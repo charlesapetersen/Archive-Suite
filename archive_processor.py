@@ -433,8 +433,13 @@ def build_pdf(jpg_path: str, ocr_text: str, out_path: str,
 _CLAUDE_MAX_B64 = 4_900_000  # Claude's hard limit is 5 MB; stay comfortably under it
 
 
-def _compress_to_limit(jpg_path: str, max_b64: int = _CLAUDE_MAX_B64):
-    """Return (bytes, mime_type), compressing with PIL if the base64 size exceeds max_b64."""
+def _compress_to_limit(jpg_path: str, max_b64: int = _CLAUDE_MAX_B64,
+                        preread_bytes: bytes = None):
+    """Return (bytes, mime_type), compressing with PIL if the base64 size exceeds max_b64.
+
+    If *preread_bytes* is supplied the file is never opened from disk, which
+    avoids sandbox/TCC re-open failures in worker threads.
+    """
     from PIL import Image as PILImage
 
     lower = jpg_path.lower()
@@ -447,14 +452,13 @@ def _compress_to_limit(jpg_path: str, max_b64: int = _CLAUDE_MAX_B64):
     else:
         mime_type = "image/jpeg"
 
-    with open(jpg_path, "rb") as f:
-        raw = f.read()
+    raw = preread_bytes if preread_bytes is not None else open(jpg_path, "rb").read()
 
     if len(base64.standard_b64encode(raw)) <= max_b64:
         return raw, mime_type  # already small enough
 
     # Compress to JPEG, iteratively reducing quality then scale until it fits
-    img = PILImage.open(jpg_path)
+    img = PILImage.open(io.BytesIO(raw))
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
 
@@ -491,11 +495,12 @@ _OCR_PROMPT = (
 
 
 def ocr_with_claude(jpg_path: str, api_key: str,
-                    model: str = "claude-opus-4-6") -> str:
+                    model: str = "claude-opus-4-6",
+                    preread_bytes: bytes = None) -> str:
     """Send the image to Claude Vision and return extracted HTML."""
     import anthropic
 
-    raw, media_type = _compress_to_limit(jpg_path)
+    raw, media_type = _compress_to_limit(jpg_path, preread_bytes=preread_bytes)
     image_data = base64.standard_b64encode(raw).decode("utf-8")
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -524,7 +529,8 @@ def ocr_with_claude(jpg_path: str, api_key: str,
 
 def ocr_with_gemini(jpg_path: str, api_key: str,
                     model: str = "gemini-2.5-flash",
-                    thinking_budget: int = 1_024) -> str:
+                    thinking_budget: int = 1_024,
+                    preread_bytes: bytes = None) -> str:
     """Send the image to Gemini Vision (google-genai SDK) and return extracted HTML."""
     try:
         from google import genai
@@ -542,8 +548,7 @@ def ocr_with_gemini(jpg_path: str, api_key: str,
     else:
         mime_type = "image/jpeg"
 
-    with open(jpg_path, "rb") as f:
-        image_bytes = f.read()
+    image_bytes = preread_bytes if preread_bytes is not None else open(jpg_path, "rb").read()
 
     # thinking_config is only supported by the Gemini 2.5+ / 3+ series
     _THINKING_MODELS = {"gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"}
@@ -580,7 +585,8 @@ def ocr_with_gemini(jpg_path: str, api_key: str,
 # ---------------------------------------------------------------------------
 
 def ocr_with_mistral(jpg_path: str, api_key: str,
-                      model: str = "mistral-ocr-latest") -> str:
+                      model: str = "mistral-ocr-latest",
+                      preread_bytes: bytes = None) -> str:
     """Send the image to Mistral OCR and return extracted HTML.
 
     Uses the dedicated ``/v1/ocr`` endpoint (not chat/completions).
@@ -591,7 +597,7 @@ def ocr_with_mistral(jpg_path: str, api_key: str,
     """
     import httpx
 
-    raw, media_type = _compress_to_limit(jpg_path)
+    raw, media_type = _compress_to_limit(jpg_path, preread_bytes=preread_bytes)
     image_data = base64.standard_b64encode(raw).decode("utf-8")
     data_uri = f"data:{media_type};base64,{image_data}"
 
@@ -1535,14 +1541,15 @@ class App(TkinterDnD.Tk):
             else:
                 out_path = os.path.splitext(img_path)[0] + "_ocr.pdf"
 
-            # -- verify the working file is actually readable ----------------
-            if not os.path.isfile(work_path):
+            # -- Read file bytes once here so OCR functions never re-open ----
+            try:
+                with open(work_path, "rb") as _fh:
+                    preread_bytes = _fh.read()
+            except OSError as exc:
                 with lock:
                     errors.append((name,
-                        f"File not accessible.\n"
-                        f"  read path: {work_path}\n"
-                        f"  original:  {img_path}\n"
-                        f"  staged:    {img_path in self._staged}"))
+                        f"Cannot read file ({type(exc).__name__}): {exc}\n"
+                        f"  path: {work_path}"))
                     done_count[0] += 1
                     d = done_count[0]
                 self.after(0, self._set_progress, d, total)
@@ -1551,7 +1558,8 @@ class App(TkinterDnD.Tk):
             # -- OCR ---------------------------------------------------------
             try:
                 ocr_text = self._call_ocr(provider, work_path, api_key,
-                                          model, thinking_budget)
+                                          model, thinking_budget,
+                                          preread_bytes=preread_bytes)
             except RecitationError:
                 with lock:
                     recitations.append((name, img_path, work_path, out_path))
@@ -1617,14 +1625,18 @@ class App(TkinterDnD.Tk):
                    self._cancel_flag.is_set())
 
     @staticmethod
-    def _call_ocr(provider, work_path, api_key, model, thinking_budget):
+    def _call_ocr(provider, work_path, api_key, model, thinking_budget,
+                  preread_bytes: bytes = None):
         """Dispatch OCR to the appropriate provider function."""
         if provider == "Anthropic":
-            return ocr_with_claude(work_path, api_key, model)
+            return ocr_with_claude(work_path, api_key, model,
+                                   preread_bytes=preread_bytes)
         elif provider == "Gemini":
-            return ocr_with_gemini(work_path, api_key, model, thinking_budget)
+            return ocr_with_gemini(work_path, api_key, model, thinking_budget,
+                                   preread_bytes=preread_bytes)
         elif provider == "Mistral":
-            return ocr_with_mistral(work_path, api_key, model)
+            return ocr_with_mistral(work_path, api_key, model,
+                                    preread_bytes=preread_bytes)
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
@@ -1978,8 +1990,20 @@ class RecitationRetryDialog(tk.Toplevel):
             name, img_path, work_path, out_path = rec
 
             try:
+                with open(work_path, "rb") as _fh:
+                    preread_bytes = _fh.read()
+            except OSError as exc:
+                with lock:
+                    errors.append((name, f"Cannot read file: {exc}"))
+                    done_count[0] += 1
+                    d = done_count[0]
+                self.after(0, self._set_progress, d, total)
+                return
+
+            try:
                 ocr_text = App._call_ocr(provider, work_path, api_key,
-                                         model, 1_024)
+                                         model, 1_024,
+                                         preread_bytes=preread_bytes)
             except RecitationError:
                 with lock:
                     errors.append((name, "Still blocked by copyright filter"))
