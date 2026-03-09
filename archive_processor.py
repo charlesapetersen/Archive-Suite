@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -1575,10 +1576,12 @@ class App(TkinterDnD.Tk):
                 self.after(0, self._set_progress, d, total)
                 return
             except Exception as exc:
+                tb = traceback.format_exc()
                 with lock:
                     errors.append((name,
                         f"OCR error ({type(exc).__name__}): {exc}\n"
-                        f"  file: {work_path}"))
+                        f"  file: {work_path}\n"
+                        f"Traceback:\n{tb}"))
                     done_count[0] += 1
                     d = done_count[0]
                 self.after(0, self._set_progress, d, total)
@@ -2012,10 +2015,12 @@ class RecitationRetryDialog(tk.Toplevel):
                 self.after(0, self._set_progress, d, total)
                 return
             except Exception as exc:
+                tb = traceback.format_exc()
                 with lock:
                     errors.append((name,
                         f"OCR error ({type(exc).__name__}): {exc}\n"
-                        f"  file: {work_path}"))
+                        f"  file: {work_path}\n"
+                        f"Traceback:\n{tb}"))
                     done_count[0] += 1
                     d = done_count[0]
                 self.after(0, self._set_progress, d, total)
