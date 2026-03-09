@@ -31,22 +31,39 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Inside a py2app bundle the system CA store path Python was compiled with may
 # not exist.  Patch ssl.create_default_context() to always load certifi's CA
 # bundle, which py2app bundles alongside the app code.
-try:
-    import certifi as _certifi
-    _cafile = _certifi.where()
-    _orig_cdc = _ssl_mod.create_default_context
+def _find_ca_bundle():
+    """Locate a usable CA certificate bundle."""
+    candidates = []
+    # 1) certifi.where() — may point outside the bundle, so verify it exists
+    try:
+        import certifi
+        candidates.append(certifi.where())
+    except ImportError:
+        pass
+    # 2) cacert.pem next to the certifi package inside the py2app bundle
+    #    Bundle layout: .app/Contents/Resources/lib/python3.XX/certifi/cacert.pem
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    for _root, _dirs, _files in os.walk(os.path.join(_this_dir, "lib")):
+        if "cacert.pem" in _files and "certifi" in _root:
+            candidates.append(os.path.join(_root, "cacert.pem"))
+    # 3) macOS system CA bundle
+    candidates.append("/etc/ssl/cert.pem")
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return None
 
+_ca_bundle = _find_ca_bundle()
+if _ca_bundle:
     def _patched_cdc(purpose=_ssl_mod.Purpose.SERVER_AUTH,
                      *, cafile=None, capath=None, cadata=None,
-                     _orig=_ssl_mod.create_default_context, _ca=_cafile):
+                     _orig=_ssl_mod.create_default_context, _ca=_ca_bundle):
         if cafile is None and capath is None and cadata is None:
             cafile = _ca
         return _orig(purpose, cafile=cafile, capath=capath, cadata=cadata)
-
     _ssl_mod.create_default_context = _patched_cdc
-    del _orig_cdc, _patched_cdc, _certifi, _cafile
-except Exception:
-    pass  # If certifi is unavailable, leave ssl untouched and let it fail naturally
+    del _patched_cdc
+del _ca_bundle, _find_ca_bundle
 # ─────────────────────────────────────────────────────────────────────────────
 
 
