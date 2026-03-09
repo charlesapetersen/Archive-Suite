@@ -37,10 +37,11 @@ try:
     _orig_cdc = _ssl_mod.create_default_context
 
     def _patched_cdc(purpose=_ssl_mod.Purpose.SERVER_AUTH,
-                     *, cafile=None, capath=None, cadata=None):
+                     *, cafile=None, capath=None, cadata=None,
+                     _orig=_ssl_mod.create_default_context, _ca=_cafile):
         if cafile is None and capath is None and cadata is None:
-            cafile = _cafile
-        return _orig_cdc(purpose, cafile=cafile, capath=capath, cadata=cadata)
+            cafile = _ca
+        return _orig(purpose, cafile=cafile, capath=capath, cadata=cadata)
 
     _ssl_mod.create_default_context = _patched_cdc
     del _orig_cdc, _patched_cdc, _certifi, _cafile
