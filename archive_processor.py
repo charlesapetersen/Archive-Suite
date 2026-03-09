@@ -20,11 +20,33 @@ import json
 import math
 import os
 import shutil
+import ssl as _ssl_mod
 import tempfile
 import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ── SSL CA bundle fix for py2app bundles ─────────────────────────────────────
+# Inside a py2app bundle the system CA store path Python was compiled with may
+# not exist.  Patch ssl.create_default_context() to always load certifi's CA
+# bundle, which py2app bundles alongside the app code.
+try:
+    import certifi as _certifi
+    _cafile = _certifi.where()
+    _orig_cdc = _ssl_mod.create_default_context
+
+    def _patched_cdc(purpose=_ssl_mod.Purpose.SERVER_AUTH,
+                     *, cafile=None, capath=None, cadata=None):
+        if cafile is None and capath is None and cadata is None:
+            cafile = _cafile
+        return _orig_cdc(purpose, cafile=cafile, capath=capath, cadata=cadata)
+
+    _ssl_mod.create_default_context = _patched_cdc
+    del _orig_cdc, _patched_cdc, _certifi, _cafile
+except Exception:
+    pass  # If certifi is unavailable, leave ssl untouched and let it fail naturally
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class RecitationError(Exception):
