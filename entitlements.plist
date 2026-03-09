@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow read/write access to files the user selects via file dialog -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <!-- Allow read/write access to the Downloads folder -->
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+    <!-- Required for py2app bundled Python to load its own code -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Allow JIT (needed by some Python extensions) -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Allow loading dylibs from arbitrary locations (py2app bundles need this) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

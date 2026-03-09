@@ -29,6 +29,8 @@ pip3 install --break-system-packages anthropic google-genai reportlab Pillow bea
 
 # ── 3. Clean previous build artifacts ────────────────────────────────────────
 echo "==> Cleaning previous build…"
+# codesign sets immutable flags on some bundle files; clear them before deleting
+chflags -R nouchg build dist 2>/dev/null || true
 rm -rf build dist
 
 # ── 4. Build the .app bundle ─────────────────────────────────────────────────
@@ -40,11 +42,15 @@ if [ ! -d "$BUNDLE" ]; then
     exit 1
 fi
 
-# ── 5. Ad-hoc code sign ─────────────────────────────────────────────────────
-# Without signing, macOS silently denies file access (TCC) instead of
-# prompting the user.  Ad-hoc signing is free — no Apple Developer account.
-echo "==> Ad-hoc signing .app bundle…"
-codesign --force --deep --sign - "$BUNDLE"
+# ── 5. Ad-hoc code sign with entitlements ───────────────────────────────────
+# Hardened runtime + entitlements are required for macOS TCC to grant the app
+# access to Desktop / Documents / Downloads when the user picks files.
+# Without them macOS hides protected files entirely (ENOENT instead of EACCES).
+echo "==> Ad-hoc signing .app bundle with entitlements…"
+codesign --force --deep --sign - \
+    --entitlements entitlements.plist \
+    --options runtime \
+    "$BUNDLE"
 
 # ── 6. Stage DMG contents (app + Applications symlink) ───────────────────────
 echo "==> Staging DMG contents…"
