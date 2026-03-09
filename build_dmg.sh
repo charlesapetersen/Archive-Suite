@@ -49,7 +49,6 @@ fi
 echo "==> Ad-hoc signing .app bundle with entitlements…"
 codesign --force --deep --sign - \
     --entitlements entitlements.plist \
-    --options runtime \
     "$BUNDLE"
 
 # ── 6. Stage DMG contents (app + Applications symlink) ───────────────────────

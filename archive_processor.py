@@ -1568,7 +1568,9 @@ class App(TkinterDnD.Tk):
                 return
             except Exception as exc:
                 with lock:
-                    errors.append((name, f"OCR error: {exc}"))
+                    errors.append((name,
+                        f"OCR error ({type(exc).__name__}): {exc}\n"
+                        f"  file: {work_path}"))
                     done_count[0] += 1
                     d = done_count[0]
                 self.after(0, self._set_progress, d, total)
@@ -1987,7 +1989,9 @@ class RecitationRetryDialog(tk.Toplevel):
                 return
             except Exception as exc:
                 with lock:
-                    errors.append((name, f"OCR error: {exc}"))
+                    errors.append((name,
+                        f"OCR error ({type(exc).__name__}): {exc}\n"
+                        f"  file: {work_path}"))
                     done_count[0] += 1
                     d = done_count[0]
                 self.after(0, self._set_progress, d, total)
