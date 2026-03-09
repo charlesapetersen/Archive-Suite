@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_dmg.sh — builds "OCR to PDF.app" and packages it as a drag-to-install DMG.
+# build_dmg.sh — builds "Archive Processor.app" and packages it as a drag-to-install DMG.
 #
 # Usage:
 #   bash build_dmg.sh
@@ -8,13 +8,13 @@
 #   pip install py2app
 #
 # Output:
-#   dist/OCR_to_PDF.dmg
+#   dist/Archive_Processor.dmg
 
 set -euo pipefail
 
-APP_NAME="OCR to PDF"
-BUNDLE="dist/OCR to PDF.app"
-DMG_OUT="dist/OCR_to_PDF.dmg"
+APP_NAME="Archive Processor"
+BUNDLE="dist/Archive Processor.app"
+DMG_OUT="dist/Archive_Processor.dmg"
 STAGING="dist/_dmg_staging"
 
 # ── 1. Install py2app if needed ──────────────────────────────────────────────
@@ -40,44 +40,20 @@ if [ ! -d "$BUNDLE" ]; then
     exit 1
 fi
 
-# ── 5. Patch tkdnd for Tcl 9.0+ ────────────────────────────────────────────
-# The pip-installed tkinterdnd2 ships tkdnd binaries compiled for Tcl 8.x.
-# We replace them with a locally-built Tcl 9-compatible copy.
-echo "==> Patching tkdnd for Tcl 9.0 compatibility…"
-TKDND9_DIR="/tmp/tkdnd"
-if [ -d "$TKDND9_DIR/build" ] && [ -f "$TKDND9_DIR/build/libtkdnd2.9.5.dylib" ]; then
-    # Find the osx-arm64 tkdnd directory inside the bundle
-    BUNDLE_TKDND=$(find "$BUNDLE" -type d -name "osx-arm64" -path "*/tkdnd/*" | head -1)
-    if [ -n "$BUNDLE_TKDND" ]; then
-        # Remove old dylib
-        rm -f "$BUNDLE_TKDND"/libtkdnd*.dylib
-        # Copy Tcl 9 dylib and updated Tcl scripts
-        cp "$TKDND9_DIR/build/libtkdnd2.9.5.dylib" "$BUNDLE_TKDND/"
-        cp "$TKDND9_DIR/library/"*.tcl "$BUNDLE_TKDND/"
-        cp "$TKDND9_DIR/build/library/pkgIndex.tcl" "$BUNDLE_TKDND/"
-        echo "  Patched: $BUNDLE_TKDND"
-    else
-        echo "WARNING: Could not find osx-arm64 tkdnd directory in bundle" >&2
-    fi
-else
-    echo "WARNING: Tcl 9 tkdnd build not found at $TKDND9_DIR/build/" >&2
-    echo "  Run: cd /tmp && git clone https://github.com/petasis/tkdnd.git && cd tkdnd && mkdir build && cd build && cmake .. && make" >&2
-fi
-
-# ── 6. Ad-hoc code sign ─────────────────────────────────────────────────────
+# ── 5. Ad-hoc code sign ─────────────────────────────────────────────────────
 # Without signing, macOS silently denies file access (TCC) instead of
 # prompting the user.  Ad-hoc signing is free — no Apple Developer account.
 echo "==> Ad-hoc signing .app bundle…"
 codesign --force --deep --sign - "$BUNDLE"
 
-# ── 7. Stage DMG contents (app + Applications symlink) ───────────────────────
+# ── 6. Stage DMG contents (app + Applications symlink) ───────────────────────
 echo "==> Staging DMG contents…"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -r "$BUNDLE" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 
-# ── 8. Create the compressed DMG ─────────────────────────────────────────────
+# ── 7. Create the compressed DMG ─────────────────────────────────────────────
 echo "==> Creating DMG…"
 rm -f "$DMG_OUT"
 hdiutil create \
@@ -87,7 +63,7 @@ hdiutil create \
     -format UDZO \
     "$DMG_OUT"
 
-# ── 9. Clean up staging area ─────────────────────────────────────────────────
+# ── 8. Clean up staging area ─────────────────────────────────────────────────
 rm -rf "$STAGING"
 
 echo ""

@@ -1,5 +1,5 @@
 """
-OCR-to-PDF App
+Archive Processor App
 ==============
 • Pick a JPG → Claude Vision OCRs it → saves a 2-page PDF
   Page 1: the original image  |  Page 2: the extracted text
@@ -8,7 +8,7 @@ Requirements (run once before using):
     pip install anthropic google-genai reportlab Pillow beautifulsoup4 tkinterdnd2
 
 Usage:
-    python ocr_to_pdf.py
+    python archive_processor.py
     (or double-click it on macOS/Windows if Python is associated with .py files)
 
 You'll need an Anthropic API key: https://console.anthropic.com/
@@ -1016,7 +1016,7 @@ class App(TkinterDnD.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("OCR → PDF  (batch)")
+        self.title("Archive Processor")
         self.resizable(True, True)
         self._key_cache = {
             p: os.environ.get(env, "") for p, env in self._PROVIDERS.items()
@@ -1024,7 +1024,7 @@ class App(TkinterDnD.Tk):
         self._last_provider = "Gemini"
         self._cancel_flag = threading.Event()
         self._image_paths: list[str] = []   # original paths (for display & output naming)
-        self._temp_dir = tempfile.mkdtemp(prefix="ocr_to_pdf_")
+        self._temp_dir = tempfile.mkdtemp(prefix="archive_processor_")
         self._staged: dict[str, str] = {}   # original_path → temp_path
         self._build_ui()
 

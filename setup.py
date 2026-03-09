@@ -12,7 +12,7 @@ The finished disk image will be at:  dist/OCR_to_PDF.dmg
 
 from setuptools import setup
 
-APP = ["ocr_to_pdf.py"]
+APP = ["archive_processor.py"]
 
 OPTIONS = {
     # argv_emulation opens a terminal-like stdin on macOS — not needed here.
@@ -42,9 +42,9 @@ OPTIONS = {
 
     # macOS Info.plist entries.
     "plist": {
-        "CFBundleName":             "OCR to PDF",
-        "CFBundleDisplayName":      "OCR to PDF",
-        "CFBundleIdentifier":       "com.user.ocrtopdf",
+        "CFBundleName":             "Archive Processor",
+        "CFBundleDisplayName":      "Archive Processor",
+        "CFBundleIdentifier":       "com.user.archiveprocessor",
         "CFBundleVersion":          "1.0.0",
         "CFBundleShortVersionString": "1.0.0",
         "NSHighResolutionCapable":  True,
@@ -56,16 +56,16 @@ OPTIONS = {
         # TCC usage descriptions (macOS 10.15+): shown in the system permission dialog
         # when the app first accesses these locations.
         "NSDesktopFolderUsageDescription":
-            "OCR to PDF reads images from your Desktop and saves PDFs there.",
+            "Archive Processor reads images from your Desktop and saves PDFs there.",
         "NSDocumentsFolderUsageDescription":
-            "OCR to PDF reads images from your Documents folder and saves PDFs there.",
+            "Archive Processor reads images from your Documents folder and saves PDFs there.",
         "NSDownloadsFolderUsageDescription":
-            "OCR to PDF reads images from your Downloads folder and saves PDFs there.",
+            "Archive Processor reads images from your Downloads folder and saves PDFs there.",
     },
 }
 
 setup(
-    name="OCR to PDF",
+    name="Archive Processor",
     app=APP,
     data_files=[],
     options={"py2app": OPTIONS},
