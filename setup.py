@@ -30,6 +30,7 @@ OPTIONS = {
         "bs4",
         "tkinterdnd2",
         "httpx",
+        "certifi",   # SSL CA bundle — httpx needs cacert.pem at runtime
     ],
 
     # Explicit module includes (tkinter sub-modules are sometimes missed).

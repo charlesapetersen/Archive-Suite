@@ -31,7 +31,10 @@ pip3 install --break-system-packages anthropic google-genai reportlab Pillow bea
 echo "==> Cleaning previous build…"
 # codesign sets immutable flags on some bundle files; clear them before deleting
 chflags -R nouchg build dist 2>/dev/null || true
-rm -rf build dist
+rm -rf build dist 2>/dev/null || true
+# Second pass in case first rm left residue
+[ -d build ] && rm -rf build
+[ -d dist  ] && rm -rf dist
 
 # ── 4. Build the .app bundle ─────────────────────────────────────────────────
 echo "==> Building .app bundle (this may take a minute)…"
@@ -42,7 +45,29 @@ if [ ! -d "$BUNDLE" ]; then
     exit 1
 fi
 
-# ── 5. Ad-hoc code sign with entitlements ───────────────────────────────────
+# ── 5. Ensure certifi CA bundle is present (httpx needs it for HTTPS) ────────
+echo "==> Ensuring certifi CA bundle is bundled…"
+CERTIFI_SRC=$(python3 -c "import certifi; print(certifi.where())")
+BUNDLE_CERTIFI=$(find "$BUNDLE" -type d -name "certifi" -path "*/site-packages/*" 2>/dev/null | head -1)
+if [ -n "$BUNDLE_CERTIFI" ]; then
+    cp "$CERTIFI_SRC" "$BUNDLE_CERTIFI/"
+    echo "  Copied cacert.pem → $BUNDLE_CERTIFI/"
+else
+    # certifi directory not found — create it and copy pem + minimal __init__
+    BUNDLE_SP=$(find "$BUNDLE" -type d -name "site-packages" | head -1)
+    if [ -n "$BUNDLE_SP" ]; then
+        mkdir -p "$BUNDLE_SP/certifi"
+        cp "$CERTIFI_SRC" "$BUNDLE_SP/certifi/"
+        CERTIFI_PKG=$(dirname "$CERTIFI_SRC")
+        cp "$CERTIFI_PKG/__init__.py" "$BUNDLE_SP/certifi/" 2>/dev/null || true
+        cp "$CERTIFI_PKG/core.py"     "$BUNDLE_SP/certifi/" 2>/dev/null || true
+        echo "  Created certifi dir and copied cacert.pem → $BUNDLE_SP/certifi/"
+    else
+        echo "WARNING: Could not locate site-packages in bundle" >&2
+    fi
+fi
+
+# ── 6. Ad-hoc code sign with entitlements ───────────────────────────────────
 # Hardened runtime + entitlements are required for macOS TCC to grant the app
 # access to Desktop / Documents / Downloads when the user picks files.
 # Without them macOS hides protected files entirely (ENOENT instead of EACCES).
@@ -51,14 +76,14 @@ codesign --force --deep --sign - \
     --entitlements entitlements.plist \
     "$BUNDLE"
 
-# ── 6. Stage DMG contents (app + Applications symlink) ───────────────────────
+# ── 7. Stage DMG contents (app + Applications symlink) ───────────────────────
 echo "==> Staging DMG contents…"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -r "$BUNDLE" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 
-# ── 7. Create the compressed DMG ─────────────────────────────────────────────
+# ── 8. Create the compressed DMG ─────────────────────────────────────────────
 echo "==> Creating DMG…"
 rm -f "$DMG_OUT"
 hdiutil create \
@@ -68,7 +93,7 @@ hdiutil create \
     -format UDZO \
     "$DMG_OUT"
 
-# ── 8. Clean up staging area ─────────────────────────────────────────────────
+# ── 9. Clean up staging area ─────────────────────────────────────────────────
 rm -rf "$STAGING"
 
 echo ""
