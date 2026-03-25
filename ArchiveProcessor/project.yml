@@ -1,0 +1,32 @@
+name: ArchiveProcessor
+options:
+  bundleIdPrefix: com.archiveprocessor
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  ArchiveProcessor:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/ArchiveProcessor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.archiveprocessor.app
+        INFOPLIST_FILE: Sources/ArchiveProcessor/Info.plist
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        SWIFT_VERSION: "6.0"
+    entitlements:
+      path: Sources/ArchiveProcessor/ArchiveProcessor.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
