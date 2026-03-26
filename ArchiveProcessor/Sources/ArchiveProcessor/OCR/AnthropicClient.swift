@@ -8,26 +8,32 @@ struct AnthropicClient {
 
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    func ocr(imageURL: URL) async throws -> OCRResult {
-        guard let imageData = try? Data(contentsOf: imageURL),
-              let nsImage = NSImage(data: imageData),
-              let tiffData = nsImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
+    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil) async throws -> OCRResult {
+        guard let jpegData = GeminiClient.loadImageAsJPEG(url: imageURL) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
+        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil)
 
-        var messages: [[String: Any]] = []
-        var content: [[String: Any]] = [
-            ["type": "image", "source": [
+        var content: [[String: Any]] = []
+
+        // If sending previous image, add it first
+        if let prevURL = previousImageURL, let prevData = GeminiClient.loadImageAsJPEG(url: prevURL) {
+            content.append(["type": "image", "source": [
                 "type": "base64",
                 "media_type": "image/jpeg",
-                "data": base64
-            ]],
-            ["type": "text", "text": "Please transcribe all text visible in this document image exactly as it appears. Preserve the original formatting, line breaks, paragraph structure, and layout as closely as possible. Output only the transcribed text with no commentary."]
-        ]
-        messages.append(["role": "user", "content": content])
+                "data": prevData.base64EncodedString()
+            ]])
+        }
+
+        content.append(["type": "image", "source": [
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": base64
+        ]])
+        content.append(["type": "text", "text": prompt])
+
+        let messages: [[String: Any]] = [["role": "user", "content": content]]
 
         var body: [String: Any] = [
             "model": model.id,
@@ -40,7 +46,7 @@ struct AnthropicClient {
             body["thinking"] = ["type": "enabled", "budget_tokens": budget]
         }
 
-        var request = URLRequest(url: endpoint)
+        var request = URLRequest(url: endpoint, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -54,22 +60,40 @@ struct AnthropicClient {
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
-            let errorBody = String(data: data, encoding: .utf8) ?? "unknown"
-            return OCRResult(text: nil, errorMessage: errorBody, errorCode: "\(http.statusCode)")
+            let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
+            return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let contentArray = json["content"] as? [[String: Any]] else {
-            return OCRResult(text: nil, errorMessage: "Malformed response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
         }
 
-        // Extract text blocks (skip thinking blocks)
-        let text = contentArray
+        let rawText = contentArray
             .filter { ($0["type"] as? String) == "text" }
             .compactMap { $0["text"] as? String }
             .joined(separator: "\n")
 
-        return OCRResult(text: text.isEmpty ? nil : text, errorMessage: nil, errorCode: nil)
+        let (classification, ocrText) = OCRPrompt.parseResponse(rawText)
+        return OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
+    }
+
+    private static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let error = json["error"] as? [String: Any] {
+            let errorType = error["type"] as? String ?? ""
+            let message = error["message"] as? String
+            if statusCode == 529 || errorType == "overloaded_error" {
+                return "Model in high use. Try again later."
+            }
+            if statusCode == 429 || errorType == "rate_limit_error" {
+                return "Rate limit exceeded. Try again later."
+            }
+            if let message = message {
+                return message
+            }
+        }
+        return "API error (\(statusCode))"
     }
 }
 

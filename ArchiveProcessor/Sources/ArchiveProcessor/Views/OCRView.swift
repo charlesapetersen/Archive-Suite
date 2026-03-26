@@ -6,26 +6,37 @@ struct OCRView: View {
     @StateObject private var processor = OCRProcessor()
 
     @State private var selectedProvider: LLMProvider = .gemini
-    @State private var selectedModel: LLMModel = LLMModel.geminiModels[3] // gemini-2.5-flash
+    @State private var selectedModel: LLMModel = LLMModel.geminiModels[2] // gemini-3.1-flash-lite
     @State private var selectedThinking: ThinkingLevel = .low
     @State private var apiKey: String = ""
     @State private var batchMode: Bool = false
     @State private var droppedFiles: [URL] = []
-    @State private var outputDirectory: URL? = nil
+    @State private var outputDirectory: URL? = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
     @State private var isTargeted = false
+
+    // Tagging & segmentation
+    @State private var enableTagging: Bool = true
+    @State private var sendPreviousImage: Bool = false
+    @State private var contextCharCount: Double = 200
 
     private var currentModels: [LLMModel] { selectedProvider.models }
 
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
-        return CostEstimator.estimate(fileCount: droppedFiles.count, model: selectedModel)
+        return CostEstimator.estimate(
+            fileCount: droppedFiles.count,
+            model: selectedModel,
+            enableTagging: enableTagging,
+            sendPreviousImage: sendPreviousImage,
+            contextCharCount: Int(contextCharCount)
+        )
     }
 
     // MARK: - Body
     var body: some View {
         HSplitView {
             controlPanel
-                .frame(minWidth: 280, maxWidth: 340)
+                .frame(minWidth: 300, maxWidth: 360)
                 .padding()
 
             filePanel
@@ -37,12 +48,13 @@ struct OCRView: View {
 
     private var controlPanel: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("OCR Settings")
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Archive Processor")
                     .font(.title2)
                     .fontWeight(.semibold)
 
-                GroupBox("Provider") {
+                // Provider & Model
+                GroupBox("Provider & Model") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Provider", selection: $selectedProvider) {
                             ForEach(LLMProvider.allCases) { p in
@@ -72,6 +84,7 @@ struct OCRView: View {
                     .padding(4)
                 }
 
+                // API Key
                 GroupBox("API Key") {
                     VStack(alignment: .leading, spacing: 6) {
                         SecureField("Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
@@ -83,6 +96,44 @@ struct OCRView: View {
                     .padding(4)
                 }
 
+                // Tagging & Segmentation
+                GroupBox("Tagging & Segmentation") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Enable tagging", isOn: $enableTagging)
+
+                        if enableTagging {
+                            Divider()
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Context from previous page:")
+                                        .font(.caption)
+                                    Spacer()
+                                    Text("\(Int(contextCharCount)) chars")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Slider(value: $contextCharCount, in: 0...1000, step: 50)
+                                Text("Characters of the previous page's OCR text sent as context for segmentation.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Divider()
+
+                            Toggle("Send previous page image (higher accuracy, higher cost)", isOn: $sendPreviousImage)
+                                .font(.caption)
+                            if sendPreviousImage {
+                                Text("Sends the full previous page image alongside the current image. ~2× image token cost but significantly better segmentation accuracy.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    .padding(4)
+                }
+
+                // Batch
                 GroupBox("Processing Mode") {
                     VStack(alignment: .leading, spacing: 6) {
                         Toggle("Batch Mode (slower, ~50% cheaper)", isOn: $batchMode)
@@ -95,6 +146,7 @@ struct OCRView: View {
                     .padding(4)
                 }
 
+                // Cost estimate
                 if let est = costEstimate {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
@@ -104,17 +156,31 @@ struct OCRView: View {
                                 Text("\(est.fileCount)")
                             }
                             HStack {
-                                Text("Standard:").foregroundStyle(.secondary)
+                                Text("OCR + classification:").foregroundStyle(.secondary)
                                 Spacer()
-                                Text(est.standardFormatted)
+                                Text(est.ocrFormatted)
                             }
+                            if enableTagging {
+                                HStack {
+                                    Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.taggingFormatted)
+                                }
+                            }
+                            Divider()
                             HStack {
-                                Text("Batch (50% off):").foregroundStyle(.secondary)
+                                Text("Total (standard):").fontWeight(.medium)
                                 Spacer()
-                                Text(est.batchFormatted)
+                                Text(est.totalStandardFormatted).fontWeight(.medium)
                             }
-                            .foregroundStyle(batchMode ? .primary : .secondary)
-                            Text("Estimates based on ~1,800 tokens/image. Actual costs may vary.")
+                            if batchMode {
+                                HStack {
+                                    Text("Total (batch):").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.totalBatchFormatted)
+                                }
+                            }
+                            Text("Estimates based on ~800 image tokens + ~850 output tokens/file. Actual costs may vary.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
@@ -123,6 +189,7 @@ struct OCRView: View {
                     }
                 }
 
+                // Output directory
                 GroupBox("Output Folder") {
                     HStack {
                         Text(outputDirectory?.lastPathComponent ?? "Not set")
@@ -135,15 +202,16 @@ struct OCRView: View {
                     .padding(4)
                 }
 
-                Button(action: startOCR) {
-                    Label("Start OCR", systemImage: "play.fill")
+                // Start button
+                Button(action: startProcessing) {
+                    Label(enableTagging ? "Start OCR + Tagging" : "Start OCR", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(droppedFiles.isEmpty || apiKey.isEmpty || outputDirectory == nil || processor.isProcessing)
 
                 if processor.isProcessing {
-                    Button("Cancel") { /* TODO: cancellation token */ }
+                    Button("Cancel") { processor.cancel() }
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
                 }
@@ -165,7 +233,7 @@ struct OCRView: View {
                 }
                 .buttonStyle(.bordered)
                 if !droppedFiles.isEmpty {
-                    Button("Clear") { droppedFiles = []; processor.jobs = [] }
+                    Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = [] }
                         .buttonStyle(.bordered)
                 }
             }
@@ -174,8 +242,16 @@ struct OCRView: View {
                 dropZone
             } else {
                 fileList
+                    .frame(maxHeight: .infinity)
             }
 
+            // Segment summary
+            if !processor.segments.isEmpty {
+                Divider()
+                segmentSummary
+            }
+
+            // Progress
             if processor.isProcessing || !processor.statusMessage.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
@@ -231,6 +307,39 @@ struct OCRView: View {
         }
     }
 
+    private var segmentSummary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Document Segments (\(processor.segments.count))")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(processor.segments.enumerated()), id: \.offset) { index, seg in
+                        HStack(spacing: 6) {
+                            if seg.isBox {
+                                Circle().fill(.red).frame(width: 8, height: 8)
+                            } else if seg.isFolder {
+                                Circle().fill(.purple).frame(width: 8, height: 8)
+                            } else {
+                                Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                            }
+                            Text("Segment \(index + 1): \(seg.pdfURLs.count) page\(seg.pdfURLs.count == 1 ? "" : "s")")
+                                .font(.caption)
+                            if seg.isBox { Text("(Box)").font(.caption).foregroundStyle(.red) }
+                            if seg.isFolder { Text("(Folder)").font(.caption).foregroundStyle(.purple) }
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 150)
+        }
+        .padding(8)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
     // MARK: - Actions
 
     private func handleDroppedURLs(_ urls: [URL]) {
@@ -282,9 +391,13 @@ struct OCRView: View {
         return imageExtensions.contains(url.pathExtension.lowercased())
     }
 
-    private func startOCR() {
+    private func startProcessing() {
         guard let outDir = outputDirectory else { return }
-        Task {
+        let context = SegmentationContext(
+            previousTextCharCount: Int(contextCharCount),
+            sendPreviousImage: sendPreviousImage
+        )
+        processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
                 provider: selectedProvider,
@@ -292,7 +405,9 @@ struct OCRView: View {
                 thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
                 apiKey: apiKey,
                 outputDirectory: outDir,
-                batchMode: batchMode
+                batchMode: batchMode,
+                enableTagging: enableTagging,
+                segmentationContext: context
             )
         }
     }
@@ -312,15 +427,39 @@ struct FileRowView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
+            if let classification = job?.classification {
+                Text(classification.displayName)
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(classificationColor(classification).opacity(0.15))
+                    .foregroundStyle(classificationColor(classification))
+                    .clipShape(Capsule())
+            }
+            if let tags = job?.appliedTags, !tags.isEmpty {
+                Text(tags.prefix(2).joined(separator: " \u{00B7} "))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             if let job = job, job.status == .failed, let msg = job.result?.errorMessage {
-                Text(msg.prefix(40) + (msg.count > 40 ? "…" : ""))
-                    .font(.caption)
+                Text(String(msg.prefix(30)) + (msg.count > 30 ? "…" : ""))
+                    .font(.caption2)
                     .foregroundStyle(.red)
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(Color.clear)
+    }
+
+    private func classificationColor(_ c: DocumentClassification) -> Color {
+        switch c {
+        case .boxLabel: return .red
+        case .folderLabel: return .purple
+        case .documentStart: return .blue
+        case .documentContinuation: return .gray
+        }
     }
 
     @ViewBuilder

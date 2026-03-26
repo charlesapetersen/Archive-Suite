@@ -9,10 +9,9 @@
 /* Begin PBXBuildFile section */
 		056A686BFF02B6F62976B184 /* GeminiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */; };
 		0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2D4943D879BAE44B746EA /* ContentView.swift */; };
-		1EEC22B00ADA98E2B47788E8 /* TaggingProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2204C6AACA007F4DC7582744 /* TaggingProcessor.swift */; };
 		261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68049A48FDC13B74708EF6F /* PDFGenerator.swift */; };
 		371A1C5378BAAC2F31DEB825 /* OCRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE519DB723DEF9EE690B75F /* OCRView.swift */; };
-		4CD1FC9C21C66AC1D8FDCC33 /* TaggingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 528DBFB0210271447D56752A /* TaggingView.swift */; };
+		683222758ABEE7C1E16B442C /* OCRPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */; };
 		7618A04F84EAAB11190B0495 /* AnthropicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */; };
 		A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */; };
 		A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */; };
@@ -29,12 +28,11 @@
 		04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSegmenter.swift; sourceTree = "<group>"; };
 		184572ECE6767F4FAFAC2066 /* ArchiveProcessor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArchiveProcessor.entitlements; sourceTree = "<group>"; };
 		20D2D4943D879BAE44B746EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		2204C6AACA007F4DC7582744 /* TaggingProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggingProcessor.swift; sourceTree = "<group>"; };
 		3607CA8DA6EC1100187B7035 /* ArchiveProcessor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArchiveProcessor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostEstimator.swift; sourceTree = "<group>"; };
 		3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropReceiver.swift; sourceTree = "<group>"; };
+		46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRPrompt.swift; sourceTree = "<group>"; };
 		4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
-		528DBFB0210271447D56752A /* TaggingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggingView.swift; sourceTree = "<group>"; };
 		5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRProcessor.swift; sourceTree = "<group>"; };
 		672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
 		7AE519DB723DEF9EE690B75F /* OCRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRView.swift; sourceTree = "<group>"; };
@@ -69,7 +67,6 @@
 			children = (
 				3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */,
 				7AE519DB723DEF9EE690B75F /* OCRView.swift */,
-				528DBFB0210271447D56752A /* TaggingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -89,7 +86,6 @@
 				04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */,
 				9155615F54261797E2D35CF1 /* MacOSTagger.swift */,
 				A90F6E42E4FA19C125CC1A0A /* TagGenerator.swift */,
-				2204C6AACA007F4DC7582744 /* TaggingProcessor.swift */,
 			);
 			path = Tagging;
 			sourceTree = "<group>";
@@ -101,6 +97,7 @@
 				672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */,
 				8DE28B3830F33D79C626AECF /* MistralClient.swift */,
 				5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */,
+				46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */,
 				F68049A48FDC13B74708EF6F /* PDFGenerator.swift */,
 			);
 			path = OCR;
@@ -187,12 +184,11 @@
 				AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */,
 				B0B556E7212824BF8FE1F656 /* MistralClient.swift in Sources */,
 				DD890DCBC5A504BB9690C5A6 /* OCRProcessor.swift in Sources */,
+				683222758ABEE7C1E16B442C /* OCRPrompt.swift in Sources */,
 				371A1C5378BAAC2F31DEB825 /* OCRView.swift in Sources */,
 				261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */,
 				A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */,
 				DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */,
-				1EEC22B00ADA98E2B47788E8 /* TaggingProcessor.swift in Sources */,
-				4CD1FC9C21C66AC1D8FDCC33 /* TaggingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

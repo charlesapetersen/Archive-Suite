@@ -4,14 +4,20 @@ struct GeneratedTags {
     var year: String?             // e.g. "1987"
     var month: String?            // e.g. "03 March"
     var dateUncertain: Bool = false
+    var ocrFailed: Bool = false
     var subjectTags: [String] = []
     var colorTag: String?         // "Red" or "Purple"
 
     var allTags: [String] {
         var tags: [String] = []
+        if ocrFailed {
+            tags.append("OCR Failed")
+            if let c = colorTag { tags.append(c) }
+            return tags
+        }
         if let y = year { tags.append(y) }
-        if let m = month { tags.append(m) }
-        tags.append(contentsOf: subjectTags)
+        if let m = month { tags.append(m.capitalized) }
+        tags.append(contentsOf: subjectTags.map { $0.capitalized })
         if dateUncertain { tags.append("Date Uncertain") }
         if let c = colorTag { tags.append(c) }
         return tags
@@ -34,7 +40,7 @@ class TagGenerator: ObservableObject {
         if segment.isFolder { return GeneratedTags(colorTag: "Purple") }
 
         let text = segment.combinedText
-        guard !text.isEmpty else { return GeneratedTags(dateUncertain: true) }
+        guard !text.isEmpty else { return GeneratedTags(ocrFailed: true) }
 
         // Build prompt
         let contextText = nearbySegments
@@ -107,7 +113,7 @@ class TagGenerator: ObservableObject {
         if let thinking = thinkingLevel {
             body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 1024 : 4000]
         }
-        var request = URLRequest(url: endpoint)
+        var request = URLRequest(url: endpoint, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -126,7 +132,7 @@ class TagGenerator: ObservableObject {
         if let thinking = thinkingLevel {
             body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 1024 : 4000]]
         }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -145,7 +151,7 @@ class TagGenerator: ObservableObject {
             "messages": [["role": "user", "content": prompt]],
             "max_tokens": 512
         ]
-        var request = URLRequest(url: endpoint)
+        var request = URLRequest(url: endpoint, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

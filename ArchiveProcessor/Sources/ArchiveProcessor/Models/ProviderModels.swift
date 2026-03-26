@@ -26,6 +26,24 @@ enum ThinkingLevel: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// MARK: - Document Classification
+
+enum DocumentClassification: String, Codable {
+    case boxLabel = "box_label"
+    case folderLabel = "folder_label"
+    case documentStart = "document_start"
+    case documentContinuation = "document_continuation"
+
+    var displayName: String {
+        switch self {
+        case .boxLabel: return "Box"
+        case .folderLabel: return "Folder"
+        case .documentStart: return "Document Start"
+        case .documentContinuation: return "Continuation"
+        }
+    }
+}
+
 // MARK: - Models
 
 struct LLMModel: Identifiable, Hashable {
@@ -34,11 +52,8 @@ struct LLMModel: Identifiable, Hashable {
     let provider: LLMProvider
     let supportsThinking: Bool
     let returnsMd: Bool
-    /// Cost per 1M input tokens (USD), standard pricing
     let inputCostPer1M: Double
-    /// Cost per 1M output tokens (USD), standard pricing
     let outputCostPer1M: Double
-    /// Batch discount multiplier (e.g. 0.5 = 50% off)
     let batchDiscount: Double
 
     static let anthropicModels: [LLMModel] = [
@@ -148,6 +163,8 @@ struct OCRJob: Identifiable {
     let sourceURL: URL
     var status: JobStatus = .pending
     var result: OCRResult?
+    var classification: DocumentClassification?
+    var appliedTags: [String] = []
 
     enum JobStatus {
         case pending, processing, succeeded, failed
@@ -156,19 +173,16 @@ struct OCRJob: Identifiable {
 
 struct OCRResult {
     let text: String?
+    let classification: DocumentClassification?
     let errorMessage: String?
     let errorCode: String?
 }
 
-// MARK: - Tagging Job
+// MARK: - Segmentation Context
 
-struct TaggingJob: Identifiable {
-    let id = UUID()
-    let sourceURL: URL
-    var status: JobStatus = .pending
-    var appliedTags: [String] = []
-
-    enum JobStatus {
-        case pending, processing, succeeded, failed
-    }
+struct SegmentationContext {
+    /// Characters of previous page's OCR text to include as context
+    var previousTextCharCount: Int = 200
+    /// Whether to send the full previous page image for higher accuracy
+    var sendPreviousImage: Bool = false
 }

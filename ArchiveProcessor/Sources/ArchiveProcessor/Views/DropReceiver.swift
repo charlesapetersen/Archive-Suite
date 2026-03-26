@@ -39,29 +39,11 @@ class DropReceiverView: NSView {
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         isTargetedBinding?.wrappedValue = false
-        guard let pasteboard = sender.draggingPasteboard.propertyList(forType: .fileURL) as? String,
-              let url = URL(string: pasteboard) else {
-            // Try reading multiple URLs
-            let urls = readURLsFromPasteboard(sender.draggingPasteboard)
-            if !urls.isEmpty {
-                onDropCallback?(urls)
-                return true
-            }
+        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+              !urls.isEmpty else {
             return false
         }
-        onDropCallback?([url])
+        onDropCallback?(urls)
         return true
-    }
-
-    private func readURLsFromPasteboard(_ pasteboard: NSPasteboard) -> [URL] {
-        guard let items = pasteboard.pasteboardItems else { return [] }
-        var urls: [URL] = []
-        for item in items {
-            if let data = item.string(forType: .fileURL),
-               let url = URL(string: data) {
-                urls.append(url)
-            }
-        }
-        return urls
     }
 }
