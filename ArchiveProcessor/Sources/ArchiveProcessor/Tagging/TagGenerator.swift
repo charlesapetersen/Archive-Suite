@@ -3,10 +3,19 @@ import Foundation
 struct GeneratedTags {
     var year: String?             // e.g. "1987"
     var month: String?            // e.g. "03 March"
+    var day: String?              // e.g. "Day 15"
     var dateUncertain: Bool = false
     var ocrFailed: Bool = false
     var subjectTags: [String] = []
     var colorTag: String?         // "Red" or "Purple"
+
+    // Extended metadata for JSON export
+    var format: String?           // e.g. "letter", "memo", "newspaper article"
+    var authorName: String?
+    var recipientName: String?
+    var authorLocation: String?
+    var recipientLocation: String?
+    var publicationName: String?
 
     var allTags: [String] {
         var tags: [String] = []
@@ -17,10 +26,24 @@ struct GeneratedTags {
         }
         if let y = year { tags.append(y) }
         if let m = month { tags.append(m.capitalized) }
+        if let d = day { tags.append(d) }
         tags.append(contentsOf: subjectTags.map { $0.capitalized })
         if dateUncertain { tags.append("Date Uncertain") }
         if let c = colorTag { tags.append(c) }
         return tags
+    }
+
+    /// Machine-readable date string (ISO 8601 partial), e.g. "1987-03-15", "1987-03", "1987"
+    var machineDate: String? {
+        guard let y = year else { return nil }
+        var date = y
+        if let m = month, let monthNum = Int(m.prefix(2)) {
+            date += String(format: "-%02d", monthNum)
+            if let d = day, let dayNum = Int(d.replacingOccurrences(of: "Day ", with: "")) {
+                date += String(format: "-%02d", dayNum)
+            }
+        }
+        return date
     }
 }
 
@@ -36,8 +59,8 @@ class TagGenerator: ObservableObject {
         apiKey: String
     ) async -> GeneratedTags {
         // Box/folder: just a color tag
-        if segment.isBox { return GeneratedTags(colorTag: "Red") }
-        if segment.isFolder { return GeneratedTags(colorTag: "Purple") }
+        if segment.isBox { return GeneratedTags(subjectTags: ["Box"], colorTag: "Red") }
+        if segment.isFolder { return GeneratedTags(subjectTags: ["Folder"], colorTag: "Purple") }
 
         let text = segment.combinedText
         guard !text.isEmpty else { return GeneratedTags(ocrFailed: true) }
@@ -65,15 +88,29 @@ class TagGenerator: ObservableObject {
         {
           "year": "1987",
           "month": "03 March",
+          "day": "Day 15",
           "date_uncertain": false,
-          "subject_tags": ["Democratic Party", "elections", "legislation"]
+          "subject_tags": ["Democratic Party", "elections", "legislation"],
+          "format": "letter",
+          "author_name": "John Smith",
+          "recipient_name": "Jane Doe",
+          "author_location": "Washington, D.C.",
+          "recipient_location": "New York, NY",
+          "publication_name": null
         }
 
         Rules:
         - "year": 4-digit year string if determinable, or null if not
         - "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
+        - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
         - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
         - "subject_tags": 2–6 general-but-specific subject tags (e.g. "Democratic Party", "taxes", "education", "transportation", "business", "literature", "economics", "foreign policy", "civil rights", "military", "journalism", "science", "health care", "labor unions"). Do NOT use overly broad terms like "politics" or "history".
+        - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
+        - "author_name": author, sender, or writer name if identifiable, or null
+        - "recipient_name": recipient or addressee name if identifiable, or null
+        - "author_location": author's or sender's location if identifiable, or null
+        - "recipient_location": recipient's location if identifiable, or null
+        - "publication_name": newspaper, magazine, or publication name if applicable, or null
         - If date_uncertain is true, still attempt to estimate year from nearby documents.
         - Respond with ONLY the JSON object. No commentary.
         """
@@ -184,8 +221,15 @@ class TagGenerator: ObservableObject {
         var tags = GeneratedTags()
         tags.year = json["year"] as? String
         tags.month = json["month"] as? String
+        tags.day = json["day"] as? String
         tags.dateUncertain = json["date_uncertain"] as? Bool ?? false
         tags.subjectTags = json["subject_tags"] as? [String] ?? []
+        tags.format = json["format"] as? String
+        tags.authorName = json["author_name"] as? String
+        tags.recipientName = json["recipient_name"] as? String
+        tags.authorLocation = json["author_location"] as? String
+        tags.recipientLocation = json["recipient_location"] as? String
+        tags.publicationName = json["publication_name"] as? String
         return tags
     }
 }

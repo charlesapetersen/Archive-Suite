@@ -134,7 +134,8 @@ class OCRProcessor: ObservableObject {
 
             await performTaggingPhase(
                 provider: pending.provider, model: pending.model,
-                thinkingLevel: pending.thinkingLevel, apiKey: apiKey
+                thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                outputDirectory: pending.outputDirectory
             )
         }
 
@@ -253,7 +254,8 @@ class OCRProcessor: ObservableObject {
                 provider: provider,
                 model: model,
                 thinkingLevel: thinkingLevel,
-                apiKey: apiKey
+                apiKey: apiKey,
+                outputDirectory: outputDirectory
             )
         }
 
@@ -713,7 +715,8 @@ class OCRProcessor: ObservableObject {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        outputDirectory: URL
     ) async {
         let generator = TagGenerator()
         let total = segments.count
@@ -744,10 +747,56 @@ class OCRProcessor: ObservableObject {
                 }
             }
 
+            // Write segment JSON metadata file
+            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
+
             let completed = segIndex + 1
             progress = 0.7 + (Double(completed) / Double(total)) * 0.3
             statusMessage = "Tagging segment \(completed)/\(total)…"
         }
+    }
+
+    // MARK: - Segment JSON
+
+    private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL) {
+        guard let firstFile = segment.pdfURLs.first else { return }
+        let baseName = firstFile.deletingPathExtension().lastPathComponent
+        let jsonURL = outputDirectory.appendingPathComponent(baseName + ".json")
+
+        // Build body text with image markers
+        var bodyParts: [String] = []
+        for (i, url) in segment.pdfURLs.enumerated() {
+            let text = i < segment.texts.count ? segment.texts[i] : ""
+            bodyParts.append("[Image: \(url.lastPathComponent)]")
+            if !text.isEmpty {
+                bodyParts.append(text)
+            }
+        }
+        let bodyText = bodyParts.joined(separator: "\n\n")
+
+        // Build JSON dictionary
+        var dict: [String: Any] = [:]
+        if let date = tags.machineDate {
+            dict["date"] = date
+        }
+        dict["date_uncertain"] = tags.dateUncertain
+        dict["subjects"] = tags.subjectTags
+
+        if let v = tags.format { dict["format"] = v }
+        if let v = tags.authorName { dict["author_name"] = v }
+        if let v = tags.recipientName { dict["recipient_name"] = v }
+        if let v = tags.authorLocation { dict["author_location"] = v }
+        if let v = tags.recipientLocation { dict["recipient_location"] = v }
+        if let v = tags.publicationName { dict["publication_name"] = v }
+
+        if segment.isBox { dict["format"] = "box_label" }
+        if segment.isFolder { dict["format"] = "folder_label" }
+
+        dict["files"] = segment.pdfURLs.map { $0.lastPathComponent }
+        dict["body"] = bodyText
+
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? data.write(to: jsonURL, options: .atomic)
     }
 
     // MARK: - Log

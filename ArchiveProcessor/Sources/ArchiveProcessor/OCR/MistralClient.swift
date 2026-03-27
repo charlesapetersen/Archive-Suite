@@ -56,43 +56,65 @@ struct MistralClient {
         return OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
     }
 
-    /// Simple heuristic classification for Mistral (since we can't add it to the prompt)
+    /// Heuristic classification for Mistral (since we can't add it to the OCR endpoint prompt)
     static func heuristicClassify(text: String?, previousText: String?) -> DocumentClassification {
         guard let text = text else { return .documentStart }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
 
-        // Box detection
-        if trimmed.count < 300 {
-            let boxKeywords = ["box no", "box \\d", "accession", "record group", "rg \\d", "archives"]
+        // Box detection — short text with box/archive keywords
+        if trimmed.count < 500 {
+            let boxKeywords = ["box no", "box \\d", "box #", "accession", "record group", "rg \\d", "records of the", "archives"]
             if boxKeywords.contains(where: { lower.range(of: $0, options: .regularExpression) != nil }) {
                 return .boxLabel
             }
         }
 
-        // Folder detection
-        if trimmed.count < 200 {
+        // Folder detection — short text with folder/tab-like content
+        if trimmed.count < 300 {
             if trimmed.range(of: "^\\d{1,4}[\\-–]\\d{1,4}", options: .regularExpression) != nil {
                 return .folderLabel
             }
-            let folderKeywords = ["folder \\d", "series \\d", "file \\d"]
+            let folderKeywords = ["folder \\d", "folder #", "series \\d", "file \\d"]
             if folderKeywords.contains(where: { lower.range(of: $0, options: .regularExpression) != nil }) {
                 return .folderLabel
             }
         }
 
-        // Continuation detection
+        // Page number indicators → continuation (e.g., "Page 2", "- 2 -", "-3-", "p. 4")
+        let lines = trimmed.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        if let firstLine = lines.first?.trimmingCharacters(in: .whitespaces) {
+            let fl = firstLine.lowercased()
+            if fl.range(of: "^-\\s*\\d+\\s*-", options: .regularExpression) != nil
+                || fl.range(of: "^page\\s+\\d+", options: .regularExpression) != nil
+                || fl.range(of: "^p\\.\\s*\\d+", options: .regularExpression) != nil {
+                return .documentContinuation
+            }
+        }
+
+        // Explicit continuation phrases
         let continuationPhrases = ["continued from", "from page", "cont'd", "(continued)"]
         if continuationPhrases.contains(where: { lower.contains($0) }) {
             return .documentContinuation
         }
-        let lines = trimmed.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+
+        // Recipient name + page number pattern (letter page 2+): "Mr. Smith  Page 2"
+        if let firstLine = lines.first {
+            if firstLine.range(of: "page\\s+\\d+", options: [.regularExpression, .caseInsensitive]) != nil
+                || firstLine.range(of: "-\\s*\\d+\\s*-", options: .regularExpression) != nil {
+                return .documentContinuation
+            }
+        }
+
+        // Text starts mid-sentence (lowercase first word)
         if let firstLine = lines.first {
             let firstWord = firstLine.prefix(while: { $0.isLetter })
             if firstWord.count > 1 && firstWord.first?.isLowercase == true {
                 return .documentContinuation
             }
         }
+
+        // Previous page ended mid-sentence (no terminal punctuation)
         if let prev = previousText?.trimmingCharacters(in: .whitespacesAndNewlines),
            prev.count > 50,
            let lastChar = prev.last,
