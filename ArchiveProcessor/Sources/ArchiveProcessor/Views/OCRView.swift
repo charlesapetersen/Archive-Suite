@@ -18,9 +18,12 @@ struct OCRView: View {
     @State private var apiKey: String
     @State private var outputDirectory: URL?
 
+    @AppStorage("keychainExplained") private var keychainExplained: Bool = false
+
     // Transient
     @State private var droppedFiles: [URL] = []
     @State private var isTargeted = false
+    @State private var showKeychainSheet = false
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
@@ -59,7 +62,15 @@ struct OCRView: View {
             filePanel
                 .padding()
         }
-        .onAppear { processor.checkForPendingBatch() }
+        .onAppear {
+            processor.checkForPendingBatch()
+            if !keychainExplained {
+                showKeychainSheet = true
+            }
+        }
+        .sheet(isPresented: $showKeychainSheet) {
+            keychainExplanationSheet
+        }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
         }
@@ -143,9 +154,19 @@ struct OCRView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         SecureField("Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                        Text("Stored securely in macOS Keychain.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.shield")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("Stored securely in macOS Keychain.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Learn more") { showKeychainSheet = true }
+                                .font(.caption)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.blue)
+                        }
                     }
                     .padding(4)
                 }
@@ -392,6 +413,79 @@ struct OCRView: View {
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Keychain Explanation Sheet
+
+    private var keychainExplanationSheet: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.blue)
+                .padding(.top, 8)
+
+            Text("Secure API Key Storage")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            VStack(alignment: .leading, spacing: 14) {
+                keychainInfoRow(
+                    icon: "key.fill",
+                    title: "Keychain Storage",
+                    detail: "Your API keys are stored in the macOS Keychain, the same secure system used by Safari, Mail, and other Apple apps to store passwords."
+                )
+                keychainInfoRow(
+                    icon: "lock.fill",
+                    title: "Encrypted & Protected",
+                    detail: "Keys are encrypted by macOS and protected by your login password. They are never stored in plain text or in app preferences."
+                )
+                keychainInfoRow(
+                    icon: "app.badge.checkmark",
+                    title: "App-Only Access",
+                    detail: "Only Archive Processor can read the keys it stores. Other apps cannot access them without your explicit permission."
+                )
+                keychainInfoRow(
+                    icon: "trash",
+                    title: "Easy to Remove",
+                    detail: "Clear the API key field at any time to delete it from the Keychain. You can also manage stored keys in Keychain Access."
+                )
+            }
+            .padding(.horizontal, 8)
+
+            Text("macOS may ask you to allow Keychain access the first time you save or retrieve a key. Click \"Always Allow\" to avoid repeated prompts.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+
+            Button("Got It") {
+                keychainExplained = true
+                showKeychainSheet = false
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.bottom, 4)
+        }
+        .padding(24)
+        .frame(width: 440)
+    }
+
+    private func keychainInfoRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.blue)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - Actions
