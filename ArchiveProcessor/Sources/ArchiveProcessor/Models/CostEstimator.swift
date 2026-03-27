@@ -18,10 +18,20 @@ struct CostEstimate {
 
 struct CostEstimator {
     // OCR: image tokens + prompt (including classification instruction + context) + output (OCR text + classification tag)
-    static let estimatedPromptTokens: Double = 350       // classification prompt + context text
-    static let estimatedImageTokens: Double = 800        // image encoding
+    static let estimatedPromptTokens: Double = 400       // classification prompt + context text
     static let estimatedOutputTokens: Double = 850       // OCR text + classification tag
-    static let estimatedPrevImageTokens: Double = 800    // if sending previous image
+
+    // Image token estimates per provider (calibrated from actual API costs).
+    // Gemini tiles high-res images extensively (~40k tokens per archival photo).
+    // Anthropic uses a more compact image encoding (~6k tokens per photo).
+    // Mistral OCR endpoint has flat per-page pricing reflected as ~1k equivalent tokens.
+    static func estimatedImageTokens(for provider: LLMProvider) -> Double {
+        switch provider {
+        case .gemini: return 40_000
+        case .anthropic: return 6_000
+        case .mistral: return 1_000
+        }
+    }
 
     // Tagging: text-only, ~1 call per segment (~3 files/segment average)
     static let estimatedTaggingInputTokens: Double = 1500
@@ -35,9 +45,10 @@ struct CostEstimator {
         contextCharCount: Int
     ) -> CostEstimate {
         // OCR cost
+        let imgTokens = estimatedImageTokens(for: model.provider)
         let contextTokens = Double(contextCharCount) / 4.0 // ~4 chars per token
-        let inputPerFile = estimatedPromptTokens + estimatedImageTokens + contextTokens
-            + (sendPreviousImage ? estimatedPrevImageTokens : 0)
+        let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
+            + (sendPreviousImage ? imgTokens : 0)
         let totalOcrInput = Double(fileCount) * inputPerFile
         let totalOcrOutput = Double(fileCount) * estimatedOutputTokens
         let ocrCost = (totalOcrInput / 1_000_000) * model.inputCostPer1M

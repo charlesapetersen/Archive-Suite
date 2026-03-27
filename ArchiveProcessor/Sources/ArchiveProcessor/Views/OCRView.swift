@@ -255,7 +255,7 @@ struct OCRView: View {
                                     Text(est.totalBatchFormatted)
                                 }
                             }
-                            Text("Estimates based on ~800 image tokens + ~850 output tokens/file. Actual costs may vary.")
+                            Text("Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)

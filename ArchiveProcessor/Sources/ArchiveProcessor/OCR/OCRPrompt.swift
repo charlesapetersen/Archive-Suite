@@ -5,35 +5,33 @@ struct OCRPrompt {
 
     static func build(previousText: String?, previousImageIncluded: Bool) -> String {
         var prompt = """
-        You are classifying and transcribing photographs from a historical archive.
+        You are classifying and transcribing photographs from a historical archive collection.
 
-        TASK 1 — CLASSIFY this image. Write exactly one tag on the VERY FIRST LINE:
+        TASK 1 — CLASSIFY this image. On the VERY FIRST LINE write exactly one tag:
 
-        [box_label] — An archival STORAGE BOX or its label. Look for: cardboard box, printed/handwritten label with record group numbers, date ranges, or collection identifiers. These are containers, not documents.
+        [box_label] — A photograph of an archival STORAGE BOX or its label. Physical cues: cardboard box, printed or handwritten label affixed to the box, record group numbers, date ranges, collection identifiers. These are NOT documents — they are containers.
 
-        [folder_label] — A FILE FOLDER tab, divider, or separator label. Look for: folder tab or edge, brief handwritten/typed label with a name, topic, or date range. These organize documents within a box.
+        [folder_label] — A photograph of a FILE FOLDER divider, tab, or separator label. Physical cues: folder tab or edge, handwritten or typed label identifying folder contents, often brief text like a name, topic, or date range. These are NOT documents — they are organizers within a box.
 
-        [document_start] — The FIRST PAGE of a new document. Strong signals:
-          • Letter salutation ("Dear ___") not seen on the previous page
-          • A NEW sender/recipient pair (different from the previous document)
-          • Memo header ("MEMORANDUM", "TO:", "FROM:") with a new subject or date
-          • A distinct title or headline for a new report, article, or form
-          • Previous page ended with blank space or a signature (that document ended)
-          NOTE: A page with the SAME recipient name and a page number ("Page 2", "- 2 -", "-3-") is a CONTINUATION, not a new document.
+        [document_start] — The FIRST PAGE of a document. Signals include:
+          • A letter salutation ("Dear ___")
+          • A new date and/or new recipient/sender at the top
+          • A memo header ("MEMORANDUM", "TO:", "FROM:", "SUBJECT:")
+          • A title, headline, or report heading
+          • Letterhead or institutional header from a different organization than the previous page
+          • A printed form, table, or list that is clearly a new item
+          • The previous page ended mid-page with blank space below (its document ended)
+          Even if the topic is the same as the previous page, a new letter or memo is a NEW DOCUMENT.
 
-        [document_continuation] — A LATER PAGE of the same document. Strong signals:
-          • Text continues mid-sentence from the previous page
-          • Page number indicators: "Page 2", "- 2 -", "-3-", "p. 4", etc.
-          • Recipient name repeated at top with a page number (standard letter format for page 2+)
-          • Same letterhead and formatting as the previous page
-          • "Continued from..." or "(continued)" text
-          • Tables, figures, or appendices belonging to the same document
+        [document_continuation] — A later page of the SAME document as the previous page. Signals:
+          • Text continues mid-sentence from where the previous page ended
+          • Sequential page numbers from the same document (e.g., previous page was "- 3 -", this is "- 4 -")
+          • Same formatting, letterhead, and layout as the previous page with text flowing continuously
+          A page is ONLY a continuation if it is clearly part of the same single document. When uncertain, prefer [document_start].
 
-        When uncertain between [document_start] and [document_continuation], consider: does this page share the same sender, recipient, date, AND format as the previous page? If yes → continuation. If any of these clearly change → new document.
+        TASK 2 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
 
-        TASK 2 — TRANSCRIBE all visible text exactly as written. Preserve formatting, line breaks, and layout. No commentary.
-
-        Response format:
+        FORMAT — Your response MUST begin with the classification tag on line 1:
         [classification_tag]
         (transcribed text)
         """
@@ -41,37 +39,36 @@ struct OCRPrompt {
         if let prevText = previousText, !prevText.isEmpty {
             prompt += "\n\n"
             if previousImageIncluded {
-                prompt += "The FIRST image is the previous page. The SECOND image is the page to classify and transcribe.\n\n"
+                prompt += "The FIRST image is the previous page. The SECOND image is the page you must classify and transcribe.\n\n"
             }
-            prompt += "Previous page ended with:\n\"\"\"\n\(prevText)\n\"\"\"\nDecide: is this the SAME document continuing, or a NEW document? Check for changes in sender, recipient, date, or format. Pages with \"Page 2\" or the same recipient + page number are continuations."
+            prompt += "Previous page's text ended with:\n\"\"\"\n\(prevText)\n\"\"\"\nUse this to decide: does the current page continue the SAME document, or is it a NEW document? Look for changes in sender, recipient, date, format, or letterhead. A new date + new recipient = new document, even if the topic is similar."
         }
 
         return prompt
     }
 
-    /// Parse the LLM response into classification + OCR text
+    /// Parse the LLM response into classification + OCR text.
+    /// Checks the first 3 lines for a classification tag to handle models that
+    /// occasionally emit a blank line or preamble before the tag.
     static func parseResponse(_ raw: String) -> (classification: DocumentClassification?, text: String?) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return (nil, nil) }
 
         let lines = trimmed.components(separatedBy: .newlines)
-        guard let firstLine = lines.first else { return (nil, trimmed) }
 
-        // Try to extract classification tag from first line
-        let classification = parseClassificationTag(firstLine)
-
-        let text: String
-        if classification != nil {
-            // Remove the classification line, return the rest as OCR text
-            text = lines.dropFirst()
-                .joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-        } else {
-            // No classification found — return all text as OCR
-            text = trimmed
+        // Search first 3 lines for a classification tag
+        let searchLimit = min(3, lines.count)
+        for i in 0..<searchLimit {
+            if let classification = parseClassificationTag(lines[i]) {
+                let text = lines.dropFirst(i + 1)
+                    .joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return (classification, text.isEmpty ? nil : text)
+            }
         }
 
-        return (classification, text.isEmpty ? nil : text)
+        // No classification found — return all text as OCR
+        return (nil, trimmed)
     }
 
     private static func parseClassificationTag(_ line: String) -> DocumentClassification? {
