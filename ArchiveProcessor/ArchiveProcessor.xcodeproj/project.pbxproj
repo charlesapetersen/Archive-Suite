@@ -11,6 +11,7 @@
 		0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2D4943D879BAE44B746EA /* ContentView.swift */; };
 		261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68049A48FDC13B74708EF6F /* PDFGenerator.swift */; };
 		371A1C5378BAAC2F31DEB825 /* OCRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE519DB723DEF9EE690B75F /* OCRView.swift */; };
+		3D8E1BF0DB0540FE4D94F124 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1336A6A82652DF9748694428 /* Assets.xcassets */; };
 		683222758ABEE7C1E16B442C /* OCRPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */; };
 		7618A04F84EAAB11190B0495 /* AnthropicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */; };
 		A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */; };
@@ -28,6 +29,7 @@
 
 /* Begin PBXFileReference section */
 		04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSegmenter.swift; sourceTree = "<group>"; };
+		1336A6A82652DF9748694428 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		184572ECE6767F4FAFAC2066 /* ArchiveProcessor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArchiveProcessor.entitlements; sourceTree = "<group>"; };
 		1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		20D2D4943D879BAE44B746EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -55,6 +57,7 @@
 			children = (
 				184572ECE6767F4FAFAC2066 /* ArchiveProcessor.entitlements */,
 				FA33D6A6A9E16A449C04DB52 /* ArchiveProcessorApp.swift */,
+				1336A6A82652DF9748694428 /* Assets.xcassets */,
 				20D2D4943D879BAE44B746EA /* ContentView.swift */,
 				8972F19AE3CF0DB63D9476B9 /* Info.plist */,
 				906D7D97CF2BAFE3327EAFFE /* Models */,
@@ -133,6 +136,7 @@
 			buildConfigurationList = 3B0572F1087F131A3034BCE8 /* Build configuration list for PBXNativeTarget "ArchiveProcessor" */;
 			buildPhases = (
 				121EC818BA594ADBD18E3A15 /* Sources */,
+				2A6B10FCACA408B58FAD8563 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -174,6 +178,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2A6B10FCACA408B58FAD8563 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D8E1BF0DB0540FE4D94F124 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		121EC818BA594ADBD18E3A15 /* Sources */ = {
