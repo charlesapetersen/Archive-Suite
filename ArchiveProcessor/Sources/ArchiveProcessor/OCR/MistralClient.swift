@@ -52,12 +52,12 @@ struct MistralClient {
 
         // Mistral doesn't support classification in its OCR endpoint,
         // so we use text heuristics as a fallback
-        let classification = heuristicClassify(text: ocrText, previousText: previousText)
+        let classification = Self.heuristicClassify(text: ocrText, previousText: previousText)
         return OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
     }
 
     /// Simple heuristic classification for Mistral (since we can't add it to the prompt)
-    private func heuristicClassify(text: String?, previousText: String?) -> DocumentClassification {
+    static func heuristicClassify(text: String?, previousText: String?) -> DocumentClassification {
         guard let text = text else { return .documentStart }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()

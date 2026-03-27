@@ -5,19 +5,36 @@ struct OCRView: View {
     // MARK: - State
     @StateObject private var processor = OCRProcessor()
 
-    @State private var selectedProvider: LLMProvider = .gemini
-    @State private var selectedModel: LLMModel = LLMModel.geminiModels[2] // gemini-3.1-flash-lite
-    @State private var selectedThinking: ThinkingLevel = .low
-    @State private var apiKey: String = ""
-    @State private var batchMode: Bool = false
+    // Persisted via @AppStorage (UserDefaults)
+    @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
+    @AppStorage("selectedThinking") private var selectedThinking: ThinkingLevel = .low
+    @AppStorage("batchMode") private var batchMode: Bool = false
+    @AppStorage("enableTagging") private var enableTagging: Bool = true
+    @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
+    @AppStorage("contextCharCount") private var contextCharCount: Double = 200
+
+    // Initialized from persisted state in init()
+    @State private var selectedModel: LLMModel
+    @State private var apiKey: String
+    @State private var outputDirectory: URL?
+
+    // Transient
     @State private var droppedFiles: [URL] = []
-    @State private var outputDirectory: URL? = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
     @State private var isTargeted = false
 
-    // Tagging & segmentation
-    @State private var enableTagging: Bool = true
-    @State private var sendPreviousImage: Bool = false
-    @State private var contextCharCount: Double = 200
+    init() {
+        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
+        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
+        _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
+        _apiKey = State(initialValue: KeychainHelper.load(account: provider.rawValue) ?? "")
+
+        if let path = UserDefaults.standard.string(forKey: "outputDirectory"),
+           FileManager.default.fileExists(atPath: path) {
+            _outputDirectory = State(initialValue: URL(fileURLWithPath: path))
+        } else {
+            _outputDirectory = State(initialValue: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first)
+        }
+    }
 
     private var currentModels: [LLMModel] { selectedProvider.models }
 
@@ -42,6 +59,20 @@ struct OCRView: View {
             filePanel
                 .padding()
         }
+        .onAppear { processor.checkForPendingBatch() }
+        .onChange(of: selectedModel) { _, newModel in
+            UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
+        }
+        .onChange(of: apiKey) { _, newKey in
+            if newKey.isEmpty {
+                KeychainHelper.delete(account: selectedProvider.rawValue)
+            } else {
+                KeychainHelper.save(account: selectedProvider.rawValue, password: newKey)
+            }
+        }
+        .onChange(of: outputDirectory) { _, newDir in
+            UserDefaults.standard.set(newDir?.path, forKey: "outputDirectory")
+        }
     }
 
     // MARK: - Control Panel
@@ -53,6 +84,27 @@ struct OCRView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
 
+                // Pending batch resume
+                if let info = processor.pendingBatchInfo {
+                    GroupBox("Pending Batch") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(info)
+                                .font(.caption)
+                            Text("Enter your API key above, then click Resume.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Resume Batch") { resumePendingBatch() }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(apiKey.isEmpty || processor.isProcessing)
+                                Button("Dismiss") { processor.dismissPendingBatch() }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(4)
+                    }
+                }
+
                 // Provider & Model
                 GroupBox("Provider & Model") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -63,7 +115,9 @@ struct OCRView: View {
                         }
                         .pickerStyle(.segmented)
                         .onChange(of: selectedProvider) { _, newProvider in
-                            selectedModel = newProvider.models[0]
+                            let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
+                            selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
+                            apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
                         }
 
                         Picker("Model", selection: $selectedModel) {
@@ -89,7 +143,7 @@ struct OCRView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         SecureField("Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                        Text("Key is not stored to disk.")
+                        Text("Stored securely in macOS Keychain.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -389,6 +443,15 @@ struct OCRView: View {
     private func isImageFile(_ url: URL) -> Bool {
         let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "bmp", "gif"]
         return imageExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private func resumePendingBatch() {
+        if let urls = processor.pendingBatchFileURLs {
+            droppedFiles = urls
+        }
+        processor.processingTask = Task {
+            await processor.resumeBatch(apiKey: apiKey)
+        }
     }
 
     private func startProcessing() {

@@ -16,10 +16,12 @@
 		A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */; };
 		A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */; };
 		AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9155615F54261797E2D35CF1 /* MacOSTagger.swift */; };
+		B088540C026FD7F3FDB353D4 /* BatchOCR.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */; };
 		B0B556E7212824BF8FE1F656 /* MistralClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE28B3830F33D79C626AECF /* MistralClient.swift */; };
 		D7B74AB236CE60AAA31EDD18 /* CostEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */; };
 		DD890DCBC5A504BB9690C5A6 /* OCRProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */; };
 		DF1D52A81281099B0113D5C0 /* DocumentSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */; };
+		DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */; };
 		DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90F6E42E4FA19C125CC1A0A /* TagGenerator.swift */; };
 		ED6330709937FDD549CF1434 /* ArchiveProcessorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA33D6A6A9E16A449C04DB52 /* ArchiveProcessorApp.swift */; };
 /* End PBXBuildFile section */
@@ -27,6 +29,7 @@
 /* Begin PBXFileReference section */
 		04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSegmenter.swift; sourceTree = "<group>"; };
 		184572ECE6767F4FAFAC2066 /* ArchiveProcessor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArchiveProcessor.entitlements; sourceTree = "<group>"; };
+		1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		20D2D4943D879BAE44B746EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		3607CA8DA6EC1100187B7035 /* ArchiveProcessor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArchiveProcessor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostEstimator.swift; sourceTree = "<group>"; };
@@ -35,6 +38,7 @@
 		4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
 		5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRProcessor.swift; sourceTree = "<group>"; };
 		672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
+		718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOCR.swift; sourceTree = "<group>"; };
 		7AE519DB723DEF9EE690B75F /* OCRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRView.swift; sourceTree = "<group>"; };
 		8972F19AE3CF0DB63D9476B9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8DE28B3830F33D79C626AECF /* MistralClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MistralClient.swift; sourceTree = "<group>"; };
@@ -75,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */,
+				1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */,
 				C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */,
 			);
 			path = Models;
@@ -94,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */,
+				718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */,
 				672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */,
 				8DE28B3830F33D79C626AECF /* MistralClient.swift */,
 				5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */,
@@ -176,11 +182,13 @@
 			files = (
 				7618A04F84EAAB11190B0495 /* AnthropicClient.swift in Sources */,
 				ED6330709937FDD549CF1434 /* ArchiveProcessorApp.swift in Sources */,
+				B088540C026FD7F3FDB353D4 /* BatchOCR.swift in Sources */,
 				0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */,
 				D7B74AB236CE60AAA31EDD18 /* CostEstimator.swift in Sources */,
 				DF1D52A81281099B0113D5C0 /* DocumentSegmenter.swift in Sources */,
 				A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */,
 				056A686BFF02B6F62976B184 /* GeminiClient.swift in Sources */,
+				DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */,
 				AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */,
 				B0B556E7212824BF8FE1F656 /* MistralClient.swift in Sources */,
 				DD890DCBC5A504BB9690C5A6 /* OCRProcessor.swift in Sources */,

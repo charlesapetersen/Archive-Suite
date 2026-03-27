@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Providers
 
-enum LLMProvider: String, CaseIterable, Identifiable {
+enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     case anthropic = "Anthropic"
     case gemini = "Gemini"
     case mistral = "Mistral"
@@ -16,11 +16,17 @@ enum LLMProvider: String, CaseIterable, Identifiable {
         case .mistral: return LLMModel.mistralModels
         }
     }
+
+    var supportsBatch: Bool {
+        switch self {
+        case .anthropic, .gemini, .mistral: return true
+        }
+    }
 }
 
 // MARK: - Thinking Level
 
-enum ThinkingLevel: String, CaseIterable, Identifiable {
+enum ThinkingLevel: String, CaseIterable, Identifiable, Codable {
     case low = "Low"
     case high = "High"
     var id: String { rawValue }
@@ -46,7 +52,7 @@ enum DocumentClassification: String, Codable {
 
 // MARK: - Models
 
-struct LLMModel: Identifiable, Hashable {
+struct LLMModel: Identifiable, Hashable, Codable {
     let id: String
     let displayName: String
     let provider: LLMProvider
