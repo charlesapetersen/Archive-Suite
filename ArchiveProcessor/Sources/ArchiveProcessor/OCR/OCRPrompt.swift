@@ -71,6 +71,44 @@ struct OCRPrompt {
         return (nil, trimmed)
     }
 
+    /// Build a text-only classification prompt for pre-OCRed text.
+    /// Used when PDFs already contain OCR text and only classification is needed.
+    static func buildClassificationOnly(text: String, previousText: String?) -> String {
+        var prompt = """
+        You are classifying a page from a historical archive collection based on its OCR text.
+
+        Classify this text as exactly one of these categories. Respond with ONLY the tag on a single line:
+
+        [box_label] — Text from a storage box label. Indicators: collection names, record group numbers, box numbers, date ranges, library/archive names, accession numbers. Typically short text with identifiers.
+
+        [folder_label] — Text from a folder tab or divider. Indicators: brief label text like a name, topic, or date range, folder identifiers. Very short text.
+
+        [document_start] — First page of a document. Indicators: letter salutation, date header, memo header, title, letterhead, new correspondence.
+
+        [document_continuation] — A later page of the same document as the previous page. Indicators: text continuing mid-sentence, sequential page numbers, same formatting.
+
+        OCR text of this page:
+        \"\"\"
+        \(text.prefix(2000))
+        \"\"\"
+        """
+
+        if let prevText = previousText, !prevText.isEmpty {
+            prompt += """
+
+            Previous page's text ended with:
+            \"\"\"
+            \(prevText.suffix(500))
+            \"\"\"
+            Use this to decide: does the current page continue the same document, or is it new?
+            """
+        }
+
+        prompt += "\n\nRespond with ONLY the classification tag (e.g., [document_start]). Nothing else."
+
+        return prompt
+    }
+
     private static func parseClassificationTag(_ line: String) -> DocumentClassification? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if trimmed.contains("[box_label]") || trimmed.contains("[box label]") {

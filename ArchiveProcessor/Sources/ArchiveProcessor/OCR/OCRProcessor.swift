@@ -8,11 +8,14 @@ class OCRProcessor: ObservableObject {
     @Published var statusMessage = ""
     @Published var failedFiles: [String] = []
     @Published var segments: [DocumentSegment] = []
+    @Published var collectionSegments: [CollectionSegment] = []
 
     @Published var pendingBatchInfo: String?
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
-    private var outputURLMap: [URL: URL] = [:]
+    var outputURLMap: [URL: URL] = [:]
+    /// Maps original PDF source URL → temporary JPEG URL (for cleanup)
+    private var pdfToImageMap: [URL: URL] = [:]
     var processingTask: Task<Void, Never>?
 
     /// Stored batch context for cancellation
@@ -35,8 +38,34 @@ class OCRProcessor: ObservableObject {
         let fileURLs: [URL]
         let outputDirectory: URL
         let enableTagging: Bool
+        let enableCollectionSegmentation: Bool
         let sendPreviousImage: Bool
         let submittedAt: Date
+
+        // Backward compatibility: default enableCollectionSegmentation to false
+        init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
+             fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
+             enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date) {
+            self.batchId = batchId; self.provider = provider; self.model = model
+            self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
+            self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
+            self.enableCollectionSegmentation = enableCollectionSegmentation
+            self.sendPreviousImage = sendPreviousImage; self.submittedAt = submittedAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            batchId = try c.decode(String.self, forKey: .batchId)
+            provider = try c.decode(LLMProvider.self, forKey: .provider)
+            model = try c.decode(LLMModel.self, forKey: .model)
+            thinkingLevel = try c.decodeIfPresent(ThinkingLevel.self, forKey: .thinkingLevel)
+            fileURLs = try c.decode([URL].self, forKey: .fileURLs)
+            outputDirectory = try c.decode(URL.self, forKey: .outputDirectory)
+            enableTagging = try c.decode(Bool.self, forKey: .enableTagging)
+            enableCollectionSegmentation = try c.decodeIfPresent(Bool.self, forKey: .enableCollectionSegmentation) ?? false
+            sendPreviousImage = try c.decode(Bool.self, forKey: .sendPreviousImage)
+            submittedAt = try c.decode(Date.self, forKey: .submittedAt)
+        }
     }
 
     private static var pendingBatchURL: URL {
@@ -92,6 +121,7 @@ class OCRProcessor: ObservableObject {
         pendingBatchInfo = nil
         failedFiles = []
         segments = []
+        collectionSegments = []
         outputURLMap = [:]
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         for i in jobs.indices { jobs[i].status = .processing }
@@ -140,6 +170,19 @@ class OCRProcessor: ObservableObject {
         }
 
         guard !Task.isCancelled else { return }
+
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory
+            )
+        }
+
+        guard !Task.isCancelled else { return }
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         let succeeded = jobs.filter { $0.status == .succeeded }.count
@@ -147,12 +190,16 @@ class OCRProcessor: ObservableObject {
         if pending.enableTagging {
             statusMessage += " \(segments.count) segments tagged."
         }
+        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
+            statusMessage += " \(collectionSegments.count) collections organized."
+        }
     }
 
     func cancel() {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
+        cleanupTempFiles()
 
         // Cancel server-side batch if active
         if let batch = activeBatch {
@@ -191,62 +238,248 @@ class OCRProcessor: ObservableObject {
         outputDirectory: URL,
         batchMode: Bool,
         enableTagging: Bool,
+        enableCollectionSegmentation: Bool = false,
+        preOCRedInput: Bool = false,
         segmentationContext: SegmentationContext
     ) async {
         guard !files.isEmpty else { return }
         isProcessing = true
         failedFiles = []
         segments = []
+        collectionSegments = []
         outputURLMap = [:]
+        pdfToImageMap = [:]
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
-        statusMessage = "Starting OCR…"
 
-        // --- Phase 1: OCR + Classification ---
-        if batchMode && provider.supportsBatch {
-            await performBatchOCR(
-                fileURLs: files,
+        if preOCRedInput {
+            // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
+            await performPreOCRedProcessing(
+                files: files,
                 provider: provider,
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
-                sendPreviousImage: segmentationContext.sendPreviousImage,
-                enableTagging: enableTagging
+                enableTagging: enableTagging,
+                enableCollectionSegmentation: enableCollectionSegmentation
             )
         } else {
-            await performOCRPhase(
-                fileURLs: files,
+            // --- Standard image OCR path ---
+            statusMessage = "Starting OCR…"
+
+            // Convert any PDF inputs to temporary JPEG images
+            let imageURLs = convertPDFInputs(files)
+
+            // Phase 1: OCR + Classification
+            if batchMode && provider.supportsBatch {
+                await performBatchOCR(
+                    fileURLs: imageURLs,
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory,
+                    sendPreviousImage: segmentationContext.sendPreviousImage,
+                    enableTagging: enableTagging,
+                    enableCollectionSegmentation: enableCollectionSegmentation
+                )
+            } else {
+                await performOCRPhase(
+                    fileURLs: imageURLs,
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory,
+                    segmentationContext: segmentationContext
+                )
+            }
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 1b: Retry files that failed due to high use
+            await retryHighUseFailures(
+                fileURLs: imageURLs,
                 provider: provider,
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
-                outputDirectory: outputDirectory,
-                segmentationContext: segmentationContext
+                outputDirectory: outputDirectory
             )
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 2: Segmentation + Tagging
+            if enableTagging {
+                statusMessage = "Segmenting documents…"
+                let segmenter = DocumentSegmenter()
+                let classifications = jobs.map { $0.result?.classification }
+                let texts = jobs.map { $0.result?.text ?? "" }
+                segments = segmenter.segment(files: files, classifications: classifications, texts: texts)
+                statusMessage = "Found \(segments.count) segments. Generating tags…"
+
+                await performTaggingPhase(
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory
+                )
+            }
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 4: Collection Segmentation
+            if enableCollectionSegmentation {
+                await performCollectionSegmentation(
+                    files: files,
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory
+                )
+            }
+
+            cleanupTempFiles()
+        }
+
+        guard !Task.isCancelled else { return }
+        writeLogFile(outputDirectory: outputDirectory)
+        isProcessing = false
+        let succeeded = jobs.filter { $0.status == .succeeded }.count
+        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        if enableTagging {
+            statusMessage += " \(segments.count) segments tagged."
+        }
+        if enableCollectionSegmentation && !collectionSegments.isEmpty {
+            statusMessage += " \(collectionSegments.count) collections organized."
+        }
+    }
+
+    // MARK: - PDF Input Conversion
+
+    /// Convert any PDF files in the input list to temporary JPEG images.
+    /// Returns a new array where PDF URLs have been replaced with temp JPEG URLs.
+    /// Non-PDF files are returned unchanged. The jobs array still references the
+    /// original source URLs for display and output naming.
+    private func convertPDFInputs(_ files: [URL]) -> [URL] {
+        var imageURLs = files
+        var converted = 0
+        for (i, url) in files.enumerated() {
+            guard url.pathExtension.lowercased() == "pdf" else { continue }
+            let imageURL = PDFToImageConverter.imageURL(for: url)
+            if imageURL != url {
+                pdfToImageMap[url] = imageURL
+                imageURLs[i] = imageURL
+                // Update the job's source to the temp image for API calls,
+                // but keep the original URL in outputURLMap keyed by temp URL
+                converted += 1
+            }
+        }
+        if converted > 0 {
+            statusMessage = "Converted \(converted) PDF\(converted == 1 ? "" : "s") to images…"
+        }
+        return imageURLs
+    }
+
+    /// Clean up temporary JPEG files created from PDF inputs.
+    private func cleanupTempFiles() {
+        for (_, tempURL) in pdfToImageMap {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+        pdfToImageMap = [:]
+    }
+
+    // MARK: - Pre-OCRed PDF Processing
+
+    private func performPreOCRedProcessing(
+        files: [URL],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        enableTagging: Bool,
+        enableCollectionSegmentation: Bool
+    ) async {
+        let total = files.count
+        statusMessage = "Extracting text from \(total) PDFs…"
+
+        // Step 1: Extract text from PDFs (no API calls)
+        for (index, url) in files.enumerated() {
+            guard !Task.isCancelled else { return }
+            jobs[index].status = .processing
+
+            let extraction = PDFTextExtractor.extract(from: url)
+            let result = OCRResult(
+                text: extraction.text,
+                classification: extraction.classification,
+                errorMessage: extraction.text == nil ? "No text found in PDF" : nil,
+                errorCode: nil
+            )
+            jobs[index].result = result
+            jobs[index].classification = extraction.classification
+            jobs[index].status = extraction.text != nil ? .succeeded : .failed
+            if extraction.text == nil {
+                failedFiles.append(url.lastPathComponent)
+            }
+
+            // Map the input PDF as the output (no new PDF generated)
+            outputURLMap[url] = url
+
+            progress = Double(index + 1) / Double(total) * 0.3
+            statusMessage = "Extracted text \(index + 1)/\(total)"
         }
 
         guard !Task.isCancelled else { return }
 
-        // --- Phase 1b: Retry files that failed due to high use ---
-        await retryHighUseFailures(
-            fileURLs: files,
-            provider: provider,
-            model: model,
-            thinkingLevel: thinkingLevel,
-            apiKey: apiKey,
-            outputDirectory: outputDirectory
-        )
+        // Step 2: Classify files that lack classification (text-only LLM calls)
+        let needsClassification = (enableTagging || enableCollectionSegmentation)
+        let unclassifiedIndices = jobs.indices.filter {
+            jobs[$0].result?.classification == nil && jobs[$0].result?.text != nil
+        }
+
+        if needsClassification && !unclassifiedIndices.isEmpty {
+            statusMessage = "Classifying \(unclassifiedIndices.count) documents…"
+            var previousText: String? = nil
+
+            for (attempt, index) in unclassifiedIndices.enumerated() {
+                guard !Task.isCancelled else { return }
+                let text = jobs[index].result?.text ?? ""
+
+                let prompt = OCRPrompt.buildClassificationOnly(text: text, previousText: previousText)
+                let classification = await classifyViaLLM(
+                    prompt: prompt, provider: provider, model: model,
+                    thinkingLevel: thinkingLevel, apiKey: apiKey
+                )
+
+                jobs[index].classification = classification
+                jobs[index].result = OCRResult(
+                    text: jobs[index].result?.text,
+                    classification: classification,
+                    errorMessage: jobs[index].result?.errorMessage,
+                    errorCode: nil
+                )
+
+                // Use this file's text as context for the next
+                previousText = String(text.suffix(500))
+
+                progress = 0.3 + Double(attempt + 1) / Double(unclassifiedIndices.count) * 0.2
+                statusMessage = "Classified \(attempt + 1)/\(unclassifiedIndices.count)"
+            }
+        }
 
         guard !Task.isCancelled else { return }
+        progress = 0.5
 
-        // --- Phase 2: Segmentation + Tagging ---
+        // Step 3: Segmentation + Tagging
         if enableTagging {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
             let texts = jobs.map { $0.result?.text ?? "" }
-            // Pass source URLs for segmentation; we'll map to output PDFs when tagging
             segments = segmenter.segment(files: files, classifications: classifications, texts: texts)
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
@@ -260,13 +493,103 @@ class OCRProcessor: ObservableObject {
         }
 
         guard !Task.isCancelled else { return }
-        writeLogFile(outputDirectory: outputDirectory)
-        isProcessing = false
-        let succeeded = jobs.filter { $0.status == .succeeded }.count
-        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
-        if enableTagging {
-            statusMessage += " \(segments.count) segments tagged."
+
+        // Step 4: Collection Segmentation
+        if enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: files,
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: outputDirectory
+            )
         }
+    }
+
+    /// Classify a document using a text-only LLM call (no image).
+    private func classifyViaLLM(
+        prompt: String,
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String
+    ) async -> DocumentClassification? {
+        do {
+            let response: String
+            switch provider {
+            case .anthropic:
+                response = try await classifyCallAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+            case .gemini:
+                response = try await classifyCallGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+            case .mistral:
+                response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
+            }
+            let (classification, _) = OCRPrompt.parseResponse(response)
+            return classification
+        } catch {
+            return nil
+        }
+    }
+
+    private nonisolated func classifyCallAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
+        let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
+        var body: [String: Any] = [
+            "model": model.id, "max_tokens": 64,
+            "messages": [["role": "user", "content": prompt]]
+        ]
+        if let thinking = thinkingLevel {
+            body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 512 : 2000]
+        }
+        var request = URLRequest(url: endpoint, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await NetworkSession.data(for: request)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else { return "" }
+        return content.filter { ($0["type"] as? String) == "text" }.compactMap { $0["text"] as? String }.joined()
+    }
+
+    private nonisolated func classifyCallGemini(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model.id):generateContent?key=\(apiKey)"
+        guard let url = URL(string: urlString) else { return "" }
+        var body: [String: Any] = ["contents": [["parts": [["text": prompt]]]]]
+        if let thinking = thinkingLevel {
+            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 512 : 2000]]
+        }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await NetworkSession.data(for: request)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content = candidates.first?["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]] else { return "" }
+        return parts.compactMap { $0["text"] as? String }.joined()
+    }
+
+    private nonisolated func classifyCallMistral(prompt: String, apiKey: String) async throws -> String {
+        let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
+        let body: [String: Any] = [
+            "model": "mistral-small-latest",
+            "messages": [["role": "user", "content": prompt]],
+            "max_tokens": 64
+        ]
+        var request = URLRequest(url: endpoint, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await NetworkSession.data(for: request)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any],
+              let content = message["content"] as? String else { return "" }
+        return content
     }
 
     // MARK: - Phase 1 (Batch): Batch OCR
@@ -279,7 +602,8 @@ class OCRProcessor: ObservableObject {
         apiKey: String,
         outputDirectory: URL,
         sendPreviousImage: Bool,
-        enableTagging: Bool
+        enableTagging: Bool,
+        enableCollectionSegmentation: Bool = false
     ) async {
         let total = fileURLs.count
 
@@ -306,7 +630,7 @@ class OCRProcessor: ObservableObject {
             statusMessage = "Batch submission failed: \(error.localizedDescription)"
             for i in jobs.indices where jobs[i].status == .processing {
                 jobs[i].status = .failed
-                failedFiles.append(fileURLs[i].lastPathComponent)
+                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
             }
             return
         }
@@ -317,6 +641,7 @@ class OCRProcessor: ObservableObject {
             batchId: batchId, provider: provider, model: model,
             thinkingLevel: thinkingLevel, fileURLs: fileURLs,
             outputDirectory: outputDirectory, enableTagging: enableTagging,
+            enableCollectionSegmentation: enableCollectionSegmentation,
             sendPreviousImage: sendPreviousImage, submittedAt: Date()
         ))
         statusMessage = "Batch submitted. Waiting for results…"
@@ -371,7 +696,7 @@ class OCRProcessor: ObservableObject {
                             statusMessage = "Batch completed but no results available"
                             for i in jobs.indices where jobs[i].status == .processing {
                                 jobs[i].status = .failed
-                                failedFiles.append(fileURLs[i].lastPathComponent)
+                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
                             }
                         }
                         batchComplete = true
@@ -392,7 +717,7 @@ class OCRProcessor: ObservableObject {
                             statusMessage = "Batch \(status.status.lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
                                 jobs[i].status = .failed
-                                failedFiles.append(fileURLs[i].lastPathComponent)
+                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
                             }
                         }
                         batchComplete = true
@@ -412,7 +737,7 @@ class OCRProcessor: ObservableObject {
                             statusMessage = "Batch \(status.state.replacingOccurrences(of: "JOB_STATE_", with: "").lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
                                 jobs[i].status = .failed
-                                failedFiles.append(fileURLs[i].lastPathComponent)
+                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
                             }
                         }
                         batchComplete = true
@@ -613,18 +938,21 @@ class OCRProcessor: ObservableObject {
     // MARK: Shared OCR helpers
 
     private func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
+        let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification
         jobs[index].status = result.text != nil ? .succeeded : .failed
         if result.text == nil {
-            failedFiles.append(url.lastPathComponent)
+            failedFiles.append(sourceURL.lastPathComponent)
         }
         let pdfGen = PDFGenerator()
-        let outputURL = outputDirectory.appendingPathComponent(
-            url.deletingPathExtension().lastPathComponent + ".pdf"
-        )
+        // Use original source name for output PDF naming
+        let baseName = sourceURL.deletingPathExtension().lastPathComponent
+        let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
+        // Use the provided url (may be temp JPEG) for the image page
         try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL)
-        outputURLMap[url] = outputURL
+        // Map by original source URL so tagging/collection segmentation can find it
+        outputURLMap[sourceURL] = outputURL
     }
 
     private static func isTimeoutError(_ result: OCRResult) -> Bool {
@@ -799,6 +1127,50 @@ class OCRProcessor: ObservableObject {
         try? data.write(to: jsonURL, options: .atomic)
     }
 
+    // MARK: - Phase 4: Collection Segmentation
+
+    private func performCollectionSegmentation(
+        files: [URL],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL
+    ) async {
+        statusMessage = "Identifying collections from box labels…"
+
+        let classifications = jobs.map { $0.result?.classification }
+        let texts = jobs.map { $0.result?.text ?? "" }
+
+        let segmenter = CollectionSegmenter()
+        collectionSegments = await segmenter.segment(
+            files: files,
+            classifications: classifications,
+            texts: texts,
+            provider: provider,
+            model: model,
+            thinkingLevel: thinkingLevel,
+            apiKey: apiKey,
+            onStatus: { [weak self] msg in
+                self?.statusMessage = msg
+            }
+        )
+
+        guard !collectionSegments.isEmpty, !Task.isCancelled else { return }
+
+        statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
+        do {
+            try segmenter.organizeOutput(
+                collections: collectionSegments,
+                outputDirectory: outputDirectory,
+                outputURLMap: outputURLMap
+            )
+            statusMessage = "Collections organized into \(collectionSegments.count) folders."
+        } catch {
+            statusMessage = "Error organizing collections: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Log
 
     private func writeLogFile(outputDirectory: URL) {
@@ -829,7 +1201,7 @@ class OCRProcessor: ObservableObject {
 
         let content = lines.joined(separator: "\n")
         let timestamp = Int(Date().timeIntervalSince1970)
-        let logURL = outputDirectory.appendingPathComponent("OCR_Log_\(timestamp).txt")
+        let logURL = outputDirectory.appendingPathComponent("ArchiveProcessor_Log_\(timestamp).txt")
         try? content.write(to: logURL, atomically: true, encoding: .utf8)
     }
 }

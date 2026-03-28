@@ -9,6 +9,8 @@ struct OCRView: View {
     @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
     @AppStorage("selectedThinking") private var selectedThinking: ThinkingLevel = .low
     @AppStorage("batchMode") private var batchMode: Bool = false
+    @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
+    @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
     @AppStorage("enableTagging") private var enableTagging: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
@@ -47,6 +49,8 @@ struct OCRView: View {
             fileCount: droppedFiles.count,
             model: selectedModel,
             enableTagging: enableTagging,
+            enableCollectionSegmentation: enableCollectionSegmentation,
+            preOCRedInput: preOCRedInput,
             sendPreviousImage: sendPreviousImage,
             contextCharCount: Int(contextCharCount)
         )
@@ -171,9 +175,32 @@ struct OCRView: View {
                     .padding(4)
                 }
 
+                // Input Mode
+                GroupBox("Input Mode") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
+                        if preOCRedInput {
+                            Text("Accept PDFs that already contain OCR text. Skips OCR API calls and uses the existing text for tagging and collection segmentation.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(4)
+                }
+
                 // Tagging & Segmentation
                 GroupBox("Tagging & Segmentation") {
                     VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Enable collection ID and file renaming", isOn: $enableCollectionSegmentation)
+                            .font(.caption)
+                        if enableCollectionSegmentation {
+                            Text("Identifies collections from box labels and organizes output PDFs into collection folders with sequential naming.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        Divider()
+
                         Toggle("Enable tagging", isOn: $enableTagging)
 
                         if enableTagging {
@@ -230,10 +257,19 @@ struct OCRView: View {
                                 Spacer()
                                 Text("\(est.fileCount)")
                             }
-                            HStack {
-                                Text("OCR + classification:").foregroundStyle(.secondary)
-                                Spacer()
-                                Text(est.ocrFormatted)
+                            if !preOCRedInput {
+                                HStack {
+                                    Text("OCR + classification:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.ocrFormatted)
+                                }
+                            }
+                            if preOCRedInput && (enableTagging || enableCollectionSegmentation) {
+                                HStack {
+                                    Text("Classification (text-only):").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.classificationFormatted)
+                                }
                             }
                             if enableTagging {
                                 HStack {
@@ -242,13 +278,20 @@ struct OCRView: View {
                                     Text(est.taggingFormatted)
                                 }
                             }
+                            if enableCollectionSegmentation {
+                                HStack {
+                                    Text("Collection ID:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.collectionFormatted)
+                                }
+                            }
                             Divider()
                             HStack {
                                 Text("Total (standard):").fontWeight(.medium)
                                 Spacer()
                                 Text(est.totalStandardFormatted).fontWeight(.medium)
                             }
-                            if batchMode {
+                            if batchMode && !preOCRedInput {
                                 HStack {
                                     Text("Total (batch):").foregroundStyle(.secondary)
                                     Spacer()
@@ -279,7 +322,7 @@ struct OCRView: View {
 
                 // Start button
                 Button(action: startProcessing) {
-                    Label(enableTagging ? "Start OCR + Tagging" : "Start OCR", systemImage: "play.fill")
+                    Label(preOCRedInput ? "Start Processing" : (enableTagging || enableCollectionSegmentation ? "Start OCR + Tagging" : "Start OCR"), systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -308,7 +351,7 @@ struct OCRView: View {
                 }
                 .buttonStyle(.bordered)
                 if !droppedFiles.isEmpty {
-                    Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = [] }
+                    Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
                         .buttonStyle(.bordered)
                 }
             }
@@ -324,6 +367,12 @@ struct OCRView: View {
             if !processor.segments.isEmpty {
                 Divider()
                 segmentSummary
+            }
+
+            // Collection summary
+            if !processor.collectionSegments.isEmpty {
+                Divider()
+                collectionSummary
             }
 
             // Progress
@@ -347,10 +396,10 @@ struct OCRView: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6]))
                 .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.5))
             VStack(spacing: 12) {
-                Image(systemName: "photo.stack")
+                Image(systemName: preOCRedInput ? "doc.text" : "photo.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
-                Text("Drop images here")
+                Text(preOCRedInput ? "Drop PDFs here" : "Drop images here")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Text("or use Add Files…")
@@ -409,6 +458,31 @@ struct OCRView: View {
                 }
             }
             .frame(maxHeight: 150)
+        }
+        .padding(8)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var collectionSummary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Collections (\(processor.collectionSegments.count))")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(processor.collectionSegments.enumerated()), id: \.offset) { _, seg in
+                        HStack(spacing: 6) {
+                            Circle().fill(.orange).frame(width: 8, height: 8)
+                            Text("\(seg.collectionName): \(seg.fileURLs.count) file\(seg.fileURLs.count == 1 ? "" : "s")")
+                                .font(.caption)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 120)
         }
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -509,7 +583,7 @@ struct OCRView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
-        panel.allowedContentTypes = [.image, .jpeg, .png, .tiff]
+        panel.allowedContentTypes = [.image, .jpeg, .png, .tiff, .pdf]
         if panel.runModal() == .OK {
             var urls: [URL] = []
             for url in panel.urls {
@@ -535,7 +609,7 @@ struct OCRView: View {
     }
 
     private func isImageFile(_ url: URL) -> Bool {
-        let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "bmp", "gif"]
+        let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "bmp", "gif", "pdf"]
         return imageExtensions.contains(url.pathExtension.lowercased())
     }
 
@@ -564,6 +638,8 @@ struct OCRView: View {
                 outputDirectory: outDir,
                 batchMode: batchMode,
                 enableTagging: enableTagging,
+                enableCollectionSegmentation: enableCollectionSegmentation,
+                preOCRedInput: preOCRedInput,
                 segmentationContext: context
             )
         }
