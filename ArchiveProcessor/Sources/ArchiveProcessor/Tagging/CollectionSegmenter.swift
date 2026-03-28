@@ -114,6 +114,10 @@ class CollectionSegmenter {
         thinkingLevel: ThinkingLevel?,
         apiKey: String
     ) async -> String {
+        guard !boxText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "Unknown"
+        }
+
         let prompt = """
         You are analyzing the OCR text from a photograph of an archival storage box label.
         Extract ONLY the collection or archive name (the name of the person or organization whose papers are in this box).

@@ -86,16 +86,23 @@ class OCRProcessor: ObservableObject {
         let enableCollectionSegmentation: Bool
         let sendPreviousImage: Bool
         let submittedAt: Date
+        let enableSegmentJSON: Bool
+        let confirmCollectionIDs: Bool
+        let reviewDocumentSegmentation: Bool
 
-        // Backward compatibility: default enableCollectionSegmentation to false
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
-             enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date) {
+             enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
+             enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
+             reviewDocumentSegmentation: Bool = false) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
             self.enableCollectionSegmentation = enableCollectionSegmentation
             self.sendPreviousImage = sendPreviousImage; self.submittedAt = submittedAt
+            self.enableSegmentJSON = enableSegmentJSON
+            self.confirmCollectionIDs = confirmCollectionIDs
+            self.reviewDocumentSegmentation = reviewDocumentSegmentation
         }
 
         init(from decoder: Decoder) throws {
@@ -110,6 +117,9 @@ class OCRProcessor: ObservableObject {
             enableCollectionSegmentation = try c.decodeIfPresent(Bool.self, forKey: .enableCollectionSegmentation) ?? false
             sendPreviousImage = try c.decode(Bool.self, forKey: .sendPreviousImage)
             submittedAt = try c.decode(Date.self, forKey: .submittedAt)
+            enableSegmentJSON = try c.decodeIfPresent(Bool.self, forKey: .enableSegmentJSON) ?? true
+            confirmCollectionIDs = try c.decodeIfPresent(Bool.self, forKey: .confirmCollectionIDs) ?? false
+            reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
         }
     }
 
@@ -217,7 +227,8 @@ class OCRProcessor: ObservableObject {
             await performTaggingPhase(
                 provider: pending.provider, model: pending.model,
                 thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                outputDirectory: pending.outputDirectory
+                outputDirectory: pending.outputDirectory,
+                enableSegmentJSON: pending.enableSegmentJSON
             )
         }
 
@@ -230,7 +241,9 @@ class OCRProcessor: ObservableObject {
                 model: pending.model,
                 thinkingLevel: pending.thinkingLevel,
                 apiKey: apiKey,
-                outputDirectory: pending.outputDirectory
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
             )
         }
 
@@ -340,7 +353,10 @@ class OCRProcessor: ObservableObject {
                     outputDirectory: outputDirectory,
                     sendPreviousImage: segmentationContext.sendPreviousImage,
                     enableTagging: enableTagging,
-                    enableCollectionSegmentation: enableCollectionSegmentation
+                    enableCollectionSegmentation: enableCollectionSegmentation,
+                    enableSegmentJSON: enableSegmentJSON,
+                    confirmCollectionIDs: confirmCollectionIDs,
+                    reviewDocumentSegmentation: reviewDocumentSegmentation
                 )
             } else {
                 await performOCRPhase(
@@ -678,7 +694,10 @@ class OCRProcessor: ObservableObject {
         outputDirectory: URL,
         sendPreviousImage: Bool,
         enableTagging: Bool,
-        enableCollectionSegmentation: Bool = false
+        enableCollectionSegmentation: Bool = false,
+        enableSegmentJSON: Bool = true,
+        confirmCollectionIDs: Bool = false,
+        reviewDocumentSegmentation: Bool = false
     ) async {
         let total = fileURLs.count
 
@@ -717,7 +736,10 @@ class OCRProcessor: ObservableObject {
             thinkingLevel: thinkingLevel, fileURLs: fileURLs,
             outputDirectory: outputDirectory, enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
-            sendPreviousImage: sendPreviousImage, submittedAt: Date()
+            sendPreviousImage: sendPreviousImage, submittedAt: Date(),
+            enableSegmentJSON: enableSegmentJSON,
+            confirmCollectionIDs: confirmCollectionIDs,
+            reviewDocumentSegmentation: reviewDocumentSegmentation
         ))
         statusMessage = "Batch submitted. Waiting for results…"
 
@@ -1454,34 +1476,49 @@ class OCRProcessor: ObservableObject {
     }
 
     /// Rebuild collection segments from current job classifications after document review changes.
+    /// Reuses existing collection names from collectionSegments where available.
     private func rebuildCollectionSegments(files: [URL]) {
         let classifications = jobs.map { $0.result?.classification }
-        let texts = jobs.map { $0.result?.text ?? "" }
 
-        // Find box labels and their collection names from OCR text
-        var boxIndices: [(index: Int, name: String)] = []
-        for (i, cls) in classifications.enumerated() {
-            if cls == .boxLabel {
-                let text = texts[i]
-                let name = CollectionSegmenter.normalizeCollectionName(
-                    text.components(separatedBy: .newlines).first ?? "Uncategorized"
-                )
-                boxIndices.append((i, name.isEmpty ? "Uncategorized" : name))
+        // Build a map of file URL to existing collection name
+        var existingFileToCollection: [URL: String] = [:]
+        for segment in collectionSegments {
+            for url in segment.fileURLs {
+                existingFileToCollection[url] = segment.collectionName
             }
         }
 
-        guard !boxIndices.isEmpty else {
+        // Find box labels and their collection names
+        var boxMap: [Int: String] = [:]
+        for (i, cls) in classifications.enumerated() {
+            if cls == .boxLabel {
+                // Prefer existing collection name if available
+                if let existing = existingFileToCollection[files[i]] {
+                    boxMap[i] = existing
+                } else {
+                    let text = jobs[i].result?.text ?? ""
+                    let name = CollectionSegmenter.normalizeCollectionName(
+                        text.components(separatedBy: .newlines).first ?? "Uncategorized"
+                    )
+                    boxMap[i] = name.isEmpty ? "Uncategorized" : name
+                }
+            }
+        }
+
+        guard !boxMap.isEmpty else {
             collectionSegments = [CollectionSegment(collectionName: "Uncategorized", fileURLs: files)]
             return
         }
 
-        var currentCollection = boxIndices[0].name
+        // Find the first box's collection name as the starting collection
+        let sortedBoxIndices = boxMap.keys.sorted()
+        var currentCollection = boxMap[sortedBoxIndices[0]]!
         var collectionOrder: [String] = []
         var collectionFiles: [String: [URL]] = [:]
 
         for i in 0..<files.count {
-            if let box = boxIndices.first(where: { $0.index == i }) {
-                currentCollection = box.name
+            if let name = boxMap[i] {
+                currentCollection = name
             }
             if collectionFiles[currentCollection] == nil {
                 collectionOrder.append(currentCollection)

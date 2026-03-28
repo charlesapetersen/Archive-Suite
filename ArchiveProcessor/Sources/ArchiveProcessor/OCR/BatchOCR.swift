@@ -628,7 +628,7 @@ struct MistralBatchClient: Sendable {
                     ocrText = t.isEmpty ? nil : t
                 }
                 let classification = MistralClient.heuristicClassify(text: ocrText, previousText: nil)
-                results[customId] = OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
+                results[customId] = OCRResult(text: ocrText, classification: classification, rotationDegrees: 0, errorMessage: nil, errorCode: nil)
             } else {
                 let errorMsg = (body?["message"] as? String)
                     ?? ((body?["error"] as? [String: Any])?["message"] as? String)
