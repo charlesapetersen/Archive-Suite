@@ -14,6 +14,17 @@ struct CollectionReviewItem: Identifiable {
     var isBoxLabel: Bool
 }
 
+// MARK: - Document Segment Review Item
+
+/// Represents a single file's document_start/document_continuation classification for review.
+struct DocumentReviewItem: Identifiable {
+    let id = UUID()
+    let fileIndex: Int
+    let fileName: String
+    let fileURL: URL
+    var classification: DocumentClassification?
+}
+
 @MainActor
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
@@ -30,6 +41,12 @@ class OCRProcessor: ObservableObject {
     @Published var collectionReviewItems: [CollectionReviewItem] = []
     @Published var awaitingCollectionConfirmation = false
     private var collectionConfirmationContinuation: CheckedContinuation<Void, Never>?
+
+    /// Document segmentation review state
+    @Published var documentReviewItems: [DocumentReviewItem] = []
+    @Published var awaitingDocumentReview = false
+    @Published var currentReviewCollectionName: String = ""
+    private var documentReviewContinuation: CheckedContinuation<Void, Never>?
 
     /// Retry dialog state
     enum RetryAction {
@@ -276,6 +293,7 @@ class OCRProcessor: ObservableObject {
         enableSegmentJSON: Bool = true,
         enableCollectionSegmentation: Bool = false,
         confirmCollectionIDs: Bool = false,
+        reviewDocumentSegmentation: Bool = false,
         preOCRedInput: Bool = false,
         segmentationContext: SegmentationContext
     ) async {
@@ -301,7 +319,8 @@ class OCRProcessor: ObservableObject {
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
-                confirmCollectionIDs: confirmCollectionIDs
+                confirmCollectionIDs: confirmCollectionIDs,
+                reviewDocumentSegmentation: reviewDocumentSegmentation
             )
         } else {
             // --- Standard image OCR path ---
@@ -387,7 +406,8 @@ class OCRProcessor: ObservableObject {
                     thinkingLevel: thinkingLevel,
                     apiKey: apiKey,
                     outputDirectory: outputDirectory,
-                    confirmBeforeOrganizing: confirmCollectionIDs
+                    confirmBeforeOrganizing: confirmCollectionIDs,
+                    reviewDocumentSegmentation: reviewDocumentSegmentation
                 )
             }
 
@@ -453,7 +473,8 @@ class OCRProcessor: ObservableObject {
         enableTagging: Bool,
         enableSegmentJSON: Bool = true,
         enableCollectionSegmentation: Bool,
-        confirmCollectionIDs: Bool = false
+        confirmCollectionIDs: Bool = false,
+        reviewDocumentSegmentation: Bool = false
     ) async {
         let total = files.count
         statusMessage = "Extracting text from \(total) PDFs…"
@@ -555,7 +576,8 @@ class OCRProcessor: ObservableObject {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
-                confirmBeforeOrganizing: confirmCollectionIDs
+                confirmBeforeOrganizing: confirmCollectionIDs,
+                reviewDocumentSegmentation: reviewDocumentSegmentation
             )
         }
     }
@@ -1192,7 +1214,8 @@ class OCRProcessor: ObservableObject {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        confirmBeforeOrganizing: Bool = false
+        confirmBeforeOrganizing: Bool = false,
+        reviewDocumentSegmentation: Bool = false
     ) async {
         statusMessage = "Identifying collections from box labels…"
 
@@ -1233,6 +1256,12 @@ class OCRProcessor: ObservableObject {
         }
 
         guard !collectionSegments.isEmpty, !Task.isCancelled else { return }
+
+        // Document segmentation review: present per-collection dialogs sequentially
+        if reviewDocumentSegmentation {
+            await performDocumentSegmentationReview(files: files, outputDirectory: outputDirectory)
+            guard !Task.isCancelled else { return }
+        }
 
         statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
         do {
@@ -1276,6 +1305,7 @@ class OCRProcessor: ObservableObject {
 
     /// Apply user edits from review items back into collectionSegments.
     /// Rebuilds segmentation from scratch using the confirmed box/folder identifications.
+    /// Also updates macOS Finder tags to reflect reclassifications.
     private func applyReviewEdits(files: [URL]) {
         // Build a lookup from file index to the reviewed item
         var reviewByIndex: [Int: CollectionReviewItem] = [:]
@@ -1283,17 +1313,45 @@ class OCRProcessor: ObservableObject {
             reviewByIndex[item.fileIndex] = item
         }
 
-        // Update job classifications from review items
+        // Update job classifications and re-tag files whose classification changed
         for item in collectionReviewItems {
             if item.fileIndex < jobs.count {
-                jobs[item.fileIndex].classification = item.classification
+                let oldClassification = jobs[item.fileIndex].classification
+                let newClassification = item.classification
+                jobs[item.fileIndex].classification = newClassification
                 if let existingResult = jobs[item.fileIndex].result {
                     jobs[item.fileIndex].result = OCRResult(
                         text: existingResult.text,
-                        classification: item.classification,
+                        classification: newClassification,
+                        rotationDegrees: existingResult.rotationDegrees,
                         errorMessage: existingResult.errorMessage,
                         errorCode: nil
                     )
+                }
+
+                // Re-tag the output file if classification changed
+                if oldClassification != newClassification,
+                   let outputURL = outputURLMap[item.fileURL] {
+                    let colorTag: String? = {
+                        switch newClassification {
+                        case .boxLabel: return "Red"
+                        case .folderLabel: return "Purple"
+                        default: return nil
+                        }
+                    }()
+                    // Build updated tags: keep existing non-color tags, replace color
+                    var existingTags = jobs[item.fileIndex].appliedTags
+                    existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }
+                    if let color = colorTag {
+                        existingTags.append(color)
+                    }
+                    if newClassification == .boxLabel {
+                        if !existingTags.contains("Box") { existingTags.insert("Box", at: 0) }
+                    } else if newClassification == .folderLabel {
+                        if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
+                    }
+                    try? MacOSTagger.applyTags(existingTags, to: outputURL)
+                    jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
         }
@@ -1335,6 +1393,90 @@ class OCRProcessor: ObservableObject {
         awaitingCollectionConfirmation = false
         collectionConfirmationContinuation?.resume()
         collectionConfirmationContinuation = nil
+    }
+
+    // MARK: - Document Segmentation Review
+
+    /// Present document segmentation review dialogs for each collection sequentially.
+    private func performDocumentSegmentationReview(files: [URL], outputDirectory: URL) async {
+        let classifications = jobs.map { $0.result?.classification }
+
+        for collection in collectionSegments {
+            guard !Task.isCancelled else { return }
+
+            // Build review items for documents in this collection (skip box/folder labels)
+            let items: [DocumentReviewItem] = collection.fileURLs.compactMap { url in
+                guard let idx = files.firstIndex(of: url) else { return nil }
+                let cls = idx < classifications.count ? classifications[idx] : nil
+                // Only include document files, not box/folder labels
+                guard cls != .boxLabel && cls != .folderLabel else { return nil }
+                return DocumentReviewItem(
+                    fileIndex: idx,
+                    fileName: url.lastPathComponent,
+                    fileURL: url,
+                    classification: cls
+                )
+            }
+
+            guard !items.isEmpty else { continue }
+
+            documentReviewItems = items
+            currentReviewCollectionName = collection.collectionName
+            statusMessage = "Review document segmentation for \"\(collection.collectionName)\"."
+            awaitingDocumentReview = true
+
+            await withCheckedContinuation { continuation in
+                documentReviewContinuation = continuation
+            }
+
+            guard !Task.isCancelled else { return }
+
+            // Apply changes from review
+            applyDocumentReviewEdits(outputDirectory: outputDirectory)
+        }
+    }
+
+    /// Called by the UI when the user confirms document segmentation review for a collection.
+    func confirmDocumentReview() {
+        awaitingDocumentReview = false
+        documentReviewContinuation?.resume()
+        documentReviewContinuation = nil
+    }
+
+    /// Apply document segmentation review edits: update job classifications and re-segment/re-tag.
+    private func applyDocumentReviewEdits(outputDirectory: URL) {
+        for item in documentReviewItems {
+            guard item.fileIndex < jobs.count else { continue }
+            let oldClassification = jobs[item.fileIndex].classification
+            let newClassification = item.classification
+
+            jobs[item.fileIndex].classification = newClassification
+            if let existingResult = jobs[item.fileIndex].result {
+                jobs[item.fileIndex].result = OCRResult(
+                    text: existingResult.text,
+                    classification: newClassification,
+                    rotationDegrees: existingResult.rotationDegrees,
+                    errorMessage: existingResult.errorMessage,
+                    errorCode: nil
+                )
+            }
+
+            // Update Finder tags if classification changed between document types
+            if oldClassification != newClassification,
+               let outputURL = outputURLMap[documentReviewItems.first(where: { $0.fileIndex == item.fileIndex })?.fileURL ?? item.fileURL] {
+                var existingTags = jobs[item.fileIndex].appliedTags
+                // No color tag changes needed for document_start vs document_continuation
+                // but apply tags to keep consistency
+                try? MacOSTagger.applyTags(existingTags, to: outputURL)
+            }
+        }
+
+        // Re-run document segmentation with updated classifications
+        let allFiles = jobs.map { $0.sourceURL }
+        let updatedClassifications = jobs.map { $0.result?.classification }
+        let texts = jobs.map { $0.result?.text ?? "" }
+        let segmenter = DocumentSegmenter()
+        segments = segmenter.segment(files: allFiles, classifications: updatedClassifications, texts: texts)
     }
 
     // MARK: - Failed OCR Retry

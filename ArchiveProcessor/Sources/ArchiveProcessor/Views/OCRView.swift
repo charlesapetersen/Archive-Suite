@@ -15,6 +15,7 @@ struct OCRView: View {
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
     @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
     @AppStorage("enableTagging") private var enableTagging: Bool = true
+    @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
@@ -84,6 +85,9 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingRetryDecision) {
             OCRRetrySheet(processor: processor)
+        }
+        .sheet(isPresented: $processor.awaitingDocumentReview) {
+            DocumentSegmentReviewSheet(processor: processor)
         }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
@@ -211,6 +215,16 @@ struct OCRView: View {
                             Toggle("Confirm identifications before organizing", isOn: $confirmCollectionIDs)
                                 .font(.caption)
                                 .padding(.leading, 16)
+
+                            Toggle("Review document segmentation", isOn: $reviewDocumentSegmentation)
+                                .font(.caption)
+                                .padding(.leading, 16)
+                            if reviewDocumentSegmentation {
+                                Text("Review and correct document start/continuation classifications for each collection before tagging.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 32)
+                            }
                         }
 
                         Divider()
@@ -654,6 +668,7 @@ struct OCRView: View {
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
                 confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
+                reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
                 segmentationContext: context
             )
@@ -668,32 +683,36 @@ struct FileRowView: View {
     let job: OCRJob?
 
     var body: some View {
-        HStack(spacing: 8) {
-            statusIcon
-            Text(url.lastPathComponent)
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            if let classification = job?.classification {
-                Text(classification.displayName)
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(classificationColor(classification).opacity(0.15))
-                    .foregroundStyle(classificationColor(classification))
-                    .clipShape(Capsule())
-            }
-            if let tags = job?.appliedTags, !tags.isEmpty {
-                Text(tags.prefix(2).joined(separator: " \u{00B7} "))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                statusIcon
+                Text(url.lastPathComponent)
+                    .font(.system(size: 12))
                     .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                if let classification = job?.classification {
+                    Text(classification.displayName)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(classificationColor(classification).opacity(0.15))
+                        .foregroundStyle(classificationColor(classification))
+                        .clipShape(Capsule())
+                }
+                if let tags = job?.appliedTags, !tags.isEmpty {
+                    Text(tags.prefix(2).joined(separator: " \u{00B7} "))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             if let job = job, job.status == .failed, let msg = job.result?.errorMessage {
-                Text(String(msg.prefix(30)) + (msg.count > 30 ? "…" : ""))
+                Text(msg)
                     .font(.caption2)
                     .foregroundStyle(.red)
+                    .padding(.leading, 24)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 8)
@@ -866,6 +885,10 @@ struct CollectionReviewSheet: View {
         processor.collectionReviewItems.filter { $0.classification == .folderLabel }.count
     }
 
+    private var documentCount: Int {
+        processor.collectionReviewItems.filter { $0.classification == .documentStart }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -898,7 +921,7 @@ struct CollectionReviewSheet: View {
 
             // Footer
             HStack {
-                Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")")
+                Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")\(documentCount > 0 ? ", \(documentCount) reclassified as document" : "")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -932,8 +955,8 @@ struct CollectionReviewRow: View {
                 .frame(width: 180, height: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            // Box/Folder radio buttons
-            HStack(spacing: 12) {
+            // Box/Folder/Document radio buttons
+            VStack(alignment: .leading, spacing: 6) {
                 radioButton(label: "Box", selected: item.classification == .boxLabel, color: .red) {
                     item.classification = .boxLabel
                     item.isBoxLabel = true
@@ -942,8 +965,12 @@ struct CollectionReviewRow: View {
                     item.classification = .folderLabel
                     item.isBoxLabel = false
                 }
+                radioButton(label: "Document", selected: item.classification == .documentStart, color: .blue) {
+                    item.classification = .documentStart
+                    item.isBoxLabel = false
+                }
             }
-            .frame(width: 130)
+            .frame(width: 100)
 
             // Filename
             Text(item.fileName)
@@ -968,7 +995,8 @@ struct CollectionReviewRow: View {
         .padding(.horizontal, 8)
         .background(
             item.classification == .boxLabel ? Color.red.opacity(0.05) :
-            Color.purple.opacity(0.05)
+            item.classification == .folderLabel ? Color.purple.opacity(0.05) :
+            Color.blue.opacity(0.05)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
@@ -1010,6 +1038,197 @@ struct CollectionReviewRow: View {
             return image
         }
         // For images, use ImageIO thumbnail generation
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: maxSize,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
+
+    private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? color : .secondary)
+                    .font(.system(size: 12))
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(selected ? color : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Document Segmentation Review Sheet
+
+struct DocumentSegmentReviewSheet: View {
+    @ObservedObject var processor: OCRProcessor
+    @State private var thumbnailSize: CGFloat = 120
+
+    private var newDocCount: Int {
+        processor.documentReviewItems.filter { $0.classification == .documentStart }.count
+    }
+
+    private var continuationCount: Int {
+        processor.documentReviewItems.filter { $0.classification == .documentContinuation }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Document Segmentation: \(processor.currentReviewCollectionName)")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Review document start and continuation classifications. Change classifications to adjust how documents are grouped.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+
+            Divider()
+
+            // Thumbnail size slider
+            HStack(spacing: 8) {
+                Image(systemName: "photo.artframe")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Slider(value: $thumbnailSize, in: 60...400, step: 10)
+                Image(systemName: "photo.artframe")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                Text("\(Int(thumbnailSize))px")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+
+            Divider()
+
+            // Document list
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(processor.documentReviewItems.indices, id: \.self) { idx in
+                        DocumentReviewRow(
+                            item: $processor.documentReviewItems[idx],
+                            thumbnailSize: thumbnailSize
+                        )
+                    }
+                }
+                .padding()
+            }
+
+            Divider()
+
+            // Footer
+            HStack {
+                Text("\(newDocCount) new document\(newDocCount == 1 ? "" : "s"), \(continuationCount) continuation\(continuationCount == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Confirm") {
+                    processor.confirmDocumentReview()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            .padding()
+        }
+        .frame(minWidth: 700, idealWidth: 1000, maxWidth: .infinity, minHeight: 500, idealHeight: 700, maxHeight: .infinity)
+        .onAppear {
+            DispatchQueue.main.async {
+                if let window = NSApp.keyWindow {
+                    window.styleMask.insert(.resizable)
+                }
+            }
+        }
+    }
+}
+
+struct DocumentReviewRow: View {
+    @Binding var item: DocumentReviewItem
+    let thumbnailSize: CGFloat
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Thumbnail
+            thumbnail
+                .frame(width: thumbnailSize, height: thumbnailSize)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            // Classification radio buttons
+            VStack(alignment: .leading, spacing: 6) {
+                radioButton(label: "New Document", selected: item.classification == .documentStart, color: .blue) {
+                    item.classification = .documentStart
+                }
+                radioButton(label: "Continuation", selected: item.classification == .documentContinuation, color: .gray) {
+                    item.classification = .documentContinuation
+                }
+            }
+            .frame(width: 120)
+
+            // Filename
+            Text(item.fileName)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(minWidth: 180, alignment: .leading)
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            item.classification == .documentStart ? Color.blue.opacity(0.05) :
+            Color.gray.opacity(0.05)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: Int(max(thumbnailSize * 2, 360))) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.1))
+                .overlay {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+        }
+    }
+
+    private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let doc = PDFKit.PDFDocument(url: url),
+                  let page = doc.page(at: 0) else { return nil }
+            let bounds = page.bounds(for: .mediaBox)
+            let scale = CGFloat(maxSize) / max(bounds.width, bounds.height)
+            let size = NSSize(width: bounds.width * scale, height: bounds.height * scale)
+            let image = NSImage(size: size)
+            image.lockFocus()
+            if let context = NSGraphicsContext.current?.cgContext {
+                context.setFillColor(CGColor.white)
+                context.fill(CGRect(origin: .zero, size: size))
+                context.scaleBy(x: scale, y: scale)
+                page.draw(with: .mediaBox, to: context)
+            }
+            image.unlockFocus()
+            return image
+        }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceThumbnailMaxPixelSize: maxSize,
