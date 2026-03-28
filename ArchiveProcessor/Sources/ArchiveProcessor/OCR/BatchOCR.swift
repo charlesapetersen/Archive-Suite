@@ -167,8 +167,8 @@ struct AnthropicBatchClient: Sendable {
                     .filter { ($0["type"] as? String) == "text" }
                     .compactMap { $0["text"] as? String }
                     .joined(separator: "\n")
-                let (classification, ocrText) = OCRPrompt.parseResponse(rawText)
-                results[customId] = OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
+                let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
+                results[customId] = OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
             } else {
                 let errorJson = resultObj["error"] as? [String: Any]
                 let errorMsg = errorJson?["message"] as? String ?? "Batch request failed"
@@ -432,8 +432,8 @@ struct GeminiBatchClient: Sendable {
             }
 
             let rawText = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
-            let (classification, ocrText) = OCRPrompt.parseResponse(rawText)
-            results[key] = OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
+            let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
+            results[key] = OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
         }
 
         return results

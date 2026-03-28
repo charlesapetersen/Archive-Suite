@@ -9,7 +9,7 @@ struct PDFGenerator {
     func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL) throws {
         let pdfDocument = PDFDocument()
 
-        if let imagePage = makeImagePage(imageURL: imageURL) {
+        if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees) {
             pdfDocument.insert(imagePage, at: 0)
         }
 
@@ -23,14 +23,14 @@ struct PDFGenerator {
 
     // MARK: - Image Page
 
-    private func makeImagePage(imageURL: URL) -> PDFPage? {
+    private func makeImagePage(imageURL: URL, rotationDegrees: Int = 0) -> PDFPage? {
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
 
         let imageWidth = cgImage.width
         let imageHeight = cgImage.height
 
-        // Get JPEG data — use original bytes if already JPEG with normal orientation
+        // Get JPEG data — use original bytes if already JPEG with normal orientation and no LLM rotation needed
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
         let orientation = properties?[kCGImagePropertyOrientation] as? Int ?? 1
         let sourceType = CGImageSourceGetType(imageSource) as? String
@@ -39,26 +39,44 @@ struct PDFGenerator {
         let embedWidth: Int
         let embedHeight: Int
 
+        // First, resolve EXIF orientation to get a correctly-oriented base image
+        let baseImage: CGImage
         if sourceType == "public.jpeg" && orientation == 1 {
-            guard let data = try? Data(contentsOf: imageURL) else { return nil }
-            jpegData = data
-            embedWidth = imageWidth
-            embedHeight = imageHeight
+            baseImage = cgImage
         } else {
-            // Non-JPEG or has EXIF rotation — re-encode as JPEG with correct orientation
             let thumbOptions: [CFString: Any] = [
                 kCGImageSourceThumbnailMaxPixelSize: max(imageWidth, imageHeight),
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true
             ]
             guard let oriented = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbOptions as CFDictionary) else { return nil }
+            baseImage = oriented
+        }
+
+        // Apply LLM-detected rotation if needed
+        let finalImage: CGImage
+        if rotationDegrees == 0 || rotationDegrees % 360 == 0 {
+            finalImage = baseImage
+        } else {
+            guard let rotated = Self.rotateImage(baseImage, byDegrees: rotationDegrees) else { return nil }
+            finalImage = rotated
+        }
+
+        // Encode final image as JPEG
+        // Optimization: if no rotation and source was normal-orientation JPEG, use raw bytes
+        if rotationDegrees == 0 && sourceType == "public.jpeg" && orientation == 1 {
+            guard let data = try? Data(contentsOf: imageURL) else { return nil }
+            jpegData = data
+            embedWidth = finalImage.width
+            embedHeight = finalImage.height
+        } else {
             let buf = NSMutableData()
             guard let dest = CGImageDestinationCreateWithData(buf, "public.jpeg" as CFString, 1, nil) else { return nil }
-            CGImageDestinationAddImage(dest, oriented, [kCGImageDestinationLossyCompressionQuality: 0.90] as CFDictionary)
+            CGImageDestinationAddImage(dest, finalImage, [kCGImageDestinationLossyCompressionQuality: 0.90] as CFDictionary)
             guard CGImageDestinationFinalize(dest) else { return nil }
             jpegData = buf as Data
-            embedWidth = oriented.width
-            embedHeight = oriented.height
+            embedWidth = finalImage.width
+            embedHeight = finalImage.height
         }
 
         guard !jpegData.isEmpty else { return nil }
@@ -150,6 +168,42 @@ struct PDFGenerator {
         append("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n\(xrefOffset)\n%%EOF\n")
 
         return pdf
+    }
+
+    // MARK: - Image Rotation
+
+    /// Rotate a CGImage clockwise by the given degrees (90, 180, or 270).
+    private static func rotateImage(_ image: CGImage, byDegrees degrees: Int) -> CGImage? {
+        let w = image.width
+        let h = image.height
+        let radians = -Double(degrees) * .pi / 180.0
+
+        let newWidth: Int
+        let newHeight: Int
+        if degrees == 90 || degrees == 270 {
+            newWidth = h
+            newHeight = w
+        } else {
+            newWidth = w
+            newHeight = h
+        }
+
+        guard let context = CGContext(
+            data: nil,
+            width: newWidth,
+            height: newHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return nil }
+
+        context.translateBy(x: CGFloat(newWidth) / 2, y: CGFloat(newHeight) / 2)
+        context.rotate(by: radians)
+        context.translateBy(x: -CGFloat(w) / 2, y: -CGFloat(h) / 2)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+        return context.makeImage()
     }
 
     // MARK: - Text Page

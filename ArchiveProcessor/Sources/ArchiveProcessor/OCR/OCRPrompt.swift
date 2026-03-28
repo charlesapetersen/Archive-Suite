@@ -29,10 +29,18 @@ struct OCRPrompt {
           • Same formatting, letterhead, and layout as the previous page with text flowing continuously
           A page is ONLY a continuation if it is clearly part of the same single document. When uncertain, prefer [document_start].
 
-        TASK 2 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
+        TASK 2 — ORIENTATION. Images may be rotated sideways or upside down. Determine the correct orientation by examining text direction. On line 2, write the clockwise rotation needed to make the image upright:
+        [rotate_0] — Image is already correctly oriented.
+        [rotate_90] — Image needs 90° clockwise rotation (text reads bottom-to-top on the left side).
+        [rotate_180] — Image is upside down and needs 180° rotation.
+        [rotate_270] — Image needs 270° clockwise rotation (text reads top-to-bottom on the right side).
+        When the image shows a folder with a tab, orient based on the folder tab and label, not fragments of documents visible inside the folder.
 
-        FORMAT — Your response MUST begin with the classification tag on line 1:
+        TASK 3 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
+
+        FORMAT — Your response MUST begin with the classification tag on line 1, rotation tag on line 2, then the transcribed text:
         [classification_tag]
+        [rotate_N]
         (transcribed text)
         """
 
@@ -47,28 +55,47 @@ struct OCRPrompt {
         return prompt
     }
 
-    /// Parse the LLM response into classification + OCR text.
-    /// Checks the first 3 lines for a classification tag to handle models that
-    /// occasionally emit a blank line or preamble before the tag.
-    static func parseResponse(_ raw: String) -> (classification: DocumentClassification?, text: String?) {
+    /// Parse the LLM response into classification + rotation + OCR text.
+    /// Checks the first few lines for classification and rotation tags to handle models that
+    /// occasionally emit a blank line or preamble before the tags.
+    static func parseResponse(_ raw: String) -> (classification: DocumentClassification?, rotationDegrees: Int, text: String?) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return (nil, nil) }
+        guard !trimmed.isEmpty else { return (nil, 0, nil) }
 
         let lines = trimmed.components(separatedBy: .newlines)
 
-        // Search first 3 lines for a classification tag
-        let searchLimit = min(3, lines.count)
+        // Search first 5 lines for classification and rotation tags
+        let searchLimit = min(5, lines.count)
+        var classification: DocumentClassification?
+        var rotationDegrees = 0
+        var contentStartLine = 0
+
         for i in 0..<searchLimit {
-            if let classification = parseClassificationTag(lines[i]) {
-                let text = lines.dropFirst(i + 1)
-                    .joined(separator: "\n")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                return (classification, text.isEmpty ? nil : text)
+            if classification == nil, let cls = parseClassificationTag(lines[i]) {
+                classification = cls
+                contentStartLine = i + 1
+                continue
+            }
+            if let rot = parseRotationTag(lines[i]) {
+                rotationDegrees = rot
+                contentStartLine = max(contentStartLine, i + 1)
+                break
+            }
+            // Stop searching if we already found a classification and this line has no tag
+            if classification != nil && parseRotationTag(lines[i]) == nil {
+                break
             }
         }
 
-        // No classification found — return all text as OCR
-        return (nil, trimmed)
+        if classification == nil {
+            // No classification found — return all text as OCR
+            return (nil, 0, trimmed)
+        }
+
+        let text = lines.dropFirst(contentStartLine)
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (classification, rotationDegrees, text.isEmpty ? nil : text)
     }
 
     /// Build a text-only classification prompt for pre-OCRed text.
@@ -107,6 +134,15 @@ struct OCRPrompt {
         prompt += "\n\nRespond with ONLY the classification tag (e.g., [document_start]). Nothing else."
 
         return prompt
+    }
+
+    private static func parseRotationTag(_ line: String) -> Int? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed.contains("[rotate_0]") || trimmed.contains("[rotate 0]") { return 0 }
+        if trimmed.contains("[rotate_90]") || trimmed.contains("[rotate 90]") { return 90 }
+        if trimmed.contains("[rotate_180]") || trimmed.contains("[rotate 180]") { return 180 }
+        if trimmed.contains("[rotate_270]") || trimmed.contains("[rotate 270]") { return 270 }
+        return nil
     }
 
     private static func parseClassificationTag(_ line: String) -> DocumentClassification? {

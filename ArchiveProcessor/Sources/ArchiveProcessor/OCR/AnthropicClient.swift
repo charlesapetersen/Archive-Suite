@@ -74,8 +74,8 @@ struct AnthropicClient {
             .compactMap { $0["text"] as? String }
             .joined(separator: "\n")
 
-        let (classification, ocrText) = OCRPrompt.parseResponse(rawText)
-        return OCRResult(text: ocrText, classification: classification, errorMessage: nil, errorCode: nil)
+        let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
     }
 
     private static func parseErrorResponse(data: Data, statusCode: Int) -> String {

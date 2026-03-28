@@ -180,8 +180,18 @@ struct OCRJob: Identifiable {
 struct OCRResult {
     let text: String?
     let classification: DocumentClassification?
+    /// Clockwise rotation in degrees needed to correct image orientation (0, 90, 180, 270).
+    let rotationDegrees: Int
     let errorMessage: String?
     let errorCode: String?
+
+    init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?) {
+        self.text = text
+        self.classification = classification
+        self.rotationDegrees = rotationDegrees
+        self.errorMessage = errorMessage
+        self.errorCode = errorCode
+    }
 }
 
 // MARK: - Segmentation Context

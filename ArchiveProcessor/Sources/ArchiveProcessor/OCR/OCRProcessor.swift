@@ -1,5 +1,19 @@
 import Foundation
 
+// MARK: - Collection Review Item
+
+/// Represents a single file's classification and collection assignment for user review.
+struct CollectionReviewItem: Identifiable {
+    let id = UUID()
+    let fileIndex: Int
+    let fileName: String
+    let fileURL: URL
+    var classification: DocumentClassification?
+    var collectionName: String
+    /// Whether this item was identified as a box label (and thus defines a collection boundary)
+    var isBoxLabel: Bool
+}
+
 @MainActor
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
@@ -11,6 +25,20 @@ class OCRProcessor: ObservableObject {
     @Published var collectionSegments: [CollectionSegment] = []
 
     @Published var pendingBatchInfo: String?
+
+    /// Review state for collection confirmation flow
+    @Published var collectionReviewItems: [CollectionReviewItem] = []
+    @Published var awaitingCollectionConfirmation = false
+    private var collectionConfirmationContinuation: CheckedContinuation<Void, Never>?
+
+    /// Retry dialog state
+    enum RetryAction {
+        case retry(provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String)
+        case continueWithout
+    }
+    @Published var failedFileIndices: [Int] = []
+    @Published var awaitingRetryDecision = false
+    private var retryContinuation: CheckedContinuation<RetryAction, Never>?
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
     var outputURLMap: [URL: URL] = [:]
@@ -154,6 +182,13 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
+        await retryLoopForFailedFiles(
+            imageURLs: pending.fileURLs,
+            outputDirectory: pending.outputDirectory
+        )
+
+        guard !Task.isCancelled else { return }
+
         if pending.enableTagging {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -238,7 +273,9 @@ class OCRProcessor: ObservableObject {
         outputDirectory: URL,
         batchMode: Bool,
         enableTagging: Bool,
+        enableSegmentJSON: Bool = true,
         enableCollectionSegmentation: Bool = false,
+        confirmCollectionIDs: Bool = false,
         preOCRedInput: Bool = false,
         segmentationContext: SegmentationContext
     ) async {
@@ -262,7 +299,9 @@ class OCRProcessor: ObservableObject {
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 enableTagging: enableTagging,
-                enableCollectionSegmentation: enableCollectionSegmentation
+                enableSegmentJSON: enableSegmentJSON,
+                enableCollectionSegmentation: enableCollectionSegmentation,
+                confirmCollectionIDs: confirmCollectionIDs
             )
         } else {
             // --- Standard image OCR path ---
@@ -310,6 +349,14 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
+            // Phase 1c: Prompt user to retry remaining failures with different provider/model
+            await retryLoopForFailedFiles(
+                imageURLs: imageURLs,
+                outputDirectory: outputDirectory
+            )
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
             // Phase 2: Segmentation + Tagging
             if enableTagging {
                 statusMessage = "Segmenting documents…"
@@ -324,7 +371,8 @@ class OCRProcessor: ObservableObject {
                     model: model,
                     thinkingLevel: thinkingLevel,
                     apiKey: apiKey,
-                    outputDirectory: outputDirectory
+                    outputDirectory: outputDirectory,
+                    enableSegmentJSON: enableSegmentJSON
                 )
             }
 
@@ -338,7 +386,8 @@ class OCRProcessor: ObservableObject {
                     model: model,
                     thinkingLevel: thinkingLevel,
                     apiKey: apiKey,
-                    outputDirectory: outputDirectory
+                    outputDirectory: outputDirectory,
+                    confirmBeforeOrganizing: confirmCollectionIDs
                 )
             }
 
@@ -402,7 +451,9 @@ class OCRProcessor: ObservableObject {
         apiKey: String,
         outputDirectory: URL,
         enableTagging: Bool,
-        enableCollectionSegmentation: Bool
+        enableSegmentJSON: Bool = true,
+        enableCollectionSegmentation: Bool,
+        confirmCollectionIDs: Bool = false
     ) async {
         let total = files.count
         statusMessage = "Extracting text from \(total) PDFs…"
@@ -488,7 +539,8 @@ class OCRProcessor: ObservableObject {
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
-                outputDirectory: outputDirectory
+                outputDirectory: outputDirectory,
+                enableSegmentJSON: enableSegmentJSON
             )
         }
 
@@ -502,7 +554,8 @@ class OCRProcessor: ObservableObject {
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
-                outputDirectory: outputDirectory
+                outputDirectory: outputDirectory,
+                confirmBeforeOrganizing: confirmCollectionIDs
             )
         }
     }
@@ -525,7 +578,7 @@ class OCRProcessor: ObservableObject {
             case .mistral:
                 response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
             }
-            let (classification, _) = OCRPrompt.parseResponse(response)
+            let (classification, _, _) = OCRPrompt.parseResponse(response)
             return classification
         } catch {
             return nil
@@ -1044,7 +1097,8 @@ class OCRProcessor: ObservableObject {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        outputDirectory: URL
+        outputDirectory: URL,
+        enableSegmentJSON: Bool = true
     ) async {
         let generator = TagGenerator()
         let total = segments.count
@@ -1075,8 +1129,10 @@ class OCRProcessor: ObservableObject {
                 }
             }
 
-            // Write segment JSON metadata file
-            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
+            // Write segment JSON metadata file (skip boxes and folders)
+            if enableSegmentJSON && !segment.isBox && !segment.isFolder {
+                writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
+            }
 
             let completed = segIndex + 1
             progress = 0.7 + (Double(completed) / Double(total)) * 0.3
@@ -1135,7 +1191,8 @@ class OCRProcessor: ObservableObject {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        outputDirectory: URL
+        outputDirectory: URL,
+        confirmBeforeOrganizing: Bool = false
     ) async {
         statusMessage = "Identifying collections from box labels…"
 
@@ -1158,6 +1215,25 @@ class OCRProcessor: ObservableObject {
 
         guard !collectionSegments.isEmpty, !Task.isCancelled else { return }
 
+        // If confirmation is requested, build review items and wait for user
+        if confirmBeforeOrganizing {
+            buildReviewItems(files: files, classifications: classifications)
+            statusMessage = "Review collection identifications before proceeding."
+            awaitingCollectionConfirmation = true
+
+            // Suspend until the user confirms
+            await withCheckedContinuation { continuation in
+                collectionConfirmationContinuation = continuation
+            }
+
+            guard !Task.isCancelled else { return }
+
+            // Apply user edits: rebuild collectionSegments from reviewItems
+            applyReviewEdits(files: files)
+        }
+
+        guard !collectionSegments.isEmpty, !Task.isCancelled else { return }
+
         statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
         do {
             try segmenter.organizeOutput(
@@ -1168,6 +1244,174 @@ class OCRProcessor: ObservableObject {
             statusMessage = "Collections organized into \(collectionSegments.count) folders."
         } catch {
             statusMessage = "Error organizing collections: \(error.localizedDescription)"
+        }
+    }
+
+    /// Build review items from current classifications and collection segments.
+    private func buildReviewItems(files: [URL], classifications: [DocumentClassification?]) {
+        // Build a map from file URL to collection name using the current segments
+        var fileToCollection: [URL: String] = [:]
+        for segment in collectionSegments {
+            for url in segment.fileURLs {
+                fileToCollection[url] = segment.collectionName
+            }
+        }
+
+        // Only include box and folder labels for review
+        collectionReviewItems = files.enumerated().compactMap { (index, url) in
+            let cls = index < classifications.count ? classifications[index] : nil
+            guard cls == .boxLabel || cls == .folderLabel else { return nil }
+            let isBox = cls == .boxLabel
+            let collection = fileToCollection[url] ?? "Uncategorized"
+            return CollectionReviewItem(
+                fileIndex: index,
+                fileName: url.lastPathComponent,
+                fileURL: url,
+                classification: cls,
+                collectionName: collection,
+                isBoxLabel: isBox
+            )
+        }
+    }
+
+    /// Apply user edits from review items back into collectionSegments.
+    /// Rebuilds segmentation from scratch using the confirmed box/folder identifications.
+    private func applyReviewEdits(files: [URL]) {
+        // Build a lookup from file index to the reviewed item
+        var reviewByIndex: [Int: CollectionReviewItem] = [:]
+        for item in collectionReviewItems {
+            reviewByIndex[item.fileIndex] = item
+        }
+
+        // Update job classifications from review items
+        for item in collectionReviewItems {
+            if item.fileIndex < jobs.count {
+                jobs[item.fileIndex].classification = item.classification
+                if let existingResult = jobs[item.fileIndex].result {
+                    jobs[item.fileIndex].result = OCRResult(
+                        text: existingResult.text,
+                        classification: item.classification,
+                        errorMessage: existingResult.errorMessage,
+                        errorCode: nil
+                    )
+                }
+            }
+        }
+
+        // Find box labels in order (user may have reclassified some)
+        let boxIndices = collectionReviewItems
+            .filter { $0.classification == .boxLabel }
+            .sorted { $0.fileIndex < $1.fileIndex }
+
+        guard !boxIndices.isEmpty else {
+            // No boxes left — put everything in one collection
+            collectionSegments = [CollectionSegment(collectionName: "Uncategorized", fileURLs: files)]
+            return
+        }
+
+        // Walk all files, assigning each to the collection of the preceding box label
+        var currentCollection = boxIndices[0].collectionName
+        var collectionOrder: [String] = []
+        var collectionFiles: [String: [URL]] = [:]
+
+        for i in 0..<files.count {
+            if let reviewed = reviewByIndex[i], reviewed.classification == .boxLabel {
+                currentCollection = reviewed.collectionName
+            }
+            if collectionFiles[currentCollection] == nil {
+                collectionOrder.append(currentCollection)
+                collectionFiles[currentCollection] = []
+            }
+            collectionFiles[currentCollection]!.append(files[i])
+        }
+
+        collectionSegments = collectionOrder.map { name in
+            CollectionSegment(collectionName: name, fileURLs: collectionFiles[name] ?? [])
+        }
+    }
+
+    /// Called by the UI when the user confirms the collection review.
+    func confirmCollectionReview() {
+        awaitingCollectionConfirmation = false
+        collectionConfirmationContinuation?.resume()
+        collectionConfirmationContinuation = nil
+    }
+
+    // MARK: - Failed OCR Retry
+
+    /// Called by UI when user chooses to retry failed files with a different provider/model.
+    func retryFailedFiles(provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) {
+        awaitingRetryDecision = false
+        retryContinuation?.resume(returning: .retry(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey))
+        retryContinuation = nil
+    }
+
+    /// Called by UI when user chooses to continue without retrying.
+    func continueWithoutRetry() {
+        awaitingRetryDecision = false
+        retryContinuation?.resume(returning: .continueWithout)
+        retryContinuation = nil
+    }
+
+    /// Present retry dialog and wait for user decision. Returns the action chosen.
+    private func promptRetryForFailedFiles() async -> RetryAction {
+        failedFileIndices = jobs.indices.filter { jobs[$0].status == .failed }.sorted()
+        guard !failedFileIndices.isEmpty else { return .continueWithout }
+
+        statusMessage = "\(failedFileIndices.count) file(s) failed OCR. Review and retry or continue."
+        awaitingRetryDecision = true
+
+        return await withCheckedContinuation { continuation in
+            retryContinuation = continuation
+        }
+    }
+
+    /// Retry loop: keeps presenting the retry dialog until all files succeed or user continues.
+    private func retryLoopForFailedFiles(
+        imageURLs: [URL],
+        outputDirectory: URL
+    ) async {
+        while true {
+            guard !Task.isCancelled else { return }
+
+            let failedCount = jobs.filter { $0.status == .failed }.count
+            guard failedCount > 0 else { return }
+
+            let action = await promptRetryForFailedFiles()
+
+            switch action {
+            case .continueWithout:
+                return
+            case .retry(let provider, let model, let thinkingLevel, let apiKey):
+                let indicesToRetry = failedFileIndices
+                statusMessage = "Retrying \(indicesToRetry.count) files with \(provider.rawValue) \(model.displayName)…"
+
+                for (attempt, index) in indicesToRetry.enumerated() {
+                    guard !Task.isCancelled else { return }
+                    jobs[index].status = .processing
+
+                    let url = imageURLs[index]
+                    let result = await Self.performOCRCall(
+                        imageURL: url,
+                        provider: provider,
+                        model: model,
+                        thinkingLevel: thinkingLevel,
+                        apiKey: apiKey,
+                        previousText: nil,
+                        previousImageURL: nil
+                    )
+
+                    handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+
+                    if result.text != nil {
+                        failedFiles.removeAll { $0 == jobs[index].sourceURL.lastPathComponent }
+                    }
+
+                    progress = Double(attempt + 1) / Double(indicesToRetry.count)
+                    statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
+                }
+            }
+            // Loop back — if there are still failures, the dialog will appear again
         }
     }
 

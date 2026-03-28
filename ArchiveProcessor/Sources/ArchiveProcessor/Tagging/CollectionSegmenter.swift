@@ -131,14 +131,21 @@ class CollectionSegmenter {
         \(boxText.prefix(2000))
         ---
 
-        Respond with ONLY the collection name, nothing else. For example: "Joel Dean papers" or "Deaver & Hannaford" or "Papers of Richard Herrnstein"
+        FORMATTING RULES:
+        - Use Title Case (capitalize each major word): "Joel Dean Papers" not "joel dean papers" or "JOEL DEAN PAPERS"
+        - Replace ampersands with "and": "Deaver and Hannaford" not "Deaver & Hannaford"
+        - Replace all special characters with words (e.g. "/" with "and", "#" with "Number")
+        - Keep it clean and readable
+
+        Respond with ONLY the collection name, nothing else. For example: "Joel Dean Papers" or "Deaver and Hannaford" or "Papers of Richard Herrnstein"
         """
 
         do {
             let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-            let name = response.trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = response.trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = Self.normalizeCollectionName(raw)
             return name.isEmpty ? "Unknown" : name
         } catch {
             return "Unknown"
@@ -163,15 +170,21 @@ class CollectionSegmenter {
 
         Group these into unique collections. For each group, pick the best canonical name.
 
+        FORMATTING RULES for canonical names:
+        - Use Title Case (capitalize each major word)
+        - Replace ampersands with "and"
+        - Replace all special characters with words
+        - Keep names clean and readable
+
         Respond with ONLY a valid JSON object mapping each input name to its canonical name. Example:
         {
-          "Joel Dean Papers": "Joel Dean papers",
-          "joel dean papers": "Joel Dean papers",
-          "Deaver & Hannaford": "Deaver & Hannaford",
-          "DEAVER AND HANNAFORD": "Deaver & Hannaford"
+          "Joel Dean Papers": "Joel Dean Papers",
+          "joel dean papers": "Joel Dean Papers",
+          "DEAVER & HANNAFORD": "Deaver and Hannaford",
+          "Deaver & Hannaford": "Deaver and Hannaford"
         }
 
-        If all names are already unique and distinct collections, map each to itself.
+        If all names are already unique and distinct collections, map each to itself (with corrected formatting).
         Respond with ONLY the JSON object.
         """
 
@@ -199,29 +212,67 @@ class CollectionSegmenter {
             return fallbackCluster(names)
         }
 
-        // Ensure every input name has a mapping
-        var result = dict
+        // Ensure every input name has a mapping, and normalize all canonical values
+        var result: [String: String] = [:]
+        for (key, value) in dict {
+            result[key] = Self.normalizeCollectionName(value)
+        }
         for name in names where result[name] == nil {
-            result[name] = name
+            result[name] = Self.normalizeCollectionName(name)
         }
         return result
     }
 
     /// Simple fallback clustering: trim whitespace, case-insensitive grouping.
     private func fallbackCluster(_ names: [String]) -> [String: String] {
-        var groups: [String: String] = [:]  // lowercased-trimmed -> first occurrence
+        var groups: [String: String] = [:]  // lowercased-trimmed -> first normalized occurrence
         var result: [String: String] = [:]
 
         for name in names {
-            let key = name.trimmingCharacters(in: .whitespaces).lowercased()
+            let key = Self.normalizeCollectionName(name).lowercased()
             if let canonical = groups[key] {
                 result[name] = canonical
             } else {
-                groups[key] = name
-                result[name] = name
+                let normalized = Self.normalizeCollectionName(name)
+                groups[key] = normalized
+                result[name] = normalized
             }
         }
         return result
+    }
+
+    // MARK: - Name Normalization
+
+    /// Normalize a collection name: title case, replace special characters with words.
+    static func normalizeCollectionName(_ name: String) -> String {
+        var result = name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Replace special characters with words
+        result = result.replacingOccurrences(of: "&", with: "and")
+        result = result.replacingOccurrences(of: "/", with: "and")
+        result = result.replacingOccurrences(of: "#", with: "Number ")
+        result = result.replacingOccurrences(of: "@", with: "at")
+
+        // Collapse multiple spaces
+        while result.contains("  ") {
+            result = result.replacingOccurrences(of: "  ", with: " ")
+        }
+
+        // Title Case: capitalize first letter of each word, lowercase the rest,
+        // but keep short words like "of", "the", "and", "in" lowercase (unless first word)
+        let lowercaseWords: Set<String> = ["of", "the", "and", "in", "for", "to", "a", "an", "on", "at", "by"]
+        let words = result.components(separatedBy: " ")
+        let titleCased = words.enumerated().map { (index, word) -> String in
+            guard !word.isEmpty else { return word }
+            let lower = word.lowercased()
+            if index > 0 && lowercaseWords.contains(lower) {
+                return lower
+            }
+            return lower.prefix(1).uppercased() + lower.dropFirst()
+        }
+        result = titleCased.joined(separator: " ")
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Organize Output

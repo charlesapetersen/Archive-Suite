@@ -1,5 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PDFKit
+import ImageIO
 
 struct OCRView: View {
     // MARK: - State
@@ -11,7 +13,9 @@ struct OCRView: View {
     @AppStorage("batchMode") private var batchMode: Bool = false
     @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
+    @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
     @AppStorage("enableTagging") private var enableTagging: Bool = true
+    @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
 
@@ -74,6 +78,12 @@ struct OCRView: View {
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
+        }
+        .sheet(isPresented: $processor.awaitingCollectionConfirmation) {
+            CollectionReviewSheet(processor: processor)
+        }
+        .sheet(isPresented: $processor.awaitingRetryDecision) {
+            OCRRetrySheet(processor: processor)
         }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
@@ -197,6 +207,10 @@ struct OCRView: View {
                             Text("Identifies collections from box labels and organizes output PDFs into collection folders with sequential naming.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
+
+                            Toggle("Confirm identifications before organizing", isOn: $confirmCollectionIDs)
+                                .font(.caption)
+                                .padding(.leading, 16)
                         }
 
                         Divider()
@@ -204,6 +218,10 @@ struct OCRView: View {
                         Toggle("Enable tagging", isOn: $enableTagging)
 
                         if enableTagging {
+                            Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
+                                .font(.caption)
+                                .padding(.leading, 16)
+
                             Divider()
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -340,49 +358,51 @@ struct OCRView: View {
     // MARK: - File Panel
 
     private var filePanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Files")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Spacer()
-                Button(action: selectFiles) {
-                    Label("Add Files…", systemImage: "plus")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Files")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Button(action: selectFiles) {
+                        Label("Add Files…", systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    if !droppedFiles.isEmpty {
+                        Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
+                            .buttonStyle(.bordered)
+                    }
                 }
-                .buttonStyle(.bordered)
-                if !droppedFiles.isEmpty {
-                    Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
-                        .buttonStyle(.bordered)
+
+                if droppedFiles.isEmpty {
+                    dropZone
+                        .frame(minHeight: 300)
+                } else {
+                    fileList
                 }
-            }
 
-            if droppedFiles.isEmpty {
-                dropZone
-            } else {
-                fileList
-                    .frame(maxHeight: .infinity)
-            }
+                // Segment summary
+                if !processor.segments.isEmpty {
+                    Divider()
+                    segmentSummary
+                }
 
-            // Segment summary
-            if !processor.segments.isEmpty {
-                Divider()
-                segmentSummary
-            }
+                // Collection summary
+                if !processor.collectionSegments.isEmpty {
+                    Divider()
+                    collectionSummary
+                }
 
-            // Collection summary
-            if !processor.collectionSegments.isEmpty {
-                Divider()
-                collectionSummary
-            }
-
-            // Progress
-            if processor.isProcessing || !processor.statusMessage.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    ProgressView(value: processor.progress)
-                    Text(processor.statusMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                // Progress
+                if processor.isProcessing || !processor.statusMessage.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 6) {
+                        ProgressView(value: processor.progress)
+                        Text(processor.statusMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -416,13 +436,12 @@ struct OCRView: View {
 
     private var fileList: some View {
         ZStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
-                        FileRowView(url: url, job: processor.jobs.first { $0.sourceURL == url })
-                    }
+            LazyVStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
+                    FileRowView(url: url, job: processor.jobs.first { $0.sourceURL == url })
                 }
             }
+            .padding(.vertical, 4)
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             DropReceiver(isTargeted: .constant(false)) { urls in
@@ -437,27 +456,24 @@ struct OCRView: View {
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(processor.segments.enumerated()), id: \.offset) { index, seg in
-                        HStack(spacing: 6) {
-                            if seg.isBox {
-                                Circle().fill(.red).frame(width: 8, height: 8)
-                            } else if seg.isFolder {
-                                Circle().fill(.purple).frame(width: 8, height: 8)
-                            } else {
-                                Circle().fill(Color.accentColor).frame(width: 8, height: 8)
-                            }
-                            Text("Segment \(index + 1): \(seg.pdfURLs.count) page\(seg.pdfURLs.count == 1 ? "" : "s")")
-                                .font(.caption)
-                            if seg.isBox { Text("(Box)").font(.caption).foregroundStyle(.red) }
-                            if seg.isFolder { Text("(Folder)").font(.caption).foregroundStyle(.purple) }
-                            Spacer()
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(processor.segments.enumerated()), id: \.offset) { index, seg in
+                    HStack(spacing: 6) {
+                        if seg.isBox {
+                            Circle().fill(.red).frame(width: 8, height: 8)
+                        } else if seg.isFolder {
+                            Circle().fill(.purple).frame(width: 8, height: 8)
+                        } else {
+                            Circle().fill(Color.accentColor).frame(width: 8, height: 8)
                         }
+                        Text("Segment \(index + 1): \(seg.pdfURLs.count) page\(seg.pdfURLs.count == 1 ? "" : "s")")
+                            .font(.caption)
+                        if seg.isBox { Text("(Box)").font(.caption).foregroundStyle(.red) }
+                        if seg.isFolder { Text("(Folder)").font(.caption).foregroundStyle(.purple) }
+                        Spacer()
                     }
                 }
             }
-            .frame(maxHeight: 150)
         }
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -470,19 +486,16 @@ struct OCRView: View {
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(processor.collectionSegments.enumerated()), id: \.offset) { _, seg in
-                        HStack(spacing: 6) {
-                            Circle().fill(.orange).frame(width: 8, height: 8)
-                            Text("\(seg.collectionName): \(seg.fileURLs.count) file\(seg.fileURLs.count == 1 ? "" : "s")")
-                                .font(.caption)
-                            Spacer()
-                        }
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(processor.collectionSegments.enumerated()), id: \.offset) { _, seg in
+                    HStack(spacing: 6) {
+                        Circle().fill(.orange).frame(width: 8, height: 8)
+                        Text("\(seg.collectionName): \(seg.fileURLs.count) file\(seg.fileURLs.count == 1 ? "" : "s")")
+                            .font(.caption)
+                        Spacer()
                     }
                 }
             }
-            .frame(maxHeight: 120)
         }
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -638,7 +651,9 @@ struct OCRView: View {
                 outputDirectory: outDir,
                 batchMode: batchMode,
                 enableTagging: enableTagging,
+                enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
+                confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
                 segmentationContext: context
             )
@@ -707,5 +722,315 @@ struct FileRowView: View {
         default:
             Image(systemName: "circle").foregroundStyle(.tertiary).font(.caption)
         }
+    }
+}
+
+// MARK: - OCR Retry Sheet
+
+struct OCRRetrySheet: View {
+    @ObservedObject var processor: OCRProcessor
+
+    @State private var selectedProvider: LLMProvider = .gemini
+    @State private var selectedModel: LLMModel = LLMModel.geminiModels[0]
+    @State private var selectedThinking: ThinkingLevel = .low
+    @State private var apiKey: String = ""
+
+    private var currentModels: [LLMModel] { selectedProvider.models }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("OCR Failures")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("\(processor.failedFileIndices.count) file(s) failed to produce OCR text. You can retry with a different provider or model, or continue without them.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+
+            Divider()
+
+            // Failed files list
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(processor.failedFileIndices, id: \.self) { index in
+                        let job = processor.jobs[index]
+                        HStack(spacing: 8) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                                .font(.caption)
+                            Text(job.sourceURL.lastPathComponent)
+                                .font(.system(size: 11, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            if let msg = job.result?.errorMessage {
+                                Text(String(msg.prefix(50)))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        .padding(.horizontal, 8)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .frame(maxHeight: 200)
+
+            Divider()
+
+            // Provider/Model selection for retry
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Retry with")
+                    .font(.headline)
+
+                Picker("Provider", selection: $selectedProvider) {
+                    ForEach(LLMProvider.allCases) { p in
+                        Text(p.rawValue).tag(p)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: selectedProvider) { _, newProvider in
+                    selectedModel = newProvider.models[0]
+                    apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
+                }
+
+                Picker("Model", selection: $selectedModel) {
+                    ForEach(currentModels) { m in
+                        Text(m.displayName).tag(m)
+                    }
+                }
+
+                if selectedModel.supportsThinking {
+                    Picker("Thinking", selection: $selectedThinking) {
+                        ForEach(ThinkingLevel.allCases) { t in
+                            Text(t.rawValue).tag(t)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                SecureField("API Key", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding()
+
+            Divider()
+
+            // Actions
+            HStack {
+                Button("Continue Without Retrying") {
+                    processor.continueWithoutRetry()
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("Retry \(processor.failedFileIndices.count) File(s)") {
+                    processor.retryFailedFiles(
+                        provider: selectedProvider,
+                        model: selectedModel,
+                        thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
+                        apiKey: apiKey
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(apiKey.isEmpty)
+            }
+            .padding()
+        }
+        .frame(minWidth: 550, idealWidth: 650, minHeight: 450, idealHeight: 550)
+        .onAppear {
+            apiKey = KeychainHelper.load(account: selectedProvider.rawValue) ?? ""
+        }
+    }
+}
+
+// MARK: - Collection Review Sheet
+
+struct CollectionReviewSheet: View {
+    @ObservedObject var processor: OCRProcessor
+
+    private var boxCount: Int {
+        processor.collectionReviewItems.filter { $0.classification == .boxLabel }.count
+    }
+
+    private var folderCount: Int {
+        processor.collectionReviewItems.filter { $0.classification == .folderLabel }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Review Box and Folder Identifications")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Toggle between Box and Folder classifications. Edit collection names for boxes. Files between boxes are automatically assigned to the preceding box's collection.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+
+            Divider()
+
+            // Box and folder list
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(processor.collectionReviewItems.indices, id: \.self) { idx in
+                        CollectionReviewRow(item: $processor.collectionReviewItems[idx])
+                    }
+                }
+                .padding()
+            }
+
+            Divider()
+
+            // Footer
+            HStack {
+                Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Confirm and Organize") {
+                    processor.confirmCollectionReview()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            .padding()
+        }
+        .frame(minWidth: 700, idealWidth: 1000, maxWidth: .infinity, minHeight: 500, idealHeight: 700, maxHeight: .infinity)
+        .onAppear {
+            // Allow the sheet's hosting window to be resizable
+            DispatchQueue.main.async {
+                if let window = NSApp.keyWindow {
+                    window.styleMask.insert(.resizable)
+                }
+            }
+        }
+    }
+}
+
+struct CollectionReviewRow: View {
+    @Binding var item: CollectionReviewItem
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Thumbnail
+            thumbnail
+                .frame(width: 180, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            // Box/Folder radio buttons
+            HStack(spacing: 12) {
+                radioButton(label: "Box", selected: item.classification == .boxLabel, color: .red) {
+                    item.classification = .boxLabel
+                    item.isBoxLabel = true
+                }
+                radioButton(label: "Folder", selected: item.classification == .folderLabel, color: .purple) {
+                    item.classification = .folderLabel
+                    item.isBoxLabel = false
+                }
+            }
+            .frame(width: 130)
+
+            // Filename
+            Text(item.fileName)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(minWidth: 180, alignment: .leading)
+
+            Spacer()
+
+            // Collection name (editable for boxes, hidden for folders)
+            if item.classification == .boxLabel {
+                TextField("Collection name", text: $item.collectionName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 250)
+                    .onSubmit {
+                        item.collectionName = CollectionSegmenter.normalizeCollectionName(item.collectionName)
+                    }
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            item.classification == .boxLabel ? Color.red.opacity(0.05) :
+            Color.purple.opacity(0.05)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: 360) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.1))
+                .overlay {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+        }
+    }
+
+    private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {
+        // For PDFs, render first page
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let doc = PDFKit.PDFDocument(url: url),
+                  let page = doc.page(at: 0) else { return nil }
+            let bounds = page.bounds(for: .mediaBox)
+            let scale = CGFloat(maxSize) / max(bounds.width, bounds.height)
+            let size = NSSize(width: bounds.width * scale, height: bounds.height * scale)
+            let image = NSImage(size: size)
+            image.lockFocus()
+            if let context = NSGraphicsContext.current?.cgContext {
+                context.setFillColor(CGColor.white)
+                context.fill(CGRect(origin: .zero, size: size))
+                context.scaleBy(x: scale, y: scale)
+                page.draw(with: .mediaBox, to: context)
+            }
+            image.unlockFocus()
+            return image
+        }
+        // For images, use ImageIO thumbnail generation
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: maxSize,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
+
+    private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? color : .secondary)
+                    .font(.system(size: 12))
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(selected ? color : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
