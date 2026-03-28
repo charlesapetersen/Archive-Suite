@@ -1077,6 +1077,14 @@ struct DocumentSegmentReviewSheet: View {
         processor.documentReviewItems.filter { $0.classification == .documentContinuation }.count
     }
 
+    private var boxCount: Int {
+        processor.documentReviewItems.filter { $0.classification == .boxLabel }.count
+    }
+
+    private var folderCount: Int {
+        processor.documentReviewItems.filter { $0.classification == .folderLabel }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -1131,7 +1139,7 @@ struct DocumentSegmentReviewSheet: View {
 
             // Footer
             HStack {
-                Text("\(newDocCount) new document\(newDocCount == 1 ? "" : "s"), \(continuationCount) continuation\(continuationCount == 1 ? "" : "s")")
+                Text("\(newDocCount) new document\(newDocCount == 1 ? "" : "s"), \(continuationCount) continuation\(continuationCount == 1 ? "" : "s")\(boxCount > 0 ? ", \(boxCount) box\(boxCount == 1 ? "" : "es")" : "")\(folderCount > 0 ? ", \(folderCount) folder\(folderCount == 1 ? "" : "s")" : "")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -1173,6 +1181,12 @@ struct DocumentReviewRow: View {
                 radioButton(label: "Continuation", selected: item.classification == .documentContinuation, color: .gray) {
                     item.classification = .documentContinuation
                 }
+                radioButton(label: "Box", selected: item.classification == .boxLabel, color: .red) {
+                    item.classification = .boxLabel
+                }
+                radioButton(label: "Folder", selected: item.classification == .folderLabel, color: .purple) {
+                    item.classification = .folderLabel
+                }
             }
             .frame(width: 120)
 
@@ -1188,6 +1202,8 @@ struct DocumentReviewRow: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(
+            item.classification == .boxLabel ? Color.red.opacity(0.05) :
+            item.classification == .folderLabel ? Color.purple.opacity(0.05) :
             item.classification == .documentStart ? Color.blue.opacity(0.05) :
             Color.gray.opacity(0.05)
         )
