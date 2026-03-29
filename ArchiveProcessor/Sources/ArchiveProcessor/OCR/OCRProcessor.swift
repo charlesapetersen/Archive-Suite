@@ -560,12 +560,14 @@ class OCRProcessor: ObservableObject {
                     let url = fileURLs[index]
                     let prevImageURL = (segmentationContext.sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                     nextSlot += 1
+                    let scale = segmentationContext.imageScale
                     group.addTask {
                         let result = await Self.performOCRCall(
                             imageURL: url, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
-                            customPrompt: segmentationContext.customPrompt
+                            customPrompt: segmentationContext.customPrompt,
+                            imageScale: scale
                         )
                         return (index, result)
                     }
@@ -583,12 +585,14 @@ class OCRProcessor: ObservableObject {
                         let url = fileURLs[idx]
                         let prevImageURL = (segmentationContext.sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                         nextSlot += 1
+                        let scale = segmentationContext.imageScale
                         group.addTask {
                             let result = await Self.performOCRCall(
                                 imageURL: url, provider: provider, model: model,
                                 thinkingLevel: thinkingLevel, apiKey: apiKey,
                                 previousText: nil, previousImageURL: prevImageURL,
-                                customPrompt: segmentationContext.customPrompt
+                                customPrompt: segmentationContext.customPrompt,
+                                imageScale: scale
                             )
                             return (idx, result)
                         }
@@ -602,7 +606,6 @@ class OCRProcessor: ObservableObject {
                 let url = fileURLs[index]
                 jobs[index].status = .processing
 
-                // Get context from the previous file (which may already be completed)
                 let previousText: String?
                 if index > 0, let prevResult = jobs[index - 1].result, segmentationContext.previousTextCharCount > 0 {
                     previousText = prevResult.text.flatMap { String($0.suffix(segmentationContext.previousTextCharCount)) }
@@ -616,7 +619,8 @@ class OCRProcessor: ObservableObject {
                     imageURL: url, provider: provider, model: model,
                     thinkingLevel: thinkingLevel, apiKey: apiKey,
                     previousText: previousText, previousImageURL: contextImageURL,
-                    customPrompt: segmentationContext.customPrompt
+                    customPrompt: segmentationContext.customPrompt,
+                    imageScale: segmentationContext.imageScale
                 )
 
                 if Self.isTimeoutError(result) {
@@ -625,7 +629,8 @@ class OCRProcessor: ObservableObject {
                         imageURL: url, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: nil,
-                        customPrompt: segmentationContext.customPrompt
+                        customPrompt: segmentationContext.customPrompt,
+                        imageScale: segmentationContext.imageScale
                     )
                 }
 
@@ -741,7 +746,8 @@ class OCRProcessor: ObservableObject {
                     enableSegmentJSON: enableSegmentJSON,
                     confirmCollectionIDs: confirmCollectionIDs,
                     reviewDocumentSegmentation: reviewDocumentSegmentation,
-                    customPrompt: segmentationContext.customPrompt
+                    customPrompt: segmentationContext.customPrompt,
+                    imageScale: segmentationContext.imageScale
                 )
             } else {
                 // Create pending run for resume-after-restart
@@ -1107,7 +1113,8 @@ class OCRProcessor: ObservableObject {
         enableSegmentJSON: Bool = true,
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
-        customPrompt: String? = nil
+        customPrompt: String? = nil,
+        imageScale: Double = 1.0
     ) async {
         let total = fileURLs.count
 
@@ -1122,13 +1129,13 @@ class OCRProcessor: ObservableObject {
             switch provider {
             case .anthropic:
                 let client = AnthropicBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
             case .mistral:
                 let client = MistralBatchClient(apiKey: apiKey, model: model)
-                batchId = try await client.submitBatch(fileURLs: fileURLs)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale)
             case .gemini:
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
             }
         } catch {
             statusMessage = "Batch submission failed: \(error.localizedDescription)"
@@ -1298,7 +1305,8 @@ class OCRProcessor: ObservableObject {
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 sendPreviousImage: segmentationContext.sendPreviousImage,
-                customPrompt: segmentationContext.customPrompt
+                customPrompt: segmentationContext.customPrompt,
+                imageScale: segmentationContext.imageScale
             )
         } else {
             // Need prior page's OCR text — must be sequential
@@ -1352,7 +1360,8 @@ class OCRProcessor: ObservableObject {
                 apiKey: apiKey,
                 previousText: contextText,
                 previousImageURL: contextImageURL,
-                customPrompt: segmentationContext.customPrompt
+                customPrompt: segmentationContext.customPrompt,
+                imageScale: segmentationContext.imageScale
             )
 
             // If timed out, retry once without context
@@ -1366,7 +1375,8 @@ class OCRProcessor: ObservableObject {
                     apiKey: apiKey,
                     previousText: nil,
                     previousImageURL: nil,
-                    customPrompt: segmentationContext.customPrompt
+                    customPrompt: segmentationContext.customPrompt,
+                    imageScale: segmentationContext.imageScale
                 )
             }
 
@@ -1389,7 +1399,8 @@ class OCRProcessor: ObservableObject {
         apiKey: String,
         outputDirectory: URL,
         sendPreviousImage: Bool,
-        customPrompt: String? = nil
+        customPrompt: String? = nil,
+        imageScale: Double = 1.0
     ) async {
         let total = fileURLs.count
         let concurrency = 4
@@ -1413,7 +1424,7 @@ class OCRProcessor: ObservableObject {
                         imageURL: url, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: prevImageURL,
-                        customPrompt: customPrompt
+                        customPrompt: customPrompt, imageScale: imageScale
                     )
                     return (index, result)
                 }
@@ -1440,7 +1451,7 @@ class OCRProcessor: ObservableObject {
                             imageURL: nextURL, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
-                            customPrompt: customPrompt
+                            customPrompt: customPrompt, imageScale: imageScale
                         )
                         return (idx, result)
                     }
@@ -1484,19 +1495,20 @@ class OCRProcessor: ObservableObject {
         apiKey: String,
         previousText: String?,
         previousImageURL: URL?,
-        customPrompt: String? = nil
+        customPrompt: String? = nil,
+        imageScale: Double = 1.0
     ) async -> OCRResult {
         do {
             switch provider {
             case .anthropic:
                 let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
             case .gemini:
                 let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
             case .mistral:
                 let client = MistralClient(apiKey: apiKey, model: model)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: imageScale)
             }
         } catch {
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil)
@@ -2091,6 +2103,22 @@ class OCRProcessor: ObservableObject {
     }
 
     // MARK: - Log
+
+    // MARK: - Resolution Test
+
+    /// Run a single OCR call at a given image scale for resolution testing. Public so the UI can call it.
+    nonisolated static func performResolutionTestCall(
+        imageURL: URL, provider: LLMProvider, model: LLMModel,
+        thinkingLevel: ThinkingLevel?, apiKey: String,
+        imageScale: Double
+    ) async -> OCRResult {
+        await performOCRCall(
+            imageURL: imageURL, provider: provider, model: model,
+            thinkingLevel: thinkingLevel, apiKey: apiKey,
+            previousText: nil, previousImageURL: nil,
+            imageScale: imageScale
+        )
+    }
 
     // MARK: - Notifications
 

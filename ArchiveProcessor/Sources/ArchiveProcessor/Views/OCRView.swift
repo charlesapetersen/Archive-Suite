@@ -20,6 +20,7 @@ struct OCRView: View {
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
+    @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
 
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
@@ -32,6 +33,10 @@ struct OCRView: View {
     @State private var droppedFiles: [URL] = []
     @State private var isTargeted = false
     @State private var showKeychainSheet = false
+    @State private var showResolutionTest = false
+    @State private var resolutionTestResults: [(scale: Int, text: String?)] = []
+    @State private var resolutionTestImage: URL?
+    @State private var isRunningResolutionTest = false
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
@@ -58,7 +63,8 @@ struct OCRView: View {
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
             sendPreviousImage: sendPreviousImage,
-            contextCharCount: Int(contextCharCount)
+            contextCharCount: Int(contextCharCount),
+            imageScale: imageScale / 100.0
         )
     }
 
@@ -89,6 +95,18 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingDocumentReview) {
             DocumentSegmentReviewSheet(processor: processor)
+        }
+        .sheet(isPresented: $showResolutionTest) {
+            ResolutionTestSheet(
+                imageURL: resolutionTestImage,
+                results: resolutionTestResults,
+                isRunning: isRunningResolutionTest,
+                onSelect: { scale in
+                    imageScale = Double(scale)
+                    showResolutionTest = false
+                },
+                onDismiss: { showResolutionTest = false }
+            )
         }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
@@ -306,7 +324,7 @@ struct OCRView: View {
                     .padding(4)
                 }
 
-                // Batch
+                // Batch & Resolution
                 GroupBox("Processing Mode") {
                     VStack(alignment: .leading, spacing: 6) {
                         Toggle("Batch Mode (slower, ~50% cheaper)", isOn: $batchMode)
@@ -314,6 +332,38 @@ struct OCRView: View {
                             Text("Batch jobs are queued and returned asynchronously. Results may take minutes to hours.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Image resolution:")
+                                    .font(.caption)
+                                Spacer()
+                                Text("\(Int(imageScale))%")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: $imageScale, in: 20...100, step: 10)
+                            if imageScale < 100 {
+                                Text("Images downscaled to \(Int(imageScale))% of original dimensions (\(Int(imageScale * imageScale / 100))% pixel count). Lower resolution reduces cost but may reduce OCR accuracy.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Button("Test Resolution…") {
+                                let panel = NSOpenPanel()
+                                panel.allowedContentTypes = [.jpeg, .png, .tiff, .heic]
+                                panel.allowsMultipleSelection = false
+                                panel.message = "Select an image to test OCR at different resolutions"
+                                if panel.runModal() == .OK, let url = panel.url {
+                                    resolutionTestImage = url
+                                    runResolutionTest(imageURL: url)
+                                }
+                            }
+                            .font(.caption)
+                            .disabled(apiKey.isEmpty || isRunningResolutionTest)
                         }
                     }
                     .padding(4)
@@ -674,6 +724,31 @@ struct OCRView: View {
         if panel.runModal() == .OK { outputDirectory = panel.url }
     }
 
+    private func runResolutionTest(imageURL: URL) {
+        isRunningResolutionTest = true
+        resolutionTestResults = []
+        showResolutionTest = true
+        let scales = [20, 40, 60, 80, 100]
+        let provider = selectedProvider
+        let model = selectedModel
+        let thinking = selectedModel.supportsThinking ? selectedThinking : nil
+        let key = apiKey
+
+        Task {
+            var results: [(scale: Int, text: String?)] = []
+            for scale in scales {
+                let result = await OCRProcessor.performResolutionTestCall(
+                    imageURL: imageURL, provider: provider, model: model,
+                    thinkingLevel: thinking, apiKey: key,
+                    imageScale: Double(scale) / 100.0
+                )
+                results.append((scale: scale, text: result.text))
+            }
+            resolutionTestResults = results
+            isRunningResolutionTest = false
+        }
+    }
+
     private func isImageFile(_ url: URL) -> Bool {
         let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "bmp", "gif", "pdf"]
         return imageExtensions.contains(url.pathExtension.lowercased())
@@ -703,7 +778,8 @@ struct OCRView: View {
         let context = SegmentationContext(
             previousTextCharCount: Int(contextCharCount),
             sendPreviousImage: sendPreviousImage,
-            customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt
+            customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
+            imageScale: imageScale / 100.0
         )
         processor.processingTask = Task {
             await processor.startProcessing(
@@ -1317,5 +1393,110 @@ struct DocumentReviewRow: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Resolution Test Sheet
+
+struct ResolutionTestSheet: View {
+    let imageURL: URL?
+    let results: [(scale: Int, text: String?)]
+    let isRunning: Bool
+    let onSelect: (Int) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Resolution Test")
+                    .font(.headline)
+                Spacer()
+                Button("Cancel") { onDismiss() }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            if isRunning && results.isEmpty {
+                Spacer()
+                ProgressView("Running OCR at 5 resolution levels…")
+                Spacer()
+            } else {
+                HSplitView {
+                    // Left: original image
+                    VStack {
+                        Text("Original Image")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let url = imageURL, let nsImage = NSImage(contentsOf: url) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    .frame(minWidth: 250)
+                    .padding(8)
+
+                    // Right: results columns
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: 1) {
+                            ForEach(Array(results.enumerated()), id: \.offset) { idx, entry in
+                                resolutionColumn(scale: entry.scale, text: entry.text, index: idx)
+                            }
+                            if isRunning {
+                                let scales = [20, 40, 60, 80, 100]
+                                ForEach(results.count..<5, id: \.self) { idx in
+                                    VStack {
+                                        Text("\(scales[idx])%")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                        Spacer()
+                                        ProgressView()
+                                        Spacer()
+                                    }
+                                    .frame(minWidth: 180)
+                                    .padding(8)
+                                    .background(Color.secondary.opacity(0.05))
+                                }
+                            }
+                        }
+                    }
+                    .frame(minWidth: 400)
+                }
+            }
+        }
+        .frame(minWidth: 900, minHeight: 500)
+        .frame(idealWidth: 1200, idealHeight: 700)
+    }
+
+    private func resolutionColumn(scale: Int, text: String?, index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("\(scale)%")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("Use") { onSelect(scale) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+            Divider()
+            ScrollView {
+                if let text = text {
+                    Text(text)
+                        .font(.system(size: 10, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("No text returned")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .italic()
+                }
+            }
+        }
+        .frame(minWidth: 180)
+        .padding(8)
+        .background(index % 2 == 0 ? Color.secondary.opacity(0.05) : Color.clear)
     }
 }

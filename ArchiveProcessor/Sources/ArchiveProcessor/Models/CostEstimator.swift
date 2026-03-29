@@ -58,13 +58,16 @@ struct CostEstimator {
         enableCollectionSegmentation: Bool = false,
         preOCRedInput: Bool = false,
         sendPreviousImage: Bool,
-        contextCharCount: Int
+        contextCharCount: Int,
+        imageScale: Double = 1.0
     ) -> CostEstimate {
         // OCR cost (zero when using pre-OCRed PDFs)
         var ocrCost: Double = 0
         var batchOcrCost: Double = 0
         if !preOCRedInput {
-            let imgTokens = estimatedImageTokens(for: model.provider)
+            // Image tokens scale with pixel count (area), which is scale²
+            let scaleArea = imageScale * imageScale
+            let imgTokens = estimatedImageTokens(for: model.provider) * scaleArea
             let contextTokens = Double(contextCharCount) / 4.0 // ~4 chars per token
             let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
                 + (sendPreviousImage ? imgTokens : 0)

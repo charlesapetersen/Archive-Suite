@@ -10,11 +10,11 @@ struct AnthropicBatchClient: Sendable {
     private var baseURL: String { "https://api.anthropic.com/v1/messages/batches" }
 
     /// Submit a batch of OCR requests. Returns the batch ID.
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil) async throws -> String {
+    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
         var requests: [[String: Any]] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url) else { continue }
+            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
@@ -25,7 +25,7 @@ struct AnthropicBatchClient: Sendable {
             var content: [[String: Any]] = []
 
             if sendPreviousImage && index > 0,
-               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1]) {
+               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
                 content.append([
                     "type": "image",
                     "source": [
@@ -210,12 +210,12 @@ struct GeminiBatchClient: Sendable {
     private var baseURL: String { "https://generativelanguage.googleapis.com/v1beta" }
 
     /// Submit a batch of OCR requests using file-based mode. Returns the batch name (e.g. "batches/123").
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil) async throws -> String {
+    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
         // Build JSONL content — one request per line
         var jsonlLines: [String] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url) else { continue }
+            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
@@ -226,7 +226,7 @@ struct GeminiBatchClient: Sendable {
             var parts: [[String: Any]] = []
 
             if sendPreviousImage && index > 0,
-               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1]) {
+               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
                 parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
             }
 
@@ -469,12 +469,12 @@ struct MistralBatchClient: Sendable {
     private var filesURL: String { "https://api.mistral.ai/v1/files" }
 
     /// Submit a batch of OCR requests. Uploads a JSONL file then creates a batch job. Returns the batch job ID.
-    func submitBatch(fileURLs: [URL]) async throws -> String {
+    func submitBatch(fileURLs: [URL], imageScale: Double = 1.0) async throws -> String {
         // Build JSONL content — one request per line
         var jsonlLines: [String] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url) else { continue }
+            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let dataURI = "data:image/jpeg;base64,\(base64)"
 

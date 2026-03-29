@@ -203,4 +203,6 @@ struct SegmentationContext {
     var sendPreviousImage: Bool = false
     /// Optional custom prompt appended to OCR instructions
     var customPrompt: String? = nil
+    /// Image resolution scale factor (0.2–1.0). 1.0 = full resolution.
+    var imageScale: Double = 1.0
 }

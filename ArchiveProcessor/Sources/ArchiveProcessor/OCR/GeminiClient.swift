@@ -7,8 +7,8 @@ struct GeminiClient {
     let model: LLMModel
     let thinkingLevel: ThinkingLevel?
 
-    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil) async throws -> OCRResult {
-        guard let jpegData = Self.loadImageAsJPEG(url: imageURL) else {
+    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
+        guard let jpegData = Self.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
@@ -17,7 +17,7 @@ struct GeminiClient {
         var parts: [[String: Any]] = []
 
         // If sending previous image, add it first
-        if let prevURL = previousImageURL, let prevData = Self.loadImageAsJPEG(url: prevURL) {
+        if let prevURL = previousImageURL, let prevData = Self.loadImageAsJPEG(url: prevURL, scale: imageScale) {
             parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
         }
 
@@ -103,22 +103,61 @@ struct GeminiClient {
         return "API error (\(statusCode))"
     }
 
-    static func loadImageAsJPEG(url: URL) -> Data? {
+    /// Load an image as JPEG data, optionally downscaling by the given factor (0.0–1.0).
+    /// A scale of 1.0 means full resolution; 0.5 means half dimensions (25% pixel count).
+    static func loadImageAsJPEG(url: URL, scale: Double = 1.0) -> Data? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             return nil
         }
-        // If already JPEG with normal orientation, use the raw file bytes
+
+        let needsScale = scale < 1.0 && scale > 0.0
         let sourceType = CGImageSourceGetType(source) as? String
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let orientation = props?[kCGImagePropertyOrientation] as? Int ?? 1
-        if sourceType == "public.jpeg" && orientation == 1 {
+
+        // If already JPEG with normal orientation and no scaling needed, use raw file bytes
+        if !needsScale && sourceType == "public.jpeg" && orientation == 1 {
             return try? Data(contentsOf: url)
         }
-        // Otherwise, encode to JPEG via ImageIO (thread-safe, no AppKit needed)
+
+        // Resolve orientation first
+        let orientedImage: CGImage
+        if orientation != 1 {
+            let thumbOptions: [CFString: Any] = [
+                kCGImageSourceThumbnailMaxPixelSize: max(cgImage.width, cgImage.height),
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true
+            ]
+            guard let oriented = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else { return nil }
+            orientedImage = oriented
+        } else {
+            orientedImage = cgImage
+        }
+
+        // Downscale if needed
+        let finalImage: CGImage
+        if needsScale {
+            let newWidth = max(1, Int(Double(orientedImage.width) * scale))
+            let newHeight = max(1, Int(Double(orientedImage.height) * scale))
+            guard let ctx = CGContext(
+                data: nil, width: newWidth, height: newHeight,
+                bitsPerComponent: 8, bytesPerRow: 0,
+                space: orientedImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return nil }
+            ctx.interpolationQuality = .high
+            ctx.draw(orientedImage, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
+            guard let scaled = ctx.makeImage() else { return nil }
+            finalImage = scaled
+        } else {
+            finalImage = orientedImage
+        }
+
+        // Encode to JPEG
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, cgImage, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+        CGImageDestinationAddImage(dest, finalImage, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return data as Data
     }
