@@ -177,7 +177,7 @@ struct OCRJob: Identifiable {
     }
 }
 
-struct OCRResult {
+struct OCRResult: Codable {
     let text: String?
     let classification: DocumentClassification?
     /// Clockwise rotation in degrees needed to correct image orientation (0, 90, 180, 270).
@@ -201,4 +201,6 @@ struct SegmentationContext {
     var previousTextCharCount: Int = 200
     /// Whether to send the full previous page image for higher accuracy
     var sendPreviousImage: Bool = false
+    /// Optional custom prompt appended to OCR instructions
+    var customPrompt: String? = nil
 }

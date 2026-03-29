@@ -10,7 +10,7 @@ struct AnthropicBatchClient: Sendable {
     private var baseURL: String { "https://api.anthropic.com/v1/messages/batches" }
 
     /// Submit a batch of OCR requests. Returns the batch ID.
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool) async throws -> String {
+    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil) async throws -> String {
         var requests: [[String: Any]] = []
 
         for (index, url) in fileURLs.enumerated() {
@@ -18,7 +18,8 @@ struct AnthropicBatchClient: Sendable {
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
-                previousImageIncluded: sendPreviousImage && index > 0
+                previousImageIncluded: sendPreviousImage && index > 0,
+                customPrompt: customPrompt
             )
 
             var content: [[String: Any]] = []
@@ -209,7 +210,7 @@ struct GeminiBatchClient: Sendable {
     private var baseURL: String { "https://generativelanguage.googleapis.com/v1beta" }
 
     /// Submit a batch of OCR requests using file-based mode. Returns the batch name (e.g. "batches/123").
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool) async throws -> String {
+    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil) async throws -> String {
         // Build JSONL content — one request per line
         var jsonlLines: [String] = []
 
@@ -218,7 +219,8 @@ struct GeminiBatchClient: Sendable {
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
-                previousImageIncluded: sendPreviousImage && index > 0
+                previousImageIncluded: sendPreviousImage && index > 0,
+                customPrompt: customPrompt
             )
 
             var parts: [[String: Any]] = []

@@ -19,6 +19,7 @@ struct OCRView: View {
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
+    @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
 
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
@@ -127,6 +128,27 @@ struct OCRView: View {
                                     .buttonStyle(.borderedProminent)
                                     .disabled(apiKey.isEmpty || processor.isProcessing)
                                 Button("Dismiss") { processor.dismissPendingBatch() }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(4)
+                    }
+                }
+
+                // Pending run resume
+                if let info = processor.pendingRunInfo {
+                    GroupBox("Interrupted Run") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(info)
+                                .font(.caption)
+                            Text("Enter your API key above, then click Resume to continue processing remaining files.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Resume Run") { resumePendingRun() }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(apiKey.isEmpty || processor.isProcessing)
+                                Button("Dismiss") { processor.dismissPendingRun() }
                                     .buttonStyle(.bordered)
                             }
                         }
@@ -262,6 +284,23 @@ struct OCRView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Custom prompt (optional):")
+                                .font(.caption)
+                            TextEditor(text: $customOCRPrompt)
+                                .font(.caption)
+                                .frame(minHeight: 40, maxHeight: 80)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                                )
+                            Text("Additional context appended to the OCR prompt, e.g. \"This collection contains legal documents from the 1950s\"")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                         }
                     }
                     .padding(4)
@@ -649,11 +688,22 @@ struct OCRView: View {
         }
     }
 
+    private func resumePendingRun() {
+        if let urls = processor.pendingRunFileURLs {
+            droppedFiles = urls
+        }
+        processor.processingTask = Task {
+            await processor.resumeRun(apiKey: apiKey)
+        }
+    }
+
     private func startProcessing() {
         guard let outDir = outputDirectory else { return }
+        let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
             previousTextCharCount: Int(contextCharCount),
-            sendPreviousImage: sendPreviousImage
+            sendPreviousImage: sendPreviousImage,
+            customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt
         )
         processor.processingTask = Task {
             await processor.startProcessing(

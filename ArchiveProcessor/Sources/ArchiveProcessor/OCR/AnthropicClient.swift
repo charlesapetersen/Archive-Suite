@@ -8,12 +8,12 @@ struct AnthropicClient {
 
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil) async throws -> OCRResult {
+    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil) async throws -> OCRResult {
         guard let jpegData = GeminiClient.loadImageAsJPEG(url: imageURL) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
-        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil)
+        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil, customPrompt: customPrompt)
 
         var content: [[String: Any]] = []
 

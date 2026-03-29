@@ -7,12 +7,12 @@ struct GeminiClient {
     let model: LLMModel
     let thinkingLevel: ThinkingLevel?
 
-    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil) async throws -> OCRResult {
+    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil) async throws -> OCRResult {
         guard let jpegData = Self.loadImageAsJPEG(url: imageURL) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
-        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil)
+        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil, customPrompt: customPrompt)
 
         var parts: [[String: Any]] = []
 

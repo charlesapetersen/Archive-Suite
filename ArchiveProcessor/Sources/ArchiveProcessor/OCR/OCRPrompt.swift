@@ -3,7 +3,7 @@ import Foundation
 /// Shared prompt builder for all providers (except Mistral OCR which has a dedicated endpoint)
 struct OCRPrompt {
 
-    static func build(previousText: String?, previousImageIncluded: Bool) -> String {
+    static func build(previousText: String?, previousImageIncluded: Bool, customPrompt: String? = nil) -> String {
         var prompt = """
         You are classifying and transcribing photographs from a historical archive collection.
 
@@ -43,6 +43,10 @@ struct OCRPrompt {
         [rotate_N]
         (transcribed text)
         """
+
+        if let custom = customPrompt, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            prompt += "\n\nADDITIONAL CONTEXT from the user:\n\(custom)"
+        }
 
         if let prevText = previousText, !prevText.isEmpty {
             prompt += "\n\n"
@@ -100,7 +104,7 @@ struct OCRPrompt {
 
     /// Build a text-only classification prompt for pre-OCRed text.
     /// Used when PDFs already contain OCR text and only classification is needed.
-    static func buildClassificationOnly(text: String, previousText: String?) -> String {
+    static func buildClassificationOnly(text: String, previousText: String?, customPrompt: String? = nil) -> String {
         var prompt = """
         You are classifying a page from a historical archive collection based on its OCR text.
 
@@ -129,6 +133,10 @@ struct OCRPrompt {
             \"\"\"
             Use this to decide: does the current page continue the same document, or is it new?
             """
+        }
+
+        if let custom = customPrompt, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            prompt += "\n\nADDITIONAL CONTEXT from the user:\n\(custom)"
         }
 
         prompt += "\n\nRespond with ONLY the classification tag (e.g., [document_start]). Nothing else."

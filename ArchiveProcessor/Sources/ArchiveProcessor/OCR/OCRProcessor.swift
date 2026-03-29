@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 // MARK: - Collection Review Item
 
@@ -89,12 +90,13 @@ class OCRProcessor: ObservableObject {
         let enableSegmentJSON: Bool
         let confirmCollectionIDs: Bool
         let reviewDocumentSegmentation: Bool
+        let customPrompt: String?
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
              enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
-             reviewDocumentSegmentation: Bool = false) {
+             reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -103,6 +105,7 @@ class OCRProcessor: ObservableObject {
             self.enableSegmentJSON = enableSegmentJSON
             self.confirmCollectionIDs = confirmCollectionIDs
             self.reviewDocumentSegmentation = reviewDocumentSegmentation
+            self.customPrompt = customPrompt
         }
 
         init(from decoder: Decoder) throws {
@@ -120,6 +123,7 @@ class OCRProcessor: ObservableObject {
             enableSegmentJSON = try c.decodeIfPresent(Bool.self, forKey: .enableSegmentJSON) ?? true
             confirmCollectionIDs = try c.decodeIfPresent(Bool.self, forKey: .confirmCollectionIDs) ?? false
             reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
+            customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
         }
     }
 
@@ -149,23 +153,104 @@ class OCRProcessor: ObservableObject {
         Self.loadPendingBatch()?.fileURLs
     }
 
-    /// Check for a persisted pending batch on launch.
+    // MARK: - Non-Batch Run Persistence
+
+    struct PendingRun: Codable {
+        let provider: LLMProvider
+        let model: LLMModel
+        let thinkingLevel: ThinkingLevel?
+        let fileURLs: [URL]
+        let outputDirectory: URL
+        let enableTagging: Bool
+        let enableSegmentJSON: Bool
+        let enableCollectionSegmentation: Bool
+        let confirmCollectionIDs: Bool
+        let reviewDocumentSegmentation: Bool
+        let preOCRedInput: Bool
+        let previousTextCharCount: Int
+        let sendPreviousImage: Bool
+        let customPrompt: String?
+        let startedAt: Date
+        /// Per-file OCR results keyed by file index. Only succeeded files are stored.
+        var completedResults: [String: OCRResult]
+    }
+
+    private static var pendingRunURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("ArchiveProcessor")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("pending_run.json")
+    }
+
+    private static func savePendingRun(_ run: PendingRun) {
+        guard let data = try? JSONEncoder().encode(run) else { return }
+        try? data.write(to: pendingRunURL)
+    }
+
+    private static func loadPendingRun() -> PendingRun? {
+        guard let data = try? Data(contentsOf: pendingRunURL) else { return nil }
+        return try? JSONDecoder().decode(PendingRun.self, from: data)
+    }
+
+    private static func deletePendingRun() {
+        try? FileManager.default.removeItem(at: pendingRunURL)
+    }
+
+    /// Tracks the active non-batch run for incremental saves. Nil when not running.
+    private var activePendingRun: PendingRun?
+
+    /// Save a completed OCR result to the pending run on disk.
+    private func saveResultToPendingRun(index: Int, result: OCRResult) {
+        guard var run = activePendingRun else { return }
+        run.completedResults["\(index)"] = result
+        activePendingRun = run
+        Self.savePendingRun(run)
+    }
+
+    /// File URLs from a pending run (for populating the file list on resume).
+    var pendingRunFileURLs: [URL]? {
+        Self.loadPendingRun()?.fileURLs
+    }
+
+    @Published var pendingRunInfo: String?
+
+    /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
-        guard let pending = Self.loadPendingBatch() else {
+        // Check for pending batch
+        if let pending = Self.loadPendingBatch() {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            let dateStr = formatter.string(from: pending.submittedAt)
+            pendingBatchInfo = "Pending batch from \(dateStr): \(pending.fileURLs.count) files via \(pending.provider.rawValue) \(pending.model.displayName)."
+        } else {
             pendingBatchInfo = nil
-            return
         }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        let dateStr = formatter.string(from: pending.submittedAt)
-        pendingBatchInfo = "Pending batch from \(dateStr): \(pending.fileURLs.count) files via \(pending.provider.rawValue) \(pending.model.displayName)."
+
+        // Check for pending run
+        if let pending = Self.loadPendingRun() {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            let dateStr = formatter.string(from: pending.startedAt)
+            let completed = pending.completedResults.count
+            let total = pending.fileURLs.count
+            pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+        } else {
+            pendingRunInfo = nil
+        }
     }
 
     /// Dismiss a pending batch notification (deletes local state only — server-side batch continues).
     func dismissPendingBatch() {
         Self.deletePendingBatch()
         pendingBatchInfo = nil
+    }
+
+    /// Dismiss a pending run notification.
+    func dismissPendingRun() {
+        Self.deletePendingRun()
+        pendingRunInfo = nil
     }
 
     /// Resume polling a previously submitted batch.
@@ -258,6 +343,297 @@ class OCRProcessor: ObservableObject {
         if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
             statusMessage += " \(collectionSegments.count) collections organized."
         }
+        postCompletionNotification()
+    }
+
+    /// Resume an interrupted non-batch run.
+    func resumeRun(apiKey: String) async {
+        guard let pending = Self.loadPendingRun() else { return }
+
+        isProcessing = true
+        pendingRunInfo = nil
+        failedFiles = []
+        segments = []
+        collectionSegments = []
+        outputURLMap = [:]
+        pdfToImageMap = [:]
+        jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
+        progress = 0
+
+        // Restore the pending run tracker for incremental saves
+        activePendingRun = pending
+
+        let segmentationContext = SegmentationContext(
+            previousTextCharCount: pending.previousTextCharCount,
+            sendPreviousImage: pending.sendPreviousImage,
+            customPrompt: pending.customPrompt
+        )
+
+        // Convert any PDF inputs
+        let imageURLs = convertPDFInputs(pending.fileURLs)
+
+        // Restore already-completed results: regenerate PDFs and populate jobs
+        let completedCount = pending.completedResults.count
+        if completedCount > 0 {
+            statusMessage = "Restoring \(completedCount) previously completed results…"
+            for (key, result) in pending.completedResults {
+                guard let index = Int(key), index < jobs.count else { continue }
+                let url = imageURLs[index]
+                handleRestoredResult(result, index: index, url: url, model: pending.model, outputDirectory: pending.outputDirectory)
+            }
+            let total = pending.fileURLs.count
+            progress = Double(completedCount) / Double(total) * 0.7
+            statusMessage = "Restored \(completedCount)/\(total). Resuming OCR…"
+        }
+
+        // Run OCR only on files that were NOT already completed
+        let remainingIndices = (0..<pending.fileURLs.count).filter {
+            pending.completedResults["\($0)"] == nil
+        }
+
+        if !remainingIndices.isEmpty {
+            if pending.preOCRedInput {
+                // For pre-OCRed, run the full pipeline (it's text extraction + classification, cheap)
+                await performPreOCRedProcessing(
+                    files: pending.fileURLs,
+                    provider: pending.provider,
+                    model: pending.model,
+                    thinkingLevel: pending.thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: pending.outputDirectory,
+                    enableTagging: pending.enableTagging,
+                    enableSegmentJSON: pending.enableSegmentJSON,
+                    enableCollectionSegmentation: pending.enableCollectionSegmentation,
+                    confirmCollectionIDs: pending.confirmCollectionIDs,
+                    reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
+                    customPrompt: pending.customPrompt
+                )
+                // Pre-OCRed path handles its own post-processing; skip to finalization
+                activePendingRun = nil
+                Self.deletePendingRun()
+                pendingRunInfo = nil
+                guard !Task.isCancelled else { return }
+                writeLogFile(outputDirectory: pending.outputDirectory)
+                isProcessing = false
+                let succeeded = jobs.filter { $0.status == .succeeded }.count
+                statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+                postCompletionNotification()
+                return
+            }
+
+            // Resume OCR for remaining files
+            await performOCRPhaseForIndices(
+                indices: remainingIndices,
+                fileURLs: imageURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                segmentationContext: segmentationContext,
+                totalFiles: pending.fileURLs.count,
+                alreadyCompleted: completedCount
+            )
+        }
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Retry high-use failures
+        await retryHighUseFailures(
+            fileURLs: imageURLs,
+            provider: pending.provider,
+            model: pending.model,
+            thinkingLevel: pending.thinkingLevel,
+            apiKey: apiKey,
+            outputDirectory: pending.outputDirectory
+        )
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Interactive retry
+        await retryLoopForFailedFiles(
+            imageURLs: imageURLs,
+            outputDirectory: pending.outputDirectory
+        )
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Tagging
+        if pending.enableTagging {
+            statusMessage = "Segmenting documents…"
+            let segmenter = DocumentSegmenter()
+            let classifications = jobs.map { $0.result?.classification }
+            let texts = jobs.map { $0.result?.text ?? "" }
+            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
+            statusMessage = "Found \(segments.count) segments. Generating tags…"
+
+            await performTaggingPhase(
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                enableSegmentJSON: pending.enableSegmentJSON
+            )
+        }
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Collection segmentation
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+            )
+        }
+
+        cleanupTempFiles()
+
+        guard !Task.isCancelled else { return }
+
+        activePendingRun = nil
+        Self.deletePendingRun()
+        pendingRunInfo = nil
+
+        writeLogFile(outputDirectory: pending.outputDirectory)
+        isProcessing = false
+        let succeeded = jobs.filter { $0.status == .succeeded }.count
+        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        if pending.enableTagging {
+            statusMessage += " \(segments.count) segments tagged."
+        }
+        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
+            statusMessage += " \(collectionSegments.count) collections organized."
+        }
+        postCompletionNotification()
+    }
+
+    /// Restore a previously completed result without re-saving to pending run.
+    private func handleRestoredResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
+        let sourceURL = jobs[index].sourceURL
+        jobs[index].result = result
+        jobs[index].classification = result.classification
+        jobs[index].status = result.text != nil ? .succeeded : .failed
+        if result.text == nil {
+            failedFiles.append(sourceURL.lastPathComponent)
+        }
+        let pdfGen = PDFGenerator()
+        let baseName = sourceURL.deletingPathExtension().lastPathComponent
+        let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
+        outputURLMap[sourceURL] = outputURL
+    }
+
+    /// OCR only specific file indices (for resuming interrupted runs).
+    private func performOCRPhaseForIndices(
+        indices: [Int],
+        fileURLs: [URL],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        segmentationContext: SegmentationContext,
+        totalFiles: Int,
+        alreadyCompleted: Int
+    ) async {
+        let remaining = indices.count
+
+        if segmentationContext.previousTextCharCount == 0 {
+            // Parallel: OCR only the remaining indices
+            var completed = 0
+            let concurrency = 4
+            for i in indices { jobs[i].status = .processing }
+            statusMessage = "OCR 0/\(remaining) remaining… (parallel)"
+
+            await withTaskGroup(of: (Int, OCRResult).self) { group in
+                var nextSlot = 0
+
+                for _ in 0..<min(concurrency, remaining) {
+                    let index = indices[nextSlot]
+                    let url = fileURLs[index]
+                    let prevImageURL = (segmentationContext.sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
+                    nextSlot += 1
+                    group.addTask {
+                        let result = await Self.performOCRCall(
+                            imageURL: url, provider: provider, model: model,
+                            thinkingLevel: thinkingLevel, apiKey: apiKey,
+                            previousText: nil, previousImageURL: prevImageURL,
+                            customPrompt: segmentationContext.customPrompt
+                        )
+                        return (index, result)
+                    }
+                }
+
+                for await (index, result) in group {
+                    guard !Task.isCancelled else { group.cancelAll(); return }
+                    handleOCRResult(result, index: index, url: fileURLs[index], model: model, outputDirectory: outputDirectory)
+                    completed += 1
+                    progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
+                    statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)"
+
+                    if nextSlot < remaining {
+                        let idx = indices[nextSlot]
+                        let url = fileURLs[idx]
+                        let prevImageURL = (segmentationContext.sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
+                        nextSlot += 1
+                        group.addTask {
+                            let result = await Self.performOCRCall(
+                                imageURL: url, provider: provider, model: model,
+                                thinkingLevel: thinkingLevel, apiKey: apiKey,
+                                previousText: nil, previousImageURL: prevImageURL,
+                                customPrompt: segmentationContext.customPrompt
+                            )
+                            return (idx, result)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Sequential: OCR remaining indices, using previous results for context
+            for (attempt, index) in indices.enumerated() {
+                guard !Task.isCancelled else { return }
+                let url = fileURLs[index]
+                jobs[index].status = .processing
+
+                // Get context from the previous file (which may already be completed)
+                let previousText: String?
+                if index > 0, let prevResult = jobs[index - 1].result, segmentationContext.previousTextCharCount > 0 {
+                    previousText = prevResult.text.flatMap { String($0.suffix(segmentationContext.previousTextCharCount)) }
+                } else {
+                    previousText = nil
+                }
+                let contextImageURL = segmentationContext.sendPreviousImage && index > 0 ? fileURLs[index - 1] : nil
+
+                statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles)…"
+                var result = await Self.performOCRCall(
+                    imageURL: url, provider: provider, model: model,
+                    thinkingLevel: thinkingLevel, apiKey: apiKey,
+                    previousText: previousText, previousImageURL: contextImageURL,
+                    customPrompt: segmentationContext.customPrompt
+                )
+
+                if Self.isTimeoutError(result) {
+                    statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles)… retrying after timeout"
+                    result = await Self.performOCRCall(
+                        imageURL: url, provider: provider, model: model,
+                        thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        previousText: nil, previousImageURL: nil,
+                        customPrompt: segmentationContext.customPrompt
+                    )
+                }
+
+                handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                progress = Double(alreadyCompleted + attempt + 1) / Double(totalFiles) * 0.7
+                statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles) complete"
+            }
+        }
     }
 
     func cancel() {
@@ -283,6 +659,13 @@ class OCRProcessor: ObservableObject {
                     await client.cancelBatch(batchName: batch.batchId)
                 }
             }
+        }
+
+        // If a non-batch run was active, keep the pending run file for resume
+        if activePendingRun != nil {
+            activePendingRun = nil
+            // Refresh the pending run info banner
+            checkForPendingBatch()
         }
 
         let succeeded = jobs.filter { $0.status == .succeeded }.count
@@ -333,7 +716,8 @@ class OCRProcessor: ObservableObject {
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
                 confirmCollectionIDs: confirmCollectionIDs,
-                reviewDocumentSegmentation: reviewDocumentSegmentation
+                reviewDocumentSegmentation: reviewDocumentSegmentation,
+                customPrompt: segmentationContext.customPrompt
             )
         } else {
             // --- Standard image OCR path ---
@@ -356,9 +740,26 @@ class OCRProcessor: ObservableObject {
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     enableSegmentJSON: enableSegmentJSON,
                     confirmCollectionIDs: confirmCollectionIDs,
-                    reviewDocumentSegmentation: reviewDocumentSegmentation
+                    reviewDocumentSegmentation: reviewDocumentSegmentation,
+                    customPrompt: segmentationContext.customPrompt
                 )
             } else {
+                // Create pending run for resume-after-restart
+                activePendingRun = PendingRun(
+                    provider: provider, model: model, thinkingLevel: thinkingLevel,
+                    fileURLs: files, outputDirectory: outputDirectory,
+                    enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
+                    enableCollectionSegmentation: enableCollectionSegmentation,
+                    confirmCollectionIDs: confirmCollectionIDs,
+                    reviewDocumentSegmentation: reviewDocumentSegmentation,
+                    preOCRedInput: false,
+                    previousTextCharCount: segmentationContext.previousTextCharCount,
+                    sendPreviousImage: segmentationContext.sendPreviousImage,
+                    customPrompt: segmentationContext.customPrompt,
+                    startedAt: Date(), completedResults: [:]
+                )
+                Self.savePendingRun(activePendingRun!)
+
                 await performOCRPhase(
                     fileURLs: imageURLs,
                     provider: provider,
@@ -431,6 +832,12 @@ class OCRProcessor: ObservableObject {
         }
 
         guard !Task.isCancelled else { return }
+
+        // Clear pending run on successful completion
+        activePendingRun = nil
+        Self.deletePendingRun()
+        pendingRunInfo = nil
+
         writeLogFile(outputDirectory: outputDirectory)
         isProcessing = false
         let succeeded = jobs.filter { $0.status == .succeeded }.count
@@ -441,6 +848,7 @@ class OCRProcessor: ObservableObject {
         if enableCollectionSegmentation && !collectionSegments.isEmpty {
             statusMessage += " \(collectionSegments.count) collections organized."
         }
+        postCompletionNotification()
     }
 
     // MARK: - PDF Input Conversion
@@ -490,7 +898,8 @@ class OCRProcessor: ObservableObject {
         enableSegmentJSON: Bool = true,
         enableCollectionSegmentation: Bool,
         confirmCollectionIDs: Bool = false,
-        reviewDocumentSegmentation: Bool = false
+        reviewDocumentSegmentation: Bool = false,
+        customPrompt: String? = nil
     ) async {
         let total = files.count
         statusMessage = "Extracting text from \(total) PDFs…"
@@ -537,7 +946,7 @@ class OCRProcessor: ObservableObject {
                 guard !Task.isCancelled else { return }
                 let text = jobs[index].result?.text ?? ""
 
-                let prompt = OCRPrompt.buildClassificationOnly(text: text, previousText: previousText)
+                let prompt = OCRPrompt.buildClassificationOnly(text: text, previousText: previousText, customPrompt: customPrompt)
                 let classification = await classifyViaLLM(
                     prompt: prompt, provider: provider, model: model,
                     thinkingLevel: thinkingLevel, apiKey: apiKey
@@ -697,7 +1106,8 @@ class OCRProcessor: ObservableObject {
         enableCollectionSegmentation: Bool = false,
         enableSegmentJSON: Bool = true,
         confirmCollectionIDs: Bool = false,
-        reviewDocumentSegmentation: Bool = false
+        reviewDocumentSegmentation: Bool = false,
+        customPrompt: String? = nil
     ) async {
         let total = fileURLs.count
 
@@ -712,13 +1122,13 @@ class OCRProcessor: ObservableObject {
             switch provider {
             case .anthropic:
                 let client = AnthropicBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt)
             case .mistral:
                 let client = MistralBatchClient(apiKey: apiKey, model: model)
                 batchId = try await client.submitBatch(fileURLs: fileURLs)
             case .gemini:
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt)
             }
         } catch {
             statusMessage = "Batch submission failed: \(error.localizedDescription)"
@@ -739,7 +1149,8 @@ class OCRProcessor: ObservableObject {
             sendPreviousImage: sendPreviousImage, submittedAt: Date(),
             enableSegmentJSON: enableSegmentJSON,
             confirmCollectionIDs: confirmCollectionIDs,
-            reviewDocumentSegmentation: reviewDocumentSegmentation
+            reviewDocumentSegmentation: reviewDocumentSegmentation,
+            customPrompt: customPrompt
         ))
         statusMessage = "Batch submitted. Waiting for results…"
 
@@ -886,7 +1297,8 @@ class OCRProcessor: ObservableObject {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
-                sendPreviousImage: segmentationContext.sendPreviousImage
+                sendPreviousImage: segmentationContext.sendPreviousImage,
+                customPrompt: segmentationContext.customPrompt
             )
         } else {
             // Need prior page's OCR text — must be sequential
@@ -939,7 +1351,8 @@ class OCRProcessor: ObservableObject {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 previousText: contextText,
-                previousImageURL: contextImageURL
+                previousImageURL: contextImageURL,
+                customPrompt: segmentationContext.customPrompt
             )
 
             // If timed out, retry once without context
@@ -952,7 +1365,8 @@ class OCRProcessor: ObservableObject {
                     thinkingLevel: thinkingLevel,
                     apiKey: apiKey,
                     previousText: nil,
-                    previousImageURL: nil
+                    previousImageURL: nil,
+                    customPrompt: segmentationContext.customPrompt
                 )
             }
 
@@ -974,7 +1388,8 @@ class OCRProcessor: ObservableObject {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        sendPreviousImage: Bool
+        sendPreviousImage: Bool,
+        customPrompt: String? = nil
     ) async {
         let total = fileURLs.count
         let concurrency = 4
@@ -997,7 +1412,8 @@ class OCRProcessor: ObservableObject {
                     let result = await Self.performOCRCall(
                         imageURL: url, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
-                        previousText: nil, previousImageURL: prevImageURL
+                        previousText: nil, previousImageURL: prevImageURL,
+                        customPrompt: customPrompt
                     )
                     return (index, result)
                 }
@@ -1023,7 +1439,8 @@ class OCRProcessor: ObservableObject {
                         let result = await Self.performOCRCall(
                             imageURL: nextURL, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
-                            previousText: nil, previousImageURL: prevImageURL
+                            previousText: nil, previousImageURL: prevImageURL,
+                            customPrompt: customPrompt
                         )
                         return (idx, result)
                     }
@@ -1047,9 +1464,11 @@ class OCRProcessor: ObservableObject {
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
         // Use the provided url (may be temp JPEG) for the image page
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL)
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
         // Map by original source URL so tagging/collection segmentation can find it
         outputURLMap[sourceURL] = outputURL
+        // Persist result for resume-after-restart
+        saveResultToPendingRun(index: index, result: result)
     }
 
     private static func isTimeoutError(_ result: OCRResult) -> Bool {
@@ -1064,16 +1483,17 @@ class OCRProcessor: ObservableObject {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         previousText: String?,
-        previousImageURL: URL?
+        previousImageURL: URL?,
+        customPrompt: String? = nil
     ) async -> OCRResult {
         do {
             switch provider {
             case .anthropic:
                 let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt)
             case .gemini:
                 let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt)
             case .mistral:
                 let client = MistralClient(apiKey: apiKey, model: model)
                 return try await client.ocr(imageURL: imageURL, previousText: previousText)
@@ -1671,6 +2091,25 @@ class OCRProcessor: ObservableObject {
     }
 
     // MARK: - Log
+
+    // MARK: - Notifications
+
+    /// Request notification permission (call once at app launch).
+    static func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// Post a local notification summarizing the completed run.
+    private func postCompletionNotification() {
+        let succeeded = jobs.filter { $0.status == .succeeded }.count
+        let failed = failedFiles.count
+        let content = UNMutableNotificationContent()
+        content.title = "Processing Complete"
+        content.body = "\(succeeded) succeeded, \(failed) failed."
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
 
     private func writeLogFile(outputDirectory: URL) {
         let dateFormatter = DateFormatter()
