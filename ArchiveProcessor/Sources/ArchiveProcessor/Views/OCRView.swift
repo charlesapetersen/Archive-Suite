@@ -34,6 +34,7 @@ struct OCRView: View {
     @State private var isTargeted = false
     @State private var showKeychainSheet = false
     @State private var showResolutionTest = false
+    @State private var showResolutionDropSheet = false
     @State private var resolutionTestResults: [(scale: Int, text: String?)] = []
     @State private var resolutionTestImage: URL?
     @State private var isRunningResolutionTest = false
@@ -95,6 +96,15 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingDocumentReview) {
             DocumentSegmentReviewSheet(processor: processor)
+        }
+        .sheet(isPresented: $showResolutionDropSheet) {
+            ResolutionDropSheet { url in
+                showResolutionDropSheet = false
+                resolutionTestImage = url
+                runResolutionTest(imageURL: url)
+            } onDismiss: {
+                showResolutionDropSheet = false
+            }
         }
         .sheet(isPresented: $showResolutionTest) {
             ResolutionTestSheet(
@@ -345,7 +355,7 @@ struct OCRView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Slider(value: $imageScale, in: 20...100, step: 10)
+                            Slider(value: $imageScale, in: 5...100, step: 5)
                             if imageScale < 100 {
                                 Text("Images downscaled to \(Int(imageScale))% of original dimensions (\(Int(imageScale * imageScale / 100))% pixel count). Lower resolution reduces cost but may reduce OCR accuracy.")
                                     .font(.caption2)
@@ -353,14 +363,7 @@ struct OCRView: View {
                             }
 
                             Button("Test Resolution…") {
-                                let panel = NSOpenPanel()
-                                panel.allowedContentTypes = [.jpeg, .png, .tiff, .heic]
-                                panel.allowsMultipleSelection = false
-                                panel.message = "Select an image to test OCR at different resolutions"
-                                if panel.runModal() == .OK, let url = panel.url {
-                                    resolutionTestImage = url
-                                    runResolutionTest(imageURL: url)
-                                }
+                                showResolutionDropSheet = true
                             }
                             .font(.caption)
                             .disabled(apiKey.isEmpty || isRunningResolutionTest)
@@ -728,23 +731,21 @@ struct OCRView: View {
         isRunningResolutionTest = true
         resolutionTestResults = []
         showResolutionTest = true
-        let scales = [20, 40, 60, 80, 100]
+        let scales = [5, 20, 40, 60, 80, 100]
         let provider = selectedProvider
         let model = selectedModel
         let thinking = selectedModel.supportsThinking ? selectedThinking : nil
         let key = apiKey
 
         Task {
-            var results: [(scale: Int, text: String?)] = []
             for scale in scales {
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: provider, model: model,
                     thinkingLevel: thinking, apiKey: key,
                     imageScale: Double(scale) / 100.0
                 )
-                results.append((scale: scale, text: result.text))
+                resolutionTestResults.append((scale: scale, text: result.text))
             }
-            resolutionTestResults = results
             isRunningResolutionTest = false
         }
     }
@@ -1015,6 +1016,10 @@ struct CollectionReviewSheet: View {
         processor.collectionReviewItems.filter { $0.classification == .documentStart }.count
     }
 
+    private var hasBoxes: Bool {
+        boxCount > 0
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -1023,9 +1028,15 @@ struct CollectionReviewSheet: View {
                     Text("Review Box and Folder Identifications")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("Toggle between Box and Folder classifications. Edit collection names for boxes. Files between boxes are automatically assigned to the preceding box's collection.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if hasBoxes {
+                        Text("Toggle between Box and Folder classifications. Edit collection names for boxes. Files between boxes are automatically assigned to the preceding box's collection.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No box labels were identified. Enter a name for this collection.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
             }
@@ -1033,23 +1044,42 @@ struct CollectionReviewSheet: View {
 
             Divider()
 
-            // Box and folder list
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(processor.collectionReviewItems.indices, id: \.self) { idx in
-                        CollectionReviewRow(item: $processor.collectionReviewItems[idx])
+            if hasBoxes {
+                // Box and folder list
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(processor.collectionReviewItems.indices, id: \.self) { idx in
+                            CollectionReviewRow(item: $processor.collectionReviewItems[idx])
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+            } else {
+                // No boxes — show collection name text field
+                VStack(spacing: 12) {
+                    Spacer()
+                    Text("Collection Name")
+                        .font(.headline)
+                    TextField("Enter collection name", text: $processor.noBoxCollectionName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 400)
+                    Text("All \(processor.jobs.count) files will be organized into this collection.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
             }
 
             Divider()
 
             // Footer
             HStack {
-                Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")\(documentCount > 0 ? ", \(documentCount) reclassified as document" : "")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if hasBoxes {
+                    Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")\(documentCount > 0 ? ", \(documentCount) reclassified as document" : "")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Confirm and Organize") {
                     processor.confirmCollectionReview()
@@ -1059,9 +1089,8 @@ struct CollectionReviewSheet: View {
             }
             .padding()
         }
-        .frame(minWidth: 700, idealWidth: 1000, maxWidth: .infinity, minHeight: 500, idealHeight: 700, maxHeight: .infinity)
+        .frame(minWidth: 700, idealWidth: 1000, maxWidth: .infinity, minHeight: hasBoxes ? 500 : 250, idealHeight: hasBoxes ? 700 : 300, maxHeight: .infinity)
         .onAppear {
-            // Allow the sheet's hosting window to be resizable
             DispatchQueue.main.async {
                 if let window = NSApp.keyWindow {
                     window.styleMask.insert(.resizable)
@@ -1338,7 +1367,7 @@ struct DocumentReviewRow: View {
 
     @ViewBuilder
     private var thumbnail: some View {
-        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: Int(max(thumbnailSize * 2, 360))) {
+        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: Int(max(thumbnailSize * 2, 800))) {
             Image(nsImage: nsImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -1418,7 +1447,7 @@ struct ResolutionTestSheet: View {
 
             if isRunning && results.isEmpty {
                 Spacer()
-                ProgressView("Running OCR at 5 resolution levels…")
+                ProgressView("Running OCR at 6 resolution levels…")
                 Spacer()
             } else {
                 HSplitView {
@@ -1444,8 +1473,8 @@ struct ResolutionTestSheet: View {
                                 resolutionColumn(scale: entry.scale, text: entry.text, index: idx)
                             }
                             if isRunning {
-                                let scales = [20, 40, 60, 80, 100]
-                                ForEach(results.count..<5, id: \.self) { idx in
+                                let scales = [5, 20, 40, 60, 80, 100]
+                                ForEach(results.count..<6, id: \.self) { idx in
                                     VStack {
                                         Text("\(scales[idx])%")
                                             .font(.caption)
@@ -1498,5 +1527,73 @@ struct ResolutionTestSheet: View {
         .frame(minWidth: 180)
         .padding(8)
         .background(index % 2 == 0 ? Color.secondary.opacity(0.05) : Color.clear)
+    }
+}
+
+// MARK: - Resolution Drop Sheet
+
+struct ResolutionDropSheet: View {
+    let onSelect: (URL) -> Void
+    let onDismiss: () -> Void
+    @State private var isTargeted = false
+
+    private let dropTypes: [UTType] = [.fileURL]
+    private let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic"]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Select Image for Resolution Test")
+                .font(.headline)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    .foregroundStyle(isTargeted ? .blue : .secondary)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isTargeted ? Color.blue.opacity(0.1) : Color.secondary.opacity(0.05))
+                    )
+
+                VStack(spacing: 8) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                    Text("Drop an image here")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                    Text("JPEG, PNG, TIFF, or HEIC")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(height: 160)
+            .onDrop(of: dropTypes, isTargeted: $isTargeted) { providers in
+                guard let provider = providers.first else { return false }
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, _ in
+                    guard let data = data as? Data,
+                          let url = URL(dataRepresentation: data, relativeTo: nil, isAbsolute: true),
+                          imageExtensions.contains(url.pathExtension.lowercased()) else { return }
+                    DispatchQueue.main.async { onSelect(url) }
+                }
+                return true
+            }
+
+            HStack {
+                Button("Browse…") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.jpeg, .png, .tiff, .heic]
+                    panel.allowsMultipleSelection = false
+                    panel.message = "Select an image to test OCR at different resolutions"
+                    if panel.runModal() == .OK, let url = panel.url {
+                        onSelect(url)
+                    }
+                }
+                Spacer()
+                Button("Cancel") { onDismiss() }
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(24)
+        .frame(width: 380)
     }
 }

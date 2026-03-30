@@ -41,6 +41,7 @@ class OCRProcessor: ObservableObject {
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
     @Published var awaitingCollectionConfirmation = false
+    @Published var noBoxCollectionName: String = "Uncategorized"
     private var collectionConfirmationContinuation: CheckedContinuation<Void, Never>?
 
     /// Document segmentation review state
@@ -301,6 +302,21 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+            )
+        }
+
+        guard !Task.isCancelled else { return }
+
         if pending.enableTagging {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -314,21 +330,6 @@ class OCRProcessor: ObservableObject {
                 thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
                 outputDirectory: pending.outputDirectory,
                 enableSegmentJSON: pending.enableSegmentJSON
-            )
-        }
-
-        guard !Task.isCancelled else { return }
-
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
             )
         }
 
@@ -458,7 +459,23 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-        // Tagging
+        // Collection segmentation (before tagging, so review can update classifications)
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+            )
+        }
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Tagging (after review so classifications are final)
         if pending.enableTagging {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -474,22 +491,6 @@ class OCRProcessor: ObservableObject {
                 apiKey: apiKey,
                 outputDirectory: pending.outputDirectory,
                 enableSegmentJSON: pending.enableSegmentJSON
-            )
-        }
-
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-        // Collection segmentation
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
             )
         }
 
@@ -799,7 +800,23 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Phase 2: Segmentation + Tagging
+            // Phase 2: Collection Segmentation (before tagging, so review can update classifications)
+            if enableCollectionSegmentation {
+                await performCollectionSegmentation(
+                    files: files,
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory,
+                    confirmBeforeOrganizing: confirmCollectionIDs,
+                    reviewDocumentSegmentation: reviewDocumentSegmentation
+                )
+            }
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 3: Segmentation + Tagging (after review so classifications are final)
             if enableTagging {
                 statusMessage = "Segmenting documents…"
                 let segmenter = DocumentSegmenter()
@@ -815,22 +832,6 @@ class OCRProcessor: ObservableObject {
                     apiKey: apiKey,
                     outputDirectory: outputDirectory,
                     enableSegmentJSON: enableSegmentJSON
-                )
-            }
-
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-            // Phase 4: Collection Segmentation
-            if enableCollectionSegmentation {
-                await performCollectionSegmentation(
-                    files: files,
-                    provider: provider,
-                    model: model,
-                    thinkingLevel: thinkingLevel,
-                    apiKey: apiKey,
-                    outputDirectory: outputDirectory,
-                    confirmBeforeOrganizing: confirmCollectionIDs,
-                    reviewDocumentSegmentation: reviewDocumentSegmentation
                 )
             }
 
@@ -977,7 +978,23 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         progress = 0.5
 
-        // Step 3: Segmentation + Tagging
+        // Step 3: Collection Segmentation (before tagging, so review can update classifications)
+        if enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: files,
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: outputDirectory,
+                confirmBeforeOrganizing: confirmCollectionIDs,
+                reviewDocumentSegmentation: reviewDocumentSegmentation
+            )
+        }
+
+        guard !Task.isCancelled else { return }
+
+        // Step 4: Segmentation + Tagging (after review so classifications are final)
         if enableTagging {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -993,22 +1010,6 @@ class OCRProcessor: ObservableObject {
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 enableSegmentJSON: enableSegmentJSON
-            )
-        }
-
-        guard !Task.isCancelled else { return }
-
-        // Step 4: Collection Segmentation
-        if enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: files,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: outputDirectory,
-                confirmBeforeOrganizing: confirmCollectionIDs,
-                reviewDocumentSegmentation: reviewDocumentSegmentation
             )
         }
     }
@@ -1694,7 +1695,11 @@ class OCRProcessor: ObservableObject {
 
         // If confirmation is requested, build review items and wait for user
         if confirmBeforeOrganizing {
+            let hasBoxes = classifications.contains(where: { $0 == .boxLabel })
             buildReviewItems(files: files, classifications: classifications)
+            if !hasBoxes {
+                noBoxCollectionName = collectionSegments.first?.collectionName ?? "Uncategorized"
+            }
             statusMessage = "Review collection identifications before proceeding."
             awaitingCollectionConfirmation = true
 
@@ -1705,8 +1710,14 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { return }
 
-            // Apply user edits: rebuild collectionSegments from reviewItems
-            applyReviewEdits(files: files)
+            if !hasBoxes {
+                // No boxes — apply user-provided collection name
+                let name = noBoxCollectionName.trimmingCharacters(in: .whitespacesAndNewlines)
+                collectionSegments = [CollectionSegment(collectionName: name.isEmpty ? "Uncategorized" : name, fileURLs: files)]
+            } else {
+                // Apply user edits: rebuild collectionSegments from reviewItems
+                applyReviewEdits(files: files)
+            }
         }
 
         guard !collectionSegments.isEmpty, !Task.isCancelled else { return }
@@ -1878,7 +1889,7 @@ class OCRProcessor: ObservableObject {
 
             guard !items.isEmpty else { continue }
 
-            documentReviewItems = items
+            documentReviewItems = items.sorted { $0.fileIndex < $1.fileIndex }
             currentReviewCollectionName = collection.collectionName
             statusMessage = "Review document segmentation for \"\(collection.collectionName)\"."
             awaitingDocumentReview = true
