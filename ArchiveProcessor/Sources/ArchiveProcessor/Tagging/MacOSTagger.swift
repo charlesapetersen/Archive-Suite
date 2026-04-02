@@ -3,6 +3,18 @@ import AppKit
 
 struct MacOSTagger {
 
+    // Read macOS Finder tags from a file
+    static func readTags(from url: URL) -> [String] {
+        var tags: [String] = []
+        do {
+            let resourceValues = try url.resourceValues(forKeys: [.tagNamesKey])
+            tags = resourceValues.tagNames ?? []
+        } catch {
+            // Silently return empty if tags can't be read
+        }
+        return tags
+    }
+
     // Apply macOS Finder tags to a file
     static func applyTags(_ tags: [String], to url: URL) throws {
         var mutableURL = url

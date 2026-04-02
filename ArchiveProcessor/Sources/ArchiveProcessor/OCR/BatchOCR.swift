@@ -209,9 +209,16 @@ struct GeminiBatchClient: Sendable {
 
     private var baseURL: String { "https://generativelanguage.googleapis.com/v1beta" }
 
-    /// Submit a batch of OCR requests using file-based mode. Returns the batch name (e.g. "batches/123").
+    /// Maximum size for inline batch requests (20MB as per Gemini docs).
+    private static let inlineMaxBytes = 20 * 1024 * 1024
+    /// Maximum JSONL file size for file-based batch (2GB Gemini File API limit, with margin).
+    private static let fileMaxBytes = 1_900_000_000
+
+    /// Submit a batch of OCR requests. Uses inline requests when under 20MB, file upload otherwise.
+    /// For very large batches (>2GB), splits into multiple batch jobs.
+    /// Returns comma-separated batch names (e.g. "batches/123" or "batches/123,batches/456").
     func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
-        // Build JSONL content — one request per line
+        // Build JSONL lines for each file, tracking sizes for chunking
         var jsonlLines: [String] = []
 
         for (index, url) in fileURLs.enumerated() {
@@ -257,29 +264,102 @@ struct GeminiBatchClient: Sendable {
             throw OCRError.networkError("No valid images to process")
         }
 
+        // Calculate total size
+        let totalSize = jsonlLines.reduce(0) { $0 + $1.utf8.count + 1 } // +1 for newline
+
+        if totalSize < Self.inlineMaxBytes {
+            // Small batch — use inline requests
+            let batchName = try await submitInlineBatch(jsonlLines: jsonlLines)
+            return batchName
+        } else if totalSize < Self.fileMaxBytes {
+            // Medium batch — single file upload
+            let batchName = try await submitFileBatch(jsonlLines: jsonlLines)
+            return batchName
+        } else {
+            // Large batch — split into chunks under the file size limit
+            var chunks: [[String]] = []
+            var currentChunk: [String] = []
+            var currentSize = 0
+
+            for line in jsonlLines {
+                let lineSize = line.utf8.count + 1
+                if currentSize + lineSize > Self.fileMaxBytes && !currentChunk.isEmpty {
+                    chunks.append(currentChunk)
+                    currentChunk = []
+                    currentSize = 0
+                }
+                currentChunk.append(line)
+                currentSize += lineSize
+            }
+            if !currentChunk.isEmpty {
+                chunks.append(currentChunk)
+            }
+
+            var batchNames: [String] = []
+            for chunk in chunks {
+                let name = try await submitFileBatch(jsonlLines: chunk)
+                batchNames.append(name)
+            }
+            return batchNames.joined(separator: ",")
+        }
+    }
+
+    /// Submit a batch using inline requests (for small batches under 20MB).
+    private func submitInlineBatch(jsonlLines: [String]) async throws -> String {
+        // Parse JSONL lines back into request objects for inline format
+        var inlinedRequests: [[String: Any]] = []
+        for line in jsonlLines {
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            let key = obj["key"] as? String ?? ""
+            inlinedRequests.append([
+                "request": obj["request"] as Any,
+                "metadata": ["key": key]
+            ])
+        }
+
+        let batchBody: [String: Any] = [
+            "batch": [
+                "displayName": "archive-processor-ocr",
+                "inputConfig": [
+                    "requests": [
+                        "requests": inlinedRequests
+                    ] as [String: Any]
+                ] as [String: Any]
+            ] as [String: Any]
+        ]
+
+        return try await createBatchJob(body: batchBody)
+    }
+
+    /// Submit a batch using file upload (for batches over 20MB).
+    private func submitFileBatch(jsonlLines: [String]) async throws -> String {
         let jsonlContent = jsonlLines.joined(separator: "\n")
         guard let jsonlData = jsonlContent.data(using: .utf8) else {
             throw OCRError.networkError("Failed to create batch data")
         }
 
-        // Upload JSONL file via File API (resumable upload)
         let fileName = try await uploadFile(data: jsonlData)
 
-        // Create batch job referencing the uploaded file
         let batchBody: [String: Any] = [
             "batch": [
-                "display_name": "archive-processor-ocr",
-                "input_config": [
-                    "file_name": fileName
+                "displayName": "archive-processor-ocr",
+                "inputConfig": [
+                    "fileName": fileName
                 ] as [String: Any]
             ] as [String: Any]
         ]
 
+        return try await createBatchJob(body: batchBody)
+    }
+
+    /// Create a batch job with the given request body. Returns the batch name.
+    private func createBatchJob(body: [String: Any]) async throws -> String {
         let createURL = URL(string: "\(baseURL)/models/\(model.id):batchGenerateContent?key=\(apiKey)")!
         var request = URLRequest(url: createURL, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: batchBody)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await NetworkSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -291,8 +371,13 @@ struct GeminiBatchClient: Sendable {
             throw OCRError.networkError(errorMsg)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let batchName = json["name"] as? String else {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw OCRError.networkError("No batch name in response")
+        }
+
+        let metadata = json["metadata"] as? [String: Any]
+        guard let batchName = json["name"] as? String
+                ?? metadata?["name"] as? String else {
             throw OCRError.networkError("No batch name in response")
         }
 
@@ -347,6 +432,9 @@ struct GeminiBatchClient: Sendable {
     struct StatusResult: Sendable {
         let isComplete: Bool
         let state: String
+        /// Results returned inline in the status response (Gemini's default).
+        let inlineResults: [String: OCRResult]?
+        /// Result file for download-based retrieval (fallback).
         let resultFileName: String?
     }
 
@@ -362,23 +450,110 @@ struct GeminiBatchClient: Sendable {
             throw OCRError.networkError("Malformed status response")
         }
 
-        let state = json["state"] as? String ?? ""
-        let isComplete = ["JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"].contains(state)
+        // State and output may be at top level or nested under "metadata"
+        let metadata = json["metadata"] as? [String: Any]
+        let state = metadata?["state"] as? String
+            ?? json["state"] as? String
+            ?? ""
 
-        // Result file location — check various possible field paths
+        let completedStates = [
+            "BATCH_STATE_SUCCEEDED", "BATCH_STATE_FAILED", "BATCH_STATE_CANCELLED", "BATCH_STATE_EXPIRED",
+            "JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"
+        ]
+        let isComplete = completedStates.contains(state)
+
+        // Try to extract inline results from response or metadata
+        var inlineResults: [String: OCRResult]? = nil
+        if isComplete {
+            // Results can be at response.inlinedResponses.inlinedResponses
+            // or metadata.output.inlinedResponses.inlinedResponses
+            let responseObj = json["response"] as? [String: Any]
+            let metaOutput = metadata?["output"] as? [String: Any]
+
+            let inlinedContainer = responseObj?["inlinedResponses"] as? [String: Any]
+                ?? metaOutput?["inlinedResponses"] as? [String: Any]
+
+            if let responses = inlinedContainer?["inlinedResponses"] as? [[String: Any]] {
+                inlineResults = Self.parseInlinedResponses(responses)
+            }
+        }
+
+        // Fallback: result file location for download-based retrieval
+        let metaDest = metadata?["dest"] as? [String: Any]
+        let metaOutputConfig = metadata?["outputConfig"] as? [String: Any]
         let dest = json["dest"] as? [String: Any]
-        let resultFileName = dest?["fileName"] as? String
+        let resultFileName = metaDest?["file_name"] as? String
+            ?? metaDest?["fileName"] as? String
+            ?? metaOutputConfig?["file_name"] as? String
+            ?? metaOutputConfig?["fileName"] as? String
             ?? dest?["file_name"] as? String
-            ?? (json["outputConfig"] as? [String: Any])?["fileName"] as? String
+            ?? dest?["fileName"] as? String
 
         return StatusResult(
             isComplete: isComplete,
             state: state,
+            inlineResults: inlineResults,
             resultFileName: resultFileName
         )
     }
 
-    /// Retrieve results from the batch output file. Returns key → OCRResult mapping.
+    /// Parse inline batch responses into OCRResult dictionary.
+    /// Each entry has: { "response": { "candidates": [...] }, "metadata": { "key": "0" } }
+    private static func parseInlinedResponses(_ responses: [[String: Any]]) -> [String: OCRResult] {
+        var results: [String: OCRResult] = [:]
+
+        for entry in responses {
+            let entryMeta = entry["metadata"] as? [String: Any]
+            let key = entryMeta?["key"] as? String ?? ""
+            guard !key.isEmpty else { continue }
+
+            // Normalize key: API returns "0", "1" etc. but app uses "file-0", "file-1"
+            let normalizedKey = key.hasPrefix("file-") ? key : "file-\(key)"
+
+            if let error = entry["error"] as? [String: Any] {
+                let errorMsg = error["message"] as? String ?? "Batch request failed"
+                results[normalizedKey] = OCRResult(text: nil, classification: nil, errorMessage: errorMsg, errorCode: (error["code"] as? Int).map { "\($0)" })
+                continue
+            }
+
+            guard let response = entry["response"] as? [String: Any] else {
+                results[normalizedKey] = OCRResult(text: nil, classification: nil, errorMessage: "No response in batch entry", errorCode: nil)
+                continue
+            }
+
+            results[normalizedKey] = parseSingleResponse(response)
+        }
+
+        return results
+    }
+
+    /// Parse a single generateContent response object into an OCRResult.
+    private static func parseSingleResponse(_ response: [String: Any]) -> OCRResult {
+        if let promptFeedback = response["promptFeedback"] as? [String: Any],
+           let blockReason = promptFeedback["blockReason"] as? String {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Content blocked by Gemini: \(blockReason)", errorCode: blockReason)
+        }
+
+        guard let candidates = response["candidates"] as? [[String: Any]],
+              let first = candidates.first else {
+            return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
+        }
+
+        if let finishReason = first["finishReason"] as? String, finishReason == "RECITATION" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
+        }
+
+        guard let content = first["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]] else {
+            return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
+        }
+
+        let rawText = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+    }
+
+    /// Retrieve results from a batch output file (fallback if results aren't inlined).
     func retrieveResults(resultFileName: String) async throws -> [String: OCRResult] {
         let downloadBase = "https://generativelanguage.googleapis.com/download/v1beta"
         let downloadURL = URL(string: "\(downloadBase)/\(resultFileName):download?alt=media&key=\(apiKey)")!
@@ -398,44 +573,16 @@ struct GeminiBatchClient: Sendable {
             let key = json["key"] as? String ?? ""
             guard !key.isEmpty else { continue }
 
-            // Check for error response
+            let normalizedKey = key.hasPrefix("file-") ? key : "file-\(key)"
+
             if let error = json["error"] as? [String: Any] {
                 let errorMsg = error["message"] as? String ?? "Batch request failed"
-                results[key] = OCRResult(text: nil, classification: nil, errorMessage: errorMsg, errorCode: (error["code"] as? Int).map { "\($0)" })
+                results[normalizedKey] = OCRResult(text: nil, classification: nil, errorMessage: errorMsg, errorCode: (error["code"] as? Int).map { "\($0)" })
                 continue
             }
 
-            // Parse generateContent response — may be under "response" key or at top level
             let response = json["response"] as? [String: Any] ?? json
-
-            // Check for content blocking
-            if let promptFeedback = response["promptFeedback"] as? [String: Any],
-               let blockReason = promptFeedback["blockReason"] as? String {
-                results[key] = OCRResult(text: nil, classification: nil, errorMessage: "Content blocked by Gemini: \(blockReason)", errorCode: blockReason)
-                continue
-            }
-
-            guard let candidates = response["candidates"] as? [[String: Any]],
-                  let first = candidates.first else {
-                results[key] = OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
-                continue
-            }
-
-            // Check for recitation
-            if let finishReason = first["finishReason"] as? String, finishReason == "RECITATION" {
-                results[key] = OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
-                continue
-            }
-
-            guard let content = first["content"] as? [String: Any],
-                  let parts = content["parts"] as? [[String: Any]] else {
-                results[key] = OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
-                continue
-            }
-
-            let rawText = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
-            let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
-            results[key] = OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+            results[normalizedKey] = Self.parseSingleResponse(response)
         }
 
         return results

@@ -38,6 +38,9 @@ class OCRProcessor: ObservableObject {
 
     @Published var pendingBatchInfo: String?
 
+    /// When true, copy macOS tags from source images to output PDFs instead of LLM tagging
+    var passSourceTags = false
+
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
     @Published var awaitingCollectionConfirmation = false
@@ -317,7 +320,7 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
-        if pending.enableTagging {
+        if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
@@ -338,8 +341,11 @@ class OCRProcessor: ObservableObject {
         isProcessing = false
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
-        if pending.enableTagging {
+        if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+        }
+        if passSourceTags {
+            statusMessage += " Source tags copied."
         }
         if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
             statusMessage += " \(collectionSegments.count) collections organized."
@@ -476,7 +482,7 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { cleanupTempFiles(); return }
 
         // Tagging (after review so classifications are final)
-        if pending.enableTagging {
+        if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
@@ -506,8 +512,11 @@ class OCRProcessor: ObservableObject {
         isProcessing = false
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
-        if pending.enableTagging {
+        if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+        }
+        if passSourceTags {
+            statusMessage += " Source tags copied."
         }
         if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
             statusMessage += " \(collectionSegments.count) collections organized."
@@ -529,6 +538,14 @@ class OCRProcessor: ObservableObject {
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
         try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
         outputURLMap[sourceURL] = outputURL
+        // Copy source tags to output PDF if pass-through mode is enabled
+        if passSourceTags {
+            let sourceTags = MacOSTagger.readTags(from: sourceURL)
+            if !sourceTags.isEmpty {
+                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                jobs[index].appliedTags = sourceTags
+            }
+        }
     }
 
     /// OCR only specific file indices (for resuming interrupted runs).
@@ -662,7 +679,9 @@ class OCRProcessor: ObservableObject {
                     await client.cancelBatch(batchId: batch.batchId)
                 case .gemini:
                     let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    await client.cancelBatch(batchName: batch.batchId)
+                    for singleId in batch.batchId.components(separatedBy: ",") {
+                        await client.cancelBatch(batchName: singleId)
+                    }
                 }
             }
         }
@@ -817,7 +836,7 @@ class OCRProcessor: ObservableObject {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
             // Phase 3: Segmentation + Tagging (after review so classifications are final)
-            if enableTagging {
+            if enableTagging && !passSourceTags {
                 statusMessage = "Segmenting documents…"
                 let segmenter = DocumentSegmenter()
                 let classifications = jobs.map { $0.result?.classification }
@@ -849,8 +868,11 @@ class OCRProcessor: ObservableObject {
         isProcessing = false
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
-        if enableTagging {
+        if enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+        }
+        if passSourceTags {
+            statusMessage += " Source tags copied."
         }
         if enableCollectionSegmentation && !collectionSegments.isEmpty {
             statusMessage += " \(collectionSegments.count) collections organized."
@@ -940,7 +962,7 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
 
         // Step 2: Classify files that lack classification (text-only LLM calls)
-        let needsClassification = (enableTagging || enableCollectionSegmentation)
+        let needsClassification = ((enableTagging && !passSourceTags) || enableCollectionSegmentation)
         let unclassifiedIndices = jobs.indices.filter {
             jobs[$0].result?.classification == nil && jobs[$0].result?.text != nil
         }
@@ -995,7 +1017,7 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
 
         // Step 4: Segmentation + Tagging (after review so classifications are final)
-        if enableTagging {
+        if enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
@@ -1011,6 +1033,15 @@ class OCRProcessor: ObservableObject {
                 outputDirectory: outputDirectory,
                 enableSegmentJSON: enableSegmentJSON
             )
+        } else if passSourceTags {
+            // For pre-OCRed input, source tags are on the input PDFs themselves
+            for (index, url) in files.enumerated() {
+                let sourceTags = MacOSTagger.readTags(from: url)
+                if !sourceTags.isEmpty, let outputURL = outputURLMap[url] {
+                    try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                    jobs[index].appliedTags = sourceTags
+                }
+            }
         }
     }
 
@@ -1241,16 +1272,46 @@ class OCRProcessor: ObservableObject {
 
                 case .gemini:
                     let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    let status = try await client.checkStatus(batchName: batchId)
-                    statusMessage = "Batch processing… (\(status.state.replacingOccurrences(of: "JOB_STATE_", with: "").lowercased()))"
+                    // Gemini may have multiple batch IDs (comma-separated) for large batches
+                    let geminiBatchIds = batchId.components(separatedBy: ",")
+                    var allComplete = true
+                    var anyFailed = false
+                    var stateDisplays: [String] = []
 
-                    if status.isComplete {
-                        if status.state == "JOB_STATE_SUCCEEDED", let fileName = status.resultFileName {
-                            statusMessage = "Retrieving batch results…"
-                            let results = try await client.retrieveResults(resultFileName: fileName)
-                            processBatchResults(results, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                    for singleBatchId in geminiBatchIds {
+                        let status = try await client.checkStatus(batchName: singleBatchId)
+                        let stateDisplay = status.state
+                            .replacingOccurrences(of: "BATCH_STATE_", with: "")
+                            .replacingOccurrences(of: "JOB_STATE_", with: "")
+                            .lowercased()
+                        stateDisplays.append(stateDisplay)
+
+                        if !status.isComplete {
+                            allComplete = false
                         } else {
-                            statusMessage = "Batch \(status.state.replacingOccurrences(of: "JOB_STATE_", with: "").lowercased())"
+                            let succeeded = status.state == "BATCH_STATE_SUCCEEDED" || status.state == "JOB_STATE_SUCCEEDED"
+                            if succeeded {
+                                if let inlineResults = status.inlineResults {
+                                    processBatchResults(inlineResults, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                                } else if let fileName = status.resultFileName {
+                                    let results = try await client.retrieveResults(resultFileName: fileName)
+                                    processBatchResults(results, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                                }
+                            } else {
+                                anyFailed = true
+                            }
+                        }
+                    }
+
+                    if geminiBatchIds.count > 1 {
+                        let completedCount = stateDisplays.filter { $0 == "succeeded" || $0 == "failed" || $0 == "cancelled" || $0 == "expired" }.count
+                        statusMessage = "Batch processing… \(completedCount)/\(geminiBatchIds.count) chunks (\(stateDisplays.first ?? "unknown"))"
+                    } else {
+                        statusMessage = "Batch processing… (\(stateDisplays.first ?? "unknown"))"
+                    }
+
+                    if allComplete {
+                        if anyFailed {
                             for i in jobs.indices where jobs[i].status == .processing {
                                 jobs[i].status = .failed
                                 failedFiles.append(jobs[i].sourceURL.lastPathComponent)
@@ -1479,6 +1540,14 @@ class OCRProcessor: ObservableObject {
         try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
         // Map by original source URL so tagging/collection segmentation can find it
         outputURLMap[sourceURL] = outputURL
+        // Copy source tags to output PDF if pass-through mode is enabled
+        if passSourceTags {
+            let sourceTags = MacOSTagger.readTags(from: sourceURL)
+            if !sourceTags.isEmpty {
+                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                jobs[index].appliedTags = sourceTags
+            }
+        }
         // Persist result for resume-after-restart
         saveResultToPendingRun(index: index, result: result)
     }

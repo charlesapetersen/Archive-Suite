@@ -15,6 +15,7 @@ struct OCRView: View {
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
     @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
     @AppStorage("enableTagging") private var enableTagging: Bool = true
+    @AppStorage("passSourceTags") private var passSourceTags: Bool = false
     @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
@@ -282,6 +283,17 @@ struct OCRView: View {
                         Toggle("Enable tagging", isOn: $enableTagging)
 
                         if enableTagging {
+                            Toggle("Copy source file tags to output PDFs", isOn: $passSourceTags)
+                                .font(.caption)
+                                .padding(.leading, 16)
+                            if passSourceTags {
+                                Text("Reads macOS Finder tags from each source image and applies them to the output PDF. Skips LLM-based tagging.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 32)
+                            }
+
+                            if !passSourceTags {
                             Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
                                 .font(.caption)
                                 .padding(.leading, 16)
@@ -312,6 +324,7 @@ struct OCRView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
+                            } // end if !passSourceTags
                         }
 
                         Divider()
@@ -395,7 +408,7 @@ struct OCRView: View {
                                     Text(est.classificationFormatted)
                                 }
                             }
-                            if enableTagging {
+                            if enableTagging && !passSourceTags {
                                 HStack {
                                     Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
                                     Spacer()
@@ -782,6 +795,7 @@ struct OCRView: View {
             customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
             imageScale: imageScale / 100.0
         )
+        processor.passSourceTags = passSourceTags && enableTagging
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
