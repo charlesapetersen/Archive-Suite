@@ -40,6 +40,8 @@ class OCRProcessor: ObservableObject {
 
     /// When true, copy macOS tags from source images to output PDFs instead of LLM tagging
     var passSourceTags = false
+    /// When true, merge continuation pages into single multi-page PDFs
+    var mergeDocuments = false
 
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
@@ -336,6 +338,26 @@ class OCRProcessor: ObservableObject {
             )
         }
 
+        if mergeDocuments {
+            performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
+        }
+
+        // Organize into collection folders (after merge so merged PDFs get moved)
+        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
+            let segmenter = CollectionSegmenter()
+            statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
+            do {
+                try segmenter.organizeOutput(
+                    collections: collectionSegments,
+                    outputDirectory: pending.outputDirectory,
+                    outputURLMap: outputURLMap
+                )
+                statusMessage = "Collections organized into \(collectionSegments.count) folders."
+            } catch {
+                statusMessage = "Error organizing collections: \(error.localizedDescription)"
+            }
+        }
+
         guard !Task.isCancelled else { return }
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
@@ -498,6 +520,26 @@ class OCRProcessor: ObservableObject {
                 outputDirectory: pending.outputDirectory,
                 enableSegmentJSON: pending.enableSegmentJSON
             )
+        }
+
+        if mergeDocuments {
+            performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
+        }
+
+        // Organize into collection folders (after merge so merged PDFs get moved)
+        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
+            let segmenter = CollectionSegmenter()
+            statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
+            do {
+                try segmenter.organizeOutput(
+                    collections: collectionSegments,
+                    outputDirectory: pending.outputDirectory,
+                    outputURLMap: outputURLMap
+                )
+                statusMessage = "Collections organized into \(collectionSegments.count) folders."
+            } catch {
+                statusMessage = "Error organizing collections: \(error.localizedDescription)"
+            }
         }
 
         cleanupTempFiles()
@@ -854,6 +896,27 @@ class OCRProcessor: ObservableObject {
                 )
             }
 
+            // Phase 4: Merge multi-page documents (before collection organization moves files)
+            if mergeDocuments {
+                performDocumentMerging(files: files, outputDirectory: outputDirectory)
+            }
+
+            // Phase 5: Organize into collection folders (after merge so merged PDFs get moved)
+            if enableCollectionSegmentation && !collectionSegments.isEmpty {
+                let segmenter = CollectionSegmenter()
+                statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
+                do {
+                    try segmenter.organizeOutput(
+                        collections: collectionSegments,
+                        outputDirectory: outputDirectory,
+                        outputURLMap: outputURLMap
+                    )
+                    statusMessage = "Collections organized into \(collectionSegments.count) folders."
+                } catch {
+                    statusMessage = "Error organizing collections: \(error.localizedDescription)"
+                }
+            }
+
             cleanupTempFiles()
         }
 
@@ -1041,6 +1104,22 @@ class OCRProcessor: ObservableObject {
                     try? MacOSTagger.applyTags(sourceTags, to: outputURL)
                     jobs[index].appliedTags = sourceTags
                 }
+            }
+        }
+
+        // Organize into collection folders (after all processing)
+        if enableCollectionSegmentation && !collectionSegments.isEmpty {
+            let segmenter = CollectionSegmenter()
+            statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
+            do {
+                try segmenter.organizeOutput(
+                    collections: collectionSegments,
+                    outputDirectory: outputDirectory,
+                    outputURLMap: outputURLMap
+                )
+                statusMessage = "Collections organized into \(collectionSegments.count) folders."
+            } catch {
+                statusMessage = "Error organizing collections: \(error.localizedDescription)"
             }
         }
     }
@@ -1690,8 +1769,14 @@ class OCRProcessor: ObservableObject {
 
     private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL) {
         guard let firstFile = segment.pdfURLs.first else { return }
-        let baseName = firstFile.deletingPathExtension().lastPathComponent
-        let jsonURL = outputDirectory.appendingPathComponent(baseName + ".json")
+        // Write JSON next to the output PDF, using its base name so they match
+        let jsonURL: URL
+        if let outputPDF = outputURLMap[firstFile] {
+            jsonURL = outputPDF.deletingPathExtension().appendingPathExtension("json")
+        } else {
+            let baseName = firstFile.deletingPathExtension().lastPathComponent
+            jsonURL = outputDirectory.appendingPathComponent(baseName + ".json")
+        }
 
         // Build body text with image markers
         var bodyParts: [String] = []
@@ -1727,6 +1812,72 @@ class OCRProcessor: ObservableObject {
 
         guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else { return }
         try? data.write(to: jsonURL, options: .atomic)
+    }
+
+    // MARK: - Document Merging
+
+    /// Merge multi-page document segments into single PDFs.
+    /// Each segment with >1 page gets combined. Single-page segments are left as-is.
+    private func performDocumentMerging(files: [URL], outputDirectory: URL) {
+        // Build segments from current classifications if not already built
+        let segs: [DocumentSegment]
+        if segments.isEmpty {
+            let segmenter = DocumentSegmenter()
+            let classifications = jobs.map { $0.result?.classification }
+            let texts = jobs.map { $0.result?.text ?? "" }
+            segs = segmenter.segment(files: files, classifications: classifications, texts: texts)
+        } else {
+            segs = segments
+        }
+
+        let multiPageSegments = segs.filter { $0.pdfURLs.count > 1 && !$0.isBox && !$0.isFolder }
+        guard !multiPageSegments.isEmpty else { return }
+
+        statusMessage = "Merging \(multiPageSegments.count) multi-page documents…"
+        let pdfGen = PDFGenerator()
+
+        for (segIdx, segment) in multiPageSegments.enumerated() {
+            // Collect the individual output PDFs for this segment
+            let sourcePDFs = segment.pdfURLs.compactMap { outputURLMap[$0] }
+            guard sourcePDFs.count > 1 else { continue }
+
+            // Name the merged PDF after the first page
+            let firstSource = segment.pdfURLs[0]
+            let baseName = firstSource.deletingPathExtension().lastPathComponent
+            let mergedURL = outputDirectory.appendingPathComponent(baseName + "_merged.pdf")
+
+            do {
+                try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)
+
+                // Apply tags from the first page's individual PDF to the merged PDF
+                if let firstJob = jobs.first(where: { $0.sourceURL == firstSource }) {
+                    if !firstJob.appliedTags.isEmpty {
+                        try? MacOSTagger.applyTags(firstJob.appliedTags, to: mergedURL)
+                    }
+                }
+
+                // Delete the individual PDFs that were merged
+                for pdfURL in sourcePDFs {
+                    try? FileManager.default.removeItem(at: pdfURL)
+                }
+
+                // Rename the JSON file to match the merged PDF name
+                let originalJSONURL = outputDirectory.appendingPathComponent(baseName + ".json")
+                let mergedJSONURL = outputDirectory.appendingPathComponent(baseName + "_merged.json")
+                if FileManager.default.fileExists(atPath: originalJSONURL.path) {
+                    try? FileManager.default.moveItem(at: originalJSONURL, to: mergedJSONURL)
+                }
+
+                // Update outputURLMap: point all source URLs in this segment to the merged PDF
+                for sourceURL in segment.pdfURLs {
+                    outputURLMap[sourceURL] = mergedURL
+                }
+
+                statusMessage = "Merged document \(segIdx + 1)/\(multiPageSegments.count): \(baseName) (\(sourcePDFs.count) pages)"
+            } catch {
+                statusMessage = "Failed to merge \(baseName): \(error.localizedDescription)"
+            }
+        }
     }
 
     // MARK: - Phase 4: Collection Segmentation
@@ -1797,17 +1948,6 @@ class OCRProcessor: ObservableObject {
             guard !Task.isCancelled else { return }
         }
 
-        statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
-        do {
-            try segmenter.organizeOutput(
-                collections: collectionSegments,
-                outputDirectory: outputDirectory,
-                outputURLMap: outputURLMap
-            )
-            statusMessage = "Collections organized into \(collectionSegments.count) folders."
-        } catch {
-            statusMessage = "Error organizing collections: \(error.localizedDescription)"
-        }
     }
 
     /// Build review items from current classifications and collection segments.

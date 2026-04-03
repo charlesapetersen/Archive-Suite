@@ -81,8 +81,8 @@ struct PDFGenerator {
 
         guard !jpegData.isEmpty else { return nil }
 
-        // Detect color space from the image
-        let numComponents = cgImage.colorSpace?.numberOfComponents ?? 3
+        // Detect color space from the final (possibly rotated) image
+        let numComponents = finalImage.colorSpace?.numberOfComponents ?? 3
         let colorSpace: String
         switch numComponents {
         case 1: colorSpace = "/DeviceGray"
@@ -188,14 +188,25 @@ struct PDFGenerator {
             newHeight = h
         }
 
+        // Use source color space and appropriate bitmap info
+        let space = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo: UInt32
+        if space.numberOfComponents == 1 {
+            // Grayscale — no alpha channel
+            bitmapInfo = CGImageAlphaInfo.none.rawValue
+        } else {
+            // RGB — use noneSkipLast for compatibility
+            bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
+        }
+
         guard let context = CGContext(
             data: nil,
             width: newWidth,
             height: newHeight,
             bitsPerComponent: 8,
             bytesPerRow: 0,
-            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            space: space,
+            bitmapInfo: bitmapInfo
         ) else { return nil }
 
         context.translateBy(x: CGFloat(newWidth) / 2, y: CGFloat(newHeight) / 2)
@@ -297,6 +308,29 @@ struct PDFGenerator {
     private func pdfPageFromData(_ data: NSMutableData) -> PDFPage? {
         guard let doc = PDFDocument(data: data as Data) else { return nil }
         return doc.page(at: 0)
+    }
+
+    // MARK: - Multi-page Document Merging
+
+    /// Merge multiple individual per-page PDFs into a single multi-page PDF.
+    /// Each source PDF has [image page, text page]. The merged PDF interleaves them:
+    /// image1, text1, image2, text2, ...
+    /// Returns the URLs of source PDFs that were merged (for deletion).
+    func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL) throws {
+        let merged = PDFDocument()
+        var pageIndex = 0
+
+        for pdfURL in sourcePDFs {
+            guard let doc = PDFDocument(url: pdfURL) else { continue }
+            for i in 0..<doc.pageCount {
+                guard let page = doc.page(at: i) else { continue }
+                merged.insert(page, at: pageIndex)
+                pageIndex += 1
+            }
+        }
+
+        guard merged.pageCount > 0 else { throw PDFError.writeFailed }
+        guard merged.write(to: outputURL) else { throw PDFError.writeFailed }
     }
 }
 

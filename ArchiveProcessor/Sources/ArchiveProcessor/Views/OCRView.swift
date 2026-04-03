@@ -21,6 +21,7 @@ struct OCRView: View {
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
+    @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
 
     // Initialized from persisted state in init()
@@ -39,6 +40,15 @@ struct OCRView: View {
     @State private var resolutionTestResults: [(scale: Int, text: String?)] = []
     @State private var resolutionTestImage: URL?
     @State private var isRunningResolutionTest = false
+
+    // Model comparison test state
+    @State private var showModelSelectionSheet = false
+    @State private var showModelTestDropSheet = false
+    @State private var showModelTestResults = false
+    @State private var modelTestSelections: [ModelTestEntry] = []
+    @State private var modelTestResults: [ModelTestResult] = []
+    @State private var modelTestImage: URL?
+    @State private var isRunningModelTest = false
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
@@ -117,6 +127,41 @@ struct OCRView: View {
                     showResolutionTest = false
                 },
                 onDismiss: { showResolutionTest = false }
+            )
+        }
+        .sheet(isPresented: $showModelSelectionSheet) {
+            ModelSelectionSheet(
+                currentProvider: selectedProvider,
+                onStart: { entries in
+                    modelTestSelections = entries
+                    showModelSelectionSheet = false
+                    showModelTestDropSheet = true
+                },
+                onDismiss: { showModelSelectionSheet = false }
+            )
+        }
+        .sheet(isPresented: $showModelTestDropSheet) {
+            ResolutionDropSheet { url in
+                showModelTestDropSheet = false
+                modelTestImage = url
+                runModelTest(imageURL: url)
+            } onDismiss: {
+                showModelTestDropSheet = false
+            }
+        }
+        .sheet(isPresented: $showModelTestResults) {
+            ModelTestResultsSheet(
+                imageURL: modelTestImage,
+                results: modelTestResults,
+                isRunning: isRunningModelTest,
+                totalCount: modelTestSelections.count,
+                onSelect: { provider, model in
+                    selectedProvider = provider
+                    selectedModel = model
+                    apiKey = KeychainHelper.load(account: provider.rawValue) ?? ""
+                    showModelTestResults = false
+                },
+                onDismiss: { showModelTestResults = false }
             )
         }
         .onChange(of: selectedModel) { _, newModel in
@@ -214,6 +259,12 @@ struct OCRView: View {
                             }
                             .pickerStyle(.segmented)
                         }
+
+                        Button("Compare Models…") {
+                            showModelSelectionSheet = true
+                        }
+                        .font(.caption)
+                        .disabled(isRunningModelTest)
                     }
                     .padding(4)
                 }
@@ -329,6 +380,16 @@ struct OCRView: View {
 
                         Divider()
 
+                        Toggle("Merge multi-page documents", isOn: $mergeDocuments)
+                        if mergeDocuments {
+                            Text("Combines continuation pages into single multi-page PDFs. Each page's image is followed by its OCR text.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 16)
+                        }
+
+                        Divider()
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Custom prompt (optional):")
                                 .font(.caption)
@@ -351,7 +412,12 @@ struct OCRView: View {
                 GroupBox("Processing Mode") {
                     VStack(alignment: .leading, spacing: 6) {
                         Toggle("Batch Mode (slower, ~50% cheaper)", isOn: $batchMode)
-                        if batchMode {
+                            .disabled(selectedProvider == .gemini)
+                        if selectedProvider == .gemini {
+                            Text("Gemini batch processing is temporarily unavailable due to a Google API infrastructure issue. Individual requests still work normally.")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        } else if batchMode {
                             Text("Batch jobs are queued and returned asynchronously. Results may take minutes to hours.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -428,7 +494,7 @@ struct OCRView: View {
                                 Spacer()
                                 Text(est.totalStandardFormatted).fontWeight(.medium)
                             }
-                            if batchMode && !preOCRedInput {
+                            if batchMode && !preOCRedInput && selectedProvider != .gemini {
                                 HStack {
                                     Text("Total (batch):").foregroundStyle(.secondary)
                                     Spacer()
@@ -744,7 +810,7 @@ struct OCRView: View {
         isRunningResolutionTest = true
         resolutionTestResults = []
         showResolutionTest = true
-        let scales = [5, 20, 40, 60, 80, 100]
+        let scales = [10, 20, 40, 60, 80, 100]
         let provider = selectedProvider
         let model = selectedModel
         let thinking = selectedModel.supportsThinking ? selectedThinking : nil
@@ -760,6 +826,32 @@ struct OCRView: View {
                 resolutionTestResults.append((scale: scale, text: result.text))
             }
             isRunningResolutionTest = false
+        }
+    }
+
+    private func runModelTest(imageURL: URL) {
+        isRunningModelTest = true
+        modelTestResults = []
+        showModelTestResults = true
+        let entries = modelTestSelections
+        let scale = imageScale / 100.0
+
+        Task {
+            for entry in entries {
+                let result = await OCRProcessor.performResolutionTestCall(
+                    imageURL: imageURL, provider: entry.provider, model: entry.model,
+                    thinkingLevel: entry.model.supportsThinking ? .low : nil,
+                    apiKey: entry.apiKey,
+                    imageScale: scale
+                )
+                modelTestResults.append(ModelTestResult(
+                    provider: entry.provider,
+                    model: entry.model,
+                    text: result.text,
+                    errorMessage: result.errorMessage
+                ))
+            }
+            isRunningModelTest = false
         }
     }
 
@@ -796,6 +888,7 @@ struct OCRView: View {
             imageScale: imageScale / 100.0
         )
         processor.passSourceTags = passSourceTags && enableTagging
+        processor.mergeDocuments = mergeDocuments
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
@@ -804,7 +897,7 @@ struct OCRView: View {
                 thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
                 apiKey: apiKey,
                 outputDirectory: outDir,
-                batchMode: batchMode,
+                batchMode: selectedProvider == .gemini ? false : batchMode,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
@@ -1236,7 +1329,7 @@ struct CollectionReviewRow: View {
 
 struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
-    @State private var thumbnailSize: CGFloat = 120
+    @State private var thumbnailSize: CGFloat = 400
 
     private var newDocCount: Int {
         processor.documentReviewItems.filter { $0.classification == .documentStart }.count
@@ -1277,7 +1370,7 @@ struct DocumentSegmentReviewSheet: View {
                 Image(systemName: "photo.artframe")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Slider(value: $thumbnailSize, in: 60...400, step: 10)
+                Slider(value: $thumbnailSize, in: 60...800, step: 10)
                 Image(systemName: "photo.artframe")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -1448,12 +1541,24 @@ struct ResolutionTestSheet: View {
     let onSelect: (Int) -> Void
     let onDismiss: () -> Void
 
+    @State private var showDiff = true
+
+    /// The 100% result text, used as diff baseline
+    private var baselineText: String? {
+        results.first(where: { $0.scale == 100 })?.text
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Resolution Test")
                     .font(.headline)
                 Spacer()
+                if baselineText != nil {
+                    Toggle("Highlight differences", isOn: $showDiff)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                }
                 Button("Cancel") { onDismiss() }
                     .buttonStyle(.bordered)
             }
@@ -1487,7 +1592,7 @@ struct ResolutionTestSheet: View {
                                 resolutionColumn(scale: entry.scale, text: entry.text, index: idx)
                             }
                             if isRunning {
-                                let scales = [5, 20, 40, 60, 80, 100]
+                                let scales = [10, 20, 40, 60, 80, 100]
                                 ForEach(results.count..<6, id: \.self) { idx in
                                     VStack {
                                         Text("\(scales[idx])%")
@@ -1513,23 +1618,63 @@ struct ResolutionTestSheet: View {
     }
 
     private func resolutionColumn(scale: Int, text: String?, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let diffResult: WordDiff.DiffResult? = {
+            guard showDiff, scale != 100, let baseline = baselineText, let text = text else { return nil }
+            return WordDiff.diff(baseline: baseline, candidate: text)
+        }()
+
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("\(scale)%")
                     .font(.caption)
                     .fontWeight(.semibold)
+                if let diff = diffResult {
+                    similarityBadge(diff.similarity)
+                }
                 Spacer()
                 Button("Use") { onSelect(scale) }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
             }
+            if let diff = diffResult {
+                HStack(spacing: 8) {
+                    if diff.missing > 0 {
+                        Label("\(diff.missing) missing", systemImage: "minus.circle")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.red)
+                    }
+                    if diff.added > 0 {
+                        Label("\(diff.added) added", systemImage: "plus.circle")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.blue)
+                    }
+                    if diff.changed > 0 {
+                        Label("\(diff.changed) changed", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+            if scale == 100 && showDiff {
+                Text("Baseline")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .italic()
+            }
             Divider()
             ScrollView {
                 if let text = text {
-                    Text(text)
-                        .font(.system(size: 10, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let diff = diffResult {
+                        diffHighlightedText(diff)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text(text)
+                            .font(.system(size: 10, design: .monospaced))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 } else {
                     Text("No text returned")
                         .font(.caption)
@@ -1538,9 +1683,626 @@ struct ResolutionTestSheet: View {
                 }
             }
         }
-        .frame(minWidth: 180)
+        .frame(width: 220)
         .padding(8)
         .background(index % 2 == 0 ? Color.secondary.opacity(0.05) : Color.clear)
+    }
+
+    private func similarityBadge(_ similarity: Double) -> some View {
+        let pct = Int(round(similarity * 100))
+        let color: Color = similarity >= 0.95 ? .green
+            : similarity >= 0.85 ? .yellow
+            : similarity >= 0.70 ? .orange
+            : .red
+        return Text("\(pct)%")
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(color.opacity(0.2))
+            .foregroundStyle(color)
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    private func diffHighlightedText(_ diff: WordDiff.DiffResult) -> some View {
+        Text(WordDiff.buildAttributedString(from: diff.elements))
+            .textSelection(.enabled)
+    }
+}
+
+// MARK: - Word-level Diff Engine
+
+enum WordDiff {
+    enum Element {
+        case equal(String)
+        case inserted(String)
+        case deleted(String)
+        case changed(String, String) // (baseline, candidate)
+        case whitespace(String)
+    }
+
+    struct DiffResult {
+        let elements: [Element]
+        let similarity: Double
+        let missing: Int  // words in baseline but not candidate
+        let added: Int    // words in candidate but not baseline
+        let changed: Int  // words that differ between baseline and candidate
+    }
+
+    /// Tokenize text preserving whitespace as separate tokens
+    private static func tokenize(_ text: String) -> [(word: String, isWhitespace: Bool)] {
+        var tokens: [(String, Bool)] = []
+        var current = ""
+        var inWhitespace = false
+
+        for ch in text {
+            let charIsWS = ch.isWhitespace || ch.isNewline
+            if charIsWS != inWhitespace && !current.isEmpty {
+                tokens.append((current, inWhitespace))
+                current = ""
+            }
+            inWhitespace = charIsWS
+            current.append(ch)
+        }
+        if !current.isEmpty {
+            tokens.append((current, inWhitespace))
+        }
+        return tokens
+    }
+
+    /// Extract just the words (non-whitespace tokens) for LCS comparison
+    private static func words(from tokens: [(word: String, isWhitespace: Bool)]) -> [String] {
+        tokens.filter { !$0.isWhitespace }.map { $0.word }
+    }
+
+    /// Longest Common Subsequence returning aligned pairs: (baselineIndex?, candidateIndex?)
+    private static func lcs(_ a: [String], _ b: [String]) -> [(Int?, Int?)] {
+        let m = a.count, n = b.count
+        // Build LCS table
+        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+        for i in 1...max(m, 1) {
+            guard i <= m else { break }
+            for j in 1...max(n, 1) {
+                guard j <= n else { break }
+                if a[i-1].lowercased() == b[j-1].lowercased() {
+                    dp[i][j] = dp[i-1][j-1] + 1
+                } else {
+                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+                }
+            }
+        }
+
+        // Backtrack to get alignment
+        var result: [(Int?, Int?)] = []
+        var i = m, j = n
+        while i > 0 || j > 0 {
+            if i > 0 && j > 0 && a[i-1].lowercased() == b[j-1].lowercased() {
+                result.append((i-1, j-1))
+                i -= 1; j -= 1
+            } else if j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j]) {
+                result.append((nil, j-1))
+                j -= 1
+            } else {
+                result.append((i-1, nil))
+                i -= 1
+            }
+        }
+        return result.reversed()
+    }
+
+    static func diff(baseline: String, candidate: String) -> DiffResult {
+        let baseTokens = tokenize(baseline)
+        let candTokens = tokenize(candidate)
+        let baseWords = words(from: baseTokens)
+        let candWords = words(from: candTokens)
+
+        let aligned = lcs(baseWords, candWords)
+
+        // Build a set of which candidate word indices are "equal" vs "inserted"
+        // and reconstruct the display from the candidate's token stream
+        var candWordStatus: [Int: (matched: Bool, baseIdx: Int?)] = [:]
+        var missingCount = 0
+        var addedCount = 0
+        var changedCount = 0
+
+        for (baseIdx, candIdx) in aligned {
+            if let bi = baseIdx, let ci = candIdx {
+                // Check if exact match or just case-insensitive match
+                if baseWords[bi] == candWords[ci] {
+                    candWordStatus[ci] = (matched: true, baseIdx: bi)
+                } else {
+                    candWordStatus[ci] = (matched: false, baseIdx: bi)
+                    changedCount += 1
+                }
+            } else if baseIdx != nil {
+                missingCount += 1
+            } else if let ci = candIdx {
+                candWordStatus[ci] = (matched: false, baseIdx: nil)
+                addedCount += 1
+            }
+        }
+
+        // Build display elements from candidate token stream, interleaving deleted words
+        var elements: [Element] = []
+        var candWordIdx = 0
+
+        // Rebuild from candidate tokens, inserting deleted markers
+        // First, build a map of "before candidate word index X, insert these deleted baseline words"
+        var deletionsBeforeCandWord: [Int: [Int]] = [:]
+        var pendingDeletions: [Int] = []
+        for (bi, ci) in aligned {
+            if let bi = bi, ci == nil {
+                pendingDeletions.append(bi)
+            } else if let ci = ci {
+                if !pendingDeletions.isEmpty {
+                    deletionsBeforeCandWord[ci] = pendingDeletions
+                    pendingDeletions = []
+                }
+            }
+        }
+        // Any remaining deletions go at the end
+        let trailingDeletions = pendingDeletions
+
+        candWordIdx = 0
+        for token in candTokens {
+            if token.isWhitespace {
+                elements.append(.whitespace(token.word))
+            } else {
+                // Insert any deletions that should appear before this candidate word
+                if let dels = deletionsBeforeCandWord[candWordIdx] {
+                    for di in dels {
+                        elements.append(.deleted(baseWords[di]))
+                        elements.append(.whitespace(" "))
+                    }
+                }
+
+                if let status = candWordStatus[candWordIdx] {
+                    if status.matched {
+                        elements.append(.equal(token.word))
+                    } else if let bi = status.baseIdx {
+                        elements.append(.changed(baseWords[bi], token.word))
+                    } else {
+                        elements.append(.inserted(token.word))
+                    }
+                } else {
+                    elements.append(.inserted(token.word))
+                }
+                candWordIdx += 1
+            }
+        }
+
+        // Append trailing deletions
+        for di in trailingDeletions {
+            elements.append(.whitespace(" "))
+            elements.append(.deleted(baseWords[di]))
+        }
+
+        let totalBaseWords = baseWords.count
+        let matchedWords = totalBaseWords - missingCount - changedCount
+        let similarity = totalBaseWords > 0 ? Double(max(0, matchedWords)) / Double(totalBaseWords) : 1.0
+
+        return DiffResult(
+            elements: elements,
+            similarity: similarity,
+            missing: missingCount,
+            added: addedCount,
+            changed: changedCount
+        )
+    }
+
+    static func buildAttributedString(from elements: [Element]) -> AttributedString {
+        var attributed = AttributedString()
+        for element in elements {
+            var part: AttributedString
+            switch element {
+            case .equal(let word):
+                part = AttributedString(word)
+                part.font = .system(size: 10, design: .monospaced)
+            case .inserted(let word):
+                part = AttributedString(word)
+                part.font = .system(size: 10, design: .monospaced).bold()
+                part.foregroundColor = .blue
+                part.backgroundColor = Color.blue.opacity(0.12)
+            case .deleted(let word):
+                part = AttributedString(word)
+                part.font = .system(size: 10, design: .monospaced).bold()
+                part.foregroundColor = .red
+                part.strikethroughStyle = .single
+                part.backgroundColor = Color.red.opacity(0.12)
+            case .changed(let from, let to):
+                var fromPart = AttributedString(from)
+                fromPart.font = .system(size: 10, design: .monospaced).bold()
+                fromPart.foregroundColor = .red
+                fromPart.strikethroughStyle = .single
+                fromPart.backgroundColor = Color.red.opacity(0.12)
+                var toPart = AttributedString(to)
+                toPart.font = .system(size: 10, design: .monospaced).bold()
+                toPart.foregroundColor = .orange
+                toPart.backgroundColor = Color.orange.opacity(0.12)
+                attributed.append(fromPart)
+                part = toPart
+            case .whitespace(let ws):
+                part = AttributedString(ws)
+                part.font = .system(size: 10, design: .monospaced)
+            }
+            attributed.append(part)
+        }
+        return attributed
+    }
+}
+
+// MARK: - Model Test Data Types
+
+struct ModelTestEntry: Identifiable {
+    let id = UUID()
+    let provider: LLMProvider
+    let model: LLMModel
+    let apiKey: String
+}
+
+struct ModelTestResult: Identifiable {
+    let id = UUID()
+    let provider: LLMProvider
+    let model: LLMModel
+    let text: String?
+    let errorMessage: String?
+}
+
+// MARK: - Model Selection Sheet
+
+struct ModelSelectionSheet: View {
+    let currentProvider: LLMProvider
+    let onStart: ([ModelTestEntry]) -> Void
+    let onDismiss: () -> Void
+
+    @State private var selections: [String: Bool] = [:]  // model.id -> selected
+    @State private var apiKeys: [String: String] = [:]    // provider.rawValue -> key
+
+    private var allModels: [(provider: LLMProvider, model: LLMModel)] {
+        LLMProvider.allCases.flatMap { provider in
+            provider.models.map { (provider: provider, model: $0) }
+        }
+    }
+
+    /// Models sorted by cost descending (most expensive first)
+    private var sortedModels: [(provider: LLMProvider, model: LLMModel)] {
+        allModels.sorted { $0.model.inputCostPer1M + $0.model.outputCostPer1M > $1.model.inputCostPer1M + $1.model.outputCostPer1M }
+    }
+
+    private var selectedEntries: [ModelTestEntry] {
+        // Return selected models sorted by cost descending (most expensive = baseline first)
+        sortedModels
+            .filter { selections[$0.model.id] == true }
+            .compactMap { pair in
+                guard let key = apiKeys[pair.provider.rawValue], !key.isEmpty else { return nil }
+                return ModelTestEntry(provider: pair.provider, model: pair.model, apiKey: key)
+            }
+    }
+
+    private var missingKeys: Set<String> {
+        var providers = Set<String>()
+        for pair in allModels where selections[pair.model.id] == true {
+            let key = apiKeys[pair.provider.rawValue] ?? ""
+            if key.isEmpty { providers.insert(pair.provider.rawValue) }
+        }
+        return providers
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Select Models to Compare")
+                    .font(.headline)
+                Spacer()
+                Button("Cancel") { onDismiss() }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(LLMProvider.allCases) { provider in
+                        providerSection(provider)
+                    }
+                }
+                .padding()
+            }
+
+            Divider()
+
+            HStack {
+                let count = selectedEntries.count
+                Text("\(count) model\(count == 1 ? "" : "s") selected")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !missingKeys.isEmpty {
+                    Text("— missing API key for: \(missingKeys.sorted().joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Spacer()
+                Button("Select Image…") {
+                    UserDefaults.standard.set(selections, forKey: "modelTestSelections")
+                    onStart(selectedEntries)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selectedEntries.count < 2)
+            }
+            .padding()
+        }
+        .frame(width: 500, height: 520)
+        .onAppear {
+            // Load saved API keys for all providers
+            for provider in LLMProvider.allCases {
+                apiKeys[provider.rawValue] = KeychainHelper.load(account: provider.rawValue) ?? ""
+            }
+            // Restore previously saved model selections, or default to current provider's first model
+            if let saved = UserDefaults.standard.dictionary(forKey: "modelTestSelections") as? [String: Bool], !saved.isEmpty {
+                selections = saved
+            } else if let firstModel = currentProvider.models.first {
+                selections[firstModel.id] = true
+            }
+        }
+    }
+
+    private func providerSection(_ provider: LLMProvider) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(provider.rawValue)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                let key = Binding(
+                    get: { apiKeys[provider.rawValue] ?? "" },
+                    set: { apiKeys[provider.rawValue] = $0 }
+                )
+                SecureField("API Key", text: key)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
+                    .font(.caption)
+            }
+
+            ForEach(provider.models) { model in
+                let isOn = Binding(
+                    get: { selections[model.id] ?? false },
+                    set: { selections[model.id] = $0 }
+                )
+                HStack {
+                    Toggle(model.displayName, isOn: isOn)
+                        .font(.caption)
+                    Spacer()
+                    Text(formatCost(model))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.leading, 16)
+            }
+        }
+    }
+
+    private func formatCost(_ model: LLMModel) -> String {
+        let total = model.inputCostPer1M + model.outputCostPer1M
+        if total < 1.0 {
+            return String(format: "$%.3f/M", total)
+        } else {
+            return String(format: "$%.2f/M", total)
+        }
+    }
+}
+
+// MARK: - Model Test Results Sheet
+
+struct ModelTestResultsSheet: View {
+    let imageURL: URL?
+    let results: [ModelTestResult]
+    let isRunning: Bool
+    let totalCount: Int
+    let onSelect: (LLMProvider, LLMModel) -> Void
+    let onDismiss: () -> Void
+
+    @State private var showDiff = true
+
+    /// The baseline is the most expensive model that returned text
+    private var baselineResult: ModelTestResult? {
+        results
+            .filter { $0.text != nil }
+            .max(by: { ($0.model.inputCostPer1M + $0.model.outputCostPer1M) < ($1.model.inputCostPer1M + $1.model.outputCostPer1M) })
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Model Comparison")
+                    .font(.headline)
+                Spacer()
+                if baselineResult != nil {
+                    Toggle("Highlight differences", isOn: $showDiff)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                }
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            if isRunning && results.isEmpty {
+                Spacer()
+                ProgressView("Running OCR on \(totalCount) models…")
+                Spacer()
+            } else {
+                HSplitView {
+                    // Left: original image
+                    VStack {
+                        Text("Original Image")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let url = imageURL, let nsImage = NSImage(contentsOf: url) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    .frame(minWidth: 250)
+                    .padding(8)
+
+                    // Right: results columns
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: 1) {
+                            ForEach(Array(results.enumerated()), id: \.offset) { idx, entry in
+                                modelResultColumn(entry: entry, index: idx)
+                            }
+                            if isRunning {
+                                ForEach(results.count..<totalCount, id: \.self) { _ in
+                                    VStack {
+                                        Text("…")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                        Spacer()
+                                        ProgressView()
+                                        Spacer()
+                                    }
+                                    .frame(minWidth: 200)
+                                    .padding(8)
+                                    .background(Color.secondary.opacity(0.05))
+                                }
+                            }
+                        }
+                    }
+                    .frame(minWidth: 400)
+                }
+            }
+        }
+        .frame(minWidth: 900, minHeight: 500)
+        .frame(idealWidth: 1300, idealHeight: 700)
+    }
+
+    private func modelResultColumn(entry: ModelTestResult, index: Int) -> some View {
+        let isBaseline = baselineResult?.model.id == entry.model.id
+        let diffResult: WordDiff.DiffResult? = {
+            guard showDiff, !isBaseline, let baseline = baselineResult?.text, let text = entry.text else { return nil }
+            return WordDiff.diff(baseline: baseline, candidate: text)
+        }()
+
+        return VStack(alignment: .leading, spacing: 4) {
+            // Header: provider + model name
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.provider.rawValue)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(entry.model.displayName)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    if let diff = diffResult {
+                        similarityBadge(diff.similarity)
+                    }
+                }
+            }
+
+            HStack {
+                // Cost indicator
+                Text(formatCost(entry.model))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Button("Use") { onSelect(entry.provider, entry.model) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+
+            if isBaseline && showDiff {
+                Text("Baseline (most expensive)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .italic()
+            }
+
+            // Diff stats
+            if let diff = diffResult {
+                HStack(spacing: 6) {
+                    if diff.missing > 0 {
+                        Label("\(diff.missing)", systemImage: "minus.circle")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.red)
+                    }
+                    if diff.added > 0 {
+                        Label("\(diff.added)", systemImage: "plus.circle")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.blue)
+                    }
+                    if diff.changed > 0 {
+                        Label("\(diff.changed)", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Text content
+            ScrollView {
+                if let text = entry.text {
+                    if let diff = diffResult {
+                        Text(WordDiff.buildAttributedString(from: diff.elements))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text(text)
+                            .font(.system(size: 10, design: .monospaced))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else if let err = entry.errorMessage {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Error")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .fontWeight(.semibold)
+                        Text(err)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("No text returned")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .italic()
+                }
+            }
+        }
+        .frame(width: 240)
+        .padding(8)
+        .background(index % 2 == 0 ? Color.secondary.opacity(0.05) : Color.clear)
+    }
+
+    private func similarityBadge(_ similarity: Double) -> some View {
+        let pct = Int(round(similarity * 100))
+        let color: Color = similarity >= 0.95 ? .green
+            : similarity >= 0.85 ? .yellow
+            : similarity >= 0.70 ? .orange
+            : .red
+        return Text("\(pct)%")
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(color.opacity(0.2))
+            .foregroundStyle(color)
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    private func formatCost(_ model: LLMModel) -> String {
+        let total = model.inputCostPer1M + model.outputCostPer1M
+        if total < 1.0 {
+            return String(format: "$%.3f/M tokens", total)
+        } else {
+            return String(format: "$%.2f/M tokens", total)
+        }
     }
 }
 

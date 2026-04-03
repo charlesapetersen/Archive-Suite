@@ -29,11 +29,13 @@ struct OCRPrompt {
           • Same formatting, letterhead, and layout as the previous page with text flowing continuously
           A page is ONLY a continuation if it is clearly part of the same single document. When uncertain, prefer [document_start].
 
-        TASK 2 — ORIENTATION. Images may be rotated sideways or upside down. Determine the correct orientation by examining text direction. On line 2, write the clockwise rotation needed to make the image upright:
-        [rotate_0] — Image is already correctly oriented.
-        [rotate_90] — Image needs 90° clockwise rotation (text reads bottom-to-top on the left side).
-        [rotate_180] — Image is upside down and needs 180° rotation.
-        [rotate_270] — Image needs 270° clockwise rotation (text reads top-to-bottom on the right side).
+        TASK 2 — ORIENTATION (CRITICAL). Many of these photographs are rotated sideways or upside down as displayed in the raw pixels. You MUST examine the actual pixel orientation of text in the image — do NOT assume the image is upright just because you can read the text. Look at whether text baselines are horizontal, vertical, or inverted relative to the image frame.
+        On line 2, write the clockwise rotation needed to make the image upright:
+        [rotate_0] — Text baselines are horizontal and text reads left-to-right normally. Image is already correctly oriented.
+        [rotate_90] — Text baselines are vertical, reading bottom-to-top on the left side of the image. Needs 90° clockwise rotation.
+        [rotate_180] — Text is upside down (baselines horizontal but text is inverted). Needs 180° rotation.
+        [rotate_270] — Text baselines are vertical, reading top-to-bottom on the right side of the image. Needs 270° clockwise rotation.
+        IMPORTANT: Examine the raw visual orientation of text carefully. If text appears sideways or upside down in the image, it IS rotated — even if you can still read it.
         When the image shows a folder with a tab, orient based on the folder tab and label, not fragments of documents visible inside the folder.
 
         TASK 3 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
@@ -85,8 +87,11 @@ struct OCRPrompt {
                 contentStartLine = max(contentStartLine, i + 1)
                 break
             }
-            // Stop searching if we already found a classification and this line has no tag
-            if classification != nil && parseRotationTag(lines[i]) == nil {
+            // Skip blank lines when searching for rotation tag after classification
+            if classification != nil {
+                let trimmedLine = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedLine.isEmpty { continue }
+                // Non-blank, non-rotation line after classification — stop searching
                 break
             }
         }
