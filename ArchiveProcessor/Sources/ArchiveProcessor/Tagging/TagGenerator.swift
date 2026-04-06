@@ -17,6 +17,14 @@ struct GeneratedTags {
     var recipientLocation: String?
     var publicationName: String?
 
+    /// Capitalize only the first letter of each word, preserving the rest (unlike .capitalized which lowercases non-initial letters).
+    static func capitalizeFirstLetters(_ string: String) -> String {
+        string.split(separator: " ", omittingEmptySubsequences: false).map { word in
+            guard let first = word.first else { return String(word) }
+            return String(first).uppercased() + word.dropFirst()
+        }.joined(separator: " ")
+    }
+
     var allTags: [String] {
         var tags: [String] = []
         if ocrFailed {
@@ -25,10 +33,10 @@ struct GeneratedTags {
             return tags
         }
         if let y = year { tags.append(y) }
-        if let m = month { tags.append(m.capitalized) }
+        if let m = month { tags.append(Self.capitalizeFirstLetters(m)) }
         if let d = day { tags.append(d) }
-        tags.append(contentsOf: subjectTags.map { $0.capitalized })
         if dateUncertain { tags.append("Date Uncertain") }
+        tags.append(contentsOf: subjectTags.map { Self.capitalizeFirstLetters($0) })
         if let c = colorTag { tags.append(c) }
         return tags
     }
@@ -56,7 +64,8 @@ class TagGenerator: ObservableObject {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        vocabulary: [String] = []
     ) async -> GeneratedTags {
         // Box/folder: just a color tag
         if segment.isBox { return GeneratedTags(subjectTags: ["Box"], colorTag: "Red") }
@@ -100,18 +109,17 @@ class TagGenerator: ObservableObject {
         }
 
         Rules:
-        - "year": 4-digit year string if determinable, or null if not
+        - "year": 4-digit year string. ALWAYS provide a year — if not stated in the document, estimate from nearby documents or contextual clues. Never return null for year.
         - "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
         - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
         - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
-        - "subject_tags": 2–6 general-but-specific subject tags (e.g. "Democratic Party", "taxes", "education", "transportation", "business", "literature", "economics", "foreign policy", "civil rights", "military", "journalism", "science", "health care", "labor unions"). Do NOT use overly broad terms like "politics" or "history".
+        - "subject_tags": \(vocabulary.isEmpty ? "2–6 general-but-specific subject tags (e.g. \"Democratic Party\", \"taxes\", \"education\", \"transportation\", \"business\", \"literature\", \"economics\", \"foreign policy\", \"civil rights\", \"military\", \"journalism\", \"science\", \"health care\", \"labor unions\"). Do NOT use overly broad terms like \"politics\" or \"history\"." : "2–6 tags chosen ONLY from this controlled vocabulary: [\(vocabulary.map { "\"\($0)\"" }.joined(separator: ", "))]. Use only tags from this list that are relevant to the document. Do not invent new tags.")
         - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
         - "author_name": author, sender, or writer name if identifiable, or null
         - "recipient_name": recipient or addressee name if identifiable, or null
         - "author_location": author's or sender's location if identifiable, or null
         - "recipient_location": recipient's location if identifiable, or null
         - "publication_name": newspaper, magazine, or publication name if applicable, or null
-        - If date_uncertain is true, still attempt to estimate year from nearby documents.
         - Respond with ONLY the JSON object. No commentary.
         """
 

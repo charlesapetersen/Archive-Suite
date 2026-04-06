@@ -24,6 +24,7 @@ struct DocumentReviewItem: Identifiable {
     let fileName: String
     let fileURL: URL
     var classification: DocumentClassification?
+    var rotationDegrees: Int = 0
 }
 
 @MainActor
@@ -42,6 +43,8 @@ class OCRProcessor: ObservableObject {
     var passSourceTags = false
     /// When true, merge continuation pages into single multi-page PDFs
     var mergeDocuments = false
+    /// Optional controlled vocabulary for subject tags (one per line)
+    var tagVocabulary: [String] = []
 
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
@@ -54,6 +57,13 @@ class OCRProcessor: ObservableObject {
     @Published var awaitingDocumentReview = false
     @Published var currentReviewCollectionName: String = ""
     private var documentReviewContinuation: CheckedContinuation<Void, Never>?
+
+    /// Interactive workflow pause states
+    @Published var awaitingSegmentationReview = false   // After OCR, before tagging
+    @Published var awaitingFinalReview = false           // After tagging, before completion
+    private var segmentationReviewContinuation: CheckedContinuation<Void, Never>?
+    enum FinalReviewAction { case complete, redoTagging }
+    private var finalReviewContinuation: CheckedContinuation<FinalReviewAction, Never>?
 
     /// Retry dialog state
     enum RetryAction {
@@ -705,6 +715,15 @@ class OCRProcessor: ObservableObject {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
+        awaitingSegmentationReview = false
+        awaitingFinalReview = false
+        awaitingDocumentReview = false
+        documentReviewContinuation?.resume()
+        documentReviewContinuation = nil
+        segmentationReviewContinuation?.resume()
+        segmentationReviewContinuation = nil
+        finalReviewContinuation?.resume(returning: .complete)
+        finalReviewContinuation = nil
         cleanupTempFiles()
 
         // Cancel server-side batch if active
@@ -861,7 +880,69 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Phase 2: Collection Segmentation (before tagging, so review can update classifications)
+            // Interactive Review: Show document segmentation review dialog for all files
+            if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
+                await showFullSegmentationReview(files: files)
+                guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+                // Rebuild segments from user-confirmed classifications
+                let segmenter = DocumentSegmenter()
+                let updatedClassifications = jobs.map { $0.result?.classification }
+                let updatedTexts = jobs.map { $0.result?.text ?? "" }
+                segments = segmenter.segment(files: files, classifications: updatedClassifications, texts: updatedTexts)
+            }
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 2: Tagging loop with redo support
+            if enableTagging && !passSourceTags {
+                var shouldRedoTagging = true
+                while shouldRedoTagging {
+                    statusMessage = "Found \(segments.count) segments. Generating tags…"
+
+                    await performTaggingPhase(
+                        provider: provider,
+                        model: model,
+                        thinkingLevel: thinkingLevel,
+                        apiKey: apiKey,
+                        outputDirectory: outputDirectory,
+                        enableSegmentJSON: enableSegmentJSON
+                    )
+
+                    guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+                    // Interactive Review Point 2: Pause for final review after tagging
+                    statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
+                    isProcessing = false
+                    awaitingFinalReview = true
+
+                    let action: FinalReviewAction = await withCheckedContinuation { continuation in
+                        finalReviewContinuation = continuation
+                    }
+
+                    guard !Task.isCancelled else { cleanupTempFiles(); return }
+                    isProcessing = true
+
+                    switch action {
+                    case .complete:
+                        shouldRedoTagging = false
+                    case .redoTagging:
+                        // Rebuild segments from potentially updated classifications
+                        let segmenter = DocumentSegmenter()
+                        let redoClassifications = jobs.map { $0.result?.classification }
+                        let redoTexts = jobs.map { $0.result?.text ?? "" }
+                        segments = segmenter.segment(files: files, classifications: redoClassifications, texts: redoTexts)
+                        // Clear existing tags before re-tagging
+                        for i in jobs.indices {
+                            jobs[i].appliedTags = []
+                        }
+                    }
+                }
+            }
+
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Phase 3: Collection Segmentation + name review (after tagging review, last step before completion)
             if enableCollectionSegmentation {
                 await performCollectionSegmentation(
                     files: files,
@@ -871,30 +952,11 @@ class OCRProcessor: ObservableObject {
                     apiKey: apiKey,
                     outputDirectory: outputDirectory,
                     confirmBeforeOrganizing: confirmCollectionIDs,
-                    reviewDocumentSegmentation: reviewDocumentSegmentation
+                    reviewDocumentSegmentation: false
                 )
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-            // Phase 3: Segmentation + Tagging (after review so classifications are final)
-            if enableTagging && !passSourceTags {
-                statusMessage = "Segmenting documents…"
-                let segmenter = DocumentSegmenter()
-                let classifications = jobs.map { $0.result?.classification }
-                let texts = jobs.map { $0.result?.text ?? "" }
-                segments = segmenter.segment(files: files, classifications: classifications, texts: texts)
-                statusMessage = "Found \(segments.count) segments. Generating tags…"
-
-                await performTaggingPhase(
-                    provider: provider,
-                    model: model,
-                    thinkingLevel: thinkingLevel,
-                    apiKey: apiKey,
-                    outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON
-                )
-            }
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
             if mergeDocuments {
@@ -903,10 +965,10 @@ class OCRProcessor: ObservableObject {
 
             // Phase 5: Organize into collection folders (after merge so merged PDFs get moved)
             if enableCollectionSegmentation && !collectionSegments.isEmpty {
-                let segmenter = CollectionSegmenter()
+                let segmenter2 = CollectionSegmenter()
                 statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
                 do {
-                    try segmenter.organizeOutput(
+                    try segmenter2.organizeOutput(
                         collections: collectionSegments,
                         outputDirectory: outputDirectory,
                         outputURLMap: outputURLMap
@@ -1063,39 +1125,59 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         progress = 0.5
 
-        // Step 3: Collection Segmentation (before tagging, so review can update classifications)
-        if enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: files,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: outputDirectory,
-                confirmBeforeOrganizing: confirmCollectionIDs,
-                reviewDocumentSegmentation: reviewDocumentSegmentation
-            )
+        // Interactive Review: Show document segmentation review dialog for all files
+        if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
+            await showFullSegmentationReview(files: files)
+            guard !Task.isCancelled else { return }
+
+            // Rebuild segments from user-confirmed classifications
+            let segmenter = DocumentSegmenter()
+            let updatedClassifications = jobs.map { $0.result?.classification }
+            let updatedTexts = jobs.map { $0.result?.text ?? "" }
+            segments = segmenter.segment(files: files, classifications: updatedClassifications, texts: updatedTexts)
         }
 
         guard !Task.isCancelled else { return }
 
-        // Step 4: Segmentation + Tagging (after review so classifications are final)
+        // Step 3: Tagging loop with redo support
         if enableTagging && !passSourceTags {
-            statusMessage = "Segmenting documents…"
-            let segmenter = DocumentSegmenter()
-            let classifications = jobs.map { $0.result?.classification }
-            let texts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: files, classifications: classifications, texts: texts)
-            statusMessage = "Found \(segments.count) segments. Generating tags…"
+            var shouldRedoTagging = true
+            while shouldRedoTagging {
+                statusMessage = "Found \(segments.count) segments. Generating tags…"
 
-            await performTaggingPhase(
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: outputDirectory,
-                enableSegmentJSON: enableSegmentJSON
-            )
+                await performTaggingPhase(
+                    provider: provider,
+                    model: model,
+                    thinkingLevel: thinkingLevel,
+                    apiKey: apiKey,
+                    outputDirectory: outputDirectory,
+                    enableSegmentJSON: enableSegmentJSON
+                )
+
+                guard !Task.isCancelled else { return }
+
+                statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
+                isProcessing = false
+                awaitingFinalReview = true
+
+                let action: FinalReviewAction = await withCheckedContinuation { continuation in
+                    finalReviewContinuation = continuation
+                }
+
+                guard !Task.isCancelled else { return }
+                isProcessing = true
+
+                switch action {
+                case .complete:
+                    shouldRedoTagging = false
+                case .redoTagging:
+                    let segmenter = DocumentSegmenter()
+                    let redoClassifications = jobs.map { $0.result?.classification }
+                    let redoTexts = jobs.map { $0.result?.text ?? "" }
+                    segments = segmenter.segment(files: files, classifications: redoClassifications, texts: redoTexts)
+                    for i in jobs.indices { jobs[i].appliedTags = [] }
+                }
+            }
         } else if passSourceTags {
             // For pre-OCRed input, source tags are on the input PDFs themselves
             for (index, url) in files.enumerated() {
@@ -1107,12 +1189,28 @@ class OCRProcessor: ObservableObject {
             }
         }
 
+        guard !Task.isCancelled else { return }
+
+        // Step 4: Collection Segmentation + name review (last step before completion)
+        if enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: files,
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: outputDirectory,
+                confirmBeforeOrganizing: confirmCollectionIDs,
+                reviewDocumentSegmentation: false
+            )
+        }
+
         // Organize into collection folders (after all processing)
         if enableCollectionSegmentation && !collectionSegments.isEmpty {
-            let segmenter = CollectionSegmenter()
+            let segmenter2 = CollectionSegmenter()
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
-                try segmenter.organizeOutput(
+                try segmenter2.organizeOutput(
                     collections: collectionSegments,
                     outputDirectory: outputDirectory,
                     outputURLMap: outputURLMap
@@ -1741,7 +1839,8 @@ class OCRProcessor: ObservableObject {
                 provider: provider,
                 model: model,
                 thinkingLevel: thinkingLevel,
-                apiKey: apiKey
+                apiKey: apiKey,
+                vocabulary: tagVocabulary
             )
 
             // Apply tags to the OUTPUT PDF files, not the source images
@@ -1795,7 +1894,7 @@ class OCRProcessor: ObservableObject {
             dict["date"] = date
         }
         dict["date_uncertain"] = tags.dateUncertain
-        dict["subjects"] = tags.subjectTags
+        dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
 
         if let v = tags.format { dict["format"] = v }
         if let v = tags.authorName { dict["author_name"] = v }
@@ -1920,7 +2019,7 @@ class OCRProcessor: ObservableObject {
             if !hasBoxes {
                 noBoxCollectionName = collectionSegments.first?.collectionName ?? "Uncategorized"
             }
-            statusMessage = "Review collection identifications before proceeding."
+            statusMessage = "Review collection names before proceeding."
             awaitingCollectionConfirmation = true
 
             // Suspend until the user confirms
@@ -1951,6 +2050,7 @@ class OCRProcessor: ObservableObject {
     }
 
     /// Build review items from current classifications and collection segments.
+    /// Only includes box labels — segmentation is already finalized at this point.
     private func buildReviewItems(files: [URL], classifications: [DocumentClassification?]) {
         // Build a map from file URL to collection name using the current segments
         var fileToCollection: [URL: String] = [:]
@@ -1960,11 +2060,10 @@ class OCRProcessor: ObservableObject {
             }
         }
 
-        // Only include box and folder labels for review
+        // Only include box labels for collection name review
         collectionReviewItems = files.enumerated().compactMap { (index, url) in
             let cls = index < classifications.count ? classifications[index] : nil
-            guard cls == .boxLabel || cls == .folderLabel else { return nil }
-            let isBox = cls == .boxLabel
+            guard cls == .boxLabel else { return nil }
             let collection = fileToCollection[url] ?? "Uncategorized"
             return CollectionReviewItem(
                 fileIndex: index,
@@ -1972,7 +2071,7 @@ class OCRProcessor: ObservableObject {
                 fileURL: url,
                 classification: cls,
                 collectionName: collection,
-                isBoxLabel: isBox
+                isBoxLabel: true
             )
         }
     }
@@ -2088,11 +2187,13 @@ class OCRProcessor: ObservableObject {
                 guard let idx = files.firstIndex(of: url) else { return nil }
                 let cls = idx < classifications.count ? classifications[idx] : nil
                 guard cls != .boxLabel && cls != .folderLabel else { return nil }
+                let rot = idx < jobs.count ? (jobs[idx].result?.rotationDegrees ?? 0) : 0
                 return DocumentReviewItem(
                     fileIndex: idx,
                     fileName: url.lastPathComponent,
                     fileURL: url,
-                    classification: cls
+                    classification: cls,
+                    rotationDegrees: rot
                 )
             }
 
@@ -2125,6 +2226,121 @@ class OCRProcessor: ObservableObject {
         awaitingDocumentReview = false
         documentReviewContinuation?.resume()
         documentReviewContinuation = nil
+    }
+
+    /// Called by the UI when the user confirms segmentation and wants to proceed with tagging.
+    func confirmSegmentationReview() {
+        awaitingSegmentationReview = false
+        segmentationReviewContinuation?.resume()
+        segmentationReviewContinuation = nil
+    }
+
+    /// Called by the UI when the user completes the final review.
+    func confirmFinalReview() {
+        awaitingFinalReview = false
+        finalReviewContinuation?.resume(returning: .complete)
+        finalReviewContinuation = nil
+    }
+
+    /// Called by the UI when the user wants to redo segmentation and tagging.
+    func redoTagging() {
+        awaitingFinalReview = false
+        finalReviewContinuation?.resume(returning: .redoTagging)
+        finalReviewContinuation = nil
+    }
+
+    /// Update classification for a single file (used by inline editing from the file pane).
+    func updateClassification(at index: Int, to newClassification: DocumentClassification) {
+        guard index < jobs.count else { return }
+        let oldClassification = jobs[index].classification
+        jobs[index].classification = newClassification
+        if let existingResult = jobs[index].result {
+            jobs[index].result = OCRResult(
+                text: existingResult.text,
+                classification: newClassification,
+                rotationDegrees: existingResult.rotationDegrees,
+                errorMessage: existingResult.errorMessage,
+                errorCode: nil
+            )
+        }
+        // Update tags on the output file
+        if oldClassification != newClassification,
+           let outputURL = outputURLMap[jobs[index].sourceURL] {
+            let colorTag: String? = {
+                switch newClassification {
+                case .boxLabel: return "Red"
+                case .folderLabel: return "Purple"
+                default: return nil
+                }
+            }()
+            var existingTags = jobs[index].appliedTags
+            existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }
+            if let color = colorTag { existingTags.append(color) }
+            if newClassification == .boxLabel {
+                if !existingTags.contains("Box") { existingTags.insert("Box", at: 0) }
+            } else if newClassification == .folderLabel {
+                if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
+            }
+            try? MacOSTagger.applyTags(existingTags, to: outputURL)
+            jobs[index].appliedTags = existingTags
+        }
+    }
+
+    /// Show the document segmentation review dialog for all files at once.
+    /// Populates documentReviewItems with every file and suspends until user confirms.
+    private func showFullSegmentationReview(files: [URL]) async {
+        documentReviewItems = files.enumerated().map { (index, url) in
+            let cls = index < jobs.count ? jobs[index].result?.classification : nil
+            let rot = index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
+            return DocumentReviewItem(
+                fileIndex: index,
+                fileName: url.lastPathComponent,
+                fileURL: url,
+                classification: cls,
+                rotationDegrees: rot
+            )
+        }
+
+        currentReviewCollectionName = "All Files"
+        statusMessage = "Review document segmentation."
+        awaitingDocumentReview = true
+
+        await withCheckedContinuation { continuation in
+            documentReviewContinuation = continuation
+        }
+
+        guard !Task.isCancelled else { return }
+
+        // Apply classification and rotation changes back to jobs
+        for item in documentReviewItems {
+            if item.fileIndex < jobs.count {
+                let newCls = item.classification
+                let newRot = item.rotationDegrees
+                jobs[item.fileIndex].classification = newCls
+                if let existingResult = jobs[item.fileIndex].result {
+                    jobs[item.fileIndex].result = OCRResult(
+                        text: existingResult.text,
+                        classification: newCls,
+                        rotationDegrees: newRot,
+                        errorMessage: existingResult.errorMessage,
+                        errorCode: nil
+                    )
+                }
+            }
+        }
+    }
+
+    /// Update rotation for a single file (used by inline editing from the file pane).
+    func updateRotation(at index: Int, degrees: Int) {
+        guard index < jobs.count, let existingResult = jobs[index].result else { return }
+        let normalized = ((degrees % 360) + 360) % 360
+        jobs[index].result = OCRResult(
+            text: existingResult.text,
+            classification: existingResult.classification,
+            rotationDegrees: normalized,
+            errorMessage: existingResult.errorMessage,
+            errorCode: nil
+        )
     }
 
     /// Rebuild collection segments from current job classifications after document review changes.
@@ -2200,7 +2416,7 @@ class OCRProcessor: ObservableObject {
                 jobs[item.fileIndex].result = OCRResult(
                     text: existingResult.text,
                     classification: newClassification,
-                    rotationDegrees: existingResult.rotationDegrees,
+                    rotationDegrees: item.rotationDegrees,
                     errorMessage: existingResult.errorMessage,
                     errorCode: nil
                 )

@@ -19,6 +19,7 @@ struct OCRView: View {
     @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
+    @AppStorage("tagVocabulary") private var tagVocabulary: String = ""
     @AppStorage("contextCharCount") private var contextCharCount: Double = 200
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
     @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
@@ -40,6 +41,11 @@ struct OCRView: View {
     @State private var resolutionTestResults: [(scale: Int, text: String?)] = []
     @State private var resolutionTestImage: URL?
     @State private var isRunningResolutionTest = false
+
+    // Inline segmentation edit & review navigation
+    @State private var editingFileIndex: Int? = nil
+    @State private var csvDropTargeted = false
+    @State private var reviewFocusedIndex: Int = 0
 
     // Model comparison test state
     @State private var showModelSelectionSheet = false
@@ -375,6 +381,43 @@ struct OCRView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
+
+                            Divider()
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Tag vocabulary (optional):")
+                                        .font(.caption)
+                                    Spacer()
+                                    Button("Load CSV…") { loadTagVocabularyCSV() }
+                                        .font(.caption)
+                                    if !tagVocabulary.isEmpty {
+                                        Button("Clear") { tagVocabulary = "" }
+                                            .font(.caption)
+                                    }
+                                }
+                                ZStack {
+                                    TextEditor(text: $tagVocabulary)
+                                        .font(.caption)
+                                        .frame(minHeight: 40, maxHeight: 80)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(csvDropTargeted ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: csvDropTargeted ? 2 : 1)
+                                        )
+                                    if tagVocabulary.isEmpty {
+                                        Text("Drop CSV here or type tags…")
+                                            .font(.caption)
+                                            .foregroundStyle(.tertiary)
+                                            .allowsHitTesting(false)
+                                    }
+                                    DropReceiver(isTargeted: $csvDropTargeted) { urls in
+                                        if let url = urls.first { loadTagVocabularyFromURL(url) }
+                                    }
+                                }
+                                Text("One tag per line. Drop a CSV, click Load CSV, or type manually. The model will choose only from these tags. Leave blank for automatic tagging.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                             } // end if !passSourceTags
                         }
 
@@ -529,9 +572,9 @@ struct OCRView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(droppedFiles.isEmpty || apiKey.isEmpty || outputDirectory == nil || processor.isProcessing)
+                .disabled(droppedFiles.isEmpty || apiKey.isEmpty || outputDirectory == nil || processor.isProcessing || isInReviewMode)
 
-                if processor.isProcessing {
+                if processor.isProcessing || isInReviewMode {
                     Button("Cancel") { processor.cancel() }
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
@@ -542,6 +585,11 @@ struct OCRView: View {
 
     // MARK: - File Panel
 
+    /// Whether the file pane is in an interactive review state
+    private var isInReviewMode: Bool {
+        processor.awaitingSegmentationReview || processor.awaitingFinalReview
+    }
+
     private var filePanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -550,13 +598,15 @@ struct OCRView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
                     Spacer()
-                    Button(action: selectFiles) {
-                        Label("Add Files…", systemImage: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    if !droppedFiles.isEmpty {
-                        Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
-                            .buttonStyle(.bordered)
+                    if !isInReviewMode {
+                        Button(action: selectFiles) {
+                            Label("Add Files…", systemImage: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        if !droppedFiles.isEmpty {
+                            Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
+                                .buttonStyle(.bordered)
+                        }
                     }
                 }
 
@@ -579,8 +629,44 @@ struct OCRView: View {
                     collectionSummary
                 }
 
+                // Review action buttons
+                if processor.awaitingSegmentationReview {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Review segmentation below. Arrow keys to navigate, 1-4 to classify, [ ] to rotate, Enter to edit.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button(action: { processor.confirmSegmentationReview() }) {
+                            Label("Proceed with Tagging", systemImage: "tag.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+
+                if processor.awaitingFinalReview {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, [ ] to rotate, Enter to edit.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Button(action: { processor.redoTagging() }) {
+                                Label("Redo Segmentation & Tagging", systemImage: "arrow.counterclockwise")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            Button(action: { processor.confirmFinalReview() }) {
+                                Label("Complete", systemImage: "checkmark.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
+
                 // Progress
-                if processor.isProcessing || !processor.statusMessage.isEmpty {
+                if processor.isProcessing || (!processor.statusMessage.isEmpty && !isInReviewMode) {
                     Divider()
                     VStack(alignment: .leading, spacing: 6) {
                         ProgressView(value: processor.progress)
@@ -588,6 +674,16 @@ struct OCRView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { editingFileIndex != nil },
+            set: { if !$0 { editingFileIndex = nil } }
+        )) {
+            if let index = editingFileIndex, index < processor.jobs.count {
+                SegmentationEditSheet(processor: processor, fileIndex: index, fileName: processor.jobs[index].sourceURL.lastPathComponent) {
+                    editingFileIndex = nil
                 }
             }
         }
@@ -621,17 +717,87 @@ struct OCRView: View {
 
     private var fileList: some View {
         ZStack {
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
-                    FileRowView(url: url, job: processor.jobs.first { $0.sourceURL == url })
+            ScrollViewReader { scrollProxy in
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
+                        FileRowView(
+                            url: url,
+                            job: processor.jobs.first { $0.sourceURL == url },
+                            showTags: processor.awaitingFinalReview,
+                            isFocused: isInReviewMode && index == reviewFocusedIndex
+                        )
+                        .contentShape(Rectangle())
+                        .id(index)
+                        .onTapGesture(count: 2) {
+                            if isInReviewMode, index < processor.jobs.count {
+                                editingFileIndex = index
+                            }
+                        }
+                        .onTapGesture(count: 1) {
+                            if isInReviewMode { reviewFocusedIndex = index }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .onChange(of: reviewFocusedIndex) { _, newIndex in
+                    withAnimation { scrollProxy.scrollTo(newIndex, anchor: .center) }
                 }
             }
-            .padding(.vertical, 4)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            DropReceiver(isTargeted: .constant(false)) { urls in
-                handleDroppedURLs(urls)
+            if !isInReviewMode {
+                DropReceiver(isTargeted: .constant(false)) { urls in
+                    handleDroppedURLs(urls)
+                }
             }
+        }
+        .focusable(isInReviewMode)
+        .onKeyPress(.upArrow) {
+            guard isInReviewMode else { return .ignored }
+            if reviewFocusedIndex > 0 { reviewFocusedIndex -= 1 }
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            guard isInReviewMode else { return .ignored }
+            if reviewFocusedIndex < droppedFiles.count - 1 { reviewFocusedIndex += 1 }
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            editingFileIndex = reviewFocusedIndex
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "]")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            let current = processor.jobs[reviewFocusedIndex].result?.rotationDegrees ?? 0
+            processor.updateRotation(at: reviewFocusedIndex, degrees: current + 90)
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "[")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            let current = processor.jobs[reviewFocusedIndex].result?.rotationDegrees ?? 0
+            processor.updateRotation(at: reviewFocusedIndex, degrees: current - 90)
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            processor.updateClassification(at: reviewFocusedIndex, to: .documentStart)
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "2")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            processor.updateClassification(at: reviewFocusedIndex, to: .documentContinuation)
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "3")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            processor.updateClassification(at: reviewFocusedIndex, to: .boxLabel)
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "4")) { _ in
+            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
+            processor.updateClassification(at: reviewFocusedIndex, to: .folderLabel)
+            return .handled
         }
     }
 
@@ -797,6 +963,33 @@ struct OCRView: View {
         }
     }
 
+    private func loadTagVocabularyCSV() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.message = "Select a CSV or text file containing tag vocabulary"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadTagVocabularyFromURL(url)
+    }
+
+    private func loadTagVocabularyFromURL(_ url: URL) {
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return }
+        var tags: [String] = []
+        for line in content.components(separatedBy: .newlines) {
+            for field in line.components(separatedBy: ",") {
+                let tag = field.trimmingCharacters(in: .whitespaces)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                    .trimmingCharacters(in: .whitespaces)
+                if !tag.isEmpty { tags.append(tag) }
+            }
+        }
+        var seen = Set<String>()
+        tags = tags.filter { seen.insert($0.lowercased()).inserted }
+        tagVocabulary = tags.joined(separator: "\n")
+    }
+
     private func chooseOutputDirectory() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -889,6 +1082,10 @@ struct OCRView: View {
         )
         processor.passSourceTags = passSourceTags && enableTagging
         processor.mergeDocuments = mergeDocuments
+        processor.tagVocabulary = tagVocabulary
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
@@ -915,6 +1112,8 @@ struct OCRView: View {
 struct FileRowView: View {
     let url: URL
     let job: OCRJob?
+    var showTags: Bool = false
+    var isFocused: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -925,6 +1124,15 @@ struct FileRowView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer()
+                if let rotation = job?.result?.rotationDegrees, rotation != 0 {
+                    Text("\(rotation)°")
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
                 if let classification = job?.classification {
                     Text(classification.displayName)
                         .font(.caption2)
@@ -934,12 +1142,25 @@ struct FileRowView: View {
                         .foregroundStyle(classificationColor(classification))
                         .clipShape(Capsule())
                 }
-                if let tags = job?.appliedTags, !tags.isEmpty {
+                if !showTags, let tags = job?.appliedTags, !tags.isEmpty {
                     Text(tags.prefix(2).joined(separator: " \u{00B7} "))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+            }
+            if showTags, let tags = job?.appliedTags, !tags.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(tags.filter { $0 != "Red" && $0 != "Purple" }, id: \.self) { tag in
+                        Text(tag)
+                            .font(.caption2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.leading, 24)
             }
             if let job = job, job.status == .failed, let msg = job.result?.errorMessage {
                 Text(msg)
@@ -951,7 +1172,22 @@ struct FileRowView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Color.clear)
+        .background(classificationBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.accentColor, lineWidth: 2)
+                .opacity(isFocused ? 1 : 0)
+        )
+    }
+
+    private var classificationBackground: Color {
+        guard let classification = job?.classification else { return .clear }
+        switch classification {
+        case .documentStart: return .blue.opacity(0.06)
+        case .documentContinuation: return .green.opacity(0.06)
+        case .boxLabel: return .red.opacity(0.06)
+        case .folderLabel: return .purple.opacity(0.06)
+        }
     }
 
     private func classificationColor(_ c: DocumentClassification) -> Color {
@@ -1072,6 +1308,18 @@ struct OCRRetrySheet: View {
 
                 SecureField("API Key", text: $apiKey)
                     .textFieldStyle(.roundedBorder)
+
+                // Cost estimate
+                let retryEstimate = CostEstimator.estimate(
+                    fileCount: processor.failedFileIndices.count,
+                    model: selectedModel,
+                    enableTagging: false,
+                    sendPreviousImage: false,
+                    contextCharCount: 0
+                )
+                Text("Estimated cost: \(retryEstimate.ocrFormatted)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding()
 
@@ -1111,20 +1359,8 @@ struct OCRRetrySheet: View {
 struct CollectionReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
 
-    private var boxCount: Int {
-        processor.collectionReviewItems.filter { $0.classification == .boxLabel }.count
-    }
-
-    private var folderCount: Int {
-        processor.collectionReviewItems.filter { $0.classification == .folderLabel }.count
-    }
-
-    private var documentCount: Int {
-        processor.collectionReviewItems.filter { $0.classification == .documentStart }.count
-    }
-
     private var hasBoxes: Bool {
-        boxCount > 0
+        !processor.collectionReviewItems.isEmpty
     }
 
     var body: some View {
@@ -1132,11 +1368,11 @@ struct CollectionReviewSheet: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Review Box and Folder Identifications")
+                    Text("Review Collection Names")
                         .font(.title2)
                         .fontWeight(.semibold)
                     if hasBoxes {
-                        Text("Toggle between Box and Folder classifications. Edit collection names for boxes. Files between boxes are automatically assigned to the preceding box's collection.")
+                        Text("Verify and correct collection names for each box. Files between boxes are automatically assigned to the preceding box's collection.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -1152,7 +1388,7 @@ struct CollectionReviewSheet: View {
             Divider()
 
             if hasBoxes {
-                // Box and folder list
+                // Box list with editable collection names
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(processor.collectionReviewItems.indices, id: \.self) { idx in
@@ -1183,7 +1419,7 @@ struct CollectionReviewSheet: View {
             // Footer
             HStack {
                 if hasBoxes {
-                    Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")\(documentCount > 0 ? ", \(documentCount) reclassified as document" : "")")
+                    Text("\(processor.collectionReviewItems.count) box\(processor.collectionReviewItems.count == 1 ? "" : "es")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1217,49 +1453,35 @@ struct CollectionReviewRow: View {
                 .frame(width: 180, height: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            // Box/Folder/Document radio buttons
-            VStack(alignment: .leading, spacing: 6) {
-                radioButton(label: "Box", selected: item.classification == .boxLabel, color: .red) {
-                    item.classification = .boxLabel
-                    item.isBoxLabel = true
-                }
-                radioButton(label: "Folder", selected: item.classification == .folderLabel, color: .purple) {
-                    item.classification = .folderLabel
-                    item.isBoxLabel = false
-                }
-                radioButton(label: "Document", selected: item.classification == .documentStart, color: .blue) {
-                    item.classification = .documentStart
-                    item.isBoxLabel = false
-                }
-            }
-            .frame(width: 100)
-
             // Filename
-            Text(item.fileName)
-                .font(.system(size: 11, design: .monospaced))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(minWidth: 180, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.fileName)
+                    .font(.system(size: 11, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text("Box")
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.15))
+                    .foregroundStyle(.red)
+                    .clipShape(Capsule())
+            }
+            .frame(minWidth: 180, alignment: .leading)
 
             Spacer()
 
-            // Collection name (editable for boxes, hidden for folders)
-            if item.classification == .boxLabel {
-                TextField("Collection name", text: $item.collectionName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 250)
-                    .onSubmit {
-                        item.collectionName = CollectionSegmenter.normalizeCollectionName(item.collectionName)
-                    }
-            }
+            // Collection name (editable)
+            TextField("Collection name", text: $item.collectionName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 280)
+                .onSubmit {
+                    item.collectionName = CollectionSegmenter.normalizeCollectionName(item.collectionName)
+                }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(
-            item.classification == .boxLabel ? Color.red.opacity(0.05) :
-            item.classification == .folderLabel ? Color.purple.opacity(0.05) :
-            Color.blue.opacity(0.05)
-        )
+        .background(Color.red.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
@@ -1330,6 +1552,7 @@ struct CollectionReviewRow: View {
 struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
     @State private var thumbnailSize: CGFloat = 400
+    @State private var focusedIndex: Int = 0
 
     private var newDocCount: Int {
         processor.documentReviewItems.filter { $0.classification == .documentStart }.count
@@ -1352,10 +1575,10 @@ struct DocumentSegmentReviewSheet: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Document Segmentation: \(processor.currentReviewCollectionName)")
+                    Text("Document Segmentation Review")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("Review document start and continuation classifications. Change classifications to adjust how documents are grouped.")
+                    Text("Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  [/]=Rotate  \u{2191}\u{2193}=Navigate  Return=Confirm")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1385,16 +1608,26 @@ struct DocumentSegmentReviewSheet: View {
             Divider()
 
             // Document list
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(processor.documentReviewItems.indices, id: \.self) { idx in
-                        DocumentReviewRow(
-                            item: $processor.documentReviewItems[idx],
-                            thumbnailSize: thumbnailSize
-                        )
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(processor.documentReviewItems.indices, id: \.self) { idx in
+                            DocumentReviewRow(
+                                item: $processor.documentReviewItems[idx],
+                                thumbnailSize: thumbnailSize,
+                                isFocused: idx == focusedIndex
+                            )
+                            .id(idx)
+                            .onTapGesture { focusedIndex = idx }
+                        }
+                    }
+                    .padding()
+                }
+                .onChange(of: focusedIndex) { _, newIndex in
+                    withAnimation {
+                        scrollProxy.scrollTo(newIndex, anchor: .center)
                     }
                 }
-                .padding()
             }
 
             Divider()
@@ -1410,6 +1643,7 @@ struct DocumentSegmentReviewSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .keyboardShortcut(.return, modifiers: [])
             }
             .padding()
         }
@@ -1421,55 +1655,134 @@ struct DocumentSegmentReviewSheet: View {
                 }
             }
         }
+        .onKeyPress(.upArrow) {
+            if focusedIndex > 0 { focusedIndex -= 1 }
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            if focusedIndex < processor.documentReviewItems.count - 1 { focusedIndex += 1 }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].classification = .documentStart
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "2")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].classification = .documentContinuation
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "3")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].classification = .boxLabel
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "4")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].classification = .folderLabel
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "[")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                let current = processor.documentReviewItems[focusedIndex].rotationDegrees
+                processor.documentReviewItems[focusedIndex].rotationDegrees = (current - 90 + 360) % 360
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "]")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].rotationDegrees = (processor.documentReviewItems[focusedIndex].rotationDegrees + 90) % 360
+            }
+            return .handled
+        }
     }
 }
 
 struct DocumentReviewRow: View {
     @Binding var item: DocumentReviewItem
     let thumbnailSize: CGFloat
+    var isFocused: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
-            // Thumbnail
+            // Thumbnail (rotated to match current rotation setting)
             thumbnail
                 .frame(width: thumbnailSize, height: thumbnailSize)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
             // Classification radio buttons
             VStack(alignment: .leading, spacing: 6) {
-                radioButton(label: "New Document", selected: item.classification == .documentStart, color: .blue) {
+                radioButton(label: "1 New Document", selected: item.classification == .documentStart, color: .blue) {
                     item.classification = .documentStart
                 }
-                radioButton(label: "Continuation", selected: item.classification == .documentContinuation, color: .gray) {
+                radioButton(label: "2 Continuation", selected: item.classification == .documentContinuation, color: .green) {
                     item.classification = .documentContinuation
                 }
-                radioButton(label: "Box", selected: item.classification == .boxLabel, color: .red) {
+                radioButton(label: "3 Box", selected: item.classification == .boxLabel, color: .red) {
                     item.classification = .boxLabel
                 }
-                radioButton(label: "Folder", selected: item.classification == .folderLabel, color: .purple) {
+                radioButton(label: "4 Folder", selected: item.classification == .folderLabel, color: .purple) {
                     item.classification = .folderLabel
                 }
             }
-            .frame(width: 120)
+            .frame(width: 130)
 
-            // Filename
-            Text(item.fileName)
-                .font(.system(size: 11, design: .monospaced))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(minWidth: 180, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                // Filename
+                Text(item.fileName)
+                    .font(.system(size: 11, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(minWidth: 180, alignment: .leading)
+
+                // Rotation radio buttons
+                HStack(spacing: 8) {
+                    Text("Rotate:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    rotationRadio(label: "0°", degrees: 0)
+                    rotationRadio(label: "90°", degrees: 90)
+                    rotationRadio(label: "180°", degrees: 180)
+                    rotationRadio(label: "270°", degrees: 270)
+                }
+            }
 
             Spacer()
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(
-            item.classification == .boxLabel ? Color.red.opacity(0.05) :
-            item.classification == .folderLabel ? Color.purple.opacity(0.05) :
-            item.classification == .documentStart ? Color.blue.opacity(0.05) :
-            Color.gray.opacity(0.05)
+            item.classification == .boxLabel ? Color.red.opacity(0.12) :
+            item.classification == .folderLabel ? Color.purple.opacity(0.12) :
+            item.classification == .documentStart ? Color.blue.opacity(0.12) :
+            Color.green.opacity(0.12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func rotationRadio(label: String, degrees: Int) -> some View {
+        Button {
+            item.rotationDegrees = degrees
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: item.rotationDegrees == degrees ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(item.rotationDegrees == degrees ? .orange : .secondary)
+                    .font(.system(size: 10))
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(item.rotationDegrees == degrees ? .orange : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -1478,6 +1791,7 @@ struct DocumentReviewRow: View {
             Image(nsImage: nsImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                .rotationEffect(.degrees(Double(item.rotationDegrees)))
         } else {
             Rectangle()
                 .fill(Color.secondary.opacity(0.1))
@@ -2371,5 +2685,95 @@ struct ResolutionDropSheet: View {
         }
         .padding(24)
         .frame(width: 380)
+    }
+}
+
+// MARK: - Segmentation Edit Sheet (double-click from file pane)
+
+struct SegmentationEditSheet: View {
+    @ObservedObject var processor: OCRProcessor
+    let fileIndex: Int
+    let fileName: String
+    let onDismiss: () -> Void
+
+    @State private var selectedClassification: DocumentClassification = .documentStart
+    @State private var rotation: Int = 0
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Edit Classification & Rotation")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text(fileName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Picker("Classification", selection: $selectedClassification) {
+                Text("1  Document Start").tag(DocumentClassification.documentStart)
+                Text("2  Continuation").tag(DocumentClassification.documentContinuation)
+                Text("3  Box Label").tag(DocumentClassification.boxLabel)
+                Text("4  Folder Label").tag(DocumentClassification.folderLabel)
+            }
+            .pickerStyle(.radioGroup)
+            .padding(.vertical, 4)
+
+            // Rotation control
+            HStack(spacing: 12) {
+                Text("Rotation:")
+                    .font(.caption)
+                Button(action: { rotation = (rotation - 90 + 360) % 360 }) {
+                    Image(systemName: "rotate.left")
+                }
+                .keyboardShortcut("[", modifiers: [])
+                Text("\(rotation)°")
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(width: 40)
+                Button(action: { rotation = (rotation + 90) % 360 }) {
+                    Image(systemName: "rotate.right")
+                }
+                .keyboardShortcut("]", modifiers: [])
+                if rotation != 0 {
+                    Button("Reset") { rotation = 0 }
+                        .font(.caption)
+                }
+            }
+
+            // Show OCR text preview
+            if let text = processor.jobs[fileIndex].result?.text, !text.isEmpty {
+                GroupBox("OCR Text Preview") {
+                    ScrollView {
+                        Text(String(text.prefix(500)))
+                            .font(.system(size: 10, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 150)
+                }
+            }
+
+            HStack {
+                Button("Cancel") { onDismiss() }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Apply") {
+                    processor.updateClassification(at: fileIndex, to: selectedClassification)
+                    processor.updateRotation(at: fileIndex, degrees: rotation)
+                    onDismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 360)
+        .onAppear {
+            if let cls = processor.jobs[fileIndex].result?.classification ?? processor.jobs[fileIndex].classification {
+                selectedClassification = cls
+            }
+            rotation = processor.jobs[fileIndex].result?.rotationDegrees ?? 0
+        }
     }
 }

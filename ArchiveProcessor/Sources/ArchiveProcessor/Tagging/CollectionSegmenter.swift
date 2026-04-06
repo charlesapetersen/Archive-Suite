@@ -313,7 +313,9 @@ class CollectionSegmenter {
                     let jsonName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
                     let jsonURL = outputDirectory.appendingPathComponent(jsonName)
                     if fm.fileExists(atPath: jsonURL.path) {
-                        let destJSON = folderURL.appendingPathComponent(newBaseName + ".json")
+                        let jsonFolder = folderURL.appendingPathComponent("JSON Output")
+                        try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
+                        let destJSON = jsonFolder.appendingPathComponent(newBaseName + ".json")
                         if fm.fileExists(atPath: destJSON.path) {
                             try fm.removeItem(at: destJSON)
                         }

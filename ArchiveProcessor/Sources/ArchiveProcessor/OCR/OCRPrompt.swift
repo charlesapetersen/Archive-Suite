@@ -29,6 +29,8 @@ struct OCRPrompt {
           • Same formatting, letterhead, and layout as the previous page with text flowing continuously
           A page is ONLY a continuation if it is clearly part of the same single document. When uncertain, prefer [document_start].
 
+        IMPORTANT: These photographs often show multiple papers stacked on top of each other. Other pages may be partially visible in the background. For classification and transcription, focus ONLY on the foreground page — ignore any background pages or partially visible documents.
+
         TASK 2 — ORIENTATION (CRITICAL). Many of these photographs are rotated sideways or upside down as displayed in the raw pixels. You MUST examine the actual pixel orientation of text in the image — do NOT assume the image is upright just because you can read the text. Look at whether text baselines are horizontal, vertical, or inverted relative to the image frame.
         On line 2, write the clockwise rotation needed to make the image upright:
         [rotate_0] — Text baselines are horizontal and text reads left-to-right normally. Image is already correctly oriented.
