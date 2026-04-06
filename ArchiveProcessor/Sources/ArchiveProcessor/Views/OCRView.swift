@@ -587,7 +587,7 @@ struct OCRView: View {
 
     /// Whether the file pane is in an interactive review state
     private var isInReviewMode: Bool {
-        processor.awaitingSegmentationReview || processor.awaitingFinalReview
+        processor.awaitingFinalReview
     }
 
     private var filePanel: some View {
@@ -630,20 +630,6 @@ struct OCRView: View {
                 }
 
                 // Review action buttons
-                if processor.awaitingSegmentationReview {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Review segmentation below. Arrow keys to navigate, 1-4 to classify, [ ] to rotate, Enter to edit.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button(action: { processor.confirmSegmentationReview() }) {
-                            Label("Proceed with Tagging", systemImage: "tag.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-
                 if processor.awaitingFinalReview {
                     Divider()
                     VStack(alignment: .leading, spacing: 8) {
@@ -1057,6 +1043,12 @@ struct OCRView: View {
         if let urls = processor.pendingBatchFileURLs {
             droppedFiles = urls
         }
+        processor.passSourceTags = passSourceTags && enableTagging
+        processor.mergeDocuments = mergeDocuments
+        processor.tagVocabulary = tagVocabulary
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         processor.processingTask = Task {
             await processor.resumeBatch(apiKey: apiKey)
         }
@@ -1066,6 +1058,12 @@ struct OCRView: View {
         if let urls = processor.pendingRunFileURLs {
             droppedFiles = urls
         }
+        processor.passSourceTags = passSourceTags && enableTagging
+        processor.mergeDocuments = mergeDocuments
+        processor.tagVocabulary = tagVocabulary
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         processor.processingTask = Task {
             await processor.resumeRun(apiKey: apiKey)
         }

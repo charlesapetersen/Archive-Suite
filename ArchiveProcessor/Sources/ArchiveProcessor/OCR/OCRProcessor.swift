@@ -59,9 +59,7 @@ class OCRProcessor: ObservableObject {
     private var documentReviewContinuation: CheckedContinuation<Void, Never>?
 
     /// Interactive workflow pause states
-    @Published var awaitingSegmentationReview = false   // After OCR, before tagging
     @Published var awaitingFinalReview = false           // After tagging, before completion
-    private var segmentationReviewContinuation: CheckedContinuation<Void, Never>?
     enum FinalReviewAction { case complete, redoTagging }
     private var finalReviewContinuation: CheckedContinuation<FinalReviewAction, Never>?
 
@@ -78,6 +76,8 @@ class OCRProcessor: ObservableObject {
     var outputURLMap: [URL: URL] = [:]
     /// Maps original PDF source URL → temporary JPEG URL (for cleanup)
     private var pdfToImageMap: [URL: URL] = [:]
+    /// The model used for the current processing run (for PDF regeneration headers)
+    private var currentModel: LLMModel?
     var processingTask: Task<Void, Never>?
 
     /// Stored batch context for cancellation
@@ -279,6 +279,7 @@ class OCRProcessor: ObservableObject {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        currentModel = pending.model
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         for i in jobs.indices { jobs[i].status = .processing }
         progress = 0
@@ -317,21 +318,7 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
-            )
-        }
-
-        guard !Task.isCancelled else { return }
-
+        // Tagging (before collection segmentation, matching main workflow order)
         if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -347,6 +334,24 @@ class OCRProcessor: ObservableObject {
                 enableSegmentJSON: pending.enableSegmentJSON
             )
         }
+
+        guard !Task.isCancelled else { return }
+
+        // Collection segmentation (after tagging)
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+            )
+        }
+
+        guard !Task.isCancelled else { return }
 
         if mergeDocuments {
             performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
@@ -396,6 +401,7 @@ class OCRProcessor: ObservableObject {
         collectionSegments = []
         outputURLMap = [:]
         pdfToImageMap = [:]
+        currentModel = pending.model
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -497,23 +503,7 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-        // Collection segmentation (before tagging, so review can update classifications)
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
-            )
-        }
-
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-        // Tagging (after review so classifications are final)
+        // Tagging (before collection segmentation, matching main workflow order)
         if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -531,6 +521,24 @@ class OCRProcessor: ObservableObject {
                 enableSegmentJSON: pending.enableSegmentJSON
             )
         }
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+        // Collection segmentation (after tagging)
+        if pending.enableCollectionSegmentation {
+            await performCollectionSegmentation(
+                files: pending.fileURLs,
+                provider: pending.provider,
+                model: pending.model,
+                thinkingLevel: pending.thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: pending.outputDirectory,
+                confirmBeforeOrganizing: pending.confirmCollectionIDs,
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+            )
+        }
+
+        guard !Task.isCancelled else { cleanupTempFiles(); return }
 
         if mergeDocuments {
             performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
@@ -715,15 +723,18 @@ class OCRProcessor: ObservableObject {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
-        awaitingSegmentationReview = false
         awaitingFinalReview = false
         awaitingDocumentReview = false
+        awaitingCollectionConfirmation = false
+        awaitingRetryDecision = false
         documentReviewContinuation?.resume()
         documentReviewContinuation = nil
-        segmentationReviewContinuation?.resume()
-        segmentationReviewContinuation = nil
         finalReviewContinuation?.resume(returning: .complete)
         finalReviewContinuation = nil
+        collectionConfirmationContinuation?.resume()
+        collectionConfirmationContinuation = nil
+        retryContinuation?.resume(returning: .continueWithout)
+        retryContinuation = nil
         cleanupTempFiles()
 
         // Cancel server-side batch if active
@@ -786,6 +797,7 @@ class OCRProcessor: ObservableObject {
         collectionSegments = []
         outputURLMap = [:]
         pdfToImageMap = [:]
+        currentModel = model
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -1807,7 +1819,8 @@ class OCRProcessor: ObservableObject {
 
             // Update failed files list if retry succeeded
             if result.text != nil {
-                failedFiles.removeAll { $0 == url.lastPathComponent }
+                let sourceFileName = jobs[index].sourceURL.lastPathComponent
+                failedFiles.removeAll { $0 == sourceFileName }
             }
             handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
         }
@@ -2228,13 +2241,6 @@ class OCRProcessor: ObservableObject {
         documentReviewContinuation = nil
     }
 
-    /// Called by the UI when the user confirms segmentation and wants to proceed with tagging.
-    func confirmSegmentationReview() {
-        awaitingSegmentationReview = false
-        segmentationReviewContinuation?.resume()
-        segmentationReviewContinuation = nil
-    }
-
     /// Called by the UI when the user completes the final review.
     func confirmFinalReview() {
         awaitingFinalReview = false
@@ -2316,6 +2322,7 @@ class OCRProcessor: ObservableObject {
             if item.fileIndex < jobs.count {
                 let newCls = item.classification
                 let newRot = item.rotationDegrees
+                let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
                 jobs[item.fileIndex].classification = newCls
                 if let existingResult = jobs[item.fileIndex].result {
                     jobs[item.fileIndex].result = OCRResult(
@@ -2324,6 +2331,21 @@ class OCRProcessor: ObservableObject {
                         rotationDegrees: newRot,
                         errorMessage: existingResult.errorMessage,
                         errorCode: nil
+                    )
+                }
+                // Regenerate output PDF if rotation changed
+                if newRot != oldRot, let result = jobs[item.fileIndex].result,
+                   let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
+                   let model = currentModel {
+                    let pdfGen = PDFGenerator()
+                    // Use temp JPEG if this was a PDF input, otherwise the original file
+                    let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
+                    try? pdfGen.generate(
+                        imageURL: imageURL,
+                        result: result,
+                        model: model,
+                        outputURL: outputURL,
+                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent
                     )
                 }
             }
