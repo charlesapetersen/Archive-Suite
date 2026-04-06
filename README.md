@@ -19,6 +19,8 @@ Process scanned images through any of three LLM providers:
 - Switch providers and models at any time
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
+- Custom OCR prompts — append additional instructions to the default OCR prompt
+- Image resolution scaling — reduce image resolution (5%–100%) to lower API costs
 
 ### PDF Output
 
@@ -27,9 +29,15 @@ Each input image produces a two-page PDF:
 - **Page 1:** The original image, correctly oriented (rotation detected and applied automatically)
 - **Page 2:** Extracted OCR text with provider, model, and date metadata. Page height adjusts dynamically — text never overflows to a third page.
 
+### Multi-Page Document Merging
+
+When enabled, continuation pages are merged into a single PDF with their document start page. A multi-page letter produces one multi-page PDF rather than separate files per page.
+
 ### Image Orientation Correction
 
 The LLM detects if images are rotated sideways or upside down. Output PDFs always show correctly oriented images. For folder photographs, orientation is based on the folder tab rather than document text.
+
+Users can manually correct rotation during the segmentation review dialog — radio buttons for 0°, 90°, 180°, 270° with live thumbnail preview. Keyboard shortcuts (`[`/`]`) rotate the focused image in 90° increments.
 
 ### Document Classification
 
@@ -82,6 +90,16 @@ When tagging is enabled, the app:
    - Color labels: Red for boxes, Purple for folders
 4. **Exports JSON metadata** per segment (optional, toggleable)
 
+### Custom Tag Vocabularies
+
+Define a controlled vocabulary for subject tags to ensure consistent tagging across a collection:
+
+- **Manual entry** — type tags directly, one per line
+- **CSV file loading** — load vocabularies from CSV files via file picker
+- **Drag and drop** — drop CSV files directly onto the vocabulary editor
+
+When a vocabulary is defined, the LLM is constrained to choose only from the provided terms.
+
 ### Collection Segmentation & Organization
 
 When collection segmentation is enabled:
@@ -91,23 +109,37 @@ When collection segmentation is enabled:
 3. Normalizes names to title case with consistent formatting
 4. Organizes output PDFs into collection folders with sequential naming (`00001 Collection Name.pdf`)
 
-### Review Dialogs
+### Interactive Review Workflow
 
-Two optional review steps let you verify and correct the app's classifications before finalizing:
+The processing workflow includes multiple interactive review points with pause/resume control:
 
-#### Box/Folder Identification Review
-- Thumbnail images (180x180) alongside each box/folder identification
-- Radio buttons to reclassify: Box, Folder, or Document
-- Editable collection names for boxes
-- Resizable dialog window
-- Changes propagate to Finder tags and collection segmentation
+#### 1. Segmentation Review (after OCR)
+A full-screen dialog showing all files with:
+- Scrollable thumbnail grid with adjustable size slider (60–800px)
+- Classification radio buttons per file (New Document, Continuation, Box, Folder)
+- Rotation correction radio buttons (0°, 90°, 180°, 270°) with live preview
+- Full keyboard navigation:
+  - `1`–`4` — set classification
+  - `[`/`]` — rotate counter-clockwise/clockwise
+  - `↑`/`↓` — navigate between files
+  - `Return` — confirm and proceed
 
-#### Document Segmentation Review
-- Sequential per-collection dialogs after box/folder identification
-- Radio buttons: New Document, Continuation, Box, or Folder
-- Adjustable thumbnail size via slider (60–400px)
-- Reclassifying as Box/Folder triggers collection segment rebuild
-- Resizable dialog window
+#### 2. Tagging Review (after tag generation)
+Review generated tags in the file pane. Double-click any file to edit its classification. Options to:
+- **Redo tagging** — regenerate tags with updated segmentation
+- **Complete** — proceed to collection organization
+
+#### 3. Collection Name Review (final step)
+Review and correct LLM-extracted collection names for box images before files are organized into collection folders.
+
+### Model Comparison Testing
+
+Built-in test UI for comparing OCR results across providers and models:
+
+- Select two provider/model combinations to compare side by side
+- Diff highlighting shows differences between outputs
+- "Use" button to adopt a model directly from test results
+- Selections persist across sessions
 
 ### Pre-OCRed PDF Input
 
@@ -128,6 +160,7 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 ### Other Features
 
 - **Cost estimator** — shows estimated cost before processing, updated dynamically as options change
+- **Source tag pass-through** — optionally copy existing Finder tags from source files to output PDFs
 - **Progress tracking** — real-time status messages and progress bar
 - **Error display** — full error text visible in the file pane
 - **Log file** — generated after processing, listing all failures with reasons
@@ -184,3 +217,20 @@ ArchiveProcessor/Sources/ArchiveProcessor/
     ├── OCRView.swift                  # Main UI with all controls and review sheets
     └── DropReceiver.swift             # Native NSView drag-and-drop handler
 ```
+
+## Potential Features
+
+- **OpenAI provider** — add GPT-4o and other OpenAI models as an OCR provider
+- **Handwriting recognition mode** — specialized prompting or model selection for handwritten documents
+- **Tag statistics dashboard** — summary view showing tag distribution, date coverage, and collection sizes across a processed batch
+- **Export tag vocabulary from results** — generate a vocabulary CSV from tags actually used across a collection, for reuse in future runs
+- **Batch tag editing** — select multiple files and apply/remove tags in bulk after processing
+- **Search and filter** — search processed files by tag, date range, format, or OCR text content
+- **Template OCR prompts** — save and load named prompt templates for different document types or collections
+- **Side-by-side image viewer** — full-resolution image viewer in the review dialog with pan/zoom for inspecting hard-to-read documents
+- **Undo/redo in review** — track classification and rotation changes with undo support during review
+- **Auto-detect document language** — identify document language and include it in metadata; optionally translate
+- **Duplicate detection** — flag visually similar or identical pages within a collection
+- **Export to CSV/spreadsheet** — export all generated metadata (dates, tags, authors, etc.) as a CSV for use in archival management systems
+- **Finder Quick Look plugin** — preview OCR text and tags directly from Finder without opening the app
+- **Watch folder mode** — monitor a folder and automatically process new images as they appear
