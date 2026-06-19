@@ -78,6 +78,8 @@ class OCRProcessor: ObservableObject {
     private var pdfToImageMap: [URL: URL] = [:]
     /// The model used for the current processing run (for PDF regeneration headers)
     private var currentModel: LLMModel?
+    /// Gateway configuration for the current run (nil = direct API mode)
+    private var currentGateway: GatewayConfig?
     var processingTask: Task<Void, Never>?
 
     /// Stored batch context for cancellation
@@ -187,6 +189,7 @@ class OCRProcessor: ObservableObject {
         let sendPreviousImage: Bool
         let customPrompt: String?
         let startedAt: Date
+        let gatewayConfig: GatewayConfig?
         /// Per-file OCR results keyed by file index. Only succeeded files are stored.
         var completedResults: [String: OCRResult]
     }
@@ -402,6 +405,7 @@ class OCRProcessor: ObservableObject {
         outputURLMap = [:]
         pdfToImageMap = [:]
         currentModel = pending.model
+        currentGateway = pending.gatewayConfig
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -586,6 +590,10 @@ class OCRProcessor: ObservableObject {
 
     /// Restore a previously completed result without re-saving to pending run.
     private func handleRestoredResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
+        guard index >= 0 && index < jobs.count else {
+            print("handleRestoredResult: index \(index) out of range (jobs.count = \(jobs.count))")
+            return
+        }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification
@@ -596,7 +604,7 @@ class OCRProcessor: ObservableObject {
         let pdfGen = PDFGenerator()
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName)
         outputURLMap[sourceURL] = outputURL
         // Copy source tags to output PDF if pass-through mode is enabled
         if passSourceTags {
@@ -622,6 +630,7 @@ class OCRProcessor: ObservableObject {
         alreadyCompleted: Int
     ) async {
         let remaining = indices.count
+        let gateway = currentGateway
 
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
@@ -645,7 +654,8 @@ class OCRProcessor: ObservableObject {
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: segmentationContext.customPrompt,
-                            imageScale: scale
+                            imageScale: scale,
+                            gatewayConfig: gateway
                         )
                         return (index, result)
                     }
@@ -670,7 +680,8 @@ class OCRProcessor: ObservableObject {
                                 thinkingLevel: thinkingLevel, apiKey: apiKey,
                                 previousText: nil, previousImageURL: prevImageURL,
                                 customPrompt: segmentationContext.customPrompt,
-                                imageScale: scale
+                                imageScale: scale,
+                                gatewayConfig: gateway
                             )
                             return (idx, result)
                         }
@@ -698,7 +709,8 @@ class OCRProcessor: ObservableObject {
                     thinkingLevel: thinkingLevel, apiKey: apiKey,
                     previousText: previousText, previousImageURL: contextImageURL,
                     customPrompt: segmentationContext.customPrompt,
-                    imageScale: segmentationContext.imageScale
+                    imageScale: segmentationContext.imageScale,
+                    gatewayConfig: gateway
                 )
 
                 if Self.isTimeoutError(result) {
@@ -708,7 +720,8 @@ class OCRProcessor: ObservableObject {
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: nil,
                         customPrompt: segmentationContext.customPrompt,
-                        imageScale: segmentationContext.imageScale
+                        imageScale: segmentationContext.imageScale,
+                        gatewayConfig: gateway
                     )
                 }
 
@@ -788,7 +801,8 @@ class OCRProcessor: ObservableObject {
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
         preOCRedInput: Bool = false,
-        segmentationContext: SegmentationContext
+        segmentationContext: SegmentationContext,
+        gatewayConfig: GatewayConfig? = nil
     ) async {
         guard !files.isEmpty else { return }
         isProcessing = true
@@ -798,6 +812,7 @@ class OCRProcessor: ObservableObject {
         outputURLMap = [:]
         pdfToImageMap = [:]
         currentModel = model
+        currentGateway = gatewayConfig
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -855,7 +870,8 @@ class OCRProcessor: ObservableObject {
                     previousTextCharCount: segmentationContext.previousTextCharCount,
                     sendPreviousImage: segmentationContext.sendPreviousImage,
                     customPrompt: segmentationContext.customPrompt,
-                    startedAt: Date(), completedResults: [:]
+                    startedAt: Date(), gatewayConfig: gatewayConfig,
+                    completedResults: [:]
                 )
                 Self.savePendingRun(activePendingRun!)
 
@@ -1244,19 +1260,28 @@ class OCRProcessor: ObservableObject {
     ) async -> DocumentClassification? {
         do {
             let response: String
-            switch provider {
-            case .anthropic:
-                response = try await classifyCallAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-            case .gemini:
-                response = try await classifyCallGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-            case .mistral:
-                response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
+            if let gateway = currentGateway {
+                response = try await classifyCallGateway(prompt: prompt, gateway: gateway)
+            } else {
+                switch provider {
+                case .anthropic:
+                    response = try await classifyCallAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+                case .gemini:
+                    response = try await classifyCallGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+                case .mistral:
+                    response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
+                }
             }
             let (classification, _, _) = OCRPrompt.parseResponse(response)
             return classification
         } catch {
             return nil
         }
+    }
+
+    private nonisolated func classifyCallGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
+        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+        return try await client.textCompletion(prompt: prompt, maxTokens: 64)
     }
 
     private nonisolated func classifyCallAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
@@ -1585,6 +1610,7 @@ class OCRProcessor: ObservableObject {
         segmentationContext: SegmentationContext
     ) async {
         let total = fileURLs.count
+        let gateway = currentGateway
         var previousText: String? = nil
         var previousImageURL: URL? = nil
 
@@ -1612,7 +1638,8 @@ class OCRProcessor: ObservableObject {
                 previousText: contextText,
                 previousImageURL: contextImageURL,
                 customPrompt: segmentationContext.customPrompt,
-                imageScale: segmentationContext.imageScale
+                imageScale: segmentationContext.imageScale,
+                gatewayConfig: gateway
             )
 
             // If timed out, retry once without context
@@ -1627,7 +1654,8 @@ class OCRProcessor: ObservableObject {
                     previousText: nil,
                     previousImageURL: nil,
                     customPrompt: segmentationContext.customPrompt,
-                    imageScale: segmentationContext.imageScale
+                    imageScale: segmentationContext.imageScale,
+                    gatewayConfig: gateway
                 )
             }
 
@@ -1654,6 +1682,7 @@ class OCRProcessor: ObservableObject {
         imageScale: Double = 1.0
     ) async {
         let total = fileURLs.count
+        let gateway = currentGateway
         let concurrency = 4
         var completed = 0
 
@@ -1675,7 +1704,8 @@ class OCRProcessor: ObservableObject {
                         imageURL: url, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: prevImageURL,
-                        customPrompt: customPrompt, imageScale: imageScale
+                        customPrompt: customPrompt, imageScale: imageScale,
+                        gatewayConfig: gateway
                     )
                     return (index, result)
                 }
@@ -1702,7 +1732,8 @@ class OCRProcessor: ObservableObject {
                             imageURL: nextURL, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
-                            customPrompt: customPrompt, imageScale: imageScale
+                            customPrompt: customPrompt, imageScale: imageScale,
+                            gatewayConfig: gateway
                         )
                         return (idx, result)
                     }
@@ -1714,6 +1745,10 @@ class OCRProcessor: ObservableObject {
     // MARK: Shared OCR helpers
 
     private func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
+        guard index >= 0 && index < jobs.count else {
+            print("handleOCRResult: index \(index) out of range (jobs.count = \(jobs.count))")
+            return
+        }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification
@@ -1726,7 +1761,7 @@ class OCRProcessor: ObservableObject {
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
         // Use the provided url (may be temp JPEG) for the image page
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent)
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName)
         // Map by original source URL so tagging/collection segmentation can find it
         outputURLMap[sourceURL] = outputURL
         // Copy source tags to output PDF if pass-through mode is enabled
@@ -1755,9 +1790,14 @@ class OCRProcessor: ObservableObject {
         previousText: String?,
         previousImageURL: URL?,
         customPrompt: String? = nil,
-        imageScale: Double = 1.0
+        imageScale: Double = 1.0,
+        gatewayConfig: GatewayConfig? = nil
     ) async -> OCRResult {
         do {
+            if let gateway = gatewayConfig {
+                let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+            }
             switch provider {
             case .anthropic:
                 let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
@@ -1796,6 +1836,7 @@ class OCRProcessor: ObservableObject {
     ) async {
         let retryIndices = jobs.indices.filter { isRetryableError(jobs[$0].result) }
         guard !retryIndices.isEmpty else { return }
+        let gateway = currentGateway
 
         statusMessage = "Waiting to retry \(retryIndices.count) file\(retryIndices.count == 1 ? "" : "s") (model was busy)…"
         try? await Task.sleep(for: .seconds(10))
@@ -1814,7 +1855,8 @@ class OCRProcessor: ObservableObject {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 previousText: nil,
-                previousImageURL: nil
+                previousImageURL: nil,
+                gatewayConfig: gateway
             )
 
             // Update failed files list if retry succeeded
@@ -1853,7 +1895,8 @@ class OCRProcessor: ObservableObject {
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
-                vocabulary: tagVocabulary
+                vocabulary: tagVocabulary,
+                gatewayConfig: currentGateway
             )
 
             // Apply tags to the OUTPUT PDF files, not the source images
@@ -2018,6 +2061,7 @@ class OCRProcessor: ObservableObject {
             model: model,
             thinkingLevel: thinkingLevel,
             apiKey: apiKey,
+            gatewayConfig: currentGateway,
             onStatus: { [weak self] msg in
                 self?.statusMessage = msg
             }
@@ -2345,7 +2389,8 @@ class OCRProcessor: ObservableObject {
                         result: result,
                         model: model,
                         outputURL: outputURL,
-                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent
+                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
+                        gatewayDisplayName: currentGateway?.displayName
                     )
                 }
             }
@@ -2543,7 +2588,8 @@ class OCRProcessor: ObservableObject {
                         thinkingLevel: thinkingLevel,
                         apiKey: apiKey,
                         previousText: nil,
-                        previousImageURL: nil
+                        previousImageURL: nil,
+                        gatewayConfig: currentGateway
                     )
 
                     handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
@@ -2568,13 +2614,15 @@ class OCRProcessor: ObservableObject {
     nonisolated static func performResolutionTestCall(
         imageURL: URL, provider: LLMProvider, model: LLMModel,
         thinkingLevel: ThinkingLevel?, apiKey: String,
-        imageScale: Double
+        imageScale: Double,
+        gatewayConfig: GatewayConfig? = nil
     ) async -> OCRResult {
         await performOCRCall(
             imageURL: imageURL, provider: provider, model: model,
             thinkingLevel: thinkingLevel, apiKey: apiKey,
             previousText: nil, previousImageURL: nil,
-            imageScale: imageScale
+            imageScale: imageScale,
+            gatewayConfig: gatewayConfig
         )
     }
 

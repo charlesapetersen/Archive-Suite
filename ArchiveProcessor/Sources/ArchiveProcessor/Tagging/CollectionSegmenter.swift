@@ -26,6 +26,7 @@ class CollectionSegmenter {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
+        gatewayConfig: GatewayConfig? = nil,
         onStatus: @escaping (String) -> Void
     ) async -> [CollectionSegment] {
         guard !files.isEmpty else { return [] }
@@ -52,7 +53,8 @@ class CollectionSegmenter {
             let text = idx < texts.count ? texts[idx] : ""
             let name = await extractCollectionName(
                 from: text, provider: provider, model: model,
-                thinkingLevel: thinkingLevel, apiKey: apiKey
+                thinkingLevel: thinkingLevel, apiKey: apiKey,
+                gatewayConfig: gatewayConfig
             )
             boxNames[idx] = name
             onStatus("Identified collection \(attempt + 1)/\(boxIndices.count): \(name)")
@@ -65,7 +67,8 @@ class CollectionSegmenter {
             onStatus("Resolving \(uniqueRawNames.count) collection names…")
             canonicalMap = await clusterCollectionNames(
                 uniqueRawNames, provider: provider, model: model,
-                thinkingLevel: thinkingLevel, apiKey: apiKey
+                thinkingLevel: thinkingLevel, apiKey: apiKey,
+                gatewayConfig: gatewayConfig
             )
         } else {
             let single = uniqueRawNames.first ?? "Unknown"
@@ -112,7 +115,8 @@ class CollectionSegmenter {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        gatewayConfig: GatewayConfig? = nil
     ) async -> String {
         guard !boxText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return "Unknown"
@@ -145,7 +149,7 @@ class CollectionSegmenter {
         """
 
         do {
-            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
             let raw = response.trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -163,7 +167,8 @@ class CollectionSegmenter {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        gatewayConfig: GatewayConfig? = nil
     ) async -> [String: String] {
         let nameList = names.enumerated().map { "\($0.offset + 1). \"\($0.element)\"" }.joined(separator: "\n")
 
@@ -193,7 +198,7 @@ class CollectionSegmenter {
         """
 
         do {
-            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
             return parseClusterResponse(response, names: names)
         } catch {
             // Fallback: use trimmed, normalized names
@@ -333,8 +338,12 @@ class CollectionSegmenter {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        gatewayConfig: GatewayConfig? = nil
     ) async throws -> String {
+        if let gateway = gatewayConfig {
+            return try await callGateway(prompt: prompt, gateway: gateway)
+        }
         switch provider {
         case .anthropic:
             return try await callAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
@@ -343,6 +352,11 @@ class CollectionSegmenter {
         case .mistral:
             return try await callMistralChat(prompt: prompt, apiKey: apiKey)
         }
+    }
+
+    private func callGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
+        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+        return try await client.textCompletion(prompt: prompt, maxTokens: 256)
     }
 
     private func callAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {

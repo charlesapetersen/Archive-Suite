@@ -65,7 +65,8 @@ class TagGenerator: ObservableObject {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        vocabulary: [String] = []
+        vocabulary: [String] = [],
+        gatewayConfig: GatewayConfig? = nil
     ) async -> GeneratedTags {
         // Box/folder: just a color tag
         if segment.isBox { return GeneratedTags(subjectTags: ["Box"], colorTag: "Red") }
@@ -124,7 +125,7 @@ class TagGenerator: ObservableObject {
         """
 
         do {
-            let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+            let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
             return parseTagResponse(rawResponse)
         } catch {
             return GeneratedTags(dateUncertain: true)
@@ -136,8 +137,12 @@ class TagGenerator: ObservableObject {
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
-        apiKey: String
+        apiKey: String,
+        gatewayConfig: GatewayConfig? = nil
     ) async throws -> String {
+        if let gateway = gatewayConfig {
+            return try await callGateway(prompt: prompt, gateway: gateway)
+        }
         switch provider {
         case .anthropic:
             return try await callAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
@@ -146,6 +151,11 @@ class TagGenerator: ObservableObject {
         case .mistral:
             return try await callMistralChat(prompt: prompt, model: model, apiKey: apiKey)
         }
+    }
+
+    private func callGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
+        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+        return try await client.textCompletion(prompt: prompt, maxTokens: 512)
     }
 
     private func callAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {

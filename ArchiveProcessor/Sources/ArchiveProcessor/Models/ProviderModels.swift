@@ -10,11 +10,14 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 
     var models: [LLMModel] {
+        let builtIn: [LLMModel]
         switch self {
-        case .anthropic: return LLMModel.anthropicModels
-        case .gemini: return LLMModel.geminiModels
-        case .mistral: return LLMModel.mistralModels
+        case .anthropic: builtIn = LLMModel.anthropicModels
+        case .gemini: builtIn = LLMModel.geminiModels
+        case .mistral: builtIn = LLMModel.mistralModels
         }
+        let custom = CustomModelStore.shared.models(for: self)
+        return builtIn + custom
     }
 
     var supportsBatch: Bool {
@@ -87,33 +90,43 @@ struct LLMModel: Identifiable, Hashable, Codable {
 
     static let geminiModels: [LLMModel] = [
         LLMModel(
+            id: "gemini-3.1-flash-lite",
+            displayName: "Gemini 3.1 Flash Lite",
+            provider: .gemini,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0.25,
+            outputCostPer1M: 1.50,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gemini-3.5-flash",
+            displayName: "Gemini 3.5 Flash",
+            provider: .gemini,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 1.50,
+            outputCostPer1M: 9.0,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gemini-3.1-pro",
+            displayName: "Gemini 3.1 Pro",
+            provider: .gemini,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 2.0,
+            outputCostPer1M: 12.0,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
             id: "gemini-3-flash-preview",
             displayName: "Gemini 3 Flash Preview",
             provider: .gemini,
             supportsThinking: false,
             returnsMd: false,
-            inputCostPer1M: 0.075,
-            outputCostPer1M: 0.30,
-            batchDiscount: 0.5
-        ),
-        LLMModel(
-            id: "gemini-3.1-pro-preview",
-            displayName: "Gemini 3.1 Pro Preview",
-            provider: .gemini,
-            supportsThinking: false,
-            returnsMd: false,
-            inputCostPer1M: 1.25,
-            outputCostPer1M: 5.0,
-            batchDiscount: 0.5
-        ),
-        LLMModel(
-            id: "gemini-3.1-flash-lite-preview",
-            displayName: "Gemini 3.1 Flash Lite Preview",
-            provider: .gemini,
-            supportsThinking: false,
-            returnsMd: false,
-            inputCostPer1M: 0.0375,
-            outputCostPer1M: 0.15,
+            inputCostPer1M: 0.50,
+            outputCostPer1M: 3.0,
             batchDiscount: 0.5
         ),
         LLMModel(
@@ -191,6 +204,83 @@ struct OCRResult: Codable {
         self.rotationDegrees = rotationDegrees
         self.errorMessage = errorMessage
         self.errorCode = errorCode
+    }
+}
+
+// MARK: - Gateway Config
+
+struct GatewayConfig: Codable, Equatable {
+    var baseURL: String
+    var modelID: String
+    var displayName: String
+    var inputCostPer1M: Double?
+    var outputCostPer1M: Double?
+
+    var apiKey: String {
+        KeychainHelper.load(account: "Gateway") ?? ""
+    }
+
+    func asLLMModel() -> LLMModel {
+        LLMModel(
+            id: modelID,
+            displayName: modelID,
+            provider: .anthropic,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: inputCostPer1M ?? 0,
+            outputCostPer1M: outputCostPer1M ?? 0,
+            batchDiscount: 0
+        )
+    }
+}
+
+// MARK: - Custom Model Store
+
+final class CustomModelStore: ObservableObject, @unchecked Sendable {
+    static let shared = CustomModelStore()
+
+    private static let storageKey = "customModels"
+
+    @Published private(set) var allCustomModels: [LLMModel] = []
+
+    private init() {
+        allCustomModels = Self.load()
+    }
+
+    func models(for provider: LLMProvider) -> [LLMModel] {
+        allCustomModels.filter { $0.provider == provider }
+    }
+
+    func add(_ model: LLMModel) {
+        allCustomModels.append(model)
+        save()
+    }
+
+    func remove(at offsets: IndexSet, provider: LLMProvider) {
+        let providerModels = models(for: provider)
+        let idsToRemove = offsets.map { providerModels[$0].id }
+        allCustomModels.removeAll { idsToRemove.contains($0.id) }
+        save()
+    }
+
+    func removeById(_ id: String) {
+        allCustomModels.removeAll { $0.id == id }
+        save()
+    }
+
+    func isCustom(_ model: LLMModel) -> Bool {
+        allCustomModels.contains { $0.id == model.id && $0.provider == model.provider }
+    }
+
+    private func save() {
+        guard let data = try? JSONEncoder().encode(allCustomModels) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    private static func load() -> [LLMModel] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let models = try? JSONDecoder().decode([LLMModel].self, from: data) else { return [] }
+        return models
     }
 }
 

@@ -6,14 +6,14 @@ import ImageIO
 
 struct PDFGenerator {
 
-    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil) throws {
+    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil) throws {
         let pdfDocument = PDFDocument()
 
         if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees) {
             pdfDocument.insert(imagePage, at: 0)
         }
 
-        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName)
+        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
         guard pdfDocument.write(to: outputURL) else {
@@ -219,7 +219,7 @@ struct PDFGenerator {
 
     // MARK: - Text Page
 
-    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil) -> PDFPage {
+    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil, gatewayDisplayName: String? = nil) -> PDFPage {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "d MMMM yyyy"
         let dateStr = dateFormatter.string(from: Date())
@@ -228,7 +228,11 @@ struct PDFGenerator {
         if let fileName = originalFileName {
             headerLine += "\n\(fileName)"
         }
-        headerLine += "\n\(model.provider.rawValue) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
+        if let gwName = gatewayDisplayName {
+            headerLine += "\n\(gwName) \u{00B7} \(model.id) \u{00B7} \(dateStr)"
+        } else {
+            headerLine += "\n\(model.provider.rawValue) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
+        }
         if let classification = result.classification {
             headerLine += "\nClassification: \(classification.displayName)"
         }

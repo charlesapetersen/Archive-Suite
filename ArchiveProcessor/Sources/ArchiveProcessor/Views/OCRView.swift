@@ -25,6 +25,14 @@ struct OCRView: View {
     @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
 
+    // Gateway mode (persisted)
+    @AppStorage("useGateway") private var useGateway: Bool = false
+    @AppStorage("gatewayBaseURL") private var gatewayBaseURL: String = ""
+    @AppStorage("gatewayModelID") private var gatewayModelID: String = ""
+    @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
+    @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
+    @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
+
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
     @State private var apiKey: String
@@ -55,12 +63,15 @@ struct OCRView: View {
     @State private var modelTestResults: [ModelTestResult] = []
     @State private var modelTestImage: URL?
     @State private var isRunningModelTest = false
+    @State private var showManageModels = false
+    @ObservedObject private var customModelStore = CustomModelStore.shared
 
     init() {
+        let isGateway = UserDefaults.standard.bool(forKey: "useGateway")
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
         let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
-        _apiKey = State(initialValue: KeychainHelper.load(account: provider.rawValue) ?? "")
+        _apiKey = State(initialValue: KeychainHelper.load(account: isGateway ? "Gateway" : provider.rawValue) ?? "")
 
         if let path = UserDefaults.standard.string(forKey: "outputDirectory"),
            FileManager.default.fileExists(atPath: path) {
@@ -70,13 +81,33 @@ struct OCRView: View {
         }
     }
 
-    private var currentModels: [LLMModel] { selectedProvider.models }
+    private var currentGatewayConfig: GatewayConfig? {
+        guard useGateway, !gatewayBaseURL.isEmpty, !gatewayModelID.isEmpty else { return nil }
+        return GatewayConfig(
+            baseURL: gatewayBaseURL,
+            modelID: gatewayModelID,
+            displayName: gatewayDisplayName.isEmpty ? "API Gateway" : gatewayDisplayName,
+            inputCostPer1M: gatewayInputCost >= 0 ? gatewayInputCost : nil,
+            outputCostPer1M: gatewayOutputCost >= 0 ? gatewayOutputCost : nil
+        )
+    }
+
+    private var currentModels: [LLMModel] {
+        let builtIn: [LLMModel]
+        switch selectedProvider {
+        case .anthropic: builtIn = LLMModel.anthropicModels
+        case .gemini: builtIn = LLMModel.geminiModels
+        case .mistral: builtIn = LLMModel.mistralModels
+        }
+        return builtIn + customModelStore.allCustomModels.filter { $0.provider == selectedProvider }
+    }
 
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
+        let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
         return CostEstimator.estimate(
             fileCount: droppedFiles.count,
-            model: selectedModel,
+            model: model,
             enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
@@ -84,6 +115,10 @@ struct OCRView: View {
             contextCharCount: Int(contextCharCount),
             imageScale: imageScale / 100.0
         )
+    }
+
+    private var gatewayHasCosts: Bool {
+        gatewayInputCost >= 0 && gatewayOutputCost >= 0
     }
 
     // MARK: - Body
@@ -170,14 +205,18 @@ struct OCRView: View {
                 onDismiss: { showModelTestResults = false }
             )
         }
+        .sheet(isPresented: $showManageModels) {
+            ManageModelsView()
+        }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
         }
         .onChange(of: apiKey) { _, newKey in
+            let account = useGateway ? "Gateway" : selectedProvider.rawValue
             if newKey.isEmpty {
-                KeychainHelper.delete(account: selectedProvider.rawValue)
+                KeychainHelper.delete(account: account)
             } else {
-                KeychainHelper.save(account: selectedProvider.rawValue, password: newKey)
+                KeychainHelper.save(account: account, password: newKey)
             }
         }
         .onChange(of: outputDirectory) { _, newDir in
@@ -236,49 +275,137 @@ struct OCRView: View {
                     }
                 }
 
-                // Provider & Model
-                GroupBox("Provider & Model") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Picker("Provider", selection: $selectedProvider) {
-                            ForEach(LLMProvider.allCases) { p in
-                                Text(p.rawValue).tag(p)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: selectedProvider) { _, newProvider in
-                            let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
-                            selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
-                            apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
-                        }
+                // API Mode
+                Picker("API Mode", selection: $useGateway) {
+                    Text("Direct API").tag(false)
+                    Text("API Gateway").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: useGateway) { _, isGateway in
+                    apiKey = KeychainHelper.load(account: isGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+                }
 
-                        Picker("Model", selection: $selectedModel) {
-                            ForEach(currentModels) { m in
-                                Text(m.displayName).tag(m)
+                if useGateway {
+                    // Gateway Configuration
+                    GroupBox("Gateway Configuration") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Gateway URL")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                TextField("https://example.com/v1", text: $gatewayBaseURL)
+                                    .textFieldStyle(.roundedBorder)
                             }
-                        }
 
-                        if selectedModel.supportsThinking {
-                            Picker("Thinking", selection: $selectedThinking) {
-                                ForEach(ThinkingLevel.allCases) { t in
-                                    Text(t.rawValue).tag(t)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Model ID")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                TextField("e.g. claude-sonnet-4-6", text: $gatewayModelID)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Display Name (for PDF headers)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                TextField("e.g. Stanford Gateway", text: $gatewayDisplayName)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            Divider()
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Pricing (optional, for cost estimates)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Input $/1M tokens")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        TextField("—", value: Binding(
+                                            get: { gatewayInputCost >= 0 ? gatewayInputCost : nil },
+                                            set: { gatewayInputCost = $0 ?? -1 }
+                                        ), format: .number)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 100)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Output $/1M tokens")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        TextField("—", value: Binding(
+                                            get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil },
+                                            set: { gatewayOutputCost = $0 ?? -1 }
+                                        ), format: .number)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 100)
+                                    }
+                                }
+                            }
+
+                            Text("All settings are saved automatically and persist across sessions.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(4)
+                    }
+                } else {
+                    // Provider & Model (Direct mode)
+                    GroupBox("Provider & Model") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Picker("Provider", selection: $selectedProvider) {
+                                ForEach(LLMProvider.allCases) { p in
+                                    Text(p.rawValue).tag(p)
                                 }
                             }
                             .pickerStyle(.segmented)
-                        }
+                            .onChange(of: selectedProvider) { _, newProvider in
+                                let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
+                                selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
+                                apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
+                            }
 
-                        Button("Compare Models…") {
-                            showModelSelectionSheet = true
+                            HStack {
+                                Picker("Model", selection: $selectedModel) {
+                                    ForEach(currentModels) { m in
+                                        let label = customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName
+                                        Text(label).tag(m)
+                                    }
+                                }
+                                Button {
+                                    showManageModels = true
+                                } label: {
+                                    Image(systemName: "plus.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Add or manage custom models")
+                            }
+
+                            if selectedModel.supportsThinking {
+                                Picker("Thinking", selection: $selectedThinking) {
+                                    ForEach(ThinkingLevel.allCases) { t in
+                                        Text(t.rawValue).tag(t)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            }
+
+                            Button("Compare Models…") {
+                                showModelSelectionSheet = true
+                            }
+                            .font(.caption)
+                            .disabled(isRunningModelTest)
                         }
-                        .font(.caption)
-                        .disabled(isRunningModelTest)
+                        .padding(4)
                     }
-                    .padding(4)
                 }
 
                 // API Key
-                GroupBox("API Key") {
+                GroupBox(useGateway ? "Gateway API Key" : "API Key") {
                     VStack(alignment: .leading, spacing: 6) {
-                        SecureField("Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
+                        SecureField(useGateway ? "Enter gateway API key…" : "Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
                         HStack(spacing: 4) {
                             Image(systemName: "lock.shield")
@@ -455,9 +582,13 @@ struct OCRView: View {
                 GroupBox("Processing Mode") {
                     VStack(alignment: .leading, spacing: 6) {
                         Toggle("Batch Mode (slower, ~50% cheaper)", isOn: $batchMode)
-                            .disabled(selectedProvider == .gemini)
-                        if selectedProvider == .gemini {
-                            Text("Gemini batch processing is temporarily unavailable due to a Google API infrastructure issue. Individual requests still work normally.")
+                            .disabled(useGateway)
+                        if useGateway {
+                            Text("Batch mode is not available when using an API gateway.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else if selectedProvider == .gemini && batchMode {
+                            Text("Gemini batch jobs may occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry or switch to non-batch mode.")
                                 .font(.caption2)
                                 .foregroundStyle(.orange)
                         } else if batchMode {
@@ -495,7 +626,14 @@ struct OCRView: View {
                 }
 
                 // Cost estimate
-                if let est = costEstimate {
+                if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
+                    GroupBox("Cost Estimate") {
+                        Text("Enter model pricing in Gateway Configuration above to see cost estimates.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(4)
+                    }
+                } else if let est = costEstimate {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -537,14 +675,14 @@ struct OCRView: View {
                                 Spacer()
                                 Text(est.totalStandardFormatted).fontWeight(.medium)
                             }
-                            if batchMode && !preOCRedInput && selectedProvider != .gemini {
+                            if !useGateway && batchMode && !preOCRedInput {
                                 HStack {
                                     Text("Total (batch):").foregroundStyle(.secondary)
                                     Spacer()
                                     Text(est.totalBatchFormatted)
                                 }
                             }
-                            Text("Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
+                            Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
@@ -991,8 +1129,9 @@ struct OCRView: View {
         showResolutionTest = true
         let scales = [10, 20, 40, 60, 80, 100]
         let provider = selectedProvider
-        let model = selectedModel
-        let thinking = selectedModel.supportsThinking ? selectedThinking : nil
+        let gateway = currentGatewayConfig
+        let model = gateway?.asLLMModel() ?? selectedModel
+        let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil
         let key = apiKey
 
         Task {
@@ -1000,7 +1139,8 @@ struct OCRView: View {
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: provider, model: model,
                     thinkingLevel: thinking, apiKey: key,
-                    imageScale: Double(scale) / 100.0
+                    imageScale: Double(scale) / 100.0,
+                    gatewayConfig: gateway
                 )
                 resolutionTestResults.append((scale: scale, text: result.text))
             }
@@ -1084,22 +1224,27 @@ struct OCRView: View {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+
+        let gateway = currentGatewayConfig
+        let effectiveModel = gateway?.asLLMModel() ?? selectedModel
+
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
                 provider: selectedProvider,
-                model: selectedModel,
-                thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
+                model: effectiveModel,
+                thinkingLevel: !useGateway && selectedModel.supportsThinking ? selectedThinking : nil,
                 apiKey: apiKey,
                 outputDirectory: outDir,
-                batchMode: selectedProvider == .gemini ? false : batchMode,
+                batchMode: useGateway ? false : batchMode,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
                 confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
                 reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
-                segmentationContext: context
+                segmentationContext: context,
+                gatewayConfig: gateway
             )
         }
     }
