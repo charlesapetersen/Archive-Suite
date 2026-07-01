@@ -53,6 +53,101 @@ enum DocumentClassification: String, Codable {
     }
 }
 
+// MARK: - Tagging Mode
+
+/// How tags are assigned to document segments.
+enum TaggingMode: String, CaseIterable, Identifiable, Codable {
+    case none              // No tagging
+    case copySource        // Copy macOS Finder tags from source images to output PDFs
+    case automatic         // LLM generates all tags (date + subjects) — the original behavior
+    case autoDate          // LLM segments + dates; the user enters subject tags
+    case autoDateManualSeg // The user segments + enters subjects; the LLM fills each date
+    case human             // The user segments and enters date + subject tags entirely
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "No tagging"
+        case .copySource: return "Copy source file tags"
+        case .automatic: return "Automatic (LLM)"
+        case .autoDate: return "Auto date and segmentation, manual subjects"
+        case .autoDateManualSeg: return "Auto date, manual segmentation & subjects"
+        case .human: return "Manual (human)"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .none: return "Skip tagging entirely."
+        case .copySource: return "Read macOS Finder tags from each source image and apply them to the output PDF. No LLM tagging."
+        case .automatic: return "The model generates date and subject tags for every document segment."
+        case .autoDate: return "The model determines the segmentation and date; you enter subject tags for each document segment."
+        case .autoDateManualSeg: return "You group the images into segments and enter subject tags; the model fills in each document's date."
+        case .human: return "You group the images into segments and enter the date and subject tags."
+        }
+    }
+
+    /// Whether this mode performs LLM/segment-based tagging (drives segmentation review, box/folder confirm, and Phase 2).
+    var enablesTagging: Bool { self != .none }
+
+    /// Whether the user manually tags each segment (any mode with a manual tagging UI).
+    var isManual: Bool { self == .autoDate || self == .autoDateManualSeg || self == .human }
+
+    /// Whether the user defines segments themselves in the full-window manual UI.
+    var usesManualSegmentationUI: Bool { self == .autoDateManualSeg || self == .human }
+
+    /// Whether the LLM fills in the date automatically.
+    var autoFillsDate: Bool { self == .autoDateManualSeg }
+
+    /// Whether document start/continuation segmentation is meaningful in the rotation review
+    /// (only the LLM-segmented modes; manual-segmentation modes own grouping in their own UI).
+    var showsDocumentClassesInReview: Bool {
+        self == .automatic || self == .autoDate
+    }
+}
+
+// MARK: - Rotation Mode
+
+/// How the app detects the rotation needed to make each scanned image upright.
+enum RotationMode: String, CaseIterable, Identifiable, Codable {
+    case off               // No rotation correction
+    case localVision       // Free, local macOS Vision (fast, ~60% accurate on documents)
+    case llmSingle         // One LLM "which-of-4-is-upright" comparative call
+    case llmMajority       // Three comparative calls, majority vote (most accurate)
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .off: return "Off"
+        case .localVision: return "Local (fast, free)"
+        case .llmSingle: return "LLM comparative"
+        case .llmMajority: return "LLM comparative ×3 (most accurate)"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .off: return "Do not correct rotation."
+        case .localVision: return "On-device macOS Vision. Free and fast, but only ~60% accurate on rotated documents."
+        case .llmSingle: return "Shows the model all four rotations and asks which is upright — one extra cheap API call per image."
+        case .llmMajority: return "Repeats the comparison three times and takes the majority vote. Most accurate; three extra cheap API calls per image."
+        }
+    }
+
+    /// Number of shuffled orderings to vote over (LLM modes only).
+    var orderings: Int {
+        switch self {
+        case .llmMajority: return 3
+        case .llmSingle: return 1
+        default: return 0
+        }
+    }
+
+    var usesLLM: Bool { self == .llmSingle || self == .llmMajority }
+}
+
 // MARK: - Models
 
 struct LLMModel: Identifiable, Hashable, Codable {
@@ -186,7 +281,7 @@ struct OCRJob: Identifiable {
     var appliedTags: [String] = []
 
     enum JobStatus {
-        case pending, processing, succeeded, failed
+        case pending, processing, succeeded, failed, removed
     }
 }
 

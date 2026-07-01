@@ -132,6 +132,58 @@ class TagGenerator: ObservableObject {
         }
     }
 
+    /// Extract ONLY the date for a segment (used by the auto-date manual tagging mode).
+    /// Cheaper than `generateTags` — no subject/format/party fields.
+    func generateDateOnly(
+        for segment: DocumentSegment,
+        nearbySegments: [DocumentSegment],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        gatewayConfig: GatewayConfig? = nil
+    ) async -> GeneratedTags {
+        if segment.isBox || segment.isFolder { return GeneratedTags() }
+        let text = segment.combinedText
+        guard !text.isEmpty else { return GeneratedTags(dateUncertain: true) }
+
+        let contextText = nearbySegments
+            .prefix(3)
+            .map { $0.combinedText.prefix(300) }
+            .joined(separator: "\n---\n")
+
+        let prompt = """
+        You are a date-extraction assistant for a historical archive.
+
+        OCR text of a document:
+        ---
+        \(text.prefix(3000))
+        ---
+
+        Nearby documents for date-estimation context (use only if this document's date is unclear):
+        ---
+        \(contextText.isEmpty ? "(none)" : contextText)
+        ---
+
+        Respond with ONLY a valid JSON object in this exact format:
+        { "year": "1987", "month": "03 March", "day": "Day 15", "date_uncertain": false }
+
+        Rules:
+        - "year": 4-digit year string. ALWAYS provide a year — if not stated, estimate from nearby documents or contextual clues. Never null.
+        - "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
+        - "day": format "Day D" (e.g. "Day 15"), or null if not determinable
+        - "date_uncertain": true if the year cannot be determined from the document itself (even if estimated from context)
+        - Respond with ONLY the JSON object. No commentary.
+        """
+
+        do {
+            let raw = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
+            return parseTagResponse(raw)
+        } catch {
+            return GeneratedTags(dateUncertain: true)
+        }
+    }
+
     private func callLLM(
         prompt: String,
         provider: LLMProvider,

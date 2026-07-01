@@ -14,8 +14,13 @@ struct OCRView: View {
     @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
     @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
-    @AppStorage("enableTagging") private var enableTagging: Bool = true
-    @AppStorage("passSourceTags") private var passSourceTags: Bool = false
+    @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
+    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmMajority.rawValue
+    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmMajority }
+    /// Derived for compatibility with existing pipeline flags.
+    private var enableTagging: Bool { taggingMode.enablesTagging }
+    private var passSourceTags: Bool { taggingMode == .copySource }
     @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
@@ -67,11 +72,10 @@ struct OCRView: View {
     @ObservedObject private var customModelStore = CustomModelStore.shared
 
     init() {
-        let isGateway = UserDefaults.standard.bool(forKey: "useGateway")
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
         let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
-        _apiKey = State(initialValue: KeychainHelper.load(account: isGateway ? "Gateway" : provider.rawValue) ?? "")
+        _apiKey = State(initialValue: "")
 
         if let path = UserDefaults.standard.string(forKey: "outputDirectory"),
            FileManager.default.fileExists(atPath: path) {
@@ -132,10 +136,17 @@ struct OCRView: View {
                 .padding()
         }
         .onAppear {
+            let isGateway = UserDefaults.standard.bool(forKey: "useGateway")
+            apiKey = KeychainHelper.load(account: isGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
             }
+            // Warm the system-tag suggestions if a manual tagging mode is already selected.
+            if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
+        }
+        .onChange(of: taggingModeRaw) { _, _ in
+            if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
@@ -148,6 +159,15 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingDocumentReview) {
             DocumentSegmentReviewSheet(processor: processor)
+        }
+        .sheet(isPresented: $processor.awaitingBoxFolderConfirmation) {
+            BoxFolderConfirmSheet(processor: processor)
+        }
+        .sheet(isPresented: $processor.awaitingManualTagging) {
+            ManualTaggingSheet(processor: processor)
+        }
+        .sheet(isPresented: $processor.awaitingManualSegTag) {
+            ManualSegmentTagView(processor: processor)
         }
         .sheet(isPresented: $showResolutionDropSheet) {
             ResolutionDropSheet { url in
@@ -355,17 +375,20 @@ struct OCRView: View {
                     // Provider & Model (Direct mode)
                     GroupBox("Provider & Model") {
                         VStack(alignment: .leading, spacing: 8) {
-                            Picker("Provider", selection: $selectedProvider) {
+                            Picker("Provider", selection: Binding(
+                                get: { selectedProvider },
+                                set: { newProvider in
+                                    let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
+                                    selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
+                                    apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
+                                    selectedProvider = newProvider
+                                }
+                            )) {
                                 ForEach(LLMProvider.allCases) { p in
                                     Text(p.rawValue).tag(p)
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .onChange(of: selectedProvider) { _, newProvider in
-                                let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
-                                selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
-                                apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
-                            }
 
                             HStack {
                                 Picker("Model", selection: $selectedModel) {
@@ -437,6 +460,31 @@ struct OCRView: View {
                     .padding(4)
                 }
 
+                // Rotation
+                GroupBox("Rotation Correction") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("Detect rotation", selection: $rotationModeRaw) {
+                            ForEach(RotationMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode.rawValue)
+                            }
+                        }
+                        Text(rotationMode.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        if rotationMode.usesLLM && selectedProvider == .mistral && !useGateway {
+                            Text("Mistral has no comparative vision path — rotation falls back to local Vision.")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                        if rotationMode.usesLLM && useGateway {
+                            Text("API Gateway mode uses local Vision for rotation.")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .padding(4)
+                }
+
                 // Tagging & Segmentation
                 GroupBox("Tagging & Segmentation") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -464,20 +512,18 @@ struct OCRView: View {
 
                         Divider()
 
-                        Toggle("Enable tagging", isOn: $enableTagging)
-
-                        if enableTagging {
-                            Toggle("Copy source file tags to output PDFs", isOn: $passSourceTags)
-                                .font(.caption)
-                                .padding(.leading, 16)
-                            if passSourceTags {
-                                Text("Reads macOS Finder tags from each source image and applies them to the output PDF. Skips LLM-based tagging.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.leading, 32)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Picker("Tagging", selection: $taggingModeRaw) {
+                                ForEach(TaggingMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode.rawValue)
+                                }
                             }
+                            Text(taggingMode.detail)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
 
-                            if !passSourceTags {
+                        if taggingMode.enablesTagging && taggingMode != .copySource {
                             Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
                                 .font(.caption)
                                 .padding(.leading, 16)
@@ -509,6 +555,7 @@ struct OCRView: View {
                                     .foregroundStyle(.tertiary)
                             }
 
+                            if taggingMode == .automatic {
                             Divider()
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -545,8 +592,8 @@ struct OCRView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
-                            } // end if !passSourceTags
-                        }
+                            } // end if taggingMode == .automatic
+                        } // end if tagging enabled (non-copy-source)
 
                         Divider()
 
@@ -706,7 +753,7 @@ struct OCRView: View {
 
                 // Start button
                 Button(action: startProcessing) {
-                    Label(preOCRedInput ? "Start Processing" : (enableTagging || enableCollectionSegmentation ? "Start OCR + Tagging" : "Start OCR"), systemImage: "play.fill")
+                    Label("Start", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -1184,6 +1231,8 @@ struct OCRView: View {
             droppedFiles = urls
         }
         processor.passSourceTags = passSourceTags && enableTagging
+        processor.taggingMode = taggingMode
+        processor.rotationMode = rotationMode
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -1199,6 +1248,8 @@ struct OCRView: View {
             droppedFiles = urls
         }
         processor.passSourceTags = passSourceTags && enableTagging
+        processor.taggingMode = taggingMode
+        processor.rotationMode = rotationMode
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -1219,6 +1270,8 @@ struct OCRView: View {
             imageScale: imageScale / 100.0
         )
         processor.passSourceTags = passSourceTags && enableTagging
+        processor.taggingMode = taggingMode
+        processor.rotationMode = rotationMode
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -1351,6 +1404,8 @@ struct FileRowView: View {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
         case .failed:
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
+        case .removed:
+            Image(systemName: "trash.circle.fill").foregroundStyle(.secondary).font(.caption)
         default:
             Image(systemName: "circle").foregroundStyle(.tertiary).font(.caption)
         }
@@ -1423,16 +1478,19 @@ struct OCRRetrySheet: View {
                 Text("Retry with")
                     .font(.headline)
 
-                Picker("Provider", selection: $selectedProvider) {
+                Picker("Provider", selection: Binding(
+                    get: { selectedProvider },
+                    set: { newProvider in
+                        selectedModel = newProvider.models[0]
+                        apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
+                        selectedProvider = newProvider
+                    }
+                )) {
                     ForEach(LLMProvider.allCases) { p in
                         Text(p.rawValue).tag(p)
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: selectedProvider) { _, newProvider in
-                    selectedModel = newProvider.models[0]
-                    apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
-                }
 
                 Picker("Model", selection: $selectedModel) {
                     ForEach(currentModels) { m in
@@ -1697,6 +1755,9 @@ struct DocumentSegmentReviewSheet: View {
     @State private var thumbnailSize: CGFloat = 400
     @State private var focusedIndex: Int = 0
 
+    /// Whether New-Document / Continuation options are offered (only when merging or tagging by segment).
+    private var showDocClasses: Bool { processor.reviewShowsDocumentClasses }
+
     private var newDocCount: Int {
         processor.documentReviewItems.filter { $0.classification == .documentStart }.count
     }
@@ -1713,6 +1774,30 @@ struct DocumentSegmentReviewSheet: View {
         processor.documentReviewItems.filter { $0.classification == .folderLabel }.count
     }
 
+    private var removedCount: Int {
+        processor.documentReviewItems.filter { $0.markedForRemoval }.count
+    }
+
+    private var footerSummary: String {
+        let active = processor.documentReviewItems.filter { !$0.markedForRemoval }
+        var parts: [String] = []
+        if showDocClasses {
+            let n = active.filter { $0.classification == .documentStart }.count
+            let c = active.filter { $0.classification == .documentContinuation }.count
+            parts.append("\(n) new document\(n == 1 ? "" : "s")")
+            parts.append("\(c) continuation\(c == 1 ? "" : "s")")
+        } else {
+            let docs = active.filter { $0.classification != .boxLabel && $0.classification != .folderLabel }.count
+            parts.append("\(docs) document\(docs == 1 ? "" : "s")")
+        }
+        let boxes = active.filter { $0.classification == .boxLabel }.count
+        let folders = active.filter { $0.classification == .folderLabel }.count
+        if boxes > 0 { parts.append("\(boxes) box\(boxes == 1 ? "" : "es")") }
+        if folders > 0 { parts.append("\(folders) folder\(folders == 1 ? "" : "s")") }
+        if removedCount > 0 { parts.append("\(removedCount) removed") }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -1721,7 +1806,9 @@ struct DocumentSegmentReviewSheet: View {
                     Text("Document Segmentation Review")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  [/]=Rotate  \u{2191}\u{2193}=Navigate  Return=Confirm")
+                    Text(showDocClasses
+                         ? "Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  \u{2190}\u{2192}=Rotate  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"
+                         : "Keys: 3=Box  4=Folder  \u{2190}\u{2192}=Rotate  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1758,7 +1845,8 @@ struct DocumentSegmentReviewSheet: View {
                             DocumentReviewRow(
                                 item: $processor.documentReviewItems[idx],
                                 thumbnailSize: thumbnailSize,
-                                isFocused: idx == focusedIndex
+                                isFocused: idx == focusedIndex,
+                                showDocumentClasses: showDocClasses
                             )
                             .id(idx)
                             .onTapGesture { focusedIndex = idx }
@@ -1777,7 +1865,7 @@ struct DocumentSegmentReviewSheet: View {
 
             // Footer
             HStack {
-                Text("\(newDocCount) new document\(newDocCount == 1 ? "" : "s"), \(continuationCount) continuation\(continuationCount == 1 ? "" : "s")\(boxCount > 0 ? ", \(boxCount) box\(boxCount == 1 ? "" : "es")" : "")\(folderCount > 0 ? ", \(folderCount) folder\(folderCount == 1 ? "" : "s")" : "")")
+                Text(footerSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -1790,7 +1878,7 @@ struct DocumentSegmentReviewSheet: View {
             }
             .padding()
         }
-        .frame(minWidth: 700, idealWidth: 1000, maxWidth: .infinity, minHeight: 500, idealHeight: 700, maxHeight: .infinity)
+        .frame(minWidth: 1000, idealWidth: 1900, maxWidth: .infinity, minHeight: 800, idealHeight: 1300, maxHeight: .infinity)
         .onAppear {
             DispatchQueue.main.async {
                 if let window = NSApp.keyWindow {
@@ -1806,15 +1894,34 @@ struct DocumentSegmentReviewSheet: View {
             if focusedIndex < processor.documentReviewItems.count - 1 { focusedIndex += 1 }
             return .handled
         }
-        .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
+        .onKeyPress(.leftArrow) {
             if focusedIndex < processor.documentReviewItems.count {
+                let current = processor.documentReviewItems[focusedIndex].rotationDegrees
+                processor.documentReviewItems[focusedIndex].rotationDegrees = (current - 90 + 360) % 360
+            }
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].rotationDegrees = (processor.documentReviewItems[focusedIndex].rotationDegrees + 90) % 360
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
+            if showDocClasses, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .documentStart
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "2")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if showDocClasses, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .documentContinuation
+            }
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "xX")) { _ in
+            if focusedIndex < processor.documentReviewItems.count {
+                processor.documentReviewItems[focusedIndex].markedForRemoval.toggle()
             }
             return .handled
         }
@@ -1850,6 +1957,18 @@ struct DocumentReviewRow: View {
     @Binding var item: DocumentReviewItem
     let thumbnailSize: CGFloat
     var isFocused: Bool = false
+    var showDocumentClasses: Bool = true
+
+    private var rowBackground: Color {
+        if item.markedForRemoval { return Color.secondary.opacity(0.10) }
+        switch item.classification {
+        case .boxLabel: return Color.red.opacity(0.12)
+        case .folderLabel: return Color.purple.opacity(0.12)
+        case .documentStart: return showDocumentClasses ? Color.blue.opacity(0.12) : Color.gray.opacity(0.10)
+        case .documentContinuation: return showDocumentClasses ? Color.green.opacity(0.12) : Color.gray.opacity(0.10)
+        case .none: return Color.gray.opacity(0.10)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1857,14 +1976,22 @@ struct DocumentReviewRow: View {
             thumbnail
                 .frame(width: thumbnailSize, height: thumbnailSize)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                .opacity(item.markedForRemoval ? 0.4 : 1)
 
             // Classification radio buttons
             VStack(alignment: .leading, spacing: 6) {
-                radioButton(label: "1 New Document", selected: item.classification == .documentStart, color: .blue) {
-                    item.classification = .documentStart
-                }
-                radioButton(label: "2 Continuation", selected: item.classification == .documentContinuation, color: .green) {
-                    item.classification = .documentContinuation
+                if showDocumentClasses {
+                    radioButton(label: "1 New Document", selected: item.classification == .documentStart, color: .blue) {
+                        item.classification = .documentStart
+                    }
+                    radioButton(label: "2 Continuation", selected: item.classification == .documentContinuation, color: .green) {
+                        item.classification = .documentContinuation
+                    }
+                } else {
+                    // Segmentation is irrelevant here — a page is either a plain document or a box/folder label.
+                    radioButton(label: "Document", selected: item.classification == .documentStart || item.classification == .documentContinuation || item.classification == nil, color: .gray) {
+                        item.classification = .documentStart
+                    }
                 }
                 radioButton(label: "3 Box", selected: item.classification == .boxLabel, color: .red) {
                     item.classification = .boxLabel
@@ -1874,6 +2001,7 @@ struct DocumentReviewRow: View {
                 }
             }
             .frame(width: 130)
+            .disabled(item.markedForRemoval)
 
             VStack(alignment: .leading, spacing: 8) {
                 // Filename
@@ -1881,6 +2009,7 @@ struct DocumentReviewRow: View {
                     .font(.system(size: 11, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .strikethrough(item.markedForRemoval)
                     .frame(minWidth: 180, alignment: .leading)
 
                 // Rotation radio buttons
@@ -1893,18 +2022,25 @@ struct DocumentReviewRow: View {
                     rotationRadio(label: "180°", degrees: 180)
                     rotationRadio(label: "270°", degrees: 270)
                 }
+                .disabled(item.markedForRemoval)
             }
 
             Spacer()
+
+            // Remove / restore button
+            Button {
+                item.markedForRemoval.toggle()
+            } label: {
+                Image(systemName: item.markedForRemoval ? "arrow.uturn.backward.circle" : "trash")
+                    .foregroundStyle(item.markedForRemoval ? Color.accentColor : .red)
+                    .font(.body)
+            }
+            .buttonStyle(.plain)
+            .help(item.markedForRemoval ? "Restore this photo" : "Remove this photo from output")
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(
-            item.classification == .boxLabel ? Color.red.opacity(0.12) :
-            item.classification == .folderLabel ? Color.purple.opacity(0.12) :
-            item.classification == .documentStart ? Color.blue.opacity(0.12) :
-            Color.green.opacity(0.12)
-        )
+        .background(rowBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 2)
@@ -1931,9 +2067,10 @@ struct DocumentReviewRow: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let nsImage = loadThumbnail(url: item.fileURL, maxSize: Int(max(thumbnailSize * 2, 800))) {
+            // Show the entire image (fit, not fill/crop) so nothing is cut off during review.
             Image(nsImage: nsImage)
                 .resizable()
-                .aspectRatio(contentMode: .fill)
+                .aspectRatio(contentMode: .fit)
                 .rotationEffect(.degrees(Double(item.rotationDegrees)))
         } else {
             Rectangle()

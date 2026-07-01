@@ -25,6 +25,56 @@ struct DocumentReviewItem: Identifiable {
     let fileURL: URL
     var classification: DocumentClassification?
     var rotationDegrees: Int = 0
+    /// User flagged this photo for removal during review (extraneous image).
+    var markedForRemoval: Bool = false
+}
+
+// MARK: - Manual Tag Segment
+
+/// One image shown in the manual tagging UI, with its corrected rotation. A context image
+/// is the nearest preceding box/folder label — shown for orientation but NOT tagged.
+struct ManualTagImage: Identifiable {
+    let id = UUID()
+    let url: URL
+    let rotationDegrees: Int
+    let isContext: Bool
+}
+
+// MARK: - Manual Segmentation + Tagging (fully human mode)
+
+/// One image in the fully-manual segmentation UI.
+struct ManualSegImage: Identifiable {
+    let id = UUID()
+    let fileIndex: Int          // index into the run's `files` array
+    let url: URL
+    let rotationDegrees: Int
+    let isBoxOrFolder: Bool      // locked single-image segment, never tagged
+}
+
+/// Date + subject tags the user enters for one manually-defined segment.
+struct SegmentTagData {
+    var year: String = ""
+    var month: String = ""      // "MM Month"
+    var day: String = ""        // "Day D"
+    var dateUncertain: Bool = false
+    var subjectTags: [String] = ["Unread"]
+}
+
+/// One document segment presented for manual/human tagging (feature 6).
+struct ManualTagSegment: Identifiable {
+    let id = UUID()
+    /// Index into the processor's `segments` array.
+    let segmentIndex: Int
+    /// Images to display: an optional leading box/folder context image, then the segment pages.
+    let images: [ManualTagImage]
+    // Editable date fields
+    var year: String = ""
+    var month: String = ""      // "MM Month", e.g. "03 March"
+    var day: String = ""        // "Day D", e.g. "Day 15"
+    var dateUncertain: Bool = false
+    var subjectTags: [String] = []
+    /// True while the auto-date LLM prefetch for this segment is still in flight.
+    var dateLoading: Bool = false
 }
 
 @MainActor
@@ -45,6 +95,16 @@ class OCRProcessor: ObservableObject {
     var mergeDocuments = false
     /// Optional controlled vocabulary for subject tags (one per line)
     var tagVocabulary: [String] = []
+    /// How tags are assigned (automatic / auto-date / human / copy-source / none). Set from the UI before a run.
+    var taggingMode: TaggingMode = .automatic
+    /// How image rotation is detected. Set from the UI before a run.
+    var rotationMode: RotationMode = .llmMajority
+    /// The active run's rotation mode, readable from the nonisolated OCR call. Only one run
+    /// executes at a time, so a static is safe here.
+    nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
+
+    /// Source URLs the user removed during segmentation review; excluded from segments, tagging, and output.
+    var removedSourceURLs: Set<URL> = []
 
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
@@ -56,7 +116,40 @@ class OCRProcessor: ObservableObject {
     @Published var documentReviewItems: [DocumentReviewItem] = []
     @Published var awaitingDocumentReview = false
     @Published var currentReviewCollectionName: String = ""
+    /// Whether the document review sheet should offer New-Document / Continuation options
+    /// (only meaningful when merging or tagging by segment).
+    @Published var reviewShowsDocumentClasses = true
     private var documentReviewContinuation: CheckedContinuation<Void, Never>?
+
+    /// Final box/folder confirmation review state (shown after document segmentation review)
+    @Published var boxFolderConfirmItems: [DocumentReviewItem] = []
+    @Published var awaitingBoxFolderConfirmation = false
+    private var boxFolderConfirmContinuation: CheckedContinuation<Void, Never>?
+
+    /// Manual (human) tagging review state — sequential, one segment at a time (autoDate mode)
+    @Published var manualTagSegments: [ManualTagSegment] = []
+    @Published var currentManualIndex = 0
+    @Published var awaitingManualTagging = false
+    private var manualTaggingContinuation: CheckedContinuation<Void, Never>?
+
+    /// Fully-manual segmentation + tagging review state (human mode)
+    @Published var manualSegImages: [ManualSegImage] = []
+    /// Parallel to `manualSegImages`: whether each image starts a new segment (a boundary).
+    @Published var manualSegIsStart: [Bool] = []
+    /// Tag data keyed by the segment's start index (into `manualSegImages`).
+    @Published var manualSegTags: [Int: SegmentTagData] = [:]
+    @Published var manualSegFocus = 0
+    @Published var awaitingManualSegTag = false
+    /// When true (autoDateManualSeg mode), each segment's date is fetched from the LLM on demand.
+    @Published var manualSegAutoDate = false
+    /// Segment start indices whose date fetch is currently in flight.
+    @Published var manualSegDateLoading: Set<Int> = []
+    private var manualSegContinuation: CheckedContinuation<Void, Never>?
+    // LLM params captured for on-demand date fetching during manual segmentation.
+    private var manualSegProvider: LLMProvider = .gemini
+    private var manualSegModel: LLMModel?
+    private var manualSegThinking: ThinkingLevel?
+    private var manualSegApiKey: String = ""
 
     /// Interactive workflow pause states
     @Published var awaitingFinalReview = false           // After tagging, before completion
@@ -352,6 +445,8 @@ class OCRProcessor: ObservableObject {
                 confirmBeforeOrganizing: pending.confirmCollectionIDs,
                 reviewDocumentSegmentation: pending.reviewDocumentSegmentation
             )
+
+            applyBoxFolderLabelTags(enableTagging: pending.enableTagging)
         }
 
         guard !Task.isCancelled else { return }
@@ -540,6 +635,8 @@ class OCRProcessor: ObservableObject {
                 confirmBeforeOrganizing: pending.confirmCollectionIDs,
                 reviewDocumentSegmentation: pending.reviewDocumentSegmentation
             )
+
+            applyBoxFolderLabelTags(enableTagging: pending.enableTagging)
         }
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -586,6 +683,31 @@ class OCRProcessor: ObservableObject {
             statusMessage += " \(collectionSegments.count) collections organized."
         }
         postCompletionNotification()
+    }
+
+    /// Applies Red/Purple color tags to box/folder label PDFs when full LLM tagging
+    /// is disabled (or when passing source tags through). When automatic tagging is enabled
+    /// these tags are already applied by the normal tagging pass, so this is a no-op.
+    private func applyBoxFolderLabelTags(enableTagging: Bool) {
+        guard !enableTagging || passSourceTags else { return }
+        applyBoxFolderLabelTagsUnconditionally()
+    }
+
+    /// Applies Red/Purple color tags to every box/folder label output PDF, unconditionally.
+    /// Used by manual tagging modes, which don't run the automatic tagging pass.
+    private func applyBoxFolderLabelTagsUnconditionally() {
+        for job in jobs {
+            guard let classification = job.result?.classification else { continue }
+            let tags: GeneratedTags
+            switch classification {
+            case .boxLabel: tags = GeneratedTags(subjectTags: ["Box"], colorTag: "Red")
+            case .folderLabel: tags = GeneratedTags(subjectTags: ["Folder"], colorTag: "Purple")
+            default: continue
+            }
+            if let outputPDF = outputURLMap[job.sourceURL] {
+                try? MacOSTagger.applyTags(tags, to: outputPDF)
+            }
+        }
     }
 
     /// Restore a previously completed result without re-saving to pending run.
@@ -811,6 +933,8 @@ class OCRProcessor: ObservableObject {
         collectionSegments = []
         outputURLMap = [:]
         pdfToImageMap = [:]
+        removedSourceURLs = []
+        Self.rotationModeForRun = rotationMode
         currentModel = model
         currentGateway = gatewayConfig
         jobs = files.map { OCRJob(sourceURL: $0) }
@@ -908,64 +1032,47 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Interactive Review: Show document segmentation review dialog for all files
+            // Interactive Review: document segmentation (rotation + classification) review
             if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
                 await showFullSegmentationReview(files: files)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-                // Rebuild segments from user-confirmed classifications
-                let segmenter = DocumentSegmenter()
-                let updatedClassifications = jobs.map { $0.result?.classification }
-                let updatedTexts = jobs.map { $0.result?.text ?? "" }
-                segments = segmenter.segment(files: files, classifications: updatedClassifications, texts: updatedTexts)
+                // Final confirmation of box/folder identifications
+                await showBoxFolderConfirmation(files: files)
+                guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+                // Rebuild segments from user-confirmed classifications (excluding removed files)
+                rebuildSegments(files: files)
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Phase 2: Tagging loop with redo support
+            // Phase 2: Tagging (mode-dependent)
             if enableTagging && !passSourceTags {
-                var shouldRedoTagging = true
-                while shouldRedoTagging {
-                    statusMessage = "Found \(segments.count) segments. Generating tags…"
-
-                    await performTaggingPhase(
-                        provider: provider,
-                        model: model,
-                        thinkingLevel: thinkingLevel,
-                        apiKey: apiKey,
-                        outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON
+                switch taggingMode {
+                case .automatic:
+                    await performAutomaticTaggingWithReview(
+                        provider: provider, model: model, thinkingLevel: thinkingLevel,
+                        apiKey: apiKey, outputDirectory: outputDirectory,
+                        enableSegmentJSON: enableSegmentJSON, files: files
                     )
-
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-                    // Interactive Review Point 2: Pause for final review after tagging
-                    statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
-                    isProcessing = false
-                    awaitingFinalReview = true
-
-                    let action: FinalReviewAction = await withCheckedContinuation { continuation in
-                        finalReviewContinuation = continuation
-                    }
-
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
-                    isProcessing = true
-
-                    switch action {
-                    case .complete:
-                        shouldRedoTagging = false
-                    case .redoTagging:
-                        // Rebuild segments from potentially updated classifications
-                        let segmenter = DocumentSegmenter()
-                        let redoClassifications = jobs.map { $0.result?.classification }
-                        let redoTexts = jobs.map { $0.result?.text ?? "" }
-                        segments = segmenter.segment(files: files, classifications: redoClassifications, texts: redoTexts)
-                        // Clear existing tags before re-tagging
-                        for i in jobs.indices {
-                            jobs[i].appliedTags = []
-                        }
-                    }
+                case .autoDate:
+                    await performManualTaggingPhase(
+                        mode: taggingMode, provider: provider, model: model,
+                        thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON
+                    )
+                case .human, .autoDateManualSeg:
+                    await performManualSegmentAndTag(
+                        autoDate: taggingMode.autoFillsDate,
+                        provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        outputDirectory: outputDirectory,
+                        enableSegmentJSON: enableSegmentJSON, files: files
+                    )
+                case .none, .copySource:
+                    break
                 }
+                guard !Task.isCancelled else { cleanupTempFiles(); return }
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -982,6 +1089,8 @@ class OCRProcessor: ObservableObject {
                     confirmBeforeOrganizing: confirmCollectionIDs,
                     reviewDocumentSegmentation: false
                 )
+
+                applyBoxFolderLabelTags(enableTagging: enableTagging)
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1153,58 +1262,45 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         progress = 0.5
 
-        // Interactive Review: Show document segmentation review dialog for all files
+        // Interactive Review: document segmentation (rotation + classification) review
         if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
             await showFullSegmentationReview(files: files)
             guard !Task.isCancelled else { return }
 
-            // Rebuild segments from user-confirmed classifications
-            let segmenter = DocumentSegmenter()
-            let updatedClassifications = jobs.map { $0.result?.classification }
-            let updatedTexts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: files, classifications: updatedClassifications, texts: updatedTexts)
+            // Final confirmation of box/folder identifications
+            await showBoxFolderConfirmation(files: files)
+            guard !Task.isCancelled else { return }
+
+            // Rebuild segments from user-confirmed classifications (excluding removed files)
+            rebuildSegments(files: files)
         }
 
         guard !Task.isCancelled else { return }
 
-        // Step 3: Tagging loop with redo support
+        // Step 3: Tagging (mode-dependent)
         if enableTagging && !passSourceTags {
-            var shouldRedoTagging = true
-            while shouldRedoTagging {
-                statusMessage = "Found \(segments.count) segments. Generating tags…"
-
-                await performTaggingPhase(
-                    provider: provider,
-                    model: model,
-                    thinkingLevel: thinkingLevel,
-                    apiKey: apiKey,
-                    outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON
+            switch taggingMode {
+            case .automatic:
+                await performAutomaticTaggingWithReview(
+                    provider: provider, model: model, thinkingLevel: thinkingLevel,
+                    apiKey: apiKey, outputDirectory: outputDirectory,
+                    enableSegmentJSON: enableSegmentJSON, files: files
                 )
-
-                guard !Task.isCancelled else { return }
-
-                statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
-                isProcessing = false
-                awaitingFinalReview = true
-
-                let action: FinalReviewAction = await withCheckedContinuation { continuation in
-                    finalReviewContinuation = continuation
-                }
-
-                guard !Task.isCancelled else { return }
-                isProcessing = true
-
-                switch action {
-                case .complete:
-                    shouldRedoTagging = false
-                case .redoTagging:
-                    let segmenter = DocumentSegmenter()
-                    let redoClassifications = jobs.map { $0.result?.classification }
-                    let redoTexts = jobs.map { $0.result?.text ?? "" }
-                    segments = segmenter.segment(files: files, classifications: redoClassifications, texts: redoTexts)
-                    for i in jobs.indices { jobs[i].appliedTags = [] }
-                }
+            case .autoDate:
+                await performManualTaggingPhase(
+                    mode: taggingMode, provider: provider, model: model,
+                    thinkingLevel: thinkingLevel, apiKey: apiKey,
+                    outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON
+                )
+            case .human, .autoDateManualSeg:
+                await performManualSegmentAndTag(
+                    autoDate: taggingMode.autoFillsDate,
+                    provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                    outputDirectory: outputDirectory,
+                    enableSegmentJSON: enableSegmentJSON, files: files
+                )
+            case .none, .copySource:
+                break
             }
         } else if passSourceTags {
             // For pre-OCRed input, source tags are on the input PDFs themselves
@@ -1231,6 +1327,8 @@ class OCRProcessor: ObservableObject {
                 confirmBeforeOrganizing: confirmCollectionIDs,
                 reviewDocumentSegmentation: false
             )
+
+            applyBoxFolderLabelTags(enableTagging: enableTagging)
         }
 
         // Organize into collection folders (after all processing)
@@ -1452,7 +1550,7 @@ class OCRProcessor: ObservableObject {
                         if let url = status.resultsURL {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(resultsURL: url)
-                            processBatchResults(results, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                            await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
                         } else {
                             statusMessage = "Batch completed but no results available"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -1473,7 +1571,7 @@ class OCRProcessor: ObservableObject {
                         if status.status == "SUCCESS", let fileId = status.outputFileId {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(outputFileId: fileId)
-                            processBatchResults(results, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                            await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
                         } else {
                             statusMessage = "Batch \(status.status.lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -1506,10 +1604,10 @@ class OCRProcessor: ObservableObject {
                             let succeeded = status.state == "BATCH_STATE_SUCCEEDED" || status.state == "JOB_STATE_SUCCEEDED"
                             if succeeded {
                                 if let inlineResults = status.inlineResults {
-                                    processBatchResults(inlineResults, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                                    await processBatchResults(inlineResults, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
                                 } else if let fileName = status.resultFileName {
                                     let results = try await client.retrieveResults(resultFileName: fileName)
-                                    processBatchResults(results, fileURLs: fileURLs, model: model, outputDirectory: outputDirectory)
+                                    await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
                                 }
                             } else {
                                 anyFailed = true
@@ -1544,13 +1642,21 @@ class OCRProcessor: ObservableObject {
         _ results: [String: OCRResult],
         fileURLs: [URL],
         model: LLMModel,
+        apiKey: String,
         outputDirectory: URL
-    ) {
+    ) async {
         for (customId, result) in results {
             let indexStr = customId.replacingOccurrences(of: "file-", with: "")
             guard let index = Int(indexStr), index < fileURLs.count else { continue }
             let url = fileURLs[index]
-            handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            // The batch path has no live network call to overlap with, but rotation is still
+            // detected per the run's mode and merged before applying.
+            let correction = await Self.detectRotation(
+                imageURL: url, provider: model.provider, apiKey: apiKey,
+                mode: Self.rotationModeForRun, gatewayConfig: currentGateway
+            )
+            let resolved = Self.mergeRotation(into: result, correction: correction)
+            handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
         }
 
         // Mark any remaining processing jobs as failed (no result returned for them)
@@ -1793,25 +1899,79 @@ class OCRProcessor: ObservableObject {
         imageScale: Double = 1.0,
         gatewayConfig: GatewayConfig? = nil
     ) async -> OCRResult {
+        // Start rotation detection concurrently with the network OCR call. Both are async, so
+        // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
+        // The detected correction overrides the OCR prompt's own rotation guess.
+        async let rotationCorrection = detectRotation(
+            imageURL: imageURL, provider: provider, apiKey: apiKey,
+            mode: rotationModeForRun, gatewayConfig: gatewayConfig
+        )
+
+        let networkResult: OCRResult
         do {
             if let gateway = gatewayConfig {
                 let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
-            }
-            switch provider {
-            case .anthropic:
-                let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
-            case .gemini:
-                let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
-            case .mistral:
-                let client = MistralClient(apiKey: apiKey, model: model)
-                return try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: imageScale)
+                networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+            } else {
+                switch provider {
+                case .anthropic:
+                    let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+                case .gemini:
+                    let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+                case .mistral:
+                    let client = MistralClient(apiKey: apiKey, model: model)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: imageScale)
+                }
             }
         } catch {
+            _ = await rotationCorrection  // let the concurrent task finish
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil)
         }
+
+        // Override rotation with the detected correction when OCR produced text and a
+        // correction was found; otherwise keep the LLM prompt's parsed rotation.
+        return mergeRotation(into: networkResult, correction: await rotationCorrection)
+    }
+
+    /// Detect the clockwise correction for an image per the run's rotation mode, with LLM
+    /// modes falling back to local Vision when unavailable. Runs off the main actor.
+    nonisolated static func detectRotation(
+        imageURL: URL,
+        provider: LLMProvider,
+        apiKey: String,
+        mode: RotationMode,
+        gatewayConfig: GatewayConfig?
+    ) async -> Int? {
+        switch mode {
+        case .off:
+            return nil
+        case .localVision:
+            return await RotationDetector.detectCorrection(imageURL: imageURL)
+        case .llmSingle, .llmMajority:
+            if let c = await LLMRotationDetector.detectCorrection(
+                imageURL: imageURL, provider: provider, apiKey: apiKey,
+                orderings: mode.orderings, gatewayConfig: gatewayConfig
+            ) {
+                return c
+            }
+            // Fall back to local Vision if the LLM path is unavailable or fails.
+            return await RotationDetector.detectCorrection(imageURL: imageURL)
+        }
+    }
+
+    /// Replace a result's rotation with the detected correction when the result has text and
+    /// a correction was found; otherwise return the result unchanged.
+    private nonisolated static func mergeRotation(into result: OCRResult, correction: Int?) -> OCRResult {
+        guard result.text != nil, let rot = correction else { return result }
+        return OCRResult(
+            text: result.text,
+            classification: result.classification,
+            rotationDegrees: rot,
+            errorMessage: result.errorMessage,
+            errorCode: result.errorCode
+        )
     }
 
     // MARK: - Retry High-Use Failures
@@ -1869,6 +2029,415 @@ class OCRProcessor: ObservableObject {
     }
 
     // MARK: - Phase 3: Tagging
+
+    /// Rebuild `segments` from current job classifications, excluding user-removed files.
+    private func rebuildSegments(files: [URL]) {
+        let segmenter = DocumentSegmenter()
+        var activeFiles: [URL] = []
+        var classifications: [DocumentClassification?] = []
+        var texts: [String] = []
+        for (i, url) in files.enumerated() {
+            if removedSourceURLs.contains(url) { continue }
+            activeFiles.append(url)
+            classifications.append(i < jobs.count ? jobs[i].result?.classification : nil)
+            texts.append(i < jobs.count ? (jobs[i].result?.text ?? "") : "")
+        }
+        segments = segmenter.segment(files: activeFiles, classifications: classifications, texts: texts)
+    }
+
+    /// Automatic (LLM) tagging with the redo-review loop. Extracted so the standard and
+    /// pre-OCRed pipelines share one implementation.
+    private func performAutomaticTaggingWithReview(
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        enableSegmentJSON: Bool,
+        files: [URL]
+    ) async {
+        var shouldRedoTagging = true
+        while shouldRedoTagging {
+            statusMessage = "Found \(segments.count) segments. Generating tags…"
+
+            await performTaggingPhase(
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: outputDirectory,
+                enableSegmentJSON: enableSegmentJSON
+            )
+
+            guard !Task.isCancelled else { return }
+
+            // Interactive Review Point 2: Pause for final review after tagging
+            statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
+            isProcessing = false
+            awaitingFinalReview = true
+
+            let action: FinalReviewAction = await withCheckedContinuation { continuation in
+                finalReviewContinuation = continuation
+            }
+
+            guard !Task.isCancelled else { return }
+            isProcessing = true
+
+            switch action {
+            case .complete:
+                shouldRedoTagging = false
+            case .redoTagging:
+                rebuildSegments(files: files)
+                for i in jobs.indices { jobs[i].appliedTags = [] }
+            }
+        }
+    }
+
+    /// Manual (human-in-the-loop) tagging. Presents each non-box/folder segment sequentially
+    /// for the user to enter subject tags (and, in `.human` mode, the date). In `.autoDate`
+    /// mode the date is prefetched from the LLM while the user tags, so they never wait on
+    /// the network. Box/folder segments still receive their Red/Purple color tags.
+    private func performManualTaggingPhase(
+        mode: TaggingMode,
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        enableSegmentJSON: Bool
+    ) async {
+        // Apply Red/Purple color tags to box/folder segments (they aren't manually tagged).
+        applyBoxFolderLabelTagsUnconditionally()
+
+        // Build one manual-tag entry per taggable (non-box/folder) segment.
+        func rotation(for url: URL) -> Int {
+            jobs.first(where: { $0.sourceURL == url })?.result?.rotationDegrees ?? 0
+        }
+        var manual: [ManualTagSegment] = []
+        for (i, seg) in segments.enumerated() where !seg.isBox && !seg.isFolder {
+            var images: [ManualTagImage] = []
+            // Context: the nearest preceding box/folder label (shown first, never tagged).
+            if let ctxSeg = segments[0..<i].last(where: { $0.isBox || $0.isFolder }),
+               let ctxURL = ctxSeg.pdfURLs.first {
+                images.append(ManualTagImage(url: ctxURL, rotationDegrees: rotation(for: ctxURL), isContext: true))
+            }
+            for url in seg.pdfURLs {
+                images.append(ManualTagImage(url: url, rotationDegrees: rotation(for: url), isContext: false))
+            }
+            manual.append(ManualTagSegment(
+                segmentIndex: i,
+                images: images,
+                subjectTags: ["Unread"],
+                dateLoading: mode == .autoDate
+            ))
+        }
+        guard !manual.isEmpty else { return }
+
+        manualTagSegments = manual
+        currentManualIndex = 0
+
+        // Prefetch dates for .autoDate while the user works (in-order, so early segments fill first).
+        var dateTask: Task<Void, Never>? = nil
+        if mode == .autoDate {
+            dateTask = Task { [weak self] in
+                await self?.prefetchManualDates(
+                    provider: provider, model: model,
+                    thinkingLevel: thinkingLevel, apiKey: apiKey
+                )
+            }
+        }
+
+        statusMessage = "Manual tagging: \(manual.count) segment\(manual.count == 1 ? "" : "s")."
+        isProcessing = false
+        awaitingManualTagging = true
+
+        await withCheckedContinuation { continuation in
+            manualTaggingContinuation = continuation
+        }
+
+        dateTask?.cancel()
+        guard !Task.isCancelled else { return }
+        isProcessing = true
+
+        // Apply the user's tags to each segment's output PDF(s) and write JSON.
+        for m in manualTagSegments where m.segmentIndex < segments.count {
+            let seg = segments[m.segmentIndex]
+            var tags = GeneratedTags()
+            tags.year = m.year.isEmpty ? nil : m.year
+            tags.month = m.month.isEmpty ? nil : m.month
+            tags.day = m.day.isEmpty ? nil : m.day
+            tags.dateUncertain = m.dateUncertain
+            tags.subjectTags = m.subjectTags
+
+            for sourceURL in seg.pdfURLs {
+                if let outputPDF = outputURLMap[sourceURL] {
+                    try? MacOSTagger.applyTags(tags, to: outputPDF)
+                }
+                if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
+                    jobs[jobIndex].appliedTags = tags.allTags
+                }
+            }
+            if enableSegmentJSON {
+                writeSegmentJSON(segment: seg, tags: tags, outputDirectory: outputDirectory)
+            }
+        }
+    }
+
+    /// Sequentially prefetch LLM date estimates for the manual-tag segments, filling any
+    /// date fields the user hasn't already edited.
+    private func prefetchManualDates(
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String
+    ) async {
+        let generator = TagGenerator()
+        for idx in manualTagSegments.indices {
+            guard !Task.isCancelled else { return }
+            let segIndex = manualTagSegments[idx].segmentIndex
+            guard segIndex < segments.count else { continue }
+            let nearby = Array(
+                segments[max(0, segIndex - 3)..<segIndex]
+                + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
+            )
+            let date = await generator.generateDateOnly(
+                for: segments[segIndex],
+                nearbySegments: nearby,
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                gatewayConfig: currentGateway
+            )
+            guard !Task.isCancelled, idx < manualTagSegments.count else { return }
+            if manualTagSegments[idx].year.isEmpty { manualTagSegments[idx].year = date.year ?? "" }
+            if manualTagSegments[idx].month.isEmpty { manualTagSegments[idx].month = date.month ?? "" }
+            if manualTagSegments[idx].day.isEmpty { manualTagSegments[idx].day = date.day ?? "" }
+            manualTagSegments[idx].dateUncertain = date.dateUncertain
+            manualTagSegments[idx].dateLoading = false
+        }
+    }
+
+    /// UI: advance to the next manual-tag segment, or finish if on the last one.
+    func advanceManualSegment() {
+        if currentManualIndex < manualTagSegments.count - 1 {
+            currentManualIndex += 1
+        } else {
+            finishManualTagging()
+        }
+    }
+
+    /// UI: go back to the previous manual-tag segment.
+    func previousManualSegment() {
+        if currentManualIndex > 0 { currentManualIndex -= 1 }
+    }
+
+    /// UI: finish manual tagging and resume the pipeline.
+    func finishManualTagging() {
+        awaitingManualTagging = false
+        manualTaggingContinuation?.resume()
+        manualTaggingContinuation = nil
+    }
+
+    // MARK: - Fully-manual segmentation + tagging (human mode)
+
+    /// Present the full-window manual grouping + tagging UI. The user defines segment
+    /// boundaries and tags each segment themselves; box/folder images are locked own-segments
+    /// and never tagged. On confirm, boundaries are written back into job classifications and
+    /// each segment's tags are applied to its output PDFs.
+    private func performManualSegmentAndTag(
+        autoDate: Bool,
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        enableSegmentJSON: Bool,
+        files: [URL]
+    ) async {
+        // Capture params for on-demand LLM date fetching from the UI.
+        manualSegAutoDate = autoDate
+        manualSegDateLoading = []
+        manualSegProvider = provider
+        manualSegModel = model
+        manualSegThinking = thinkingLevel
+        manualSegApiKey = apiKey
+
+        // Build the ordered image list (excluding removed files).
+        var images: [ManualSegImage] = []
+        for (i, url) in files.enumerated() {
+            guard !removedSourceURLs.contains(url), i < jobs.count else { continue }
+            let cls = jobs[i].result?.classification
+            images.append(ManualSegImage(
+                fileIndex: i,
+                url: url,
+                rotationDegrees: jobs[i].result?.rotationDegrees ?? 0,
+                isBoxOrFolder: cls == .boxLabel || cls == .folderLabel
+            ))
+        }
+        guard !images.isEmpty else { return }
+
+        // Seed boundaries from current classifications: first image, any box/folder, the image
+        // after a box/folder, and any documentStart begin a new segment.
+        var isStart = [Bool](repeating: false, count: images.count)
+        var tags: [Int: SegmentTagData] = [:]
+        for idx in images.indices {
+            let img = images[idx]
+            let cls = jobs[img.fileIndex].result?.classification
+            let startsHere = idx == 0
+                || img.isBoxOrFolder
+                || images[idx - 1].isBoxOrFolder
+                || cls == .documentStart
+            isStart[idx] = startsHere
+            if startsHere && !img.isBoxOrFolder { tags[idx] = SegmentTagData() }
+        }
+
+        manualSegImages = images
+        manualSegIsStart = isStart
+        manualSegTags = tags
+        manualSegFocus = 0
+
+        statusMessage = "Manual segmentation & tagging: \(images.count) image\(images.count == 1 ? "" : "s")."
+        isProcessing = false
+        awaitingManualSegTag = true
+
+        await withCheckedContinuation { continuation in
+            manualSegContinuation = continuation
+        }
+
+        guard !Task.isCancelled else { return }
+        isProcessing = true
+
+        // Write user boundaries back into job classifications (box/folder preserved).
+        for idx in manualSegImages.indices {
+            let img = manualSegImages[idx]
+            guard img.fileIndex < jobs.count, !img.isBoxOrFolder else { continue }
+            let newCls: DocumentClassification = manualSegIsStart[idx] ? .documentStart : .documentContinuation
+            jobs[img.fileIndex].classification = newCls
+            if let r = jobs[img.fileIndex].result {
+                jobs[img.fileIndex].result = OCRResult(
+                    text: r.text, classification: newCls,
+                    rotationDegrees: r.rotationDegrees,
+                    errorMessage: r.errorMessage, errorCode: nil
+                )
+            }
+        }
+
+        rebuildSegments(files: files)
+        applyBoxFolderLabelTagsUnconditionally()
+
+        // Map each image URL → its manualSegImages index so we can find a segment's tag data
+        // from its first page (robust even if a boundary was forced by a preceding box/folder).
+        var indexByURL: [URL: Int] = [:]
+        for (idx, img) in manualSegImages.enumerated() { indexByURL[img.url] = idx }
+
+        for seg in segments where !seg.isBox && !seg.isFolder {
+            guard let firstURL = seg.pdfURLs.first else { continue }
+            let data = indexByURL[firstURL].flatMap { manualSegTags[$0] } ?? SegmentTagData()
+            var gtags = GeneratedTags()
+            gtags.year = data.year.isEmpty ? nil : data.year
+            gtags.month = data.month.isEmpty ? nil : data.month
+            gtags.day = data.day.isEmpty ? nil : data.day
+            gtags.dateUncertain = data.dateUncertain
+            gtags.subjectTags = data.subjectTags
+
+            for sourceURL in seg.pdfURLs {
+                if let outputPDF = outputURLMap[sourceURL] {
+                    try? MacOSTagger.applyTags(gtags, to: outputPDF)
+                }
+                if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
+                    jobs[jobIndex].appliedTags = gtags.allTags
+                }
+            }
+            if enableSegmentJSON {
+                writeSegmentJSON(segment: seg, tags: gtags, outputDirectory: outputDirectory)
+            }
+        }
+    }
+
+    /// UI: toggle whether the image at `idx` starts a new segment (a boundary). The first
+    /// image and box/folder images are locked. Keeps `manualSegTags` consistent.
+    func toggleManualBoundary(at idx: Int) {
+        guard idx > 0, idx < manualSegImages.count, !manualSegImages[idx].isBoxOrFolder else { return }
+        manualSegIsStart[idx].toggle()
+        if manualSegIsStart[idx] {
+            if manualSegTags[idx] == nil { manualSegTags[idx] = SegmentTagData() }
+        } else {
+            manualSegTags[idx] = nil
+        }
+    }
+
+    /// The start index of the segment containing image `idx`.
+    func manualSegStartIndex(for idx: Int) -> Int {
+        guard !manualSegImages.isEmpty else { return 0 }
+        var i = min(max(idx, 0), manualSegImages.count - 1)
+        while i > 0 && !(i < manualSegIsStart.count && manualSegIsStart[i]) { i -= 1 }
+        return i
+    }
+
+    /// The next segment-start index after `idx`, if any (for ↓ navigation).
+    func manualSegNextStart(after idx: Int) -> Int? {
+        var i = idx + 1
+        while i < manualSegImages.count {
+            if i < manualSegIsStart.count && manualSegIsStart[i] { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    /// The previous segment-start index before the segment containing `idx` (for ↑ navigation).
+    func manualSegPreviousStart(before idx: Int) -> Int? {
+        let start = manualSegStartIndex(for: idx)
+        guard start > 0 else { return nil }
+        return manualSegStartIndex(for: start - 1)
+    }
+
+    func confirmManualSegTag() {
+        awaitingManualSegTag = false
+        manualSegContinuation?.resume()
+        manualSegContinuation = nil
+    }
+
+    /// UI (autoDateManualSeg mode): fetch the LLM date for the segment starting at `startIndex`,
+    /// built from that segment's current pages, and fill any empty date fields. Idempotent —
+    /// skips if already loading or the date is already populated.
+    func fetchManualSegDate(startIndex: Int) async {
+        guard manualSegAutoDate, let model = manualSegModel else { return }
+        guard startIndex < manualSegImages.count, !manualSegImages[startIndex].isBoxOrFolder else { return }
+        let existing = manualSegTags[startIndex] ?? SegmentTagData()
+        // Don't refetch if a date is already present or a fetch is in flight.
+        guard existing.year.isEmpty, !manualSegDateLoading.contains(startIndex) else { return }
+
+        // Collect the segment's pages (startIndex … just before the next start).
+        let end = (manualSegNextStart(after: startIndex) ?? manualSegImages.count) - 1
+        guard startIndex <= end else { return }
+        var urls: [URL] = []
+        var texts: [String] = []
+        for i in startIndex...end where !manualSegImages[i].isBoxOrFolder {
+            let url = manualSegImages[i].url
+            urls.append(url)
+            texts.append(jobs.first { $0.sourceURL == url }?.result?.text ?? "")
+        }
+        guard !urls.isEmpty else { return }
+
+        manualSegDateLoading.insert(startIndex)
+        let segment = DocumentSegment(pdfURLs: urls, texts: texts)
+        let date = await TagGenerator().generateDateOnly(
+            for: segment, nearbySegments: [],
+            provider: manualSegProvider, model: model,
+            thinkingLevel: manualSegThinking, apiKey: manualSegApiKey,
+            gatewayConfig: currentGateway
+        )
+        manualSegDateLoading.remove(startIndex)
+
+        guard !Task.isCancelled else { return }
+        var data = manualSegTags[startIndex] ?? SegmentTagData()
+        if data.year.isEmpty { data.year = date.year ?? "" }
+        if data.month.isEmpty { data.month = date.month ?? "" }
+        if data.day.isEmpty { data.day = date.day ?? "" }
+        data.dateUncertain = date.dateUncertain
+        manualSegTags[startIndex] = data
+    }
 
     private func performTaggingPhase(
         provider: LLMProvider,
@@ -2351,6 +2920,10 @@ class OCRProcessor: ObservableObject {
             )
         }
 
+        // New-Document / Continuation options are only meaningful when merging or when an
+        // LLM-segmented tagging mode is used. In manual-segmentation modes the dedicated
+        // grouping UI owns segmentation, so the rotation review shows only rotation + box/folder.
+        reviewShowsDocumentClasses = mergeDocuments || taggingMode.showsDocumentClassesInReview
         currentReviewCollectionName = "All Files"
         statusMessage = "Review document segmentation."
         awaitingDocumentReview = true
@@ -2361,40 +2934,100 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
-        // Apply classification and rotation changes back to jobs
+        // Apply classification, rotation, and removal changes back to jobs
         for item in documentReviewItems {
-            if item.fileIndex < jobs.count {
-                let newCls = item.classification
-                let newRot = item.rotationDegrees
-                let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
-                jobs[item.fileIndex].classification = newCls
-                if let existingResult = jobs[item.fileIndex].result {
-                    jobs[item.fileIndex].result = OCRResult(
-                        text: existingResult.text,
-                        classification: newCls,
-                        rotationDegrees: newRot,
-                        errorMessage: existingResult.errorMessage,
-                        errorCode: nil
-                    )
+            guard item.fileIndex < jobs.count else { continue }
+
+            // Removal: drop this photo from output, tagging, and segments
+            if item.markedForRemoval {
+                removedSourceURLs.insert(item.fileURL)
+                if let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL] {
+                    try? FileManager.default.removeItem(at: outputURL)
+                    let jsonURL = outputURL.deletingPathExtension().appendingPathExtension("json")
+                    try? FileManager.default.removeItem(at: jsonURL)
+                    outputURLMap[jobs[item.fileIndex].sourceURL] = nil
                 }
-                // Regenerate output PDF if rotation changed
-                if newRot != oldRot, let result = jobs[item.fileIndex].result,
-                   let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
-                   let model = currentModel {
-                    let pdfGen = PDFGenerator()
-                    // Use temp JPEG if this was a PDF input, otherwise the original file
-                    let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
-                    try? pdfGen.generate(
-                        imageURL: imageURL,
-                        result: result,
-                        model: model,
-                        outputURL: outputURL,
-                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
-                        gatewayDisplayName: currentGateway?.displayName
-                    )
-                }
+                jobs[item.fileIndex].status = .removed
+                continue
+            }
+
+            let newCls = item.classification
+            let newRot = item.rotationDegrees
+            let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
+            jobs[item.fileIndex].classification = newCls
+            if let existingResult = jobs[item.fileIndex].result {
+                jobs[item.fileIndex].result = OCRResult(
+                    text: existingResult.text,
+                    classification: newCls,
+                    rotationDegrees: newRot,
+                    errorMessage: existingResult.errorMessage,
+                    errorCode: nil
+                )
+            }
+            // Regenerate output PDF if rotation changed
+            if newRot != oldRot, let result = jobs[item.fileIndex].result,
+               let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
+               let model = currentModel {
+                let pdfGen = PDFGenerator()
+                // Use temp JPEG if this was a PDF input, otherwise the original file
+                let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
+                try? pdfGen.generate(
+                    imageURL: imageURL,
+                    result: result,
+                    model: model,
+                    outputURL: outputURL,
+                    originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
+                    gatewayDisplayName: currentGateway?.displayName
+                )
             }
         }
+    }
+
+    // MARK: - Box/Folder Final Confirmation
+
+    /// Present a final confirmation of every box/folder identification (after the rotation
+    /// review). Reclassifications are written back into jobs, updating Red/Purple tags.
+    private func showBoxFolderConfirmation(files: [URL]) async {
+        let items: [DocumentReviewItem] = files.enumerated().compactMap { (index, url) in
+            guard !removedSourceURLs.contains(url), index < jobs.count else { return nil }
+            let cls = jobs[index].result?.classification
+            guard cls == .boxLabel || cls == .folderLabel else { return nil }
+            return DocumentReviewItem(
+                fileIndex: index,
+                fileName: url.lastPathComponent,
+                fileURL: url,
+                classification: cls,
+                rotationDegrees: jobs[index].result?.rotationDegrees ?? 0
+            )
+        }
+
+        // Nothing to confirm — skip the sheet entirely.
+        guard !items.isEmpty else { return }
+
+        boxFolderConfirmItems = items
+        statusMessage = "Confirm box and folder identifications."
+        awaitingBoxFolderConfirmation = true
+
+        await withCheckedContinuation { continuation in
+            boxFolderConfirmContinuation = continuation
+        }
+
+        guard !Task.isCancelled else { return }
+
+        // Apply any reclassifications (updateClassification handles Red/Purple tag updates).
+        for item in boxFolderConfirmItems where item.fileIndex < jobs.count {
+            let newCls = item.classification ?? .documentStart
+            if jobs[item.fileIndex].classification != newCls {
+                updateClassification(at: item.fileIndex, to: newCls)
+            }
+        }
+    }
+
+    /// Called by the UI when the user confirms the box/folder review.
+    func confirmBoxFolderReview() {
+        awaitingBoxFolderConfirmation = false
+        boxFolderConfirmContinuation?.resume()
+        boxFolderConfirmContinuation = nil
     }
 
     /// Update rotation for a single file (used by inline editing from the file pane).
@@ -2651,9 +3284,11 @@ class OCRProcessor: ObservableObject {
         let dateStr = dateFormatter.string(from: Date())
 
         var lines = ["Archive Processor — OCR Log", "Date: \(dateStr)", ""]
+        let removedCount = jobs.filter { $0.status == .removed }.count
         lines.append("Total files: \(jobs.count)")
         lines.append("Succeeded: \(jobs.filter { $0.status == .succeeded }.count)")
         lines.append("Failed: \(failedFiles.count)")
+        if removedCount > 0 { lines.append("Removed during review: \(removedCount)") }
         if !segments.isEmpty {
             lines.append("Document segments: \(segments.count)")
         }
