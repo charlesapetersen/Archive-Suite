@@ -15,6 +15,8 @@
 		25922CF438F3053123EDFD60 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA476D0BECB92F4AE6714A78 /* CaptureSession.swift */; };
 		261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68049A48FDC13B74708EF6F /* PDFGenerator.swift */; };
 		27F8387A204C6F91898348FD /* NetworkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA72715DACC7832B447737B /* NetworkSession.swift */; };
+		2A7B44006B6C9EAC0FF506E9 /* LiveCaptureProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2BDBA685773A244C13D776A /* LiveCaptureProcessor.swift */; };
+		2DAD0440BFF4FFBDFBDA7BD5 /* CollectionFinalizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473BEF7CEA4B1BB2CBDD6182 /* CollectionFinalizeSheet.swift */; };
 		371A1C5378BAAC2F31DEB825 /* OCRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE519DB723DEF9EE690B75F /* OCRView.swift */; };
 		3D8E1BF0DB0540FE4D94F124 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1336A6A82652DF9748694428 /* Assets.xcassets */; };
 		409BF603222531B6FB91A8AC /* CaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3E42E4C08CDBC05B7F9AFB /* CaptureModels.swift */; };
@@ -25,9 +27,11 @@
 		7FD5C6773B4EA10A947EED51 /* USBBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6A98B62C13E89DA5ED3DDF /* USBBridge.swift */; };
 		904533896796EE9945E61E08 /* LLMRotationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F615D9D9C926B7805A3ED2 /* LLMRotationDetector.swift */; };
 		9B29F513A193C1B2B18BB7FA /* LiveCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB6F995FE1FFDC02771F7DD /* LiveCaptureView.swift */; };
+		9DC088C4AB1AFA61DCACFD45 /* LiveCaptureTestDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7CB9BC4F9472789E4B09AC /* LiveCaptureTestDriver.swift */; };
 		A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */; };
 		A31E3D3616F4B92754877B53 /* CollectionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096C0E9D05F40D15835769A6 /* CollectionSegmenter.swift */; };
 		A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */; };
+		AA8D85413146B5934D228015 /* SessionProcessingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE4FA4A5DAA7C0892D4D5CC /* SessionProcessingConfig.swift */; };
 		AB14D2D96483775855E78A70 /* CaptureServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C98F3B5353A75639380095DE /* CaptureServer.swift */; };
 		AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9155615F54261797E2D35CF1 /* MacOSTagger.swift */; };
 		B088540C026FD7F3FDB353D4 /* BatchOCR.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */; };
@@ -42,6 +46,7 @@
 		DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */; };
 		DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90F6E42E4FA19C125CC1A0A /* TagGenerator.swift */; };
 		E12D577E4C9F4FD712550CBD /* PDFToImageConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9599054C424B7CE60EC6C7 /* PDFToImageConverter.swift */; };
+		EBF0F52E7CCFBAC616CDB265 /* LiveSessionSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */; };
 		ED6330709937FDD549CF1434 /* ArchiveProcessorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA33D6A6A9E16A449C04DB52 /* ArchiveProcessorApp.swift */; };
 		EF52F84BA62DDDEE06B21476 /* ManageModelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CBF4F0E4A42B295AFC3B793 /* ManageModelsView.swift */; };
 		F1D78EE6F5E76BC734023CAB /* TagInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9149C20C69B7A53A3A765C85 /* TagInputField.swift */; };
@@ -65,7 +70,9 @@
 		3CA72715DACC7832B447737B /* NetworkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSession.swift; sourceTree = "<group>"; };
 		3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropReceiver.swift; sourceTree = "<group>"; };
 		46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRPrompt.swift; sourceTree = "<group>"; };
+		473BEF7CEA4B1BB2CBDD6182 /* CollectionFinalizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFinalizeSheet.swift; sourceTree = "<group>"; };
 		4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
+		4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionSettingsSheet.swift; sourceTree = "<group>"; };
 		5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRProcessor.swift; sourceTree = "<group>"; };
 		672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
 		718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOCR.swift; sourceTree = "<group>"; };
@@ -82,10 +89,13 @@
 		AA476D0BECB92F4AE6714A78 /* CaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSession.swift; sourceTree = "<group>"; };
 		AB9599054C424B7CE60EC6C7 /* PDFToImageConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFToImageConverter.swift; sourceTree = "<group>"; };
 		ABE185CBB6660116E100F055 /* ArchiveThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveThumbnail.swift; sourceTree = "<group>"; };
+		BA7CB9BC4F9472789E4B09AC /* LiveCaptureTestDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureTestDriver.swift; sourceTree = "<group>"; };
 		BE6A98B62C13E89DA5ED3DDF /* USBBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBBridge.swift; sourceTree = "<group>"; };
 		C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModels.swift; sourceTree = "<group>"; };
 		C98F3B5353A75639380095DE /* CaptureServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureServer.swift; sourceTree = "<group>"; };
+		CBE4FA4A5DAA7C0892D4D5CC /* SessionProcessingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionProcessingConfig.swift; sourceTree = "<group>"; };
 		CDB6F995FE1FFDC02771F7DD /* LiveCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureView.swift; sourceTree = "<group>"; };
+		D2BDBA685773A244C13D776A /* LiveCaptureProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureProcessor.swift; sourceTree = "<group>"; };
 		E760CA9C9C7D2039579CAD63 /* ManualSegmentTagView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualSegmentTagView.swift; sourceTree = "<group>"; };
 		E824C503170331E2B6B28477 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		F68049A48FDC13B74708EF6F /* PDFGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFGenerator.swift; sourceTree = "<group>"; };
@@ -135,9 +145,11 @@
 			children = (
 				ABE185CBB6660116E100F055 /* ArchiveThumbnail.swift */,
 				9476E18160E1111CE717B515 /* BoxFolderConfirmSheet.swift */,
+				473BEF7CEA4B1BB2CBDD6182 /* CollectionFinalizeSheet.swift */,
 				3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */,
 				175746529FD50FCD7CCD7AD1 /* KeyboardTokenField.swift */,
 				CDB6F995FE1FFDC02771F7DD /* LiveCaptureView.swift */,
+				4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */,
 				2CBF4F0E4A42B295AFC3B793 /* ManageModelsView.swift */,
 				E760CA9C9C7D2039579CAD63 /* ManualSegmentTagView.swift */,
 				A662257BABACAA6C78DA8969 /* ManualTaggingSheet.swift */,
@@ -163,6 +175,9 @@
 			children = (
 				9B3E42E4C08CDBC05B7F9AFB /* CaptureModels.swift */,
 				AA476D0BECB92F4AE6714A78 /* CaptureSession.swift */,
+				D2BDBA685773A244C13D776A /* LiveCaptureProcessor.swift */,
+				BA7CB9BC4F9472789E4B09AC /* LiveCaptureTestDriver.swift */,
+				CBE4FA4A5DAA7C0892D4D5CC /* SessionProcessingConfig.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -290,6 +305,7 @@
 				409BF603222531B6FB91A8AC /* CaptureModels.swift in Sources */,
 				AB14D2D96483775855E78A70 /* CaptureServer.swift in Sources */,
 				25922CF438F3053123EDFD60 /* CaptureSession.swift in Sources */,
+				2DAD0440BFF4FFBDFBDA7BD5 /* CollectionFinalizeSheet.swift in Sources */,
 				A31E3D3616F4B92754877B53 /* CollectionSegmenter.swift in Sources */,
 				0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */,
 				D7B74AB236CE60AAA31EDD18 /* CostEstimator.swift in Sources */,
@@ -299,7 +315,10 @@
 				B3D2909BB5C15A34E2CAE51A /* KeyboardTokenField.swift in Sources */,
 				DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */,
 				904533896796EE9945E61E08 /* LLMRotationDetector.swift in Sources */,
+				2A7B44006B6C9EAC0FF506E9 /* LiveCaptureProcessor.swift in Sources */,
+				9DC088C4AB1AFA61DCACFD45 /* LiveCaptureTestDriver.swift in Sources */,
 				9B29F513A193C1B2B18BB7FA /* LiveCaptureView.swift in Sources */,
+				EBF0F52E7CCFBAC616CDB265 /* LiveSessionSettingsSheet.swift in Sources */,
 				AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */,
 				EF52F84BA62DDDEE06B21476 /* ManageModelsView.swift in Sources */,
 				BDAC142166A91D114B288FAD /* ManualSegmentTagView.swift in Sources */,
@@ -315,6 +334,7 @@
 				E12D577E4C9F4FD712550CBD /* PDFToImageConverter.swift in Sources */,
 				A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */,
 				781E1A90500243A9F9B182F6 /* RotationDetector.swift in Sources */,
+				AA8D85413146B5934D228015 /* SessionProcessingConfig.swift in Sources */,
 				1AAD7B5145E74283A0C02556 /* SystemTagsProvider.swift in Sources */,
 				DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */,
 				F1D78EE6F5E76BC734023CAB /* TagInputField.swift in Sources */,

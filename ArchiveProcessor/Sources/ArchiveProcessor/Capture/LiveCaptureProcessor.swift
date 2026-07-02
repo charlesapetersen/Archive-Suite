@@ -1,0 +1,543 @@
+import Foundation
+import AppKit
+
+/// Streams processing during Live Capture: OCRs each page **as it arrives**, and finalizes each
+/// segment (tagging + PDF + dual-output + optional merge) into a durable staging area as the operator
+/// resolves its Mac tag card — overlapping the expensive OCR with capture. End-of-session finalization
+/// (Phase 3/4) moves the staged outputs into named collection folders with continuing numbering.
+///
+/// Reuses the app's tested primitives: `OCRProcessor.performOCRCall` (OCR + rotation), `PDFGenerator`,
+/// `TagGenerator`, and `MacOSTagger`. Segmentation is supplied by the phone, so no batch segmentation
+/// pass is needed here; a segment's collection is the most-recent preceding **Box** marker.
+@MainActor
+final class LiveCaptureProcessor: ObservableObject {
+
+    /// Live per-segment status for the UI.
+    struct SegmentStatus: Identifiable {
+        let id: String                 // groupId
+        var index: Int
+        var type: CaptureGroupType
+        var pageCount: Int
+        var phase: Phase
+        enum Phase: String { case ocr = "OCR…", tagging = "Tagging…", staged = "Staged", failed = "Failed" }
+    }
+
+    /// A staged, fully-processed segment awaiting end-of-session finalization (this is the manifest).
+    struct StagedSegment: Codable {
+        let groupId: String
+        let type: String               // CaptureGroupType.rawValue
+        var collectionKey: String      // most-recent Box groupId, or "__unfiled__"
+        var order: Int
+        var pdfURLs: [URL]
+        var imageURLs: [URL]
+        var jsonURL: URL?
+        var boxLabelText: String?
+    }
+
+    @Published private(set) var statuses: [SegmentStatus] = []
+    @Published private(set) var staged: [StagedSegment] = []
+
+    /// End-of-session finalization state (Phase 3/4).
+    @Published var drafts: [CollectionDraft] = []
+    @Published var showFinalizeSheet = false
+    @Published private(set) var isFinalizing = false
+    @Published private(set) var finalizeSummary: String?
+    /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
+    @Published private(set) var failedGroupIds: Set<String> = []
+
+    private unowned let session: CaptureSession
+    private var config: SessionProcessingConfig?
+    private var stagingDir: URL?
+
+    private var pageTasks: [UUID: Task<OCRResult, Never>] = [:]
+    private var startedPhotoIds: Set<UUID> = []
+    private var finalizedGroups: Set<String> = []
+    private var currentCollectionKey = "__unfiled__"
+    /// Each group's collection, pinned when its first photo arrives (in capture order) so it's
+    /// independent of the order segments happen to finalize in.
+    private var groupCollectionKey: [String: String] = [:]
+
+    private static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
+                                            "July", "August", "September", "October", "November", "December"]
+
+    init(session: CaptureSession) { self.session = session }
+
+    // MARK: - Lifecycle
+
+    /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
+    func activate(config: SessionProcessingConfig) {
+        self.config = config
+        let dir = config.outputDirectory
+            .appendingPathComponent(".ArchiveProcessor-LiveStaging", isDirectory: true)
+            .appendingPathComponent(session.sessionId, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        stagingDir = dir
+        // Arm the shared tagging knobs for this session's writes.
+        MacOSTagger.stampUnread = config.taggingMode.stampsUnread
+        OCRProcessor.rotationModeForRun = config.rotationMode
+
+        loadStagingManifest()   // resume: reload already-staged segments so they're not re-OCR'd
+        // Process photos already received (resume after a crash, or "chose live after some capture").
+        for photo in session.photos { photoIngested(photo) }
+        for group in session.groups where group.type == .document
+            && session.resolvedGroupIds.contains(group.id) && !finalizedGroups.contains(group.id) {
+            let gid = group.id
+            Task { [weak self] in await self?.finalizeSegment(groupId: gid) }
+        }
+    }
+
+    /// Resume: reload segments already staged before a crash/relaunch so they aren't re-processed.
+    private func loadStagingManifest() {
+        guard let stagingDir else { return }
+        let url = stagingDir.appendingPathComponent("staging-manifest.json")
+        guard let data = try? Data(contentsOf: url),
+              let restored = try? JSONDecoder().decode([StagedSegment].self, from: data), !restored.isEmpty else { return }
+        staged = restored
+        for s in restored {
+            finalizedGroups.insert(s.groupId)
+            groupCollectionKey[s.groupId] = s.collectionKey
+            if !statuses.contains(where: { $0.id == s.groupId }) {
+                statuses.append(SegmentStatus(id: s.groupId, index: statuses.count + 1,
+                    type: CaptureGroupType(rawValue: s.type) ?? .document,
+                    pageCount: max(s.imageURLs.count, s.pdfURLs.count), phase: .staged))
+            }
+        }
+        // Restore the "current collection" so subsequent captures file under the right Box.
+        if let lastBox = restored.filter({ $0.type == CaptureGroupType.box.rawValue }).max(by: { $0.order < $1.order }) {
+            currentCollectionKey = lastBox.groupId
+        }
+    }
+
+    /// Re-run OCR for segments that produced no text, then re-finalize them.
+    func retryFailed() {
+        guard session.processingMode == .live else { return }
+        for gid in Array(failedGroupIds) {
+            guard let group = session.groups.first(where: { $0.id == gid }) else { failedGroupIds.remove(gid); continue }
+            finalizedGroups.remove(gid)
+            failedGroupIds.remove(gid)
+            staged.removeAll { $0.groupId == gid }
+            for p in group.photos { startedPhotoIds.remove(p.id); pageTasks[p.id] = nil }
+            setPhase(gid, .ocr)
+            for p in group.photos { photoIngested(p) }
+            if group.type == .document { segmentResolved(groupId: gid) }
+        }
+        persistManifest()
+    }
+
+    // MARK: - Triggers (called by CaptureSession)
+
+    /// A photo landed. Start its OCR immediately (max overlap). Box/Folder markers (single image,
+    /// no tag card) also finalize right away.
+    func photoIngested(_ photo: CapturedPhoto) {
+        guard session.processingMode == .live, let config,
+              !startedPhotoIds.contains(photo.id),
+              !finalizedGroups.contains(photo.groupId) else { return }   // skip already-staged (resume)
+        startedPhotoIds.insert(photo.id)
+
+        // Pin collection membership now, in capture order (a Box starts a new collection).
+        if photo.type == .box { currentCollectionKey = photo.groupId }
+        if groupCollectionKey[photo.groupId] == nil {
+            groupCollectionKey[photo.groupId] = (photo.type == .box) ? photo.groupId : currentCollectionKey
+        }
+
+        pageTasks[photo.id] = Self.ocrTask(
+            imageURL: photo.url, provider: config.provider, model: config.model,
+            thinkingLevel: config.thinkingLevel, apiKey: config.apiKey,
+            customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
+            imageScale: config.imageScale, gateway: config.gateway)
+
+        let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
+        upsertStatus(groupId: photo.groupId, type: photo.type, pageCount: pageCount,
+                     phase: photo.type == .document ? .ocr : .tagging)
+
+        if photo.type != .document {   // Box/Folder marker → finalize now
+            Task { [weak self] in await self?.finalizeSegment(groupId: photo.groupId) }
+        }
+    }
+
+    /// A document segment's Mac tag card was resolved (Save/Skip) → finalize it.
+    func segmentResolved(groupId: String) {
+        guard session.processingMode == .live else { return }
+        Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
+    }
+
+    // MARK: - Finalize one segment
+
+    private func finalizeSegment(groupId: String) async {
+        guard session.processingMode == .live, let config, let stagingDir,
+              !finalizedGroups.contains(groupId),
+              let group = session.groups.first(where: { $0.id == groupId }) else { return }
+        finalizedGroups.insert(groupId)
+        session.lockSettings()   // first finalize locks the session's settings
+
+        let collectionKey = groupCollectionKey[groupId] ?? (group.type == .box ? group.id : currentCollectionKey)
+        setPhase(groupId, .tagging)
+
+        // Await the OCR results for this segment's pages (started on arrival).
+        var results: [OCRResult] = []
+        var texts: [String] = []
+        for photo in group.photos {
+            let r = await pageTasks[photo.id]?.value
+                ?? OCRResult(text: nil, classification: nil, errorMessage: "OCR not started", errorCode: nil)
+            results.append(r)
+            texts.append(r.text ?? "")
+        }
+
+        // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
+        let mac = session.macTags[groupId]
+        let segment = DocumentSegment(pdfURLs: group.photos.map { $0.url },
+                                      isBox: group.type == .box, isFolder: group.type == .folder, texts: texts)
+        var tags = await computeTags(group: group, segment: segment, mac: mac, config: config)
+        // Phone's in-the-room date wins (Mac override beats the phone value).
+        if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
+        if let m = mac?.month ?? group.month, (1...12).contains(m) {
+            tags.month = String(format: "%02d %@", m, Self.englishMonthNames[m - 1])
+        }
+
+        // Snapshot Sendable per-page work for the off-main file writes.
+        let pages: [PageWork] = group.photos.enumerated().map { (i, p) in
+            let pr = (p.priority == "P10") ? "P10" : (mac?.priority ?? p.priority)
+            return PageWork(sourceURL: p.url, result: results[i], priority: pr)
+        }
+        let gType = group.type, gOrder = group.order
+        let baseTags = tags.allTags
+        let doMerge = config.mergeDocuments && gType == .document && pages.count > 1
+        let model = config.model, gatewayName = config.gateway?.displayName
+        let writeJSON = config.enableSegmentJSON && gType == .document
+        let jsonTags = tags
+
+        let outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
+            Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
+                                   pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
+                                   gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
+                                   jsonTags: jsonTags, texts: texts,
+                                   boxLabelText: gType == .box ? texts.first : nil)
+        }.value
+
+        staged.append(outcome)
+        persistManifest()
+        for p in group.photos { pageTasks[p.id] = nil }   // free memory
+        let anyText = results.contains { $0.text != nil }
+        if gType == .document && !anyText {
+            failedGroupIds.insert(groupId); setPhase(groupId, .failed)
+        } else {
+            failedGroupIds.remove(groupId); setPhase(groupId, .staged)
+        }
+    }
+
+    /// Compute the segment's subject/color tags (may hit the LLM). Date/priority are layered on later.
+    private func computeTags(group: CaptureGroup, segment: DocumentSegment,
+                             mac: MacSegmentTags?, config: SessionProcessingConfig) async -> GeneratedTags {
+        if group.type != .document {
+            // Box/Folder → color tag (TagGenerator returns Box/Red or Folder/Purple with no LLM call).
+            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
+                                                     model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
+                                                     vocabulary: [], gatewayConfig: config.gateway)
+        }
+        if let subs = mac?.subjects, !subs.isEmpty { return GeneratedTags(subjectTags: subs) }   // Mac-tagged → no LLM
+        if config.taggingMode == .automatic {
+            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
+                                                     model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
+                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.gateway)
+        }
+        return GeneratedTags()   // manual mode, no Mac subjects → date/priority only
+    }
+
+    // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
+
+    private struct PageWork: Sendable {
+        let sourceURL: URL
+        let result: OCRResult
+        let priority: String?
+    }
+
+    nonisolated private static func writeSegmentFiles(
+        groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
+        pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
+        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?
+    ) -> StagedSegment {
+        let fm = FileManager.default
+        let pdfGen = PDFGenerator()
+        var pdfURLs: [URL] = []
+        var imageURLs: [URL] = []
+
+        for page in pages {
+            let base = page.sourceURL.deletingPathExtension().lastPathComponent
+            let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
+            try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
+                                 outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
+                                 gatewayDisplayName: gatewayName)
+            var tagList = baseTags
+            if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
+            try? MacOSTagger.applyTags(tagList, to: stagedPDF)
+            pdfURLs.append(stagedPDF)
+
+            // Dual output: original image next to its PDF, same base name + identical tags.
+            let ext = page.sourceURL.pathExtension.isEmpty ? "jpg" : page.sourceURL.pathExtension
+            let stagedImg = stagingDir.appendingPathComponent(base + "." + ext)
+            try? fm.removeItem(at: stagedImg)
+            if (try? fm.copyItem(at: page.sourceURL, to: stagedImg)) != nil {
+                try? MacOSTagger.applyTags(tagList, to: stagedImg)
+                imageURLs.append(stagedImg)
+            }
+        }
+
+        // Segment JSON (documents only), written from source page names before any merge.
+        var jsonURL: URL? = nil
+        if writeJSON, type == .document, let firstPDF = pdfURLs.first {
+            let jurl = firstPDF.deletingPathExtension().appendingPathExtension("json")
+            writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags, to: jurl)
+            jsonURL = jurl
+        }
+
+        if doMerge, pdfURLs.count > 1 {
+            let base = pdfURLs[0].deletingPathExtension().lastPathComponent
+            let mergedURL = stagingDir.appendingPathComponent(base + "_merged.pdf")
+            do {
+                try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
+                var tagList = baseTags
+                if let pr = pages.first?.priority, !tagList.contains(pr) { tagList.append(pr) }
+                try? MacOSTagger.applyTags(tagList, to: mergedURL)
+                for u in pdfURLs { try? fm.removeItem(at: u) }
+                pdfURLs = [mergedURL]
+            } catch { /* keep the individual PDFs if merge fails */ }
+        }
+
+        return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
+                             pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText)
+    }
+
+    /// Mirrors `OCRProcessor.writeSegmentJSON`: a metadata sidecar with the OCR body + fields.
+    nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags, to jsonURL: URL) {
+        var bodyParts: [String] = []
+        for (i, u) in pageURLs.enumerated() {
+            let t = i < texts.count ? texts[i] : ""
+            bodyParts.append("[Image: \(u.lastPathComponent)]")
+            if !t.isEmpty { bodyParts.append(t) }
+        }
+        var dict: [String: Any] = [:]
+        if let d = tags.machineDate { dict["date"] = d }
+        dict["date_uncertain"] = tags.dateUncertain
+        dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
+        if let v = tags.format { dict["format"] = v }
+        if let v = tags.authorName { dict["author_name"] = v }
+        if let v = tags.recipientName { dict["recipient_name"] = v }
+        if let v = tags.authorLocation { dict["author_location"] = v }
+        if let v = tags.recipientLocation { dict["recipient_location"] = v }
+        if let v = tags.publicationName { dict["publication_name"] = v }
+        dict["files"] = pageURLs.map { $0.lastPathComponent }
+        dict["body"] = bodyParts.joined(separator: "\n\n")
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? data.write(to: jsonURL, options: .atomic)
+    }
+
+    nonisolated private static func ocrTask(
+        imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
+        apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?
+    ) -> Task<OCRResult, Never> {
+        Task.detached(priority: .userInitiated) {
+            await OCRProcessor.performOCRCall(
+                imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
+                apiKey: apiKey, previousText: nil, previousImageURL: nil,
+                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway)
+        }
+    }
+
+    // MARK: - Manifest + status
+
+    private func persistManifest() {
+        guard let stagingDir else { return }
+        let url = stagingDir.appendingPathComponent("staging-manifest.json")
+        if let data = try? JSONEncoder().encode(staged) { try? data.write(to: url, options: .atomic) }
+    }
+
+    private func upsertStatus(groupId: String, type: CaptureGroupType, pageCount: Int, phase: SegmentStatus.Phase) {
+        if let idx = statuses.firstIndex(where: { $0.id == groupId }) {
+            statuses[idx].pageCount = pageCount
+            if statuses[idx].phase != .staged { statuses[idx].phase = phase }
+        } else {
+            statuses.append(SegmentStatus(id: groupId, index: statuses.count + 1, type: type,
+                                          pageCount: pageCount, phase: phase))
+        }
+    }
+
+    private func setPhase(_ groupId: String, _ phase: SegmentStatus.Phase) {
+        if let idx = statuses.firstIndex(where: { $0.id == groupId }) { statuses[idx].phase = phase }
+    }
+
+    // MARK: - End-of-session finalization (Phase 3/4)
+
+    /// One collection awaiting the operator's name/append confirmation.
+    struct CollectionDraft: Identifiable {
+        let id: String                 // collectionKey
+        var finalName: String          // editable candidate name
+        var existingFolders: [URL]     // all existing collection folders (for the picker)
+        var suggestedFolders: [URL]    // fuzzy top matches (shown first)
+        var chosenExisting: URL?       // nil → create a new folder; else append to this one
+        var segmentCount: Int
+        var photoCount: Int
+    }
+
+    /// Build collection drafts (candidate names + fuzzy-matched existing folders) and show the sheet.
+    func beginFinalize() {
+        guard let config, !staged.isEmpty else { return }
+        let existing = Self.existingCollectionFolders(in: config.outputDirectory)
+        let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
+        let orderedKeys = byKey.keys.sorted {
+            (byKey[$0]?.map(\.order).min() ?? .max) < (byKey[$1]?.map(\.order).min() ?? .max)
+        }
+        drafts = orderedKeys.map { key in
+            let segs = byKey[key] ?? []
+            let candidate = Self.candidateName(segments: segs)
+            return CollectionDraft(id: key, finalName: candidate, existingFolders: existing,
+                                   suggestedFolders: Self.fuzzyMatches(candidate, in: existing, limit: 3),
+                                   chosenExisting: nil, segmentCount: segs.count,
+                                   photoCount: segs.reduce(0) { $0 + $1.imageURLs.count })
+        }
+        showFinalizeSheet = true
+    }
+
+    /// Move staged outputs into their (new or existing) collection folders, continuing numbering.
+    func finalize(_ decided: [CollectionDraft]) {
+        guard let config, let stagingDir, !isFinalizing else { return }
+        isFinalizing = true
+        let outputDir = config.outputDirectory
+        let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
+        let plans: [MovePlan] = decided.map { d in
+            let segs = (byKey[d.id] ?? []).sorted { $0.order < $1.order }
+            let name = d.chosenExisting?.lastPathComponent ?? Self.sanitize(d.finalName)
+            let folder = d.chosenExisting ?? outputDir.appendingPathComponent(name, isDirectory: true)
+            return MovePlan(folder: folder, name: name, appending: d.chosenExisting != nil, segments: segs)
+        }
+        Task { [weak self] in
+            let summary = await Task.detached { Self.executePlans(plans) }.value
+            guard let self else { return }
+            try? FileManager.default.removeItem(at: stagingDir)   // staging emptied into collections
+            self.staged.removeAll()
+            self.statuses.removeAll()
+            self.drafts.removeAll()
+            self.finalizedGroups.removeAll()
+            self.startedPhotoIds.removeAll()
+            self.currentCollectionKey = "__unfiled__"
+            self.showFinalizeSheet = false
+            self.isFinalizing = false
+            self.finalizeSummary = summary
+        }
+    }
+
+    private struct MovePlan: Sendable {
+        let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
+    }
+
+    nonisolated private static func executePlans(_ plans: [MovePlan]) -> String {
+        let fm = FileManager.default
+        var movedFiles = 0
+        for plan in plans {
+            try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
+            var seq = plan.appending ? maxExistingNumber(in: plan.folder) : 0
+            for seg in plan.segments {
+                // Merged multi-page document = one PDF for many images; else 1 PDF per image.
+                let merged = seg.pdfURLs.count == 1 && seg.imageURLs.count > 1
+                var firstNum: Int?
+                for (i, img) in seg.imageURLs.enumerated() {
+                    seq += 1
+                    if firstNum == nil { firstNum = seq }
+                    let numStr = String(format: "%05d", seq)
+                    let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
+                    move(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"), fm: fm)
+                    movedFiles += 1
+                    if !merged, i < seg.pdfURLs.count {
+                        move(seg.pdfURLs[i], to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
+                        movedFiles += 1
+                    }
+                }
+                if merged, let fn = firstNum, let pdf = seg.pdfURLs.first {
+                    move(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"), fm: fm)
+                    movedFiles += 1
+                }
+                if let json = seg.jsonURL, let fn = firstNum {
+                    let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)
+                    try? fm.createDirectory(at: jf, withIntermediateDirectories: true)
+                    move(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"), fm: fm)
+                }
+            }
+        }
+        return "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
+    }
+
+    nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager) {
+        guard fm.fileExists(atPath: src.path) else { return }
+        if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
+        try? fm.moveItem(at: src, to: dest)
+    }
+
+    /// Highest leading NNNNN number among files directly in a folder (0 if none) — for append numbering.
+    nonisolated private static func maxExistingNumber(in folder: URL) -> Int {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return 0 }
+        var maxN = 0
+        for u in items {
+            let prefix = u.lastPathComponent.prefix(5)
+            if prefix.count == 5, prefix.allSatisfy(\.isNumber), let n = Int(prefix) { maxN = max(maxN, n) }
+        }
+        return maxN
+    }
+
+    nonisolated private static func existingCollectionFolders(in dir: URL) -> [URL] {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        return items.filter {
+            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            && !$0.lastPathComponent.hasPrefix(".")
+            && $0.lastPathComponent != "JSON Output"
+        }.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    nonisolated private static func candidateName(segments: [StagedSegment]) -> String {
+        if let box = segments.first(where: { $0.type == CaptureGroupType.box.rawValue }), let label = box.boxLabelText {
+            let line = label.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                .first(where: { !$0.isEmpty }) ?? ""
+            return sanitize(String(line.prefix(80)))
+        }
+        return ""   // no Box marker → operator must name it
+    }
+
+    nonisolated private static func sanitize(_ name: String) -> String {
+        let cleaned = name.replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-").trimmingCharacters(in: .whitespaces)
+        return cleaned.isEmpty ? "Untitled Collection" : cleaned
+    }
+
+    /// Fuzzy-rank existing folders against a candidate name (case-insensitive Levenshtein + substring).
+    nonisolated private static func fuzzyMatches(_ candidate: String, in folders: [URL], limit: Int) -> [URL] {
+        let c = candidate.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !c.isEmpty, !folders.isEmpty else { return [] }
+        return folders.map { (url: $0, score: similarity(c, $0.lastPathComponent.lowercased())) }
+            .filter { $0.score >= 0.34 }
+            .sorted { $0.score > $1.score }
+            .prefix(limit).map { $0.url }
+    }
+
+    nonisolated private static func similarity(_ a: String, _ b: String) -> Double {
+        if a == b { return 1 }
+        if !a.isEmpty && !b.isEmpty && (a.contains(b) || b.contains(a)) { return 0.9 }
+        let dist = levenshtein(Array(a), Array(b))
+        let maxLen = max(a.count, b.count)
+        return maxLen == 0 ? 0 : 1.0 - Double(dist) / Double(maxLen)
+    }
+
+    nonisolated private static func levenshtein(_ a: [Character], _ b: [Character]) -> Int {
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var prev = Array(0...b.count)
+        var cur = [Int](repeating: 0, count: b.count + 1)
+        for i in 1...a.count {
+            cur[0] = i
+            for j in 1...b.count {
+                cur[j] = a[i - 1] == b[j - 1] ? prev[j - 1] : Swift.min(prev[j - 1], prev[j], cur[j - 1]) + 1
+            }
+            swap(&prev, &cur)
+        }
+        return prev[b.count]
+    }
+}

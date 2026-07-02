@@ -125,11 +125,11 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 
 ---
 
-## API Keys
-- **Do not store API keys in code or config files**
-- Do not run up costs
-- Before any test run: (1) write a test plan, (2) estimate the cost, (3) request the appropriate API key from the user
-- For tests, prefer lower-cost models (e.g., gemini-2.5-flash-lite, claude-sonnet-4-6)
+## API Keys & LLM Calls
+- **LLM/API calls are allowed and expected** — this app is built around them, and running them is a normal part of development and verification. The constraint is **cost, not permission**: keep spending low and get a key first.
+- **Do not store API keys in code or config files** — Keychain, or user-provided at runtime, only.
+- Before any **paid** run: (1) write a short test plan, (2) estimate the cost, (3) request the appropriate API key from the user. Once you have the key, proceed with the run.
+- Keep costs low: prefer the cheapest capable model for tests (e.g., `gemini-2.5-flash-lite`, `claude-sonnet-4-6`) and the smallest input set that proves the behavior.
 
 ---
 

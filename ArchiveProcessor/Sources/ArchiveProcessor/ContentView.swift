@@ -31,9 +31,10 @@ struct ContentView: View {
             case .files:
                 OCRView(processor: processor)
             case .live:
-                LiveCaptureView(session: capture, processor: processor, onProcess: { mode = .files })
+                LiveCaptureView(session: capture, processor: processor, liveProc: capture.liveProcessor, onProcess: { mode = .files })
             }
         }
         .frame(minWidth: 900, minHeight: 700)
+        .onAppear { LiveCaptureTestDriver.runIfRequested(session: capture) }
     }
 }

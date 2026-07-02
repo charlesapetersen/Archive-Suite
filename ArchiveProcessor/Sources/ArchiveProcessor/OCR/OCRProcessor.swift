@@ -1966,7 +1966,9 @@ class OCRProcessor: ObservableObject {
             || result.errorCode?.lowercased().contains("timeout") == true
     }
 
-    private nonisolated static func performOCRCall(
+    /// Single-image OCR + concurrent rotation detection, merged into one result. Reused by the
+    /// Live Capture streaming coordinator (reads `rotationModeForRun`, set before the run).
+    nonisolated static func performOCRCall(
         imageURL: URL,
         provider: LLMProvider,
         model: LLMModel,

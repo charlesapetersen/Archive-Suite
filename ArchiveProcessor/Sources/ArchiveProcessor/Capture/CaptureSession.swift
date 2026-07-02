@@ -19,6 +19,41 @@ final class CaptureSession: ObservableObject {
     @Published private(set) var macTags: [String: MacSegmentTags] = [:]
     @Published private(set) var resolvedGroupIds: Set<String> = []
 
+    // MARK: - Live processing mode (streaming vs. batch handoff)
+
+    /// How this session's captures are processed. Chosen once near the start of the session.
+    enum LiveProcessingMode: String { case undecided, stageForLater, live }
+    @Published private(set) var processingMode: LiveProcessingMode = .undecided
+    /// The locked processing settings for a `.live` session (nil until confirmed).
+    @Published private(set) var config: SessionProcessingConfig?
+    /// Once the first segment has been processed, settings can no longer change.
+    @Published private(set) var settingsLocked = false
+
+    /// Streaming coordinator (created on first use). Processes each segment during a `.live` session.
+    private(set) lazy var liveProcessor = LiveCaptureProcessor(session: self)
+
+    func chooseLive(config: SessionProcessingConfig) {
+        guard !settingsLocked else { return }
+        self.config = config
+        processingMode = .live
+        liveProcessor.activate(config: config)
+    }
+    func chooseStageForLater() {
+        guard !settingsLocked else { return }
+        processingMode = .stageForLater
+        config = nil
+    }
+    /// Reopen the choice (only allowed before the first segment locks the session).
+    func resetProcessingChoice() {
+        guard !settingsLocked else { return }
+        processingMode = .undecided
+        config = nil
+    }
+    /// Called by the streaming coordinator when the first segment begins processing.
+    func lockSettings() {
+        if config != nil { settingsLocked = true }
+    }
+
     /// Short, easy-to-type bearer token the phone presents (shown in the pairing QR, and typeable
     /// for USB/manual pairing). **Stable across launches** (persisted) so a paired phone keeps
     /// working without re-pairing. LAN/USB-local transport only, so a short code is fine.
@@ -129,6 +164,7 @@ final class CaptureSession: ObservableObject {
         connectedDeviceName = deviceName ?? connectedDeviceName
         statusMessage = "Received \(photos.count) photo\(photos.count == 1 ? "" : "s")" + (deviceName.map { " from \($0)" } ?? "")
         writeManifest()
+        if processingMode == .live { liveProcessor.photoIngested(photo) }   // start OCR on arrival
         return finalURL
     }
 
@@ -175,10 +211,12 @@ final class CaptureSession: ObservableObject {
     func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
         macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
         resolvedGroupIds.insert(groupId)
+        if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
     }
 
     func skipMacTags(groupId: String) {
         resolvedGroupIds.insert(groupId)
+        if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
     }
 
     /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.

@@ -9,8 +9,11 @@ import CoreImage.CIFilterBuiltins
 struct LiveCaptureView: View {
     @ObservedObject var session: CaptureSession
     @ObservedObject var processor: OCRProcessor
+    @ObservedObject var liveProc: LiveCaptureProcessor
     /// Switch the app back to the Files tab after staging captured photos for processing.
     var onProcess: () -> Void
+
+    @State private var showSettings = false
 
     var body: some View {
         HSplitView {
@@ -31,6 +34,12 @@ struct LiveCaptureView: View {
         // then advances to the next (box/folder markers need no card).
         .sheet(item: Binding(get: { session.pendingTagGroup }, set: { _ in })) { group in
             SegmentTagCard(group: group, session: session)
+        }
+        .sheet(isPresented: $showSettings) {
+            LiveSessionSettingsSheet(session: session)
+        }
+        .sheet(isPresented: $liveProc.showFinalizeSheet) {
+            CollectionFinalizeSheet(liveProc: liveProc)
         }
     }
 
@@ -58,6 +67,83 @@ struct LiveCaptureView: View {
                         Text(session.statusMessage)
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(6)
+                }
+
+                GroupBox("Processing") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        switch session.processingMode {
+                        case .undecided:
+                            Text("Choose how this session's captures are processed:")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button { showSettings = true } label: {
+                                Label("Process live", systemImage: "bolt.fill").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button { session.chooseStageForLater() } label: {
+                                Label("Stage for later", systemImage: "tray.and.arrow.down").frame(maxWidth: .infinity)
+                            }
+                        case .stageForLater:
+                            Label("Stage for later", systemImage: "tray.and.arrow.down")
+                                .font(.callout).fontWeight(.medium)
+                            Text("Captures collect here; use Process to send them to the Files tab.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Change…") { session.resetProcessingChoice() }.font(.caption)
+                        case .live:
+                            Label("Process live", systemImage: "bolt.fill")
+                                .font(.callout).fontWeight(.medium)
+                            if let cfg = session.config {
+                                Text(cfg.summary)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text("→ \(cfg.outputDirectory.lastPathComponent)")
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                            }
+                            Text(session.settingsLocked
+                                 ? "Settings locked — processing has started."
+                                 : "Each segment processes as you finish tagging it.")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            HStack {
+                                Button("Edit settings…") { showSettings = true }
+                                    .font(.caption).disabled(session.settingsLocked)
+                                Button("Change…") { session.resetProcessingChoice() }
+                                    .font(.caption).disabled(session.settingsLocked)
+                            }
+                            if !liveProc.statuses.isEmpty {
+                                Divider()
+                                let done = liveProc.statuses.filter { $0.phase == .staged }.count
+                                Text("\(done)/\(liveProc.statuses.count) segments processed")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        ForEach(liveProc.statuses) { s in
+                                            HStack(spacing: 6) {
+                                                Circle().fill(phaseColor(s.phase)).frame(width: 6, height: 6)
+                                                Text("\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p")
+                                                    .font(.caption2)
+                                                Spacer()
+                                                Text(s.phase.rawValue).font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                                .frame(maxHeight: 150)
+                                if !liveProc.failedGroupIds.isEmpty {
+                                    Button("Retry \(liveProc.failedGroupIds.count) failed OCR") { liveProc.retryFailed() }
+                                        .font(.caption).foregroundStyle(.red)
+                                }
+                            }
+                            if let summary = liveProc.finalizeSummary {
+                                Divider()
+                                Label(summary, systemImage: "checkmark.circle.fill")
+                                    .font(.caption).foregroundStyle(.green)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                     }
                     .padding(6)
                 }
@@ -112,9 +198,15 @@ struct LiveCaptureView: View {
                 Spacer()
                 if !session.photos.isEmpty {
                     Button("Clear") { session.clear() }
-                    Button("Process \(session.photos.count) →") { stageForProcessing() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(processor.isProcessing)
+                    if session.processingMode != .live {
+                        Button("Process \(session.photos.count) →") { stageForProcessing() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(processor.isProcessing)
+                    } else if !liveProc.staged.isEmpty {
+                        Button("Finish session (\(liveProc.staged.count)) →") { liveProc.beginFinalize() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(liveProc.isFinalizing)
+                    }
                 }
             }
             .padding(.bottom, 8)
@@ -176,6 +268,15 @@ struct LiveCaptureView: View {
             group.type == .folder ? Color.purple.opacity(0.06) : Color.gray.opacity(0.05)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func phaseColor(_ phase: LiveCaptureProcessor.SegmentStatus.Phase) -> Color {
+        switch phase {
+        case .ocr: return .orange
+        case .tagging: return .blue
+        case .staged: return .green
+        case .failed: return .red
+        }
     }
 
     // MARK: Handoff

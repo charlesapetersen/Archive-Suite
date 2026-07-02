@@ -163,6 +163,63 @@ Phase 3a (builds; on-device behavior unverified) — package `com.archiveprocess
 
 ---
 
+## Live streaming processing (new approach — planned 2026-07-02, **APPROVED 2026-07-02 — implementing**)
+
+**Goal:** overlap OCR + tagging + PDF/dual-output generation *with* capture, so that by the time the operator stops shooting, almost all processing is already done. Only end-of-session confirmations (collection names) remain. Today everything is deferred to a single batch `Process` run after capture; this makes the expensive OCR run concurrently with the (slow, human-paced) capture + Mac tagging.
+
+**Decisions (confirmed with user 2026-07-02):**
+- **OCR starts on segment arrival** (max overlap). It runs while the operator tags that segment on the Mac; subjects/date/priority are applied to the finished OCR result afterward.
+- **Selectable at session start:** *Process live* (this new streaming mode) vs *Stage for later* (the current, tested batch handoff → Files tab → Process, left unchanged as a fallback).
+- **Settings confirmed at session start; locked after the first segment is processed** (consistent settings across the session).
+- **Existing-collection detection = fuzzy suggestions:** at finalization, show the closest-matching existing folders in the output dir as append suggestions, plus a "new collection" option.
+- **Appending continues the numbering:** files added to a pre-existing collection start *after* the last photo number already in that folder, so the sequence stays contiguous.
+
+**Two-phase model:**
+
+*A. Streaming (during capture), per segment:*
+1. A segment finishes on the phone (**End segment**, or a **Box/Folder** marker) → its page(s) immediately enqueue for OCR using the locked settings. For documents, the Mac tag card pops in parallel.
+2. Per page (off-main): OCR → rotation detect (if enabled) → generate PDF (full-res page-1 image + text page) → export the original image → write the OCR `.json`. Multi-page document segments **merge per segment** (when `mergeDocuments`), since all a segment's pages arrive together.
+3. When **both** the OCR result and the tag card have resolved: apply subjects (Mac card; or the LLM in automatic mode if the card was Skipped) + phone date + priority + Red/Purple color, and stamp the trailing **Unread** tag.
+4. Outputs land in a **durable per-session staging area** with provisional names. A manifest records, per segment: its collection (= the most-recent preceding **Box** marker), its staged files, and status.
+- **Box/Folder markers** are OCR'd for their label text (feeds collection-name extraction), colored Red/Purple, and staged as single-image items.
+
+*B. Finalization (End session):*
+1. Gather Box markers → extract candidate collection names via the existing `CollectionSegmenter.extractCollectionName` + `clusterCollectionNames` (now over the already-OCR'd labels).
+2. **Collection confirmation sheet:** per collection, show the candidate name (editable) + **fuzzy-matched existing output folders** as append targets + "new collection." A session with no Box markers → prompt for one name (like `noBoxCollectionName`).
+3. Per collection: if **appending**, scan the chosen folder for the highest `NNNNN ` prefix and start numbering at max+1; else start at 1.
+4. Move/rename staged PDFs + original images + `.json` into `outputDir/[Collection]/` (+ `JSON Output/`) with contiguous sequential names — reuse `CollectionSegmenter.organizeOutput`, extended to accept a **per-collection start offset**.
+
+**Architecture:**
+- New `@MainActor` streaming coordinator (e.g. `LiveCaptureProcessor`) driven by `CaptureSession` segment-resolution events. It **reuses existing primitives**: the OCR clients + `GeminiClient.loadImageAsJPEG`, `PDFGenerator`, rotation detectors, `MacOSTagger`/tag application, and `CollectionSegmenter.extractCollectionName`/`organizeOutput`.
+- The batch `OCRProcessor.startProcessing()` is left intact for *Stage for later*. Per-segment OCR/PDF/tag helpers are factored out of the monolithic run so both paths share them (rather than duplicating).
+- Locked settings captured in a `SessionProcessingConfig` (provider/model/thinking/tagging mode/rotation/merge/output dir/API key). Because the phone supplies segmentation, the "segmentation needs all files" coupling in the batch path does not apply here.
+
+**Durability & failure handling** (extends the existing invariant — archival photos are never re-shot; re-OCR is cheap):
+- Staged PDFs/JSON written durably; the manifest lets a mid-session crash resume without re-OCR and makes finalization idempotent/re-runnable.
+- A segment whose OCR fails is retried (existing retry logic); unresolved failures are listed in an end-of-session summary so the operator can retry or finalize without them.
+
+**Assumptions (CONFIRMED by user 2026-07-02):**
+- A **Box** marker starts a new collection; **Folder** markers (Purple) sub-group *within* the current collection and do not start a new one (matches today's box→collection semantics). ✅ confirmed
+- Collection-name extraction still makes a (cheap) LLM call on each Box label during streaming; the confirm + fuzzy-match + append step is new and runs at end. ✅ confirmed
+
+**Progress checklist (resumable — update as each lands):**
+- [x] **Phase 1** — `SessionProcessingConfig` model; Live Capture session-start UI: *Process live* vs *Stage for later* chooser + settings sheet (reuses provider/model/thinking/taggingMode/rotation/merge/outputDir/apiKey); **lock after first segment**. **[DONE 2026-07-02: `Capture/SessionProcessingConfig.swift` + `CaptureSession` mode/config/lock state + `Views/LiveSessionSettingsSheet.swift` + Processing GroupBox chooser in `LiveCaptureView`. Builds + relaunched. Streaming itself is Phase 2; the capturePanel "Process →" still stages-for-later until then.]**
+- [x] **Phase 2** — `LiveCaptureProcessor` (@MainActor) streaming coordinator. **[DONE 2026-07-02 (build-verified; paid-OCR run pending): `Capture/LiveCaptureProcessor.swift`. OCR starts on each photo's arrival (`CaptureSession.ingest` → `photoIngested`, detached `OCRProcessor.performOCRCall` — made internal — reusing rotation via `rotationModeForRun`). A segment finalizes when its Mac tag card resolves (`applyMacTags`/`skipMacTags` → `segmentResolved`); Box/Folder markers finalize on arrival. Finalize awaits the pages' OCR, computes tags (Mac subjects skip the LLM; automatic mode calls `TagGenerator`; box/folder→color), layers phone date + per-page priority (P10 override) + Unread, generates PDFs + dual-output originals + segment JSON off-main, merges multi-page docs, and writes a durable `staging-manifest.json` under `<output>/.ArchiveProcessor-LiveStaging/<sessionId>/`. First finalize locks settings. Live per-segment status list shown in the control panel; the capturePanel "Process →" is hidden in `.live` mode. Files remain in staging until Phase 3/4 finalization.]**
+- [x] **Phase 3** — End-session collection confirmation. **[DONE 2026-07-02 (build-verified): `beginFinalize()` groups staged segments by collectionKey, derives a candidate name from the Box label's OCR text, and fuzzy-matches (case-insensitive Levenshtein + substring) existing output folders. `Views/CollectionFinalizeSheet.swift` lets the operator edit each name or pick an existing folder (★ = suggested) to append to; no-box collections require a typed name. "Finish session (N) →" button in the capture panel launches it.]**
+- [x] **Phase 4** — Finalization move/rename. **[DONE 2026-07-02 (build- + logic-verified via `scratchpad/fin.swift`): `finalize()` → off-main `executePlans` moves staged PDFs + dual-output images + JSON into `<output>/[Collection]/` (+ `JSON Output/`). **Per-photo numbering**; appending starts at the folder's current max `NNNNN`+1 (verified: existing 00001–00003 → new 00004/00005). Merged multi-page docs: images numbered per page, the merged PDF named after the segment's first number. Staging dir removed after; summary shown. Built my own mover rather than reuse the jobs-coupled `organizeOutput`.]**
+- [x] **Phase 5** — Crash-resume + failure surfacing. **[DONE 2026-07-02 (build-verified): `activate()` reloads `staging-manifest.json` → restores `staged`/`finalizedGroups`/status/`currentCollectionKey`, and re-enqueues OCR only for not-yet-staged received photos (also handles "chose live after some capture"); `photoIngested` skips finalized groups so nothing is re-OCR'd. Failed-OCR document segments are tracked in `failedGroupIds`, surfaced in the control panel (red "Retry N failed OCR" → `retryFailed()`) and as a warning banner in the finalize sheet; they're still filed as image-only PDFs.]**
+- [x] **Paid-OCR verification** — **[DONE 2026-07-02, real Gemini `gemini-2.5-flash-lite`, ~$0.01]** via a headless env-gated `Capture/LiveCaptureTestDriver.swift` (feeds `Test Files/Collection Segmentation` images straight into a `.live` session; run with `LIVECAPTURE_TESTMODE=1`). **Verified end-to-end:** OCR-on-arrival → per-segment tag/PDF/dual-output/JSON → staging → finalize into `BAKER LIBRARY/` (name from the **box-label OCR**) with per-photo numbering `00001–00004`; tags correct (box=`Red,Box,Unread`; docs=real `year/month/day + subjects + Unread`-last; **PDF & JPG identical**); segment JSON rich (author/recipient/date/body). **Append run** fuzzy-matched the existing `BAKER LIBRARY` and continued numbering `00005/00006`. Caveat: local-Vision rotation hangs **only** headlessly (Vision needs a window-server session) — not a real-use issue; the test uses rotation `.off`.
+
+**Suggested phasing:** (1) session settings sheet + *Process-live/Stage-for-later* chooser + lock-after-first-segment; (2) streaming coordinator (per-segment OCR→PDF→dual-output→tags) with durable staging + manifest; (3) end-session collection confirmation (fuzzy match + append numbering); (4) finalization move/rename via extended `organizeOutput`; (5) crash-resume + failure summary. Paid-OCR verification gated on an API key per CLAUDE.md (test plan + cost estimate + cheap model first).
+
+### Follow-up (do AFTER the Live Capture streaming work above — requested 2026-07-02): consolidate settings into a **Settings** panel
+- Move **most** of the settings currently crowded into the Process Files (OCR) UI into a dedicated **Settings** panel/tab. Add other durable app settings there too (a single home for everything persisted).
+- **Group into labeled subgroups** so it's easy to navigate/understand — e.g. *Provider & Model*, *OCR* (context chars, send-previous-image, image resolution, custom prompt, batch, pre-OCR'd input), *Tagging* (mode, tag vocabulary, segment JSON, collection segmentation + confirm), *Rotation*, *Output & Naming*, *Live Capture*, *Advanced / API Gateway*.
+- The **Process Files** screen then keeps only run-time essentials (file drop, cost estimate, Process/Resume). Durable/persisted settings live in Settings.
+- **Reuse:** the grouped setting controls should be shared components so the Live Capture session-settings sheet (Phase 1) and the new Settings panel render the same groups from one source — avoids the current duplication between `OCRView` and `LiveSessionSettingsSheet`.
+
+---
+
 ## Key files
 - **macOS new:** `Capture/CaptureModels.swift`, `Capture/CaptureSession.swift`, `Net/CaptureServer.swift`, `Views/LiveCaptureView.swift`.
 - **macOS modified:** `ContentView.swift`, `OCR/OCRProcessor.swift`, `Views/OCRView.swift`, `Sources/ArchiveProcessor/Info.plist`, `project.yml` (Info.plist keys; later bundle `adb` for USB).
@@ -172,8 +229,9 @@ Phase 3a (builds; on-device behavior unverified) — package `com.archiveprocess
 `OCRProcessor.startProcessing`; `GeneratedTags`/`SegmentTagData`; `MacOSTagger.applyTags`; `ArchiveThumbnail`, `TagInputField`, `SystemTagsProvider`; `RotationDetector`/`LLMRotationDetector`; `NetworkSession`.
 
 ## Testing & cost policy (per CLAUDE.md)
+- **LLM/API calls are allowed and expected** — the constraint is cost, not permission. Keep spending low and get a key first; then run.
 - Do NOT modify `Test Files/`; write outputs only.
-- No API keys in code. Before any paid run: test plan → cost estimate → request key. Prefer `gemini-2.5-flash-lite` / `claude-sonnet-4-6`.
+- No API keys in code (Keychain / runtime only). Before any **paid** run: (1) short test plan, (2) cost estimate, (3) request the key — then proceed. Prefer the cheapest capable model (`gemini-2.5-flash-lite` / `claude-sonnet-4-6`) and the smallest input set that proves the behavior.
 - Phase 1 verifiable with curl + `dns-sd -B _archivecap._tcp` (no phone, minimal/zero API cost until the OCR step).
 
 ## Risks / notes
