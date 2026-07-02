@@ -91,6 +91,27 @@ class OCRProcessor: ObservableObject {
 
     /// When true, copy macOS tags from source images to output PDFs instead of LLM tagging
     var passSourceTags = false
+
+    // MARK: Live Capture staging (set by LiveCaptureView, consumed by OCRView → startProcessing)
+    /// Ordered captured photo URLs waiting to be loaded as the input file list.
+    @Published var stagedCaptureFiles: [URL] = []
+    /// Parallel to the staged/loaded files: whether each starts a new group, and its type.
+    var stagedCaptureBoundaries: [Bool] = []
+    var stagedCaptureTypes: [CaptureGroupType] = []
+    /// Parallel minimal on-phone tags: per-photo priority ("P10"…"P7") and the group's year/month.
+    var stagedCapturePriorities: [String?] = []
+    var stagedCaptureYears: [Int?] = []
+    var stagedCaptureMonths: [Int?] = []
+    /// Active pre-grouped segmentation for the current run (empty = use LLM segmentation).
+    var preGroupedBoundaries: [Bool] = []
+    var preGroupedTypes: [CaptureGroupType] = []
+    /// Active pre-grouped phone tags for the current run (parallel to the loaded files; empty = none).
+    var preGroupedPriorities: [String?] = []
+    var preGroupedYears: [Int?] = []
+    var preGroupedMonths: [Int?] = []
+    /// Live Capture: also emit each page's original image (renamed + tagged) alongside its PDF.
+    var exportOriginals = false
+
     /// When true, merge continuation pages into single multi-page PDFs
     var mergeDocuments = false
     /// Optional controlled vocabulary for subject tags (one per line)
@@ -1032,8 +1053,12 @@ class OCRProcessor: ObservableObject {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Interactive Review: document segmentation (rotation + classification) review
-            if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
+            // Segmentation: pre-grouped from Live Capture, else the interactive LLM review.
+            if preGroupedBoundaries.count == files.count && !files.isEmpty {
+                // Groups were defined on the phone — apply them directly, skip LLM segmentation.
+                applyPreGroupedClassifications(files: files)
+                rebuildSegments(files: files)
+            } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
                 await showFullSegmentationReview(files: files)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
 
@@ -1094,6 +1119,14 @@ class OCRProcessor: ObservableObject {
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Live Capture: layer per-page phone priority on top now that box/folder Red/Purple is
+            // final, and before merge folds appliedTags into merged PDFs.
+            applyCapturePriorityTags()
+
+            // Live Capture dual output: write each original image next to its PDF (same base + tags),
+            // before merge repoints outputURLMap and before organization moves files.
+            exportOriginalImages()
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
             if mergeDocuments {
@@ -2045,6 +2078,82 @@ class OCRProcessor: ObservableObject {
         segments = segmenter.segment(files: activeFiles, classifications: classifications, texts: texts)
     }
 
+    /// Apply Live-Capture group boundaries/types to job classifications, so segmentation uses
+    /// the phone's grouping instead of the LLM. Boundaries → documentStart/continuation;
+    /// box/folder types → the corresponding label classification.
+    private func applyPreGroupedClassifications(files: [URL]) {
+        for i in files.indices where i < jobs.count {
+            let type = i < preGroupedTypes.count ? preGroupedTypes[i] : .document
+            let isStart = i < preGroupedBoundaries.count ? preGroupedBoundaries[i] : true
+            let cls: DocumentClassification
+            switch type {
+            case .box: cls = .boxLabel
+            case .folder: cls = .folderLabel
+            case .document: cls = isStart ? .documentStart : .documentContinuation
+            }
+            jobs[i].classification = cls
+            if let r = jobs[i].result {
+                jobs[i].result = OCRResult(text: r.text, classification: cls,
+                                           rotationDegrees: r.rotationDegrees,
+                                           errorMessage: r.errorMessage, errorCode: nil)
+            }
+        }
+    }
+
+    // MARK: - Live Capture phone tags (priority + date)
+
+    private static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
+                                            "July", "August", "September", "October", "November", "December"]
+
+    /// Phone-supplied year for the file at `index`, as a "YYYY" tag; nil if none.
+    private func phoneYearTag(at index: Int) -> String? {
+        guard index >= 0, index < preGroupedYears.count, let y = preGroupedYears[index] else { return nil }
+        return String(y)
+    }
+
+    /// Phone-supplied month for the file at `index`, as an "MM Month" tag (e.g. "03 March"); nil if none.
+    private func phoneMonthTag(at index: Int) -> String? {
+        guard index >= 0, index < preGroupedMonths.count,
+              let m = preGroupedMonths[index], (1...12).contains(m) else { return nil }
+        return String(format: "%02d %@", m, Self.englishMonthNames[m - 1])
+    }
+
+    /// Live Capture: layer each page's phone-set priority ("P10"…"P7") onto whatever the tagging
+    /// phase applied. macOS tag application replaces, so read → append → re-apply; also record it in
+    /// the job's appliedTags so document merging carries it. No-op outside a pre-grouped run.
+    private func applyCapturePriorityTags() {
+        guard !preGroupedPriorities.isEmpty else { return }
+        for i in jobs.indices where i < preGroupedPriorities.count {
+            guard let raw = preGroupedPriorities[i]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty,
+                  let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
+            var tags = MacOSTagger.readTags(from: outputPDF)
+            if !tags.contains(raw) {
+                tags.append(raw)
+                try? MacOSTagger.applyTags(tags, to: outputPDF)
+            }
+            if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
+        }
+    }
+
+    /// Live Capture dual output: write each page's original image next to its PDF (same base name),
+    /// tagged identically, so the final folder holds BOTH the image and the PDF. Runs before merge/
+    /// organization so `outputURLMap` is still per-page; `organizeOutput` moves the sibling image too.
+    private func exportOriginalImages() {
+        guard exportOriginals else { return }
+        let fm = FileManager.default
+        for job in jobs {
+            guard let pdfURL = outputURLMap[job.sourceURL],
+                  fm.fileExists(atPath: job.sourceURL.path) else { continue }
+            let ext = job.sourceURL.pathExtension.isEmpty ? "jpg" : job.sourceURL.pathExtension
+            let imageURL = pdfURL.deletingPathExtension().appendingPathExtension(ext)
+            try? fm.removeItem(at: imageURL)
+            guard (try? fm.copyItem(at: job.sourceURL, to: imageURL)) != nil else { continue }
+            // Mirror the PDF's final tags (date / subjects / priority / Red-Purple) onto the image.
+            let tags = MacOSTagger.readTags(from: pdfURL)
+            if !tags.isEmpty { try? MacOSTagger.applyTags(tags, to: imageURL) }
+        }
+    }
+
     /// Automatic (LLM) tagging with the redo-review loop. Extracted so the standard and
     /// pre-OCRed pipelines share one implementation.
     private func performAutomaticTaggingWithReview(
@@ -2124,11 +2233,17 @@ class OCRProcessor: ObservableObject {
             for url in seg.pdfURLs {
                 images.append(ManualTagImage(url: url, rotationDegrees: rotation(for: url), isContext: false))
             }
+            // Pre-fill the phone's date (Live Capture); when present, skip the LLM date prefetch.
+            let phoneFileIdx = seg.pdfURLs.first.flatMap { url in jobs.firstIndex(where: { $0.sourceURL == url }) }
+            let phoneYear = phoneFileIdx.flatMap { phoneYearTag(at: $0) }
+            let phoneMonth = phoneFileIdx.flatMap { phoneMonthTag(at: $0) }
             manual.append(ManualTagSegment(
                 segmentIndex: i,
                 images: images,
+                year: phoneYear ?? "",
+                month: phoneMonth ?? "",
                 subjectTags: ["Unread"],
-                dateLoading: mode == .autoDate
+                dateLoading: mode == .autoDate && phoneYear == nil && phoneMonth == nil
             ))
         }
         guard !manual.isEmpty else { return }
@@ -2196,6 +2311,11 @@ class OCRProcessor: ObservableObject {
             guard !Task.isCancelled else { return }
             let segIndex = manualTagSegments[idx].segmentIndex
             guard segIndex < segments.count else { continue }
+            // Skip segments already dated (e.g., pre-filled from Live Capture) — no LLM call needed.
+            if !manualTagSegments[idx].year.isEmpty {
+                manualTagSegments[idx].dateLoading = false
+                continue
+            }
             let nearby = Array(
                 segments[max(0, segIndex - 3)..<segIndex]
                 + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
@@ -2289,7 +2409,13 @@ class OCRProcessor: ObservableObject {
                 || images[idx - 1].isBoxOrFolder
                 || cls == .documentStart
             isStart[idx] = startsHere
-            if startsHere && !img.isBoxOrFolder { tags[idx] = SegmentTagData() }
+            if startsHere && !img.isBoxOrFolder {
+                // Pre-fill the phone's date (Live Capture) so the manual UI shows it; user can edit.
+                var seed = SegmentTagData()
+                if let y = phoneYearTag(at: img.fileIndex) { seed.year = y }
+                if let mo = phoneMonthTag(at: img.fileIndex) { seed.month = mo }
+                tags[idx] = seed
+            }
         }
 
         manualSegImages = images
@@ -2457,7 +2583,7 @@ class OCRProcessor: ObservableObject {
                 + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
             )
 
-            let tags = await generator.generateTags(
+            var tags = await generator.generateTags(
                 for: segment,
                 nearbySegments: nearby,
                 provider: provider,
@@ -2467,6 +2593,13 @@ class OCRProcessor: ObservableObject {
                 vocabulary: tagVocabulary,
                 gatewayConfig: currentGateway
             )
+
+            // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
+            if let firstURL = segment.pdfURLs.first,
+               let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
+                if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false }
+                if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
+            }
 
             // Apply tags to the OUTPUT PDF files, not the source images
             for sourceURL in segment.pdfURLs {

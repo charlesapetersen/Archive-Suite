@@ -15,3 +15,18 @@ Test Files/
 
 # API keys
 *.env
+
+# Android / Gradle
+.gradle/
+local.properties
+*.apk
+*.iml
+.idea/
+captures/
+
+# Test outputs (generated)
+Test Outputs/
+
+# Xcode user state (also under the nested project dir)
+**/xcuserdata/
+*.xcuserstate

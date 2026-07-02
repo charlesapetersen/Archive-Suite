@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Framework Material theme so no external XML theme dependency is needed; Compose supplies the real UI. -->
+    <style name="Theme.ArchiveCapture" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

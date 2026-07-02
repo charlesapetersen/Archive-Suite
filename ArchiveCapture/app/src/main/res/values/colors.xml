@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive-icon background behind the Archive Processor logo foreground. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

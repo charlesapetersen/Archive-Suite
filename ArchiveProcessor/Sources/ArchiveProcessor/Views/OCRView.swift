@@ -5,7 +5,8 @@ import ImageIO
 
 struct OCRView: View {
     // MARK: - State
-    @StateObject private var processor = OCRProcessor()
+    /// Shared processor (injected so the Live Capture tab can stage files into this view).
+    @ObservedObject var processor: OCRProcessor
 
     // Persisted via @AppStorage (UserDefaults)
     @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
@@ -47,6 +48,13 @@ struct OCRView: View {
 
     // Transient
     @State private var droppedFiles: [URL] = []
+    /// Pre-grouped segmentation from a Live Capture handoff (aligned to droppedFiles); empty otherwise.
+    @State private var captureBoundaries: [Bool] = []
+    @State private var captureTypes: [CaptureGroupType] = []
+    /// Minimal on-phone tags from the same handoff (aligned to droppedFiles); empty otherwise.
+    @State private var capturePriorities: [String?] = []
+    @State private var captureYears: [Int?] = []
+    @State private var captureMonths: [Int?] = []
     @State private var isTargeted = false
     @State private var showKeychainSheet = false
     @State private var showResolutionTest = false
@@ -71,7 +79,8 @@ struct OCRView: View {
     @State private var showManageModels = false
     @ObservedObject private var customModelStore = CustomModelStore.shared
 
-    init() {
+    init(processor: OCRProcessor) {
+        _processor = ObservedObject(wrappedValue: processor)
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
         let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
@@ -147,6 +156,30 @@ struct OCRView: View {
         }
         .onChange(of: taggingModeRaw) { _, _ in
             if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
+        }
+        .onChange(of: processor.stagedCaptureFiles) { _, staged in
+            guard !staged.isEmpty else { return }
+            // Live Capture handed off pre-grouped photos → load them as the input files.
+            droppedFiles = staged
+            captureBoundaries = processor.stagedCaptureBoundaries
+            captureTypes = processor.stagedCaptureTypes
+            capturePriorities = processor.stagedCapturePriorities
+            captureYears = processor.stagedCaptureYears
+            captureMonths = processor.stagedCaptureMonths
+            processor.stagedCaptureFiles = []
+        }
+        .onAppear {
+            // Live Capture stages files, THEN switches to this tab — so this view is created after
+            // stagedCaptureFiles changed and .onChange won't fire for it. Pick up anything pending.
+            let staged = processor.stagedCaptureFiles
+            guard !staged.isEmpty else { return }
+            droppedFiles = staged
+            captureBoundaries = processor.stagedCaptureBoundaries
+            captureTypes = processor.stagedCaptureTypes
+            capturePriorities = processor.stagedCapturePriorities
+            captureYears = processor.stagedCaptureYears
+            captureMonths = processor.stagedCaptureMonths
+            processor.stagedCaptureFiles = []
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
@@ -789,7 +822,7 @@ struct OCRView: View {
                         }
                         .buttonStyle(.bordered)
                         if !droppedFiles.isEmpty {
-                            Button("Clear") { droppedFiles = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
+                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
                                 .buttonStyle(.bordered)
                         }
                     }
@@ -886,6 +919,19 @@ struct OCRView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Segmentation decided on the phone (Live Capture handoff), shown next to each file so the
+    /// finished box/folder/start/continuation marks appear before processing and aren't redone.
+    private func capturePreGroupedClassification(at index: Int) -> DocumentClassification? {
+        guard captureBoundaries.count == droppedFiles.count,
+              captureTypes.count == droppedFiles.count,
+              index < droppedFiles.count else { return nil }
+        switch captureTypes[index] {
+        case .box: return .boxLabel
+        case .folder: return .folderLabel
+        case .document: return captureBoundaries[index] ? .documentStart : .documentContinuation
+        }
+    }
+
     private var fileList: some View {
         ZStack {
             ScrollViewReader { scrollProxy in
@@ -895,7 +941,8 @@ struct OCRView: View {
                             url: url,
                             job: processor.jobs.first { $0.sourceURL == url },
                             showTags: processor.awaitingFinalReview,
-                            isFocused: isInReviewMode && index == reviewFocusedIndex
+                            isFocused: isInReviewMode && index == reviewFocusedIndex,
+                            presetClassification: capturePreGroupedClassification(at: index)
                         )
                         .contentShape(Rectangle())
                         .id(index)
@@ -1272,6 +1319,22 @@ struct OCRView: View {
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
+        // Pre-grouped segmentation only applies when the loaded files match a Live Capture handoff.
+        if captureBoundaries.count == droppedFiles.count && !droppedFiles.isEmpty {
+            processor.preGroupedBoundaries = captureBoundaries
+            processor.preGroupedTypes = captureTypes
+            processor.preGroupedPriorities = capturePriorities.count == droppedFiles.count ? capturePriorities : []
+            processor.preGroupedYears = captureYears.count == droppedFiles.count ? captureYears : []
+            processor.preGroupedMonths = captureMonths.count == droppedFiles.count ? captureMonths : []
+            processor.exportOriginals = true   // Live Capture: emit original image + PDF
+        } else {
+            processor.preGroupedBoundaries = []
+            processor.preGroupedTypes = []
+            processor.preGroupedPriorities = []
+            processor.preGroupedYears = []
+            processor.preGroupedMonths = []
+            processor.exportOriginals = false
+        }
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -1310,6 +1373,8 @@ struct FileRowView: View {
     let job: OCRJob?
     var showTags: Bool = false
     var isFocused: Bool = false
+    /// Live Capture segmentation to show before a job exists (falls back to `job.classification`).
+    var presetClassification: DocumentClassification? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -1329,7 +1394,7 @@ struct FileRowView: View {
                         .foregroundStyle(.orange)
                         .clipShape(Capsule())
                 }
-                if let classification = job?.classification {
+                if let classification = job?.classification ?? presetClassification {
                     Text(classification.displayName)
                         .font(.caption2)
                         .padding(.horizontal, 6)
@@ -1377,7 +1442,7 @@ struct FileRowView: View {
     }
 
     private var classificationBackground: Color {
-        guard let classification = job?.classification else { return .clear }
+        guard let classification = job?.classification ?? presetClassification else { return .clear }
         switch classification {
         case .documentStart: return .blue.opacity(0.06)
         case .documentContinuation: return .green.opacity(0.06)

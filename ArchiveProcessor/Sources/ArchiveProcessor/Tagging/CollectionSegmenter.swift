@@ -326,6 +326,19 @@ class CollectionSegmenter {
                         }
                         try fm.moveItem(at: jsonURL, to: destJSON)
                     }
+
+                    // Live Capture dual output: move the sibling original image (same base name as
+                    // the PDF) alongside it, renamed to match.
+                    let imgBase = pdfURL.deletingPathExtension().lastPathComponent
+                    for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
+                        let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
+                        if fm.fileExists(atPath: imgURL.path) {
+                            let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
+                            if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
+                            try fm.moveItem(at: imgURL, to: destImg)
+                            break
+                        }
+                    }
                 }
             }
         }

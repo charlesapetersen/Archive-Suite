@@ -26,6 +26,12 @@
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Archive Processor receives photos from the Archive Capture companion app over your local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_archivecap._tcp</string>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
