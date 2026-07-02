@@ -21,11 +21,17 @@ struct LiveCaptureView: View {
                 .padding()
         }
         .onAppear {
+            SystemTagsProvider.shared.warmUp()   // prime subject autocomplete
             if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1", !session.serverRunning {
                 session.start()
             }
         }
         .onDisappear { /* keep the session/server running across tab switches */ }
+        // Auto-advancing tag card: pops up for each completed document segment as it arrives,
+        // then advances to the next (box/folder markers need no card).
+        .sheet(item: Binding(get: { session.pendingTagGroup }, set: { _ in })) { group in
+            SegmentTagCard(group: group, session: session)
+        }
     }
 
     // MARK: Left — connection / pairing
@@ -175,7 +181,7 @@ struct LiveCaptureView: View {
     // MARK: Handoff
 
     private func stageForProcessing() {
-        let (files, boundaries, types, priorities, years, months) = session.orderedFilesAndGroups()
+        let (files, boundaries, types, priorities, years, months, subjects) = session.orderedFilesAndGroups()
         guard !files.isEmpty else { return }
         processor.stagedCaptureFiles = files
         processor.stagedCaptureBoundaries = boundaries
@@ -183,6 +189,7 @@ struct LiveCaptureView: View {
         processor.stagedCapturePriorities = priorities
         processor.stagedCaptureYears = years
         processor.stagedCaptureMonths = months
+        processor.stagedCaptureSubjects = subjects
         onProcess()
     }
 
@@ -219,5 +226,203 @@ struct LiveCaptureView: View {
             if name == "en0" { break }   // prefer Wi-Fi/primary
         }
         return address
+    }
+}
+
+/// Auto-advancing tag card for one completed document segment during Live Capture. Subjects are the
+/// piece the phone doesn't capture; year/month/priority default to the phone's values and are editable.
+/// Built for keyboard speed: type subjects, ↑/↓ to pick a suggestion, ⇥ to autocomplete, ⏎ to add
+/// (⏎ on an empty field saves), ⌫ on an empty field deletes the previous tag, esc skips.
+private struct SegmentTagCard: View {
+    let group: CaptureGroup
+    @ObservedObject var session: CaptureSession
+
+    @State private var subjects: [String] = []
+    @State private var input: String = ""
+    @State private var suggestions: [String] = []
+    @State private var highlighted: Int = -1     // -1 = typed text is the candidate; ≥0 = a suggestion
+    @State private var yearText: String = ""
+    @State private var month: Int? = nil
+    @State private var priority: String? = nil
+
+    private let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Tag this segment").font(.title2).fontWeight(.semibold)
+            Text("\(group.photos.count) page\(group.photos.count == 1 ? "" : "s"). Subjects become archive tags; date & priority came from the phone.")
+                .font(.caption).foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(group.photos) { photo in
+                        ArchiveThumbnail(url: photo.url, maxSize: 320)
+                            .frame(width: 120, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.2)))
+                    }
+                }
+            }
+
+            subjectsSection
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Year").font(.caption).foregroundStyle(.secondary)
+                    TextField("YYYY", text: $yearText)
+                        .frame(width: 70)
+                        .onChange(of: yearText) { _, v in yearText = String(v.filter(\.isNumber).prefix(4)) }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Month").font(.caption).foregroundStyle(.secondary)
+                    Picker("", selection: $month) {
+                        Text("—").tag(Int?.none)
+                        ForEach(1...12, id: \.self) { m in Text(monthNames[m - 1]).tag(Int?.some(m)) }
+                    }.labelsHidden().frame(width: 90)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Priority").font(.caption).foregroundStyle(.secondary)
+                    Picker("", selection: $priority) {
+                        Text("—").tag(String?.none)
+                        ForEach(["P10", "P9", "P8", "P7"], id: \.self) { p in Text(p).tag(String?.some(p)) }
+                    }.labelsHidden().frame(width: 80)
+                }
+                Spacer()
+            }
+
+            Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc skip")
+                .font(.caption2).foregroundStyle(.tertiary)
+
+            HStack {
+                Button("Skip") { session.skipMacTags(groupId: group.id) }
+                Spacer()
+                Button("Save ▸") { save() }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .onChange(of: input) { _, _ in recompute() }
+        .onAppear {
+            let existing = session.macTags[group.id]
+            subjects = existing?.subjects ?? []
+            yearText = (existing?.year ?? group.year).map(String.init) ?? ""
+            month = existing?.month ?? group.month
+            priority = existing?.priority ?? group.priority
+        }
+    }
+
+    // MARK: Subjects (keyboard-driven autocomplete)
+
+    private var subjectsSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Subjects").font(.callout).fontWeight(.medium)
+            FlowLayout(spacing: 6) {
+                ForEach(subjects, id: \.self) { tag in
+                    TagChip(text: tag) { subjects.removeAll { $0 == tag } }
+                }
+                KeyboardTokenField(
+                    text: $input,
+                    placeholder: subjects.isEmpty ? "Add subject…" : "",
+                    onMoveUp: { moveHighlight(-1) },
+                    onMoveDown: { moveHighlight(1) },
+                    onTab: { onTab() },
+                    onReturn: { onReturn() },
+                    onDeleteWhenEmpty: { deletePrevious() },
+                    onEscape: { onEscape() },
+                    focusOnAppear: true
+                )
+                .frame(minWidth: 140, minHeight: 22)
+            }
+            .padding(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.35)))
+
+            if !suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(suggestions.enumerated()), id: \.element) { idx, s in
+                        HStack(spacing: 6) {
+                            Image(systemName: "tag").font(.caption2).foregroundStyle(.secondary)
+                            Text(s).font(.caption)
+                            Spacer()
+                            if idx == highlighted {
+                                Text("⏎").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4).padding(.horizontal, 8)
+                        .background(idx == highlighted ? Color.accentColor.opacity(0.25) : Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { commit(s) }
+                    }
+                }
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
+            }
+        }
+    }
+
+    // MARK: Keyboard actions
+
+    private func recompute() {
+        let p = input.trimmingCharacters(in: .whitespaces)
+        suggestions = p.isEmpty ? [] : SystemTagsProvider.shared.suggestions(prefix: input, excluding: subjects, limit: 6)
+        highlighted = -1   // the typed text is the default candidate; arrows dive into the list
+    }
+
+    private func moveHighlight(_ delta: Int) {
+        guard !suggestions.isEmpty else { return }
+        if highlighted < 0 {
+            highlighted = delta > 0 ? 0 : suggestions.count - 1
+        } else {
+            highlighted = (highlighted + delta + suggestions.count) % suggestions.count
+        }
+    }
+
+    private func commit(_ raw: String) {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        input = ""; suggestions = []; highlighted = -1
+        guard !t.isEmpty, !subjects.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }) else { return }
+        subjects.append(t)
+        SystemTagsProvider.shared.register([t])
+    }
+
+    /// Return: the highlighted suggestion if one is chosen, else the typed text.
+    private func returnCandidate() -> String? {
+        if highlighted >= 0, highlighted < suggestions.count { return suggestions[highlighted] }
+        let t = input.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
+    }
+
+    /// Tab (autocomplete): the highlighted suggestion, else the top suggestion, else the typed text.
+    private func tabCandidate() -> String? {
+        if highlighted >= 0, highlighted < suggestions.count { return suggestions[highlighted] }
+        if let first = suggestions.first { return first }
+        let t = input.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
+    }
+
+    private func onReturn() -> Bool {
+        if let c = returnCandidate() { commit(c); return true }
+        save(); return true                 // empty field → save & advance
+    }
+
+    private func onTab() -> Bool {
+        if let c = tabCandidate() { commit(c); return true }
+        return false                        // empty field → let focus move to Year
+    }
+
+    private func deletePrevious() -> Bool {
+        guard !subjects.isEmpty else { return false }
+        subjects.removeLast()
+        return true
+    }
+
+    private func onEscape() {
+        if input.isEmpty { session.skipMacTags(groupId: group.id) }
+        else { input = ""; suggestions = []; highlighted = -1 }
+    }
+
+    private func save() {
+        session.applyMacTags(groupId: group.id, subjects: subjects,
+                             priority: priority, year: Int(yearText), month: month)
     }
 }

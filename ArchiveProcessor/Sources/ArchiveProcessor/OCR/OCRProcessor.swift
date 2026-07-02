@@ -102,6 +102,8 @@ class OCRProcessor: ObservableObject {
     var stagedCapturePriorities: [String?] = []
     var stagedCaptureYears: [Int?] = []
     var stagedCaptureMonths: [Int?] = []
+    /// Mac-operator subjects per file (from the Live Capture tag card; empty entry = untagged).
+    var stagedCaptureSubjects: [[String]] = []
     /// Active pre-grouped segmentation for the current run (empty = use LLM segmentation).
     var preGroupedBoundaries: [Bool] = []
     var preGroupedTypes: [CaptureGroupType] = []
@@ -109,6 +111,7 @@ class OCRProcessor: ObservableObject {
     var preGroupedPriorities: [String?] = []
     var preGroupedYears: [Int?] = []
     var preGroupedMonths: [Int?] = []
+    var preGroupedSubjects: [[String]] = []
     /// Live Capture: also emit each page's original image (renamed + tagged) alongside its PDF.
     var exportOriginals = false
 
@@ -117,7 +120,10 @@ class OCRProcessor: ObservableObject {
     /// Optional controlled vocabulary for subject tags (one per line)
     var tagVocabulary: [String] = []
     /// How tags are assigned (automatic / auto-date / human / copy-source / none). Set from the UI before a run.
-    var taggingMode: TaggingMode = .automatic
+    /// Setting it also arms the "Unread" trailing-tag stamp for real-tagging modes (see MacOSTagger).
+    var taggingMode: TaggingMode = .automatic {
+        didSet { MacOSTagger.stampUnread = taggingMode.stampsUnread }
+    }
     /// How image rotation is detected. Set from the UI before a run.
     var rotationMode: RotationMode = .llmMajority
     /// The active run's rotation mode, readable from the nonisolated OCR call. Only one run
@@ -2195,8 +2201,10 @@ class OCRProcessor: ObservableObject {
             for w in work {
                 try? fm.removeItem(at: w.img)
                 guard (try? fm.copyItem(at: w.src, to: w.img)) != nil else { continue }
+                // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
+                // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
                 let tags = MacOSTagger.readTags(from: w.pdf)
-                if !tags.isEmpty { try? MacOSTagger.applyTags(tags, to: w.img) }
+                try? MacOSTagger.applyTags(tags, to: w.img)
             }
         }.value
     }
@@ -2354,11 +2362,12 @@ class OCRProcessor: ObservableObject {
         apiKey: String
     ) async {
         let generator = TagGenerator()
+        // Gather segments still needing a date (main actor); skip already-dated ones (incl. Live
+        // Capture pre-fills).
+        var work: [(idx: Int, segment: DocumentSegment, nearby: [DocumentSegment])] = []
         for idx in manualTagSegments.indices {
-            guard !Task.isCancelled else { return }
             let segIndex = manualTagSegments[idx].segmentIndex
             guard segIndex < segments.count else { continue }
-            // Skip segments already dated (e.g., pre-filled from Live Capture) — no LLM call needed.
             if !manualTagSegments[idx].year.isEmpty {
                 manualTagSegments[idx].dateLoading = false
                 continue
@@ -2367,21 +2376,50 @@ class OCRProcessor: ObservableObject {
                 segments[max(0, segIndex - 3)..<segIndex]
                 + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
             )
-            let date = await generator.generateDateOnly(
-                for: segments[segIndex],
-                nearbySegments: nearby,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                gatewayConfig: currentGateway
-            )
-            guard !Task.isCancelled, idx < manualTagSegments.count else { return }
-            if manualTagSegments[idx].year.isEmpty { manualTagSegments[idx].year = date.year ?? "" }
-            if manualTagSegments[idx].month.isEmpty { manualTagSegments[idx].month = date.month ?? "" }
-            if manualTagSegments[idx].day.isEmpty { manualTagSegments[idx].day = date.day ?? "" }
-            manualTagSegments[idx].dateUncertain = date.dateUncertain
-            manualTagSegments[idx].dateLoading = false
+            work.append((idx, segments[segIndex], nearby))
+        }
+        guard !work.isEmpty else { return }
+        let gateway = currentGateway
+        let maxConcurrent = min(6, work.count)
+
+        // Fetch dates concurrently (bounded), skipping thinking, and apply each result on the main
+        // actor as it arrives (only filling fields the user hasn't already set).
+        await withTaskGroup(of: (Int, GeneratedTags).self) { group in
+            var next = 0
+            while next < maxConcurrent {
+                let w = work[next]
+                group.addTask {
+                    let date = await generator.generateDateOnly(
+                        for: w.segment, nearbySegments: w.nearby,
+                        provider: provider, model: model, thinkingLevel: nil,
+                        apiKey: apiKey, gatewayConfig: gateway
+                    )
+                    return (w.idx, date)
+                }
+                next += 1
+            }
+            for await (idx, date) in group {
+                if Task.isCancelled { break }
+                if idx < manualTagSegments.count {
+                    if manualTagSegments[idx].year.isEmpty { manualTagSegments[idx].year = date.year ?? "" }
+                    if manualTagSegments[idx].month.isEmpty { manualTagSegments[idx].month = date.month ?? "" }
+                    if manualTagSegments[idx].day.isEmpty { manualTagSegments[idx].day = date.day ?? "" }
+                    manualTagSegments[idx].dateUncertain = date.dateUncertain
+                    manualTagSegments[idx].dateLoading = false
+                }
+                if next < work.count {
+                    let w = work[next]
+                    group.addTask {
+                        let date = await generator.generateDateOnly(
+                            for: w.segment, nearbySegments: w.nearby,
+                            provider: provider, model: model, thinkingLevel: nil,
+                            apiKey: apiKey, gatewayConfig: gateway
+                        )
+                        return (w.idx, date)
+                    }
+                    next += 1
+                }
+            }
         }
     }
 
@@ -2621,51 +2659,98 @@ class OCRProcessor: ObservableObject {
         enableSegmentJSON: Bool = true
     ) async {
         let generator = TagGenerator()
-        let total = segments.count
+        let snapshot = segments
+        let total = snapshot.count
+        guard total > 0 else { return }
+        // Capture immutable inputs for the concurrent tasks.
+        let vocabulary = tagVocabulary
+        let gateway = currentGateway
+        let maxConcurrent = min(6, total)
 
-        for (segIndex, segment) in segments.enumerated() {
-            guard !Task.isCancelled else { return }
-            let nearby = Array(
-                segments[max(0, segIndex - 3)..<segIndex]
-                + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
-            )
+        // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
+        // only immutable, Sendable inputs.
+        let nearbyBySeg: [[DocumentSegment]] = (0..<total).map { i in
+            Array(snapshot[max(0, i - 3)..<i] + snapshot[min(i + 1, total)..<min(i + 4, total)])
+        }
+        // Subjects the Mac operator entered during Live Capture (per segment). Non-empty → apply
+        // directly and skip the LLM tag call for that segment.
+        let macSubjectsBySeg: [[String]] = snapshot.map { seg in
+            guard let firstURL = seg.pdfURLs.first,
+                  let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }),
+                  fileIdx < preGroupedSubjects.count else { return [] }
+            return preGroupedSubjects[fileIdx]
+        }
 
-            var tags = await generator.generateTags(
-                for: segment,
-                nearbySegments: nearby,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                vocabulary: tagVocabulary,
-                gatewayConfig: currentGateway
-            )
-
-            // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
-            if let firstURL = segment.pdfURLs.first,
-               let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
-                if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false }
-                if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
-            }
-
-            // Apply tags to the OUTPUT PDF files, not the source images
-            for sourceURL in segment.pdfURLs {
-                if let outputPDF = outputURLMap[sourceURL] {
-                    try? MacOSTagger.applyTags(tags, to: outputPDF)
+        // Tag segments concurrently (bounded pool) instead of one-at-a-time. Each call is small,
+        // text-only, and independent, so overlapping the network round-trips is a big speedup.
+        // Tagging is a simple text→JSON task, so we skip thinking (`thinkingLevel: nil`).
+        var completed = 0
+        await withTaskGroup(of: (Int, GeneratedTags).self) { group in
+            var next = 0
+            while next < maxConcurrent {
+                let i = next
+                group.addTask {
+                    if !macSubjectsBySeg[i].isEmpty {
+                        return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]))   // Mac-tagged → no LLM
+                    }
+                    let tags = await generator.generateTags(
+                        for: snapshot[i], nearbySegments: nearbyBySeg[i],
+                        provider: provider, model: model, thinkingLevel: nil,
+                        apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway
+                    )
+                    return (i, tags)
                 }
-                if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
-                    jobs[jobIndex].appliedTags = tags.allTags
+                next += 1
+            }
+            for await (i, rawTags) in group {
+                if Task.isCancelled { break }
+                applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
+                                   enableSegmentJSON: enableSegmentJSON, outputDirectory: outputDirectory)
+                completed += 1
+                progress = 0.7 + (Double(completed) / Double(total)) * 0.3
+                statusMessage = "Tagging \(completed)/\(total)…"
+                if next < total {
+                    let j = next
+                    group.addTask {
+                        if !macSubjectsBySeg[j].isEmpty {
+                            return (j, GeneratedTags(subjectTags: macSubjectsBySeg[j]))   // Mac-tagged → no LLM
+                        }
+                        let tags = await generator.generateTags(
+                            for: snapshot[j], nearbySegments: nearbyBySeg[j],
+                            provider: provider, model: model, thinkingLevel: nil,
+                            apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway
+                        )
+                        return (j, tags)
+                    }
+                    next += 1
                 }
             }
+        }
+    }
 
-            // Write segment JSON metadata file (skip boxes and folders)
-            if enableSegmentJSON && !segment.isBox && !segment.isFolder {
-                writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
+    /// Apply generated tags to one segment's output PDFs, layering the Live Capture phone date on top
+    /// and writing the segment JSON. Runs on the main actor (called from the tagging task group).
+    private func applyGeneratedTags(_ rawTags: GeneratedTags, toSegmentAt i: Int, in snapshot: [DocumentSegment],
+                                    enableSegmentJSON: Bool, outputDirectory: URL) {
+        guard i < snapshot.count else { return }
+        let segment = snapshot[i]
+        var tags = rawTags
+        // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
+        if let firstURL = segment.pdfURLs.first,
+           let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
+            if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false }
+            if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
+        }
+        for sourceURL in segment.pdfURLs {
+            if let outputPDF = outputURLMap[sourceURL] {
+                try? MacOSTagger.applyTags(tags, to: outputPDF)
             }
-
-            let completed = segIndex + 1
-            progress = 0.7 + (Double(completed) / Double(total)) * 0.3
-            statusMessage = "Tagging segment \(completed)/\(total)…"
+            if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
+                jobs[jobIndex].appliedTags = tags.allTags
+            }
+        }
+        if enableSegmentJSON && !segment.isBox && !segment.isFolder {
+            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
         }
     }
 

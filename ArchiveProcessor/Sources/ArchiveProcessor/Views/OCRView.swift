@@ -55,6 +55,7 @@ struct OCRView: View {
     @State private var capturePriorities: [String?] = []
     @State private var captureYears: [Int?] = []
     @State private var captureMonths: [Int?] = []
+    @State private var captureSubjects: [[String]] = []
     @State private var isTargeted = false
     @State private var showKeychainSheet = false
     @State private var showResolutionTest = false
@@ -166,6 +167,7 @@ struct OCRView: View {
             capturePriorities = processor.stagedCapturePriorities
             captureYears = processor.stagedCaptureYears
             captureMonths = processor.stagedCaptureMonths
+            captureSubjects = processor.stagedCaptureSubjects
             processor.stagedCaptureFiles = []
         }
         .onAppear {
@@ -179,6 +181,7 @@ struct OCRView: View {
             capturePriorities = processor.stagedCapturePriorities
             captureYears = processor.stagedCaptureYears
             captureMonths = processor.stagedCaptureMonths
+            captureSubjects = processor.stagedCaptureSubjects
             processor.stagedCaptureFiles = []
         }
         .sheet(isPresented: $showKeychainSheet) {
@@ -822,7 +825,7 @@ struct OCRView: View {
                         }
                         .buttonStyle(.bordered)
                         if !droppedFiles.isEmpty {
-                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
+                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
                                 .buttonStyle(.bordered)
                         }
                     }
@@ -1326,6 +1329,7 @@ struct OCRView: View {
             processor.preGroupedPriorities = capturePriorities.count == droppedFiles.count ? capturePriorities : []
             processor.preGroupedYears = captureYears.count == droppedFiles.count ? captureYears : []
             processor.preGroupedMonths = captureMonths.count == droppedFiles.count ? captureMonths : []
+            processor.preGroupedSubjects = captureSubjects.count == droppedFiles.count ? captureSubjects : []
             processor.exportOriginals = true   // Live Capture: emit original image + PDF
         } else {
             processor.preGroupedBoundaries = []
@@ -1333,6 +1337,7 @@ struct OCRView: View {
             processor.preGroupedPriorities = []
             processor.preGroupedYears = []
             processor.preGroupedMonths = []
+            processor.preGroupedSubjects = []
             processor.exportOriginals = false
         }
         processor.mergeDocuments = mergeDocuments

@@ -3,6 +3,12 @@ import AppKit
 
 struct MacOSTagger {
 
+    /// When true, every file written by `applyTags` gets a trailing "Unread" tag (as the last tag).
+    /// Set once per run by the processor from the selected `TaggingMode` (real-tagging modes only —
+    /// off for "No tagging" and "Copy source tags"). Written on the main actor before a run begins
+    /// and only read during tagging, so the cross-actor access is safe.
+    nonisolated(unsafe) static var stampUnread = false
+
     // Read macOS Finder tags from a file
     static func readTags(from url: URL) -> [String] {
         var tags: [String] = []
@@ -17,10 +23,13 @@ struct MacOSTagger {
 
     // Apply macOS Finder tags to a file
     static func applyTags(_ tags: [String], to url: URL) throws {
-        var mutableURL = url
+        // In stamping modes, drop any incoming "Unread" so we can re-add it exactly once, last.
+        var incoming = tags
+        if stampUnread {
+            incoming.removeAll { $0.caseInsensitiveCompare("Unread") == .orderedSame }
+        }
         // Filter empty tags
-        let filtered = tags.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard !filtered.isEmpty else { return }
+        let filtered = incoming.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
         // Build NSURLTagNamesKey-compatible array
         // Color tags need special treatment via NSURLLabelNumberKey
@@ -29,6 +38,10 @@ struct MacOSTagger {
 
         var allTagNames = textTags
         if let color = colorTagName { allTagNames.insert(color, at: 0) }
+        // Real-tagging modes: "Unread" is always the final tag on every output (even if nothing else).
+        if stampUnread { allTagNames.append("Unread") }
+
+        guard !allTagNames.isEmpty else { return }
 
         try (url as NSURL).setResourceValue(allTagNames, forKey: .tagNamesKey)
 

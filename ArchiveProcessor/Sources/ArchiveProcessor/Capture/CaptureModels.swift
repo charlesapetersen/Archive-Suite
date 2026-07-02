@@ -45,4 +45,15 @@ struct CaptureGroup: Identifiable {
     /// Group date = first non-nil year/month among its photos (all should match).
     var year: Int? { photos.compactMap { $0.year }.first }
     var month: Int? { photos.compactMap { $0.month }.first }
+    /// The group's priority default (first page's; per-page P10 overrides live on the photos).
+    var priority: String? { photos.first?.priority }
+}
+
+/// Tags the Mac operator enters for a segment during Live Capture. Subjects are the piece the phone
+/// doesn't capture; year/month/priority default to the phone's values but can be adjusted here.
+struct MacSegmentTags: Equatable {
+    var subjects: [String] = []
+    var priority: String? = nil
+    var year: Int? = nil
+    var month: Int? = nil
 }

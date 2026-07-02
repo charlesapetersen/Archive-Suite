@@ -14,6 +14,11 @@ final class CaptureSession: ObservableObject {
     @Published var statusMessage = "Idle"
     @Published private(set) var connectedDeviceName: String?
 
+    /// Mac operator's per-segment tags entered during capture (groupId → tags), plus the set of
+    /// document groups already tagged or skipped on the Mac (drives the auto-advancing card).
+    @Published private(set) var macTags: [String: MacSegmentTags] = [:]
+    @Published private(set) var resolvedGroupIds: Set<String> = []
+
     /// Short, easy-to-type bearer token the phone presents (shown in the pairing QR, and typeable
     /// for USB/manual pairing). **Stable across launches** (persisted) so a paired phone keeps
     /// working without re-pairing. LAN/USB-local transport only, so a short code is fine.
@@ -158,26 +163,48 @@ final class CaptureSession: ObservableObject {
             .sorted { $0.order < $1.order }
     }
 
-    /// Ordered file URLs + per-group boundary/type info for the OCR pre-grouped handoff.
+    // MARK: - Mac-side tagging (auto-advancing card)
+
+    /// The next completed document group awaiting Mac tagging. A document group is complete on
+    /// arrival (the phone uploads a segment only when it's ended); box/folder are markers that need
+    /// no card, so they're treated as already resolved.
+    var pendingTagGroup: CaptureGroup? {
+        groups.first { $0.type == .document && !resolvedGroupIds.contains($0.id) }
+    }
+
+    func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
+        macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
+        resolvedGroupIds.insert(groupId)
+    }
+
+    func skipMacTags(groupId: String) {
+        resolvedGroupIds.insert(groupId)
+    }
+
+    /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.
     func orderedFilesAndGroups() -> (files: [URL], boundaries: [Bool], types: [CaptureGroupType],
-                                     priorities: [String?], years: [Int?], months: [Int?]) {
+                                     priorities: [String?], years: [Int?], months: [Int?], subjects: [[String]]) {
         var files: [URL] = []
         var boundaries: [Bool] = []
         var types: [CaptureGroupType] = []
         var priorities: [String?] = []
         var years: [Int?] = []
         var months: [Int?] = []
+        var subjects: [[String]] = []
         for group in groups {
+            let mac = macTags[group.id]
             for (i, photo) in group.photos.enumerated() {
                 files.append(photo.url)
                 boundaries.append(i == 0)          // first photo of a group starts a segment
                 types.append(group.type)
-                priorities.append(photo.priority)  // per-photo (page P10 override)
-                years.append(group.year)           // group date, repeated per photo
-                months.append(group.month)
+                // Per-page P10 (phone) wins; else the Mac operator's group priority; else phone value.
+                priorities.append(photo.priority == "P10" ? "P10" : (mac?.priority ?? photo.priority))
+                years.append(mac?.year ?? group.year)     // Mac date override wins over the phone's
+                months.append(mac?.month ?? group.month)
+                subjects.append(mac?.subjects ?? [])       // Mac-entered subjects (empty if untagged)
             }
         }
-        return (files, boundaries, types, priorities, years, months)
+        return (files, boundaries, types, priorities, years, months, subjects)
     }
 
     // MARK: - Durable manifest (crash recovery)
