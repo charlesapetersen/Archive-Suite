@@ -1,6 +1,6 @@
 # Live Capture — Android companion app + macOS receiver
 
-**Status:** **v3.2.0 pushed (commit + tag) to GitHub.** Live Capture verified end-to-end: on-device capture→ingest, crash durability (phone + Mac), dual output built, capture-UI refinements. Remaining = one cheap paid Process/OCR run to confirm tags land on PDFs. · **Last updated:** 2026-07-02
+**Status:** **v3.2.1 pushed (commit d9da0de + tag) to GitHub.** Live Capture verified end-to-end (on-device capture→ingest, crash durability, dual output) plus reliability/performance hardening (stable pairing, unplug self-heal, and the OCR/PDF/thumbnail beachball fixes). Remaining = one cheap paid Process/OCR run to confirm tags land on PDFs. · **Last updated:** 2026-07-02
 **Permanent working plan.** If work is interrupted, resume from the phase checklists below.
 (Supersedes the temporary plan at `~/.claude/plans/moonlit-strolling-crane.md`.)
 
@@ -144,7 +144,7 @@ Phase 3a (builds; on-device behavior unverified) — package `com.archiveprocess
 - Camera preview is now a **letterboxed top region** (`FIT_CENTER`) with controls in a panel below, rather than full-screen behind the controls.
 - Added a **Clear** action (confirm dialog) that deletes all captured photos + resets the session (files + `session.json`).
 
-### Post-v3.2.0 — committed locally as v3.2.1 (commit 3d7a5e2 + tag v3.2.1; push deferred, venue WiFi blocks SSL)
+### Post-v3.2.0 — shipped as v3.2.1 (commit d9da0de + tag v3.2.1, pushed to origin/main)
 - Clear-all-photos action (Android).
 - Stable Mac token (UserDefaults) + pinned port 48627 (fallback if busy) → phone reconnects across Mac launches with no re-pair.
 - Per-photo delete (tap → X → delete) + select-then-Box/Folder to reclassify a photo as a single-image marker; P10 moved to long-press.
