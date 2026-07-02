@@ -12,6 +12,7 @@ import com.archiveprocessor.capture.data.SessionStore
 import com.archiveprocessor.capture.net.MacClient
 import com.archiveprocessor.capture.net.MacEndpoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -39,6 +40,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     var pendingTagGroupId by mutableStateOf<String?>(null)
         private set
 
+    /** Thumbnail selection for the tap → X → delete flow (one item at a time). */
+    var selectedItemId by mutableStateOf<Long?>(null)
+        private set
+    var armed by mutableStateOf(false)   // second tap: delete-armed (shows an X)
+        private set
+
     private var seqCounter = 0
     private var nextId = 1L
 
@@ -56,6 +63,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             if (items.isNotEmpty()) statusMessage = "Restored ${items.size} photo(s) from last session"
             resumeUploads()
         }
+        startAutoRetry()
     }
 
     private fun persist() = store.save(items.toList(), seqCounter, nextId, currentGroupId)
@@ -65,6 +73,20 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (client == null) return
         items.filter { it.state == UploadState.UPLOADING || it.state == UploadState.FAILED }
             .forEach { enqueueUpload(it) }
+    }
+
+    /** Background self-heal: periodically re-send failed uploads so an unplug/replug (or any brief
+     *  network blip) recovers automatically — no manual Retry needed. Capture keeps working offline;
+     *  photos just sit FAILED and flush once the link is back. Cancelled when the VM is cleared. */
+    private fun startAutoRetry() {
+        viewModelScope.launch {
+            while (true) {
+                delay(8_000)
+                if (client != null && items.any { it.state == UploadState.FAILED }) {
+                    items.filter { it.state == UploadState.FAILED }.forEach { enqueueUpload(it) }
+                }
+            }
+        }
     }
 
     // ---- Pairing ----
@@ -106,6 +128,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Main shutter: add a page to the current document segment (buffered until finalized). */
     fun addDocumentPhoto(file: File) {
+        clearSelection()
         seqCounter += 1
         items.add(CapturedItem(id = nextId++, file = file, groupId = currentGroupId, seq = seqCounter, type = GroupType.DOCUMENT))
         val n = items.count { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT }
@@ -115,6 +138,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Box/Folder: a single-image marker (never a multi-page segment) — its own group; uploads now. */
     fun captureMarker(file: File, type: GroupType) {
+        clearSelection()
         seqCounter += 1
         val item = CapturedItem(id = nextId++, file = file, groupId = newGroupId(), seq = seqCounter, type = type)
         items.add(item)
@@ -130,6 +154,40 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val it = items[i]
         items[i] = it.copy(priority = if (it.priority == "P10") null else "P10")
         persist()
+    }
+
+    private fun clearSelection() { selectedItemId = null; armed = false }
+
+    /** Tap cycle on a thumbnail: select → arm (show X) → delete. */
+    fun tapItem(id: Long) {
+        when {
+            selectedItemId != id -> { selectedItemId = id; armed = false }
+            !armed -> armed = true
+            else -> deleteItem(id)
+        }
+    }
+
+    fun deleteItem(id: Long) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            runCatching { items[i].file.delete() }
+            items.removeAt(i)
+        }
+        clearSelection()
+        persist()
+    }
+
+    /** Reclassify the selected photo as a single-image box/folder marker (own group) and upload it. */
+    fun reclassifySelected(type: GroupType) {
+        val id = selectedItemId ?: return
+        val i = items.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null, state = UploadState.PENDING)
+            items[i] = updated
+            clearSelection()
+            persist()
+            enqueueUpload(updated)
+        }
     }
 
     // ---- Grouping / finalize ----
@@ -198,6 +256,19 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     fun finishSession() {
         val c = client ?: return
         viewModelScope.launch { withContext(Dispatchers.IO) { c.sessionComplete() } }
+    }
+
+    /** Delete every captured photo (files + persisted session) and start a clean session. */
+    fun clearSession() {
+        for (item in items) { runCatching { item.file.delete() } }
+        items.clear()
+        seqCounter = 0
+        nextId = 1L
+        currentGroupId = newGroupId()
+        pendingTagGroupId = null
+        clearSelection()
+        statusMessage = ""
+        store.clear()
     }
 
     private fun setState(id: Long, state: UploadState) {

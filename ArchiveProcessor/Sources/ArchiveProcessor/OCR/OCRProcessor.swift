@@ -537,14 +537,54 @@ class OCRProcessor: ObservableObject {
         // Convert any PDF inputs
         let imageURLs = convertPDFInputs(pending.fileURLs)
 
-        // Restore already-completed results: regenerate PDFs and populate jobs
+        // Restore already-completed results. The original run already wrote these PDFs, so reuse
+        // them when present and only regenerate genuinely-missing ones — off the main actor, since
+        // embedding full-resolution images is heavy (this was causing a beachball on resume).
         let completedCount = pending.completedResults.count
         if completedCount > 0 {
             statusMessage = "Restoring \(completedCount) previously completed results…"
+            let fm = FileManager.default
+            // Gather on the main actor.
+            var restores: [(index: Int, result: OCRResult, sourceURL: URL, outputURL: URL)] = []
+            var toGenerate: [(imageURL: URL, outputURL: URL, fileName: String, result: OCRResult)] = []
             for (key, result) in pending.completedResults {
-                guard let index = Int(key), index < jobs.count else { continue }
-                let url = imageURLs[index]
-                handleRestoredResult(result, index: index, url: url, model: pending.model, outputDirectory: pending.outputDirectory)
+                guard let index = Int(key), index < jobs.count, index < imageURLs.count else { continue }
+                let sourceURL = jobs[index].sourceURL
+                let baseName = sourceURL.deletingPathExtension().lastPathComponent
+                let outputURL = pending.outputDirectory.appendingPathComponent(baseName + ".pdf")
+                restores.append((index, result, sourceURL, outputURL))
+                if !fm.fileExists(atPath: outputURL.path) {
+                    toGenerate.append((imageURLs[index], outputURL, sourceURL.lastPathComponent, result))
+                }
+            }
+            // Regenerate only missing PDFs, off the main thread.
+            if !toGenerate.isEmpty {
+                let model = pending.model
+                let gatewayName = currentGateway?.displayName
+                statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
+                await Task.detached(priority: .utility) {
+                    let gen = PDFGenerator()
+                    for g in toGenerate {
+                        try? gen.generate(imageURL: g.imageURL, result: g.result, model: model,
+                                          outputURL: g.outputURL, originalFileName: g.fileName,
+                                          gatewayDisplayName: gatewayName)
+                    }
+                }.value
+            }
+            // Apply the (cheap) state updates back on the main actor.
+            for r in restores {
+                jobs[r.index].result = r.result
+                jobs[r.index].classification = r.result.classification
+                jobs[r.index].status = r.result.text != nil ? .succeeded : .failed
+                if r.result.text == nil { failedFiles.append(r.sourceURL.lastPathComponent) }
+                outputURLMap[r.sourceURL] = r.outputURL
+                if passSourceTags {
+                    let sourceTags = MacOSTagger.readTags(from: r.sourceURL)
+                    if !sourceTags.isEmpty {
+                        try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
+                        jobs[r.index].appliedTags = sourceTags
+                    }
+                }
             }
             let total = pending.fileURLs.count
             progress = Double(completedCount) / Double(total) * 0.7
@@ -1126,7 +1166,7 @@ class OCRProcessor: ObservableObject {
 
             // Live Capture dual output: write each original image next to its PDF (same base + tags),
             // before merge repoints outputURLMap and before organization moves files.
-            exportOriginalImages()
+            await exportOriginalImages()
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
             if mergeDocuments {
@@ -2138,20 +2178,27 @@ class OCRProcessor: ObservableObject {
     /// Live Capture dual output: write each page's original image next to its PDF (same base name),
     /// tagged identically, so the final folder holds BOTH the image and the PDF. Runs before merge/
     /// organization so `outputURLMap` is still per-page; `organizeOutput` moves the sibling image too.
-    private func exportOriginalImages() {
+    private func exportOriginalImages() async {
         guard exportOriginals else { return }
-        let fm = FileManager.default
-        for job in jobs {
+        // Snapshot the work on the main actor…
+        let work: [(src: URL, img: URL, pdf: URL)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
-                  fm.fileExists(atPath: job.sourceURL.path) else { continue }
+                  FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
             let ext = job.sourceURL.pathExtension.isEmpty ? "jpg" : job.sourceURL.pathExtension
-            let imageURL = pdfURL.deletingPathExtension().appendingPathExtension(ext)
-            try? fm.removeItem(at: imageURL)
-            guard (try? fm.copyItem(at: job.sourceURL, to: imageURL)) != nil else { continue }
-            // Mirror the PDF's final tags (date / subjects / priority / Red-Purple) onto the image.
-            let tags = MacOSTagger.readTags(from: pdfURL)
-            if !tags.isEmpty { try? MacOSTagger.applyTags(tags, to: imageURL) }
+            return (src: job.sourceURL, img: pdfURL.deletingPathExtension().appendingPathExtension(ext), pdf: pdfURL)
         }
+        guard !work.isEmpty else { return }
+        // …then copy the (full-resolution) originals + mirror the PDF's tags OFF the main thread,
+        // so the UI never stalls on large files.
+        await Task.detached(priority: .utility) {
+            let fm = FileManager.default
+            for w in work {
+                try? fm.removeItem(at: w.img)
+                guard (try? fm.copyItem(at: w.src, to: w.img)) != nil else { continue }
+                let tags = MacOSTagger.readTags(from: w.pdf)
+                if !tags.isEmpty { try? MacOSTagger.applyTags(tags, to: w.img) }
+            }
+        }.value
     }
 
     /// Automatic (LLM) tagging with the redo-review loop. Extracted so the standard and

@@ -20,20 +20,38 @@ final class CaptureServer: @unchecked Sendable {
         self.token = session.token
     }
 
+    /// Fixed listen port so the phone's saved pairing (host/port/token) keeps working across Mac
+    /// launches. Falls back to a system-assigned port only if this one is already in use.
+    private static let preferredPort: UInt16 = 48627
+
     func start() {
+        startListening(on: Self.preferredPort)
+    }
+
+    private func startListening(on port: UInt16?) {
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
-            let listener = try NWListener(using: params)   // system-assigned port
+            let listener: NWListener
+            if let port, let nwPort = NWEndpoint.Port(rawValue: port) {
+                listener = try NWListener(using: params, on: nwPort)
+            } else {
+                listener = try NWListener(using: params)   // system-assigned fallback
+            }
             listener.service = NWListener.Service(name: "Archive Processor", type: "_archivecap._tcp")
 
             listener.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    let port = listener.port?.rawValue ?? 0
-                    Task { @MainActor in self?.session?.serverDidStart(port: port) }
+                    let boundPort = listener.port?.rawValue ?? 0
+                    Task { @MainActor in self?.session?.serverDidStart(port: boundPort) }
                 case .failed(let error):
-                    Task { @MainActor in self?.session?.serverDidFail(error.localizedDescription) }
+                    if port != nil {
+                        // Fixed port busy → fall back to a system-assigned port once.
+                        self?.queue.async { self?.retryWithSystemPort() }
+                    } else {
+                        Task { @MainActor in self?.session?.serverDidFail(error.localizedDescription) }
+                    }
                 case .cancelled:
                     Task { @MainActor in self?.session?.serverDidStop() }
                 default:
@@ -46,8 +64,19 @@ final class CaptureServer: @unchecked Sendable {
             listener.start(queue: queue)
             self.listener = listener
         } catch {
-            Task { @MainActor in self.session?.serverDidFail(error.localizedDescription) }
+            if port != nil {
+                queue.async { [weak self] in self?.retryWithSystemPort() }
+            } else {
+                Task { @MainActor in self.session?.serverDidFail(error.localizedDescription) }
+            }
         }
+    }
+
+    private func retryWithSystemPort() {
+        listener?.stateUpdateHandler = nil   // suppress the spurious .cancelled → serverDidStop
+        listener?.cancel()
+        listener = nil
+        startListening(on: nil)
     }
 
     func stop() {

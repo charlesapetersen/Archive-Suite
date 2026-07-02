@@ -10,21 +10,50 @@ struct ArchiveThumbnail: View {
     let url: URL
     var maxSize: Int = 800
     var rotationDegrees: Int = 0
+    @State private var image: NSImage?
 
     var body: some View {
-        if let nsImage = Self.load(url: url, maxSize: maxSize) {
-            Image(nsImage: nsImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .rotationEffect(.degrees(Double(rotationDegrees)))
-        } else {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.1))
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
-                }
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .rotationEffect(.degrees(Double(rotationDegrees)))
+            } else {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.1))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    }
+            }
         }
+        // Decode off the main thread so grids/strips of thumbnails never stall the UI.
+        .task(id: url) {
+            image = await Self.loadAsync(url: url, maxSize: maxSize)
+        }
+    }
+
+    /// Async loader: decodes the image thumbnail off the main actor (image case) and returns an
+    /// NSImage on the caller's actor. The PDF path stays on the caller (rare, small count).
+    static func loadAsync(url: URL, maxSize: Int) async -> NSImage? {
+        if url.pathExtension.lowercased() == "pdf" {
+            return load(url: url, maxSize: maxSize)
+        }
+        let data: Data? = await Task.detached(priority: .userInitiated) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceThumbnailMaxPixelSize: maxSize,
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true
+                  ] as CFDictionary) else { return nil }
+            let out = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
+            CGImageDestinationAddImage(dest, cg, nil)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+            return out as Data
+        }.value
+        return data.flatMap { NSImage(data: $0) }
     }
 
     static func load(url: URL, maxSize: Int) -> NSImage? {

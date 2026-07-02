@@ -14,14 +14,19 @@ final class CaptureSession: ObservableObject {
     @Published var statusMessage = "Idle"
     @Published private(set) var connectedDeviceName: String?
 
-    /// Short, easy-to-type per-session bearer token the phone presents (shown in the pairing QR,
-    /// and typeable for USB/manual pairing). LAN/USB-local transport only, so a short code is fine.
-    let token = CaptureSession.makeToken()
+    /// Short, easy-to-type bearer token the phone presents (shown in the pairing QR, and typeable
+    /// for USB/manual pairing). **Stable across launches** (persisted) so a paired phone keeps
+    /// working without re-pairing. LAN/USB-local transport only, so a short code is fine.
+    let token = CaptureSession.loadOrCreateToken()
 
-    /// 6 chars from an unambiguous alphabet (no 0/O/1/I/L) — ~10^9 combinations.
-    private static func makeToken() -> String {
+    /// 6 chars from an unambiguous alphabet (no 0/O/1/I/L), persisted in UserDefaults.
+    private static func loadOrCreateToken() -> String {
+        let key = "LiveCaptureToken"
+        if let existing = UserDefaults.standard.string(forKey: key), existing.count == 6 { return existing }
         let alphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
-        return String((0..<6).map { _ in alphabet.randomElement()! })
+        let t = String((0..<6).map { _ in alphabet.randomElement()! })
+        UserDefaults.standard.set(t, forKey: key)
+        return t
     }
 
     /// Session id + incoming folder under Application Support.
@@ -71,13 +76,14 @@ final class CaptureSession: ObservableObject {
             }
             FileHandle.standardError.write(Data(line.utf8))
         }
-        // Auto-establish the USB reverse tunnel so a tethered phone can pair over the cable.
-        USBBridge.setupReverse(port: port)
+        // Keep the USB reverse tunnel asserted (re-asserted on a timer so a replug self-heals).
+        USBBridge.startReverse(port: port)
     }
 
     func serverDidStop() {
         serverRunning = false
         statusMessage = "Stopped."
+        USBBridge.stopReverse()
     }
 
     func serverDidFail(_ message: String) {

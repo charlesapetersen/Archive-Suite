@@ -1,6 +1,6 @@
 # Live Capture — Android companion app + macOS receiver
 
-**Status:** Phases 1–3a done; Phase 4 capture→ingest verified on-device (Pixel 9 over USB); remaining = paid Process/OCR run to confirm tags on PDFs · **Last updated:** 2026-07-01
+**Status:** **v3.2.0 pushed (commit + tag) to GitHub.** Live Capture verified end-to-end: on-device capture→ingest, crash durability (phone + Mac), dual output built, capture-UI refinements. Remaining = one cheap paid Process/OCR run to confirm tags land on PDFs. · **Last updated:** 2026-07-02
 **Permanent working plan.** If work is interrupted, resume from the phase checklists below.
 (Supersedes the temporary plan at `~/.claude/plans/moonlit-strolling-crane.md`.)
 
@@ -78,7 +78,7 @@ Untracked/uncommitted on `main`:
 
 ### Android side (`ArchiveCapture/`, Kotlin + Compose + CameraX)
 - **Connect screen:** scan the Mac's QR → parse `{host, port, token, name}`; persist endpoint; `GET /ping` to confirm. Also supports **USB** (`adb reverse` → connect to `127.0.0.1:PORT`) and manual host/port/token entry, so no shared Wi-Fi is required.
-- **Capture screen:** CameraX full-res preview; **white circular shutter (no label)** shoots document pages; **Box (red) / Folder (purple)** each capture a **single-image marker** (never a multi-page segment) and upload immediately; **End segment** finalizes the current document segment → tag sheet; recent-thumbnail strip + per-photo upload status; **tap a thumbnail to flag that page `P10`** (gold ring + badge; independent of the segment priority). App icon = the Archive Processor Mac icon (adaptive, generated from `AppIcon` via `sips`).
+- **Capture screen:** CameraX full-res preview; **white circular shutter (no label)** shoots document pages; **Box (red) / Folder (purple)** each capture a **single-image marker** (never a multi-page segment) and upload immediately; **End segment** finalizes the current document segment → tag sheet; recent-thumbnail strip (auto-scrolls) + per-photo upload status. **Thumbnail tap = select → X → delete**; **long-press = flag `P10`**; with a photo selected, **Box/Folder reclassifies it** into a single-image marker. App icon = the Archive Processor Mac icon (adaptive, generated from `AppIcon` via `sips`).
 - **Segment-completion tagging sheet** (on "New Document" / finish segment): **Priority** chips P7–P10; **Year** = recency-suggested chips + custom entry; **Month** = neutral Jan–Dec (no recency).
 - **Recency model:** phone-local store of recent year selections; suggest a small range around them. (Months excluded by design.)
 - **Upload:** durable queue (WorkManager + Room, or a simple disk queue) decoupled from shutter; retries on blips; posts Protocol v2 to the Mac's LAN IP.
@@ -135,7 +135,26 @@ Phase 3a (builds; on-device behavior unverified) — package `com.archiveprocess
 - [ ] Then Process (paid OCR) → confirm priority + date (+ Red/Purple + rotation) on the output PDFs. Metadata (type/priority/year/month) rides in the upload headers; provable only by a Process run. Needs an API key.
 
 ### Phase 5 — polish
-- [ ] **Re-pair affordance (needed):** the app has no way back to the Connect screen once an endpoint is saved (`MainActivity` shows CaptureScreen when `endpoint != null`). Since port/token change each Mac session, add a disconnect/re-pair button. (Workaround during testing: `adb shell pm clear com.archiveprocessor.capture`.)
+- [x] **Re-pair without churn — DONE:** the Mac token is now **stable** (persisted in UserDefaults) and the listen port is **pinned to 48627** (falls back to a system-assigned port only if busy). Verified: two relaunches kept the same port + token. A phone paired over USB (`127.0.0.1:48627` + token) keeps working across Mac restarts with **no re-pair**. To re-pair when genuinely needed (new Mac/network), clear the app's saved endpoint (`run-as … rm shared_prefs/archivecapture.xml`, which keeps photos).
+
+### Capture UI refinements (2026-07-02, in v3.2.0)
+- Middle button renamed **New doc → End segment**, moved **above** the thumbnail strip (shutter stays at the very bottom) to avoid accidental taps.
+- Thumbnail strip **auto-scrolls** to the newest capture.
+- Removed the top bar (title, upload count, Unpair) and the P10 hint text.
+- Camera preview is now a **letterboxed top region** (`FIT_CENTER`) with controls in a panel below, rather than full-screen behind the controls.
+- Added a **Clear** action (confirm dialog) that deletes all captured photos + resets the session (files + `session.json`).
+
+### Post-v3.2.0 — committed locally as v3.2.1 (commit 3d7a5e2 + tag v3.2.1; push deferred, venue WiFi blocks SSL)
+- Clear-all-photos action (Android).
+- Stable Mac token (UserDefaults) + pinned port 48627 (fallback if busy) → phone reconnects across Mac launches with no re-pair.
+- Per-photo delete (tap → X → delete) + select-then-Box/Folder to reclassify a photo as a single-image marker; P10 moved to long-press.
+- `POTENTIAL_FEATURES.md`: wired-transport-without-USB-debugging feasibility analysis.
+- **Performance (fixes the process-start beachball on full-res phone photos):** `GeminiClient.loadImageAsJPEG` (used by all providers) no longer full-decodes — it reads dimensions from the header and decodes straight to a capped **~2048 px** long edge, honoring EXIF orientation (no more ~50 MB/image buffers × concurrent workers). Vision LLMs downsample internally, so OCR quality is unaffected; the **PDF page-1 image and the archived original stay full-resolution** (produced separately). `exportOriginalImages()` (dual-output copy) moved **off the main actor**. `maxOCRDimension` is a tunable constant.
+- **Resume Run beachball fixed:** the resume path was regenerating a full-resolution PDF for *every* already-completed file, synchronously on the main actor — even though the original run had already written those PDFs. Now it **reuses existing output PDFs** (usually all of them → resume is near-instant) and rebuilds only genuinely-missing ones **off the main actor**.
+- **Thumbnail beachballs fixed (uncommitted, after v3.2.1):** review thumbnails were decoded synchronously in-body (a burst of main-thread decodes whenever a pane filled). Now **all three** load **off the main actor** (placeholder → async decode via a detached task → NSImage on main): `DocumentReviewRow` (segmentation review), `CollectionReviewRow` (collection review), and the shared `ArchiveThumbnail` (box/folder-confirm + manual-tag sheets + the Mac Live Capture strip). Closes the whole thumbnail-beachball class.
+- **Capture size confirmed (2026-07-02):** phone captures are standard **JPEG, 4080×3060 (~12.5 MP), ~3.2–3.8 MB** — same as the Pixel camera app, **not RAW**, already ≤4 MB. The beachballs were Mac-side full-res *decoding*, not oversized files; no capture-size change needed (could pin JPEG quality/resolution for a hard ≤4 MB guarantee if ever wanted).
+- **Unplug resilience** (phone can be unplugged easily): Mac re-asserts `adb reverse` every 5s (a dropped tunnel self-heals in ~3s — verified by removing the mapping and watching it return); phone **auto-retries** failed uploads every 8s. Capture keeps working offline (photos buffer, durable); on replug everything flushes automatically (idempotent ingest → no dupes), no manual Retry.
+- Caveat: delete/reclassify only affect the phone; a photo already uploaded to the Mac isn't removed remotely (no delete endpoint) — best done before End segment while still PENDING.
 - [ ] Smoother USB pairing UX: QR carries port+token; app offers **Connect over USB** (localhost) vs **Wi-Fi**; Mac auto-runs `adb reverse` when USB is chosen (bundle `adb`). Consider a fixed/known listen port for predictable USB pairing.
 - [ ] Durable queue across process death (re-enqueue disk files on relaunch); reconnection/resume; retake/delete/reorder; mDNS auto-discovery; session save/reset.
 

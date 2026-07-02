@@ -75,3 +75,17 @@
 - **Cost tracking** — cumulative cost reporting across all processing runs
 - **Accuracy metrics** — compare OCR results against ground truth files for benchmarking
 - **Tag frequency analysis** — show most common tags, date distributions, subject clusters
+
+---
+
+## Live Capture — Wired Transport Without USB Debugging (feasibility)
+
+The v3.2.0 Live Capture wired mode uses `adb reverse`, which requires **USB debugging** (Developer Options) + a per-computer adb authorization + `adb` on the Mac. That is fine for personal/small-scale use but **cannot ship in a wide-release app** — you can't ask general users to enable Developer Options and trust an RSA key. A normal Android app also cannot open a USB data channel to a host except through the sanctioned USB APIs, so "no debugging" means dropping adb entirely. Options, in order of practicality:
+
+1. **Wi‑Fi instead of USB (easiest, wide-release-ready).** Already supported via QR/manual LAN pairing. For a broad release this is the pragmatic primary transport; wired becomes a power-user extra. Downside: needs a shared network (the reading-room problem).
+
+2. **USB tethering (no Developer Options, but fragile on Macs).** The user toggles Settings → Hotspot & tethering → USB tethering, creating a real network link over the cable; the app does HTTP over it — no debugging/authorization. **But** Android tethering uses RNDIS, which modern Apple‑Silicon macOS does not support without a kernel driver (kexts are largely dead on current macOS). Some newer devices offer NCM (better macOS support) but it's inconsistent. Consumer-friendly on the phone, unreliable on the Mac today — not safe to ship.
+
+3. **Android Open Accessory (AOA) — the proper wide-release wired path.** Android's sanctioned way for an app to talk to a USB *host* with no debugging/root. The Mac acts as USB host via **libusb** (pure user-space, no kext), sends AOA control requests to switch the phone into accessory mode, then bulk-transfers; the Android app implements the `UsbAccessory` side and gets a standard one-time "Allow this app to access the USB device?" prompt (not Developer Options). Distributable and robust, but real engineering: a custom framed protocol on both sides plus a libusb host embedded in the Mac app. Moderate-to-high effort.
+
+**Bottom line:** feasible for wide release, but only by adding **AOA** (option 3) — a real project, not a flag. USB tethering (option 2) is too flaky on current Macs to rely on. Recommended posture for a broad release: make **Wi‑Fi the primary transport**, keep `adb reverse` as a documented power-user/dev option, and invest in **AOA** only if wired-for-everyone becomes a hard requirement.

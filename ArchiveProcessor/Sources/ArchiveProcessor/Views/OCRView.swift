@@ -1711,6 +1711,7 @@ struct CollectionReviewSheet: View {
 
 struct CollectionReviewRow: View {
     @Binding var item: CollectionReviewItem
+    @State private var loadedImage: NSImage?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1753,19 +1754,46 @@ struct CollectionReviewRow: View {
 
     @ViewBuilder
     private var thumbnail: some View {
-        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: 360) {
-            Image(nsImage: nsImage)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } else {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.1))
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
+        Group {
+            if let loadedImage {
+                Image(nsImage: loadedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.1))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+            }
         }
+        // Decode off the main thread so the collection-review pane fills without stalling.
+        .task(id: item.fileURL) {
+            loadedImage = await Self.loadThumbnailAsync(url: item.fileURL, maxSize: 500)
+        }
+    }
+
+    private static func loadThumbnailAsync(url: URL, maxSize: Int) async -> NSImage? {
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let doc = PDFKit.PDFDocument(url: url), let page = doc.page(at: 0) else { return nil }
+            return page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
+        }
+        let data: Data? = await Task.detached(priority: .userInitiated) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceThumbnailMaxPixelSize: maxSize,
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true
+                  ] as CFDictionary) else { return nil }
+            let out = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
+            CGImageDestinationAddImage(dest, cg, nil)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+            return out as Data
+        }.value
+        return data.flatMap { NSImage(data: $0) }
     }
 
     private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {
@@ -2023,6 +2051,7 @@ struct DocumentReviewRow: View {
     let thumbnailSize: CGFloat
     var isFocused: Bool = false
     var showDocumentClasses: Bool = true
+    @State private var loadedImage: NSImage?
 
     private var rowBackground: Color {
         if item.markedForRemoval { return Color.secondary.opacity(0.10) }
@@ -2131,21 +2160,50 @@ struct DocumentReviewRow: View {
 
     @ViewBuilder
     private var thumbnail: some View {
-        if let nsImage = loadThumbnail(url: item.fileURL, maxSize: Int(max(thumbnailSize * 2, 800))) {
-            // Show the entire image (fit, not fill/crop) so nothing is cut off during review.
-            Image(nsImage: nsImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .rotationEffect(.degrees(Double(item.rotationDegrees)))
-        } else {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.1))
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
+        Group {
+            if let loadedImage {
+                // Show the entire image (fit, not fill/crop) so nothing is cut off during review.
+                Image(nsImage: loadedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .rotationEffect(.degrees(Double(item.rotationDegrees)))
+            } else {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.1))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+            }
         }
+        // Decode off the main thread so filling the review pane never blocks the UI.
+        .task(id: item.fileURL) {
+            loadedImage = await Self.loadThumbnailAsync(url: item.fileURL, maxSize: 1000)
+        }
+    }
+
+    /// Decode a thumbnail off the main actor (image case) and return an NSImage on the caller's
+    /// actor — prevents a burst of synchronous decodes from beachballing the review pane.
+    private static func loadThumbnailAsync(url: URL, maxSize: Int) async -> NSImage? {
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let doc = PDFKit.PDFDocument(url: url), let page = doc.page(at: 0) else { return nil }
+            return page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
+        }
+        let data: Data? = await Task.detached(priority: .userInitiated) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceThumbnailMaxPixelSize: maxSize,
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true
+                  ] as CFDictionary) else { return nil }
+            let out = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
+            CGImageDestinationAddImage(dest, cg, nil)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+            return out as Data
+        }.value
+        return data.flatMap { NSImage(data: $0) }
     }
 
     private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {

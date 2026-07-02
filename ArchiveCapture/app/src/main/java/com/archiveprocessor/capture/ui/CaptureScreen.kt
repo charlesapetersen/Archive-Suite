@@ -10,9 +10,10 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,6 +83,8 @@ fun CaptureScreen(vm: CaptureViewModel) {
         if (vm.items.isNotEmpty()) listState.animateScrollToItem(vm.items.size - 1)
     }
 
+    var showClearConfirm by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview — top region only, letterboxed (FIT_CENTER) on black.
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -106,6 +110,9 @@ fun CaptureScreen(vm: CaptureViewModel) {
         ) {
             // End segment — above the photos and away from the shutter, to avoid accidental taps.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (vm.items.isNotEmpty()) {
+                    TextButton(onClick = { showClearConfirm = true }) { Text("Clear", color = Color.White) }
+                }
                 if (vm.items.any { it.state == UploadState.FAILED }) {
                     TextButton(onClick = { vm.retryFailed() }) { Text("Retry", color = Color.White) }
                 }
@@ -118,7 +125,15 @@ fun CaptureScreen(vm: CaptureViewModel) {
             // Recent captures (auto-scrolling; tap a page to toggle its P10 override).
             if (vm.items.isNotEmpty()) {
                 LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(vm.items) { item -> Thumb(item) { vm.toggleP10(item.id) } }
+                    items(vm.items) { item ->
+                        Thumb(
+                            item = item,
+                            isSelected = vm.selectedItemId == item.id && !vm.armed,
+                            isArmed = vm.selectedItemId == item.id && vm.armed,
+                            onTap = { vm.tapItem(item.id) },
+                            onLongPress = { vm.toggleP10(item.id) }
+                        )
+                    }
                 }
             }
 
@@ -129,7 +144,10 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Button(
-                    onClick = { takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.BOX) } },
+                    onClick = {
+                        if (vm.selectedItemId != null) vm.reclassifySelected(GroupType.BOX)
+                        else takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.BOX) }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White)
                 ) { Text("Box") }
 
@@ -141,7 +159,10 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 ) { }
 
                 Button(
-                    onClick = { takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.FOLDER) } },
+                    onClick = {
+                        if (vm.selectedItemId != null) vm.reclassifySelected(GroupType.FOLDER)
+                        else takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.FOLDER) }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2), contentColor = Color.White)
                 ) { Text("Folder") }
             }
@@ -154,6 +175,21 @@ fun CaptureScreen(vm: CaptureViewModel) {
         ModalBottomSheet(onDismissRequest = { vm.cancelTagSheet() }, sheetState = sheetState) {
             SegmentTagSheet(recentYears = vm.recentYears()) { p, y, m -> vm.applyTagsAndContinue(p, y, m) }
         }
+    }
+
+    // Confirm before clearing (deletes photos from the phone — destructive).
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear all photos?") },
+            text = { Text("This permanently deletes all ${vm.items.size} captured photo(s) from this phone and cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { vm.clearSession(); showClearConfirm = false }) {
+                    Text("Clear", color = Color(0xFFD32F2F))
+                }
+            },
+            dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") } }
+        )
     }
 }
 
@@ -175,8 +211,15 @@ private fun takePicture(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Thumb(item: CapturedItem, onToggleP10: () -> Unit) {
+private fun Thumb(
+    item: CapturedItem,
+    isSelected: Boolean,
+    isArmed: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit
+) {
     val bmp: ImageBitmap? = remember(item.file.path) { decodeThumb(item.file.path) }
     val stateColor = when (item.state) {
         UploadState.UPLOADED -> Color(0xFF34C759)
@@ -185,18 +228,29 @@ private fun Thumb(item: CapturedItem, onToggleP10: () -> Unit) {
         UploadState.PENDING -> Color.Gray
     }
     val isP10 = item.priority == "P10"
+    val ring = when {
+        isArmed -> Color(0xFFFF3B30)     // red: tap again to delete
+        isSelected -> Color(0xFF0A84FF)  // blue: selected
+        isP10 -> Color(0xFFFFD60A)       // gold: P10
+        else -> null
+    }
     Box(
         Modifier.size(64.dp).clip(RoundedCornerShape(6.dp)).background(Color.DarkGray)
-            .then(if (isP10) Modifier.border(3.dp, Color(0xFFFFD60A), RoundedCornerShape(6.dp)) else Modifier)
-            .clickable { onToggleP10() }
+            .then(if (ring != null) Modifier.border(3.dp, ring, RoundedCornerShape(6.dp)) else Modifier)
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
     ) {
         if (bmp != null) {
             Image(bitmap = bmp, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
         Box(Modifier.align(Alignment.BottomStart).padding(3.dp).size(10.dp).clip(CircleShape).background(stateColor))
-        if (isP10) {
+        if (isP10 && !isArmed) {
             Box(Modifier.align(Alignment.TopEnd).padding(2.dp).clip(RoundedCornerShape(3.dp)).background(Color.Red)) {
                 Text("P10", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 2.dp))
+            }
+        }
+        if (isArmed) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) {
+                Text("✕", color = Color.White, style = MaterialTheme.typography.headlineMedium)
             }
         }
     }
