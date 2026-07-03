@@ -13,6 +13,7 @@
 		056A686BFF02B6F62976B184 /* GeminiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */; };
 		0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2D4943D879BAE44B746EA /* ContentView.swift */; };
 		1AAD7B5145E74283A0C02556 /* SystemTagsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8789F34022E9F86E6FED252 /* SystemTagsProvider.swift */; };
+		1D2F5A4BC482092B3D13EC19 /* KeyValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F65BE656C03EC77B0DE844C /* KeyValidator.swift */; };
 		25922CF438F3053123EDFD60 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA476D0BECB92F4AE6714A78 /* CaptureSession.swift */; };
 		261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68049A48FDC13B74708EF6F /* PDFGenerator.swift */; };
 		27F8387A204C6F91898348FD /* NetworkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA72715DACC7832B447737B /* NetworkSession.swift */; };
@@ -23,6 +24,7 @@
 		409BF603222531B6FB91A8AC /* CaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3E42E4C08CDBC05B7F9AFB /* CaptureModels.swift */; };
 		432F4A260326599508D52AEE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55EBFFC59F9D3601452D48B /* SettingsView.swift */; };
 		4DF4EC8B061213FFD0C667D3 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D3E7CAB2E353DF835B1207 /* ToolsView.swift */; };
+		5EED219C8815E74E90EF6C58 /* ProviderKeySpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A46F4393BC436C4D64332ED /* ProviderKeySpec.swift */; };
 		683222758ABEE7C1E16B442C /* OCRPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */; };
 		7618A04F84EAAB11190B0495 /* AnthropicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */; };
 		781E1A90500243A9F9B182F6 /* RotationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2635DAB9C212C6B88B107E6A /* RotationDetector.swift */; };
@@ -35,6 +37,7 @@
 		A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */; };
 		A1B9340110C8A1FEEA64A285 /* ModelSelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDBD87ADFFE65D6424FD802D /* ModelSelectionStore.swift */; };
 		A31E3D3616F4B92754877B53 /* CollectionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096C0E9D05F40D15835769A6 /* CollectionSegmenter.swift */; };
+		A399B3EA8D9B90217A262B58 /* ProviderKeyWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE0F806AFAB4A040DD91F03 /* ProviderKeyWizard.swift */; };
 		A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */; };
 		AA8D85413146B5934D228015 /* SessionProcessingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE4FA4A5DAA7C0892D4D5CC /* SessionProcessingConfig.swift */; };
 		AB14D2D96483775855E78A70 /* CaptureServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C98F3B5353A75639380095DE /* CaptureServer.swift */; };
@@ -60,6 +63,7 @@
 /* Begin PBXFileReference section */
 		04D660DD2F9F10946F864B8E /* DocumentSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSegmenter.swift; sourceTree = "<group>"; };
 		096C0E9D05F40D15835769A6 /* CollectionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSegmenter.swift; sourceTree = "<group>"; };
+		0A46F4393BC436C4D64332ED /* ProviderKeySpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeySpec.swift; sourceTree = "<group>"; };
 		1336A6A82652DF9748694428 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		175746529FD50FCD7CCD7AD1 /* KeyboardTokenField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTokenField.swift; sourceTree = "<group>"; };
 		17A2664D8334EA43978AB36E /* PDFTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFTextExtractor.swift; sourceTree = "<group>"; };
@@ -76,6 +80,8 @@
 		46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRPrompt.swift; sourceTree = "<group>"; };
 		473BEF7CEA4B1BB2CBDD6182 /* CollectionFinalizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFinalizeSheet.swift; sourceTree = "<group>"; };
 		4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
+		4DE0F806AFAB4A040DD91F03 /* ProviderKeyWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeyWizard.swift; sourceTree = "<group>"; };
+		4F65BE656C03EC77B0DE844C /* KeyValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyValidator.swift; sourceTree = "<group>"; };
 		5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRProcessor.swift; sourceTree = "<group>"; };
 		672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
 		70424A4716F4D071D5E42435 /* ImageEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEncoding.swift; sourceTree = "<group>"; };
@@ -161,6 +167,7 @@
 				E760CA9C9C7D2039579CAD63 /* ManualSegmentTagView.swift */,
 				A662257BABACAA6C78DA8969 /* ManualTaggingSheet.swift */,
 				7AE519DB723DEF9EE690B75F /* OCRView.swift */,
+				4DE0F806AFAB4A040DD91F03 /* ProviderKeyWizard.swift */,
 				C55EBFFC59F9D3601452D48B /* SettingsView.swift */,
 				9149C20C69B7A53A3A765C85 /* TagInputField.swift */,
 				80D3E7CAB2E353DF835B1207 /* ToolsView.swift */,
@@ -175,6 +182,7 @@
 				37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */,
 				1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */,
 				FDBD87ADFFE65D6424FD802D /* ModelSelectionStore.swift */,
+				0A46F4393BC436C4D64332ED /* ProviderKeySpec.swift */,
 				C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */,
 				A38CA8FA8FFB2CE9849EF964 /* TimeEstimator.swift */,
 			);
@@ -212,6 +220,7 @@
 				718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */,
 				672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */,
 				70424A4716F4D071D5E42435 /* ImageEncoding.swift */,
+				4F65BE656C03EC77B0DE844C /* KeyValidator.swift */,
 				93F615D9D9C926B7805A3ED2 /* LLMRotationDetector.swift */,
 				8DE28B3830F33D79C626AECF /* MistralClient.swift */,
 				3CA72715DACC7832B447737B /* NetworkSession.swift */,
@@ -325,6 +334,7 @@
 				A4D72C1B57ABB14958EE7CE6 /* DropReceiver.swift in Sources */,
 				056A686BFF02B6F62976B184 /* GeminiClient.swift in Sources */,
 				8992E431C5F3F042FC581778 /* ImageEncoding.swift in Sources */,
+				1D2F5A4BC482092B3D13EC19 /* KeyValidator.swift in Sources */,
 				B3D2909BB5C15A34E2CAE51A /* KeyboardTokenField.swift in Sources */,
 				DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */,
 				904533896796EE9945E61E08 /* LLMRotationDetector.swift in Sources */,
@@ -345,6 +355,8 @@
 				261EC31F73FA340514B7B9D9 /* PDFGenerator.swift in Sources */,
 				011F7F9B74805B13A5511980 /* PDFTextExtractor.swift in Sources */,
 				E12D577E4C9F4FD712550CBD /* PDFToImageConverter.swift in Sources */,
+				5EED219C8815E74E90EF6C58 /* ProviderKeySpec.swift in Sources */,
+				A399B3EA8D9B90217A262B58 /* ProviderKeyWizard.swift in Sources */,
 				A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */,
 				781E1A90500243A9F9B182F6 /* RotationDetector.swift in Sources */,
 				AA8D85413146B5934D228015 /* SessionProcessingConfig.swift in Sources */,
