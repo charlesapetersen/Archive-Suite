@@ -50,7 +50,7 @@ struct ProviderKeySpec: Identifiable, Sendable {
     static let mistral = ProviderKeySpec(
         provider: .mistral,
         account: LLMProvider.mistral.rawValue,
-        blurb: "Archive Processor can also use Mistral to read your archive photos. You'll make your own key. It's free to create; OCR may require adding your own card to Mistral — any charges go to Mistral, never to this app.",
+        blurb: "Archive Processor can also use Mistral to read your archive photos. You'll make your own key — free to create, and OCR works on the free tier (no credit card needed to start). Very heavy use may later need a paid plan; any charges then go to Mistral, never to this app.",
         signInURL: URL(string: "https://console.mistral.ai/api-keys")!,
         billingURL: URL(string: "https://admin.mistral.ai/")!,
         privacyURL: URL(string: "https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training")!,
@@ -60,7 +60,7 @@ struct ProviderKeySpec: Identifiable, Sendable {
             "Open “API Keys” → “Create new key”, then COPY IT NOW — it’s shown only once.",
             "Come back here and paste it below."
         ],
-        costNote: "Free to create. OCR may need a paid plan — you'd add your own card in Mistral (charges go to Mistral, not this app).",
+        costNote: "Free — no card needed to start, and OCR works on the free tier. Heavy/bulk use may hit free-tier limits and eventually need a paid plan (your own card; charges go to Mistral, not this app).",
         privacyNote: "For sensitive documents, turn off training in Mistral’s Privacy settings, or use a paid plan (paid is opted out by default). Data is EU-hosted by default.",
         cardNote: "Have your phone ready for an SMS verification code.",
         keyPrecheck: { $0.count >= 20 && !$0.contains(" ") && !$0.hasPrefix("AIza") },   // reject a mis-pasted Gemini key
