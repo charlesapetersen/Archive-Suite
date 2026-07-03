@@ -89,3 +89,34 @@ The v3.2.0 Live Capture wired mode uses `adb reverse`, which requires **USB debu
 3. **Android Open Accessory (AOA) — the proper wide-release wired path.** Android's sanctioned way for an app to talk to a USB *host* with no debugging/root. The Mac acts as USB host via **libusb** (pure user-space, no kext), sends AOA control requests to switch the phone into accessory mode, then bulk-transfers; the Android app implements the `UsbAccessory` side and gets a standard one-time "Allow this app to access the USB device?" prompt (not Developer Options). Distributable and robust, but real engineering: a custom framed protocol on both sides plus a libusb host embedded in the Mac app. Moderate-to-high effort.
 
 **Bottom line:** feasible for wide release, but only by adding **AOA** (option 3) — a real project, not a flag. USB tethering (option 2) is too flaky on current Macs to rely on. Recommended posture for a broad release: make **Wi‑Fi the primary transport**, keep `adb reverse` as a documented power-user/dev option, and invest in **AOA** only if wired-for-everyone becomes a hard requirement.
+
+---
+
+## App-Store Distribution — Phase 4 (deferred)
+
+The distribution initiative (see `DISTRIBUTION_PLAN.md`) is complete through **Phase 3**: guided
+BYO-key onboarding (Gemini + Mistral, both confirmed free with no card), and an **iPhone capture
+companion** (`ArchiveCaptureiOS/`) alongside the Android one. **Phase 4 — publishing the companion
+apps to the App Store and Google Play — is intentionally deferred** and captured here for the future.
+
+Phase 4 is mostly **owner (not Claude) work**, because it needs paid accounts, real hardware, and
+signing identities Claude cannot access:
+
+- **[USER] Apple:** enroll in the Apple Developer Program ($99/yr); create the App ID, signing
+  certificate, and provisioning profile; run the iOS companion on a physical iPhone to smoke-test the
+  camera + LAN pairing (the simulator can't exercise the camera); archive and upload via Xcode /
+  App Store Connect; complete the App Privacy questionnaire; submit for review.
+- **[USER] Google:** create a Google Play Console account (one-time $25); generate an upload key and
+  sign the Android app bundle (`.aab`); complete the Data Safety form; submit.
+- **[USER] Assets:** capture screenshots / a short screen-recording of each companion for the store
+  listings (Claude can't produce device screenshots of a live camera session).
+
+What **Claude can draft on request** (no accounts needed): the privacy policy, the Play **Data
+Safety** form answers, the Apple **App Privacy** "nutrition-label" answers, the store descriptions /
+keywords, and the in-app BYO-key onboarding copy. Because neither companion holds API keys or sends
+data anywhere except the user's own paired Mac over the LAN, the privacy story is simple (no data
+collection / no third-party sharing) — which keeps the questionnaires short.
+
+**Feasibility note:** every code artifact Phase 4 needs already exists and builds; the blockers are
+purely account/identity/asset steps that require the owner. Nothing here needs new engineering unless
+review feedback demands a change.

@@ -7,7 +7,7 @@ Built for archivists, historians, and researchers working with large digitized d
 The app has three areas, selectable at the top of the window, plus a native Settings window:
 
 - **Process Files** — drop in images (or a folder) and run OCR + tagging + organization as a batch.
-- **Live Capture** — photograph documents with an Android companion app and stream them to the Mac; optionally OCR/tag/PDF **each segment as you shoot** so processing finishes with capture.
+- **Live Capture** — photograph documents with an **Android or iPhone** companion app and stream them to the Mac; optionally OCR/tag/PDF **each segment as you shoot** so processing finishes with capture.
 - **Tools** — one-off diagnostics: compare OCR across models, and test how image resolution affects OCR.
 - **Settings (⌘,)** — all durable settings (provider, model, API key, rotation, tagging options, live-capture mode) in one place, with a live cost estimate for 1,000 files that updates as you change settings.
 
@@ -29,6 +29,18 @@ Process scanned images through any of three LLM providers:
 - Cost estimation displayed before processing (standard and batch pricing)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
 - Image resolution scaling — **size-based** (target a fraction of a standard image size; see below) to lower API cost and time, downscaling large files more
+
+### Guided API-Key Setup
+
+You bring your own API keys, and the app makes that easy. A **first-run wizard** (and a **Set up keys**
+button in Settings) walks you through creating and pasting a **free** Gemini and Mistral key — both
+providers offer an OCR-capable free tier with **no credit card required**:
+
+- Step-by-step instructions with the exact console page to open for each provider
+- Paste-and-validate: each key is format-checked, then confirmed with a live call (a synthetic
+  sample-OCR test) before it's saved — so a mistyped or wrong-provider key is caught immediately
+- Per-provider status chips in Settings show at a glance which keys are set and working
+- Keys are stored only in the macOS Keychain — never in code, config files, or logs
 
 ### PDF Output
 
@@ -188,11 +200,11 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 
 ## Live Capture (phone companion + streaming)
 
-Photograph documents with a phone and stream them straight into the pipeline — no scanner, no manual import. This is the **Live Capture** tab plus an Android companion app (`ArchiveCapture/`, Kotlin + Jetpack Compose + CameraX).
+Photograph documents with a phone and stream them straight into the pipeline — no scanner, no manual import. This is the **Live Capture** tab plus a companion app for **Android** (`ArchiveCapture/`, Kotlin + Jetpack Compose + CameraX) or **iPhone** (`ArchiveCaptureiOS/`, SwiftUI + AVFoundation). Both companions speak the same streaming protocol and offer the same capture workflow; pick whichever phone you have.
 
-**On the phone:** shoot document pages with a full-resolution shutter; mark **Box** (red) and **Folder** (purple) with dedicated buttons; **End segment** finishes a document. Minimal on-phone tagging per segment: **priority** (P7–P10, with a per-page P10 override via long-press) and **year/month**. Photos and their grouping/tags are written to disk immediately and uploaded via a durable, auto-retrying queue — so a photo (which can't be re-taken) is never lost, even across an app crash or an unplugged cable.
+**On the phone:** shoot document pages with a full-resolution shutter; mark **Box** (red) and **Folder** (purple) with dedicated buttons; **End segment** finishes a document. Minimal on-phone tagging per segment: **priority** (P7–P10, with a per-page P10 override via long-press) and **year/month**. Photos and their grouping/tags are written to disk immediately and uploaded via a durable, auto-retrying queue — so a photo (which can't be re-taken) is never lost, even across an app crash or an unplugged cable. As each segment is confirmed on the Mac, its photos **leave the phone** (with a transfer animation), so images stream to the Mac in segments rather than piling up on the device.
 
-**Pairing:** the Mac shows a QR code (host / port / token); the phone scans it. Works over the LAN, or over **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired.
+**Pairing:** the Mac shows a QR code (host / port / token); the phone scans it (or you can enter host/port/token manually). Works over the LAN; **Android** additionally supports **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired.
 
 **On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/priority. The card is fully keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add / save, ⌫ to delete the previous tag).
 
@@ -203,8 +215,8 @@ Photograph documents with a phone and stream them straight into the pipeline —
 
 ## Architecture
 
-- **Language:** Swift (macOS app), Kotlin (Android companion)
-- **UI:** SwiftUI (macOS native), Jetpack Compose + CameraX (Android)
+- **Language:** Swift (macOS app + iPhone companion), Kotlin (Android companion)
+- **UI:** SwiftUI (macOS native + iPhone companion), Jetpack Compose + CameraX (Android); iPhone capture uses AVFoundation
 - **Concurrency:** Swift async/await with TaskGroup for parallel processing (Swift 6 strict concurrency)
 - **PDF Generation:** Core Graphics with DCTDecode JPEG embedding and CTFramesetter for text layout
 - **Filesystem Tagging:** NSFileManager extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
@@ -233,6 +245,16 @@ cd ArchiveCapture
 ```
 
 Sideload the APK to an Android phone, then pair by scanning the QR shown in the Mac app's Live Capture tab (LAN, or USB via `adb reverse`).
+
+**iPhone companion (optional, for Live Capture):**
+
+```bash
+cd ArchiveCaptureiOS
+xcodegen generate
+open ArchiveCaptureiOS.xcodeproj
+```
+
+Build and run on an iPhone with Xcode (iOS 17+; camera capture needs a physical device — the simulator has no camera), then pair by scanning the QR shown in the Mac app's Live Capture tab (LAN). `project.yml` is authoritative; regenerate after adding files.
 
 ## Project Structure
 
@@ -278,6 +300,14 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 
 ArchiveCapture/                        # Android companion app (Kotlin + Compose + CameraX)
 └── app/src/main/java/com/archiveprocessor/capture/  # capture/, data/, net/, ui/
+
+ArchiveCaptureiOS/                     # iPhone companion app (SwiftUI + AVFoundation, XcodeGen)
+└── Sources/ArchiveCaptureiOS/
+    ├── App.swift / ContentView.swift  # Entry point; Connect ⇄ Capture screen switch
+    ├── Net/                           # MacEndpoint (QR parse), MacClient (ping/postPhoto/complete)
+    ├── Capture/                       # CaptureModels, SessionStore (durable JSON), CaptureViewModel
+    ├── Camera/CameraController.swift  # AVFoundation photo capture
+    └── UI/                            # CameraPreview, QRScannerView, ConnectScreen, CaptureScreen, SegmentTagSheet
 ```
 
 ## Potential Features

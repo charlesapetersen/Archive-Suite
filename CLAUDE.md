@@ -122,7 +122,7 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 
 ## Primary Function 3: Live Capture (phone companion + streaming)
 
-Photograph documents with an **Android companion app** (`ArchiveCapture/`, Kotlin + Compose + CameraX) and stream them to the Mac's Live Capture tab.
+Photograph documents with a phone companion app — **Android** (`ArchiveCapture/`, Kotlin + Compose + CameraX) or **iPhone** (`ArchiveCaptureiOS/`, SwiftUI + AVFoundation, XcodeGen, Swift 5 language mode) — and stream them to the Mac's Live Capture tab. Both companions speak the same `CaptureServer` protocol and share the segment-transfer UX (photos leave the phone as segments are confirmed on the Mac). The iPhone companion holds no API keys and pairs over the LAN (QR or manual host/port/token).
 
 - **On the phone:** full-res shutter; **Box** (red) / **Folder** (purple) markers; **End segment** finishes a document. Minimal on-phone tagging: priority (P7–P10 + per-page P10) and year/month. Durable disk queue with auto-retry — a photo is never lost (archival photos can't be re-taken). Idempotent re-upload on the Mac (same group+seq → replace).
 - **Pairing:** QR (host/port/token, Bearer-auth). LAN or **USB** (`adb reverse` → `127.0.0.1`, auto-run by the Mac). Stable token + pinned port survive Mac restarts; the QR hides once paired.
@@ -130,7 +130,8 @@ Photograph documents with an **Android companion app** (`ArchiveCapture/`, Kotli
 - **Two modes (chosen in Settings, `liveProcessingMode`):**
   - **Stage for later** — captures collect, then hand off to Process Files for a batch run.
   - **Process live** — each segment is OCR'd **on arrival**, tagged, turned into a **PDF + renamed original image** (dual output), merged if multi-page, and staged as you shoot. At **Finish session**, confirm each collection's name (auto-suggested from the box-label OCR, **fuzzy-matched against existing folders** to append; new files continue that folder's `NNNNN` numbering). Durable + resumable (staging manifest; failed-OCR retry).
-- **Key files:** `Capture/{CaptureModels,CaptureSession,SessionProcessingConfig,LiveCaptureProcessor}.swift`, `Net/{CaptureServer,USBBridge}.swift`, `Views/{LiveCaptureView,CollectionFinalizeSheet,KeyboardTokenField}.swift`.
+- **Key files (Mac):** `Capture/{CaptureModels,CaptureSession,SessionProcessingConfig,LiveCaptureProcessor}.swift`, `Net/{CaptureServer,USBBridge}.swift`, `Views/{LiveCaptureView,CollectionFinalizeSheet,KeyboardTokenField}.swift`.
+- **Key files (iPhone, `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`):** `Net/{MacEndpoint,MacClient}.swift`, `Capture/{CaptureModels,SessionStore,CaptureViewModel}.swift`, `Camera/CameraController.swift`, `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,SegmentTagSheet}.swift`. Its own `project.yml` (`xcodegen generate` after adding files); camera capture needs a physical device (the simulator has no camera).
 
 ---
 
@@ -158,8 +159,8 @@ Photograph documents with an **Android companion app** (`ArchiveCapture/`, Kotli
 ---
 
 ## Architecture Notes (macOS Native)
-- Language: Swift (macOS app) + Kotlin (Android companion, `ArchiveCapture/`)
-- UI framework: SwiftUI (AppKit where needed); Android is Jetpack Compose + CameraX
+- Language: Swift (macOS app + iPhone companion, `ArchiveCaptureiOS/`) + Kotlin (Android companion, `ArchiveCapture/`)
+- UI framework: SwiftUI (AppKit where needed); iPhone companion is SwiftUI + AVFoundation; Android is Jetpack Compose + CameraX
 - Concurrency: Swift concurrency (async/await + TaskGroup) for parallel OCR workers; **Swift 6 strict concurrency** (`@MainActor`, `Sendable`, `nonisolated(unsafe)` for the few write-once statics)
 - PDF generation: Core Graphics (dynamic page sizing for the text page)
 - Filesystem tagging: `NSFileManager` extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
@@ -172,10 +173,12 @@ Photograph documents with an **Android companion app** (`ArchiveCapture/`, Kotli
 ## Project Structure
 ```
 Archive Processor/
-├── CLAUDE.md, README.md, POTENTIAL_FEATURES.md
+├── CLAUDE.md, README.md, POTENTIAL_FEATURES.md, DISTRIBUTION_PLAN.md
 ├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
 │   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
 ├── ArchiveCapture/                    # Android companion app (Gradle)
+├── ArchiveCaptureiOS/                 # iPhone companion app (XcodeGen: project.yml)
+│   └── Sources/ArchiveCaptureiOS/{Net, Capture, Camera, UI}/
 └── Test Files/                        # Do NOT modify; write outputs only
 ```
 See the README's "Project Structure" for the full annotated file tree (Capture/, Net/, and the Views split into OCRView / SettingsView / ToolsView / LiveCaptureView / etc.).
