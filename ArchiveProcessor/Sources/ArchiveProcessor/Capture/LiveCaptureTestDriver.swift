@@ -43,7 +43,7 @@ enum LiveCaptureTestDriver {
         // this streaming verification is exercising.
         let config = SessionProcessingConfig(
             provider: .gemini, model: model, thinkingLevel: .low, apiKey: key,
-            taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+            taggingMode: .automatic, rotationMode: .off, reviewRotation: false, mergeDocuments: false,
             outputDirectory: outDir, contextCharCount: 0, sendPreviousImage: false,
             customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
             outputImageFile: true, pdfImageMB: 2.0, exportedImageMB: 3.0)

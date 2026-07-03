@@ -37,6 +37,19 @@ final class LiveCaptureProcessor: ObservableObject {
     @Published private(set) var statuses: [SegmentStatus] = []
     @Published private(set) var staged: [StagedSegment] = []
 
+    /// End-of-session rotation review (opt-in) — a dedicated pass over every captured page, shown at
+    /// Finish before collection naming. One editable row per staged page.
+    struct RotationReviewPage: Identifiable {
+        let id = UUID()
+        let groupId: String
+        let pageIndex: Int        // index within its segment's pages
+        let order: Int            // segment capture order (for stable sorting)
+        let sourceURL: URL
+        var rotationDegrees: Int
+    }
+    @Published var showRotationReview = false
+    @Published var rotationReviewPages: [RotationReviewPage] = []
+
     /// End-of-session finalization state (Phase 3/4).
     @Published var drafts: [CollectionDraft] = []
     @Published var showFinalizeSheet = false
@@ -52,6 +65,10 @@ final class LiveCaptureProcessor: ObservableObject {
     private var pageTasks: [UUID: Task<OCRResult, Never>] = [:]
     private var startedPhotoIds: Set<UUID> = []
     private var finalizedGroups: Set<String> = []
+    /// Everything `writeSegmentFiles` needs, retained per finalized segment so the end-of-session
+    /// rotation review can regenerate a segment's staged PDF/JPG with corrected rotation. In-memory
+    /// for the current run only (rotation review is a same-session step, before finalization).
+    private var retained: [String: RetainedSegment] = [:]
     private var currentCollectionKey = "__unfiled__"
     /// Each group's collection, pinned when its first photo arrives (in capture order) so it's
     /// independent of the order segments happen to finalize in.
@@ -218,6 +235,13 @@ final class LiveCaptureProcessor: ObservableObject {
         }.value
 
         staged.append(outcome)
+        // Retain the write inputs so an end-of-session rotation review can regenerate this segment.
+        retained[groupId] = RetainedSegment(
+            groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
+            pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
+            writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
+            boxLabelText: gType == .box ? texts.first : nil,
+            outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
         persistManifest()
         for p in group.photos { pageTasks[p.id] = nil }   // free memory
         let anyText = results.contains { $0.text != nil }
@@ -252,6 +276,27 @@ final class LiveCaptureProcessor: ObservableObject {
         let sourceURL: URL
         let result: OCRResult
         let priority: String?
+    }
+
+    /// All inputs to `writeSegmentFiles` for one finalized segment, retained so the end-of-session
+    /// rotation review can regenerate it with corrected page rotation.
+    private struct RetainedSegment: Sendable {
+        let groupId: String
+        let type: CaptureGroupType
+        let collectionKey: String
+        let order: Int
+        var pages: [PageWork]        // var: page rotation is updated before regeneration
+        let baseTags: [String]
+        let doMerge: Bool
+        let model: LLMModel
+        let gatewayName: String?
+        let writeJSON: Bool
+        let jsonTags: GeneratedTags
+        let texts: [String]
+        let boxLabelText: String?
+        let outputImageFile: Bool
+        let pdfImageMB: Double
+        let exportedImageMB: Double
     }
 
     nonisolated private static func writeSegmentFiles(
@@ -382,6 +427,82 @@ final class LiveCaptureProcessor: ObservableObject {
         var photoCount: Int
     }
 
+    // MARK: - End-of-session rotation review (opt-in)
+
+    /// Finish-session entry point. If "Review rotation" is on (and detection isn't Off), present a
+    /// dedicated rotation-review pass over every captured page first; otherwise go straight to naming.
+    func finishSession() {
+        guard let config, !staged.isEmpty else { return }
+        guard config.reviewRotation, config.rotationMode != .off else { beginFinalize(); return }
+        var pages: [RotationReviewPage] = []
+        for seg in retained.values {
+            for (i, p) in seg.pages.enumerated() {
+                pages.append(RotationReviewPage(groupId: seg.groupId, pageIndex: i, order: seg.order,
+                                                sourceURL: p.sourceURL,
+                                                rotationDegrees: p.result.rotationDegrees))
+            }
+        }
+        pages.sort { ($0.order, $0.pageIndex) < ($1.order, $1.pageIndex) }
+        guard !pages.isEmpty else { beginFinalize(); return }
+        rotationReviewPages = pages
+        showRotationReview = true
+    }
+
+    /// Dismiss the rotation review without finalizing (back to capture).
+    func cancelRotationReview() {
+        showRotationReview = false
+        rotationReviewPages = []
+    }
+
+    /// Apply the reviewed rotations: regenerate each changed segment's staged PDF/JPG, then proceed
+    /// to collection naming. Unchanged pages are left untouched.
+    func applyRotationReviewAndFinalize() {
+        showRotationReview = false
+        var changedGroups: Set<String> = []
+        for page in rotationReviewPages {
+            guard var seg = retained[page.groupId], page.pageIndex < seg.pages.count else { continue }
+            let old = seg.pages[page.pageIndex].result.rotationDegrees
+            let new = ((page.rotationDegrees % 360) + 360) % 360
+            guard new != old else { continue }
+            let pw = seg.pages[page.pageIndex]
+            let r = pw.result
+            seg.pages[page.pageIndex] = PageWork(
+                sourceURL: pw.sourceURL,
+                result: OCRResult(text: r.text, classification: r.classification, rotationDegrees: new,
+                                  errorMessage: r.errorMessage, errorCode: r.errorCode),
+                priority: pw.priority)
+            retained[page.groupId] = seg
+            changedGroups.insert(page.groupId)
+        }
+        rotationReviewPages = []
+        guard !changedGroups.isEmpty, let stagingDir else { beginFinalize(); return }
+
+        let segsToRegen = changedGroups.compactMap { retained[$0] }
+        isFinalizing = true
+        Task { [weak self] in
+            let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
+                segsToRegen.map { seg in
+                    Self.writeSegmentFiles(groupId: seg.groupId, type: seg.type, collectionKey: seg.collectionKey,
+                                           order: seg.order, pages: seg.pages, baseTags: seg.baseTags,
+                                           doMerge: seg.doMerge, model: seg.model, gatewayName: seg.gatewayName,
+                                           stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
+                                           texts: seg.texts, boxLabelText: seg.boxLabelText,
+                                           outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
+                                           exportedImageMB: seg.exportedImageMB)
+                }
+            }.value
+            guard let self else { return }
+            for outcome in regenerated {
+                if let idx = self.staged.firstIndex(where: { $0.groupId == outcome.groupId }) {
+                    self.staged[idx] = outcome
+                }
+            }
+            self.persistManifest()
+            self.isFinalizing = false
+            self.beginFinalize()
+        }
+    }
+
     /// Build collection drafts (candidate names + fuzzy-matched existing folders) and show the sheet.
     func beginFinalize() {
         guard let config, !staged.isEmpty else { return }
@@ -422,6 +543,8 @@ final class LiveCaptureProcessor: ObservableObject {
             self.drafts.removeAll()
             self.finalizedGroups.removeAll()
             self.startedPhotoIds.removeAll()
+            self.retained.removeAll()
+            self.rotationReviewPages.removeAll()
             self.currentCollectionKey = "__unfiled__"
             self.showFinalizeSheet = false
             self.isFinalizing = false

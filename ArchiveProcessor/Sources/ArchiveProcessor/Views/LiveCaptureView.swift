@@ -39,6 +39,9 @@ struct LiveCaptureView: View {
         .sheet(isPresented: $liveProc.showFinalizeSheet) {
             CollectionFinalizeSheet(liveProc: liveProc)
         }
+        .sheet(isPresented: $liveProc.showRotationReview) {
+            LiveRotationReviewSheet(liveProc: liveProc)
+        }
     }
 
     // MARK: Left — connection / pairing
@@ -186,7 +189,7 @@ struct LiveCaptureView: View {
                             .buttonStyle(.borderedProminent)
                             .disabled(processor.isProcessing)
                     } else if !liveProc.staged.isEmpty {
-                        Button("Finish session (\(liveProc.staged.count)) →") { liveProc.beginFinalize() }
+                        Button("Finish session (\(liveProc.staged.count)) →") { liveProc.finishSession() }
                             .buttonStyle(.borderedProminent)
                             .disabled(liveProc.isFinalizing)
                     }
@@ -508,5 +511,126 @@ private struct SegmentTagCard: View {
     private func save() {
         session.applyMacTags(groupId: group.id, subjects: subjects,
                              priority: priority, year: Int(yearText), month: month)
+    }
+}
+
+// MARK: - Live end-of-session rotation review
+
+/// Process Live rotation review: a dedicated, keyboard-fast pass over every captured page shown at
+/// Finish (before collection naming). Confirming regenerates the affected staged PDF/JPG with the
+/// corrected rotation; images preview already-oriented.
+struct LiveRotationReviewSheet: View {
+    @ObservedObject var liveProc: LiveCaptureProcessor
+    @State private var thumbnailSize: CGFloat = 320
+    @State private var focusedIndex = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Review Rotation").font(.title2).fontWeight(.semibold)
+                    Text("Keys: \u{2190}\u{2192} or [ ]=Rotate  \u{2191}\u{2193}=Navigate  Return=Continue")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+
+            Divider()
+
+            HStack(spacing: 8) {
+                Image(systemName: "photo.artframe").font(.caption2).foregroundStyle(.secondary)
+                Slider(value: $thumbnailSize, in: 60...800, step: 10)
+                Image(systemName: "photo.artframe").font(.body).foregroundStyle(.secondary)
+                Text("\(Int(thumbnailSize))px").font(.caption2).foregroundStyle(.secondary).frame(width: 40)
+            }
+            .padding(.horizontal).padding(.vertical, 6)
+
+            Divider()
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(liveProc.rotationReviewPages.indices, id: \.self) { idx in
+                            LiveRotationRow(page: $liveProc.rotationReviewPages[idx],
+                                            thumbnailSize: thumbnailSize,
+                                            isFocused: idx == focusedIndex)
+                                .id(idx)
+                                .onTapGesture { focusedIndex = idx }
+                        }
+                    }
+                    .padding()
+                }
+                .onChange(of: focusedIndex) { _, n in withAnimation { proxy.scrollTo(n, anchor: .center) } }
+            }
+
+            Divider()
+
+            HStack {
+                Text("\(liveProc.rotationReviewPages.count) page\(liveProc.rotationReviewPages.count == 1 ? "" : "s")")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel") { liveProc.cancelRotationReview() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Continue") { liveProc.applyRotationReviewAndFinalize() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.return, modifiers: [])
+            }
+            .padding()
+        }
+        .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity, minHeight: 700, idealHeight: 1000, maxHeight: .infinity)
+        .onKeyPress(.upArrow) { if focusedIndex > 0 { focusedIndex -= 1 }; return .handled }
+        .onKeyPress(.downArrow) { if focusedIndex < liveProc.rotationReviewPages.count - 1 { focusedIndex += 1 }; return .handled }
+        .onKeyPress(.leftArrow) { rotate(-90); return .handled }
+        .onKeyPress(.rightArrow) { rotate(90); return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "[")) { _ in rotate(-90); return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "]")) { _ in rotate(90); return .handled }
+    }
+
+    private func rotate(_ delta: Int) {
+        guard focusedIndex < liveProc.rotationReviewPages.count else { return }
+        let cur = liveProc.rotationReviewPages[focusedIndex].rotationDegrees
+        liveProc.rotationReviewPages[focusedIndex].rotationDegrees = (((cur + delta) % 360) + 360) % 360
+    }
+}
+
+private struct LiveRotationRow: View {
+    @Binding var page: LiveCaptureProcessor.RotationReviewPage
+    let thumbnailSize: CGFloat
+    var isFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ArchiveThumbnail(url: page.sourceURL, maxSize: 1000, rotationDegrees: page.rotationDegrees)
+                .frame(width: thumbnailSize, height: thumbnailSize)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(page.sourceURL.lastPathComponent)
+                    .font(.system(size: 11, design: .monospaced))
+                    .lineLimit(1).truncationMode(.middle)
+                    .frame(minWidth: 180, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text("Rotate:").font(.caption).foregroundStyle(.secondary)
+                    ForEach([0, 90, 180, 270], id: \.self) { deg in
+                        Button { page.rotationDegrees = deg } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: page.rotationDegrees == deg ? "largecircle.fill.circle" : "circle")
+                                    .foregroundStyle(page.rotationDegrees == deg ? .orange : .secondary)
+                                    .font(.system(size: 10))
+                                Text("\(deg)°").font(.caption2)
+                                    .foregroundStyle(page.rotationDegrees == deg ? .orange : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4).padding(.horizontal, 8)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 2))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
