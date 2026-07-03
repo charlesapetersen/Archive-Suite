@@ -75,6 +75,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // Arm the shared tagging knobs for this session's writes.
         MacOSTagger.stampUnread = config.taggingMode.stampsUnread
         OCRProcessor.rotationModeForRun = config.rotationMode
+        OCRProcessor.loadStandardImageMB()
 
         loadStagingManifest()   // resume: reload already-staged segments so they're not re-OCR'd
         // Process photos already received (resume after a crash, or "chose live after some capture").

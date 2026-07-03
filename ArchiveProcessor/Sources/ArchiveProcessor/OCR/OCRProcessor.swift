@@ -130,6 +130,29 @@ class OCRProcessor: ObservableObject {
     /// executes at a time, so a static is safe here.
     nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
 
+    /// The "standard" image size (MB) the resolution slider targets. Set once per run from Settings.
+    nonisolated(unsafe) static var standardImageMB: Double = 3.0
+
+    /// Load the standard size from UserDefaults (default 3 MB) — call at run start.
+    static func loadStandardImageMB() {
+        let v = UserDefaults.standard.double(forKey: "standardImageSizeMB")
+        standardImageMB = v > 0 ? v : 3.0
+    }
+
+    /// The resolution slider is a **size target**, not a dimension %: `sizeFraction` (0–1) × the
+    /// standard size gives a target file size; the dimension scale is ~√(target/actual), clamped to
+    /// ≤1 (never upscale). So larger files are downscaled more; files already at/under target are
+    /// left full-resolution. Returns 1.0 (full) at fraction ≥ 1 for average/small files.
+    nonisolated static func targetDimensionScale(forFileAt url: URL, sizeFraction: Double) -> Double {
+        let targetBytes = max(0.01, sizeFraction) * standardImageMB * 1_000_000
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let bytes = (attrs[.size] as? NSNumber)?.doubleValue, bytes > 0 else {
+            return min(1.0, sizeFraction)   // unknown size → treat the fraction as a dimension scale
+        }
+        guard bytes > targetBytes else { return 1.0 }
+        return min(1.0, (targetBytes / bytes).squareRoot())
+    }
+
     /// Source URLs the user removed during segmentation review; excluded from segments, tagging, and output.
     var removedSourceURLs: Set<URL> = []
 
@@ -1002,6 +1025,7 @@ class OCRProcessor: ObservableObject {
         pdfToImageMap = [:]
         removedSourceURLs = []
         Self.rotationModeForRun = rotationMode
+        Self.loadStandardImageMB()
         currentModel = model
         currentGateway = gatewayConfig
         jobs = files.map { OCRJob(sourceURL: $0) }
@@ -1988,22 +2012,26 @@ class OCRProcessor: ObservableObject {
             mode: rotationModeForRun, gatewayConfig: gatewayConfig
         )
 
+        // The incoming `imageScale` is the size-target slider fraction; convert to a per-file
+        // dimension scale (larger files reduced more; average/small files left full-res).
+        let scale = targetDimensionScale(forFileAt: imageURL, sizeFraction: imageScale)
+
         let networkResult: OCRResult
         do {
             if let gateway = gatewayConfig {
                 let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
-                networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+                networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
             } else {
                 switch provider {
                 case .anthropic:
                     let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .gemini:
                     let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: imageScale)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .mistral:
                     let client = MistralClient(apiKey: apiKey, model: model)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: imageScale)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
                 }
             }
         } catch {

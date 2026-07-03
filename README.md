@@ -28,7 +28,7 @@ Process scanned images through any of three LLM providers:
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
-- Image resolution scaling — reduce image resolution (5%–100%) to lower API costs
+- Image resolution scaling — **size-based** (target a fraction of a standard image size; see below) to lower API cost and time, downscaling large files more
 
 ### PDF Output
 
@@ -150,7 +150,16 @@ Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
 ### Settings window (⌘,)
 
-All durable settings live in a native macOS Settings window: provider/model/API mode, API key (Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. A **cost-estimate pane pinned on the right** recomputes live (1,000 files ≈ 3 MB each) as you change settings, so the cost impact of each choice is immediately visible. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
+All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / Gateway, each in the Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
+
+A **pinned pane on the right** recomputes live for 1,000 files (at your standard image size) as you change settings:
+
+- **Cost** — broken out by phase: OCR, **rotation** (LLM rotation calls, which weren't counted before), tagging, and collection ID, with standard and batch totals.
+- **Time** — an estimate of *processing* time (network + LLM generation only, not human interaction), broken out per phase, calibrated from measured latencies and the pipeline's concurrency (OCR 4-wide, tagging 6-wide; rotation overlaps OCR). Interactive (non-batch) processing; batch mode returns asynchronously.
+
+### Size-based image resolution
+
+The image-resolution slider is a **target fraction of a standard image size** (default 3 MB, configurable in Settings), not a fixed percentage of each file's dimensions. At 100% it targets the standard size, so **larger files are downscaled more** while average/small files are left full-resolution — evening out cost and time across a collection.
 
 ### Pre-OCRed PDF Input
 

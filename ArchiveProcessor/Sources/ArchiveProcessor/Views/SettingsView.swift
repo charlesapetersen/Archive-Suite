@@ -26,6 +26,7 @@ struct SettingsView: View {
     @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
     @AppStorage("batchMode") private var batchMode: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
+    @AppStorage("standardImageSizeMB") private var standardImageSizeMB: Double = 3.0
     @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmMajority.rawValue
 
     @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
@@ -42,7 +43,10 @@ struct SettingsView: View {
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @State private var selectedModel: LLMModel
-    @State private var apiKey: String = ""
+    @State private var anthropicKey = ""
+    @State private var geminiKey = ""
+    @State private var mistralKey = ""
+    @State private var gatewayKey = ""
     @State private var showManageModels = false
 
     init() {
@@ -74,36 +78,61 @@ struct SettingsView: View {
             costPane
                 .frame(width: 210)
         }
-        .frame(width: 660, height: 640)
-        .onAppear { apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "" }
+        .frame(width: 680, height: 660)
+        .onAppear {
+            anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
+            geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
+            mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
+            gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
+        }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
     }
 
     // MARK: Fixed cost pane (stays put while the form scrolls)
 
     @ViewBuilder private var costPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Estimated cost").font(.headline)
-            Text("1,000 files (~3 MB each)").font(.caption).foregroundStyle(.secondary)
-            Divider()
+        let tagging = taggingMode.enablesTagging && taggingMode != .copySource
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Estimate — 1,000 files").font(.headline)
+            Text("~\(String(format: "%.2g", standardImageSizeMB)) MB each")
+                .font(.caption2).foregroundStyle(.secondary)
+
             let model = useGateway ? gatewayModel : selectedModel
             if let model {
                 let est = CostEstimator.estimate(
-                    fileCount: 1000, model: model,
-                    enableTagging: taggingMode.enablesTagging && taggingMode != .copySource,
+                    fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage,
-                    contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0)
-                costRow("Standard", est.totalStandardFormatted, bold: true)
-                if batchMode && !useGateway && !preOCRedInput {
-                    costRow("Batch (~50% off)", est.totalBatchFormatted)
+                    contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
+                    rotationMode: rotationMode, useGateway: useGateway)
+                let time = TimeEstimator.estimate(
+                    fileCount: 1000, model: model, rotationMode: rotationMode,
+                    sequentialOCR: contextCharCount > 0, enableTagging: tagging,
+                    enableCollectionSegmentation: enableCollectionSegmentation,
+                    preOCRedInput: preOCRedInput, useGateway: useGateway)
+
+                Divider().padding(.vertical, 2)
+                Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                costRow("Total", est.totalStandardFormatted, bold: true)
+                if batchMode && !useGateway && !preOCRedInput { costRow("Batch", est.totalBatchFormatted) }
+                if !preOCRedInput { costRow("· OCR", est.ocrFormatted) }
+                if est.rotationCost > 0 { costRow("· Rotation", est.rotationFormatted) }
+                if tagging { costRow("· Tagging", est.taggingFormatted) }
+                if enableCollectionSegmentation { costRow("· Collection", est.collectionFormatted) }
+
+                Divider().padding(.vertical, 2)
+                Text("TIME (processing only)").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                costRow("Total", time.totalFormatted, bold: true)
+                if time.ocrSeconds > 0 { costRow("· OCR", time.ocrFormatted) }
+                if time.rotationSeconds > 0 { costRow("· Rotation*", time.rotationFormatted) }
+                if tagging { costRow("· Tagging", time.taggingFormatted) }
+                if enableCollectionSegmentation { costRow("· Collection", time.collectionFormatted) }
+                if time.rotationSeconds > 0 {
+                    Text("*runs during OCR").font(.caption2).foregroundStyle(.tertiary)
                 }
-                Divider()
-                if !preOCRedInput { costRow("OCR", est.ocrFormatted) }
-                if taggingMode.enablesTagging && taggingMode != .copySource { costRow("Tagging", est.taggingFormatted) }
-                if enableCollectionSegmentation { costRow("Collection ID", est.collectionFormatted) }
+
                 Spacer()
-                Text("Recomputes as you change settings. Actual cost varies with content & resolution.")
+                Text("Approximate; varies with model, content & network.")
                     .font(.caption2).foregroundStyle(.tertiary)
             } else {
                 Text("Enter gateway model pricing to estimate cost.").font(.caption).foregroundStyle(.secondary)
@@ -131,7 +160,6 @@ struct SettingsView: View {
                 Text("Direct API").tag(false)
                 Text("API Gateway").tag(true)
             }
-            .onChange(of: useGateway) { _, g in apiKey = KeychainHelper.load(account: g ? "Gateway" : selectedProvider.rawValue) ?? "" }
 
             if useGateway {
                 TextField("Gateway URL", text: $gatewayBaseURL)
@@ -145,7 +173,6 @@ struct SettingsView: View {
                     set: { p in
                         let saved = UserDefaults.standard.string(forKey: "selectedModelId_\(p.rawValue)") ?? ""
                         selectedModel = p.models.first { $0.id == saved } ?? p.models[0]
-                        apiKey = KeychainHelper.load(account: p.rawValue) ?? ""
                         selectedProvider = p
                     })) {
                     ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
@@ -170,17 +197,26 @@ struct SettingsView: View {
 
     @ViewBuilder private var apiKeySection: some View {
         Section {
-            SecureField(useGateway ? "Gateway API key" : "\(selectedProvider.rawValue) API key", text: $apiKey)
-                .onChange(of: apiKey) { _, k in
-                    let account = useGateway ? "Gateway" : selectedProvider.rawValue
-                    let trimmed = k.trimmingCharacters(in: .whitespaces)
-                    if trimmed.isEmpty { KeychainHelper.delete(account: account) } else { KeychainHelper.save(account: account, password: trimmed) }
+            keyField("Anthropic", account: LLMProvider.anthropic.rawValue, text: $anthropicKey)
+            keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
+            keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
+            if useGateway { keyField("Gateway", account: "Gateway", text: $gatewayKey) }
+        } header: {
+            Text("API Keys")
+        } footer: {
+            Label("Each provider's key is stored separately in the macOS Keychain.", systemImage: "lock.shield").font(.caption)
+        }
+    }
+
+    @ViewBuilder private func keyField(_ label: String, account: String, text: Binding<String>) -> some View {
+        HStack {
+            Text(label).frame(width: 84, alignment: .leading)
+            SecureField("\(label) API key", text: text)
+                .onChange(of: text.wrappedValue) { _, k in
+                    let t = k.trimmingCharacters(in: .whitespaces)
+                    if t.isEmpty { KeychainHelper.delete(account: account) } else { KeychainHelper.save(account: account, password: t) }
                     NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
                 }
-        } header: {
-            Text(useGateway ? "Gateway API Key" : "API Key")
-        } footer: {
-            Label("Stored securely in the macOS Keychain.", systemImage: "lock.shield").font(.caption)
         }
     }
 
@@ -188,9 +224,18 @@ struct SettingsView: View {
         Section("Input & Processing") {
             Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
             Toggle("Batch mode (slower, ~50% cheaper)", isOn: $batchMode).disabled(useGateway)
-            VStack(alignment: .leading) {
-                HStack { Text("Image resolution"); Spacer(); Text("\(Int(imageScale))%").foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack { Text("Image resolution"); Spacer(); Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary) }
                 Slider(value: $imageScale, in: 5...100, step: 5)
+                Text("Targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image. Larger files are downscaled more; smaller files are left as-is.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Standard image size")
+                Spacer()
+                TextField("MB", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
+                    .frame(width: 52).multilineTextAlignment(.trailing)
+                Stepper("MB", value: $standardImageSizeMB, in: 0.5...20, step: 0.5)
             }
         }
     }

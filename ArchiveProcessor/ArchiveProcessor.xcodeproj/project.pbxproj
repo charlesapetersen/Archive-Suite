@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		011F7F9B74805B13A5511980 /* PDFTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A2664D8334EA43978AB36E /* PDFTextExtractor.swift */; };
 		023CBF7F217833DD43616689 /* OpenAICompatibleClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FFEA8BB15779B79F02BC246 /* OpenAICompatibleClient.swift */; };
+		05518B7064CEC6295241C6D8 /* TimeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38CA8FA8FFB2CE9849EF964 /* TimeEstimator.swift */; };
 		056A686BFF02B6F62976B184 /* GeminiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */; };
 		0AD6505473A4DEA02474D422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2D4943D879BAE44B746EA /* ContentView.swift */; };
 		1AAD7B5145E74283A0C02556 /* SystemTagsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8789F34022E9F86E6FED252 /* SystemTagsProvider.swift */; };
@@ -85,6 +86,7 @@
 		93F615D9D9C926B7805A3ED2 /* LLMRotationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRotationDetector.swift; sourceTree = "<group>"; };
 		9476E18160E1111CE717B515 /* BoxFolderConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoxFolderConfirmSheet.swift; sourceTree = "<group>"; };
 		9B3E42E4C08CDBC05B7F9AFB /* CaptureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModels.swift; sourceTree = "<group>"; };
+		A38CA8FA8FFB2CE9849EF964 /* TimeEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEstimator.swift; sourceTree = "<group>"; };
 		A662257BABACAA6C78DA8969 /* ManualTaggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTaggingSheet.swift; sourceTree = "<group>"; };
 		A90F6E42E4FA19C125CC1A0A /* TagGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagGenerator.swift; sourceTree = "<group>"; };
 		AA476D0BECB92F4AE6714A78 /* CaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSession.swift; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 				37F83CEC4FA203D3AD7F69AB /* CostEstimator.swift */,
 				1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */,
 				C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */,
+				A38CA8FA8FFB2CE9849EF964 /* TimeEstimator.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -341,6 +344,7 @@
 				1AAD7B5145E74283A0C02556 /* SystemTagsProvider.swift in Sources */,
 				DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */,
 				F1D78EE6F5E76BC734023CAB /* TagInputField.swift in Sources */,
+				05518B7064CEC6295241C6D8 /* TimeEstimator.swift in Sources */,
 				4DF4EC8B061213FFD0C667D3 /* ToolsView.swift in Sources */,
 				7FD5C6773B4EA10A947EED51 /* USBBridge.swift in Sources */,
 				7A1DAF60930B3EFECB9D83D0 /* ZoomableImageView.swift in Sources */,

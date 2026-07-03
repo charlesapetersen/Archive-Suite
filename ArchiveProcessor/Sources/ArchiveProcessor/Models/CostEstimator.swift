@@ -5,17 +5,19 @@ struct CostEstimate {
     let classificationCost: Double
     let taggingCost: Double
     let collectionCost: Double
+    let rotationCost: Double
     let batchOcrCost: Double
     let fileCount: Int
     let model: LLMModel
 
-    var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost }
-    var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost }
+    var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost + rotationCost }
+    var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost + rotationCost }
 
     var ocrFormatted: String { "$\(String(format: "%.4f", ocrCost))" }
     var classificationFormatted: String { "$\(String(format: "%.4f", classificationCost))" }
     var taggingFormatted: String { "$\(String(format: "%.4f", taggingCost))" }
     var collectionFormatted: String { "$\(String(format: "%.4f", collectionCost))" }
+    var rotationFormatted: String { "$\(String(format: "%.4f", rotationCost))" }
     var totalStandardFormatted: String { "$\(String(format: "%.4f", totalStandard))" }
     var totalBatchFormatted: String { "$\(String(format: "%.4f", totalBatch))" }
 }
@@ -51,6 +53,25 @@ struct CostEstimator {
     static let estimatedClassificationInputTokens: Double = 600
     static let estimatedClassificationOutputTokens: Double = 10
 
+    // Rotation (LLM comparative call): 4 downscaled (~800px) candidate images + a short prompt,
+    // one letter of output. `.llmSingle` = 1 call/file, `.llmMajority` = 3 calls/file. Always runs
+    // on a fixed cheap model (gemini-2.5-flash-lite for Gemini, claude-sonnet-4-6 for Anthropic);
+    // Gateway/Mistral fall back to free local Vision.
+    static let estimatedRotationPromptTokens: Double = 90
+    static let estimatedRotationOutputTokens: Double = 5
+    static func estimatedRotationCandidateTokens(for provider: LLMProvider) -> Double {
+        provider == .anthropic ? 650 : 600     // per 800px candidate image
+    }
+    /// (inputCostPer1M, outputCostPer1M) of the fixed model used for rotation, or nil if rotation
+    /// is free/unavailable for this provider.
+    static func rotationModelCost(for provider: LLMProvider) -> (Double, Double)? {
+        switch provider {
+        case .gemini: return (0.0375, 0.15)     // gemini-2.5-flash-lite
+        case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
+        case .mistral: return nil               // no LLM rotation path → local Vision (free)
+        }
+    }
+
     static func estimate(
         fileCount: Int,
         model: LLMModel,
@@ -59,14 +80,17 @@ struct CostEstimator {
         preOCRedInput: Bool = false,
         sendPreviousImage: Bool,
         contextCharCount: Int,
-        imageScale: Double = 1.0
+        imageScale: Double = 1.0,
+        rotationMode: RotationMode = .off,
+        useGateway: Bool = false
     ) -> CostEstimate {
-        // OCR cost (zero when using pre-OCRed PDFs)
+        // OCR cost (zero when using pre-OCRed PDFs).
+        // `imageScale` is the size-target slider fraction; for a standard-size file it equals the
+        // image *area* fraction (target size ∝ area), so image tokens scale linearly with it.
         var ocrCost: Double = 0
         var batchOcrCost: Double = 0
         if !preOCRedInput {
-            // Image tokens scale with pixel count (area), which is scale²
-            let scaleArea = imageScale * imageScale
+            let scaleArea = imageScale
             let imgTokens = estimatedImageTokens(for: model.provider) * scaleArea
             let contextTokens = Double(contextCharCount) / 4.0 // ~4 chars per token
             let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
@@ -109,11 +133,23 @@ struct CostEstimator {
                            + ((boxOutput + clusterOutput) / 1_000_000) * model.outputCostPer1M
         }
 
+        // Rotation cost (LLM modes only; free for Gateway/Mistral/local Vision/off; none for pre-OCRed).
+        var rotationCost: Double = 0
+        let rotCalls = rotationMode.orderings
+        if rotCalls > 0, !preOCRedInput, !useGateway,
+           let (rIn, rOut) = rotationModelCost(for: model.provider) {
+            let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens
+            let calls = Double(fileCount) * Double(rotCalls)
+            rotationCost = (calls * inputPerCall / 1_000_000) * rIn
+                         + (calls * estimatedRotationOutputTokens / 1_000_000) * rOut
+        }
+
         return CostEstimate(
             ocrCost: ocrCost,
             classificationCost: classificationCost,
             taggingCost: taggingCost,
             collectionCost: collectionCost,
+            rotationCost: rotationCost,
             batchOcrCost: batchOcrCost,
             fileCount: fileCount,
             model: model

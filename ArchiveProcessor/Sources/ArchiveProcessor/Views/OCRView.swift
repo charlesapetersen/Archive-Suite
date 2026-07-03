@@ -114,8 +114,21 @@ struct OCRView: View {
             preOCRedInput: preOCRedInput,
             sendPreviousImage: sendPreviousImage,
             contextCharCount: Int(contextCharCount),
-            imageScale: imageScale / 100.0
+            imageScale: imageScale / 100.0,
+            rotationMode: rotationMode,
+            useGateway: useGateway
         )
+    }
+
+    /// Processing-time estimate for the current batch (LLM/processing time only).
+    private var timeEstimate: TimeEstimate? {
+        guard !droppedFiles.isEmpty else { return nil }
+        let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
+        return TimeEstimator.estimate(
+            fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
+            sequentialOCR: contextCharCount > 0, enableTagging: enableTagging,
+            enableCollectionSegmentation: enableCollectionSegmentation,
+            preOCRedInput: preOCRedInput, useGateway: useGateway)
     }
 
     private var gatewayHasCosts: Bool {
@@ -330,6 +343,13 @@ struct OCRView: View {
                                     Text(est.collectionFormatted)
                                 }
                             }
+                            if est.rotationCost > 0 {
+                                HStack {
+                                    Text("Rotation:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.rotationFormatted)
+                                }
+                            }
                             Divider()
                             HStack {
                                 Text("Total (standard):").fontWeight(.medium)
@@ -347,6 +367,16 @@ struct OCRView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
+                            if let t = timeEstimate {
+                                Divider()
+                                HStack {
+                                    Text("Est. time:").fontWeight(.medium)
+                                    Spacer()
+                                    Text(t.totalFormatted).fontWeight(.medium)
+                                }
+                                Text("Processing time only (no user interaction). OCR \(t.ocrFormatted)\(t.rotationSeconds > 0 ? " · rotation \(t.rotationFormatted) (overlaps OCR)" : "")\(enableTagging && !passSourceTags ? " · tagging \(t.taggingFormatted)" : "").")
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                            }
                         }
                         .padding(4)
                     }
