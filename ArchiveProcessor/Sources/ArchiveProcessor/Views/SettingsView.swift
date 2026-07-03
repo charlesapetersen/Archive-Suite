@@ -178,9 +178,14 @@ struct SettingsView: View {
 
     @ViewBuilder private var providerSection: some View {
         Section("Provider & Model") {
-            Picker("API mode", selection: $useGateway) {
+            Picker(selection: $useGateway) {
                 Text("Direct API").tag(false)
                 Text("API Gateway").tag(true)
+            } label: {
+                HStack {
+                    Text("API mode")
+                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint — enter its base URL, model ID, a display name for PDF headers, and optionally per-token pricing (used only for the cost/time estimate). Useful for self-hosted or institutional proxies.")
+                }
             }
 
             if useGateway {
@@ -190,7 +195,7 @@ struct SettingsView: View {
                 TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number)
                 TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number)
             } else {
-                Picker("Provider", selection: Binding(
+                Picker(selection: Binding(
                     get: { selectedProvider },
                     set: { p in
                         let saved = UserDefaults.standard.string(forKey: "selectedModelId_\(p.rawValue)") ?? ""
@@ -198,18 +203,33 @@ struct SettingsView: View {
                         selectedProvider = p
                     })) {
                     ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
+                } label: {
+                    HStack {
+                        Text("Provider")
+                        HelpButton(text: "Which LLM service performs OCR and tagging. Each has its own models, pricing, and API key.")
+                    }
                 }
-                Picker("Model", selection: $selectedModel) {
+                Picker(selection: $selectedModel) {
                     ForEach(models) { m in
                         Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
+                    }
+                } label: {
+                    HStack {
+                        Text("Model")
+                        HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                     }
                 }
                 .onChange(of: selectedModel) { _, m in
                     UserDefaults.standard.set(m.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
                 }
                 if selectedModel.supportsThinking {
-                    Picker("Thinking", selection: $selectedThinking) {
+                    Picker(selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
+                    } label: {
+                        HStack {
+                            Text("Thinking")
+                            HelpButton(text: "Extended reasoning for models that support it. High can improve hard pages but costs more and is slower. Tagging always runs without thinking.")
+                        }
                     }
                 }
                 Button("Manage custom models…") { showManageModels = true }
@@ -245,7 +265,12 @@ struct SettingsView: View {
 
     @ViewBuilder private var inputSection: some View {
         Section("Input & Processing") {
-            Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
+            Toggle(isOn: $preOCRedInput) {
+                HStack {
+                    Text("Pre-OCRed PDF input")
+                    HelpButton(text: "Process PDFs that already contain OCR text (e.g. from a prior run or another tool). Skips OCR API calls and uses the embedded text for tagging and collection ID.")
+                }
+            }
             Toggle(isOn: $batchMode) {
                 HStack {
                     Text("Batch mode (slower, ~50% cheaper)")
@@ -303,13 +328,33 @@ struct SettingsView: View {
                     HelpButton(text: "\(taggingMode.detail)\n\nLinked to the Tagging dropdown in Process Files — changing either updates both. Shown here so you can see the cost/time effect of each mode.")
                 }
             }
-            Toggle("Collection ID + file renaming", isOn: $enableCollectionSegmentation)
+            Toggle(isOn: $enableCollectionSegmentation) {
+                HStack {
+                    Text("Collection ID + file renaming")
+                    HelpButton(text: "Identify archival collections from box-label photos and organize outputs into per-collection folders with sequential names (e.g. “00001 Collection Name.pdf”).")
+                }
+            }
             if enableCollectionSegmentation {
-                Toggle("Confirm identifications before organizing", isOn: $confirmCollectionIDs)
-                Toggle("Review document segmentation", isOn: $reviewDocumentSegmentation)
+                Toggle(isOn: $confirmCollectionIDs) {
+                    HStack {
+                        Text("Confirm identifications before organizing")
+                        HelpButton(text: "Pause before filing so you can review and correct the collection names the model extracted from box labels.")
+                    }
+                }
+                Toggle(isOn: $reviewDocumentSegmentation) {
+                    HStack {
+                        Text("Review document segmentation")
+                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging.")
+                    }
+                }
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
-                Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
+                Toggle(isOn: $enableSegmentJSON) {
+                    HStack {
+                        Text("Export segment JSON metadata")
+                        HelpButton(text: "Write a .json sidecar per document with structured metadata (date, subjects, author/recipient, body text) next to the PDF.")
+                    }
+                }
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")
@@ -327,9 +372,17 @@ struct SettingsView: View {
                     }
                 }
             }
-            Toggle("Merge multi-page documents", isOn: $mergeDocuments)
+            Toggle(isOn: $mergeDocuments) {
+                HStack {
+                    Text("Merge multi-page documents")
+                    HelpButton(text: "Combine a document's continuation pages into one multi-page PDF (each page's image followed by its text) instead of a separate PDF per page.")
+                }
+            }
             VStack(alignment: .leading, spacing: 4) {
-                Text("Custom prompt (optional)").font(.caption)
+                HStack {
+                    Text("Custom prompt (optional)").font(.caption)
+                    HelpButton(text: "Extra instructions appended to the OCR prompt — e.g. “This collection is 1950s legal correspondence.” Helps with unusual documents, languages, or formats.")
+                }
                 TextEditor(text: $customOCRPrompt).font(.caption).frame(height: 50)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
             }
