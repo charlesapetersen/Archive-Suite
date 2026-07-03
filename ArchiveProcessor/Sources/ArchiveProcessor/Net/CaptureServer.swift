@@ -169,8 +169,14 @@ final class CaptureServer: @unchecked Sendable {
                 respond(conn, status: "400 Bad Request", json: ["error": "empty body"])
                 return
             }
-            let groupId = req.headers["x-group"] ?? "default"
-            let seq = Int(req.headers["x-seq"] ?? "") ?? 0
+            // Require an explicit group + numeric seq. Without this, malformed or rogue uploads collapse
+            // to a shared (group:"default", seq:0) key and the idempotent-replace logic silently overwrites
+            // a real photo — a "photo is never lost" violation. The Android client always sends both.
+            guard let groupId = req.headers["x-group"], !groupId.isEmpty,
+                  let seq = (req.headers["x-seq"]).flatMap({ Int($0) }) else {
+                respond(conn, status: "400 Bad Request", json: ["error": "missing or invalid X-Group/X-Seq"])
+                return
+            }
             let type = CaptureGroupType(rawValue: req.headers["x-type"] ?? "document") ?? .document
             let device = req.headers["x-device"]
             // Minimal on-phone tagging (all optional).

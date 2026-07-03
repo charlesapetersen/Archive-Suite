@@ -322,7 +322,8 @@ class OCRProcessor: ObservableObject {
     }
 
     private static var pendingBatchURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("ArchiveProcessor")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("pending_batch.json")
@@ -371,7 +372,8 @@ class OCRProcessor: ObservableObject {
     }
 
     private static var pendingRunURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("ArchiveProcessor")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("pending_run.json")
@@ -1695,6 +1697,7 @@ class OCRProcessor: ObservableObject {
         while !batchComplete {
             guard !Task.isCancelled else { return }
 
+            // Poll every 30s for the first ~5 min (few batches finish faster), then back off to 60s.
             let interval: Duration = pollCount < 10 ? .seconds(30) : .seconds(60)
             try? await Task.sleep(for: interval)
             pollCount += 1
@@ -1822,10 +1825,12 @@ class OCRProcessor: ObservableObject {
             handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
         }
 
-        // Mark any remaining processing jobs as failed (no result returned for them)
+        // Mark any remaining processing jobs as failed (no result returned for them).
+        // Report the filename from the job itself (matches the sibling loop above) rather than
+        // cross-indexing fileURLs, so this stays correct even if the arrays ever diverge.
         for i in jobs.indices where jobs[i].status == .processing {
             jobs[i].status = .failed
-            failedFiles.append(fileURLs[i].lastPathComponent)
+            failedFiles.append(jobs[i].sourceURL.lastPathComponent)
         }
     }
 

@@ -68,7 +68,7 @@ struct GeminiClient {
         }
 
         if let finishReason = first["finishReason"] as? String, finishReason == "RECITATION" {
-            return OCRResult(text: nil, classification: nil, errorMessage: "No text returned by model. Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
         }
 
         guard let content = first["content"] as? [String: Any],

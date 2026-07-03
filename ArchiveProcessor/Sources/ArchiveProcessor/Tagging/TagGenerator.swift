@@ -111,7 +111,7 @@ class TagGenerator: ObservableObject {
 
         Rules:
         - "year": 4-digit year string. ALWAYS provide a year — if not stated in the document, estimate from nearby documents or contextual clues. Never return null for year.
-        - "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
+        - "month": format "MM MonthName" (e.g. "03 March"). Provide ONLY if the month is explicitly stated in THIS document. NEVER infer or estimate the month from context or nearby documents. Return null otherwise.
         - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
         - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
         - "subject_tags": \(vocabulary.isEmpty ? "2–6 general-but-specific subject tags (e.g. \"Democratic Party\", \"taxes\", \"education\", \"transportation\", \"business\", \"literature\", \"economics\", \"foreign policy\", \"civil rights\", \"military\", \"journalism\", \"science\", \"health care\", \"labor unions\"). Do NOT use overly broad terms like \"politics\" or \"history\"." : "2–6 tags chosen ONLY from this controlled vocabulary: [\(vocabulary.map { "\"\($0)\"" }.joined(separator: ", "))]. Use only tags from this list that are relevant to the document. Do not invent new tags.")
@@ -170,7 +170,7 @@ class TagGenerator: ObservableObject {
 
         Rules:
         - "year": 4-digit year string. ALWAYS provide a year — if not stated, estimate from nearby documents or contextual clues. Never null.
-        - "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
+        - "month": format "MM MonthName" (e.g. "03 March"). Provide ONLY if the month is explicitly stated in THIS document. NEVER infer or estimate the month from context or nearby documents. Return null otherwise.
         - "day": format "Day D" (e.g. "Day 15"), or null if not determinable
         - "date_uncertain": true if the year cannot be determined from the document itself (even if estimated from context)
         - Respond with ONLY the JSON object. No commentary.

@@ -229,7 +229,7 @@ struct PDFGenerator {
             headerLine += "\n\(fileName)"
         }
         if let gwName = gatewayDisplayName {
-            headerLine += "\n\(gwName) \u{00B7} \(model.id) \u{00B7} \(dateStr)"
+            headerLine += "\n\(gwName) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
         } else {
             headerLine += "\n\(model.provider.rawValue) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
         }

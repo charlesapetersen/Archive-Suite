@@ -33,7 +33,13 @@ struct MacOSTagger {
 
         // Build NSURLTagNamesKey-compatible array
         // Color tags need special treatment via NSURLLabelNumberKey
-        let colorTagName = filtered.first { $0 == "Red" || $0 == "Purple" || $0 == "Orange" || $0 == "Gray" || $0 == "Green" || $0 == "Blue" || $0 == "Yellow" }
+        // Only Red (box) and Purple (folder) are assigned in real-tagging modes, so restrict color
+        // detection there — otherwise a subject tag that happens to be a color word (e.g. "Green",
+        // "Blue") would be misapplied as a Finder color label. Copy-source mode passes through all colors.
+        let colorNames: Set<String> = stampUnread
+            ? ["Red", "Purple"]
+            : ["Red", "Purple", "Orange", "Gray", "Green", "Blue", "Yellow"]
+        let colorTagName = filtered.first { colorNames.contains($0) }
         let textTags = filtered.filter { $0 != colorTagName }
 
         var allTagNames = textTags
