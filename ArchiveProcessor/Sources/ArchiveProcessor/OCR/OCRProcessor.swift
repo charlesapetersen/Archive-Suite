@@ -557,6 +557,11 @@ class OCRProcessor: ObservableObject {
         pdfToImageMap = [:]
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
+        // Restore the run-time knobs the OCR call reads (startProcessing sets these; resume must too,
+        // or OCR falls back to the default Local Vision rotation — which stalls the parallel workers).
+        Self.rotationModeForRun = rotationMode
+        Self.loadStandardImageMB()
+        removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -698,23 +703,38 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-        // Tagging (before collection segmentation, matching main workflow order)
+        // Tagging (mode-dependent), matching the main workflow — not always automatic.
         if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
             let texts = jobs.map { $0.result?.text ?? "" }
             segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
-            statusMessage = "Found \(segments.count) segments. Generating tags…"
+            statusMessage = "Found \(segments.count) segments. Tagging…"
 
-            await performTaggingPhase(
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                enableSegmentJSON: pending.enableSegmentJSON
-            )
+            switch taggingMode {
+            case .automatic:
+                await performAutomaticTaggingWithReview(
+                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
+                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs
+                )
+            case .autoDate:
+                await performManualTaggingPhase(
+                    mode: taggingMode, provider: pending.provider, model: pending.model,
+                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON
+                )
+            case .human, .autoDateManualSeg:
+                await performManualSegmentAndTag(
+                    autoDate: taggingMode.autoFillsDate,
+                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
+                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs
+                )
+            case .none, .copySource:
+                break
+            }
         }
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
