@@ -6,6 +6,27 @@ extension Notification.Name {
     static let apiKeyChanged = Notification.Name("APIKeyChanged")
 }
 
+/// A small clickable "?" that reveals an explanation in a popover (also shown on hover), so the
+/// settings rows stay uncluttered.
+struct HelpButton: View {
+    let text: String
+    @State private var show = false
+    var body: some View {
+        Button { show.toggle() } label: {
+            Image(systemName: "questionmark.circle").foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(text)
+        .popover(isPresented: $show, arrowEdge: .bottom) {
+            Text(text)
+                .font(.callout)
+                .frame(width: 300, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(14)
+        }
+    }
+}
+
 /// The app's durable settings, shown in a native Settings window (⌘,). Settings are shared with the
 /// Process Files view via the same `@AppStorage`/UserDefaults keys (auto-synced) plus the Keychain
 /// for the API key. The tagging-mode dropdown and the output folder stay in the main UI; the
@@ -203,9 +224,10 @@ struct SettingsView: View {
             keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
             if useGateway { keyField("Gateway", account: "Gateway", text: $gatewayKey) }
         } header: {
-            Text("API Keys")
-        } footer: {
-            Label("Each provider's key is stored separately in the macOS Keychain.", systemImage: "lock.shield").font(.caption)
+            HStack {
+                Text("API Keys")
+                HelpButton(text: "Each provider's key is stored separately and securely in the macOS Keychain. Enter a key for whichever provider(s) you use.")
+            }
         }
     }
 
@@ -226,41 +248,55 @@ struct SettingsView: View {
             Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
             Toggle("Batch mode (slower, ~50% cheaper)", isOn: $batchMode).disabled(useGateway)
             VStack(alignment: .leading, spacing: 4) {
-                HStack { Text("Image resolution"); Spacer(); Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary) }
+                HStack {
+                    Text("Image resolution")
+                    HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution.")
+                    Spacer()
+                    Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary)
+                }
                 Slider(value: $imageScale, in: 5...100, step: 5)
-                Text("Targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image. Larger files are downscaled more; smaller files are left as-is.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             HStack {
                 Text("Standard image size")
+                HelpButton(text: "The reference size the resolution slider targets (default 3 MB). Set it to your collection's typical image size.")
                 Spacer()
-                TextField("MB", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
+                TextField("", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
-                Stepper("MB", value: $standardImageSizeMB, in: 0.5...20, step: 0.5)
+                Text("MB").foregroundStyle(.secondary)
+                Stepper("", value: $standardImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Stepper("Parallel OCR workers: \(ocrWorkerCount)", value: $ocrWorkerCount, in: 1...12)
-                Text("More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
-                    .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("Parallel OCR workers: \(ocrWorkerCount)")
+                HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
+                Spacer()
+                Stepper("", value: $ocrWorkerCount, in: 1...12).labelsHidden()
             }
         }
     }
 
     @ViewBuilder private var rotationSection: some View {
-        Section("Rotation Correction") {
-            Picker("Detect rotation", selection: $rotationModeRaw) {
+        Section {
+            Picker(selection: $rotationModeRaw) {
                 ForEach(RotationMode.allCases) { Text($0.displayName).tag($0.rawValue) }
+            } label: {
+                HStack {
+                    Text("Detect rotation")
+                    HelpButton(text: "\(rotationMode.detail)\n\nTime impact: Off / Local Vision add no LLM time. Single (default) makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
+                }
             }
-            Text(rotationMode.detail).font(.caption).foregroundStyle(.secondary)
-            Text("Time impact: Off / Local Vision add no LLM time. Single (default) makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
-                .font(.caption).foregroundStyle(.secondary)
-        }
+        } header: { Text("Rotation Correction") }
     }
 
     @ViewBuilder private var taggingSection: some View {
         Section {
-            Text("Tagging mode is chosen in the Process Files view. These options apply to it.")
-                .font(.caption).foregroundStyle(.secondary)
+            Picker(selection: $taggingModeRaw) {
+                ForEach(TaggingMode.allCases) { Text($0.displayName).tag($0.rawValue) }
+            } label: {
+                HStack {
+                    Text("Tagging mode")
+                    HelpButton(text: "\(taggingMode.detail)\n\nLinked to the Tagging dropdown in Process Files — changing either updates both. Shown here so you can see the cost/time effect of each mode.")
+                }
+            }
             Toggle("Collection ID + file renaming", isOn: $enableCollectionSegmentation)
             if enableCollectionSegmentation {
                 Toggle("Confirm identifications before organizing", isOn: $confirmCollectionIDs)
@@ -268,14 +304,18 @@ struct SettingsView: View {
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
-                Toggle("Send previous page image (better segmentation, ~2× image cost)", isOn: $sendPreviousImage)
-                if sendPreviousImage {
-                    Text("Gives the model the previous page's full image as segmentation context, while keeping OCR parallel (Gemini/Anthropic).")
-                        .font(.caption).foregroundStyle(.secondary)
+                Toggle(isOn: $sendPreviousImage) {
+                    HStack {
+                        Text("Send previous page image")
+                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Gemini/Anthropic only.")
+                    }
                 }
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Tag vocabulary (optional, one per line)").font(.caption)
+                        HStack {
+                            Text("Tag vocabulary (optional)").font(.caption)
+                            HelpButton(text: "One tag per line. When set, the model chooses subject tags only from this controlled vocabulary. Leave blank for free-form tagging.")
+                        }
                         TextEditor(text: $tagVocabulary).font(.caption).frame(height: 60)
                             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
                     }
@@ -294,14 +334,15 @@ struct SettingsView: View {
 
     @ViewBuilder private var liveCaptureSection: some View {
         Section {
-            Picker("When capturing", selection: $liveProcessingMode) {
+            Picker(selection: $liveProcessingMode) {
                 Text("Stage for later").tag("stage")
                 Text("Process live").tag("live")
+            } label: {
+                HStack {
+                    Text("When capturing")
+                    HelpButton(text: "Stage for later: captures collect in Live Capture; send them to Process Files for a normal batch run.\n\nProcess live: each captured segment is OCR'd, tagged, and turned into a PDF as you shoot (using the settings here); confirm collection names at the end.")
+                }
             }
-            Text(liveProcessingMode == "live"
-                 ? "Each captured segment is OCR'd, tagged, and turned into a PDF as you shoot (using the settings above); confirm collection names at the end."
-                 : "Captures collect in Live Capture; send them to Process Files for a normal batch run.")
-                .font(.caption).foregroundStyle(.secondary)
         } header: {
             Text("Live Capture")
         }
