@@ -71,16 +71,9 @@ struct OCRView: View {
     init(processor: OCRProcessor) {
         _processor = ObservedObject(wrappedValue: processor)
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
-        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
-        _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
+        _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
         _apiKey = State(initialValue: "")
-
-        if let path = UserDefaults.standard.string(forKey: "outputDirectory"),
-           FileManager.default.fileExists(atPath: path) {
-            _outputDirectory = State(initialValue: URL(fileURLWithPath: path))
-        } else {
-            _outputDirectory = State(initialValue: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first)
-        }
+        _outputDirectory = State(initialValue: ModelSelectionStore.savedOutputDirectory())
     }
 
     private var currentGatewayConfig: GatewayConfig? {
@@ -195,7 +188,7 @@ struct OCRView: View {
             if let path = UserDefaults.standard.string(forKey: "outputDirectory"), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
-            let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(selectedProvider.rawValue)") ?? ""
+            let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
             if let m = currentModels.first(where: { $0.id == modelId }) { selectedModel = m }
         }
         .sheet(isPresented: $showKeychainSheet) {
@@ -220,7 +213,7 @@ struct OCRView: View {
             ManualSegmentTagView(processor: processor)
         }
         .onChange(of: selectedModel) { _, newModel in
-            UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
+            ModelSelectionStore.saveModel(newModel, for: selectedProvider)
         }
         .onChange(of: apiKey) { _, newKey in
             let account = useGateway ? "Gateway" : selectedProvider.rawValue
@@ -231,7 +224,7 @@ struct OCRView: View {
             }
         }
         .onChange(of: outputDirectory) { _, newDir in
-            UserDefaults.standard.set(newDir?.path, forKey: "outputDirectory")
+            ModelSelectionStore.saveOutputDirectory(newDir)
         }
     }
 
@@ -1354,50 +1347,7 @@ struct CollectionReviewRow: View {
             guard let doc = PDFKit.PDFDocument(url: url), let page = doc.page(at: 0) else { return nil }
             return page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
         }
-        let data: Data? = await Task.detached(priority: .userInitiated) {
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                      kCGImageSourceThumbnailMaxPixelSize: maxSize,
-                      kCGImageSourceCreateThumbnailFromImageAlways: true,
-                      kCGImageSourceCreateThumbnailWithTransform: true
-                  ] as CFDictionary) else { return nil }
-            let out = NSMutableData()
-            guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
-            CGImageDestinationAddImage(dest, cg, nil)
-            guard CGImageDestinationFinalize(dest) else { return nil }
-            return out as Data
-        }.value
-        return data.flatMap { NSImage(data: $0) }
-    }
-
-    private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {
-        // For PDFs, render first page
-        if url.pathExtension.lowercased() == "pdf" {
-            guard let doc = PDFKit.PDFDocument(url: url),
-                  let page = doc.page(at: 0) else { return nil }
-            let bounds = page.bounds(for: .mediaBox)
-            let scale = CGFloat(maxSize) / max(bounds.width, bounds.height)
-            let size = NSSize(width: bounds.width * scale, height: bounds.height * scale)
-            let image = NSImage(size: size)
-            image.lockFocus()
-            if let context = NSGraphicsContext.current?.cgContext {
-                context.setFillColor(CGColor.white)
-                context.fill(CGRect(origin: .zero, size: size))
-                context.scaleBy(x: scale, y: scale)
-                page.draw(with: .mediaBox, to: context)
-            }
-            image.unlockFocus()
-            return image
-        }
-        // For images, use ImageIO thumbnail generation
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceThumbnailMaxPixelSize: maxSize,
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true
-        ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        return await ArchiveThumbnail.loadImageThumbnail(url: url, maxSize: maxSize)
     }
 
     private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
@@ -1764,48 +1714,7 @@ struct DocumentReviewRow: View {
             guard let doc = PDFKit.PDFDocument(url: url), let page = doc.page(at: 0) else { return nil }
             return page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
         }
-        let data: Data? = await Task.detached(priority: .userInitiated) {
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                      kCGImageSourceThumbnailMaxPixelSize: maxSize,
-                      kCGImageSourceCreateThumbnailFromImageAlways: true,
-                      kCGImageSourceCreateThumbnailWithTransform: true
-                  ] as CFDictionary) else { return nil }
-            let out = NSMutableData()
-            guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
-            CGImageDestinationAddImage(dest, cg, nil)
-            guard CGImageDestinationFinalize(dest) else { return nil }
-            return out as Data
-        }.value
-        return data.flatMap { NSImage(data: $0) }
-    }
-
-    private func loadThumbnail(url: URL, maxSize: Int) -> NSImage? {
-        if url.pathExtension.lowercased() == "pdf" {
-            guard let doc = PDFKit.PDFDocument(url: url),
-                  let page = doc.page(at: 0) else { return nil }
-            let bounds = page.bounds(for: .mediaBox)
-            let scale = CGFloat(maxSize) / max(bounds.width, bounds.height)
-            let size = NSSize(width: bounds.width * scale, height: bounds.height * scale)
-            let image = NSImage(size: size)
-            image.lockFocus()
-            if let context = NSGraphicsContext.current?.cgContext {
-                context.setFillColor(CGColor.white)
-                context.fill(CGRect(origin: .zero, size: size))
-                context.scaleBy(x: scale, y: scale)
-                page.draw(with: .mediaBox, to: context)
-            }
-            image.unlockFocus()
-            return image
-        }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceThumbnailMaxPixelSize: maxSize,
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true
-        ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        return await ArchiveThumbnail.loadImageThumbnail(url: url, maxSize: maxSize)
     }
 
     private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {

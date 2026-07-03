@@ -10,7 +10,7 @@ struct MistralClient {
     /// Mistral OCR uses a dedicated endpoint that only returns text.
     /// Classification is done via text heuristics since the OCR endpoint doesn't support custom prompts.
     func ocr(imageURL: URL, previousText: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
-        guard let jpegData = GeminiClient.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()

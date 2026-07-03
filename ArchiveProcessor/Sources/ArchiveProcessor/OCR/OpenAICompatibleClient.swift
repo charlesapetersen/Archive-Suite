@@ -12,7 +12,7 @@ struct OpenAICompatibleClient {
     }
 
     func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
-        guard let jpegData = GeminiClient.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
@@ -20,7 +20,7 @@ struct OpenAICompatibleClient {
 
         var contentParts: [[String: Any]] = []
 
-        if let prevURL = previousImageURL, let prevData = GeminiClient.loadImageAsJPEG(url: prevURL, scale: imageScale) {
+        if let prevURL = previousImageURL, let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale) {
             contentParts.append([
                 "type": "image_url",
                 "image_url": ["url": "data:image/jpeg;base64,\(prevData.base64EncodedString())"]

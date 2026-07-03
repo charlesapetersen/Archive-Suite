@@ -1,5 +1,18 @@
 import Foundation
 
+/// Shared HTTP error-body → message parsing for the batch clients. Checks a top-level `message`
+/// first (Mistral's shape), then nested `error.message` (Anthropic/Gemini). Anthropic and Gemini
+/// error bodies carry no top-level `message`, so this is behavior-identical to their prior
+/// nested-only parsing — it simply also covers Mistral's top-level form.
+private func parseBatchErrorBody(data: Data, statusCode: Int) -> String {
+    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        if let message = json["message"] as? String { return message }
+        if let error = json["error"] as? [String: Any],
+           let message = error["message"] as? String { return message }
+    }
+    return "API error (\(statusCode))"
+}
+
 // MARK: - Anthropic Batch Client
 
 struct AnthropicBatchClient: Sendable {
@@ -14,7 +27,7 @@ struct AnthropicBatchClient: Sendable {
         var requests: [[String: Any]] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
@@ -25,7 +38,7 @@ struct AnthropicBatchClient: Sendable {
             var content: [[String: Any]] = []
 
             if sendPreviousImage && index > 0,
-               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
+               let prevData = ImageEncoding.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
                 content.append([
                     "type": "image",
                     "source": [
@@ -85,7 +98,7 @@ struct AnthropicBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = Self.parseErrorBody(data: data, statusCode: http.statusCode)
+            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
             throw OCRError.networkError(errorMsg)
         }
 
@@ -189,15 +202,6 @@ struct AnthropicBatchClient: Sendable {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         _ = try? await NetworkSession.data(for: request)
     }
-
-    private static func parseErrorBody(data: Data, statusCode: Int) -> String {
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String {
-            return message
-        }
-        return "API error (\(statusCode))"
-    }
 }
 
 // MARK: - Gemini Batch Client
@@ -222,7 +226,7 @@ struct GeminiBatchClient: Sendable {
         var jsonlLines: [String] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let prompt = OCRPrompt.build(
                 previousText: nil,
@@ -233,7 +237,7 @@ struct GeminiBatchClient: Sendable {
             var parts: [[String: Any]] = []
 
             if sendPreviousImage && index > 0,
-               let prevData = GeminiClient.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
+               let prevData = ImageEncoding.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
                 parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
             }
 
@@ -367,7 +371,7 @@ struct GeminiBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = Self.parseErrorBody(data: data, statusCode: http.statusCode)
+            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
             throw OCRError.networkError(errorMsg)
         }
 
@@ -595,15 +599,6 @@ struct GeminiBatchClient: Sendable {
         request.httpMethod = "POST"
         _ = try? await NetworkSession.data(for: request)
     }
-
-    private static func parseErrorBody(data: Data, statusCode: Int) -> String {
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String {
-            return message
-        }
-        return "API error (\(statusCode))"
-    }
 }
 
 // MARK: - Mistral Batch Client
@@ -621,7 +616,7 @@ struct MistralBatchClient: Sendable {
         var jsonlLines: [String] = []
 
         for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = GeminiClient.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let dataURI = "data:image/jpeg;base64,\(base64)"
 
@@ -673,7 +668,7 @@ struct MistralBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = Self.parseErrorBody(data: data, statusCode: http.statusCode)
+            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
             throw OCRError.networkError(errorMsg)
         }
 
@@ -796,14 +791,5 @@ struct MistralBatchClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         _ = try? await NetworkSession.data(for: request)
-    }
-
-    private static func parseErrorBody(data: Data, statusCode: Int) -> String {
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let message = json["message"] as? String { return message }
-            if let error = json["error"] as? [String: Any],
-               let message = error["message"] as? String { return message }
-        }
-        return "API error (\(statusCode))"
     }
 }

@@ -24,52 +24,55 @@ struct PDFGenerator {
     // MARK: - Image Page
 
     private func makeImagePage(imageURL: URL, rotationDegrees: Int = 0) -> PDFPage? {
-        guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
+        guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else { return nil }
 
-        let imageWidth = cgImage.width
-        let imageHeight = cgImage.height
-
-        // Get JPEG data — use original bytes if already JPEG with normal orientation and no LLM rotation needed
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
         let orientation = properties?[kCGImagePropertyOrientation] as? Int ?? 1
         let sourceType = CGImageSourceGetType(imageSource) as? String
+        let noRotation = rotationDegrees == 0 || rotationDegrees % 360 == 0
 
         let jpegData: Data
         let embedWidth: Int
         let embedHeight: Int
+        let colorSpace: String
 
-        // First, resolve EXIF orientation to get a correctly-oriented base image
-        let baseImage: CGImage
-        if sourceType == "public.jpeg" && orientation == 1 {
-            baseImage = cgImage
-        } else {
-            let thumbOptions: [CFString: Any] = [
-                kCGImageSourceThumbnailMaxPixelSize: max(imageWidth, imageHeight),
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true
-            ]
-            guard let oriented = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbOptions as CFDictionary) else { return nil }
-            baseImage = oriented
-        }
-
-        // Apply LLM-detected rotation if needed
-        let finalImage: CGImage
-        if rotationDegrees == 0 || rotationDegrees % 360 == 0 {
-            finalImage = baseImage
-        } else {
-            guard let rotated = Self.rotateImage(baseImage, byDegrees: rotationDegrees) else { return nil }
-            finalImage = rotated
-        }
-
-        // Encode final image as JPEG
-        // Optimization: if no rotation and source was normal-orientation JPEG, use raw bytes
-        if rotationDegrees == 0 && sourceType == "public.jpeg" && orientation == 1 {
-            guard let data = try? Data(contentsOf: imageURL) else { return nil }
+        if noRotation && sourceType == "public.jpeg" && orientation == 1 {
+            // Fast path: embed the original JPEG bytes as-is — the full bitmap is never decoded.
+            // Width/height/color-model come straight from the file header.
+            guard let data = try? Data(contentsOf: imageURL),
+                  let w = properties?[kCGImagePropertyPixelWidth] as? Int,
+                  let h = properties?[kCGImagePropertyPixelHeight] as? Int else { return nil }
             jpegData = data
-            embedWidth = finalImage.width
-            embedHeight = finalImage.height
+            embedWidth = w
+            embedHeight = h
+            colorSpace = Self.pdfColorSpace(forColorModel: properties?[kCGImagePropertyColorModel] as? String)
         } else {
+            // Slow path: decode, resolve EXIF orientation, apply any LLM rotation, then re-encode as JPEG.
+            guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
+            let imageWidth = cgImage.width
+            let imageHeight = cgImage.height
+
+            let baseImage: CGImage
+            if sourceType == "public.jpeg" && orientation == 1 {
+                baseImage = cgImage
+            } else {
+                let thumbOptions: [CFString: Any] = [
+                    kCGImageSourceThumbnailMaxPixelSize: max(imageWidth, imageHeight),
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true
+                ]
+                guard let oriented = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbOptions as CFDictionary) else { return nil }
+                baseImage = oriented
+            }
+
+            let finalImage: CGImage
+            if noRotation {
+                finalImage = baseImage
+            } else {
+                guard let rotated = Self.rotateImage(baseImage, byDegrees: rotationDegrees) else { return nil }
+                finalImage = rotated
+            }
+
             let buf = NSMutableData()
             guard let dest = CGImageDestinationCreateWithData(buf, "public.jpeg" as CFString, 1, nil) else { return nil }
             CGImageDestinationAddImage(dest, finalImage, [kCGImageDestinationLossyCompressionQuality: 0.90] as CFDictionary)
@@ -77,18 +80,17 @@ struct PDFGenerator {
             jpegData = buf as Data
             embedWidth = finalImage.width
             embedHeight = finalImage.height
+
+            // Detect color space from the final (possibly rotated) image.
+            let numComponents = finalImage.colorSpace?.numberOfComponents ?? 3
+            switch numComponents {
+            case 1: colorSpace = "/DeviceGray"
+            case 4: colorSpace = "/DeviceCMYK"
+            default: colorSpace = "/DeviceRGB"
+            }
         }
 
         guard !jpegData.isEmpty else { return nil }
-
-        // Detect color space from the final (possibly rotated) image
-        let numComponents = finalImage.colorSpace?.numberOfComponents ?? 3
-        let colorSpace: String
-        switch numComponents {
-        case 1: colorSpace = "/DeviceGray"
-        case 4: colorSpace = "/DeviceCMYK"
-        default: colorSpace = "/DeviceRGB"
-        }
 
         // Calculate positioning centered on letter-size page
         let pageWidth = 612.0
@@ -110,6 +112,16 @@ struct PDFGenerator {
 
         guard let doc = PDFDocument(data: pdfBytes) else { return nil }
         return doc.page(at: 0)
+    }
+
+    /// Maps a CGImageSource color model (kCGImagePropertyColorModel*) to the PDF /ColorSpace name.
+    /// Equivalent to the decoded-image `numberOfComponents` mapping used on the slow path
+    /// (Gray→1, CMYK→4, RGB/other→3), but derived from the file header without a full decode.
+    private static func pdfColorSpace(forColorModel model: String?) -> String {
+        guard let model else { return "/DeviceRGB" }
+        if model == (kCGImagePropertyColorModelGray as String) { return "/DeviceGray" }
+        if model == (kCGImagePropertyColorModelCMYK as String) { return "/DeviceCMYK" }
+        return "/DeviceRGB"
     }
 
     /// Constructs raw PDF bytes with the JPEG data embedded as a DCTDecode image stream.

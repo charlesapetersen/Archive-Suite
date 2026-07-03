@@ -73,8 +73,7 @@ struct SettingsView: View {
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
-        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
-        _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
+        _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
     }
 
     private var models: [LLMModel] {
@@ -202,8 +201,7 @@ struct SettingsView: View {
                 Picker(selection: Binding(
                     get: { selectedProvider },
                     set: { p in
-                        let saved = UserDefaults.standard.string(forKey: "selectedModelId_\(p.rawValue)") ?? ""
-                        selectedModel = p.models.first { $0.id == saved } ?? p.models[0]
+                        selectedModel = ModelSelectionStore.savedModel(for: p)
                         selectedProvider = p
                     })) {
                     ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
@@ -224,7 +222,7 @@ struct SettingsView: View {
                     }
                 }
                 .onChange(of: selectedModel) { _, m in
-                    UserDefaults.standard.set(m.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
+                    ModelSelectionStore.saveModel(m, for: selectedProvider)
                 }
                 if selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {

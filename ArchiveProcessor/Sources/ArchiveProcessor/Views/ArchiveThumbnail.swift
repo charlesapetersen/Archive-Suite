@@ -40,6 +40,13 @@ struct ArchiveThumbnail: View {
         if url.pathExtension.lowercased() == "pdf" {
             return load(url: url, maxSize: maxSize)
         }
+        return await loadImageThumbnail(url: url, maxSize: maxSize)
+    }
+
+    /// Decode a raster image to a downscaled thumbnail off the main actor (via a detached task) and
+    /// return an NSImage on the caller's actor. Shared by `loadAsync` and the review-row loaders so a
+    /// burst of thumbnails never blocks the UI. Callers handle PDFs themselves (page rendering differs).
+    static func loadImageThumbnail(url: URL, maxSize: Int) async -> NSImage? {
         let data: Data? = await Task.detached(priority: .userInitiated) {
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [

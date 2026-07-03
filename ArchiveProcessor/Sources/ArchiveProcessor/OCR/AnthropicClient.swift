@@ -9,7 +9,7 @@ struct AnthropicClient {
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
     func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
-        guard let jpegData = GeminiClient.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
@@ -18,7 +18,7 @@ struct AnthropicClient {
         var content: [[String: Any]] = []
 
         // If sending previous image, add it first
-        if let prevURL = previousImageURL, let prevData = GeminiClient.loadImageAsJPEG(url: prevURL, scale: imageScale) {
+        if let prevURL = previousImageURL, let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale) {
             content.append(["type": "image", "source": [
                 "type": "base64",
                 "media_type": "image/jpeg",

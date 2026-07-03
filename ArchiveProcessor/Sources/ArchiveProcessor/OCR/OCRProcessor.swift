@@ -2051,8 +2051,13 @@ class OCRProcessor: ObservableObject {
     }
 
     private static func isTimeoutError(_ result: OCRResult) -> Bool {
-        result.errorMessage?.lowercased().contains("timed out") == true
-            || result.errorCode?.lowercased().contains("timeout") == true
+        if result.errorMessage?.lowercased().contains("timed out") == true
+            || result.errorCode?.lowercased().contains("timeout") == true { return true }
+        // Providers also surface timeouts as HTTP 408 (Request Timeout) / 504 (Gateway Timeout)
+        // without those words. Excludes 503 (overload) — NetworkSession already retries/backs those off,
+        // and this drives a bare one-shot retry (max one extra attempt per file), so no double-counting.
+        if let code = result.errorCode, code == "408" || code == "504" { return true }
+        return false
     }
 
     /// Single-image OCR + concurrent rotation detection, merged into one result. Reused by the
