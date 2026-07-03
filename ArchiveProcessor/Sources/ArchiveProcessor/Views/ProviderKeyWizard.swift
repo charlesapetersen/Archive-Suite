@@ -94,7 +94,7 @@ private struct ProviderKeyStep: View {
                     else { SecureField("\(spec.displayName) API key", text: $key) }
                 }
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: key) { _, _ in status = nil }
+                .onChange(of: key) { _, _ in status = nil; testStatus = nil }
                 Button { reveal.toggle() } label: { Image(systemName: reveal ? "eye.slash" : "eye") }
                     .buttonStyle(.borderless)
                 #if canImport(AppKit)
@@ -142,6 +142,7 @@ private struct ProviderKeyStep: View {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         validating = true
         status = nil
+        testStatus = nil
         Task {
             let result = await spec.validate(trimmed)
             validating = false

@@ -104,13 +104,18 @@ struct SettingsView: View {
                 .frame(width: 210)
         }
         .frame(width: 680, height: 660)
-        .onAppear {
-            anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
-            geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
-            mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
-            gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
-        }
+        .onAppear { reloadKeys() }
+        .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
+    }
+
+    /// Reload the key fields from the Keychain — on appear and whenever a key changes (e.g. the guided
+    /// wizard saves one), so the SecureFields stay in sync with the "Validated"/"Saved" chips.
+    private func reloadKeys() {
+        anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
+        geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
+        mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
+        gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
     }
 
     // MARK: Fixed cost pane (stays put while the form scrolls)
@@ -269,6 +274,9 @@ struct SettingsView: View {
             SecureField("\(label) API key", text: text)
                 .onChange(of: text.wrappedValue) { _, k in
                     let t = k.trimmingCharacters(in: .whitespaces)
+                    // Ignore programmatic reloads (e.g. after the wizard saves, or on appear): if the value
+                    // already matches the Keychain, don't re-save, clear the Validated flag, or loop notices.
+                    if t == (KeychainHelper.load(account: account) ?? "") { return }
                     if t.isEmpty { KeychainHelper.delete(account: account) } else { KeychainHelper.save(account: account, password: t) }
                     UserDefaults.standard.set(false, forKey: "keyValidated_\(account)")   // manual edit → needs re-validation
                     NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
