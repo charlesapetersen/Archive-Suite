@@ -42,22 +42,36 @@ struct ManualTagImage: Identifiable {
 
 // MARK: - Manual Segmentation + Tagging (fully human mode)
 
-/// One image in the fully-manual segmentation UI.
-struct ManualSegImage: Identifiable {
-    let id = UUID()
-    let fileIndex: Int          // index into the run's `files` array
-    let url: URL
-    let rotationDegrees: Int
-    let isBoxOrFolder: Bool      // locked single-image segment, never tagged
+/// The kind of a photo in the manual segmentation UI. Box/folder photos are dividers that
+/// receive only a color tag; documents are grouped into tagged segments.
+enum ManualPhotoKind: Hashable { case document, box, folder
+    var isBoxOrFolder: Bool { self != .document }
 }
 
-/// Date + subject tags the user enters for one manually-defined segment.
+/// One image in the fully-manual segmentation UI. Rotation and kind are user-editable.
+struct ManualSegImage: Identifiable {
+    let id = UUID()
+    let fileIndex: Int          // stable index into the run's `files`/`jobs` arrays — the key
+    let url: URL
+    var rotationDegrees: Int
+    var kind: ManualPhotoKind
+}
+
+/// A document segment the user has identified and tagged. Its pages drop out of the viewer.
+struct CompletedManualSegment: Identifiable {
+    let id = UUID()
+    let indices: [Int]          // ordered indices into `manualSegImages`; first is the segment start
+    var tags: SegmentTagData
+}
+
+/// Date + subject tags the user enters for one manually-defined segment. (The trailing "Unread"
+/// tag is added automatically by `MacOSTagger.applyTags` in stamping modes, so it is not seeded here.)
 struct SegmentTagData {
     var year: String = ""
     var month: String = ""      // "MM Month"
     var day: String = ""        // "Day D"
     var dateUncertain: Bool = false
-    var subjectTags: [String] = ["Unread"]
+    var subjectTags: [String] = []
 }
 
 /// One document segment presented for manual/human tagging (feature 6).
@@ -188,18 +202,31 @@ class OCRProcessor: ObservableObject {
     @Published var awaitingManualTagging = false
     private var manualTaggingContinuation: CheckedContinuation<Void, Never>?
 
-    /// Fully-manual segmentation + tagging review state (human mode)
+    /// Fully-manual segmentation + tagging review state (human / autoDateManualSeg modes).
+    /// Progressive "consume-as-you-go": the user reviews rotation + box/folder, identifies each
+    /// document segment by marking where it ends, then tags it — the tagged pages then drop out.
+    /// `manualSegImages` is the immutable ordered backing store; all session state below indexes
+    /// into it (array indices are stable for the session; `fileIndex` is used only at apply-back).
     @Published var manualSegImages: [ManualSegImage] = []
-    /// Parallel to `manualSegImages`: whether each image starts a new segment (a boundary).
-    @Published var manualSegIsStart: [Bool] = []
-    /// Tag data keyed by the segment's start index (into `manualSegImages`).
-    @Published var manualSegTags: [Int: SegmentTagData] = [:]
+    /// Array indices assigned to a completed (tagged) segment — dropped from the viewer.
+    @Published var manualSegConsumed: Set<Int> = []
+    /// Array indices flagged for removal (file ops deferred to Finish, so restore is a pure toggle).
+    @Published var manualSegRemoved: Set<Int> = []
+    /// The document segments the user has already identified and tagged.
+    @Published var manualSegCompleted: [CompletedManualSegment] = []
+    /// The photo currently shown large (an index into `manualSegImages`).
     @Published var manualSegFocus = 0
+    /// The pending segment currently open in the tag card (array-index range), or nil while browsing.
+    @Published var manualSegTaggingRange: ClosedRange<Int>? = nil
+    /// The editable tag data for the pending segment shown in the tag card.
+    @Published var manualSegDraftTags = SegmentTagData()
     @Published var awaitingManualSegTag = false
     /// When true (autoDateManualSeg mode), each segment's date is fetched from the LLM on demand.
     @Published var manualSegAutoDate = false
-    /// Segment start indices whose date fetch is currently in flight.
-    @Published var manualSegDateLoading: Set<Int> = []
+    /// True while the tag card's date fetch is in flight.
+    @Published var manualSegDateFetching = false
+    /// Pre-OCRed run: output PDFs ARE the source files, so rotation must not regenerate them.
+    private var manualSegPreOCRed = false
     private var manualSegContinuation: CheckedContinuation<Void, Never>?
     // LLM params captured for on-demand date fetching during manual segmentation.
     private var manualSegProvider: LLMProvider = .gemini
@@ -730,7 +757,8 @@ class OCRProcessor: ObservableObject {
                     autoDate: taggingMode.autoFillsDate,
                     provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
                     apiKey: apiKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs
+                    enableSegmentJSON: pending.enableSegmentJSON,
+                    preOCRed: pending.preOCRedInput, files: pending.fileURLs
                 )
             case .none, .copySource:
                 break
@@ -1154,6 +1182,9 @@ class OCRProcessor: ObservableObject {
                 // Groups were defined on the phone — apply them directly, skip LLM segmentation.
                 applyPreGroupedClassifications(files: files)
                 rebuildSegments(files: files)
+            } else if taggingMode.usesManualSegmentationUI {
+                // Manual modes: the combined segment+tag window owns rotation, box/folder, and
+                // segmentation, so skip the separate review here (it rebuilds segments itself).
             } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
                 await showFullSegmentationReview(files: files)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1188,7 +1219,7 @@ class OCRProcessor: ObservableObject {
                         autoDate: taggingMode.autoFillsDate,
                         provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                         outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON, files: files
+                        enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files
                     )
                 case .none, .copySource:
                     break
@@ -1391,8 +1422,11 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         progress = 0.5
 
-        // Interactive Review: document segmentation (rotation + classification) review
-        if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
+        // Interactive Review: document segmentation (rotation + classification) review. Manual
+        // modes skip it — the combined segment+tag window owns rotation, box/folder, and segmentation.
+        if taggingMode.usesManualSegmentationUI {
+            // no-op: handled in the combined manual window
+        } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
             await showFullSegmentationReview(files: files)
             guard !Task.isCancelled else { return }
 
@@ -1426,7 +1460,7 @@ class OCRProcessor: ObservableObject {
                     autoDate: taggingMode.autoFillsDate,
                     provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                     outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON, files: files
+                    enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files
                 )
             case .none, .copySource:
                 break
@@ -2502,10 +2536,11 @@ class OCRProcessor: ObservableObject {
 
     // MARK: - Fully-manual segmentation + tagging (human mode)
 
-    /// Present the full-window manual grouping + tagging UI. The user defines segment
-    /// boundaries and tags each segment themselves; box/folder images are locked own-segments
-    /// and never tagged. On confirm, boundaries are written back into job classifications and
-    /// each segment's tags are applied to its output PDFs.
+    /// Present the progressive manual segmentation + tagging window (human / autoDateManualSeg).
+    /// The user reviews rotation + box/folder, walks the photos in order, marks where each document
+    /// segment ends and tags it (the tagged pages then drop out of the viewer). On Finish, the
+    /// identified segments are translated back into job classifications, corrected rotations are
+    /// baked into the output PDFs, and each segment's tags are applied.
     private func performManualSegmentAndTag(
         autoDate: Bool,
         provider: LLMProvider,
@@ -2514,55 +2549,41 @@ class OCRProcessor: ObservableObject {
         apiKey: String,
         outputDirectory: URL,
         enableSegmentJSON: Bool,
+        preOCRed: Bool,
         files: [URL]
     ) async {
         // Capture params for on-demand LLM date fetching from the UI.
         manualSegAutoDate = autoDate
-        manualSegDateLoading = []
         manualSegProvider = provider
         manualSegModel = model
         manualSegThinking = thinkingLevel
         manualSegApiKey = apiKey
+        manualSegPreOCRed = preOCRed
 
-        // Build the ordered image list (excluding removed files).
+        // Build the ordered image list (excluding already-removed files). Kind + rotation seed from
+        // the OCR classifications; both are user-editable in the UI.
         var images: [ManualSegImage] = []
         for (i, url) in files.enumerated() {
             guard !removedSourceURLs.contains(url), i < jobs.count else { continue }
             let cls = jobs[i].result?.classification
+            let kind: ManualPhotoKind = cls == .boxLabel ? .box : (cls == .folderLabel ? .folder : .document)
             images.append(ManualSegImage(
                 fileIndex: i,
                 url: url,
                 rotationDegrees: jobs[i].result?.rotationDegrees ?? 0,
-                isBoxOrFolder: cls == .boxLabel || cls == .folderLabel
+                kind: kind
             ))
         }
         guard !images.isEmpty else { return }
 
-        // Seed boundaries from current classifications: first image, any box/folder, the image
-        // after a box/folder, and any documentStart begin a new segment.
-        var isStart = [Bool](repeating: false, count: images.count)
-        var tags: [Int: SegmentTagData] = [:]
-        for idx in images.indices {
-            let img = images[idx]
-            let cls = jobs[img.fileIndex].result?.classification
-            let startsHere = idx == 0
-                || img.isBoxOrFolder
-                || images[idx - 1].isBoxOrFolder
-                || cls == .documentStart
-            isStart[idx] = startsHere
-            if startsHere && !img.isBoxOrFolder {
-                // Pre-fill the phone's date (Live Capture) so the manual UI shows it; user can edit.
-                var seed = SegmentTagData()
-                if let y = phoneYearTag(at: img.fileIndex) { seed.year = y }
-                if let mo = phoneMonthTag(at: img.fileIndex) { seed.month = mo }
-                tags[idx] = seed
-            }
-        }
-
         manualSegImages = images
-        manualSegIsStart = isStart
-        manualSegTags = tags
-        manualSegFocus = 0
+        manualSegConsumed = []
+        manualSegRemoved = []
+        manualSegCompleted = []
+        manualSegTaggingRange = nil
+        manualSegDraftTags = SegmentTagData()
+        manualSegDateFetching = false
+        manualSegFocus = manualSegPendingStart ?? 0
 
         statusMessage = "Manual segmentation & tagging: \(images.count) image\(images.count == 1 ? "" : "s")."
         isProcessing = false
@@ -2575,32 +2596,82 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         isProcessing = true
 
-        // Write user boundaries back into job classifications (box/folder preserved).
-        for idx in manualSegImages.indices {
-            let img = manualSegImages[idx]
-            guard img.fileIndex < jobs.count, !img.isBoxOrFolder else { continue }
-            let newCls: DocumentClassification = manualSegIsStart[idx] ? .documentStart : .documentContinuation
-            jobs[img.fileIndex].classification = newCls
-            if let r = jobs[img.fileIndex].result {
-                jobs[img.fileIndex].result = OCRResult(
-                    text: r.text, classification: newCls,
-                    rotationDegrees: r.rotationDegrees,
-                    errorMessage: r.errorMessage, errorCode: nil
-                )
+        // (a) Removals: drop flagged photos from output, tagging, and segmentation.
+        for idx in manualSegRemoved where idx < manualSegImages.count {
+            let fileIndex = manualSegImages[idx].fileIndex
+            guard fileIndex < jobs.count else { continue }
+            let sourceURL = jobs[fileIndex].sourceURL
+            removedSourceURLs.insert(sourceURL)
+            if let outputURL = outputURLMap[sourceURL] {
+                try? FileManager.default.removeItem(at: outputURL)
+                let jsonURL = outputURL.deletingPathExtension().appendingPathExtension("json")
+                try? FileManager.default.removeItem(at: jsonURL)
+                outputURLMap[sourceURL] = nil
+            }
+            jobs[fileIndex].status = .removed
+        }
+
+        // (b) Rotation: bake any corrected rotation into the output PDF by regenerating it. Skipped
+        // for pre-OCRed input, where the "output" IS the user's original source PDF (regen would
+        // overwrite it). Must run before merge (which deletes per-page PDFs) and before tag apply
+        // (regen overwrites the PDF, which would clobber freshly-applied Finder tags).
+        if !preOCRed, let model = currentModel {
+            for idx in manualSegImages.indices where !manualSegRemoved.contains(idx) {
+                let img = manualSegImages[idx]
+                let fileIndex = img.fileIndex
+                guard fileIndex < jobs.count, let existing = jobs[fileIndex].result,
+                      img.rotationDegrees != existing.rotationDegrees else { continue }
+                let updated = OCRResult(text: existing.text, classification: existing.classification,
+                                        rotationDegrees: img.rotationDegrees,
+                                        errorMessage: existing.errorMessage, errorCode: nil)
+                jobs[fileIndex].result = updated
+                if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
+                    let imageURL = pdfToImageMap[img.url] ?? img.url
+                    try? PDFGenerator().generate(
+                        imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
+                        originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
+                        gatewayDisplayName: currentGateway?.displayName
+                    )
+                }
             }
         }
 
+        // (c) Write classifications from the user's kinds + completed-segment membership.
+        var startArrayIndices = Set<Int>()
+        for seg in manualSegCompleted { if let first = seg.indices.first { startArrayIndices.insert(first) } }
+        for idx in manualSegImages.indices where !manualSegRemoved.contains(idx) {
+            let img = manualSegImages[idx]
+            let fileIndex = img.fileIndex
+            guard fileIndex < jobs.count else { continue }
+            let newCls: DocumentClassification
+            switch img.kind {
+            case .box: newCls = .boxLabel
+            case .folder: newCls = .folderLabel
+            case .document: newCls = startArrayIndices.contains(idx) ? .documentStart : .documentContinuation
+            }
+            jobs[fileIndex].classification = newCls
+            if let r = jobs[fileIndex].result {
+                jobs[fileIndex].result = OCRResult(text: r.text, classification: newCls,
+                                                   rotationDegrees: r.rotationDegrees,
+                                                   errorMessage: r.errorMessage, errorCode: nil)
+            }
+        }
+
+        // (d) Rebuild segments from the corrected classifications; apply box/folder color tags.
         rebuildSegments(files: files)
         applyBoxFolderLabelTagsUnconditionally()
 
-        // Map each image URL → its manualSegImages index so we can find a segment's tag data
-        // from its first page (robust even if a boundary was forced by a preceding box/folder).
-        var indexByURL: [URL: Int] = [:]
-        for (idx, img) in manualSegImages.enumerated() { indexByURL[img.url] = idx }
+        // (e) Apply each identified segment's tags to its output PDFs, keyed by the segment's
+        // first-page URL (a stable key that survives consumption).
+        var tagsByFirstURL: [URL: SegmentTagData] = [:]
+        for seg in manualSegCompleted {
+            guard let first = seg.indices.first, first < manualSegImages.count else { continue }
+            tagsByFirstURL[manualSegImages[first].url] = seg.tags
+        }
 
         for seg in segments where !seg.isBox && !seg.isFolder {
             guard let firstURL = seg.pdfURLs.first else { continue }
-            let data = indexByURL[firstURL].flatMap { manualSegTags[$0] } ?? SegmentTagData()
+            let data = tagsByFirstURL[firstURL] ?? SegmentTagData()
             var gtags = GeneratedTags()
             gtags.year = data.year.isEmpty ? nil : data.year
             gtags.month = data.month.isEmpty ? nil : data.month
@@ -2622,41 +2693,113 @@ class OCRProcessor: ObservableObject {
         }
     }
 
-    /// UI: toggle whether the image at `idx` starts a new segment (a boundary). The first
-    /// image and box/folder images are locked. Keeps `manualSegTags` consistent.
-    func toggleManualBoundary(at idx: Int) {
-        guard idx > 0, idx < manualSegImages.count, !manualSegImages[idx].isBoxOrFolder else { return }
-        manualSegIsStart[idx].toggle()
-        if manualSegIsStart[idx] {
-            if manualSegTags[idx] == nil { manualSegTags[idx] = SegmentTagData() }
-        } else {
-            manualSegTags[idx] = nil
+    // MARK: Manual segmentation — derived state
+
+    /// First array index that is an un-consumed, un-removed document — the start of the pending segment.
+    var manualSegPendingStart: Int? {
+        manualSegImages.indices.first {
+            manualSegImages[$0].kind == .document && !manualSegConsumed.contains($0) && !manualSegRemoved.contains($0)
         }
     }
 
-    /// The start index of the segment containing image `idx`.
-    func manualSegStartIndex(for idx: Int) -> Int {
-        guard !manualSegImages.isEmpty else { return 0 }
-        var i = min(max(idx, 0), manualSegImages.count - 1)
-        while i > 0 && !(i < manualSegIsStart.count && manualSegIsStart[i]) { i -= 1 }
-        return i
-    }
-
-    /// The next segment-start index after `idx`, if any (for ↓ navigation).
-    func manualSegNextStart(after idx: Int) -> Int? {
-        var i = idx + 1
-        while i < manualSegImages.count {
-            if i < manualSegIsStart.count && manualSegIsStart[i] { return i }
-            i += 1
+    /// The last index of the contiguous document run beginning at `start` (stops at a box/folder or a
+    /// consumed image; removed images are skipped transparently).
+    func manualSegRunEnd(from start: Int) -> Int {
+        var end = start
+        var k = start
+        while k < manualSegImages.count {
+            if manualSegConsumed.contains(k) { break }
+            if manualSegImages[k].kind != .document { break }
+            if !manualSegRemoved.contains(k) { end = k }
+            k += 1
         }
-        return nil
+        return end
     }
 
-    /// The previous segment-start index before the segment containing `idx` (for ↑ navigation).
-    func manualSegPreviousStart(before idx: Int) -> Int? {
-        let start = manualSegStartIndex(for: idx)
-        guard start > 0 else { return nil }
-        return manualSegStartIndex(for: start - 1)
+    /// The last index of the pending segment given the current focus (clamped into the run).
+    var manualSegPendingEnd: Int? {
+        guard let s = manualSegPendingStart else { return nil }
+        return min(max(manualSegFocus, s), manualSegRunEnd(from: s))
+    }
+
+    /// The array-index range currently highlighted as the pending segment (nil while none).
+    var manualSegPendingRange: ClosedRange<Int>? {
+        guard let s = manualSegPendingStart, let e = manualSegPendingEnd, s <= e else { return nil }
+        return s...e
+    }
+
+    /// Number of document photos still awaiting tagging.
+    var manualSegRemainingDocCount: Int {
+        manualSegImages.indices.filter {
+            manualSegImages[$0].kind == .document && !manualSegConsumed.contains($0) && !manualSegRemoved.contains($0)
+        }.count
+    }
+
+    /// Finish is allowed only when every document has been tagged or removed (boxes/folders may remain).
+    var manualSegCanFinish: Bool { manualSegRemainingDocCount == 0 }
+
+    // MARK: Manual segmentation — UI intents
+
+    /// Move the viewer focus to the next/previous non-consumed photo.
+    func manualSegAdvanceFocus(_ delta: Int) {
+        guard !manualSegImages.isEmpty, delta != 0 else { return }
+        var i = manualSegFocus + delta
+        while i >= 0 && i < manualSegImages.count {
+            if !manualSegConsumed.contains(i) { manualSegFocus = i; return }
+            i += delta
+        }
+    }
+
+    /// Set the focused photo's kind (Box / Folder / Document). No-op on consumed photos.
+    func manualSegSetKind(_ kind: ManualPhotoKind, at idx: Int) {
+        guard idx >= 0, idx < manualSegImages.count, !manualSegConsumed.contains(idx) else { return }
+        manualSegImages[idx].kind = kind
+    }
+
+    /// Rotate the focused photo 90° clockwise (live in the UI; baked into the PDF at Finish).
+    func manualSegRotate(at idx: Int) {
+        guard idx >= 0, idx < manualSegImages.count else { return }
+        manualSegImages[idx].rotationDegrees = (((manualSegImages[idx].rotationDegrees + 90) % 360) + 360) % 360
+    }
+
+    /// Toggle whether the focused photo is flagged for removal (file ops applied at Finish).
+    func manualSegToggleRemoved(at idx: Int) {
+        guard idx >= 0, idx < manualSegImages.count, !manualSegConsumed.contains(idx) else { return }
+        if manualSegRemoved.contains(idx) { manualSegRemoved.remove(idx) } else { manualSegRemoved.insert(idx) }
+    }
+
+    /// Open the tag card for the current pending segment, seeding the phone date (Live Capture).
+    func manualSegEndAndTag() {
+        guard manualSegTaggingRange == nil, let range = manualSegPendingRange else { return }
+        var seed = SegmentTagData()
+        let firstFileIndex = manualSegImages[range.lowerBound].fileIndex
+        if let y = phoneYearTag(at: firstFileIndex) { seed.year = y }
+        if let mo = phoneMonthTag(at: firstFileIndex) { seed.month = mo }
+        manualSegDraftTags = seed
+        manualSegTaggingRange = range
+    }
+
+    /// Dismiss the tag card without committing (back to browsing to adjust the segment end).
+    func manualSegCancelTagging() {
+        manualSegTaggingRange = nil
+        manualSegDateFetching = false
+    }
+
+    /// Commit the pending segment with the drafted tags — its document pages are consumed (drop out).
+    func manualSegCommitPendingSegment() {
+        guard let range = manualSegTaggingRange else { return }
+        let indices = range.filter { manualSegImages[$0].kind == .document && !manualSegRemoved.contains($0) }
+        manualSegTaggingRange = nil
+        manualSegDateFetching = false
+        guard !indices.isEmpty else { return }
+        manualSegCompleted.append(CompletedManualSegment(indices: indices, tags: manualSegDraftTags))
+        manualSegConsumed.formUnion(indices)
+        manualSegDraftTags = SegmentTagData()
+        if let next = manualSegPendingStart {
+            manualSegFocus = next
+        } else if let firstVisible = manualSegImages.indices.first(where: { !manualSegConsumed.contains($0) }) {
+            manualSegFocus = firstVisible
+        }
     }
 
     func confirmManualSegTag() {
@@ -2665,29 +2808,22 @@ class OCRProcessor: ObservableObject {
         manualSegContinuation = nil
     }
 
-    /// UI (autoDateManualSeg mode): fetch the LLM date for the segment starting at `startIndex`,
-    /// built from that segment's current pages, and fill any empty date fields. Idempotent —
-    /// skips if already loading or the date is already populated.
-    func fetchManualSegDate(startIndex: Int) async {
+    /// UI (autoDateManualSeg mode): fetch the LLM date for the pending segment's pages and fill any
+    /// empty date fields in the draft. Idempotent — skips if a date is present or a fetch is in flight.
+    func fetchManualSegDate(forIndices indices: [Int]) async {
         guard manualSegAutoDate, let model = manualSegModel else { return }
-        guard startIndex < manualSegImages.count, !manualSegImages[startIndex].isBoxOrFolder else { return }
-        let existing = manualSegTags[startIndex] ?? SegmentTagData()
-        // Don't refetch if a date is already present or a fetch is in flight.
-        guard existing.year.isEmpty, !manualSegDateLoading.contains(startIndex) else { return }
+        guard manualSegDraftTags.year.isEmpty, !manualSegDateFetching else { return }
 
-        // Collect the segment's pages (startIndex … just before the next start).
-        let end = (manualSegNextStart(after: startIndex) ?? manualSegImages.count) - 1
-        guard startIndex <= end else { return }
         var urls: [URL] = []
         var texts: [String] = []
-        for i in startIndex...end where !manualSegImages[i].isBoxOrFolder {
+        for i in indices where i >= 0 && i < manualSegImages.count && manualSegImages[i].kind == .document {
             let url = manualSegImages[i].url
             urls.append(url)
             texts.append(jobs.first { $0.sourceURL == url }?.result?.text ?? "")
         }
         guard !urls.isEmpty else { return }
 
-        manualSegDateLoading.insert(startIndex)
+        manualSegDateFetching = true
         let segment = DocumentSegment(pdfURLs: urls, texts: texts)
         let date = await TagGenerator().generateDateOnly(
             for: segment, nearbySegments: [],
@@ -2695,15 +2831,13 @@ class OCRProcessor: ObservableObject {
             thinkingLevel: manualSegThinking, apiKey: manualSegApiKey,
             gatewayConfig: currentGateway
         )
-        manualSegDateLoading.remove(startIndex)
+        manualSegDateFetching = false
 
         guard !Task.isCancelled else { return }
-        var data = manualSegTags[startIndex] ?? SegmentTagData()
-        if data.year.isEmpty { data.year = date.year ?? "" }
-        if data.month.isEmpty { data.month = date.month ?? "" }
-        if data.day.isEmpty { data.day = date.day ?? "" }
-        data.dateUncertain = date.dateUncertain
-        manualSegTags[startIndex] = data
+        if manualSegDraftTags.year.isEmpty { manualSegDraftTags.year = date.year ?? "" }
+        if manualSegDraftTags.month.isEmpty { manualSegDraftTags.month = date.month ?? "" }
+        if manualSegDraftTags.day.isEmpty { manualSegDraftTags.day = date.day ?? "" }
+        manualSegDraftTags.dateUncertain = date.dateUncertain
     }
 
     private func performTaggingPhase(

@@ -2,8 +2,9 @@ import SwiftUI
 import AppKit
 
 /// Full-size image viewer with fit-to-window default plus zoom (magnify gesture, and the
-/// parent's `+`/`-`/`0` keys via the `zoom` binding) and drag-to-pan. Renders in the given
-/// corrected rotation. Loads a high-resolution bitmap via `ArchiveThumbnail.load`.
+/// parent's `+`/`-`/`0` keys via the `zoom` binding), drag-to-pan, and scroll-wheel / trackpad
+/// pan when zoomed in. Renders in the given corrected rotation. Loads a high-resolution bitmap
+/// via `ArchiveThumbnail.load`.
 struct ZoomableImageView: View {
     let url: URL
     var rotationDegrees: Int = 0
@@ -13,6 +14,7 @@ struct ZoomableImageView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @GestureState private var pinch: CGFloat = 1.0
+    @State private var scrollMonitor: Any?
 
     var body: some View {
         GeometryReader { geo in
@@ -46,7 +48,20 @@ struct ZoomableImageView: View {
             .clipped()
             .contentShape(Rectangle())
         }
-        .onAppear(perform: load)
+        .onAppear {
+            load()
+            // Scroll wheel / two-finger trackpad scroll pans the image when zoomed in.
+            scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+                guard zoom > 1 else { return event }
+                offset = CGSize(width: offset.width + event.scrollingDeltaX,
+                                height: offset.height + event.scrollingDeltaY)
+                lastOffset = offset
+                return nil   // consume while panning
+            }
+        }
+        .onDisappear {
+            if let m = scrollMonitor { NSEvent.removeMonitor(m); scrollMonitor = nil }
+        }
         .onChange(of: url) { _, _ in
             load()
             offset = .zero
