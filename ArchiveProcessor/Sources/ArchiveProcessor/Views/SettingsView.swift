@@ -48,6 +48,9 @@ struct SettingsView: View {
     @AppStorage("batchMode") private var batchMode: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
     @AppStorage("standardImageSizeMB") private var standardImageSizeMB: Double = 3.0
+    @AppStorage("outputImageFile") private var outputImageFile: Bool = true
+    @AppStorage("pdfImageSizeMB") private var pdfImageSizeMB: Double = 2.0
+    @AppStorage("exportedImageSizeMB") private var exportedImageSizeMB: Double = 3.0
     @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
     @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
 
@@ -300,6 +303,33 @@ struct SettingsView: View {
                 Stepper("", value: $standardImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
             }
             .disabled(preOCRedInput)
+            Toggle(isOn: $outputImageFile) {
+                HStack {
+                    Text("Also export a separate image file (two files)")
+                    HelpButton(text: "On: each document is saved as BOTH a PDF (image page + OCR text page) and a separate image file. Off: only the PDF is saved (one file). The two images are sized independently below and separately from the image sent to the LLM.")
+                }
+            }
+            .disabled(preOCRedInput)
+            HStack {
+                Text("PDF image size")
+                HelpButton(text: "Target size for the image embedded in each output PDF (default 2 MB). Independent of both the image sent to the LLM and the source resolution — larger images are downscaled toward this target, while smaller ones are embedded as-is. Not used for pre-OCRed input.")
+                Spacer()
+                TextField("", value: $pdfImageSizeMB, format: .number.precision(.fractionLength(0...1)))
+                    .frame(width: 52).multilineTextAlignment(.trailing)
+                Text("MB").foregroundStyle(.secondary)
+                Stepper("", value: $pdfImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+            }
+            .disabled(preOCRedInput)
+            HStack {
+                Text("Exported image size")
+                HelpButton(text: "Target size for the separately-exported image file (default 3 MB). Independent of the camera/source resolution — larger images are downscaled toward this target, while already-small JPEGs are kept byte-for-byte. Only applies when \"Also export a separate image file\" is on.")
+                Spacer()
+                TextField("", value: $exportedImageSizeMB, format: .number.precision(.fractionLength(0...1)))
+                    .frame(width: 52).multilineTextAlignment(.trailing)
+                Text("MB").foregroundStyle(.secondary)
+                Stepper("", value: $exportedImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+            }
+            .disabled(!outputImageFile || preOCRedInput)
             HStack {
                 Text("Parallel OCR workers: \(ocrWorkerCount)")
                 HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")

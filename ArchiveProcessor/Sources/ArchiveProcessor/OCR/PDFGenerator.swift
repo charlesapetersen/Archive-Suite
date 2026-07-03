@@ -6,10 +6,10 @@ import ImageIO
 
 struct PDFGenerator {
 
-    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil) throws {
+    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0) throws {
         let pdfDocument = PDFDocument()
 
-        if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees) {
+        if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB) {
             pdfDocument.insert(imagePage, at: 0)
         }
 
@@ -23,7 +23,7 @@ struct PDFGenerator {
 
     // MARK: - Image Page
 
-    private func makeImagePage(imageURL: URL, rotationDegrees: Int = 0) -> PDFPage? {
+    private func makeImagePage(imageURL: URL, rotationDegrees: Int = 0, targetMB: Double = 0) -> PDFPage? {
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else { return nil }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
@@ -31,14 +31,21 @@ struct PDFGenerator {
         let sourceType = CGImageSourceGetType(imageSource) as? String
         let noRotation = rotationDegrees == 0 || rotationDegrees % 360 == 0
 
+        // Is the source already within the PDF image-size target? (targetMB <= 0 means no limit.)
+        let underTarget: Bool = {
+            guard targetMB > 0 else { return true }
+            let size = ((try? FileManager.default.attributesOfItem(atPath: imageURL.path))?[.size] as? NSNumber)?.intValue ?? Int.max
+            return Double(size) <= targetMB * 1_000_000
+        }()
+
         let jpegData: Data
         let embedWidth: Int
         let embedHeight: Int
         let colorSpace: String
 
-        if noRotation && sourceType == "public.jpeg" && orientation == 1 {
-            // Fast path: embed the original JPEG bytes as-is — the full bitmap is never decoded.
-            // Width/height/color-model come straight from the file header.
+        if noRotation && sourceType == "public.jpeg" && orientation == 1 && underTarget {
+            // Verbatim fast path: unrotated, normal-orientation JPEG already within target → embed the
+            // original bytes as-is (no decode, no re-encode). Dims/color-model come from the file header.
             guard let data = try? Data(contentsOf: imageURL),
                   let w = properties?[kCGImagePropertyPixelWidth] as? Int,
                   let h = properties?[kCGImagePropertyPixelHeight] as? Int else { return nil }
@@ -47,7 +54,8 @@ struct PDFGenerator {
             embedHeight = h
             colorSpace = Self.pdfColorSpace(forColorModel: properties?[kCGImagePropertyColorModel] as? String)
         } else {
-            // Slow path: decode, resolve EXIF orientation, apply any LLM rotation, then re-encode as JPEG.
+            // Decode, resolve EXIF orientation, apply any LLM rotation, then encode toward the PDF image
+            // size target (targetMB <= 0 → full-resolution encode at quality 0.90, i.e. prior behavior).
             guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
             let imageWidth = cgImage.width
             let imageHeight = cgImage.height
@@ -73,15 +81,14 @@ struct PDFGenerator {
                 finalImage = rotated
             }
 
-            let buf = NSMutableData()
-            guard let dest = CGImageDestinationCreateWithData(buf, "public.jpeg" as CFString, 1, nil) else { return nil }
-            CGImageDestinationAddImage(dest, finalImage, [kCGImageDestinationLossyCompressionQuality: 0.90] as CFDictionary)
-            guard CGImageDestinationFinalize(dest) else { return nil }
-            jpegData = buf as Data
-            embedWidth = finalImage.width
-            embedHeight = finalImage.height
+            // Size toward the target on the FINAL oriented/rotated image (so the long edge is correct).
+            guard let enc = ImageEncoding.encodeToTargetMB(finalImage, targetMB: targetMB, quality: 0.90) else { return nil }
+            jpegData = enc.data
+            embedWidth = enc.width
+            embedHeight = enc.height
 
-            // Detect color space from the final (possibly rotated) image.
+            // Detect color space from the final (possibly rotated) image; dimensions may be downscaled
+            // but the component count is preserved, so the embedded /ColorSpace stays correct.
             let numComponents = finalImage.colorSpace?.numberOfComponents ?? 3
             switch numComponents {
             case 1: colorSpace = "/DeviceGray"

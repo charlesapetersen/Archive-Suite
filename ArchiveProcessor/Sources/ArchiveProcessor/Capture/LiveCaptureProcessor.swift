@@ -206,13 +206,15 @@ final class LiveCaptureProcessor: ObservableObject {
         let model = config.model, gatewayName = config.gateway?.displayName
         let writeJSON = config.enableSegmentJSON && gType == .document
         let jsonTags = tags
+        let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB
 
         let outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
             Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
                                    jsonTags: jsonTags, texts: texts,
-                                   boxLabelText: gType == .box ? texts.first : nil)
+                                   boxLabelText: gType == .box ? texts.first : nil,
+                                   outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
         }.value
 
         staged.append(outcome)
@@ -255,7 +257,8 @@ final class LiveCaptureProcessor: ObservableObject {
     nonisolated private static func writeSegmentFiles(
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
-        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?
+        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
+        outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double
     ) -> StagedSegment {
         let fm = FileManager.default
         let pdfGen = PDFGenerator()
@@ -267,19 +270,19 @@ final class LiveCaptureProcessor: ObservableObject {
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
                                  outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                 gatewayDisplayName: gatewayName)
+                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB)
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
             try? MacOSTagger.applyTags(tagList, to: stagedPDF)
             pdfURLs.append(stagedPDF)
 
-            // Dual output: original image next to its PDF, same base name + identical tags.
-            let ext = page.sourceURL.pathExtension.isEmpty ? "jpg" : page.sourceURL.pathExtension
-            let stagedImg = stagingDir.appendingPathComponent(base + "." + ext)
-            try? fm.removeItem(at: stagedImg)
-            if (try? fm.copyItem(at: page.sourceURL, to: stagedImg)) != nil {
-                try? MacOSTagger.applyTags(tagList, to: stagedImg)
-                imageURLs.append(stagedImg)
+            // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
+            if outputImageFile {
+                let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
+                if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB) {
+                    try? MacOSTagger.applyTags(tagList, to: stagedImg)
+                    imageURLs.append(stagedImg)
+                }
             }
         }
 
@@ -437,24 +440,36 @@ final class LiveCaptureProcessor: ObservableObject {
             try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
             var seq = plan.appending ? maxExistingNumber(in: plan.folder) : 0
             for seg in plan.segments {
-                // Merged multi-page document = one PDF for many images; else 1 PDF per image.
-                let merged = seg.pdfURLs.count == 1 && seg.imageURLs.count > 1
                 var firstNum: Int?
-                for (i, img) in seg.imageURLs.enumerated() {
-                    seq += 1
-                    if firstNum == nil { firstNum = seq }
-                    let numStr = String(format: "%05d", seq)
-                    let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                    move(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"), fm: fm)
-                    movedFiles += 1
-                    if !merged, i < seg.pdfURLs.count {
-                        move(seg.pdfURLs[i], to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
+                if seg.imageURLs.isEmpty {
+                    // One-file output (PDF only): number by PDF (a merged doc is already a single PDF).
+                    for pdf in seg.pdfURLs {
+                        seq += 1
+                        if firstNum == nil { firstNum = seq }
+                        let numStr = String(format: "%05d", seq)
+                        move(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
                         movedFiles += 1
                     }
-                }
-                if merged, let fn = firstNum, let pdf = seg.pdfURLs.first {
-                    move(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"), fm: fm)
-                    movedFiles += 1
+                } else {
+                    // Two-file output: number by page image; move each image + its paired/merged PDF.
+                    // Merged multi-page document = one PDF for many images; else 1 PDF per image.
+                    let merged = seg.pdfURLs.count == 1 && seg.imageURLs.count > 1
+                    for (i, img) in seg.imageURLs.enumerated() {
+                        seq += 1
+                        if firstNum == nil { firstNum = seq }
+                        let numStr = String(format: "%05d", seq)
+                        let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
+                        move(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"), fm: fm)
+                        movedFiles += 1
+                        if !merged, i < seg.pdfURLs.count {
+                            move(seg.pdfURLs[i], to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
+                            movedFiles += 1
+                        }
+                    }
+                    if merged, let fn = firstNum, let pdf = seg.pdfURLs.first {
+                        move(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"), fm: fm)
+                        movedFiles += 1
+                    }
                 }
                 if let json = seg.jsonURL, let fn = firstNum {
                     let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)

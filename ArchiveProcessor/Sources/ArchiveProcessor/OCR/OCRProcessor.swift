@@ -150,13 +150,25 @@ class OCRProcessor: ObservableObject {
     /// Parallel OCR workers for the batch run (user-configurable in Settings, 1–12). Set once per run.
     nonisolated(unsafe) static var ocrWorkerCount: Int = 4
 
-    /// Load run-time knobs from UserDefaults (standard size default 3 MB, OCR workers default 4) —
-    /// call at run start.
+    /// Target size (MB) for the image embedded in each output PDF (0 = full source resolution).
+    /// Independent of the LLM/OCR image size. Set once per run from Settings.
+    nonisolated(unsafe) static var pdfImageMB: Double = 0
+
+    /// Target size (MB) for the separately-exported image file in two-file output (0 = full resolution).
+    /// Independent of the camera/source size. Set once per run from Settings.
+    nonisolated(unsafe) static var exportedImageMB: Double = 0
+
+    /// Load run-time knobs from UserDefaults (standard size 3 MB, OCR workers 4, PDF-image 2 MB,
+    /// exported-image 3 MB) — call at run start.
     static func loadStandardImageMB() {
         let v = UserDefaults.standard.double(forKey: "standardImageSizeMB")
         standardImageMB = v > 0 ? v : 3.0
         let w = UserDefaults.standard.integer(forKey: "ocrWorkerCount")
         ocrWorkerCount = w > 0 ? min(12, w) : 4
+        let p = UserDefaults.standard.double(forKey: "pdfImageSizeMB")
+        pdfImageMB = p > 0 ? p : 2.0
+        let e = UserDefaults.standard.double(forKey: "exportedImageSizeMB")
+        exportedImageMB = e > 0 ? e : 3.0
     }
 
     /// The resolution slider is a **size target**, not a dimension %: `sizeFraction` (0–1) × the
@@ -630,13 +642,14 @@ class OCRProcessor: ObservableObject {
             if !toGenerate.isEmpty {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
+                let pdfMB = Self.pdfImageMB
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
                 await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
                     for g in toGenerate {
                         try? gen.generate(imageURL: g.imageURL, result: g.result, model: model,
                                           outputURL: g.outputURL, originalFileName: g.fileName,
-                                          gatewayDisplayName: gatewayName)
+                                          gatewayDisplayName: gatewayName, pdfImageMB: pdfMB)
                     }
                 }.value
             }
@@ -872,7 +885,7 @@ class OCRProcessor: ObservableObject {
         let pdfGen = PDFGenerator()
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName)
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
         outputURLMap[sourceURL] = outputURL
         // Copy source tags to output PDF if pass-through mode is enabled
         if passSourceTags {
@@ -2035,7 +2048,7 @@ class OCRProcessor: ObservableObject {
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
         // Use the provided url (may be temp JPEG) for the image page
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName)
+        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
         // Map by original source URL so tagging/collection segmentation can find it
         outputURLMap[sourceURL] = outputURL
         // Copy source tags to output PDF if pass-through mode is enabled
@@ -2286,21 +2299,23 @@ class OCRProcessor: ObservableObject {
     /// organization so `outputURLMap` is still per-page; `organizeOutput` moves the sibling image too.
     private func exportOriginalImages() async {
         guard exportOriginals else { return }
-        // Snapshot the work on the main actor…
+        let exportedMB = Self.exportedImageMB
+        // Snapshot the work on the main actor… The exported image is always a .jpg sized toward the
+        // exported-image target (independent of the source/camera size).
         let work: [(src: URL, img: URL, pdf: URL)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
                   FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
-            let ext = job.sourceURL.pathExtension.isEmpty ? "jpg" : job.sourceURL.pathExtension
-            return (src: job.sourceURL, img: pdfURL.deletingPathExtension().appendingPathExtension(ext), pdf: pdfURL)
+            // For PDF inputs, export from the converted temp JPEG (the same page image the PDF embeds),
+            // not the raw .pdf — matching every PDFGenerator call site.
+            let src = pdfToImageMap[job.sourceURL] ?? job.sourceURL
+            return (src: src, img: pdfURL.deletingPathExtension().appendingPathExtension("jpg"), pdf: pdfURL)
         }
         guard !work.isEmpty else { return }
-        // …then copy the (full-resolution) originals + mirror the PDF's tags OFF the main thread,
-        // so the UI never stalls on large files.
+        // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
+        // stalls on large files. writeSizedJPEG copies already-small JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {
-            let fm = FileManager.default
             for w in work {
-                try? fm.removeItem(at: w.img)
-                guard (try? fm.copyItem(at: w.src, to: w.img)) != nil else { continue }
+                guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
                 let tags = MacOSTagger.readTags(from: w.pdf)
@@ -2640,7 +2655,8 @@ class OCRProcessor: ObservableObject {
                     try? PDFGenerator().generate(
                         imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                         originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
-                        gatewayDisplayName: currentGateway?.displayName
+                        gatewayDisplayName: currentGateway?.displayName,
+                        pdfImageMB: Self.pdfImageMB
                     )
                 }
             }
@@ -3442,7 +3458,8 @@ class OCRProcessor: ObservableObject {
                     model: model,
                     outputURL: outputURL,
                     originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
-                    gatewayDisplayName: currentGateway?.displayName
+                    gatewayDisplayName: currentGateway?.displayName,
+                    pdfImageMB: Self.pdfImageMB
                 )
             }
         }

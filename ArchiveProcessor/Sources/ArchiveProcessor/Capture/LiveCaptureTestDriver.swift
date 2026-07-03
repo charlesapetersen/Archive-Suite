@@ -45,7 +45,8 @@ enum LiveCaptureTestDriver {
             provider: .gemini, model: model, thinkingLevel: .low, apiKey: key,
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
             outputDirectory: outDir, contextCharCount: 0, sendPreviousImage: false,
-            customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil)
+            customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
+            outputImageFile: true, pdfImageMB: 2.0, exportedImageMB: 3.0)
         session.beginLiveSession(config: config)
         NSLog("TESTDRIVER: live session started, model=\(session.config?.model.id ?? "?"), out=\(outDir.path)")
 

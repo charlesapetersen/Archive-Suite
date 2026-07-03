@@ -22,6 +22,9 @@ struct SessionProcessingConfig {
     var enableSegmentJSON: Bool
     var tagVocabulary: [String]
     var gateway: GatewayConfig?
+    var outputImageFile: Bool         // two files (PDF + separate image) vs one file (PDF only)
+    var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
+    var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
 
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults() -> SessionProcessingConfig {
@@ -74,7 +77,10 @@ struct SessionProcessingConfig {
                 .components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty },
-            gateway: gateway
+            gateway: gateway,
+            outputImageFile: (d.object(forKey: "outputImageFile") as? Bool) ?? true,
+            pdfImageMB: { let p = d.double(forKey: "pdfImageSizeMB"); return p > 0 ? p : 2.0 }(),
+            exportedImageMB: { let e = d.double(forKey: "exportedImageSizeMB"); return e > 0 ? e : 3.0 }()
         )
     }
 

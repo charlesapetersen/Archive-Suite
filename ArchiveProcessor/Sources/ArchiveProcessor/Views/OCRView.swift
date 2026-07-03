@@ -31,6 +31,7 @@ struct OCRView: View {
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
     @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
+    @AppStorage("outputImageFile") private var outputImageFile: Bool = true   // two files (PDF + image) vs one (PDF only)
 
     // Gateway mode (persisted)
     @AppStorage("useGateway") private var useGateway: Bool = false
@@ -881,7 +882,7 @@ struct OCRView: View {
             processor.preGroupedYears = captureYears.count == droppedFiles.count ? captureYears : []
             processor.preGroupedMonths = captureMonths.count == droppedFiles.count ? captureMonths : []
             processor.preGroupedSubjects = captureSubjects.count == droppedFiles.count ? captureSubjects : []
-            processor.exportOriginals = true   // Live Capture: emit original image + PDF
+            processor.exportOriginals = outputImageFile   // two-file output: also emit a sized image
         } else {
             processor.preGroupedBoundaries = []
             processor.preGroupedTypes = []
@@ -889,7 +890,7 @@ struct OCRView: View {
             processor.preGroupedYears = []
             processor.preGroupedMonths = []
             processor.preGroupedSubjects = []
-            processor.exportOriginals = false
+            processor.exportOriginals = outputImageFile
         }
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
