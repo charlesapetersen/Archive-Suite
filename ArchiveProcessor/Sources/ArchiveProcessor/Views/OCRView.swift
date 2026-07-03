@@ -940,11 +940,14 @@ struct FileRowView: View {
     var presetClassification: DocumentClassification? = nil
     @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
 
-    /// In manual-segmentation modes the user defines document boundaries, so the model's
-    /// start/continuation guesses are meaningless and shouldn't be shown (box/folder still are).
+    /// Document start/continuation only mean something when the LLM segments (Automatic / Auto-date).
+    /// In manual-segmentation, Human, No-tagging, and Copy-source modes those are user-defined or
+    /// unused, so they shouldn't clutter the file pane. Box/folder markers always show.
     private func shows(_ c: DocumentClassification) -> Bool {
-        let manualSeg = (TaggingMode(rawValue: taggingModeRaw) ?? .automatic).usesManualSegmentationUI
-        return !(manualSeg && (c == .documentStart || c == .documentContinuation))
+        if c == .documentStart || c == .documentContinuation {
+            return (TaggingMode(rawValue: taggingModeRaw) ?? .automatic).llmSegments
+        }
+        return true
     }
 
     var body: some View {
