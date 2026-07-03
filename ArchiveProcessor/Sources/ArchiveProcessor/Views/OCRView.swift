@@ -113,7 +113,7 @@ struct OCRView: View {
             enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
-            sendPreviousImage: sendPreviousImage,
+            sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
             contextCharCount: Int(contextCharCount),
             imageScale: imageScale / 100.0,
             rotationMode: rotationMode,
@@ -873,7 +873,7 @@ struct OCRView: View {
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
             previousTextCharCount: Int(contextCharCount),
-            sendPreviousImage: sendPreviousImage,
+            sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
             customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
             imageScale: imageScale / 100.0
         )

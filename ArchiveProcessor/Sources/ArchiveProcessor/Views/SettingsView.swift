@@ -124,7 +124,7 @@ struct SettingsView: View {
                 let est = CostEstimator.estimate(
                     fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
-                    preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage,
+                    preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway)
                 let time = TimeEstimator.estimate(
@@ -344,9 +344,10 @@ struct SettingsView: View {
                 Toggle(isOn: $reviewDocumentSegmentation) {
                     HStack {
                         Text("Review document segmentation")
-                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging.")
+                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when the model does the segmentation (Automatic / Auto-date).")
                     }
                 }
+                .disabled(!taggingMode.llmSegments)
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle(isOn: $enableSegmentJSON) {
@@ -358,9 +359,10 @@ struct SettingsView: View {
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")
-                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Gemini/Anthropic only.")
+                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Only used when the model does the segmentation (Automatic / Auto-date); in manual-segmentation modes it's ignored, so it adds no cost. Gemini/Anthropic only.")
                     }
                 }
+                .disabled(!taggingMode.llmSegments)
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {

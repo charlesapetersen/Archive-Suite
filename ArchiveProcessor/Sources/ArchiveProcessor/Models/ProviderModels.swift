@@ -101,6 +101,11 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
     /// Whether the user defines segments themselves in the full-window manual UI.
     var usesManualSegmentationUI: Bool { self == .autoDateManualSeg || self == .human }
 
+    /// Whether the LLM performs document segmentation in this mode. Only then do segmentation-context
+    /// options (send previous page image, review segmentation) matter — otherwise the user segments
+    /// (or there's no segmentation), so those settings are irrelevant.
+    var llmSegments: Bool { self == .automatic || self == .autoDate }
+
     /// Whether the LLM fills in the date automatically.
     var autoFillsDate: Bool { self == .autoDateManualSeg }
 
