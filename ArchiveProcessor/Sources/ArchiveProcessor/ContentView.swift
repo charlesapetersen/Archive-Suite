@@ -5,6 +5,8 @@ struct ContentView: View {
     @StateObject private var capture = CaptureSession()
     @State private var mode: Mode =
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" ? .live : .files
+    @AppStorage("hasSeenKeyOnboarding") private var hasSeenKeyOnboarding = false
+    @State private var showKeyOnboarding = false
 
     enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture", tools = "Tools" }
 
@@ -37,6 +39,24 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 700)
-        .onAppear { LiveCaptureTestDriver.runIfRequested(session: capture) }
+        .onAppear {
+            LiveCaptureTestDriver.runIfRequested(session: capture)
+            maybePresentKeyOnboarding()
+        }
+        .sheet(isPresented: $showKeyOnboarding) {
+            ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
+        }
+    }
+
+    /// On first launch with no API key of any kind, present the guided key wizard (dismissible;
+    /// always re-openable from Settings). Skipped in the headless Live Capture test mode.
+    private func maybePresentKeyOnboarding() {
+        guard !hasSeenKeyOnboarding,
+              ProcessInfo.processInfo.environment["LIVECAPTURE_TESTMODE"] != "1" else { return }
+        let hasAnyKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) != nil
+            || KeychainHelper.load(account: LLMProvider.mistral.rawValue) != nil
+            || KeychainHelper.load(account: LLMProvider.anthropic.rawValue) != nil
+            || KeychainHelper.load(account: "Gateway") != nil
+        if !hasAnyKey { showKeyOnboarding = true }
     }
 }

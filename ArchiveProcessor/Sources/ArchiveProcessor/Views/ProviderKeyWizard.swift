@@ -57,6 +57,8 @@ private struct ProviderKeyStep: View {
     @State private var reveal = false
     @State private var validating = false
     @State private var status: KeyValidator.KeyStatus?
+    @State private var testing = false
+    @State private var testStatus: KeyValidator.KeyStatus?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -116,6 +118,15 @@ private struct ProviderKeyStep: View {
             .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || validating)
 
             if let status { statusView(status) }
+
+            if status?.isUsable == true {
+                Button { testOCR() } label: {
+                    if testing { ProgressView().controlSize(.small) }
+                    else { Label("Test OCR on a sample page", systemImage: "text.viewfinder") }
+                }
+                .disabled(testing)
+                if let testStatus { statusView(testStatus) }
+            }
         }
         .onAppear { key = KeychainHelper.load(account: spec.account) ?? "" }
     }
@@ -140,6 +151,18 @@ private struct ProviderKeyStep: View {
                 UserDefaults.standard.set(true, forKey: "keyValidated_\(spec.account)")
                 NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
             }
+        }
+    }
+
+    private func testOCR() {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        testing = true
+        testStatus = nil
+        Task {
+            let result = await SampleOCRTester.run(account: spec.account, key: trimmed)
+            testing = false
+            testStatus = result
+            if result == .works { UserDefaults.standard.set(true, forKey: "keyOCRTested_\(spec.account)") }
         }
     }
 
