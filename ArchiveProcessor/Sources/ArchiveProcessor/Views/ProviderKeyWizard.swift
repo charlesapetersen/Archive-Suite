@@ -59,6 +59,19 @@ private struct ProviderKeyStep: View {
     @State private var status: KeyValidator.KeyStatus?
     @State private var testing = false
     @State private var testStatus: KeyValidator.KeyStatus?
+    @State private var clipboardCandidate: String?
+
+    /// Regions where Google requires the paid Gemini tier (EEA + UK + Switzerland).
+    private static let paidOnlyGeminiRegions: Set<String> = [
+        "AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE",
+        "IS","LI","NO","GB","CH"
+    ]
+    private var geminiRegionWarning: String? {
+        guard spec.account == LLMProvider.gemini.rawValue,
+              let region = Locale.current.region?.identifier,
+              Self.paidOnlyGeminiRegions.contains(region) else { return nil }
+        return "In your region (EU/UK/Switzerland) Google requires the paid plan — enable billing (add a card) in AI Studio. A free key will otherwise fail with a region error."
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -84,10 +97,24 @@ private struct ProviderKeyStep: View {
             if let card = spec.cardNote { noteRow("exclamationmark.bubble", card) }
             noteRow("dollarsign.circle", spec.costNote)
             noteRow("lock.circle", spec.privacyNote)
+            if let warn = geminiRegionWarning {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text(warn).font(.caption).foregroundStyle(.orange)
+                }
+            }
 
             Divider().padding(.vertical, 4)
 
             Text("Paste your \(spec.displayName) key").font(.headline)
+            #if canImport(AppKit)
+            if let cand = clipboardCandidate, key.isEmpty {
+                Button { key = cand; clipboardCandidate = nil } label: {
+                    Label("Paste key from clipboard", systemImage: "doc.on.clipboard")
+                }
+                .buttonStyle(.bordered)
+            }
+            #endif
             HStack(spacing: 6) {
                 Group {
                     if reveal { TextField("\(spec.displayName) API key", text: $key) }
@@ -128,7 +155,26 @@ private struct ProviderKeyStep: View {
                 if let testStatus { statusView(testStatus) }
             }
         }
-        .onAppear { key = KeychainHelper.load(account: spec.account) ?? "" }
+        .onAppear {
+            key = KeychainHelper.load(account: spec.account) ?? ""
+            checkClipboard()
+        }
+        #if canImport(AppKit)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            checkClipboard()   // the user just returned from the browser, likely after copying the key
+        }
+        #endif
+    }
+
+    /// If the clipboard holds something shaped like this provider's key and the field is empty, offer a
+    /// one-tap paste banner (so the user doesn't have to hunt for the Paste button on return).
+    private func checkClipboard() {
+        #if canImport(AppKit)
+        guard key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let s = NSPasteboard.general.string(forType: .string) else { clipboardCandidate = nil; return }
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        clipboardCandidate = (!t.isEmpty && spec.keyPrecheck(t)) ? t : nil
+        #endif
     }
 
     private func noteRow(_ icon: String, _ text: String) -> some View {

@@ -71,6 +71,11 @@ enum NetworkSession {
     /// HTTP statuses that indicate a transient rate-limit / overload and should be retried.
     private static let retryableStatuses: Set<Int> = [429, 500, 502, 503, 529]
 
+    /// Timestamp of the most recent 429 (rate-limit) retry, so the OCR UI can show a "pacing to your
+    /// key's rate limit" note during bulk jobs instead of looking stalled. Write-mostly; read only for
+    /// a cosmetic status line.
+    nonisolated(unsafe) static var lastRateLimitedAt: Date?
+
     /// Perform a data request through the global limiter, retrying transient transport errors
     /// and rate-limit/overload responses with exponential backoff + jitter (honoring
     /// `Retry-After` when present).
@@ -108,6 +113,7 @@ enum NetworkSession {
                 if let http = response as? HTTPURLResponse,
                    retryableStatuses.contains(http.statusCode),
                    attempt < maxRetries {
+                    if http.statusCode == 429 { lastRateLimitedAt = Date() }
                     retryAfter = parseRetryAfter(http)
                     lastError = URLError(.badServerResponse)
                     continue

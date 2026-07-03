@@ -171,6 +171,15 @@ class OCRProcessor: ObservableObject {
         exportedImageMB = e > 0 ? e : 3.0
     }
 
+    /// Cosmetic status suffix shown while a (typically free-tier) key is being rate-limited (429), so a
+    /// paced bulk job doesn't look stalled. The actual backoff/retry is handled in NetworkSession.
+    private static var rateLimitSuffix: String {
+        if let t = NetworkSession.lastRateLimitedAt, Date().timeIntervalSince(t) < 12 {
+            return " · pacing to your key's rate limit"
+        }
+        return ""
+    }
+
     /// The resolution slider is a **size target**, not a dimension %: `sizeFraction` (0–1) × the
     /// standard size gives a target file size; the dimension scale is ~√(target/actual), clamped to
     /// ≤1 (never upscale). So larger files are downscaled more; files already at/under target are
@@ -947,7 +956,7 @@ class OCRProcessor: ObservableObject {
                     handleOCRResult(result, index: index, url: fileURLs[index], model: model, outputDirectory: outputDirectory)
                     completed += 1
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
-                    statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)"
+                    statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
 
                     if nextSlot < remaining {
                         let idx = indices[nextSlot]
@@ -984,7 +993,7 @@ class OCRProcessor: ObservableObject {
                 }
                 let contextImageURL = segmentationContext.sendPreviousImage && index > 0 ? fileURLs[index - 1] : nil
 
-                statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles)…"
+                statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles)…" + Self.rateLimitSuffix
                 var result = await Self.performOCRCall(
                     imageURL: url, provider: provider, model: model,
                     thinkingLevel: thinkingLevel, apiKey: apiKey,
@@ -1915,7 +1924,7 @@ class OCRProcessor: ObservableObject {
             }
             let contextImageURL = segmentationContext.sendPreviousImage ? previousImageURL : nil
 
-            statusMessage = "OCR \(index + 1)/\(total)…"
+            statusMessage = "OCR \(index + 1)/\(total)…" + Self.rateLimitSuffix
             var result = await Self.performOCRCall(
                 imageURL: url,
                 provider: provider,
@@ -2006,7 +2015,7 @@ class OCRProcessor: ObservableObject {
 
                 completed += 1
                 progress = Double(completed) / Double(total) * 0.7
-                statusMessage = "OCR \(completed)/\(total) complete (parallel)"
+                statusMessage = "OCR \(completed)/\(total) complete (parallel)" + Self.rateLimitSuffix
 
                 // Add next task if available
                 if nextIndex < total {
