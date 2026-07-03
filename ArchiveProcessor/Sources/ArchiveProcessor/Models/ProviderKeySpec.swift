@@ -63,7 +63,7 @@ struct ProviderKeySpec: Identifiable, Sendable {
         costNote: "Free to create. OCR may need a paid plan — you'd add your own card in Mistral (charges go to Mistral, not this app).",
         privacyNote: "For sensitive documents, turn off training in Mistral’s Privacy settings, or use a paid plan (paid is opted out by default). Data is EU-hosted by default.",
         cardNote: "Have your phone ready for an SMS verification code.",
-        keyPrecheck: { $0.count >= 20 && !$0.contains(" ") },
+        keyPrecheck: { $0.count >= 20 && !$0.contains(" ") && !$0.hasPrefix("AIza") },   // reject a mis-pasted Gemini key
         validate: { await KeyValidator.validateMistral(key: $0) }
     )
 
