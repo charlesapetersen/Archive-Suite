@@ -21,38 +21,50 @@ final class CaptureSession: ObservableObject {
 
     // MARK: - Live processing mode (streaming vs. batch handoff)
 
-    /// How this session's captures are processed. Chosen once near the start of the session.
+    /// How this session's captures are processed. Resolved on first activity from the app-wide
+    /// **Settings** choice (`liveProcessingMode`), then fixed for the session.
     enum LiveProcessingMode: String { case undecided, stageForLater, live }
     @Published private(set) var processingMode: LiveProcessingMode = .undecided
-    /// The locked processing settings for a `.live` session (nil until confirmed).
+    /// The snapshotted processing settings for a `.live` session (nil until activated).
     @Published private(set) var config: SessionProcessingConfig?
-    /// Once the first segment has been processed, settings can no longer change.
+    /// Set once the first segment begins processing (the config is already snapshotted).
     @Published private(set) var settingsLocked = false
+    /// True once a phone has paired (pinged) or sent a photo — used to hide the QR.
+    @Published private(set) var paired = false
 
     /// Streaming coordinator (created on first use). Processes each segment during a `.live` session.
     private(set) lazy var liveProcessor = LiveCaptureProcessor(session: self)
 
-    func chooseLive(config: SessionProcessingConfig) {
-        guard !settingsLocked else { return }
+    /// The user's app-wide choice (Settings ⌘,): stream each segment live, or stage for a later batch run.
+    private var liveModeEnabled: Bool { UserDefaults.standard.string(forKey: "liveProcessingMode") == "live" }
+
+    /// On first activity, fix the session's processing mode from Settings and — for live — snapshot
+    /// the config so mid-session Settings changes don't affect the running session.
+    func activateProcessingIfNeeded() {
+        guard processingMode == .undecided else { return }
+        if liveModeEnabled {
+            let cfg = SessionProcessingConfig.fromDefaults()
+            config = cfg
+            processingMode = .live
+            liveProcessor.activate(config: cfg)
+        } else {
+            processingMode = .stageForLater
+        }
+    }
+
+    func markPaired() { paired = true }
+    /// Re-show the pairing QR (e.g. to pair a different phone); doesn't disconnect the current one.
+    func unpairDisplay() { paired = false }
+
+    /// Start a live session with an explicit config (used by the headless test driver).
+    func beginLiveSession(config: SessionProcessingConfig) {
         self.config = config
         processingMode = .live
         liveProcessor.activate(config: config)
     }
-    func chooseStageForLater() {
-        guard !settingsLocked else { return }
-        processingMode = .stageForLater
-        config = nil
-    }
-    /// Reopen the choice (only allowed before the first segment locks the session).
-    func resetProcessingChoice() {
-        guard !settingsLocked else { return }
-        processingMode = .undecided
-        config = nil
-    }
+
     /// Called by the streaming coordinator when the first segment begins processing.
-    func lockSettings() {
-        if config != nil { settingsLocked = true }
-    }
+    func lockSettings() { if config != nil { settingsLocked = true } }
 
     /// Short, easy-to-type bearer token the phone presents (shown in the pairing QR, and typeable
     /// for USB/manual pairing). **Stable across launches** (persisted) so a paired phone keeps
@@ -164,6 +176,8 @@ final class CaptureSession: ObservableObject {
         connectedDeviceName = deviceName ?? connectedDeviceName
         statusMessage = "Received \(photos.count) photo\(photos.count == 1 ? "" : "s")" + (deviceName.map { " from \($0)" } ?? "")
         writeManifest()
+        paired = true
+        activateProcessingIfNeeded()   // fix mode from Settings on first photo
         if processingMode == .live { liveProcessor.photoIngested(photo) }   // start OCR on arrival
         return finalURL
     }

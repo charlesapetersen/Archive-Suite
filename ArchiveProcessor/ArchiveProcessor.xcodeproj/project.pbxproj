@@ -20,6 +20,8 @@
 		371A1C5378BAAC2F31DEB825 /* OCRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE519DB723DEF9EE690B75F /* OCRView.swift */; };
 		3D8E1BF0DB0540FE4D94F124 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1336A6A82652DF9748694428 /* Assets.xcassets */; };
 		409BF603222531B6FB91A8AC /* CaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3E42E4C08CDBC05B7F9AFB /* CaptureModels.swift */; };
+		432F4A260326599508D52AEE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55EBFFC59F9D3601452D48B /* SettingsView.swift */; };
+		4DF4EC8B061213FFD0C667D3 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D3E7CAB2E353DF835B1207 /* ToolsView.swift */; };
 		683222758ABEE7C1E16B442C /* OCRPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */; };
 		7618A04F84EAAB11190B0495 /* AnthropicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */; };
 		781E1A90500243A9F9B182F6 /* RotationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2635DAB9C212C6B88B107E6A /* RotationDetector.swift */; };
@@ -46,7 +48,6 @@
 		DFCEE6244993F1623C58C1E2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B26C4CF437E24E4D1F8A8DA /* KeychainHelper.swift */; };
 		DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90F6E42E4FA19C125CC1A0A /* TagGenerator.swift */; };
 		E12D577E4C9F4FD712550CBD /* PDFToImageConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9599054C424B7CE60EC6C7 /* PDFToImageConverter.swift */; };
-		EBF0F52E7CCFBAC616CDB265 /* LiveSessionSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */; };
 		ED6330709937FDD549CF1434 /* ArchiveProcessorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA33D6A6A9E16A449C04DB52 /* ArchiveProcessorApp.swift */; };
 		EF52F84BA62DDDEE06B21476 /* ManageModelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CBF4F0E4A42B295AFC3B793 /* ManageModelsView.swift */; };
 		F1D78EE6F5E76BC734023CAB /* TagInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9149C20C69B7A53A3A765C85 /* TagInputField.swift */; };
@@ -72,11 +73,11 @@
 		46B71A5D1C7D45CCB93F7693 /* OCRPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRPrompt.swift; sourceTree = "<group>"; };
 		473BEF7CEA4B1BB2CBDD6182 /* CollectionFinalizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFinalizeSheet.swift; sourceTree = "<group>"; };
 		4BDE5EEEFDB9E67EB66D3E57 /* AnthropicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicClient.swift; sourceTree = "<group>"; };
-		4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionSettingsSheet.swift; sourceTree = "<group>"; };
 		5718CAD78B58981552C0BBA7 /* OCRProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRProcessor.swift; sourceTree = "<group>"; };
 		672DF0CBF6BA7523347EA3B2 /* GeminiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiClient.swift; sourceTree = "<group>"; };
 		718C8D44AD4281ECFCD22E3D /* BatchOCR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOCR.swift; sourceTree = "<group>"; };
 		7AE519DB723DEF9EE690B75F /* OCRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRView.swift; sourceTree = "<group>"; };
+		80D3E7CAB2E353DF835B1207 /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsView.swift; sourceTree = "<group>"; };
 		8972F19AE3CF0DB63D9476B9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8DE28B3830F33D79C626AECF /* MistralClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MistralClient.swift; sourceTree = "<group>"; };
 		9149C20C69B7A53A3A765C85 /* TagInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagInputField.swift; sourceTree = "<group>"; };
@@ -92,6 +93,7 @@
 		BA7CB9BC4F9472789E4B09AC /* LiveCaptureTestDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureTestDriver.swift; sourceTree = "<group>"; };
 		BE6A98B62C13E89DA5ED3DDF /* USBBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBBridge.swift; sourceTree = "<group>"; };
 		C17B9EBF69D0ECE117FF2F91 /* ProviderModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModels.swift; sourceTree = "<group>"; };
+		C55EBFFC59F9D3601452D48B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		C98F3B5353A75639380095DE /* CaptureServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureServer.swift; sourceTree = "<group>"; };
 		CBE4FA4A5DAA7C0892D4D5CC /* SessionProcessingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionProcessingConfig.swift; sourceTree = "<group>"; };
 		CDB6F995FE1FFDC02771F7DD /* LiveCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureView.swift; sourceTree = "<group>"; };
@@ -149,12 +151,13 @@
 				3DC9BAB3F789B2A167A323D8 /* DropReceiver.swift */,
 				175746529FD50FCD7CCD7AD1 /* KeyboardTokenField.swift */,
 				CDB6F995FE1FFDC02771F7DD /* LiveCaptureView.swift */,
-				4E899C50F1A89DC104C98CCC /* LiveSessionSettingsSheet.swift */,
 				2CBF4F0E4A42B295AFC3B793 /* ManageModelsView.swift */,
 				E760CA9C9C7D2039579CAD63 /* ManualSegmentTagView.swift */,
 				A662257BABACAA6C78DA8969 /* ManualTaggingSheet.swift */,
 				7AE519DB723DEF9EE690B75F /* OCRView.swift */,
+				C55EBFFC59F9D3601452D48B /* SettingsView.swift */,
 				9149C20C69B7A53A3A765C85 /* TagInputField.swift */,
+				80D3E7CAB2E353DF835B1207 /* ToolsView.swift */,
 				E824C503170331E2B6B28477 /* ZoomableImageView.swift */,
 			);
 			path = Views;
@@ -318,7 +321,6 @@
 				2A7B44006B6C9EAC0FF506E9 /* LiveCaptureProcessor.swift in Sources */,
 				9DC088C4AB1AFA61DCACFD45 /* LiveCaptureTestDriver.swift in Sources */,
 				9B29F513A193C1B2B18BB7FA /* LiveCaptureView.swift in Sources */,
-				EBF0F52E7CCFBAC616CDB265 /* LiveSessionSettingsSheet.swift in Sources */,
 				AFABDCD01FE4C6B96C91A22C /* MacOSTagger.swift in Sources */,
 				EF52F84BA62DDDEE06B21476 /* ManageModelsView.swift in Sources */,
 				BDAC142166A91D114B288FAD /* ManualSegmentTagView.swift in Sources */,
@@ -335,9 +337,11 @@
 				A09BF69D2DA69F060D9BE29B /* ProviderModels.swift in Sources */,
 				781E1A90500243A9F9B182F6 /* RotationDetector.swift in Sources */,
 				AA8D85413146B5934D228015 /* SessionProcessingConfig.swift in Sources */,
+				432F4A260326599508D52AEE /* SettingsView.swift in Sources */,
 				1AAD7B5145E74283A0C02556 /* SystemTagsProvider.swift in Sources */,
 				DFE43A2BA4F3E52D9AA21A81 /* TagGenerator.swift in Sources */,
 				F1D78EE6F5E76BC734023CAB /* TagInputField.swift in Sources */,
+				4DF4EC8B061213FFD0C667D3 /* ToolsView.swift in Sources */,
 				7FD5C6773B4EA10A947EED51 /* USBBridge.swift in Sources */,
 				7A1DAF60930B3EFECB9D83D0 /* ZoomableImageView.swift in Sources */,
 			);

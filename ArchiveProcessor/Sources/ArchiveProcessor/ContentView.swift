@@ -6,7 +6,7 @@ struct ContentView: View {
     @State private var mode: Mode =
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" ? .live : .files
 
-    enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture" }
+    enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture", tools = "Tools" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,6 +32,8 @@ struct ContentView: View {
                 OCRView(processor: processor)
             case .live:
                 LiveCaptureView(session: capture, processor: processor, liveProc: capture.liveProcessor, onProcess: { mode = .files })
+            case .tools:
+                ToolsView()
             }
         }
         .frame(minWidth: 900, minHeight: 700)

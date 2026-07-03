@@ -15,5 +15,9 @@ struct ArchiveProcessorApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }

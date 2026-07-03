@@ -4,6 +4,13 @@ A native macOS application for processing historical archive photograph collecti
 
 Built for archivists, historians, and researchers working with large digitized document collections.
 
+The app has three areas, selectable at the top of the window, plus a native Settings window:
+
+- **Process Files** — drop in images (or a folder) and run OCR + tagging + organization as a batch.
+- **Live Capture** — photograph documents with an Android companion app and stream them to the Mac; optionally OCR/tag/PDF **each segment as you shoot** so processing finishes with capture.
+- **Tools** — one-off diagnostics: compare OCR across models, and test how image resolution affects OCR.
+- **Settings (⌘,)** — all durable settings (provider, model, API key, rotation, tagging options, live-capture mode) in one place, with a live cost estimate for 1,000 files that updates as you change settings.
+
 ## Features
 
 ### Multi-Provider LLM OCR
@@ -13,10 +20,11 @@ Process scanned images through any of three LLM providers:
 | Provider | Models | Thinking Mode | Batch Processing |
 |----------|--------|---------------|------------------|
 | **Anthropic** | Claude Sonnet 4.6, Claude Opus 4.6 | Low / High | Yes |
-| **Google Gemini** | 2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 3 Flash Preview, 3.1 Pro Preview, 3.1 Flash Lite Preview | Low / High | Yes |
+| **Google Gemini** | 3.1 Flash Lite (default), 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite | Low / High | Yes |
 | **Mistral** | Mistral OCR 3 | — | Yes |
 
-- Switch providers and models at any time
+- Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates
+- Switch providers and models at any time (in **Settings**)
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
@@ -88,6 +96,7 @@ When tagging is enabled, the app:
 3. **Applies macOS Finder tags** to output PDFs:
    - Text tags via `NSURLTagNamesKey`
    - Color labels: Red for boxes, Purple for folders
+   - An **`Unread`** tag as the **last** tag on every output — but only in real-tagging modes (not "No tagging" or "Copy source tags") — so freshly processed files are easy to spot and triage
 4. **Exports JSON metadata** per segment (optional, toggleable)
 
 ### Custom Tag Vocabularies
@@ -132,14 +141,16 @@ Review generated tags in the file pane. Double-click any file to edit its classi
 #### 3. Collection Name Review (final step)
 Review and correct LLM-extracted collection names for box images before files are organized into collection folders.
 
-### Model Comparison Testing
+### Tools tab
 
-Built-in test UI for comparing OCR results across providers and models:
+Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
-- Select two provider/model combinations to compare side by side
-- Diff highlighting shows differences between outputs
-- "Use" button to adopt a model directly from test results
-- Selections persist across sessions
+- **Compare Models** — run one image through several provider/model combinations side by side, with diff highlighting, and adopt a model directly from the results.
+- **Test Resolution** — OCR one image at 10–100% resolution to see how downscaling trades accuracy against cost, then adopt a resolution.
+
+### Settings window (⌘,)
+
+All durable settings live in a native macOS Settings window: provider/model/API mode, API key (Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. A **cost-estimate pane pinned on the right** recomputes live (1,000 files ≈ 3 MB each) as you change settings, so the cost impact of each choice is immediately visible. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
 
 ### Pre-OCRed PDF Input
 
@@ -166,18 +177,36 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 - **Log file** — generated after processing, listing all failures with reasons
 - **Secure networking** — ephemeral URLSession, retry with backoff on transient errors, cellular network support
 
+## Live Capture (phone companion + streaming)
+
+Photograph documents with a phone and stream them straight into the pipeline — no scanner, no manual import. This is the **Live Capture** tab plus an Android companion app (`ArchiveCapture/`, Kotlin + Jetpack Compose + CameraX).
+
+**On the phone:** shoot document pages with a full-resolution shutter; mark **Box** (red) and **Folder** (purple) with dedicated buttons; **End segment** finishes a document. Minimal on-phone tagging per segment: **priority** (P7–P10, with a per-page P10 override via long-press) and **year/month**. Photos and their grouping/tags are written to disk immediately and uploaded via a durable, auto-retrying queue — so a photo (which can't be re-taken) is never lost, even across an app crash or an unplugged cable.
+
+**Pairing:** the Mac shows a QR code (host / port / token); the phone scans it. Works over the LAN, or over **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired.
+
+**On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/priority. The card is fully keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add / save, ⌫ to delete the previous tag).
+
+**Two processing modes** (chosen in Settings):
+
+- **Stage for later** — captures collect in Live Capture; send them to Process Files for a normal batch run.
+- **Process live** — each segment is **OCR'd on arrival**, tagged (Mac subjects, or the LLM), turned into a **PDF + a renamed copy of the original image** (dual output), merged if multi-page, and staged — all while you keep shooting. At **Finish session** you confirm each collection's name (auto-suggested from the box label's OCR, **fuzzy-matched against existing output folders** so you can append to one). New files are numbered continuing an existing collection's sequence. Processing is durable and resumable: a mid-session crash reloads the staging manifest and never re-OCRs already-processed segments; failed-OCR segments can be retried.
+
 ## Architecture
 
-- **Language:** Swift
-- **UI:** SwiftUI (macOS native)
-- **Concurrency:** Swift async/await with TaskGroup for parallel processing
+- **Language:** Swift (macOS app), Kotlin (Android companion)
+- **UI:** SwiftUI (macOS native), Jetpack Compose + CameraX (Android)
+- **Concurrency:** Swift async/await with TaskGroup for parallel processing (Swift 6 strict concurrency)
 - **PDF Generation:** Core Graphics with DCTDecode JPEG embedding and CTFramesetter for text layout
 - **Filesystem Tagging:** NSFileManager extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
-- **Networking:** URLSession with automatic retry and exponential backoff
+- **Networking:** URLSession with automatic retry and exponential backoff; a lightweight `NWListener` HTTP receiver for Live Capture (Bearer-token auth; `GET /ping`, `POST /photo`, `POST /session/complete`)
+- **Settings sharing:** durable settings persist in `UserDefaults`/`@AppStorage` (shared across the main window and the Settings window) + Keychain for API keys
 - **Key Storage:** macOS Keychain via Security framework
 - **Project Generation:** XcodeGen (`project.yml`)
 
 ## Building
+
+**macOS app:**
 
 ```bash
 cd ArchiveProcessor
@@ -185,37 +214,61 @@ xcodegen generate
 open ArchiveProcessor.xcodeproj
 ```
 
-Build and run with Xcode (macOS target).
+Build and run with Xcode (macOS target). Regenerate the project with `xcodegen generate` whenever files are added — `project.yml` is authoritative; don't hand-edit the `.pbxproj`.
+
+**Android companion (optional, for Live Capture):**
+
+```bash
+cd ArchiveCapture
+./gradlew assembleDebug        # → app/build/outputs/apk/debug/app-debug.apk
+```
+
+Sideload the APK to an Android phone, then pair by scanning the QR shown in the Mac app's Live Capture tab (LAN, or USB via `adb reverse`).
 
 ## Project Structure
 
 ```
 ArchiveProcessor/Sources/ArchiveProcessor/
-├── ArchiveProcessorApp.swift          # App entry point
-├── ContentView.swift                  # Root view
+├── ArchiveProcessorApp.swift          # App entry point (+ Settings scene, ⌘,)
+├── ContentView.swift                  # Root view: Process Files / Live Capture / Tools tabs
 ├── Models/
-│   ├── ProviderModels.swift           # LLMProvider, LLMModel, OCRResult, OCRJob
+│   ├── ProviderModels.swift           # LLMProvider, LLMModel, TaggingMode, RotationMode, OCRResult
 │   ├── CostEstimator.swift            # Pre-processing cost calculation
 │   └── KeychainHelper.swift           # Secure API key storage
 ├── OCR/
-│   ├── OCRProcessor.swift             # Main processing orchestrator
+│   ├── OCRProcessor.swift             # Main batch processing orchestrator
 │   ├── OCRPrompt.swift                # Prompt builder and response parser
-│   ├── AnthropicClient.swift          # Anthropic Messages API client
-│   ├── GeminiClient.swift             # Google Gemini API client
-│   ├── MistralClient.swift            # Mistral OCR API client
+│   ├── AnthropicClient / GeminiClient / MistralClient / OpenAICompatibleClient (gateway)
 │   ├── BatchOCR.swift                 # Batch clients for all three providers
 │   ├── PDFGenerator.swift             # Output PDF creation
-│   ├── PDFTextExtractor.swift         # Text extraction from existing PDFs
-│   ├── PDFToImageConverter.swift      # PDF-to-JPEG conversion for OCR
+│   ├── PDFTextExtractor / PDFToImageConverter
+│   ├── RotationDetector / LLMRotationDetector   # local Vision + LLM rotation
 │   └── NetworkSession.swift           # URLSession with retry logic
 ├── Tagging/
 │   ├── DocumentSegmenter.swift        # Document boundary detection
 │   ├── TagGenerator.swift             # LLM-based tag generation
 │   ├── CollectionSegmenter.swift      # Collection identification and organization
-│   └── MacOSTagger.swift              # macOS Finder tag application
+│   ├── MacOSTagger.swift              # macOS Finder tag application (+ trailing "Unread")
+│   └── SystemTagsProvider.swift       # Finder-tag autocomplete (background Spotlight)
+├── Capture/                           # Live Capture
+│   ├── CaptureModels.swift            # CapturedPhoto, CaptureGroup, MacSegmentTags
+│   ├── CaptureSession.swift           # Session state, durable manifest, pairing, mode
+│   ├── SessionProcessingConfig.swift  # Snapshot of settings for a live session
+│   └── LiveCaptureProcessor.swift     # Streaming coordinator (OCR→tag→PDF→stage→finalize)
+├── Net/
+│   ├── CaptureServer.swift            # NWListener HTTP receiver (Bearer token)
+│   └── USBBridge.swift                # adb reverse tunnel for USB pairing
 └── Views/
-    ├── OCRView.swift                  # Main UI with all controls and review sheets
+    ├── OCRView.swift                  # Process Files UI + review sheets
+    ├── SettingsView.swift             # Settings window (⌘,) + live cost pane
+    ├── ToolsView.swift                # Compare Models + Test Resolution
+    ├── LiveCaptureView.swift          # Live Capture UI (pairing, status, tag card)
+    ├── CollectionFinalizeSheet.swift  # End-of-session collection naming
+    ├── KeyboardTokenField.swift       # Keyboard-driven tag entry
     └── DropReceiver.swift             # Native NSView drag-and-drop handler
+
+ArchiveCapture/                        # Android companion app (Kotlin + Compose + CameraX)
+└── app/src/main/java/com/archiveprocessor/capture/  # capture/, data/, net/, ui/
 ```
 
 ## Potential Features

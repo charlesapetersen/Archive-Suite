@@ -46,7 +46,7 @@ enum LiveCaptureTestDriver {
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
             outputDirectory: outDir, contextCharCount: 0, sendPreviousImage: false,
             customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil)
-        session.chooseLive(config: config)
+        session.beginLiveSession(config: config)
         NSLog("TESTDRIVER: live session started, model=\(session.config?.model.id ?? "?"), out=\(outDir.path)")
 
         // Ingest each segment's images directly (bypassing the phone/network), then resolve documents.

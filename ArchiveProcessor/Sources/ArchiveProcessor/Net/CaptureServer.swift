@@ -161,6 +161,7 @@ final class CaptureServer: @unchecked Sendable {
         let route = "\(req.method) \(req.path.split(separator: "?").first ?? "")"
         switch route {
         case "GET /ping":
+            Task { @MainActor [weak self] in self?.session?.markPaired() }   // phone paired → hide QR
             respond(conn, status: "200 OK", json: ["ok": true, "app": "ArchiveProcessor"])
 
         case "POST /photo":

@@ -58,26 +58,13 @@ struct OCRView: View {
     @State private var captureSubjects: [[String]] = []
     @State private var isTargeted = false
     @State private var showKeychainSheet = false
-    @State private var showResolutionTest = false
-    @State private var showResolutionDropSheet = false
-    @State private var resolutionTestResults: [(scale: Int, text: String?)] = []
-    @State private var resolutionTestImage: URL?
-    @State private var isRunningResolutionTest = false
+    @Environment(\.scenePhase) private var scenePhase
 
     // Inline segmentation edit & review navigation
     @State private var editingFileIndex: Int? = nil
     @State private var csvDropTargeted = false
     @State private var reviewFocusedIndex: Int = 0
 
-    // Model comparison test state
-    @State private var showModelSelectionSheet = false
-    @State private var showModelTestDropSheet = false
-    @State private var showModelTestResults = false
-    @State private var modelTestSelections: [ModelTestEntry] = []
-    @State private var modelTestResults: [ModelTestResult] = []
-    @State private var modelTestImage: URL?
-    @State private var isRunningModelTest = false
-    @State private var showManageModels = false
     @ObservedObject private var customModelStore = CustomModelStore.shared
 
     init(processor: OCRProcessor) {
@@ -184,6 +171,19 @@ struct OCRView: View {
             captureSubjects = processor.stagedCaptureSubjects
             processor.stagedCaptureFiles = []
         }
+        .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
+            apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Returning from the Settings window: pick up any changed key / model / output folder.
+            guard phase == .active else { return }
+            apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+            if let path = UserDefaults.standard.string(forKey: "outputDirectory"), FileManager.default.fileExists(atPath: path) {
+                outputDirectory = URL(fileURLWithPath: path)
+            }
+            let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(selectedProvider.rawValue)") ?? ""
+            if let m = currentModels.first(where: { $0.id == modelId }) { selectedModel = m }
+        }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
         }
@@ -204,65 +204,6 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingManualSegTag) {
             ManualSegmentTagView(processor: processor)
-        }
-        .sheet(isPresented: $showResolutionDropSheet) {
-            ResolutionDropSheet { url in
-                showResolutionDropSheet = false
-                resolutionTestImage = url
-                runResolutionTest(imageURL: url)
-            } onDismiss: {
-                showResolutionDropSheet = false
-            }
-        }
-        .sheet(isPresented: $showResolutionTest) {
-            ResolutionTestSheet(
-                imageURL: resolutionTestImage,
-                results: resolutionTestResults,
-                isRunning: isRunningResolutionTest,
-                onSelect: { scale in
-                    imageScale = Double(scale)
-                    showResolutionTest = false
-                },
-                onDismiss: { showResolutionTest = false }
-            )
-        }
-        .sheet(isPresented: $showModelSelectionSheet) {
-            ModelSelectionSheet(
-                currentProvider: selectedProvider,
-                onStart: { entries in
-                    modelTestSelections = entries
-                    showModelSelectionSheet = false
-                    showModelTestDropSheet = true
-                },
-                onDismiss: { showModelSelectionSheet = false }
-            )
-        }
-        .sheet(isPresented: $showModelTestDropSheet) {
-            ResolutionDropSheet { url in
-                showModelTestDropSheet = false
-                modelTestImage = url
-                runModelTest(imageURL: url)
-            } onDismiss: {
-                showModelTestDropSheet = false
-            }
-        }
-        .sheet(isPresented: $showModelTestResults) {
-            ModelTestResultsSheet(
-                imageURL: modelTestImage,
-                results: modelTestResults,
-                isRunning: isRunningModelTest,
-                totalCount: modelTestSelections.count,
-                onSelect: { provider, model in
-                    selectedProvider = provider
-                    selectedModel = model
-                    apiKey = KeychainHelper.load(account: provider.rawValue) ?? ""
-                    showModelTestResults = false
-                },
-                onDismiss: { showModelTestResults = false }
-            )
-        }
-        .sheet(isPresented: $showManageModels) {
-            ManageModelsView()
         }
         .onChange(of: selectedModel) { _, newModel in
             UserDefaults.standard.set(newModel.id, forKey: "selectedModelId_\(selectedProvider.rawValue)")
@@ -331,382 +272,19 @@ struct OCRView: View {
                     }
                 }
 
-                // API Mode
-                Picker("API Mode", selection: $useGateway) {
-                    Text("Direct API").tag(false)
-                    Text("API Gateway").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: useGateway) { _, isGateway in
-                    apiKey = KeychainHelper.load(account: isGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
-                }
-
-                if useGateway {
-                    // Gateway Configuration
-                    GroupBox("Gateway Configuration") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Gateway URL")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                TextField("https://example.com/v1", text: $gatewayBaseURL)
-                                    .textFieldStyle(.roundedBorder)
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Model ID")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                TextField("e.g. claude-sonnet-4-6", text: $gatewayModelID)
-                                    .textFieldStyle(.roundedBorder)
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Display Name (for PDF headers)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                TextField("e.g. Stanford Gateway", text: $gatewayDisplayName)
-                                    .textFieldStyle(.roundedBorder)
-                            }
-
-                            Divider()
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Pricing (optional, for cost estimates)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                HStack(spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Input $/1M tokens")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                        TextField("—", value: Binding(
-                                            get: { gatewayInputCost >= 0 ? gatewayInputCost : nil },
-                                            set: { gatewayInputCost = $0 ?? -1 }
-                                        ), format: .number)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 100)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Output $/1M tokens")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                        TextField("—", value: Binding(
-                                            get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil },
-                                            set: { gatewayOutputCost = $0 ?? -1 }
-                                        ), format: .number)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 100)
-                                    }
-                                }
-                            }
-
-                            Text("All settings are saved automatically and persist across sessions.")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(4)
-                    }
-                } else {
-                    // Provider & Model (Direct mode)
-                    GroupBox("Provider & Model") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Picker("Provider", selection: Binding(
-                                get: { selectedProvider },
-                                set: { newProvider in
-                                    let savedId = UserDefaults.standard.string(forKey: "selectedModelId_\(newProvider.rawValue)") ?? ""
-                                    selectedModel = newProvider.models.first { $0.id == savedId } ?? newProvider.models[0]
-                                    apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
-                                    selectedProvider = newProvider
-                                }
-                            )) {
-                                ForEach(LLMProvider.allCases) { p in
-                                    Text(p.rawValue).tag(p)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-
-                            HStack {
-                                Picker("Model", selection: $selectedModel) {
-                                    ForEach(currentModels) { m in
-                                        let label = customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName
-                                        Text(label).tag(m)
-                                    }
-                                }
-                                Button {
-                                    showManageModels = true
-                                } label: {
-                                    Image(systemName: "plus.circle")
-                                }
-                                .buttonStyle(.borderless)
-                                .help("Add or manage custom models")
-                            }
-
-                            if selectedModel.supportsThinking {
-                                Picker("Thinking", selection: $selectedThinking) {
-                                    ForEach(ThinkingLevel.allCases) { t in
-                                        Text(t.rawValue).tag(t)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                            }
-
-                            Button("Compare Models…") {
-                                showModelSelectionSheet = true
-                            }
-                            .font(.caption)
-                            .disabled(isRunningModelTest)
-                        }
-                        .padding(4)
-                    }
-                }
-
-                // API Key
-                GroupBox(useGateway ? "Gateway API Key" : "API Key") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SecureField(useGateway ? "Enter gateway API key…" : "Enter \(selectedProvider.rawValue) API key…", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                        HStack(spacing: 4) {
-                            Image(systemName: "lock.shield")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("Stored securely in macOS Keychain.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Learn more") { showKeychainSheet = true }
-                                .font(.caption)
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                    .padding(4)
-                }
-
-                // Input Mode
-                GroupBox("Input Mode") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
-                        if preOCRedInput {
-                            Text("Accept PDFs that already contain OCR text. Skips OCR API calls and uses the existing text for tagging and collection segmentation.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(4)
-                }
-
-                // Rotation
-                GroupBox("Rotation Correction") {
+                // Tagging mode stays in the main UI; other settings are in the Settings window (⌘,).
+                GroupBox("Tagging") {
                     VStack(alignment: .leading, spacing: 4) {
-                        Picker("Detect rotation", selection: $rotationModeRaw) {
-                            ForEach(RotationMode.allCases) { mode in
+                        Picker("Tagging", selection: $taggingModeRaw) {
+                            ForEach(TaggingMode.allCases) { mode in
                                 Text(mode.displayName).tag(mode.rawValue)
                             }
                         }
-                        Text(rotationMode.detail)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        if rotationMode.usesLLM && selectedProvider == .mistral && !useGateway {
-                            Text("Mistral has no comparative vision path — rotation falls back to local Vision.")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                        }
-                        if rotationMode.usesLLM && useGateway {
-                            Text("API Gateway mode uses local Vision for rotation.")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                        }
+                        Text(taggingMode.detail).font(.caption2).foregroundStyle(.tertiary)
                     }
                     .padding(4)
                 }
 
-                // Tagging & Segmentation
-                GroupBox("Tagging & Segmentation") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Enable collection ID and file renaming", isOn: $enableCollectionSegmentation)
-                            .font(.caption)
-                        if enableCollectionSegmentation {
-                            Text("Identifies collections from box labels and organizes output PDFs into collection folders with sequential naming.")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-
-                            Toggle("Confirm identifications before organizing", isOn: $confirmCollectionIDs)
-                                .font(.caption)
-                                .padding(.leading, 16)
-
-                            Toggle("Review document segmentation", isOn: $reviewDocumentSegmentation)
-                                .font(.caption)
-                                .padding(.leading, 16)
-                            if reviewDocumentSegmentation {
-                                Text("Review and correct document start/continuation classifications for each collection before tagging.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.leading, 32)
-                            }
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Picker("Tagging", selection: $taggingModeRaw) {
-                                ForEach(TaggingMode.allCases) { mode in
-                                    Text(mode.displayName).tag(mode.rawValue)
-                                }
-                            }
-                            Text(taggingMode.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-
-                        if taggingMode.enablesTagging && taggingMode != .copySource {
-                            Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
-                                .font(.caption)
-                                .padding(.leading, 16)
-
-                            Divider()
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Context from previous page:")
-                                        .font(.caption)
-                                    Spacer()
-                                    Text("\(Int(contextCharCount)) chars")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Slider(value: $contextCharCount, in: 0...1000, step: 50)
-                                Text("Characters of the previous page's OCR text sent as context for segmentation.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-
-                            Divider()
-
-                            Toggle("Send previous page image (higher accuracy, higher cost)", isOn: $sendPreviousImage)
-                                .font(.caption)
-                            if sendPreviousImage {
-                                Text("Sends the full previous page image alongside the current image. ~2× image token cost but significantly better segmentation accuracy.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-
-                            if taggingMode == .automatic {
-                            Divider()
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Tag vocabulary (optional):")
-                                        .font(.caption)
-                                    Spacer()
-                                    Button("Load CSV…") { loadTagVocabularyCSV() }
-                                        .font(.caption)
-                                    if !tagVocabulary.isEmpty {
-                                        Button("Clear") { tagVocabulary = "" }
-                                            .font(.caption)
-                                    }
-                                }
-                                ZStack {
-                                    TextEditor(text: $tagVocabulary)
-                                        .font(.caption)
-                                        .frame(minHeight: 40, maxHeight: 80)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 4)
-                                                .stroke(csvDropTargeted ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: csvDropTargeted ? 2 : 1)
-                                        )
-                                    if tagVocabulary.isEmpty {
-                                        Text("Drop CSV here or type tags…")
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                            .allowsHitTesting(false)
-                                    }
-                                    DropReceiver(isTargeted: $csvDropTargeted) { urls in
-                                        if let url = urls.first { loadTagVocabularyFromURL(url) }
-                                    }
-                                }
-                                Text("One tag per line. Drop a CSV, click Load CSV, or type manually. The model will choose only from these tags. Leave blank for automatic tagging.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            } // end if taggingMode == .automatic
-                        } // end if tagging enabled (non-copy-source)
-
-                        Divider()
-
-                        Toggle("Merge multi-page documents", isOn: $mergeDocuments)
-                        if mergeDocuments {
-                            Text("Combines continuation pages into single multi-page PDFs. Each page's image is followed by its OCR text.")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .padding(.leading, 16)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Custom prompt (optional):")
-                                .font(.caption)
-                            TextEditor(text: $customOCRPrompt)
-                                .font(.caption)
-                                .frame(minHeight: 40, maxHeight: 80)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                                )
-                            Text("Additional context appended to the OCR prompt, e.g. \"This collection contains legal documents from the 1950s\"")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .padding(4)
-                }
-
-                // Batch & Resolution
-                GroupBox("Processing Mode") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Toggle("Batch Mode (slower, ~50% cheaper)", isOn: $batchMode)
-                            .disabled(useGateway)
-                        if useGateway {
-                            Text("Batch mode is not available when using an API gateway.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        } else if selectedProvider == .gemini && batchMode {
-                            Text("Gemini batch jobs may occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry or switch to non-batch mode.")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                        } else if batchMode {
-                            Text("Batch jobs are queued and returned asynchronously. Results may take minutes to hours.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("Image resolution:")
-                                    .font(.caption)
-                                Spacer()
-                                Text("\(Int(imageScale))%")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Slider(value: $imageScale, in: 5...100, step: 5)
-                            if imageScale < 100 {
-                                Text("Images downscaled to \(Int(imageScale))% of original dimensions (\(Int(imageScale * imageScale / 100))% pixel count). Lower resolution reduces cost but may reduce OCR accuracy.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-
-                            Button("Test Resolution…") {
-                                showResolutionDropSheet = true
-                            }
-                            .font(.caption)
-                            .disabled(apiKey.isEmpty || isRunningResolutionTest)
-                        }
-                    }
-                    .padding(4)
-                }
 
                 // Cost estimate
                 if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
@@ -1218,57 +796,6 @@ struct OCRView: View {
         panel.canCreateDirectories = true
         panel.prompt = "Select Output Folder"
         if panel.runModal() == .OK { outputDirectory = panel.url }
-    }
-
-    private func runResolutionTest(imageURL: URL) {
-        isRunningResolutionTest = true
-        resolutionTestResults = []
-        showResolutionTest = true
-        let scales = [10, 20, 40, 60, 80, 100]
-        let provider = selectedProvider
-        let gateway = currentGatewayConfig
-        let model = gateway?.asLLMModel() ?? selectedModel
-        let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil
-        let key = apiKey
-
-        Task {
-            for scale in scales {
-                let result = await OCRProcessor.performResolutionTestCall(
-                    imageURL: imageURL, provider: provider, model: model,
-                    thinkingLevel: thinking, apiKey: key,
-                    imageScale: Double(scale) / 100.0,
-                    gatewayConfig: gateway
-                )
-                resolutionTestResults.append((scale: scale, text: result.text))
-            }
-            isRunningResolutionTest = false
-        }
-    }
-
-    private func runModelTest(imageURL: URL) {
-        isRunningModelTest = true
-        modelTestResults = []
-        showModelTestResults = true
-        let entries = modelTestSelections
-        let scale = imageScale / 100.0
-
-        Task {
-            for entry in entries {
-                let result = await OCRProcessor.performResolutionTestCall(
-                    imageURL: imageURL, provider: entry.provider, model: entry.model,
-                    thinkingLevel: entry.model.supportsThinking ? .low : nil,
-                    apiKey: entry.apiKey,
-                    imageScale: scale
-                )
-                modelTestResults.append(ModelTestResult(
-                    provider: entry.provider,
-                    model: entry.model,
-                    text: result.text,
-                    errorMessage: result.errorMessage
-                ))
-            }
-            isRunningModelTest = false
-        }
     }
 
     private func isImageFile(_ url: URL) -> Bool {

@@ -13,7 +13,8 @@ struct LiveCaptureView: View {
     /// Switch the app back to the Files tab after staging captured photos for processing.
     var onProcess: () -> Void
 
-    @State private var showSettings = false
+    /// App-wide choice (Settings ⌘,): live streaming vs. staging for a later batch run.
+    @AppStorage("liveProcessingMode") private var liveProcessingMode: String = "stage"
 
     var body: some View {
         HSplitView {
@@ -34,9 +35,6 @@ struct LiveCaptureView: View {
         // then advances to the next (box/folder markers need no card).
         .sheet(item: Binding(get: { session.pendingTagGroup }, set: { _ in })) { group in
             SegmentTagCard(group: group, session: session)
-        }
-        .sheet(isPresented: $showSettings) {
-            LiveSessionSettingsSheet(session: session)
         }
         .sheet(isPresented: $liveProc.showFinalizeSheet) {
             CollectionFinalizeSheet(liveProc: liveProc)
@@ -73,82 +71,67 @@ struct LiveCaptureView: View {
 
                 GroupBox("Processing") {
                     VStack(alignment: .leading, spacing: 8) {
-                        switch session.processingMode {
-                        case .undecided:
-                            Text("Choose how this session's captures are processed:")
+                        let live = liveProcessingMode == "live"
+                        Label(live ? "Process live" : "Stage for later",
+                              systemImage: live ? "bolt.fill" : "tray.and.arrow.down")
+                            .font(.callout).fontWeight(.medium)
+                        Text(live ? "Each segment is OCR'd & tagged as you capture; finish the session to name collections."
+                                  : "Captures collect here; use Process to send them to the Files tab.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.tertiary)
+
+                        if live, let cfg = session.config {
+                            Text(cfg.summary).font(.caption2).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if live, !liveProc.statuses.isEmpty {
+                            Divider()
+                            let done = liveProc.statuses.filter { $0.phase == .staged }.count
+                            Text("\(done)/\(liveProc.statuses.count) segments processed")
                                 .font(.caption).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Button { showSettings = true } label: {
-                                Label("Process live", systemImage: "bolt.fill").frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            Button { session.chooseStageForLater() } label: {
-                                Label("Stage for later", systemImage: "tray.and.arrow.down").frame(maxWidth: .infinity)
-                            }
-                        case .stageForLater:
-                            Label("Stage for later", systemImage: "tray.and.arrow.down")
-                                .font(.callout).fontWeight(.medium)
-                            Text("Captures collect here; use Process to send them to the Files tab.")
-                                .font(.caption).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Button("Change…") { session.resetProcessingChoice() }.font(.caption)
-                        case .live:
-                            Label("Process live", systemImage: "bolt.fill")
-                                .font(.callout).fontWeight(.medium)
-                            if let cfg = session.config {
-                                Text(cfg.summary)
-                                    .font(.caption).foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Text("→ \(cfg.outputDirectory.lastPathComponent)")
-                                    .font(.caption2).foregroundStyle(.tertiary)
-                            }
-                            Text(session.settingsLocked
-                                 ? "Settings locked — processing has started."
-                                 : "Each segment processes as you finish tagging it.")
-                                .font(.caption2).foregroundStyle(.tertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            HStack {
-                                Button("Edit settings…") { showSettings = true }
-                                    .font(.caption).disabled(session.settingsLocked)
-                                Button("Change…") { session.resetProcessingChoice() }
-                                    .font(.caption).disabled(session.settingsLocked)
-                            }
-                            if !liveProc.statuses.isEmpty {
-                                Divider()
-                                let done = liveProc.statuses.filter { $0.phase == .staged }.count
-                                Text("\(done)/\(liveProc.statuses.count) segments processed")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        ForEach(liveProc.statuses) { s in
-                                            HStack(spacing: 6) {
-                                                Circle().fill(phaseColor(s.phase)).frame(width: 6, height: 6)
-                                                Text("\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p")
-                                                    .font(.caption2)
-                                                Spacer()
-                                                Text(s.phase.rawValue).font(.caption2).foregroundStyle(.secondary)
-                                            }
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    ForEach(liveProc.statuses) { s in
+                                        HStack(spacing: 6) {
+                                            Circle().fill(phaseColor(s.phase)).frame(width: 6, height: 6)
+                                            Text("\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p")
+                                                .font(.caption2)
+                                            Spacer()
+                                            Text(s.phase.rawValue).font(.caption2).foregroundStyle(.secondary)
                                         }
                                     }
                                 }
-                                .frame(maxHeight: 150)
-                                if !liveProc.failedGroupIds.isEmpty {
-                                    Button("Retry \(liveProc.failedGroupIds.count) failed OCR") { liveProc.retryFailed() }
-                                        .font(.caption).foregroundStyle(.red)
-                                }
                             }
-                            if let summary = liveProc.finalizeSummary {
-                                Divider()
-                                Label(summary, systemImage: "checkmark.circle.fill")
-                                    .font(.caption).foregroundStyle(.green)
-                                    .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxHeight: 150)
+                            if !liveProc.failedGroupIds.isEmpty {
+                                Button("Retry \(liveProc.failedGroupIds.count) failed OCR") { liveProc.retryFailed() }
+                                    .font(.caption).foregroundStyle(.red)
                             }
+                        }
+                        if live, let summary = liveProc.finalizeSummary {
+                            Divider()
+                            Label(summary, systemImage: "checkmark.circle.fill")
+                                .font(.caption).foregroundStyle(.green)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(6)
                 }
 
-                if session.serverRunning, let payload = pairingPayload {
+                if session.serverRunning, session.paired {
+                    GroupBox("Phone") {
+                        HStack(spacing: 6) {
+                            Image(systemName: "iphone.gen3").foregroundStyle(.green)
+                            Text(session.connectedDeviceName.map { "Paired · \($0)" } ?? "Paired")
+                                .font(.callout)
+                            Spacer()
+                            Button("Show QR") { session.unpairDisplay() }.font(.caption)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(6)
+                    }
+                } else if session.serverRunning, let payload = pairingPayload {
                     GroupBox("Pair the phone") {
                         VStack(spacing: 8) {
                             if let qr = Self.qrImage(from: payload) {
@@ -198,7 +181,7 @@ struct LiveCaptureView: View {
                 Spacer()
                 if !session.photos.isEmpty {
                     Button("Clear") { session.clear() }
-                    if session.processingMode != .live {
+                    if liveProcessingMode != "live" {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
                             .disabled(processor.isProcessing)

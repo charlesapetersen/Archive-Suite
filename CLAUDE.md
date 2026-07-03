@@ -110,10 +110,34 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 **Special tags**
 - Photographs of **boxes** → macOS `Red` tag
 - Photographs of **folders** → macOS `Purple` tag
+- Every output (PDF **and** any exported original image) → a trailing **`Unread`** tag, applied **last**, for triage. Only in real-tagging modes (`.automatic`/`.autoDate`/`.autoDateManualSeg`/`.human`) — never for "No tagging" or "Copy source tags". Implemented via `MacOSTagger.stampUnread` (armed from `TaggingMode.stampsUnread`).
 
 ### API Efficiency for Tagging
 - Minimize API calls — batch OCR results where possible before making tagging calls
 - Reuse OCR output; do not re-query the image for tagging if text is already extracted
+
+---
+
+---
+
+## Primary Function 3: Live Capture (phone companion + streaming)
+
+Photograph documents with an **Android companion app** (`ArchiveCapture/`, Kotlin + Compose + CameraX) and stream them to the Mac's Live Capture tab.
+
+- **On the phone:** full-res shutter; **Box** (red) / **Folder** (purple) markers; **End segment** finishes a document. Minimal on-phone tagging: priority (P7–P10 + per-page P10) and year/month. Durable disk queue with auto-retry — a photo is never lost (archival photos can't be re-taken). Idempotent re-upload on the Mac (same group+seq → replace).
+- **Pairing:** QR (host/port/token, Bearer-auth). LAN or **USB** (`adb reverse` → `127.0.0.1`, auto-run by the Mac). Stable token + pinned port survive Mac restarts; the QR hides once paired.
+- **Mac tagging:** an auto-advancing, keyboard-driven **tag card** per document segment (subjects via `SystemTagsProvider` autocomplete; editable date/priority).
+- **Two modes (chosen in Settings, `liveProcessingMode`):**
+  - **Stage for later** — captures collect, then hand off to Process Files for a batch run.
+  - **Process live** — each segment is OCR'd **on arrival**, tagged, turned into a **PDF + renamed original image** (dual output), merged if multi-page, and staged as you shoot. At **Finish session**, confirm each collection's name (auto-suggested from the box-label OCR, **fuzzy-matched against existing folders** to append; new files continue that folder's `NNNNN` numbering). Durable + resumable (staging manifest; failed-OCR retry).
+- **Key files:** `Capture/{CaptureModels,CaptureSession,SessionProcessingConfig,LiveCaptureProcessor}.swift`, `Net/{CaptureServer,USBBridge}.swift`, `Views/{LiveCaptureView,CollectionFinalizeSheet,KeyboardTokenField}.swift`.
+
+---
+
+## Settings & Tools
+
+- **Settings window (⌘,)** — `Views/SettingsView.swift`, a `Settings { }` scene. All durable settings (provider/model/API mode+key, input/batch/resolution, rotation, tagging options, custom models, live-capture mode) in a grouped `Form`, with a **pinned live cost-estimate pane** (1,000 files ≈ 3 MB). Shared with the main window via `@AppStorage`/UserDefaults + Keychain. The **tagging-mode dropdown** and **output folder** stay in the Process Files view.
+- **Tools tab** — `Views/ToolsView.swift`: **Compare Models** + **Test Resolution** (one-off diagnostics via `OCRProcessor.performResolutionTestCall`).
 
 ---
 
@@ -134,26 +158,24 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 ---
 
 ## Architecture Notes (macOS Native)
-- Language: Swift
-- UI framework: SwiftUI (or AppKit where needed)
-- Concurrency: Swift concurrency (async/await + TaskGroup) for parallel OCR workers
-- PDF generation: PDFKit (with dynamic page sizing for text page)
-- Filesystem tagging: `NSFileManager` extended attributes or `tag` CLI tool
-- Networking: URLSession for LLM API calls
+- Language: Swift (macOS app) + Kotlin (Android companion, `ArchiveCapture/`)
+- UI framework: SwiftUI (AppKit where needed); Android is Jetpack Compose + CameraX
+- Concurrency: Swift concurrency (async/await + TaskGroup) for parallel OCR workers; **Swift 6 strict concurrency** (`@MainActor`, `Sendable`, `nonisolated(unsafe)` for the few write-once statics)
+- PDF generation: Core Graphics (dynamic page sizing for the text page)
+- Filesystem tagging: `NSFileManager` extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
+- Networking: URLSession for LLM API calls; an `NWListener` HTTP receiver for Live Capture (`Net/CaptureServer.swift`)
+- Settings: durable settings in `UserDefaults`/`@AppStorage` (shared across the main window and the ⌘, Settings scene) + Keychain for keys
+- Build: XcodeGen — `project.yml` is authoritative; run `xcodegen generate` after adding files (never hand-edit `.pbxproj`)
 
 ---
 
-## Project Structure (planned)
+## Project Structure
 ```
 Archive Processor/
-├── CLAUDE.md
-├── Archive Processor.xcodeproj/
-├── Sources/
-│   ├── App/
-│   ├── OCR/          # LLM provider clients, batch logic
-│   ├── Tagging/      # Document segmentation, tag application
-│   ├── PDF/          # PDF generation (PDFKit)
-│   └── UI/           # SwiftUI views
-├── Test Files/       # Do not modify
-└── Test Outputs/     # Generated PDFs and log files from test runs
+├── CLAUDE.md, README.md, POTENTIAL_FEATURES.md
+├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
+│   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
+├── ArchiveCapture/                    # Android companion app (Gradle)
+└── Test Files/                        # Do NOT modify; write outputs only
 ```
+See the README's "Project Structure" for the full annotated file tree (Capture/, Net/, and the Views split into OCRView / SettingsView / ToolsView / LiveCaptureView / etc.).
