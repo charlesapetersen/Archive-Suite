@@ -72,6 +72,7 @@ struct SettingsView: View {
     @State private var geminiKey = ""
     @State private var mistralKey = ""
     @State private var gatewayKey = ""
+    @State private var showKeyWizard = false
     @State private var showManageModels = false
 
     init() {
@@ -244,6 +245,9 @@ struct SettingsView: View {
 
     @ViewBuilder private var apiKeySection: some View {
         Section {
+            Button { showKeyWizard = true } label: {
+                Label("Set up keys (guided) — Gemini & Mistral", systemImage: "wand.and.stars")
+            }
             keyField("Anthropic", account: LLMProvider.anthropic.rawValue, text: $anthropicKey)
             keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
             keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
@@ -251,8 +255,11 @@ struct SettingsView: View {
         } header: {
             HStack {
                 Text("API Keys")
-                HelpButton(text: "Each provider's key is stored separately and securely in the macOS Keychain. Enter a key for whichever provider(s) you use.")
+                HelpButton(text: "New here? Tap “Set up keys (guided)” to create your own free Gemini or Mistral key step by step, with a live check that it works. Or paste a key directly below. Each key is stored securely in the macOS Keychain; you only need one provider.")
             }
+        }
+        .sheet(isPresented: $showKeyWizard) {
+            ProviderKeyWizard { showKeyWizard = false }
         }
     }
 
@@ -263,8 +270,20 @@ struct SettingsView: View {
                 .onChange(of: text.wrappedValue) { _, k in
                     let t = k.trimmingCharacters(in: .whitespaces)
                     if t.isEmpty { KeychainHelper.delete(account: account) } else { KeychainHelper.save(account: account, password: t) }
+                    UserDefaults.standard.set(false, forKey: "keyValidated_\(account)")   // manual edit → needs re-validation
                     NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
                 }
+            keyStatusChip(account: account, hasKey: !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+    }
+
+    /// Small status chip: green "Validated" once the guided wizard's live check passed, else "Saved".
+    @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
+        if UserDefaults.standard.bool(forKey: "keyValidated_\(account)") {
+            Label("Validated", systemImage: "checkmark.seal.fill")
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
+        } else if hasKey {
+            Text("Saved").font(.caption).foregroundStyle(.secondary)
         }
     }
 
