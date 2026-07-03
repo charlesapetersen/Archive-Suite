@@ -46,6 +46,14 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     var armed by mutableStateOf(false)   // second tap: delete-armed (shows an X)
         private set
 
+    /** Running count of photos confirmed received by the Mac this session (they then leave the phone). */
+    var sentCount by mutableStateOf(0)
+        private set
+    /** Transient "just sent a segment/marker to the Mac" banner (auto-clears); drives transfer feedback. */
+    var transferFlash by mutableStateOf<String?>(null)
+        private set
+    private var flashJob: kotlinx.coroutines.Job? = null
+
     private var seqCounter = 0
     private var nextId = 1L
 
@@ -60,6 +68,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             seqCounter = r.seq
             nextId = r.nextId
             r.groupId?.let { currentGroupId = it }
+            // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone
+            // shows only what still needs sending (mirrors the normal post-upload cleanup).
+            items.filter { it.state == UploadState.UPLOADED }.toList().forEach { i ->
+                runCatching { i.file.delete() }; items.remove(i)
+            }
             if (items.isNotEmpty()) statusMessage = "Restored ${items.size} photo(s) from last session"
             resumeUploads()
         }
@@ -71,8 +84,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
     private fun resumeUploads() {
         if (client == null) return
-        items.filter { it.state == UploadState.UPLOADING || it.state == UploadState.FAILED }
-            .forEach { enqueueUpload(it) }
+        // Re-send anything not yet on the Mac: in-flight/failed of any kind, plus a PENDING marker
+        // (box/folder captured while unpaired — it never got enqueued). Buffered PENDING document pages
+        // are intentionally NOT sent here; they wait for "End segment" so they can be tagged first.
+        items.filter {
+            it.state == UploadState.UPLOADING || it.state == UploadState.FAILED ||
+                (it.state == UploadState.PENDING && it.type != GroupType.DOCUMENT)
+        }.forEach { enqueueUpload(it) }
     }
 
     /** Background self-heal: periodically re-send failed uploads so an unplug/replug (or any brief
@@ -82,8 +100,14 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             while (true) {
                 delay(8_000)
-                if (client != null && items.any { it.state == UploadState.FAILED }) {
-                    items.filter { it.state == UploadState.FAILED }.forEach { enqueueUpload(it) }
+                // Flush failed uploads and any stuck PENDING marker (unpaired capture); leave buffered
+                // document pages alone until "End segment".
+                val needsSend = items.filter {
+                    it.state == UploadState.FAILED ||
+                        (it.state == UploadState.PENDING && it.type != GroupType.DOCUMENT)
+                }
+                if (client != null && needsSend.isNotEmpty()) {
+                    needsSend.forEach { enqueueUpload(it) }
                 }
             }
         }
@@ -145,6 +169,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         statusMessage = if (type == GroupType.BOX) "Box captured" else "Folder captured"
         persist()
         enqueueUpload(item)
+        flash(if (type == GroupType.BOX) "Box → Mac" else "Folder → Mac")
     }
 
     /** Long-press a page thumbnail to toggle a per-page P10 override. */
@@ -157,6 +182,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearSelection() { selectedItemId = null; armed = false }
+
+    /** Show a brief transfer banner (auto-clears after a couple of seconds). */
+    private fun flash(message: String) {
+        transferFlash = message
+        flashJob?.cancel()
+        flashJob = viewModelScope.launch { delay(2500); transferFlash = null }
+    }
 
     /** Tap cycle on a thumbnail: select → arm (show X) → delete. */
     fun tapItem(id: Long) {
@@ -175,6 +207,20 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         }
         clearSelection()
         persist()
+    }
+
+    /** A photo confirmed received by the Mac is durably safe there, so remove it from the phone
+     *  (frees storage; keeps the strip showing only in-flight/queued pages, never a growing pile). */
+    private fun removeConfirmed(item: CapturedItem) {
+        // Guard by identity + state so a stale delayed-removal can never delete a different/newer photo
+        // that reused this id (e.g. after Clear resets the id counter) — only the same, still-UPLOADED file.
+        val i = items.indexOfFirst { it.id == item.id && it.file == item.file }
+        if (i >= 0 && items[i].state == UploadState.UPLOADED) {
+            runCatching { items[i].file.delete() }
+            items.removeAt(i)
+            if (selectedItemId == item.id) clearSelection()
+            persist()
+        }
     }
 
     /** Reclassify the selected photo as a single-image box/folder marker (own group) and upload it. */
@@ -202,14 +248,17 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     fun applyTagsAndContinue(priority: String?, year: Int?, month: Int?) {
         val gid = pendingTagGroupId ?: return
         year?.let { prefs.noteYear(it) }
+        var n = 0
         for (i in items.indices) {
             val it = items[i]
             if (it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING) {
                 val stamped = it.copy(priority = it.priority ?: priority, year = year, month = month)
                 items[i] = stamped
                 enqueueUpload(stamped)
+                n++
             }
         }
+        if (n > 0) flash("Segment → Mac · $n page${if (n == 1) "" else "s"}")
         pendingTagGroupId = null
         startNewGroup()
         persist()
@@ -245,6 +294,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
+            if (ok) {
+                sentCount += 1
+                // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
+                // lets the strip animate it out), so photos transfer in segments instead of piling up.
+                viewModelScope.launch { delay(650); removeConfirmed(item) }
+            }
             statusMessage = uploadSummary()
         }
     }
@@ -267,6 +322,8 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         currentGroupId = newGroupId()
         pendingTagGroupId = null
         clearSelection()
+        sentCount = 0
+        transferFlash = null
         statusMessage = ""
         store.clear()
     }
@@ -280,8 +337,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun uploadSummary(): String {
-        val up = items.count { it.state == UploadState.UPLOADED }
         val failed = items.count { it.state == UploadState.FAILED }
-        return "$up uploaded" + if (failed > 0) ", $failed failed" else ""
+        val inflight = items.count { it.state == UploadState.PENDING || it.state == UploadState.UPLOADING }
+        return buildString {
+            append("$sentCount sent to Mac")
+            if (inflight > 0) append(" · $inflight queued")
+            if (failed > 0) append(" · $failed failed")
+        }
     }
 }

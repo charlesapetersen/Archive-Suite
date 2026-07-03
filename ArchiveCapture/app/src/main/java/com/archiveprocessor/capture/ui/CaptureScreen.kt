@@ -14,6 +14,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,10 +81,13 @@ fun CaptureScreen(vm: CaptureViewModel) {
     val controller = remember { LifecycleCameraController(context) }
     LaunchedEffect(hasCam) { if (hasCam) controller.bindToLifecycle(lifecycleOwner) }
 
+    // The strip shows only current in-flight work — document pages (queued/transferring) plus any failed
+    // markers to retry. Confirmed uploads leave the phone, so images never pile up here.
+    val strip = vm.items.filter { it.type == GroupType.DOCUMENT || it.state == UploadState.PENDING || it.state == UploadState.FAILED }
     // Auto-scroll the strip so the newest capture stays in view.
     val listState = rememberLazyListState()
-    LaunchedEffect(vm.items.size) {
-        if (vm.items.isNotEmpty()) listState.animateScrollToItem(vm.items.size - 1)
+    LaunchedEffect(strip.size) {
+        if (strip.isNotEmpty()) listState.animateScrollToItem(strip.size - 1)
     }
 
     var showClearConfirm by remember { mutableStateOf(false) }
@@ -122,17 +129,36 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 TextButton(onClick = { vm.finishSession() }) { Text("Finish", color = Color.White) }
             }
 
-            // Recent captures (auto-scrolling; tap a page to toggle its P10 override).
-            if (vm.items.isNotEmpty()) {
+            // Transfer feedback: segments/markers fly to the Mac; images don't accumulate on the phone.
+            val uploading = vm.items.count { it.state == UploadState.UPLOADING }
+            if (vm.transferFlash != null || uploading > 0 || vm.sentCount > 0) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AnimatedVisibility(visible = vm.transferFlash != null, enter = fadeIn(), exit = fadeOut()) {
+                        Text("⤴ ${vm.transferFlash ?: ""}", color = Color(0xFF34C759), style = MaterialTheme.typography.labelLarge)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (uploading > 0) Text("Transferring $uploading…", color = Color(0xFFFFCC00), style = MaterialTheme.typography.labelMedium)
+                    if (vm.sentCount > 0) Text("${vm.sentCount} on Mac ✓", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            // Current segment (auto-scrolling; tap a page to toggle its P10 override). Confirmed pages
+            // animate out as they reach the Mac, so the strip reflects only what's still transferring.
+            if (strip.isNotEmpty()) {
                 LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(vm.items) { item ->
-                        Thumb(
-                            item = item,
-                            isSelected = vm.selectedItemId == item.id && !vm.armed,
-                            isArmed = vm.selectedItemId == item.id && vm.armed,
-                            onTap = { vm.tapItem(item.id) },
-                            onLongPress = { vm.toggleP10(item.id) }
-                        )
+                    items(strip, key = { it.id }) { item ->
+                        AnimatedVisibility(
+                            visible = item.state != UploadState.UPLOADED,
+                            exit = fadeOut() + slideOutVertically { -it }
+                        ) {
+                            Thumb(
+                                item = item,
+                                isSelected = vm.selectedItemId == item.id && !vm.armed,
+                                isArmed = vm.selectedItemId == item.id && vm.armed,
+                                onTap = { vm.tapItem(item.id) },
+                                onLongPress = { vm.toggleP10(item.id) }
+                            )
+                        }
                     }
                 }
             }
