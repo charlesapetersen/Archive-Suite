@@ -108,8 +108,16 @@ final class LiveCaptureProcessor: ObservableObject {
     private func loadStagingManifest() {
         guard let stagingDir else { return }
         let url = stagingDir.appendingPathComponent("staging-manifest.json")
-        guard let data = try? Data(contentsOf: url),
-              let restored = try? JSONDecoder().decode([StagedSegment].self, from: data), !restored.isEmpty else { return }
+        guard let data = try? Data(contentsOf: url) else { return }
+        let decoder = JSONDecoder()
+        var restored: [StagedSegment] = []
+        if let manifest = try? decoder.decode(StagingManifest.self, from: data) {
+            restored = manifest.staged
+            for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
+        } else if let legacy = try? decoder.decode([StagedSegment].self, from: data) {
+            restored = legacy   // legacy manifest (pre-rotation-review): no retained inputs
+        }
+        guard !restored.isEmpty else { return }
         staged = restored
         for s in restored {
             finalizedGroups.insert(s.groupId)
@@ -272,15 +280,16 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
 
-    private struct PageWork: Sendable {
+    private struct PageWork: Sendable, Codable {
         let sourceURL: URL
         let result: OCRResult
         let priority: String?
     }
 
     /// All inputs to `writeSegmentFiles` for one finalized segment, retained so the end-of-session
-    /// rotation review can regenerate it with corrected page rotation.
-    private struct RetainedSegment: Sendable {
+    /// rotation review can regenerate it with corrected page rotation. Persisted in the staging
+    /// manifest so the review still works after a crash/relaunch resume.
+    private struct RetainedSegment: Sendable, Codable {
         let groupId: String
         let type: CaptureGroupType
         let collectionKey: String
@@ -394,10 +403,18 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - Manifest + status
 
+    /// On-disk staging manifest: staged segments plus the per-segment write inputs needed to
+    /// regenerate a segment during the end-of-session rotation review after a crash/relaunch.
+    private struct StagingManifest: Codable {
+        var staged: [StagedSegment]
+        var retained: [RetainedSegment]
+    }
+
     private func persistManifest() {
         guard let stagingDir else { return }
         let url = stagingDir.appendingPathComponent("staging-manifest.json")
-        if let data = try? JSONEncoder().encode(staged) { try? data.write(to: url, options: .atomic) }
+        let manifest = StagingManifest(staged: staged, retained: Array(retained.values))
+        if let data = try? JSONEncoder().encode(manifest) { try? data.write(to: url, options: .atomic) }
     }
 
     private func upsertStatus(groupId: String, type: CaptureGroupType, pageCount: Int, phase: SegmentStatus.Phase) {
@@ -475,9 +492,14 @@ final class LiveCaptureProcessor: ObservableObject {
             changedGroups.insert(page.groupId)
         }
         rotationReviewPages = []
-        guard !changedGroups.isEmpty, let stagingDir else { beginFinalize(); return }
-
-        let segsToRegen = changedGroups.compactMap { retained[$0] }
+        // Only regenerate segments whose source photos ALL still exist on disk. Regenerating from a
+        // missing source (e.g. the operator hit "Clear" before Finish, deleting the originals) would
+        // overwrite good staged output with an image-less/broken file — so keep the existing output.
+        let fm = FileManager.default
+        let segsToRegen = changedGroups
+            .compactMap { retained[$0] }
+            .filter { seg in seg.pages.allSatisfy { fm.fileExists(atPath: $0.sourceURL.path) } }
+        guard !segsToRegen.isEmpty, let stagingDir else { beginFinalize(); return }
         isFinalizing = true
         Task { [weak self] in
             let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in

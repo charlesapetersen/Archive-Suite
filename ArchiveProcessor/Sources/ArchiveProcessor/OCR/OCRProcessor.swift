@@ -3464,6 +3464,12 @@ class OCRProcessor: ObservableObject {
                     gatewayDisplayName: currentGateway?.displayName,
                     pdfImageMB: Self.pdfImageMB
                 )
+                // Regenerating rewrites the file, dropping its Finder tags. In copy-source mode the
+                // tags were applied during OCR and nothing re-applies them later, so restore them now.
+                // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
+                if passSourceTags {
+                    try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL)
+                }
             }
         }
     }

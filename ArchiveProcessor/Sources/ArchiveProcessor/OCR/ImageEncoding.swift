@@ -128,10 +128,23 @@ enum ImageEncoding {
             newHeight = h
         }
 
-        let space = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo: UInt32 = space.numberOfComponents == 1
-            ? CGImageAlphaInfo.none.rawValue
-            : CGImageAlphaInfo.noneSkipLast.rawValue
+        // Pick a context color space CoreGraphics can actually back. Grayscale → gray+none; RGB →
+        // source space + noneSkipLast. Anything else (notably CMYK, whose noneSkipLast context is
+        // unsupported and returns nil) is rendered into DeviceRGB — CoreGraphics converts on draw,
+        // matching the RGB image the JPEG export path already produces via orientedCGImage.
+        let sourceSpace = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let space: CGColorSpace
+        let bitmapInfo: UInt32
+        if sourceSpace.numberOfComponents == 1 {
+            space = sourceSpace
+            bitmapInfo = CGImageAlphaInfo.none.rawValue
+        } else if sourceSpace.numberOfComponents == 3 {
+            space = sourceSpace
+            bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
+        } else {
+            space = CGColorSpaceCreateDeviceRGB()
+            bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
+        }
         guard let context = CGContext(data: nil, width: newWidth, height: newHeight, bitsPerComponent: 8,
                                       bytesPerRow: 0, space: space, bitmapInfo: bitmapInfo) else { return nil }
 

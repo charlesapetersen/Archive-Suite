@@ -1,6 +1,6 @@
 import Foundation
 
-struct GeneratedTags {
+struct GeneratedTags: Codable {
     var year: String?             // e.g. "1987"
     var month: String?            // e.g. "03 March"
     var day: String?              // e.g. "Day 15"
