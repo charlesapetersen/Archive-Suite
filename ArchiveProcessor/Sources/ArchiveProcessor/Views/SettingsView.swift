@@ -246,7 +246,13 @@ struct SettingsView: View {
     @ViewBuilder private var inputSection: some View {
         Section("Input & Processing") {
             Toggle("Pre-OCRed PDF input", isOn: $preOCRedInput)
-            Toggle("Batch mode (slower, ~50% cheaper)", isOn: $batchMode).disabled(useGateway)
+            Toggle(isOn: $batchMode) {
+                HStack {
+                    Text("Batch mode (slower, ~50% cheaper)")
+                    HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
+                }
+            }
+            .disabled(useGateway)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Image resolution")
