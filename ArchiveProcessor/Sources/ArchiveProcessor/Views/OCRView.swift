@@ -110,7 +110,7 @@ struct OCRView: View {
         return CostEstimator.estimate(
             fileCount: droppedFiles.count,
             model: model,
-            enableTagging: enableTagging,
+            enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
             sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
@@ -127,7 +127,7 @@ struct OCRView: View {
         let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
         return TimeEstimator.estimate(
             fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
-            sequentialOCR: contextCharCount > 0, enableTagging: enableTagging,
+            sequentialOCR: contextCharCount > 0, enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
     }
@@ -330,7 +330,7 @@ struct OCRView: View {
                                     Text(est.classificationFormatted)
                                 }
                             }
-                            if enableTagging && !passSourceTags {
+                            if taggingMode.llmTags {
                                 HStack {
                                     Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
                                     Spacer()
@@ -375,7 +375,7 @@ struct OCRView: View {
                                     Spacer()
                                     Text(t.totalFormatted).fontWeight(.medium)
                                 }
-                                Text("Processing time only (no user interaction). OCR \(t.ocrFormatted)\(t.rotationSeconds > 0 ? " · rotation \(t.rotationFormatted) (overlaps OCR)" : "")\(enableTagging && !passSourceTags ? " · tagging \(t.taggingFormatted)" : "").")
+                                Text("Processing time only (no user interaction). OCR \(t.ocrFormatted)\(t.rotationSeconds > 0 ? " · rotation \(t.rotationFormatted) (overlaps OCR)" : "")\(taggingMode.llmTags ? " · tagging \(t.taggingFormatted)" : "").")
                                     .font(.caption2).foregroundStyle(.tertiary)
                             }
                         }
@@ -938,6 +938,14 @@ struct FileRowView: View {
     var isFocused: Bool = false
     /// Live Capture segmentation to show before a job exists (falls back to `job.classification`).
     var presetClassification: DocumentClassification? = nil
+    @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+
+    /// In manual-segmentation modes the user defines document boundaries, so the model's
+    /// start/continuation guesses are meaningless and shouldn't be shown (box/folder still are).
+    private func shows(_ c: DocumentClassification) -> Bool {
+        let manualSeg = (TaggingMode(rawValue: taggingModeRaw) ?? .automatic).usesManualSegmentationUI
+        return !(manualSeg && (c == .documentStart || c == .documentContinuation))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -957,7 +965,7 @@ struct FileRowView: View {
                         .foregroundStyle(.orange)
                         .clipShape(Capsule())
                 }
-                if let classification = job?.classification ?? presetClassification {
+                if let classification = job?.classification ?? presetClassification, shows(classification) {
                     Text(classification.displayName)
                         .font(.caption2)
                         .padding(.horizontal, 6)
@@ -1005,7 +1013,7 @@ struct FileRowView: View {
     }
 
     private var classificationBackground: Color {
-        guard let classification = job?.classification ?? presetClassification else { return .clear }
+        guard let classification = job?.classification ?? presetClassification, shows(classification) else { return .clear }
         switch classification {
         case .documentStart: return .blue.opacity(0.06)
         case .documentContinuation: return .green.opacity(0.06)

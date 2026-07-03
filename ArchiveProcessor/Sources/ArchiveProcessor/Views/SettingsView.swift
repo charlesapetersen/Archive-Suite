@@ -113,7 +113,7 @@ struct SettingsView: View {
     // MARK: Fixed cost pane (stays put while the form scrolls)
 
     @ViewBuilder private var costPane: some View {
-        let tagging = taggingMode.enablesTagging && taggingMode != .copySource
+        let tagging = taggingMode.llmTags   // LLM tag/date calls (excludes Human / Copy-source / None)
         VStack(alignment: .leading, spacing: 6) {
             Text("Estimate — 1,000 files").font(.headline)
             Text("~\(String(format: "%.2g", standardImageSizeMB)) MB each")
@@ -151,6 +151,10 @@ struct SettingsView: View {
                 if enableCollectionSegmentation { costRow("· Collection", time.collectionFormatted) }
                 if time.rotationSeconds > 0 {
                     Text("*runs during OCR").font(.caption2).foregroundStyle(.tertiary)
+                }
+                if batchMode && !useGateway && !preOCRedInput {
+                    Text("Batch mode returns asynchronously (minutes–hours); the time above is the equivalent interactive run.")
+                        .font(.caption2).foregroundStyle(.orange)
                 }
 
                 Spacer()
@@ -274,19 +278,20 @@ struct SettingsView: View {
             Toggle(isOn: $batchMode) {
                 HStack {
                     Text("Batch mode (slower, ~50% cheaper)")
-                    HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
+                    HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway or pre-OCRed input.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
                 }
             }
-            .disabled(useGateway)
+            .disabled(useGateway || preOCRedInput)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Image resolution")
-                    HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution.")
+                    HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution. Not used for pre-OCRed input (no images are sent).")
                     Spacer()
                     Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary)
                 }
                 Slider(value: $imageScale, in: 5...100, step: 5)
             }
+            .disabled(preOCRedInput)
             HStack {
                 Text("Standard image size")
                 HelpButton(text: "The reference size the resolution slider targets (default 3 MB). Set it to your collection's typical image size.")
@@ -296,6 +301,7 @@ struct SettingsView: View {
                 Text("MB").foregroundStyle(.secondary)
                 Stepper("", value: $standardImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
             }
+            .disabled(preOCRedInput)
             HStack {
                 Text("Parallel OCR workers: \(ocrWorkerCount)")
                 HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
@@ -315,6 +321,7 @@ struct SettingsView: View {
                     HelpButton(text: "\(rotationMode.detail)\n\nTime impact: Off / Local Vision add no LLM time. Single (default) makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
                 }
             }
+            .disabled(preOCRedInput)
         } header: { Text("Rotation Correction") }
     }
 
@@ -359,10 +366,10 @@ struct SettingsView: View {
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")
-                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Only used when the model does the segmentation (Automatic / Auto-date); in manual-segmentation modes it's ignored, so it adds no cost. Gemini/Anthropic only.")
+                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Only used when the model does the segmentation (Automatic / Auto-date); in manual-segmentation or pre-OCRed modes it's ignored, so it adds no cost. Gemini/Anthropic only.")
                     }
                 }
-                .disabled(!taggingMode.llmSegments)
+                .disabled(!taggingMode.llmSegments || preOCRedInput)
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {

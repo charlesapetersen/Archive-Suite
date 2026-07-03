@@ -106,6 +106,10 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
     /// (or there's no segmentation), so those settings are irrelevant.
     var llmSegments: Bool { self == .automatic || self == .autoDate }
 
+    /// Whether the LLM makes per-segment tagging/date calls (drives the tagging cost/time estimate).
+    /// Excludes `.human` (user enters everything), `.copySource`, and `.none` (no LLM tagging calls).
+    var llmTags: Bool { self == .automatic || self == .autoDate || self == .autoDateManualSeg }
+
     /// Whether the LLM fills in the date automatically.
     var autoFillsDate: Bool { self == .autoDateManualSeg }
 
