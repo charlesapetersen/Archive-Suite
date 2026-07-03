@@ -7,6 +7,7 @@ struct CaptureScreen: View {
     @ObservedObject var vm: CaptureViewModel
     @StateObject private var camera = CameraController()
     @State private var showClearConfirm = false
+    @State private var isCapturing = false
 
     /// Current in-flight work: document pages, plus any PENDING/FAILED marker needing attention.
     private var strip: [CapturedItem] {
@@ -76,6 +77,7 @@ struct CaptureScreen: View {
                         .background(Color(red: 0.48, green: 0.12, blue: 0.64)).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .disabled(isCapturing)
 
                 if !vm.statusMessage.isEmpty {
                     Text(vm.statusMessage).font(.caption2).foregroundStyle(.white.opacity(0.6))
@@ -104,7 +106,10 @@ struct CaptureScreen: View {
     /// Reclassify a selected page into a Box/Folder if one is selected; otherwise take a new photo.
     private func capture(_ type: GroupType) {
         if type != .document, vm.selectedItemId != nil { vm.reclassifySelected(type); return }
+        guard !isCapturing else { return }
+        isCapturing = true
         camera.capturePhoto { data in
+            isCapturing = false
             guard let data else { return }
             let url = vm.newCaptureFileURL()
             guard (try? data.write(to: url)) != nil else { return }
