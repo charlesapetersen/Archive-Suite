@@ -279,7 +279,7 @@ final class LiveCaptureProcessor: ObservableObject {
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
-                if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB) {
+                if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
                     try? MacOSTagger.applyTags(tagList, to: stagedImg)
                     imageURLs.append(stagedImg)
                 }

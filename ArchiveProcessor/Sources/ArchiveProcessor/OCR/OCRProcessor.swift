@@ -140,6 +140,9 @@ class OCRProcessor: ObservableObject {
     }
     /// How image rotation is detected. Set from the UI before a run.
     var rotationMode: RotationMode = .llmSingle
+    /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
+    /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
+    var reviewRotation = false
     /// The active run's rotation mode, readable from the nonisolated OCR call. Only one run
     /// executes at a time, so a static is safe here.
     nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
@@ -210,6 +213,10 @@ class OCRProcessor: ObservableObject {
     /// Whether the document review sheet should offer New-Document / Continuation options
     /// (only meaningful when merging or tagging by segment).
     @Published var reviewShowsDocumentClasses = true
+    /// When true, the shared review sheet is the dedicated rotation-review pass: it shows ONLY the
+    /// rotation control (no classification/box-folder radios). When false it's the segmentation/
+    /// tagging review, which shows classification only (rotation is a separate step, applied for display).
+    @Published var reviewRotationOnly = false
     private var documentReviewContinuation: CheckedContinuation<Void, Never>?
 
     /// Final box/folder confirmation review state (shown after document segmentation review)
@@ -1200,6 +1207,14 @@ class OCRProcessor: ObservableObject {
             )
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            // Dedicated rotation review (opt-in) — a fast, standalone pass, separate from and BEFORE
+            // the segmentation/tagging review, and run in EVERY tagging mode. It bakes the corrected
+            // rotation into each output PDF; the exported JPG then picks up the same value.
+            if reviewRotation && rotationMode != .off {
+                await showRotationReview(files: files)
+                guard !Task.isCancelled else { cleanupTempFiles(); return }
+            }
 
             // Segmentation: pre-grouped from Live Capture, else the interactive LLM review.
             if preGroupedBoundaries.count == files.count && !files.isEmpty {
@@ -2311,20 +2326,22 @@ class OCRProcessor: ObservableObject {
         let exportedMB = Self.exportedImageMB
         // Snapshot the work on the main actor… The exported image is always a .jpg sized toward the
         // exported-image target (independent of the source/camera size).
-        let work: [(src: URL, img: URL, pdf: URL)] = jobs.compactMap { job in
+        let work: [(src: URL, img: URL, pdf: URL, rot: Int)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
                   FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
             // For PDF inputs, export from the converted temp JPEG (the same page image the PDF embeds),
             // not the raw .pdf — matching every PDFGenerator call site.
             let src = pdfToImageMap[job.sourceURL] ?? job.sourceURL
-            return (src: src, img: pdfURL.deletingPathExtension().appendingPathExtension("jpg"), pdf: pdfURL)
+            // Snapshot the final (post-review) rotation so the exported .jpg matches the rotated PDF.
+            return (src: src, img: pdfURL.deletingPathExtension().appendingPathExtension("jpg"), pdf: pdfURL,
+                    rot: job.result?.rotationDegrees ?? 0)
         }
         guard !work.isEmpty else { return }
         // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
-        // stalls on large files. writeSizedJPEG copies already-small JPEGs byte-for-byte.
+        // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {
             for w in work {
-                guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB) else { continue }
+                guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB, rotationDegrees: w.rot) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
                 let tags = MacOSTagger.readTags(from: w.pdf)
@@ -2789,12 +2806,6 @@ class OCRProcessor: ObservableObject {
     func manualSegSetKind(_ kind: ManualPhotoKind, at idx: Int) {
         guard idx >= 0, idx < manualSegImages.count, !manualSegConsumed.contains(idx) else { return }
         manualSegImages[idx].kind = kind
-    }
-
-    /// Rotate the focused photo 90° clockwise (live in the UI; baked into the PDF at Finish).
-    func manualSegRotate(at idx: Int) {
-        guard idx >= 0, idx < manualSegImages.count else { return }
-        manualSegImages[idx].rotationDegrees = (((manualSegImages[idx].rotationDegrees + 90) % 360) + 360) % 360
     }
 
     /// Toggle whether the focused photo is flagged for removal (file ops applied at Finish).
@@ -3316,6 +3327,7 @@ class OCRProcessor: ObservableObject {
             guard !items.isEmpty else { continue }
 
             documentReviewItems = items.sorted { $0.fileIndex < $1.fileIndex }
+            reviewRotationOnly = false
             currentReviewCollectionName = collection.collectionName
             statusMessage = "Review document segmentation for \"\(collection.collectionName)\"."
             awaitingDocumentReview = true
@@ -3395,8 +3407,71 @@ class OCRProcessor: ObservableObject {
         }
     }
 
+    /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
+    /// Shows every page with a rotation control; on confirm, writes the chosen rotation into each job
+    /// and regenerates the output PDF where it changed, so the exported JPG (written later) matches.
+    private func showRotationReview(files: [URL]) async {
+        documentReviewItems = files.enumerated().map { (index, url) in
+            let cls = index < jobs.count ? jobs[index].result?.classification : nil
+            let rot = index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
+            return DocumentReviewItem(
+                fileIndex: index,
+                fileName: url.lastPathComponent,
+                fileURL: url,
+                classification: cls,
+                rotationDegrees: rot
+            )
+        }
+
+        reviewRotationOnly = true
+        reviewShowsDocumentClasses = false
+        currentReviewCollectionName = "All Files"
+        statusMessage = "Review rotation."
+        awaitingDocumentReview = true
+
+        await withCheckedContinuation { continuation in
+            documentReviewContinuation = continuation
+        }
+        reviewRotationOnly = false
+
+        guard !Task.isCancelled else { return }
+
+        // Apply rotation changes back to jobs and regenerate the affected output PDFs.
+        for item in documentReviewItems {
+            guard item.fileIndex < jobs.count else { continue }
+            let newRot = item.rotationDegrees
+            let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
+            guard newRot != oldRot, let existingResult = jobs[item.fileIndex].result else { continue }
+            jobs[item.fileIndex].result = OCRResult(
+                text: existingResult.text,
+                classification: existingResult.classification,
+                rotationDegrees: newRot,
+                errorMessage: existingResult.errorMessage,
+                errorCode: existingResult.errorCode
+            )
+            if let result = jobs[item.fileIndex].result,
+               let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
+               let model = currentModel {
+                let pdfGen = PDFGenerator()
+                // Use the temp JPEG if this was a PDF input, otherwise the original file.
+                let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
+                try? pdfGen.generate(
+                    imageURL: imageURL,
+                    result: result,
+                    model: model,
+                    outputURL: outputURL,
+                    originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
+                    gatewayDisplayName: currentGateway?.displayName,
+                    pdfImageMB: Self.pdfImageMB
+                )
+            }
+        }
+    }
+
     /// Show the document segmentation review dialog for all files at once.
     /// Populates documentReviewItems with every file and suspends until user confirms.
+    /// Rotation is NOT edited here — it is a separate, earlier pass (`showRotationReview`); the
+    /// already-chosen rotation is carried on each item purely so the thumbnails preview upright.
     private func showFullSegmentationReview(files: [URL]) async {
         documentReviewItems = files.enumerated().map { (index, url) in
             let cls = index < jobs.count ? jobs[index].result?.classification : nil
@@ -3412,7 +3487,8 @@ class OCRProcessor: ObservableObject {
 
         // New-Document / Continuation options are only meaningful when merging or when an
         // LLM-segmented tagging mode is used. In manual-segmentation modes the dedicated
-        // grouping UI owns segmentation, so the rotation review shows only rotation + box/folder.
+        // grouping UI owns segmentation, so the review shows only box/folder.
+        reviewRotationOnly = false
         reviewShowsDocumentClasses = mergeDocuments || taggingMode.showsDocumentClassesInReview
         currentReviewCollectionName = "All Files"
         statusMessage = "Review document segmentation."
@@ -3424,7 +3500,8 @@ class OCRProcessor: ObservableObject {
 
         guard !Task.isCancelled else { return }
 
-        // Apply classification, rotation, and removal changes back to jobs
+        // Apply classification and removal changes back to jobs (rotation is preserved as-is —
+        // it was handled in the separate rotation-review pass).
         for item in documentReviewItems {
             guard item.fileIndex < jobs.count else { continue }
 
@@ -3442,33 +3519,14 @@ class OCRProcessor: ObservableObject {
             }
 
             let newCls = item.classification
-            let newRot = item.rotationDegrees
-            let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
             jobs[item.fileIndex].classification = newCls
             if let existingResult = jobs[item.fileIndex].result {
                 jobs[item.fileIndex].result = OCRResult(
                     text: existingResult.text,
                     classification: newCls,
-                    rotationDegrees: newRot,
+                    rotationDegrees: existingResult.rotationDegrees,
                     errorMessage: existingResult.errorMessage,
-                    errorCode: nil
-                )
-            }
-            // Regenerate output PDF if rotation changed
-            if newRot != oldRot, let result = jobs[item.fileIndex].result,
-               let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
-               let model = currentModel {
-                let pdfGen = PDFGenerator()
-                // Use temp JPEG if this was a PDF input, otherwise the original file
-                let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
-                try? pdfGen.generate(
-                    imageURL: imageURL,
-                    result: result,
-                    model: model,
-                    outputURL: outputURL,
-                    originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
-                    gatewayDisplayName: currentGateway?.displayName,
-                    pdfImageMB: Self.pdfImageMB
+                    errorCode: existingResult.errorCode
                 )
             }
         }
@@ -3519,19 +3577,6 @@ class OCRProcessor: ObservableObject {
         awaitingBoxFolderConfirmation = false
         boxFolderConfirmContinuation?.resume()
         boxFolderConfirmContinuation = nil
-    }
-
-    /// Update rotation for a single file (used by inline editing from the file pane).
-    func updateRotation(at index: Int, degrees: Int) {
-        guard index < jobs.count, let existingResult = jobs[index].result else { return }
-        let normalized = ((degrees % 360) + 360) % 360
-        jobs[index].result = OCRResult(
-            text: existingResult.text,
-            classification: existingResult.classification,
-            rotationDegrees: normalized,
-            errorMessage: existingResult.errorMessage,
-            errorCode: nil
-        )
     }
 
     /// Rebuild collection segments from current job classifications after document review changes.

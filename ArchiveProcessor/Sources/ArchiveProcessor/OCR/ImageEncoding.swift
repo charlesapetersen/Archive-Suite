@@ -75,13 +75,17 @@ enum ImageEncoding {
         return (data, small.width, small.height)
     }
 
-    /// Write the image at `url` to `dest` as a JPEG of ~`targetMB`. A normal-orientation JPEG that is
-    /// already at/under the target is copied byte-for-byte (pristine, no re-encode); everything else is
-    /// decoded (EXIF orientation baked in) and re-encoded toward the target. `dest` should be a `.jpg`.
+    /// Write the image at `url` to `dest` as a JPEG of ~`targetMB`, applying `rotationDegrees` (the app's
+    /// clockwise rotation correction, in {0,90,180,270}) so the exported image matches the rotated PDF
+    /// page-1 image. A normal-orientation JPEG that is already at/under the target AND needs no rotation is
+    /// copied byte-for-byte (pristine, no re-encode); everything else is decoded (EXIF orientation baked
+    /// in), rotated if needed, and re-encoded toward the target. `dest` should be a `.jpg`.
     @discardableResult
-    static func writeSizedJPEG(from url: URL, to dest: URL, targetMB: Double, quality: Double = 0.9) -> Bool {
+    static func writeSizedJPEG(from url: URL, to dest: URL, targetMB: Double, rotationDegrees: Int = 0, quality: Double = 0.9) -> Bool {
         let fm = FileManager.default
-        if targetMB > 0, let src = CGImageSourceCreateWithURL(url as CFURL, nil) {
+        let noRotation = rotationDegrees % 360 == 0
+        // Pristine byte-copy fast path — only valid when there is no rotation to bake in.
+        if noRotation, targetMB > 0, let src = CGImageSourceCreateWithURL(url as CFURL, nil) {
             let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
             let type = CGImageSourceGetType(src) as? String
             let orientation = props?[kCGImagePropertyOrientation] as? Int ?? 1
@@ -91,10 +95,51 @@ enum ImageEncoding {
                 if (try? fm.copyItem(at: url, to: dest)) != nil { return true }
             }
         }
-        guard let img = orientedCGImage(url: url),
-              let enc = encodeToTargetMB(img, targetMB: targetMB, quality: quality) else { return false }
+        guard let oriented = orientedCGImage(url: url) else { return false }
+        let finalImage: CGImage
+        if noRotation {
+            finalImage = oriented
+        } else {
+            guard let rotated = rotate(oriented, byDegreesClockwise: rotationDegrees) else { return false }
+            finalImage = rotated
+        }
+        guard let enc = encodeToTargetMB(finalImage, targetMB: targetMB, quality: quality) else { return false }
         try? fm.removeItem(at: dest)
         do { try enc.data.write(to: dest); return true } catch { return false }
+    }
+
+    /// Rotate a CGImage CLOCKWISE by 90/180/270 degrees (0 or a multiple of 360 returns the input
+    /// unchanged). Shared by PDFGenerator (PDF page-1 image) and `writeSizedJPEG` (exported original) so
+    /// both outputs use an identical rotation convention and never disagree by axis.
+    static func rotate(_ image: CGImage, byDegreesClockwise degrees: Int) -> CGImage? {
+        let norm = ((degrees % 360) + 360) % 360
+        guard norm != 0 else { return image }
+        let w = image.width
+        let h = image.height
+        let radians = -Double(norm) * .pi / 180.0
+
+        let newWidth: Int
+        let newHeight: Int
+        if norm == 90 || norm == 270 {
+            newWidth = h
+            newHeight = w
+        } else {
+            newWidth = w
+            newHeight = h
+        }
+
+        let space = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo: UInt32 = space.numberOfComponents == 1
+            ? CGImageAlphaInfo.none.rawValue
+            : CGImageAlphaInfo.noneSkipLast.rawValue
+        guard let context = CGContext(data: nil, width: newWidth, height: newHeight, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: space, bitmapInfo: bitmapInfo) else { return nil }
+
+        context.translateBy(x: CGFloat(newWidth) / 2, y: CGFloat(newHeight) / 2)
+        context.rotate(by: radians)
+        context.translateBy(x: -CGFloat(w) / 2, y: -CGFloat(h) / 2)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return context.makeImage()
     }
 
     /// Decode `url` to a full-resolution, EXIF-oriented CGImage (orientation baked into the pixels).

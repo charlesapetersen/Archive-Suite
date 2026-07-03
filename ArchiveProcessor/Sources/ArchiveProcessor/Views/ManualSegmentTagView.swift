@@ -1,15 +1,14 @@
 import SwiftUI
 import AppKit
 
-/// Progressive manual segmentation + tagging (human / autoDateManualSeg modes), modeled on the
-/// Live Capture tag card. The user walks the photos in order, reviews rotation and box/folder
-/// identifications, marks where each document segment ends, and tags it — as a segment is tagged
-/// its pages drop out of the viewer. Box/folder photos stay as markers. When only boxes/folders
-/// remain, Finish resumes the pipeline. Keyboard-first.
+/// Progressive manual segmentation + tagging (human / autoDateManualSeg modes). The user walks the
+/// photos in order, reviews box/folder identifications, marks where each document segment ends, and
+/// tags it — as a segment is tagged its pages drop out of the viewer. Box/folder photos stay as
+/// markers. When only boxes/folders remain, Finish resumes the pipeline. Keyboard-first. Rotation is
+/// a separate, earlier step (the "Review rotation" pass); images here display already-oriented.
 ///
 /// Keys (image canvas focused):
-///   ← / →   previous / next photo
-///   R       rotate 90°           X   remove / restore this photo
+///   ← / →   previous / next photo    X   remove / restore this photo
 ///   B / F / D   mark Box / Folder / Document
 ///   Space   Quick Look preview   + / − / 0   zoom (drag or scroll to pan when zoomed)
 ///   ⏎       end the current segment here & tag it
@@ -72,7 +71,7 @@ struct ManualSegmentTagView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
-                Text("← → photo   ⏎ end & tag   R rotate   B/F/D box/folder/doc   X remove   Space preview")
+                Text("← → photo   ⏎ end & tag   B/F/D box/folder/doc   X remove   Space preview")
                     .font(.caption2).foregroundStyle(.tertiary)
                 Button("Finish ▸") { processor.confirmManualSegTag() }
                     .buttonStyle(.borderedProminent)
@@ -124,7 +123,6 @@ struct ManualSegmentTagView: View {
             if showPreview { showPreview = false; return .handled }
             return .ignored
         }
-        .onKeyPress(characters: CharacterSet(charactersIn: "rR")) { _ in processor.manualSegRotate(at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "xX")) { _ in processor.manualSegToggleRemoved(at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "bB")) { _ in processor.manualSegSetKind(.box, at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in processor.manualSegSetKind(.folder, at: focus); return .handled }
@@ -240,8 +238,6 @@ struct ManualSegmentTagView: View {
                 .pickerStyle(.segmented).labelsHidden().frame(width: 300)
                 .disabled(processor.manualSegConsumed.contains(focus))
 
-                Button { processor.manualSegRotate(at: focus) } label: { Image(systemName: "rotate.right") }
-                    .help("Rotate 90° (R)")
                 Button { processor.manualSegToggleRemoved(at: focus) } label: {
                     Image(systemName: processor.manualSegRemoved.contains(focus) ? "arrow.uturn.backward" : "trash")
                 }

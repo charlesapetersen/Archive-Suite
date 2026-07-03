@@ -77,7 +77,7 @@ struct PDFGenerator {
             if noRotation {
                 finalImage = baseImage
             } else {
-                guard let rotated = Self.rotateImage(baseImage, byDegrees: rotationDegrees) else { return nil }
+                guard let rotated = ImageEncoding.rotate(baseImage, byDegreesClockwise: rotationDegrees) else { return nil }
                 finalImage = rotated
             }
 
@@ -187,53 +187,6 @@ struct PDFGenerator {
         append("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n\(xrefOffset)\n%%EOF\n")
 
         return pdf
-    }
-
-    // MARK: - Image Rotation
-
-    /// Rotate a CGImage clockwise by the given degrees (90, 180, or 270).
-    private static func rotateImage(_ image: CGImage, byDegrees degrees: Int) -> CGImage? {
-        let w = image.width
-        let h = image.height
-        let radians = -Double(degrees) * .pi / 180.0
-
-        let newWidth: Int
-        let newHeight: Int
-        if degrees == 90 || degrees == 270 {
-            newWidth = h
-            newHeight = w
-        } else {
-            newWidth = w
-            newHeight = h
-        }
-
-        // Use source color space and appropriate bitmap info
-        let space = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo: UInt32
-        if space.numberOfComponents == 1 {
-            // Grayscale — no alpha channel
-            bitmapInfo = CGImageAlphaInfo.none.rawValue
-        } else {
-            // RGB — use noneSkipLast for compatibility
-            bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
-        }
-
-        guard let context = CGContext(
-            data: nil,
-            width: newWidth,
-            height: newHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: space,
-            bitmapInfo: bitmapInfo
-        ) else { return nil }
-
-        context.translateBy(x: CGFloat(newWidth) / 2, y: CGFloat(newHeight) / 2)
-        context.rotate(by: radians)
-        context.translateBy(x: -CGFloat(w) / 2, y: -CGFloat(h) / 2)
-        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-
-        return context.makeImage()
     }
 
     // MARK: - Text Page

@@ -19,6 +19,7 @@ struct OCRView: View {
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
+    @AppStorage("reviewRotation") private var reviewRotation: Bool = false
     @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
@@ -457,7 +458,7 @@ struct OCRView: View {
                 if processor.awaitingFinalReview {
                     Divider()
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, [ ] to rotate, Enter to edit.")
+                        Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, Enter to edit.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 12) {
@@ -589,18 +590,6 @@ struct OCRView: View {
         .onKeyPress(.return) {
             guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
             editingFileIndex = reviewFocusedIndex
-            return .handled
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "]")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            let current = processor.jobs[reviewFocusedIndex].result?.rotationDegrees ?? 0
-            processor.updateRotation(at: reviewFocusedIndex, degrees: current + 90)
-            return .handled
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "[")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            let current = processor.jobs[reviewFocusedIndex].result?.rotationDegrees ?? 0
-            processor.updateRotation(at: reviewFocusedIndex, degrees: current - 90)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
@@ -835,6 +824,7 @@ struct OCRView: View {
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
+        processor.reviewRotation = reviewRotation
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -852,6 +842,7 @@ struct OCRView: View {
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
+        processor.reviewRotation = reviewRotation
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -874,6 +865,7 @@ struct OCRView: View {
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
+        processor.reviewRotation = reviewRotation
         // Pre-grouped segmentation only applies when the loaded files match a Live Capture handoff.
         if captureBoundaries.count == droppedFiles.count && !droppedFiles.isEmpty {
             processor.preGroupedBoundaries = captureBoundaries
@@ -1375,6 +1367,8 @@ struct DocumentSegmentReviewSheet: View {
 
     /// Whether New-Document / Continuation options are offered (only when merging or tagging by segment).
     private var showDocClasses: Bool { processor.reviewShowsDocumentClasses }
+    /// When true this is the dedicated rotation-review pass — show only the rotation control.
+    private var rotationOnly: Bool { processor.reviewRotationOnly }
 
     private var newDocCount: Int {
         processor.documentReviewItems.filter { $0.classification == .documentStart }.count
@@ -1398,6 +1392,11 @@ struct DocumentSegmentReviewSheet: View {
 
     private var footerSummary: String {
         let active = processor.documentReviewItems.filter { !$0.markedForRemoval }
+        if rotationOnly {
+            let rotated = active.filter { $0.rotationDegrees % 360 != 0 }.count
+            let n = active.count
+            return "\(n) page\(n == 1 ? "" : "s")" + (rotated > 0 ? ", \(rotated) rotated" : "")
+        }
         var parts: [String] = []
         if showDocClasses {
             let n = active.filter { $0.classification == .documentStart }.count
@@ -1421,12 +1420,14 @@ struct DocumentSegmentReviewSheet: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Document Segmentation Review")
+                    Text(rotationOnly ? "Review Rotation" : "Document Segmentation Review")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text(showDocClasses
-                         ? "Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  \u{2190}\u{2192}=Rotate  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"
-                         : "Keys: 3=Box  4=Folder  \u{2190}\u{2192}=Rotate  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm")
+                    Text(rotationOnly
+                         ? "Keys: \u{2190}\u{2192} or [ ]=Rotate  \u{2191}\u{2193}=Navigate  Return=Confirm"
+                         : (showDocClasses
+                            ? "Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"
+                            : "Keys: 3=Box  4=Folder  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1464,7 +1465,8 @@ struct DocumentSegmentReviewSheet: View {
                                 item: $processor.documentReviewItems[idx],
                                 thumbnailSize: thumbnailSize,
                                 isFocused: idx == focusedIndex,
-                                showDocumentClasses: showDocClasses
+                                showDocumentClasses: showDocClasses,
+                                rotationOnly: rotationOnly
                             )
                             .id(idx)
                             .onTapGesture { focusedIndex = idx }
@@ -1513,57 +1515,57 @@ struct DocumentSegmentReviewSheet: View {
             return .handled
         }
         .onKeyPress(.leftArrow) {
-            if focusedIndex < processor.documentReviewItems.count {
+            if rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 let current = processor.documentReviewItems[focusedIndex].rotationDegrees
                 processor.documentReviewItems[focusedIndex].rotationDegrees = (current - 90 + 360) % 360
             }
             return .handled
         }
         .onKeyPress(.rightArrow) {
-            if focusedIndex < processor.documentReviewItems.count {
+            if rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].rotationDegrees = (processor.documentReviewItems[focusedIndex].rotationDegrees + 90) % 360
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
-            if showDocClasses, focusedIndex < processor.documentReviewItems.count {
+            if !rotationOnly, showDocClasses, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .documentStart
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "2")) { _ in
-            if showDocClasses, focusedIndex < processor.documentReviewItems.count {
+            if !rotationOnly, showDocClasses, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .documentContinuation
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "xX")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if !rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].markedForRemoval.toggle()
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "3")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if !rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .boxLabel
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "4")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if !rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].classification = .folderLabel
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "[")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 let current = processor.documentReviewItems[focusedIndex].rotationDegrees
                 processor.documentReviewItems[focusedIndex].rotationDegrees = (current - 90 + 360) % 360
             }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "]")) { _ in
-            if focusedIndex < processor.documentReviewItems.count {
+            if rotationOnly, focusedIndex < processor.documentReviewItems.count {
                 processor.documentReviewItems[focusedIndex].rotationDegrees = (processor.documentReviewItems[focusedIndex].rotationDegrees + 90) % 360
             }
             return .handled
@@ -1576,6 +1578,8 @@ struct DocumentReviewRow: View {
     let thumbnailSize: CGFloat
     var isFocused: Bool = false
     var showDocumentClasses: Bool = true
+    /// Dedicated rotation-review pass: show only the rotation control, no classification/remove.
+    var rotationOnly: Bool = false
     @State private var loadedImage: NSImage?
 
     private var rowBackground: Color {
@@ -1597,30 +1601,32 @@ struct DocumentReviewRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .opacity(item.markedForRemoval ? 0.4 : 1)
 
-            // Classification radio buttons
-            VStack(alignment: .leading, spacing: 6) {
-                if showDocumentClasses {
-                    radioButton(label: "1 New Document", selected: item.classification == .documentStart, color: .blue) {
-                        item.classification = .documentStart
+            // Classification radio buttons (hidden in the dedicated rotation-review pass).
+            if !rotationOnly {
+                VStack(alignment: .leading, spacing: 6) {
+                    if showDocumentClasses {
+                        radioButton(label: "1 New Document", selected: item.classification == .documentStart, color: .blue) {
+                            item.classification = .documentStart
+                        }
+                        radioButton(label: "2 Continuation", selected: item.classification == .documentContinuation, color: .green) {
+                            item.classification = .documentContinuation
+                        }
+                    } else {
+                        // Segmentation is irrelevant here — a page is either a plain document or a box/folder label.
+                        radioButton(label: "Document", selected: item.classification == .documentStart || item.classification == .documentContinuation || item.classification == nil, color: .gray) {
+                            item.classification = .documentStart
+                        }
                     }
-                    radioButton(label: "2 Continuation", selected: item.classification == .documentContinuation, color: .green) {
-                        item.classification = .documentContinuation
+                    radioButton(label: "3 Box", selected: item.classification == .boxLabel, color: .red) {
+                        item.classification = .boxLabel
                     }
-                } else {
-                    // Segmentation is irrelevant here — a page is either a plain document or a box/folder label.
-                    radioButton(label: "Document", selected: item.classification == .documentStart || item.classification == .documentContinuation || item.classification == nil, color: .gray) {
-                        item.classification = .documentStart
+                    radioButton(label: "4 Folder", selected: item.classification == .folderLabel, color: .purple) {
+                        item.classification = .folderLabel
                     }
                 }
-                radioButton(label: "3 Box", selected: item.classification == .boxLabel, color: .red) {
-                    item.classification = .boxLabel
-                }
-                radioButton(label: "4 Folder", selected: item.classification == .folderLabel, color: .purple) {
-                    item.classification = .folderLabel
-                }
+                .frame(width: 130)
+                .disabled(item.markedForRemoval)
             }
-            .frame(width: 130)
-            .disabled(item.markedForRemoval)
 
             VStack(alignment: .leading, spacing: 8) {
                 // Filename
@@ -1631,31 +1637,34 @@ struct DocumentReviewRow: View {
                     .strikethrough(item.markedForRemoval)
                     .frame(minWidth: 180, alignment: .leading)
 
-                // Rotation radio buttons
-                HStack(spacing: 8) {
-                    Text("Rotate:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    rotationRadio(label: "0°", degrees: 0)
-                    rotationRadio(label: "90°", degrees: 90)
-                    rotationRadio(label: "180°", degrees: 180)
-                    rotationRadio(label: "270°", degrees: 270)
+                // Rotation radio buttons — only in the dedicated rotation-review pass.
+                if rotationOnly {
+                    HStack(spacing: 8) {
+                        Text("Rotate:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        rotationRadio(label: "0°", degrees: 0)
+                        rotationRadio(label: "90°", degrees: 90)
+                        rotationRadio(label: "180°", degrees: 180)
+                        rotationRadio(label: "270°", degrees: 270)
+                    }
                 }
-                .disabled(item.markedForRemoval)
             }
 
             Spacer()
 
-            // Remove / restore button
-            Button {
-                item.markedForRemoval.toggle()
-            } label: {
-                Image(systemName: item.markedForRemoval ? "arrow.uturn.backward.circle" : "trash")
-                    .foregroundStyle(item.markedForRemoval ? Color.accentColor : .red)
-                    .font(.body)
+            // Remove / restore button (segmentation review only).
+            if !rotationOnly {
+                Button {
+                    item.markedForRemoval.toggle()
+                } label: {
+                    Image(systemName: item.markedForRemoval ? "arrow.uturn.backward.circle" : "trash")
+                        .foregroundStyle(item.markedForRemoval ? Color.accentColor : .red)
+                        .font(.body)
+                }
+                .buttonStyle(.plain)
+                .help(item.markedForRemoval ? "Restore this photo" : "Remove this photo from output")
             }
-            .buttonStyle(.plain)
-            .help(item.markedForRemoval ? "Restore this photo" : "Remove this photo from output")
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
@@ -2584,11 +2593,10 @@ struct SegmentationEditSheet: View {
     let onDismiss: () -> Void
 
     @State private var selectedClassification: DocumentClassification = .documentStart
-    @State private var rotation: Int = 0
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Edit Classification & Rotation")
+            Text("Edit Classification")
                 .font(.title3)
                 .fontWeight(.semibold)
 
@@ -2606,27 +2614,6 @@ struct SegmentationEditSheet: View {
             }
             .pickerStyle(.radioGroup)
             .padding(.vertical, 4)
-
-            // Rotation control
-            HStack(spacing: 12) {
-                Text("Rotation:")
-                    .font(.caption)
-                Button(action: { rotation = (rotation - 90 + 360) % 360 }) {
-                    Image(systemName: "rotate.left")
-                }
-                .keyboardShortcut("[", modifiers: [])
-                Text("\(rotation)°")
-                    .font(.system(size: 13, design: .monospaced))
-                    .frame(width: 40)
-                Button(action: { rotation = (rotation + 90) % 360 }) {
-                    Image(systemName: "rotate.right")
-                }
-                .keyboardShortcut("]", modifiers: [])
-                if rotation != 0 {
-                    Button("Reset") { rotation = 0 }
-                        .font(.caption)
-                }
-            }
 
             // Show OCR text preview
             if let text = processor.jobs[fileIndex].result?.text, !text.isEmpty {
@@ -2647,7 +2634,6 @@ struct SegmentationEditSheet: View {
                 Spacer()
                 Button("Apply") {
                     processor.updateClassification(at: fileIndex, to: selectedClassification)
-                    processor.updateRotation(at: fileIndex, degrees: rotation)
                     onDismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -2660,7 +2646,6 @@ struct SegmentationEditSheet: View {
             if let cls = processor.jobs[fileIndex].result?.classification ?? processor.jobs[fileIndex].classification {
                 selectedClassification = cls
             }
-            rotation = processor.jobs[fileIndex].result?.rotationDegrees ?? 0
         }
     }
 }

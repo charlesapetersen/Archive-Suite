@@ -53,6 +53,7 @@ struct SettingsView: View {
     @AppStorage("exportedImageSizeMB") private var exportedImageSizeMB: Double = 3.0
     @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
     @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
+    @AppStorage("reviewRotation") private var reviewRotation: Bool = false
 
     @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
@@ -377,6 +378,13 @@ struct SettingsView: View {
                 }
             }
             .disabled(preOCRedInput)
+            Toggle(isOn: $reviewRotation) {
+                HStack {
+                    Text("Review rotation")
+                    HelpButton(text: "Pause for a quick, dedicated pass to check and fix each page's orientation before output — separate from (and before) the tagging/segmentation review, since rotation is a fast, mindless check. Runs in every tagging mode, including fully-manual. For Process Live, this pass runs once at Finish, over all captured pages. The chosen rotation is applied to both the PDF and the exported image. Requires a rotation-detection mode above (turn Detect rotation off to disable).")
+                }
+            }
+            .disabled(rotationMode == .off || preOCRedInput)
         } header: { Text("Rotation Correction") }
     }
 
