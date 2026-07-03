@@ -1,0 +1,369 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1280AC1925ED2CFFD9500A5D /* CaptureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCBFC526E508017857010DD4 /* CaptureScreen.swift */; };
+		40B453561F0F11DDFD09BD87 /* ConnectScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC10F4EF56C2225977C405B /* ConnectScreen.swift */; };
+		49151675E40FEB793C5842E3 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59B1BC24C08966ECED9FAC0A /* SessionStore.swift */; };
+		4CF37A2BD512001426676DD9 /* CaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7C3B42C45EB5D6A60043AE /* CaptureModels.swift */; };
+		4E1C0DC912626F0B8B734020 /* MacEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F947DAFC0EA1A296DA10776 /* MacEndpoint.swift */; };
+		4EE743F898F65860C01EC348 /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75B794AF7E4CAA946D74018 /* CameraPreview.swift */; };
+		53232359D81E9F66F7B4883F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896D4406DECB72037BA78C0D /* ContentView.swift */; };
+		54E4BEA25866AADC0DDA198D /* SegmentTagSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55D4CE654FD743041E3EB696 /* SegmentTagSheet.swift */; };
+		55FFDCEBAA32DFB25DE05A1D /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9989B9015280E592145657D4 /* QRScannerView.swift */; };
+		7C1B73884656F57F52AE902E /* MacClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4DF69C2F34577B6DD5E578 /* MacClient.swift */; };
+		9A0E41DA68EE909632914B26 /* CaptureViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C947C6886ABC93843A124A /* CaptureViewModel.swift */; };
+		D8AC284BCE3504FD5FE5D20B /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C8C3A3D4AEA5193029EF2F6 /* App.swift */; };
+		EAC518535FD6B052AD744C31 /* CameraController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC045CEC188107DF819227F2 /* CameraController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		39F1076D74215146C52CC2FA /* ArchiveCaptureiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ArchiveCaptureiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4DC10F4EF56C2225977C405B /* ConnectScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectScreen.swift; sourceTree = "<group>"; };
+		5274B93170A44285D6079245 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		55D4CE654FD743041E3EB696 /* SegmentTagSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentTagSheet.swift; sourceTree = "<group>"; };
+		59B1BC24C08966ECED9FAC0A /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		5F947DAFC0EA1A296DA10776 /* MacEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEndpoint.swift; sourceTree = "<group>"; };
+		63C947C6886ABC93843A124A /* CaptureViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureViewModel.swift; sourceTree = "<group>"; };
+		6F7C3B42C45EB5D6A60043AE /* CaptureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModels.swift; sourceTree = "<group>"; };
+		7C8C3A3D4AEA5193029EF2F6 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		896D4406DECB72037BA78C0D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9989B9015280E592145657D4 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		AA4DF69C2F34577B6DD5E578 /* MacClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacClient.swift; sourceTree = "<group>"; };
+		CC045CEC188107DF819227F2 /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
+		DCBFC526E508017857010DD4 /* CaptureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureScreen.swift; sourceTree = "<group>"; };
+		F75B794AF7E4CAA946D74018 /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		07AC9E3C7EB90826CAD66AE6 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				F75B794AF7E4CAA946D74018 /* CameraPreview.swift */,
+				DCBFC526E508017857010DD4 /* CaptureScreen.swift */,
+				4DC10F4EF56C2225977C405B /* ConnectScreen.swift */,
+				9989B9015280E592145657D4 /* QRScannerView.swift */,
+				55D4CE654FD743041E3EB696 /* SegmentTagSheet.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		175AC1168D76A703523E1F66 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				6F7C3B42C45EB5D6A60043AE /* CaptureModels.swift */,
+				63C947C6886ABC93843A124A /* CaptureViewModel.swift */,
+				59B1BC24C08966ECED9FAC0A /* SessionStore.swift */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		2DBD423807B154BB1A961210 /* ArchiveCaptureiOS */ = {
+			isa = PBXGroup;
+			children = (
+				7C8C3A3D4AEA5193029EF2F6 /* App.swift */,
+				896D4406DECB72037BA78C0D /* ContentView.swift */,
+				5274B93170A44285D6079245 /* Info.plist */,
+				EA867A4F04D3B30E779F0B03 /* Camera */,
+				175AC1168D76A703523E1F66 /* Capture */,
+				5F2F61ED501FBCE3FE8DAA88 /* Net */,
+				07AC9E3C7EB90826CAD66AE6 /* UI */,
+			);
+			name = ArchiveCaptureiOS;
+			path = Sources/ArchiveCaptureiOS;
+			sourceTree = "<group>";
+		};
+		5BF58F515C14BF85B38A2F7B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				39F1076D74215146C52CC2FA /* ArchiveCaptureiOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5F2F61ED501FBCE3FE8DAA88 /* Net */ = {
+			isa = PBXGroup;
+			children = (
+				AA4DF69C2F34577B6DD5E578 /* MacClient.swift */,
+				5F947DAFC0EA1A296DA10776 /* MacEndpoint.swift */,
+			);
+			path = Net;
+			sourceTree = "<group>";
+		};
+		B6E7BE3F90FE2BF1D0C43877 = {
+			isa = PBXGroup;
+			children = (
+				2DBD423807B154BB1A961210 /* ArchiveCaptureiOS */,
+				5BF58F515C14BF85B38A2F7B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		EA867A4F04D3B30E779F0B03 /* Camera */ = {
+			isa = PBXGroup;
+			children = (
+				CC045CEC188107DF819227F2 /* CameraController.swift */,
+			);
+			path = Camera;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F16692B0D800AB71F13CDFF7 /* ArchiveCaptureiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 175FED82EE7FA890FA38286B /* Build configuration list for PBXNativeTarget "ArchiveCaptureiOS" */;
+			buildPhases = (
+				FB579071D5A7089C460F6133 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ArchiveCaptureiOS;
+			packageProductDependencies = (
+			);
+			productName = ArchiveCaptureiOS;
+			productReference = 39F1076D74215146C52CC2FA /* ArchiveCaptureiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CA09E012112FE2723303206A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 48035F033AD68610803B0542 /* Build configuration list for PBXProject "ArchiveCaptureiOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B6E7BE3F90FE2BF1D0C43877;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5BF58F515C14BF85B38A2F7B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F16692B0D800AB71F13CDFF7 /* ArchiveCaptureiOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FB579071D5A7089C460F6133 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D8AC284BCE3504FD5FE5D20B /* App.swift in Sources */,
+				EAC518535FD6B052AD744C31 /* CameraController.swift in Sources */,
+				4EE743F898F65860C01EC348 /* CameraPreview.swift in Sources */,
+				4CF37A2BD512001426676DD9 /* CaptureModels.swift in Sources */,
+				1280AC1925ED2CFFD9500A5D /* CaptureScreen.swift in Sources */,
+				9A0E41DA68EE909632914B26 /* CaptureViewModel.swift in Sources */,
+				40B453561F0F11DDFD09BD87 /* ConnectScreen.swift in Sources */,
+				53232359D81E9F66F7B4883F /* ContentView.swift in Sources */,
+				7C1B73884656F57F52AE902E /* MacClient.swift in Sources */,
+				4E1C0DC912626F0B8B734020 /* MacEndpoint.swift in Sources */,
+				55FFDCEBAA32DFB25DE05A1D /* QRScannerView.swift in Sources */,
+				54E4BEA25866AADC0DDA198D /* SegmentTagSheet.swift in Sources */,
+				49151675E40FEB793C5842E3 /* SessionStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		62975548CBAFE3953F9CCA20 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Sources/ArchiveCaptureiOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.archiveprocessor.capture.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		932851AAA4E1EC128364CE82 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D4A24C227D0EF0851F13DEA8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D5C1629B3EEC63623E16944E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Sources/ArchiveCaptureiOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.archiveprocessor.capture.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		175FED82EE7FA890FA38286B /* Build configuration list for PBXNativeTarget "ArchiveCaptureiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				62975548CBAFE3953F9CCA20 /* Debug */,
+				D5C1629B3EEC63623E16944E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		48035F033AD68610803B0542 /* Build configuration list for PBXProject "ArchiveCaptureiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				932851AAA4E1EC128364CE82 /* Debug */,
+				D4A24C227D0EF0851F13DEA8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = CA09E012112FE2723303206A /* Project object */;
+}
