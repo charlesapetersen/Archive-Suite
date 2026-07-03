@@ -64,20 +64,22 @@ struct TimeEstimator {
         enableTagging: Bool,
         enableCollectionSegmentation: Bool = false,
         preOCRedInput: Bool = false,
-        useGateway: Bool = false
+        useGateway: Bool = false,
+        ocrWorkers: Int = 4
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
+        let maxWorkers = Double(max(1, ocrWorkers))
 
         // OCR (image → full transcription), or text-only classification for pre-OCRed input.
         var ocr = 0.0
-        let ocrWorkers = sequentialOCR ? 1.0 : ocrParallelWorkers
+        let w = sequentialOCR ? 1.0 : maxWorkers
         if preOCRedInput {
             if enableTagging || enableCollectionSegmentation {
-                ocr = ceil(n / ocrParallelWorkers) * callSeconds(outputTokens: CostEstimator.estimatedClassificationOutputTokens, speed: speed)
+                ocr = ceil(n / maxWorkers) * callSeconds(outputTokens: CostEstimator.estimatedClassificationOutputTokens, speed: speed)
             }
         } else {
-            ocr = ceil(n / ocrWorkers) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)
+            ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)
         }
 
         // Rotation — concurrent with each page's OCR (per image: `orderings` sequential comparisons).
@@ -85,7 +87,7 @@ struct TimeEstimator {
         let rotCalls = rotationMode.orderings
         if rotCalls > 0, !preOCRedInput, !useGateway, model.provider != .mistral {
             let rotSpeed = model.provider == .anthropic ? 1.6 : 1.0   // gemini rotation uses flash-lite
-            rotation = ceil(n / ocrWorkers) * Double(rotCalls) * (rotationAskSeconds * rotSpeed)
+            rotation = ceil(n / w) * Double(rotCalls) * (rotationAskSeconds * rotSpeed)
         }
 
         // Tagging (text → JSON), 6-wide, ~1 call per 3 files.

@@ -62,7 +62,7 @@ struct SessionProcessingConfig {
             thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: "selectedThinking") ?? "") ?? .low,
             apiKey: apiKey,
             taggingMode: TaggingMode(rawValue: d.string(forKey: "taggingModeRaw") ?? "") ?? .automatic,
-            rotationMode: RotationMode(rawValue: d.string(forKey: "rotationModeRaw") ?? "") ?? .llmMajority,
+            rotationMode: RotationMode(rawValue: d.string(forKey: "rotationModeRaw") ?? "") ?? .llmSingle,
             mergeDocuments: d.bool(forKey: "mergeDocuments"),
             outputDirectory: outURL,
             contextCharCount: Int(d.object(forKey: "contextCharCount") as? Double ?? 200),

@@ -27,7 +27,8 @@ struct SettingsView: View {
     @AppStorage("batchMode") private var batchMode: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
     @AppStorage("standardImageSizeMB") private var standardImageSizeMB: Double = 3.0
-    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmMajority.rawValue
+    @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
+    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
 
     @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
@@ -35,7 +36,7 @@ struct SettingsView: View {
     @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
-    @AppStorage("contextCharCount") private var contextCharCount: Double = 200
+    @AppStorage("contextCharCount") private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @AppStorage("tagVocabulary") private var tagVocabulary: String = ""
     @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
@@ -59,17 +60,17 @@ struct SettingsView: View {
         selectedProvider.models + customModelStore.allCustomModels.filter { $0.provider == selectedProvider }
     }
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
-    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmMajority }
+    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
 
     var body: some View {
         HStack(spacing: 0) {
             Form {
+                liveCaptureSection
                 providerSection
                 apiKeySection
                 inputSection
                 rotationSection
                 taggingSection
-                liveCaptureSection
             }
             .formStyle(.grouped)
             .frame(minWidth: 400)
@@ -109,7 +110,7 @@ struct SettingsView: View {
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
-                    preOCRedInput: preOCRedInput, useGateway: useGateway)
+                    preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
 
                 Divider().padding(.vertical, 2)
                 Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
@@ -237,6 +238,11 @@ struct SettingsView: View {
                     .frame(width: 52).multilineTextAlignment(.trailing)
                 Stepper("MB", value: $standardImageSizeMB, in: 0.5...20, step: 0.5)
             }
+            VStack(alignment: .leading, spacing: 2) {
+                Stepper("Parallel OCR workers: \(ocrWorkerCount)", value: $ocrWorkerCount, in: 1...12)
+                Text("More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -246,6 +252,8 @@ struct SettingsView: View {
                 ForEach(RotationMode.allCases) { Text($0.displayName).tag($0.rawValue) }
             }
             Text(rotationMode.detail).font(.caption).foregroundStyle(.secondary)
+            Text("Time impact: Off / Local Vision add no LLM time. Single (default) makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -260,11 +268,11 @@ struct SettingsView: View {
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle("Export segment JSON metadata", isOn: $enableSegmentJSON)
-                VStack(alignment: .leading) {
-                    HStack { Text("Context from previous page"); Spacer(); Text("\(Int(contextCharCount)) chars").foregroundStyle(.secondary) }
-                    Slider(value: $contextCharCount, in: 0...1000, step: 50)
+                Toggle("Send previous page image (better segmentation, ~2× image cost)", isOn: $sendPreviousImage)
+                if sendPreviousImage {
+                    Text("Gives the model the previous page's full image as segmentation context, while keeping OCR parallel (Gemini/Anthropic).")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Toggle("Send previous page image (higher accuracy, higher cost)", isOn: $sendPreviousImage)
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Tag vocabulary (optional, one per line)").font(.caption)

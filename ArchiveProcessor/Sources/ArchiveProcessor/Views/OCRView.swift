@@ -17,8 +17,9 @@ struct OCRView: View {
     @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
     @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
-    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmMajority.rawValue
-    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmMajority }
+    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
+    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
+    @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
@@ -26,7 +27,7 @@ struct OCRView: View {
     @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
     @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
     @AppStorage("tagVocabulary") private var tagVocabulary: String = ""
-    @AppStorage("contextCharCount") private var contextCharCount: Double = 200
+    @AppStorage("contextCharCount") private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
     @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
     @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
@@ -128,7 +129,7 @@ struct OCRView: View {
             fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
             sequentialOCR: contextCharCount > 0, enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
-            preOCRedInput: preOCRedInput, useGateway: useGateway)
+            preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
     }
 
     private var gatewayHasCosts: Bool {

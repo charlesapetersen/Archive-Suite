@@ -125,7 +125,7 @@ class OCRProcessor: ObservableObject {
         didSet { MacOSTagger.stampUnread = taggingMode.stampsUnread }
     }
     /// How image rotation is detected. Set from the UI before a run.
-    var rotationMode: RotationMode = .llmMajority
+    var rotationMode: RotationMode = .llmSingle
     /// The active run's rotation mode, readable from the nonisolated OCR call. Only one run
     /// executes at a time, so a static is safe here.
     nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
@@ -133,10 +133,16 @@ class OCRProcessor: ObservableObject {
     /// The "standard" image size (MB) the resolution slider targets. Set once per run from Settings.
     nonisolated(unsafe) static var standardImageMB: Double = 3.0
 
-    /// Load the standard size from UserDefaults (default 3 MB) — call at run start.
+    /// Parallel OCR workers for the batch run (user-configurable in Settings, 1–12). Set once per run.
+    nonisolated(unsafe) static var ocrWorkerCount: Int = 4
+
+    /// Load run-time knobs from UserDefaults (standard size default 3 MB, OCR workers default 4) —
+    /// call at run start.
     static func loadStandardImageMB() {
         let v = UserDefaults.standard.double(forKey: "standardImageSizeMB")
         standardImageMB = v > 0 ? v : 3.0
+        let w = UserDefaults.standard.integer(forKey: "ocrWorkerCount")
+        ocrWorkerCount = w > 0 ? min(12, w) : 4
     }
 
     /// The resolution slider is a **size target**, not a dimension %: `sizeFraction` (0–1) × the
@@ -847,7 +853,7 @@ class OCRProcessor: ObservableObject {
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
             var completed = 0
-            let concurrency = 4
+            let concurrency = max(1, Self.ocrWorkerCount)
             for i in indices { jobs[i].status = .processing }
             statusMessage = "OCR 0/\(remaining) remaining… (parallel)"
 
@@ -1892,7 +1898,7 @@ class OCRProcessor: ObservableObject {
     ) async {
         let total = fileURLs.count
         let gateway = currentGateway
-        let concurrency = 4
+        let concurrency = max(1, Self.ocrWorkerCount)
         var completed = 0
 
         // Mark all as processing
