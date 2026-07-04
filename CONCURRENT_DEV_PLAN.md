@@ -1,6 +1,12 @@
 # Concurrent / Multi-Agent Development — Implementation Plan
 
-**STATUS:** NOT STARTED · **NEXT ACTION:** Phase 0 pre-flight (verify `.pbxproj` regenerates faithfully + scheme survives) on a branch off `main`.
+**STATUS:** IN PROGRESS on branch `refactor/concurrent-dev` (pushed to origin; `main` untouched). **NEXT ACTION:** C2.2–C2.12 — extract the scattered method clusters from `OCRProcessor.swift` into `extension OCRProcessor` files (compiler-guided access relaxation), then C2 gate + the paid batch smoke.
+
+**Progress (2026-07-03):**
+- ✅ Phase 0 (drift = zero; scheme survives from-scratch regen) · ✅ Task A (`.pbxproj` untracked + gitignored, docs updated) · ✅ Task B (worktree section + proven live) · ✅ C1 (OCRView.swift 2649→919; 11 sibling files, pure move) · ✅ C2.1 (`OCRProcessor+Types.swift`, 8 types).
+- All commits verified (byte-identical move-proofs, symbol multiset identical main↔HEAD, green clean build) and pushed. Commits: `ddca3d7` (A), `1399321` (B), `96cc1f6` (C1), `907166c` (C2.1).
+- **Corrected warning baseline:** a from-scratch **clean** build shows **15 pre-existing warnings** (ManualSegmentTagView ×12, CaptureServer ×2, LiveCaptureView ×1) — the initial "0" was a *cached* build hiding them. **Zero** warnings were introduced by the refactor. Use 15 (clean) as the delta baseline for C2.2+.
+- **Remaining (C2.2–C2.12):** methods are scattered through the class body interleaved with the stored properties that must stay, so each cluster needs precise brace-boundary extraction + relaxing (drop `private` on) exactly the members touched across the new file boundary — deferred from the unattended run as the highest-risk-to-automate part. Recipe unchanged below. Then the paid batch smoke (C-S-paid) via the Process Files GUI.
 
 > This is the durable, executable plan. It supersedes the scratch copy under `~/.claude/plans/`.
 > Every step below carries its **own verification** — you check that each step worked *before* moving to the next, rather than doing one big verification at the end. Checks are tagged **[free]** (no API spend — builds are compile-only), **[manual]** (human observation), or **[paid]** (costs API money — exactly one, last).
