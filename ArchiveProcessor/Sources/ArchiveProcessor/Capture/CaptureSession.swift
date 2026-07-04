@@ -175,6 +175,8 @@ final class CaptureSession: ObservableObject {
         lastActivity = Date()
         connectedDeviceName = deviceName ?? connectedDeviceName
         statusMessage = "Received \(photos.count) photo\(photos.count == 1 ? "" : "s")" + (deviceName.map { " from \($0)" } ?? "")
+        // New capture began — drop any prior "Finalized …" summary so the Captured pane shows photos.
+        liveProcessor.clearFinalizeSummary()
         writeManifest()
         paired = true
         activateProcessingIfNeeded()   // fix mode from Settings on first photo

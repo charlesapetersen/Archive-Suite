@@ -112,12 +112,6 @@ struct LiveCaptureView: View {
                                     .font(.caption).foregroundStyle(.red)
                             }
                         }
-                        if live, let summary = liveProc.finalizeSummary {
-                            Divider()
-                            Label(summary, systemImage: "checkmark.circle.fill")
-                                .font(.caption).foregroundStyle(.green)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     }
                     .padding(6)
                 }
@@ -183,7 +177,7 @@ struct LiveCaptureView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if !session.photos.isEmpty {
-                    Button("Clear") { session.clear() }
+                    Button("Clear") { session.clear(); liveProc.clearFinalizeSummary() }
                     if liveProcessingMode != "live" {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
@@ -201,12 +195,24 @@ struct LiveCaptureView: View {
 
             if session.photos.isEmpty {
                 Spacer()
-                VStack(spacing: 8) {
-                    Image(systemName: "camera.badge.clock").font(.system(size: 40)).foregroundStyle(.secondary)
-                    Text(session.serverRunning ? "Waiting for photos…\nShoot on the phone; they'll appear here grouped."
-                                               : "Start the server, then pair the phone.")
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
+                if let summary = liveProc.finalizeSummary {
+                    // Session complete: the captured photos have been processed & filed, so the pane
+                    // shows the result here in their place until the next photo starts a new batch.
+                    VStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 40)).foregroundStyle(.green)
+                        Text(summary)
+                            .font(.title3).multilineTextAlignment(.center)
+                        Text("Shoot on the phone to start a new batch.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "camera.badge.clock").font(.system(size: 40)).foregroundStyle(.secondary)
+                        Text(session.serverRunning ? "Waiting for photos…\nShoot on the phone; they'll appear here grouped."
+                                                   : "Start the server, then pair the phone.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
             } else {

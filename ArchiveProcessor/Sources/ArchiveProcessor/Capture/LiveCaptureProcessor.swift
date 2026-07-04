@@ -574,9 +574,15 @@ final class LiveCaptureProcessor: ObservableObject {
             self.currentCollectionKey = "__unfiled__"
             self.showFinalizeSheet = false
             self.isFinalizing = false
+            // These source photos are fully processed and filed — clear them from the Captured pane,
+            // then show the finalize summary there in their place until new capture begins.
+            self.session.clear()
             self.finalizeSummary = summary
         }
     }
+
+    /// Clear the "Finalized …" summary (called when new capture begins, or on a manual Clear).
+    func clearFinalizeSummary() { if finalizeSummary != nil { finalizeSummary = nil } }
 
     private struct MovePlan: Sendable {
         let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
