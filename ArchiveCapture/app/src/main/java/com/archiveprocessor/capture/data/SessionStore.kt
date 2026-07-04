@@ -41,10 +41,12 @@ class SessionStore(context: Context) {
             val tmp = File(file.parentFile, "session.json.tmp")
             tmp.writeText(root.toString())
             if (!tmp.renameTo(file)) {
-                // renameTo returns false (no throw) on some filesystems if the destination exists —
-                // fall back to an overwrite copy so the durable state can't silently lag reality.
-                tmp.copyTo(file, overwrite = true)
-                tmp.delete()
+                // renameTo can return false (no throw) on some filesystems when the destination exists.
+                // Remove the destination and retry the atomic rename — never copyTo(overwrite), which
+                // writes in place and can leave a TRUNCATED session.json if the process is killed
+                // mid-write (that corrupt file then fails to load, orphaning queued photos). If the retry
+                // also fails, leave the previous good file intact (tmp still holds a full copy).
+                if (file.delete()) tmp.renameTo(file)
             }
         } catch (e: Exception) {
             // Never crash the capture flow because of a persistence hiccup.

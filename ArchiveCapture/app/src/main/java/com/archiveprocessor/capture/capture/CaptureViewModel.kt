@@ -12,6 +12,7 @@ import com.archiveprocessor.capture.data.SessionStore
 import com.archiveprocessor.capture.net.MacClient
 import com.archiveprocessor.capture.net.MacEndpoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,7 +62,16 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = SessionStore(app)
 
+    /** Off-main, write-latest-wins session persistence: snapshot on the (cheap) main thread, then
+     *  serialize + write on IO so the UI never blocks on disk during capture/upload bursts. */
+    private data class SaveSnapshot(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val group: String, val pendingTag: String?)
+    private val saveChannel = Channel<SaveSnapshot>(Channel.CONFLATED)
+
     init {
+        // Start the off-main session writer first, so any persist() during restore is handled off the UI thread.
+        viewModelScope.launch(Dispatchers.IO) {
+            for (snap in saveChannel) store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag)
+        }
         // Crash resilience: restore any prior session and re-send whatever wasn't confirmed uploaded.
         store.load()?.let { r ->
             items.addAll(r.items)
@@ -85,10 +95,29 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 pendingTagGroupId = tagGroup
             }
         }
+        // Self-heal orphans: capture files on disk not tracked by the restored session (session.json can
+        // lag/corrupt across a crash) would otherwise never be shown, uploaded, or cleaned up. Re-adopt
+        // them into a dedicated recovery segment so an un-retakeable image is never silently lost.
+        val known = items.map { it.file.path }.toHashSet()
+        val orphans = sessionDir.listFiles { f -> f.isFile && f.name.startsWith("img_") && f.path !in known }
+            ?.sortedBy { it.name } ?: emptyList()
+        if (orphans.isNotEmpty()) {
+            val recoveryGroup = newGroupId()
+            orphans.forEach { f ->
+                seqCounter += 1
+                items.add(CapturedItem(id = nextId++, file = f, groupId = recoveryGroup, seq = seqCounter, type = GroupType.DOCUMENT))
+            }
+            statusMessage = "Recovered ${orphans.size} untracked photo(s)"
+            persist()
+        }
         startAutoRetry()
     }
 
-    private fun persist() = store.save(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId)
+    private fun persist() {
+        // trySend on a CONFLATED channel never blocks and always keeps the latest snapshot; the IO
+        // consumer writes it near-immediately, preserving crash durability without main-thread disk I/O.
+        saveChannel.trySend(SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId))
+    }
 
     /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
     private fun resumeUploads() {
@@ -157,7 +186,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Capture ----
 
-    fun newCaptureFile(): File = File(sessionDir, "img_${System.currentTimeMillis()}.jpg")
+    // UUID (not just a millisecond timestamp): two captures in the same millisecond must not resolve to
+    // the same path, or CameraX would overwrite the first image and one archival page would be lost.
+    fun newCaptureFile(): File = File(sessionDir, "img_${System.currentTimeMillis()}_${UUID.randomUUID()}.jpg")
 
     /** Main shutter: add a page to the current document segment (buffered until finalized). */
     fun addDocumentPhoto(file: File) {
