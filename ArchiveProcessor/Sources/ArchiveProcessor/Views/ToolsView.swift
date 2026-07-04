@@ -38,7 +38,7 @@ struct ToolsView: View {
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
-        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
+        let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: provider)) ?? ""
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
     }
 
@@ -53,7 +53,7 @@ struct ToolsView: View {
     /// Re-read the selected model (for the current provider) and the matching Keychain key. Mirrors the
     /// init's resolution so switching provider/gateway in Settings updates the Tools diagnostics live.
     private func reloadModelAndKey() {
-        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(selectedProvider.rawValue)") ?? ""
+        let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
         selectedModel = selectedProvider.models.first { $0.id == modelId } ?? selectedProvider.models[0]
         apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
     }
@@ -143,7 +143,7 @@ struct ToolsView: View {
                     modelTestTask?.cancel()   // user picked a model — stop the remaining paid test calls
                     selectedProvider = provider
                     selectedModel = model
-                    UserDefaults.standard.set(model.id, forKey: "selectedModelId_\(provider.rawValue)")
+                    UserDefaults.standard.set(model.id, forKey: ModelSelectionStore.modelKey(for: provider))
                     apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
                     showModelTestResults = false
                 },

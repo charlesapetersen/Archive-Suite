@@ -13,13 +13,14 @@ struct CostEstimate {
     var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost + rotationCost }
     var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost + rotationCost }
 
-    var ocrFormatted: String { "$\(String(format: "%.4f", ocrCost))" }
-    var classificationFormatted: String { "$\(String(format: "%.4f", classificationCost))" }
-    var taggingFormatted: String { "$\(String(format: "%.4f", taggingCost))" }
-    var collectionFormatted: String { "$\(String(format: "%.4f", collectionCost))" }
-    var rotationFormatted: String { "$\(String(format: "%.4f", rotationCost))" }
-    var totalStandardFormatted: String { "$\(String(format: "%.4f", totalStandard))" }
-    var totalBatchFormatted: String { "$\(String(format: "%.4f", totalBatch))" }
+    private func money(_ v: Double) -> String { "$" + String(format: "%.4f", v) }
+    var ocrFormatted: String { money(ocrCost) }
+    var classificationFormatted: String { money(classificationCost) }
+    var taggingFormatted: String { money(taggingCost) }
+    var collectionFormatted: String { money(collectionCost) }
+    var rotationFormatted: String { money(rotationCost) }
+    var totalStandardFormatted: String { money(totalStandard) }
+    var totalBatchFormatted: String { money(totalBatch) }
 }
 
 struct CostEstimator {

@@ -127,3 +127,33 @@ review feedback demands a change.
 - **iOS "minimal functionality" risk (App Store guidelines 2.1 / 4.2):** the companion is useless without the paired Mac, so the listing and first-run must clearly state the Mac-app dependency.
 - **[D3] first-run wizard behavior:** forced vs. dismissible banner — verify against the shipped `ContentView` first-run flow before treating as open.
 - **Provider caveats to keep in the in-app copy:** Gemini's free tier may train on inputs and requires the **paid** tier in the EEA/UK/CH (already handled by a locale pre-warn); free-tier rate limits are dynamic — keep copy provider-agnostic / user-refreshable rather than hardcoded.
+
+## Maintainability / refactor backlog (deferred from the 2026-07-04 audit)
+
+Behavior-preserving de-duplication/refactors surfaced by the maintainability audit but deferred because they
+either consolidate copies that have already DRIFTED (so unifying is a behavior decision, not a safe merge),
+touch the Tier-2 file-move/finalize path, or are large mechanical sweeps better done as one focused pass. Each
+is safe to pick up individually; prove equivalence + build before/after. Item-by-item detail (file:line,
+safety, verdict) is in audit run `wf_4373722d-e70`.
+
+- **Central `DefaultsKey` constants for the ~35 @AppStorage keys (flagship).** The keys are hand-typed string
+  literals across OCRView / SettingsView / ToolsView / LiveCaptureView + non-view code; a typo silently splits
+  a setting (the writer's value is lost, the reader sees the default) with no compiler error. Add an enum of
+  constants in `Models/` and reference it everywhere, keeping the string VALUES byte-identical so saved
+  settings survive. Do it as ONE complete sweep — a half-migration mixing literals + constants is worse than none.
+- **Shared provider text-completion client.** `TagGenerator` and `CollectionSegmenter` duplicate ~85 lines of
+  callLLM/callGateway/callAnthropic/callGemini/callMistralChat (differ only by max_tokens; already drifted on
+  the Mistral signature). Extract one shared text client taking a maxTokens param.
+- **Shared finalize/organize helpers.** startProcessing / resumeRun / resumeBatch each duplicate the
+  "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
+  `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
+- **Unify the box/folder color-retag logic** across applyReviewEdits / updateClassification /
+  applyDocumentReviewEdits (three copies that have slightly drifted — confirm the intended behavior first).
+- **Smaller de-dups:** shared `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor);
+  `ThinkingLevel.budgetTokens` + the Anthropic max_tokens bump (4 clients — budgets differ by call type);
+  a shared transient-status friendly-message helper (4 OCR clients); one `acceptedImageExtensions` constant
+  (3 files); shared `englishMonthNames` / `monthTag` (LiveCaptureProcessor + OCRProcessor); a segment-JSON
+  schema builder (2 sites); OCRResult `.with(...)` copy helpers; `GatewayConfig.fromDefaults()` (3 views); a
+  `liveProcessingMode` enum instead of "stage"/"live" magic strings; LLMRotationDetector.rotate →
+  ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder.
+- **Value decision:** the recent-years cap differs between the companions (iOS 5, Android 6) — pick one.
