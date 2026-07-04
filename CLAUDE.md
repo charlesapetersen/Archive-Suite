@@ -170,6 +170,40 @@ Photograph documents with a phone companion app — **Android** (`ArchiveCapture
 
 ---
 
+## Concurrent / multi-agent development
+
+Multiple people or AI instances can work in parallel **as long as each gets its own git worktree** — never run two instances in the same working directory (they clobber each other's uncommitted edits and race on the build cache).
+
+**Worktree lifecycle** (paths contain a space — always quote):
+```bash
+git worktree add "../ap-wt-<lane>" -b <branch>   # isolated sibling checkout on its own branch
+cd "../ap-wt-<lane>/ArchiveProcessor" && xcodegen generate   # required: .xcodeproj isn't committed
+# ...work, build (below), commit...
+git worktree remove "../ap-wt-<lane>"   # ./build is gitignored, so it doesn't block removal
+```
+
+**Per-worktree build isolation** — give each worktree its own DerivedData so concurrent builds don't collide:
+```bash
+xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build
+# iOS: xcodebuild -scheme ArchiveCaptureiOS -sdk iphonesimulator -configuration Debug -derivedDataPath ./build/DD build
+```
+`./build` is already gitignored, so per-worktree DerivedData is never committed. Note: `-derivedDataPath` isolates DerivedData and module caches but **not** the shared user-level Clang cache (`CACHE_ROOT`) — treat it as "separate DerivedData per worktree," not fully sandboxed.
+
+**Ownership lanes** — avoid two instances editing the same lane at once:
+- **Android** — `ArchiveCapture/` (Gradle, Kotlin). Fully independent.
+- **iPhone** — `ArchiveCaptureiOS/` (Swift 5). Independent *except* the phone↔Mac protocol.
+- **macOS OCR core** — `Sources/ArchiveProcessor/{OCR, Models, Capture, Net}`.
+- **macOS Views + Tagging** — `Sources/ArchiveProcessor/{Views, Tagging}`.
+
+**Shared hotspots that force cross-lane coordination:**
+- **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): **append cases only — never renumber, reorder, or change rawValues** (they are `Codable`/persisted; reordering corrupts users' saved settings).
+- **Phone↔Mac protocol:** `Net/CaptureServer.swift` (routes `GET /ping`, `POST /photo`, `POST /session/complete`, `Authorization: Bearer`) ↔ `ArchiveCaptureiOS/.../Net/MacClient.swift`. Change both sides together.
+- **The two `project.yml` files.**
+
+**Rules:** never hand-edit `.pbxproj` (edit `project.yml` + `xcodegen generate`, now also required after clone); keep commits small and rebase often; build-verify before every commit.
+
+---
+
 ## Project Structure
 ```
 Archive Processor/
