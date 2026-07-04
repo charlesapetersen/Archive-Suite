@@ -70,14 +70,13 @@ Every image is automatically classified as one of:
 
 Mistral (which uses a dedicated OCR endpoint without prompt support) classifies via text heuristics instead.
 
-### Contextual OCR
+### Previous-page image context
 
-Optionally send context from the previous page to improve classification accuracy:
-
-- **Previous text context** — configurable character count (0–1000) from the prior page's OCR text
-- **Previous image** — send the full previous page image alongside the current one
-
-Setting previous text to 0 enables parallel OCR processing (4 concurrent workers). Any non-zero value requires sequential processing.
+Optionally send the **previous page's image** alongside the current one to improve classification
+(box / folder / document continuation). This applies to the LLM-segmenting providers (Gemini, Anthropic),
+roughly doubles per-image cost, and **keeps OCR running in parallel**. (An earlier free-text
+"previous text context" slider was removed; OCR always runs in parallel now, across a configurable worker
+pool — *Settings › Parallel OCR workers*, default 4.)
 
 ### Batch Processing
 

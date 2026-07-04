@@ -141,7 +141,7 @@ Photograph documents with a phone companion app — **Android** (`ArchiveCapture
 
 ## Settings & Tools
 
-- **Settings window (⌘,)** — `Views/SettingsView.swift`, a `Settings { }` scene. All durable settings (provider/model/API mode+key, input/batch/resolution, rotation, tagging options, custom models, live-capture mode) in a grouped `Form`, with a **pinned live cost-estimate pane** (1,000 files ≈ 3 MB). Shared with the main window via `@AppStorage`/UserDefaults + Keychain. The **tagging-mode dropdown** and **output folder** stay in the Process Files view.
+- **Settings window (⌘,)** — `Views/SettingsView.swift`, a `Settings { }` scene. All durable settings (provider/model/API mode+key, input/batch/resolution, rotation, tagging options, custom models, live-capture mode) in a grouped `Form`, with a **pinned live cost-estimate pane** (estimates a 1,000-file run, each file at the default 3 MB standard image size). Shared with the main window via `@AppStorage`/UserDefaults + Keychain. The **tagging-mode dropdown** and **output folder** stay in the Process Files view.
 - **Tools tab** — `Views/ToolsView.swift`: **Compare Models** + **Test Resolution** (one-off diagnostics via `OCRProcessor.performResolutionTestCall`).
 
 ---
@@ -200,7 +200,7 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 - **macOS Views + Tagging** — `Sources/ArchiveProcessor/{Views, Tagging}`.
 
 **Shared hotspots that force cross-lane coordination:**
-- **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): **append cases only — never renumber, reorder, or change rawValues** (they are `Codable`/persisted; reordering corrupts users' saved settings).
+- **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position).
 - **Phone↔Mac protocol:** `Net/CaptureServer.swift` (routes `GET /ping`, `POST /photo`, `POST /session/complete`, `Authorization: Bearer`) ↔ `ArchiveCaptureiOS/.../Net/MacClient.swift`. Change both sides together.
 - **The two `project.yml` files.**
 

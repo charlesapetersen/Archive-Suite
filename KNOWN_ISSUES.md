@@ -53,13 +53,13 @@ sessions created by the current build.
 end-of-session rotation review showed only 2 of 6 pages — yet **all 6 files were output correctly**.
 
 **Root cause (confirmed in code):**
-- `LiveCaptureProcessor.finishSession()` builds `rotationReviewPages` from `retained.values`
-  (`Capture/LiveCaptureProcessor.swift`, finishSession ~L470, `for seg in retained.values` ~L475). `retained` holds the per-segment inputs needed to
+- `LiveCaptureProcessor.finishSession()` (in `Capture/LiveCaptureProcessor.swift`) builds `rotationReviewPages`
+  by iterating `retained.values`. `retained` holds the per-segment inputs needed to
   regenerate a segment (source URLs, `OCRResult` incl. `rotationDegrees`, tags, model, …).
-- `retained[groupId]` is written **atomically with every `staged.append(...)`** in `finalizeSegment`
-  (`staged.append(...)` ~L261, `retained[groupId] = …` ~L263), so for any segment the current build finalizes, `staged` and `retained` stay in sync.
+- `retained[groupId]` is written **atomically with every `staged.append(...)`** in `finalizeSegment`,
+  so for any segment the current build finalizes, `staged` and `retained` stay in sync.
 - The **only** way `staged` can contain a segment with no `retained` entry is `loadStagingManifest()`
-  (~L108) restoring a **legacy-format** staging manifest — a bare `[StagedSegment]` array written
+  restoring a **legacy-format** staging manifest — a bare `[StagedSegment]` array written
   before retained-persistence (commit `c0312f4`). The new format is `StagingManifest { staged, retained }`;
   the legacy branch restores `staged` + `finalizedGroups` but leaves `retained` empty for those segments.
 - Result on recovery of such a session: legacy segments are re-staged/output (they're in `staged`) but

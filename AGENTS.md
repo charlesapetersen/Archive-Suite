@@ -13,20 +13,13 @@ git worktree remove "../ap-wt-<lane>"                   # ./build is gitignored,
 ```
 Prereq: `brew install xcodegen` (or just run `./bootstrap.sh` from the worktree root — it installs XcodeGen if missing and regenerates every project). `-derivedDataPath` isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per worktree."
 
-## Ownership lanes (avoid two agents in one lane at once)
-- **Android** — `ArchiveCapture/` (Gradle/Kotlin). Fully independent.
-- **iPhone** — `ArchiveCaptureiOS/` (Swift 5). Independent except the phone↔Mac protocol.
-- **macOS OCR core** — `Sources/ArchiveProcessor/{OCR, Models, Capture, Net}`.
-- **macOS Views + Tagging** — `Sources/ArchiveProcessor/{Views, Tagging}`.
-
-## Shared hotspots — coordinate before editing
-- `Models/ProviderModels.swift` enums (`LLMProvider`, `TaggingMode`, `RotationMode`, …): **append cases only**; never renumber/reorder/change rawValues (Codable + persisted).
-- Phone↔Mac protocol: `Net/CaptureServer.swift` ⇄ `ArchiveCaptureiOS/.../Net/MacClient.swift` (`/ping`, `/photo`, `/session/complete`, Bearer). Change both sides together.
-- The two `project.yml` files.
-
-## The two split classes (behavior-preserving refactor)
-- `OCR/OCRProcessor.swift` holds **only stored state + member types**; methods are in `OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift`, types in `OCRProcessor+Types.swift`. New methods go in the extension matching their concern; **stored properties stay in `OCRProcessor.swift`**.
-- `Views/OCRView.swift` is the main view; sheets/rows/diff are `OCRView+*.swift`.
+## Lanes, hotspots & split classes (quick reference)
+The **authoritative, detailed** versions — ownership lanes, the shared hotspots, and the `OCRProcessor` /
+`OCRView` split-class rules — live in **[CLAUDE.md](CLAUDE.md) → "Concurrent / multi-agent development."**
+Kept here as a glance so this file stands alone; edit the detail in CLAUDE.md, not here.
+- **Lanes** (one agent each): Android `ArchiveCapture/` · iPhone `ArchiveCaptureiOS/` · macOS OCR core `Sources/ArchiveProcessor/{OCR,Models,Capture,Net}` · macOS Views+Tagging `Sources/ArchiveProcessor/{Views,Tagging}`.
+- **Coordinate before editing:** the `ProviderModels.swift` persisted enums (all `String`-backed — never rename a case or change an explicit rawValue string; appending is safe, reordering is harmless); the phone↔Mac protocol (`Net/CaptureServer.swift` ⇄ iOS `Net/MacClient.swift` — change both sides); the two `project.yml` files.
+- **Split classes:** `OCRProcessor.swift` = stored state only (methods in `OCRProcessor+*.swift`, types in `+Types.swift`); `OCRView.swift` = main view (sheets/rows/diff in `OCRView+*.swift`).
 
 ## Rules
 - Never hand-edit `.pbxproj` — edit `project.yml` + `xcodegen generate` (required after clone too).
