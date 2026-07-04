@@ -29,20 +29,20 @@ struct SessionProcessingConfig {
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults() -> SessionProcessingConfig {
         let d = UserDefaults.standard
-        let provider = LLMProvider(rawValue: d.string(forKey: "selectedProvider") ?? "") ?? .gemini
+        let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let modelId = d.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         let builtIns = provider.models
         let custom = CustomModelStore.shared.allCustomModels.filter { $0.provider == provider }
         let model = (builtIns + custom).first { $0.id == modelId } ?? builtIns.first ?? provider.models[0]
 
-        let useGateway = d.bool(forKey: "useGateway")
-        let gatewayBaseURL = d.string(forKey: "gatewayBaseURL") ?? ""
-        let gatewayModelID = d.string(forKey: "gatewayModelID") ?? ""
+        let useGateway = d.bool(forKey: DefaultsKeys.useGateway)
+        let gatewayBaseURL = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
+        let gatewayModelID = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
         var gateway: GatewayConfig? = nil
         if useGateway, !gatewayBaseURL.isEmpty, !gatewayModelID.isEmpty {
-            let inCost = d.object(forKey: "gatewayInputCost") as? Double ?? -1
-            let outCost = d.object(forKey: "gatewayOutputCost") as? Double ?? -1
-            let name = d.string(forKey: "gatewayDisplayName") ?? ""
+            let inCost = d.object(forKey: DefaultsKeys.gatewayInputCost) as? Double ?? -1
+            let outCost = d.object(forKey: DefaultsKeys.gatewayOutputCost) as? Double ?? -1
+            let name = d.string(forKey: DefaultsKeys.gatewayDisplayName) ?? ""
             gateway = GatewayConfig(baseURL: gatewayBaseURL, modelID: gatewayModelID,
                                     displayName: name.isEmpty ? "API Gateway" : name,
                                     inputCostPer1M: inCost >= 0 ? inCost : nil,
@@ -50,7 +50,7 @@ struct SessionProcessingConfig {
         }
 
         let outURL: URL = {
-            if let path = d.string(forKey: "outputDirectory"), FileManager.default.fileExists(atPath: path) {
+            if let path = d.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 return URL(fileURLWithPath: path)
             }
             return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -62,25 +62,25 @@ struct SessionProcessingConfig {
         return SessionProcessingConfig(
             provider: provider,
             model: model,
-            thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: "selectedThinking") ?? "") ?? .low,
+            thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low,
             apiKey: apiKey,
-            taggingMode: TaggingMode(rawValue: d.string(forKey: "taggingModeRaw") ?? "") ?? .automatic,
-            rotationMode: RotationMode(rawValue: d.string(forKey: "rotationModeRaw") ?? "") ?? .llmSingle,
-            mergeDocuments: d.bool(forKey: "mergeDocuments"),
+            taggingMode: TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic,
+            rotationMode: RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .llmSingle,
+            mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
             outputDirectory: outURL,
-            contextCharCount: Int(d.object(forKey: "contextCharCount") as? Double ?? 200),
-            sendPreviousImage: d.bool(forKey: "sendPreviousImage"),
-            customOCRPrompt: d.string(forKey: "customOCRPrompt") ?? "",
-            imageScale: (d.object(forKey: "imageResolutionPercent") as? Double ?? 100) / 100.0,
-            enableSegmentJSON: d.object(forKey: "enableSegmentJSON") as? Bool ?? true,
-            tagVocabulary: (d.string(forKey: "tagVocabulary") ?? "")
+            contextCharCount: Int(d.object(forKey: DefaultsKeys.contextCharCount) as? Double ?? 200),
+            sendPreviousImage: d.bool(forKey: DefaultsKeys.sendPreviousImage),
+            customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
+            imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
+            enableSegmentJSON: d.object(forKey: DefaultsKeys.enableSegmentJSON) as? Bool ?? true,
+            tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
                 .components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty },
             gateway: gateway,
-            outputImageFile: (d.object(forKey: "outputImageFile") as? Bool) ?? true,
-            pdfImageMB: { let p = d.double(forKey: "pdfImageSizeMB"); return p > 0 ? p : 2.0 }(),
-            exportedImageMB: { let e = d.double(forKey: "exportedImageSizeMB"); return e > 0 ? e : 3.0 }()
+            outputImageFile: (d.object(forKey: DefaultsKeys.outputImageFile) as? Bool) ?? true,
+            pdfImageMB: { let p = d.double(forKey: DefaultsKeys.pdfImageSizeMB); return p > 0 ? p : 2.0 }(),
+            exportedImageMB: { let e = d.double(forKey: DefaultsKeys.exportedImageSizeMB); return e > 0 ? e : 3.0 }()
         )
     }
 

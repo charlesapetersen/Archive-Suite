@@ -136,11 +136,9 @@ touch the Tier-2 file-move/finalize path, or are large mechanical sweeps better 
 is safe to pick up individually; prove equivalence + build before/after. Item-by-item detail (file:line,
 safety, verdict) is in audit run `wf_4373722d-e70`.
 
-- **Central `DefaultsKey` constants for the ~35 @AppStorage keys (flagship).** The keys are hand-typed string
-  literals across OCRView / SettingsView / ToolsView / LiveCaptureView + non-view code; a typo silently splits
-  a setting (the writer's value is lost, the reader sees the default) with no compiler error. Add an enum of
-  constants in `Models/` and reference it everywhere, keeping the string VALUES byte-identical so saved
-  settings survive. Do it as ONE complete sweep — a half-migration mixing literals + constants is worse than none.
+- ~~**Central `DefaultsKey` constants for the ~35 @AppStorage keys (flagship).**~~ **DONE** (2026-07-04):
+  `Models/DefaultsKeys.swift` now defines all 37 durable-settings keys once and every `@AppStorage` / `forKey:`
+  call site references it; values verified byte-identical to the originals so saved settings are preserved.
 - **Shared provider text-completion client.** `TagGenerator` and `CollectionSegmenter` duplicate ~85 lines of
   callLLM/callGateway/callAnthropic/callGemini/callMistralChat (differ only by max_tokens; already drifted on
   the Mistral signature). Extract one shared text client taking a maxTokens param.

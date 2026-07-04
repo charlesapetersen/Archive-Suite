@@ -14,7 +14,7 @@ struct LiveCaptureView: View {
     var onProcess: () -> Void
 
     /// App-wide choice (Settings ⌘,): live streaming vs. staging for a later batch run.
-    @AppStorage("liveProcessingMode") private var liveProcessingMode: String = "stage"
+    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
 
     var body: some View {
         HSplitView {

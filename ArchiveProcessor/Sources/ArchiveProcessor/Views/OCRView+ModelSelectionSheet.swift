@@ -79,7 +79,7 @@ struct ModelSelectionSheet: View {
                 }
                 Spacer()
                 Button("Select Image…") {
-                    UserDefaults.standard.set(selections, forKey: "modelTestSelections")
+                    UserDefaults.standard.set(selections, forKey: DefaultsKeys.modelTestSelections)
                     onStart(selectedEntries)
                 }
                 .buttonStyle(.borderedProminent)
@@ -94,7 +94,7 @@ struct ModelSelectionSheet: View {
                 apiKeys[provider.rawValue] = KeychainHelper.load(account: provider.rawValue) ?? ""
             }
             // Restore previously saved model selections, or default to current provider's first model
-            if let saved = UserDefaults.standard.dictionary(forKey: "modelTestSelections") as? [String: Bool], !saved.isEmpty {
+            if let saved = UserDefaults.standard.dictionary(forKey: DefaultsKeys.modelTestSelections) as? [String: Bool], !saved.isEmpty {
                 selections = saved
             } else if let firstModel = currentProvider.models.first {
                 selections[firstModel.id] = true

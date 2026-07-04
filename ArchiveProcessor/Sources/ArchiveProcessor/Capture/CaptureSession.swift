@@ -36,7 +36,7 @@ final class CaptureSession: ObservableObject {
     private(set) lazy var liveProcessor = LiveCaptureProcessor(session: self)
 
     /// The user's app-wide choice (Settings ⌘,): stream each segment live, or stage for a later batch run.
-    private var liveModeEnabled: Bool { UserDefaults.standard.string(forKey: "liveProcessingMode") == "live" }
+    private var liveModeEnabled: Bool { UserDefaults.standard.string(forKey: DefaultsKeys.liveProcessingMode) == "live" }
 
     /// On first activity, fix the session's processing mode from Settings and — for live — snapshot
     /// the config so mid-session Settings changes don't affect the running session.

@@ -23,7 +23,7 @@ enum ModelSelectionStore {
 
     /// The persisted output directory if it still exists, otherwise the user's Downloads folder.
     static func savedOutputDirectory() -> URL? {
-        if let path = UserDefaults.standard.string(forKey: "outputDirectory"),
+        if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory),
            FileManager.default.fileExists(atPath: path) {
             return URL(fileURLWithPath: path)
         }
@@ -32,6 +32,6 @@ enum ModelSelectionStore {
 
     /// Persist the output directory (nil clears it).
     static func saveOutputDirectory(_ url: URL?) {
-        UserDefaults.standard.set(url?.path, forKey: "outputDirectory")
+        UserDefaults.standard.set(url?.path, forKey: DefaultsKeys.outputDirectory)
     }
 }

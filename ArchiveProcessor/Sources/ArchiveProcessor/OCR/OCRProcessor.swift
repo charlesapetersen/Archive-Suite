@@ -75,13 +75,13 @@ class OCRProcessor: ObservableObject {
     /// Load run-time knobs from UserDefaults (standard size 3 MB, OCR workers 4, PDF-image 2 MB,
     /// exported-image 3 MB) — call at run start.
     static func loadStandardImageMB() {
-        let v = UserDefaults.standard.double(forKey: "standardImageSizeMB")
+        let v = UserDefaults.standard.double(forKey: DefaultsKeys.standardImageSizeMB)
         standardImageMB = v > 0 ? v : 3.0
-        let w = UserDefaults.standard.integer(forKey: "ocrWorkerCount")
+        let w = UserDefaults.standard.integer(forKey: DefaultsKeys.ocrWorkerCount)
         ocrWorkerCount = w > 0 ? min(12, w) : 4
-        let p = UserDefaults.standard.double(forKey: "pdfImageSizeMB")
+        let p = UserDefaults.standard.double(forKey: DefaultsKeys.pdfImageSizeMB)
         pdfImageMB = p > 0 ? p : 2.0
-        let e = UserDefaults.standard.double(forKey: "exportedImageSizeMB")
+        let e = UserDefaults.standard.double(forKey: DefaultsKeys.exportedImageSizeMB)
         exportedImageMB = e > 0 ? e : 3.0
     }
 

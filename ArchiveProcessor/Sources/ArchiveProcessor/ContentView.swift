@@ -5,7 +5,7 @@ struct ContentView: View {
     @StateObject private var capture = CaptureSession()
     @State private var mode: Mode =
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" ? .live : .files
-    @AppStorage("hasSeenKeyOnboarding") private var hasSeenKeyOnboarding = false
+    @AppStorage(DefaultsKeys.hasSeenKeyOnboarding) private var hasSeenKeyOnboarding = false
     @State private var showKeyOnboarding = false
 
     enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture", tools = "Tools" }

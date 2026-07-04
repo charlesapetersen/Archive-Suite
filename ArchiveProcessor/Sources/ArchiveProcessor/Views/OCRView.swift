@@ -9,46 +9,46 @@ struct OCRView: View {
     @ObservedObject var processor: OCRProcessor
 
     // Persisted via @AppStorage (UserDefaults)
-    @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
-    @AppStorage("selectedThinking") private var selectedThinking: ThinkingLevel = .low
-    @AppStorage("batchMode") private var batchMode: Bool = false
-    @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
-    @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
-    @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
-    @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
+    @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
+    @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
+    @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
+    @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
+    @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
-    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
+    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
-    @AppStorage("reviewRotation") private var reviewRotation: Bool = false
-    @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
+    @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
+    @AppStorage(DefaultsKeys.ocrWorkerCount) private var ocrWorkerCount: Int = 4
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
-    @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
-    @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
-    @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
-    @AppStorage("tagVocabulary") private var tagVocabulary: String = ""
-    @AppStorage("contextCharCount") private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
-    @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
-    @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
-    @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
-    @AppStorage("outputImageFile") private var outputImageFile: Bool = true   // two files (PDF + image) vs one (PDF only)
+    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
+    @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
+    @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
+    @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
+    @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
+    @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
+    @AppStorage(DefaultsKeys.outputImageFile) private var outputImageFile: Bool = true   // two files (PDF + image) vs one (PDF only)
 
     // Gateway mode (persisted)
-    @AppStorage("useGateway") private var useGateway: Bool = false
-    @AppStorage("gatewayBaseURL") private var gatewayBaseURL: String = ""
-    @AppStorage("gatewayModelID") private var gatewayModelID: String = ""
-    @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
-    @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
-    @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
-    @AppStorage("gatewayUpstreamProvider") private var gatewayUpstreamProvider: LLMProvider = .anthropic
+    @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
+    @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
+    @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
+    @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
+    @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
+    @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
+    @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
 
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
     @State private var apiKey: String
     @State private var outputDirectory: URL?
 
-    @AppStorage("keychainExplained") private var keychainExplained: Bool = false
+    @AppStorage(DefaultsKeys.keychainExplained) private var keychainExplained: Bool = false
 
     // Transient
     @State private var droppedFiles: [URL] = []
@@ -72,7 +72,7 @@ struct OCRView: View {
 
     init(processor: OCRProcessor) {
         _processor = ObservedObject(wrappedValue: processor)
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
+        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
         _apiKey = State(initialValue: "")
         _outputDirectory = State(initialValue: ModelSelectionStore.savedOutputDirectory())
@@ -143,7 +143,7 @@ struct OCRView: View {
                 .padding()
         }
         .onAppear {
-            let isGateway = UserDefaults.standard.bool(forKey: "useGateway")
+            let isGateway = UserDefaults.standard.bool(forKey: DefaultsKeys.useGateway)
             apiKey = KeychainHelper.load(account: isGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
             processor.checkForPendingBatch()
             if !keychainExplained {
@@ -188,7 +188,7 @@ struct OCRView: View {
             // Returning from the Settings window: pick up any changed key / model / output folder.
             guard phase == .active else { return }
             apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
-            if let path = UserDefaults.standard.string(forKey: "outputDirectory"), FileManager.default.fileExists(atPath: path) {
+            if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
             let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""

@@ -35,39 +35,39 @@ struct HelpButton: View {
 /// Layout: a scrolling settings form on the left, with a **fixed cost-estimate pane on the right**
 /// that stays visible so cost effects of each change are immediately apparent.
 struct SettingsView: View {
-    @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
-    @AppStorage("selectedThinking") private var selectedThinking: ThinkingLevel = .low
-    @AppStorage("useGateway") private var useGateway: Bool = false
-    @AppStorage("gatewayBaseURL") private var gatewayBaseURL: String = ""
-    @AppStorage("gatewayModelID") private var gatewayModelID: String = ""
-    @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
-    @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
-    @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
-    @AppStorage("gatewayUpstreamProvider") private var gatewayUpstreamProvider: LLMProvider = .anthropic
+    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
+    @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
+    @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
+    @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
+    @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
+    @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
+    @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
+    @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
+    @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
 
-    @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
-    @AppStorage("batchMode") private var batchMode: Bool = false
-    @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
-    @AppStorage("standardImageSizeMB") private var standardImageSizeMB: Double = 3.0
-    @AppStorage("outputImageFile") private var outputImageFile: Bool = true
-    @AppStorage("pdfImageSizeMB") private var pdfImageSizeMB: Double = 2.0
-    @AppStorage("exportedImageSizeMB") private var exportedImageSizeMB: Double = 3.0
-    @AppStorage("writeLogFile") private var writeLogEnabled: Bool = false
-    @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
-    @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
-    @AppStorage("reviewRotation") private var reviewRotation: Bool = false
+    @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
+    @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
+    @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
+    @AppStorage(DefaultsKeys.standardImageSizeMB) private var standardImageSizeMB: Double = 3.0
+    @AppStorage(DefaultsKeys.outputImageFile) private var outputImageFile: Bool = true
+    @AppStorage(DefaultsKeys.pdfImageSizeMB) private var pdfImageSizeMB: Double = 2.0
+    @AppStorage(DefaultsKeys.exportedImageSizeMB) private var exportedImageSizeMB: Double = 3.0
+    @AppStorage(DefaultsKeys.writeLogFile) private var writeLogEnabled: Bool = false
+    @AppStorage(DefaultsKeys.ocrWorkerCount) private var ocrWorkerCount: Int = 4
+    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
+    @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
 
-    @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
-    @AppStorage("enableCollectionSegmentation") private var enableCollectionSegmentation: Bool = false
-    @AppStorage("confirmCollectionIDs") private var confirmCollectionIDs: Bool = false
-    @AppStorage("reviewDocumentSegmentation") private var reviewDocumentSegmentation: Bool = false
-    @AppStorage("enableSegmentJSON") private var enableSegmentJSON: Bool = true
-    @AppStorage("sendPreviousImage") private var sendPreviousImage: Bool = false
-    @AppStorage("contextCharCount") private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
-    @AppStorage("tagVocabulary") private var tagVocabulary: String = ""
-    @AppStorage("mergeDocuments") private var mergeDocuments: Bool = false
-    @AppStorage("customOCRPrompt") private var customOCRPrompt: String = ""
-    @AppStorage("liveProcessingMode") private var liveProcessingMode: String = "stage"
+    @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
+    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
+    @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
+    @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
+    @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
+    @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
+    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @State private var selectedModel: LLMModel
@@ -79,7 +79,7 @@ struct SettingsView: View {
     @State private var showManageModels = false
 
     init() {
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
+        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
     }
 

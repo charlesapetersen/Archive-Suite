@@ -4,15 +4,15 @@ import SwiftUI
 /// output across models, and test how image resolution affects OCR. Both run one-off OCR calls via
 /// `OCRProcessor.performResolutionTestCall` — independent of the main processing run.
 struct ToolsView: View {
-    @AppStorage("selectedProvider") private var selectedProvider: LLMProvider = .gemini
-    @AppStorage("selectedThinking") private var selectedThinking: ThinkingLevel = .low
-    @AppStorage("useGateway") private var useGateway: Bool = false
-    @AppStorage("gatewayBaseURL") private var gatewayBaseURL: String = ""
-    @AppStorage("gatewayModelID") private var gatewayModelID: String = ""
-    @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
-    @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
-    @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
-    @AppStorage("imageResolutionPercent") private var imageScale: Double = 100
+    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
+    @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
+    @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
+    @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
+    @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
+    @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
+    @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
+    @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
+    @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
 
     @State private var selectedModel: LLMModel
     @State private var apiKey: String = ""
@@ -37,7 +37,7 @@ struct ToolsView: View {
     @State private var modelTestTask: Task<Void, Never>?
 
     init() {
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
+        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: provider)) ?? ""
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
     }

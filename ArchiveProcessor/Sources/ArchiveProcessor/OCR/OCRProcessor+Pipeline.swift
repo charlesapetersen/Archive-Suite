@@ -1050,7 +1050,7 @@ extension OCRProcessor {
     }
     private func writeLogFile(outputDirectory: URL) {
         // Opt-in: only write the log when the user has enabled it (default off).
-        guard UserDefaults.standard.bool(forKey: "writeLogFile") else { return }
+        guard UserDefaults.standard.bool(forKey: DefaultsKeys.writeLogFile) else { return }
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "d MMMM yyyy HH:mm"
         let dateStr = dateFormatter.string(from: Date())

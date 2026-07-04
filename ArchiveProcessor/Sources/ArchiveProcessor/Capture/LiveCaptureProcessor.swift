@@ -473,7 +473,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// (0 if detection was off), and the operator can correct any of them.
     func finishSession() {
         guard !staged.isEmpty else { return }
-        let wantReview = UserDefaults.standard.bool(forKey: "reviewRotation")
+        let wantReview = UserDefaults.standard.bool(forKey: DefaultsKeys.reviewRotation)
         guard wantReview else { beginFinalize(); return }
         var pages: [RotationReviewPage] = []
         for seg in retained.values {

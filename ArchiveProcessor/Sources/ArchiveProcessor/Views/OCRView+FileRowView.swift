@@ -12,7 +12,7 @@ struct FileRowView: View {
     var isFocused: Bool = false
     /// Live Capture segmentation to show before a job exists (falls back to `job.classification`).
     var presetClassification: DocumentClassification? = nil
-    @AppStorage("taggingModeRaw") private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
 
     /// Document start/continuation only mean something when the LLM segments (Automatic / Auto-date).
     /// In manual-segmentation, Human, No-tagging, and Copy-source modes those are user-defined or
