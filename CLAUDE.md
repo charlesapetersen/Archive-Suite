@@ -226,10 +226,15 @@ break it — plus a targeted functional test where feasible. This tier is trigge
 - file-writing tag/output code (`Tagging/MacOSTagger.swift`, PDF/image output, collection numbering that could **overwrite** files),
 - batch/manifest persistence, or anything changing `@MainActor`/`Sendable`/actor isolation.
 
-**Tier 3 — before every push or release (the batch):** run a **multi-agent adversarial review of the whole
-accumulated diff** (the *find → refute* pattern: finders propose defects, a second set of agents tries to
-refute each, only survivors are real), and a **live smoke test** if the OCR/tagging/PDF path changed. Push
-only after it comes back clean. (Batching pushes is the standing cadence — commit locally often, push rarely.)
+**Tier 3 — before every release (DMG + GitHub release; done sparingly):** run a **multi-agent adversarial
+review of the whole accumulated diff since the last release** (the *find → refute* pattern: finders propose
+defects, a second set of agents tries to refute each, only survivors are real), and a **live smoke test** if
+the OCR/tagging/PDF path changed. Cut the release only after it comes back clean.
+
+**Cadence:** **push commits to `origin` frequently** — a clean build + Tier-1 self-review (and Tier-2 for
+high-blast-radius diffs) is enough to push; don't hoard local commits. **Releases are the sparse milestone:**
+build a DMG + tag a GitHub release only occasionally (a coherent, release-worthy batch), gated by the Tier-3
+review above. In short: push often, release rarely.
 
 **Always adversarially *verify* findings before acting on them.** With no human to sanity-check, a plausible-
 but-wrong "fix" is its own risk: have a second agent try to *refute* each finding (default to "not a bug" when
