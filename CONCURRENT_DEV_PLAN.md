@@ -1,12 +1,14 @@
 # Concurrent / Multi-Agent Development — Implementation Plan
 
-**STATUS:** IN PROGRESS on branch `refactor/concurrent-dev` (pushed to origin; `main` untouched). **NEXT ACTION:** C2.2–C2.12 — extract the scattered method clusters from `OCRProcessor.swift` into `extension OCRProcessor` files (compiler-guided access relaxation), then C2 gate + the paid batch smoke.
+**STATUS:** COMPLETE on branch `refactor/concurrent-dev` (pushed to origin; `main` untouched), pending your review/merge. **NEXT ACTION:** review the PR and merge; optionally the full manual UI click-through.
 
-**Progress (2026-07-03):**
-- ✅ Phase 0 (drift = zero; scheme survives from-scratch regen) · ✅ Task A (`.pbxproj` untracked + gitignored, docs updated) · ✅ Task B (worktree section + proven live) · ✅ C1 (OCRView.swift 2649→919; 11 sibling files, pure move) · ✅ C2.1 (`OCRProcessor+Types.swift`, 8 types).
-- All commits verified (byte-identical move-proofs, symbol multiset identical main↔HEAD, green clean build) and pushed. Commits: `ddca3d7` (A), `1399321` (B), `96cc1f6` (C1), `907166c` (C2.1).
-- **Corrected warning baseline:** a from-scratch **clean** build shows **15 pre-existing warnings** (ManualSegmentTagView ×12, CaptureServer ×2, LiveCaptureView ×1) — the initial "0" was a *cached* build hiding them. **Zero** warnings were introduced by the refactor. Use 15 (clean) as the delta baseline for C2.2+.
-- **Remaining (C2.2–C2.12):** methods are scattered through the class body interleaved with the stored properties that must stay, so each cluster needs precise brace-boundary extraction + relaxing (drop `private` on) exactly the members touched across the new file boundary — deferred from the unattended run as the highest-risk-to-automate part. Recipe unchanged below. Then the paid batch smoke (C-S-paid) via the Process Files GUI.
+**Progress (2026-07-03) — all done, verified, pushed:**
+- ✅ Phase 0 (drift = zero; scheme survives from-scratch regen) · ✅ Task A (`.pbxproj` untracked + gitignored, docs updated) · ✅ Task B (worktree section + proven live) · ✅ C1 (OCRView.swift 2649→919; 11 sibling files) · ✅ C2.1 (`OCRProcessor+Types.swift`, 8 types) · ✅ **C2 coarse** (OCRProcessor.swift 3860→436 into 4 concern extensions: `+Pipeline` / `+OCR` / `+Tagging` / `+ReviewFlows`; 46 members relaxed private→internal, 33 stayed private).
+- Commits: `ddca3d7` (A), `1399321` (B), `96cc1f6` (C1), `907166c` (C2.1), `c1f0a5b` (C2 coarse).
+- **C2 was done coarse (4 files) not fine (12), by decision** — captures the conflict-reduction + whole-file-read benefit while keeping related state-mutating logic together (lower cross-file tracing cost for an agent).
+- **Verification:** every move proven byte-identical to removed content before relaxation; symbol multiset identical to `main` across the whole refactor; **from-scratch clean build green** (15 pre-existing warnings — ManualSegmentTagView ×12, CaptureServer ×2, LiveCaptureView ×1 — **0 introduced**); app launches clean; **paid end-to-end smoke passed** (headless driver, real `gemini-2.5-flash-lite` OCR through moved `+OCR`/`+Tagging`: real extracted text, PDF+JPG+JSON dual output, collection auto-named from OCR content, no errors).
+- **Note:** the initial warning "0" was a *cached* build masking the 15 pre-existing warnings.
+- **Not done (optional):** full manual UI sheet-by-sheet click-through (launch/crash-check done as proxy). The `.pbxproj` onboarding change is documented; an optional `bootstrap.sh` could smooth fresh-clone setup.
 
 > This is the durable, executable plan. It supersedes the scratch copy under `~/.claude/plans/`.
 > Every step below carries its **own verification** — you check that each step worked *before* moving to the next, rather than doing one big verification at the end. Checks are tagged **[free]** (no API spend — builds are compile-only), **[manual]** (human observation), or **[paid]** (costs API money — exactly one, last).
