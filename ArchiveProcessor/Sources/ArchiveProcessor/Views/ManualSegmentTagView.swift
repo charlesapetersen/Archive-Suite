@@ -62,26 +62,24 @@ struct ManualSegmentTagView: View {
 
     // MARK: Header
 
+    // Compact single-row header so the image gets as much vertical space as possible.
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Segment & Tag").font(.title2).fontWeight(.semibold)
-                Text(progressLine).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                Text("← → photo   ⏎ end & tag   B/F/D box/folder/doc   X remove   Space preview")
-                    .font(.caption2).foregroundStyle(.tertiary)
-                Button("Finish ▸") { processor.confirmManualSegTag() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!processor.manualSegCanFinish)
-                    .help(processor.manualSegCanFinish
-                          ? "Apply all tags and continue."
-                          : "Tag or remove every document first (\(remainingDocs) left).")
-            }
+        HStack(spacing: 10) {
+            Text("Segment & Tag").font(.headline)
+            Text(progressLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Spacer(minLength: 12)
+            Text("← → photo · ⏎ end & tag · B/F/D · X remove · Space preview")
+                .font(.caption2).foregroundStyle(.tertiary).lineLimit(1).layoutPriority(-1)
+            Button("Finish ▸") { processor.confirmManualSegTag() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!processor.manualSegCanFinish)
+                .help(processor.manualSegCanFinish
+                      ? "Apply all tags and continue."
+                      : "Tag or remove every document first (\(remainingDocs) left).")
         }
-        .padding()
+        .padding(.horizontal, 12).padding(.vertical, 6)
     }
 
     private var progressLine: String {

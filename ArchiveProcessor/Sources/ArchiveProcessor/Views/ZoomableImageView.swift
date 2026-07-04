@@ -102,13 +102,15 @@ private final class PanState: ObservableObject {
     private(set) var zoom: CGFloat = 1
     private var maxOffset: CGSize = .zero
 
-    /// Keep the current zoom + max pan distance fresh, and re-clamp the offset (e.g. after zoom-out).
+    /// Refresh the zoom + max pan distance, and anchor the TOP of the image to the top of the viewport
+    /// (don't zoom toward the center) so the first line of a document stays put as you zoom in. The
+    /// current horizontal pan is preserved; the user can still scroll down to reach lower content.
     func update(zoom: CGFloat, fit: CGSize, viewport: CGSize) {
         self.zoom = zoom
         maxOffset = CGSize(width: max(0, (fit.width * zoom - viewport.width) / 2),
                            height: max(0, (fit.height * zoom - viewport.height) / 2))
-        let clamped = clamp(offset)
-        if clamped != offset { offset = clamped }
+        // +maxOffset.height shifts the image down so its top edge sits at the viewport top.
+        offset = clamp(CGSize(width: offset.width, height: maxOffset.height))
         last = offset
     }
     func setOffset(width: CGFloat, height: CGFloat) { offset = clamp(CGSize(width: width, height: height)) }
