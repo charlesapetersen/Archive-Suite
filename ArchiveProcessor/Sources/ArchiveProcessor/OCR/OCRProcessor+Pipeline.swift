@@ -161,6 +161,9 @@ extension OCRProcessor {
 
             switch pending.taggingMode {
             case .automatic:
+                // Batch resume intentionally uses performTaggingPhase (NOT performAutomaticTaggingWithReview):
+                // a resumed batch has no interactive session to drive the redo-review loop, so it tags straight
+                // through. (The interactive run path uses the review loop; this divergence is deliberate.)
                 await performTaggingPhase(
                     provider: pending.provider, model: pending.model,
                     thinkingLevel: pending.thinkingLevel, apiKey: apiKey,

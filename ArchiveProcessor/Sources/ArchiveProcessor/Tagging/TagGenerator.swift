@@ -233,7 +233,7 @@ class TagGenerator: ObservableObject {
         case .gemini:
             return try await callGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
         case .mistral:
-            return try await callMistralChat(prompt: prompt, model: model, apiKey: apiKey)
+            return try await callMistralChat(prompt: prompt, apiKey: apiKey)
         }
     }
 
@@ -283,7 +283,8 @@ class TagGenerator: ObservableObject {
         return parts.compactMap { $0["text"] as? String }.joined()
     }
 
-    private func callMistralChat(prompt: String, model: LLMModel, apiKey: String) async throws -> String {
+    // The tagging model is intentionally fixed to mistral-small-latest (cheaper), so no model param.
+    private func callMistralChat(prompt: String, apiKey: String) async throws -> String {
         let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
         let body: [String: Any] = [
             "model": "mistral-small-latest",  // Use cheaper model for tagging

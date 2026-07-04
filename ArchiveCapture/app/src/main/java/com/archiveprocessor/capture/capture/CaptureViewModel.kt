@@ -280,6 +280,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             clearSelection()
             persist()
             // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
+            // KNOWN BUG (see KNOWN_ISSUES.md #4): `replaces` is transient, so retry/resume/autoRetry re-send with
+            // replaces=null and a failed first attempt can leave a stray old copy. Fix mirrors iOS commit 8df6ef4
+            // (persist replacesGroupId on the item). Left as-is here to keep the maintainability pass behavior-preserving.
             enqueueUpload(updated, replaces = oldGroupId)
         }
     }

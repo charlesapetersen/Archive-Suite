@@ -756,10 +756,7 @@ extension OCRProcessor {
         }
     }
     func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
-        guard index >= 0 && index < jobs.count else {
-            print("handleOCRResult: index \(index) out of range (jobs.count = \(jobs.count))")
-            return
-        }
+        guard index >= 0 && index < jobs.count else { return }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification

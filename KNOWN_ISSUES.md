@@ -94,3 +94,24 @@ in `loadStagingManifest` would fix it.
 **Repro (approx):** stage a live session with an older build (legacy manifest) → force a restart so the
 session is recovered → *Process* → *Finish session* with "Review rotation" on → review shows only the
 segments finalized in the current run.
+
+---
+
+## 4. Android companion: reclassify's X-Replaces is lost on upload retry (stray duplicate on the Mac)
+
+**Status:** deferred (2026-07-04). Found during the maintainability pass. **Real data-integrity bug**, kept
+here (not fixed) so that pass stayed behavior-preserving — the **iOS twin was already fixed** in commit `8df6ef4`.
+
+**Symptom:** reclassifying a photo into a Box/Folder marker while unpaired or during a network blip can leave
+BOTH the original document-group copy AND the new marker on the Mac — a stray extra page in the segment.
+
+**Root cause:** `reclassifySelected` (`ArchiveCapture/.../capture/CaptureViewModel.kt`) calls
+`enqueueUpload(updated, replaces = oldGroupId)` so the Mac drops the old `(oldGroupId, seq)` copy. But
+`replaces` is a transient parameter, not stored on the `CapturedItem`. The retry / resume / auto-retry paths
+all call `enqueueUpload(it)` with the default `replaces = null`, so if the first attempt doesn't land, the
+eventual successful upload omits `X-Replaces` and the Mac keeps the original (its idempotent replace is keyed
+on group+seq, and the group now differs).
+
+**Fix (mirror the iOS fix `8df6ef4`):** add `replacesGroupId: String?` to the Android `CapturedItem`, set it in
+`reclassifySelected`, and have `enqueueUpload` read it from the item so every re-send keeps sending `X-Replaces`
+until it lands. Persist it in `SessionStore` for durability across restart.

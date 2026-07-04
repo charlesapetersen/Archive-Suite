@@ -146,7 +146,7 @@ enum LLMRotationDetector {
         return out
     }
 
-    /// Rotate a CGImage clockwise by 0/90/180/270 (matches PDFGenerator.rotateImage).
+    /// Rotate a CGImage clockwise by 0/90/180/270 (mirrors ImageEncoding.rotate(_:byDegreesClockwise:)).
     private static func rotate(_ image: CGImage, byDegreesClockwise degrees: Int) -> CGImage? {
         if degrees % 360 == 0 { return image }
         let w = image.width, h = image.height

@@ -1,5 +1,11 @@
 import Foundation
 
+// INVARIANT — the provider/model/mode enums below are String-backed, Codable, and PERSISTED (in
+// UserDefaults and in encoded snapshots like PendingRun / PendingBatch / SessionProcessingConfig).
+// Never rename a case or change an explicit rawValue string: that orphans users' saved settings.
+// Appending new cases is safe; reordering is harmless (the persisted key is the string, not the position).
+// This is a cross-lane shared hotspot — see CLAUDE.md → "Concurrent / multi-agent development."
+
 // MARK: - Providers
 
 enum LLMProvider: String, CaseIterable, Identifiable, Codable {

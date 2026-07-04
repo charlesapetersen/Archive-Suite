@@ -4,6 +4,11 @@ import Network
 /// Minimal HTTP/1.1 receiver for the phone companion app, built on Network.framework.
 /// Routes: `GET /ping`, `POST /photo` (raw JPEG body + `X-*` metadata headers), and
 /// `POST /session/complete`. All requests must carry `Authorization: Bearer <session token>`.
+/// `POST /photo` header contract (body = raw JPEG): REQUIRED `X-Group` (must pass `isSafeGroupId`) and
+/// `X-Seq` (Int ≥ 0); OPTIONAL `X-Type` (CaptureGroupType rawValue, default `document`), `X-Device`,
+/// `X-Priority`, `X-Year`/`X-Month` (Int), and `X-Replaces` (a prior group id to drop; `isSafeGroupId`-checked).
+/// Same (group, seq) replaces idempotently. This contract is a shared hotspot — keep it in sync with the
+/// phones' `MacClient` (iOS `ArchiveCaptureiOS` + Android `ArchiveCapture`).
 /// One request per connection (responses set `Connection: close`); the phone opens a fresh
 /// connection per photo, which keeps framing trivial and robust.
 /// Mutable state (`listener`) is only touched on the serial `queue`, and `session` is a
