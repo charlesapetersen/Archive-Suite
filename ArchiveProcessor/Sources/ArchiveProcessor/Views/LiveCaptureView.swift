@@ -182,6 +182,12 @@ struct LiveCaptureView: View {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
                             .disabled(processor.isProcessing)
+                    } else if session.processingMode == .undecided {
+                        // Live mode, but the session was never activated — e.g. photos recovered after
+                        // a restart. Resume the live pipeline (OCR + per-segment tag cards) so these
+                        // photos can be processed instead of only cleared.
+                        Button("Process \(session.photos.count) →") { session.activateProcessingIfNeeded() }
+                            .buttonStyle(.borderedProminent)
                     } else if !liveProc.staged.isEmpty {
                         Button("Finish session (\(liveProc.staged.count)) →") { liveProc.finishSession() }
                             .buttonStyle(.borderedProminent)
