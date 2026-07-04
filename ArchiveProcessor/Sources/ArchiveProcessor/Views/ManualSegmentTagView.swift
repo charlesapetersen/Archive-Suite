@@ -1,6 +1,20 @@
 import SwiftUI
 import AppKit
 
+/// Native confirmation before discarding an in-progress run from a review dialog. Uses a modal
+/// `NSAlert` (not SwiftUI `.alert`) so it works reliably inside the bare review `NSWindow`. The safe
+/// choice ("Keep Working") is the default (Return); only an explicit "Discard" click runs `discard`.
+@MainActor
+func confirmDiscardRun(_ message: String, discard: () -> Void) {
+    let alert = NSAlert()
+    alert.messageText = "Discard this run?"
+    alert.informativeText = message
+    alert.alertStyle = .warning
+    alert.addButton(withTitle: "Keep Working")   // first button = default (Return)
+    alert.addButton(withTitle: "Discard")
+    if alert.runModal() == .alertSecondButtonReturn { discard() }
+}
+
 /// Progressive manual segmentation + tagging (human / autoDateManualSeg modes). The user walks the
 /// photos in order, reviews box/folder identifications, marks where each document segment ends, and
 /// tags it — as a segment is tagged its pages drop out of the viewer. Box/folder photos stay as
@@ -76,7 +90,7 @@ struct ManualSegmentTagView: View {
             Spacer(minLength: 12)
             Text("← → photo · ⏎ end & tag · B/F/D · X remove · Space preview")
                 .font(.caption2).foregroundStyle(.tertiary).lineLimit(1).layoutPriority(-1)
-            Button("Cancel") { processor.cancel() }
+            Button("Cancel") { confirmDiscardRun("Your tagging progress in this review will be lost.") { processor.cancel() } }
                 .controlSize(.small)
                 .help("Discard this run and return to the file list. (Esc while browsing.)")
             Button("Finish ▸") { processor.confirmManualSegTag() }
@@ -129,7 +143,8 @@ struct ManualSegmentTagView: View {
         .onKeyPress(.space) { showPreview.toggle(); return .handled }
         .onKeyPress(.escape) {
             if showPreview { showPreview = false; return .handled }
-            processor.cancel(); return .handled   // escape out of the whole dialog (abort the run)
+            confirmDiscardRun("Your tagging progress in this review will be lost.") { processor.cancel() }
+            return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "xX")) { _ in processor.manualSegToggleRemoved(at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "bB")) { _ in processor.manualSegSetKind(.box, at: focus); return .handled }

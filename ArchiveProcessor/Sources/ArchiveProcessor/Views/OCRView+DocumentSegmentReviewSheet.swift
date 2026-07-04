@@ -135,7 +135,7 @@ struct DocumentSegmentReviewSheet: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") {
-                    processor.cancel()
+                    confirmDiscardRun("Your review progress will be lost.") { processor.cancel() }
                 }
                 .controlSize(.large)
                 .keyboardShortcut(.cancelAction)
@@ -216,7 +216,7 @@ struct DocumentSegmentReviewSheet: View {
         // Return confirms and moves past the dialog; Escape cancels the run. (The window is a bare
         // NSWindow, so the Confirm/Cancel button key-equivalents don't fire — handle keys here.)
         .onKeyPress(.return) { processor.confirmDocumentReview(); return .handled }
-        .onKeyPress(.escape) { processor.cancel(); return .handled }
+        .onKeyPress(.escape) { confirmDiscardRun("Your review progress will be lost.") { processor.cancel() }; return .handled }
     }
 }
 
