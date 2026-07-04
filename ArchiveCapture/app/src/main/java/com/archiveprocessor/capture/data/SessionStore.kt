@@ -29,6 +29,7 @@ class SessionStore(context: Context) {
                     it.priority?.let { v -> put("priority", v) }
                     it.year?.let { v -> put("year", v) }
                     it.month?.let { v -> put("month", v) }
+                    it.replacesGroupId?.let { v -> put("replacesGroupId", v) }
                 })
             }
             val root = JSONObject().apply {
@@ -73,7 +74,8 @@ class SessionStore(context: Context) {
                         priority = if (o.has("priority")) o.getString("priority") else null,
                         year = if (o.has("year")) o.getInt("year") else null,
                         month = if (o.has("month")) o.getInt("month") else null,
-                        state = UploadState.valueOf(o.getString("state"))
+                        state = UploadState.valueOf(o.getString("state")),
+                        replacesGroupId = if (o.has("replacesGroupId")) o.getString("replacesGroupId") else null
                     )
                 )
             }

@@ -18,5 +18,9 @@ data class CapturedItem(
     val priority: String? = null,   // per-page P10 override, or the segment default at finalize
     val year: Int? = null,
     val month: Int? = null,
-    val state: UploadState = UploadState.PENDING
+    val state: UploadState = UploadState.PENDING,
+    // When this photo was reclassified into a new group, the old group whose (oldGroup, seq) copy the
+    // Mac should drop (X-Replaces). Stored on the item so EVERY retry/resume re-sends it until it lands —
+    // not just the first attempt — otherwise a failed first upload leaves a stray old copy. Mirrors iOS.
+    val replacesGroupId: String? = null
 )

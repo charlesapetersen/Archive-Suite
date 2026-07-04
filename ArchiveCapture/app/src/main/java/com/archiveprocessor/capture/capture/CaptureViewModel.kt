@@ -275,15 +275,15 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val i = items.indexOfFirst { it.id == id }
         if (i >= 0) {
             val oldGroupId = items[i].groupId
-            val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null, state = UploadState.PENDING)
+            // Persist the drop-old-copy target on the item so retry / resume / autoRetry all keep sending
+            // X-Replaces until the reclassify lands (not just the first attempt).
+            val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null,
+                state = UploadState.PENDING, replacesGroupId = oldGroupId)
             items[i] = updated
             clearSelection()
             persist()
             // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
-            // KNOWN BUG (see KNOWN_ISSUES.md #4): `replaces` is transient, so retry/resume/autoRetry re-send with
-            // replaces=null and a failed first attempt can leave a stray old copy. Fix mirrors iOS commit 8df6ef4
-            // (persist replacesGroupId on the item). Left as-is here to keep the maintainability pass behavior-preserving.
-            enqueueUpload(updated, replaces = oldGroupId)
+            enqueueUpload(updated)
         }
     }
 
@@ -333,9 +333,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). */
     private val inFlightUploads = mutableSetOf<Long>()
 
-    private fun enqueueUpload(item: CapturedItem, replaces: String? = null) {
+    private fun enqueueUpload(item: CapturedItem) {
         val c = client ?: return
         if (!inFlightUploads.add(item.id)) return   // already uploading this id — don't double-send
+        // Durable on the item, so retry / resume / autoRetry keep sending X-Replaces until it lands.
+        val replaces = item.replacesGroupId
         setState(item.id, UploadState.UPLOADING)
         viewModelScope.launch {
             try {
