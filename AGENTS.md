@@ -31,4 +31,8 @@ Prereq: `brew install xcodegen` (or just run `./bootstrap.sh` from the worktree 
 ## Rules
 - Never hand-edit `.pbxproj` — edit `project.yml` + `xcodegen generate` (required after clone too).
 - Small commits, rebase often, build-verify before committing (no CI).
+- **Review before pushing, tiered by risk** (no human reviewer): every commit builds clean + self-review;
+  high-blast-radius changes (`Capture/`, `Net/`, file-writing tag/output, manifest persistence, actor isolation)
+  get an *adversarial* multi-agent review; the pre-push batch gets a full find→refute review + live smoke test.
+  Full policy: **CLAUDE.md → "Verification & review policy (no human in the loop)."**
 - Releases: see **CLAUDE.md → Releasing** (use `/opt/homebrew/bin/gh`, not bare `gh`).

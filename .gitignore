@@ -29,3 +29,6 @@ Test Outputs/
 # Xcode user state (also under the nested project dir)
 **/xcuserdata/
 *.xcuserstate
+
+# Transient maintenance/resume state (session working files)
+.maintenance/

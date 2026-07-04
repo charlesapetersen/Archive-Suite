@@ -208,6 +208,36 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 
 ---
 
+## Verification & review policy (no human in the loop)
+
+This project is maintained by Claude with **no human reviewer, no CI, and minimal automated tests**, yet it
+writes **irreplaceable data** (archival photos that can't be re-shot), uses strict Swift-6 concurrency, and
+spends real money on API calls. So verification is **deliberate and tiered by risk** — not the same effort on
+every change. **Decision (2026-07-04): yes, do adversarial review before pushing — but tier it as below** so
+the cost matches the risk instead of running a heavy review on every trivial edit.
+
+**Tier 1 — every commit (always):** build clean with **no new warnings** (`xcodegen generate` + `xcodebuild … build`),
+and self-review the diff (`/code-review`, or read your own diff critically). Cheap; catches most regressions.
+
+**Tier 2 — high-blast-radius changes (adversarial, regardless of diff size):** any change touching a class of
+bug that has **no undo** gets a multi-agent *adversarial* review — independent skeptic agents that try to
+break it — plus a targeted functional test where feasible. This tier is triggered by edits to:
+- `Capture/`, `Net/` (Live Capture durability, the phone↔Mac protocol, crash-recovery/manifest logic),
+- file-writing tag/output code (`Tagging/MacOSTagger.swift`, PDF/image output, collection numbering that could **overwrite** files),
+- batch/manifest persistence, or anything changing `@MainActor`/`Sendable`/actor isolation.
+
+**Tier 3 — before every push or release (the batch):** run a **multi-agent adversarial review of the whole
+accumulated diff** (the *find → refute* pattern: finders propose defects, a second set of agents tries to
+refute each, only survivors are real), and a **live smoke test** if the OCR/tagging/PDF path changed. Push
+only after it comes back clean. (Batching pushes is the standing cadence — commit locally often, push rarely.)
+
+**Always adversarially *verify* findings before acting on them.** With no human to sanity-check, a plausible-
+but-wrong "fix" is its own risk: have a second agent try to *refute* each finding (default to "not a bug" when
+uncertain) before you change code. The `Workflow` tool's find→verify pattern is the intended vehicle; a durable
+example script lives at `.maintenance/` during active maintenance sessions.
+
+---
+
 ## Releasing (macOS DMG + GitHub release)
 
 Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag is the source of truth; `Info.plist` `CFBundleShortVersionString` is left at "1.0". Patch bump for internal-only changes (refactors), minor for user-facing features. Distribution is **owner-only** (ad-hoc signed `CODE_SIGN_IDENTITY "-"`, not notarized) — a fresh macOS may need right-click→Open the first time.
