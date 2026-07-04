@@ -429,7 +429,7 @@ struct OCRView: View {
                         }
                         .buttonStyle(.bordered)
                         if !droppedFiles.isEmpty {
-                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = [] }
+                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                                 .buttonStyle(.bordered)
                         }
                     }
@@ -1364,6 +1364,7 @@ struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
     @State private var thumbnailSize: CGFloat = 400
     @State private var focusedIndex: Int = 0
+    @State private var reviewWindow: NSWindow?
 
     /// Whether New-Document / Continuation options are offered (only when merging or tagging by segment).
     private var showDocClasses: Bool { processor.reviewShowsDocumentClasses }
@@ -1502,10 +1503,12 @@ struct DocumentSegmentReviewSheet: View {
         .onAppear {
             DispatchQueue.main.async {
                 if let window = NSApp.keyWindow {
-                    window.styleMask.insert(.resizable)
+                    window.makeMovableFullScreenReview()
+                    reviewWindow = window
                 }
             }
         }
+        .onDisappear { reviewWindow?.close(); reviewWindow = nil }
         .onKeyPress(.upArrow) {
             if focusedIndex > 0 { focusedIndex -= 1 }
             return .handled

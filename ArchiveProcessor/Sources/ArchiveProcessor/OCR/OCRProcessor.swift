@@ -587,6 +587,7 @@ class OCRProcessor: ObservableObject {
         guard !Task.isCancelled else { return }
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
+        progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if pending.enableTagging && !passSourceTags {
@@ -718,6 +719,7 @@ class OCRProcessor: ObservableObject {
                 guard !Task.isCancelled else { return }
                 writeLogFile(outputDirectory: pending.outputDirectory)
                 isProcessing = false
+                progress = 1.0
                 let succeeded = jobs.filter { $0.status == .succeeded }.count
                 statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
                 postCompletionNotification()
@@ -846,6 +848,7 @@ class OCRProcessor: ObservableObject {
 
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
+        progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if pending.enableTagging && !passSourceTags {
@@ -1327,6 +1330,7 @@ class OCRProcessor: ObservableObject {
 
         writeLogFile(outputDirectory: outputDirectory)
         isProcessing = false
+        progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if enableTagging && !passSourceTags {

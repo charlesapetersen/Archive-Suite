@@ -16,6 +16,7 @@ struct ManualSegmentTagView: View {
     @ObservedObject var processor: OCRProcessor
     @State private var zoom: CGFloat = 1
     @State private var showPreview = false
+    @State private var reviewWindow: NSWindow?
     @FocusState private var canvasFocused: Bool
 
     private var images: [ManualSegImage] { processor.manualSegImages }
@@ -58,13 +59,13 @@ struct ManualSegmentTagView: View {
             SystemTagsProvider.shared.warmUp()
             canvasFocused = true
             DispatchQueue.main.async {
-                guard let window = NSApp.keyWindow else { return }
-                window.styleMask.insert(.resizable)   // stay user-adjustable
-                if let screen = window.screen ?? NSScreen.main {
-                    window.setFrame(screen.visibleFrame, display: true)   // open maximized
+                if let window = NSApp.keyWindow {
+                    window.makeMovableFullScreenReview()   // full visible screen, movable, resizable
+                    reviewWindow = window
                 }
             }
         }
+        .onDisappear { reviewWindow?.close(); reviewWindow = nil }
     }
 
     // MARK: Header
@@ -584,5 +585,30 @@ private struct DayField: View {
             let filtered = d.filter(\.isNumber)
             if filtered != digits { digits = filtered }   // sync when auto-filled externally
         }
+    }
+}
+
+// MARK: - Review window styling (shared by the rotation/segmentation review + Segment & Tag)
+
+extension NSWindow {
+    /// Promote an attached sheet into a free-standing, titled, MOVABLE, resizable window that fills the
+    /// visible screen. macOS sheets are anchored to their parent and can't be moved by the user, so we
+    /// detach (endSheet) and give it a real title bar to drag. `setFrame(visibleFrame)` is honored
+    /// verbatim on a detached window (no parent re-clamping), fixing the off-screen sizing. The view's
+    /// `.onDisappear` closes this window when the SwiftUI sheet binding flips false.
+    ///
+    /// Deliberately NO `.closable`/`.miniaturizable`: a title-bar close/minimize would dismiss the
+    /// window WITHOUT resuming the review's continuation, hanging the pipeline. The dialog is dismissed
+    /// only via its own Confirm/Cancel/Finish buttons. `.none` animation avoids an end-sheet flicker.
+    func makeMovableFullScreenReview() {
+        animationBehavior = .none
+        sheetParent?.endSheet(self)
+        styleMask.insert([.titled, .resizable])
+        isMovable = true
+        let hostScreen = screen ?? NSApp.mainWindow?.screen ?? NSScreen.main
+        if let visible = hostScreen?.visibleFrame {
+            setFrame(visible, display: true)
+        }
+        makeKeyAndOrderFront(nil)
     }
 }
