@@ -261,7 +261,7 @@ The `.dmg` is a build artifact — never commit it (build under gitignored `buil
 ## Project Structure
 ```
 Archive Processor/
-├── CLAUDE.md, README.md, AGENTS.md, prompts.md, POTENTIAL_FEATURES.md, KNOWN_ISSUES.md, CODE_REVIEW_PLAN.md
+├── CLAUDE.md, README.md, AGENTS.md, prompts.md, POTENTIAL_FEATURES.md, KNOWN_ISSUES.md
 ├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
 │   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
 ├── ArchiveCapture/                    # Android companion app (Gradle)
