@@ -227,9 +227,9 @@ Photograph documents with a phone and stream them straight into the pipeline —
 
 ## Building
 
-**Prerequisite:** install XcodeGen once — `brew install xcodegen`.
+**Quick start:** `./bootstrap.sh` — installs XcodeGen (if needed) and generates every Xcode project; pass `--open` to also open the macOS app. Then build & run in Xcode. (Manual steps are below if you prefer.)
 
-The `.xcodeproj` is **generated and not committed** (`project.yml` is authoritative). So a fresh clone has no project file: you **must** run `xcodegen generate` before opening or building — otherwise Xcode/`xcodebuild` will report a missing project.
+The `.xcodeproj` is **generated and not committed** (`project.yml` is authoritative), so a fresh clone has no project file: run `./bootstrap.sh` (or `xcodegen generate`) before opening or building — otherwise Xcode/`xcodebuild` reports a missing project. For the manual path, install XcodeGen once: `brew install xcodegen`.
 
 **macOS app:**
 

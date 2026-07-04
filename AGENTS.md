@@ -11,7 +11,7 @@ cd "../ap-wt-<lane>/ArchiveProcessor" && xcodegen generate   # .xcodeproj is NOT
 xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build   # per-worktree DerivedData
 git worktree remove "../ap-wt-<lane>"                   # ./build is gitignored, so it won't block removal
 ```
-Prereq: `brew install xcodegen`. `-derivedDataPath` isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per worktree."
+Prereq: `brew install xcodegen` (or just run `./bootstrap.sh` from the worktree root — it installs XcodeGen if missing and regenerates every project). `-derivedDataPath` isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per worktree."
 
 ## Ownership lanes (avoid two agents in one lane at once)
 - **Android** — `ArchiveCapture/` (Gradle/Kotlin). Fully independent.
