@@ -33,7 +33,15 @@ struct LiveCaptureView: View {
         .onDisappear { /* keep the session/server running across tab switches */ }
         // Auto-advancing tag card: pops up for each completed document segment as it arrives,
         // then advances to the next (box/folder markers need no card).
-        .sheet(item: Binding(get: { session.pendingTagGroup }, set: { _ in })) { group in
+        .sheet(item: Binding(
+            get: { session.pendingTagGroup },
+            set: { newValue in
+                // A nil write means the sheet was dismissed without Save/Skip. Resolve the current
+                // segment (as a skip) so the card doesn't immediately re-present with fresh state and
+                // strand the operator's typed edits with no way to close it.
+                if newValue == nil, let g = session.pendingTagGroup { session.skipMacTags(groupId: g.id) }
+            }
+        )) { group in
             SegmentTagCard(group: group, session: session)
         }
         .sheet(isPresented: $liveProc.showFinalizeSheet) {

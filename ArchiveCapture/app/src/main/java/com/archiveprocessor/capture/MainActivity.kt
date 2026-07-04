@@ -6,10 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archiveprocessor.capture.capture.CaptureViewModel
@@ -23,9 +19,10 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val vm: CaptureViewModel = viewModel()
-                    var connected by remember { mutableStateOf(vm.endpoint != null) }
-                    if (connected) CaptureScreen(vm)
-                    else ConnectScreen(vm) { connected = true }
+                    // Derive from the observable endpoint so disconnect()/re-pair are reflected — a
+                    // one-way remembered flag would diverge from the source of truth.
+                    if (vm.endpoint != null) CaptureScreen(vm)
+                    else ConnectScreen(vm) { }
                 }
             }
         }

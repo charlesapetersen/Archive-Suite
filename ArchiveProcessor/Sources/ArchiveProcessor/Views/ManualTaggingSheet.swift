@@ -85,6 +85,7 @@ struct ManualTaggingSheet: View {
         }
         .onChange(of: processor.currentManualIndex) { _, _ in
             focusedImage = 0
+            showPreview = false   // close the preview so it can't index the previous (larger) segment
             canvasFocused = true
         }
     }

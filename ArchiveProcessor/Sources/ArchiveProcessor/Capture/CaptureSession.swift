@@ -177,8 +177,12 @@ final class CaptureSession: ObservableObject {
         statusMessage = "Received \(photos.count) photo\(photos.count == 1 ? "" : "s")" + (deviceName.map { " from \($0)" } ?? "")
         // New capture began — drop any prior "Finalized …" summary so the Captured pane shows photos.
         liveProcessor.clearFinalizeSummary()
-        writeManifest()
         paired = true
+        // Durability contract: only acknowledge success (→ phone deletes its only copy of an
+        // un-retakeable archival photo) once the grouping/tag metadata is durably persisted. If the
+        // manifest write fails, return nil → server responds 500 → phone retries. The JPEG is already
+        // on disk and idempotent replace makes the retry safe; live processing waits until durable.
+        guard writeManifest() else { return nil }
         activateProcessingIfNeeded()   // fix mode from Settings on first photo
         if processingMode == .live { liveProcessor.photoIngested(photo) }   // start OCR on arrival
         return finalURL
@@ -187,6 +191,18 @@ final class CaptureSession: ObservableObject {
     func removePhoto(_ photo: CapturedPhoto) {
         try? FileManager.default.removeItem(at: photo.url)
         photos.removeAll { $0.id == photo.id }
+        writeManifest()
+    }
+
+    /// Remove a previously-received photo identified by (groupId, seq). Used when the phone reclassifies
+    /// an already-uploaded photo into a new group (`X-Replaces`), so the old copy isn't orphaned on the
+    /// Mac. Skipped in live mode once that group has been finalized/staged (removing a staged segment's
+    /// source would corrupt staging); a no-op if not present.
+    func removePhotoIfSafe(groupId: String, seq: Int) {
+        if processingMode == .live && liveProcessor.isFinalized(groupId) { return }
+        guard let idx = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) else { return }
+        try? FileManager.default.removeItem(at: photos[idx].url)
+        photos.remove(at: idx)
         writeManifest()
     }
 
@@ -276,13 +292,17 @@ final class CaptureSession: ObservableObject {
     private var manifestURL: URL { incomingFolder.appendingPathComponent("manifest.json") }
 
     /// Persist per-photo metadata so a Mac crash doesn't lose grouping/tags (the JPEGs don't carry it).
-    private func writeManifest() {
+    /// Returns whether the write succeeded, so `ingest` can withhold the success ack until the
+    /// grouping metadata is durably on disk.
+    @discardableResult
+    private func writeManifest() -> Bool {
         let entries = photos.map {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
                           type: $0.type.rawValue, priority: $0.priority, year: $0.year, month: $0.month)
         }
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? data.write(to: manifestURL, options: .atomic)
+        guard let data = try? JSONEncoder().encode(entries) else { return false }
+        do { try data.write(to: manifestURL, options: .atomic); return true }
+        catch { return false }
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
@@ -297,6 +317,9 @@ final class CaptureSession: ObservableObject {
                   !entries.isEmpty else { continue }
             var restored: [CapturedPhoto] = []
             for e in entries {
+                // Defense-in-depth: never resolve a manifest name that could escape the folder
+                // (a tampered/legacy manifest must not become a path-traversal on restore).
+                guard !e.name.contains("/"), !e.name.contains("..") else { continue }
                 let url = folder.appendingPathComponent(e.name)
                 guard fm.fileExists(atPath: url.path) else { continue }
                 restored.append(CapturedPhoto(

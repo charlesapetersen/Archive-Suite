@@ -137,18 +137,38 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Re-run OCR for segments that produced no text, then re-finalize them.
     func retryFailed() {
         guard session.processingMode == .live else { return }
+        let fm = FileManager.default
+        var toReprocess: [String] = []
         for gid in Array(failedGroupIds) {
             guard let group = session.groups.first(where: { $0.id == gid }) else { failedGroupIds.remove(gid); continue }
+            // Delete the old (failed) staged output + retained state first, so we don't orphan files
+            // on disk or re-review stale rotation for a segment we're about to regenerate.
+            if let old = staged.first(where: { $0.groupId == gid }) {
+                for u in old.pdfURLs { try? fm.removeItem(at: u) }
+                for u in old.imageURLs { try? fm.removeItem(at: u) }
+                if let j = old.jsonURL { try? fm.removeItem(at: j) }
+            }
             finalizedGroups.remove(gid)
             failedGroupIds.remove(gid)
             staged.removeAll { $0.groupId == gid }
+            retained[gid] = nil
             for p in group.photos { startedPhotoIds.remove(p.id); pageTasks[p.id] = nil }
             setPhase(gid, .ocr)
+            toReprocess.append(gid)
+        }
+        // Persist the cleaned state BEFORE re-processing, so a crash mid-retry leaves a consistent
+        // manifest (failed segments removed) rather than a half-updated one.
+        persistManifest()
+        for gid in toReprocess {
+            guard let group = session.groups.first(where: { $0.id == gid }) else { continue }
             for p in group.photos { photoIngested(p) }
             if group.type == .document { segmentResolved(groupId: gid) }
         }
-        persistManifest()
     }
+
+    /// Whether a group has been finalized (staged) this session — the Mac uses this to avoid removing
+    /// a reclassified photo's source out from under an already-staged live segment.
+    func isFinalized(_ groupId: String) -> Bool { finalizedGroups.contains(groupId) }
 
     // MARK: - Triggers (called by CaptureSession)
 

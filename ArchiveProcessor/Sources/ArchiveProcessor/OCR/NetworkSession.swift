@@ -68,8 +68,11 @@ enum NetworkSession {
     /// per-image rotation calls don't collectively exceed provider limits and trigger 503s.
     private static let limiter = RequestLimiter(limit: 5)
 
-    /// HTTP statuses that indicate a transient rate-limit / overload and should be retried.
-    private static let retryableStatuses: Set<Int> = [429, 500, 502, 503, 529]
+    /// HTTP statuses for a transient rate-limit / overload — retried aggressively with backoff.
+    private static let retryableStatuses: Set<Int> = [429, 503, 529]
+    /// 5xx that may be non-idempotent server-side failures on a billable POST — retried at most once
+    /// so a flapping backend can't multiply token cost (see performWithRetry).
+    private static let limitedRetryStatuses: Set<Int> = [500, 502]
 
     /// Timestamp of the most recent 429 (rate-limit) retry, so the OCR UI can show a "pacing to your
     /// key's rate limit" note during bulk jobs instead of looking stalled. Write-mostly; read only for
@@ -109,14 +112,18 @@ enum NetworkSession {
                 req.setValue("close", forHTTPHeaderField: "Connection")
                 let (data, response) = try await shared.data(for: req)
 
-                // Retry transient rate-limit / overload HTTP statuses.
-                if let http = response as? HTTPURLResponse,
-                   retryableStatuses.contains(http.statusCode),
-                   attempt < maxRetries {
-                    if http.statusCode == 429 { lastRateLimitedAt = Date() }
-                    retryAfter = parseRetryAfter(http)
-                    lastError = URLError(.badServerResponse)
-                    continue
+                // Retry transient rate-limit / overload statuses with full backoff; 500/502 (which on a
+                // billable POST may be non-idempotent server-side failures) at most once, so a flapping
+                // backend can't multiply token cost.
+                if let http = response as? HTTPURLResponse, attempt < maxRetries {
+                    let retryable = retryableStatuses.contains(http.statusCode)
+                        || (limitedRetryStatuses.contains(http.statusCode) && attempt < 1)
+                    if retryable {
+                        if http.statusCode == 429 { lastRateLimitedAt = Date() }
+                        retryAfter = parseRetryAfter(http)
+                        lastError = URLError(.badServerResponse)
+                        continue
+                    }
                 }
                 return (data, response)
             } catch {
@@ -141,9 +148,17 @@ enum NetworkSession {
         return computed
     }
 
-    /// Parse a `Retry-After` header (seconds form only).
+    /// Parse a `Retry-After` header — either delta-seconds or an HTTP-date (RFC 7231). Some gateways
+    /// send the date form; without this it was dropped and we retried sooner than the server asked.
     private static func parseRetryAfter(_ http: HTTPURLResponse) -> Double? {
-        guard let value = http.value(forHTTPHeaderField: "Retry-After") else { return nil }
-        return Double(value.trimmingCharacters(in: .whitespaces))
+        guard let value = http.value(forHTTPHeaderField: "Retry-After")?.trimmingCharacters(in: .whitespaces),
+              !value.isEmpty else { return nil }
+        if let seconds = Double(value) { return seconds }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(identifier: "GMT")
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        if let date = fmt.date(from: value) { return max(0, date.timeIntervalSinceNow) }
+        return nil
     }
 }

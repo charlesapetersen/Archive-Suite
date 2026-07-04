@@ -28,8 +28,14 @@ enum ImageEncoding {
         let scaledDim = (scale > 0 && scale < 1.0) ? Int(Double(maxDim) * scale) : maxDim
         let target = maxDim > 0 ? min(scaledDim, maxOCRDimension) : maxOCRDimension
 
-        // Fast path: an already-small JPEG with normal orientation → send raw bytes, no decode.
-        if sourceType == "public.jpeg" && orientation == 1 && maxDim > 0 && target >= maxDim {
+        // Fast path: an already-small baseline RGB/Gray JPEG with normal orientation → send raw bytes,
+        // no decode. Restricted to RGB/Gray: a CMYK/exotic JPEG is a valid `public.jpeg` but is rejected
+        // by the vision APIs, so those must fall through to the re-encode path below (which normalizes
+        // to RGB/Gray).
+        let colorModel = props?[kCGImagePropertyColorModel] as? String
+        let isRGBorGray = colorModel == (kCGImagePropertyColorModelRGB as String)
+            || colorModel == (kCGImagePropertyColorModelGray as String)
+        if sourceType == "public.jpeg" && orientation == 1 && maxDim > 0 && target >= maxDim && isRGBorGray {
             return try? Data(contentsOf: url)
         }
 
@@ -40,8 +46,17 @@ enum ImageEncoding {
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true
         ]
-        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else {
-            return try? Data(contentsOf: url)   // fallback: raw bytes
+        // If the thumbnail decode fails (some HEIC/TIFF variants) fall back to a full decode — but
+        // NEVER return the raw original bytes: a HEIC/TIFF shipped under an `image/jpeg` label is
+        // rejected by the APIs with an opaque error. If we can't produce a real JPEG, return nil so
+        // the caller reports a clean image-load failure.
+        let cg: CGImage
+        if let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) {
+            cg = thumb
+        } else if let full = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            cg = full
+        } else {
+            return nil
         }
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }

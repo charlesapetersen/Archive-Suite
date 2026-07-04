@@ -41,6 +41,7 @@ struct OCRView: View {
     @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
     @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
     @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
+    @AppStorage("gatewayUpstreamProvider") private var gatewayUpstreamProvider: LLMProvider = .anthropic
 
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
@@ -112,7 +113,8 @@ struct OCRView: View {
             contextCharCount: Int(contextCharCount),
             imageScale: imageScale / 100.0,
             rotationMode: rotationMode,
-            useGateway: useGateway
+            useGateway: useGateway,
+            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil
         )
     }
 
@@ -191,7 +193,13 @@ struct OCRView: View {
                 outputDirectory = URL(fileURLWithPath: path)
             }
             let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
-            if let m = currentModels.first(where: { $0.id == modelId }) { selectedModel = m }
+            if let m = currentModels.first(where: { $0.id == modelId }) {
+                selectedModel = m
+            } else if !currentModels.contains(where: { $0.id == selectedModel.id }) {
+                // Saved model gone (e.g. a deleted custom model) and the current selection is no longer
+                // valid → fall back to a valid model so a run can't use a ghost model id.
+                selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
+            }
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
@@ -815,8 +823,11 @@ struct OCRView: View {
     }
 
     private func isImageFile(_ url: URL) -> Bool {
-        let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic", "bmp", "gif", "pdf"]
-        return imageExtensions.contains(url.pathExtension.lowercased())
+        let ext = url.pathExtension.lowercased()
+        // Mode-aware: pre-OCRed input ingests PDFs; image mode accepts only the documented image
+        // formats (JPEG/PNG/TIFF/HEIC) — so a wrong-type file is rejected at the door instead of
+        // entering the pipeline and failing later.
+        return preOCRedInput ? (ext == "pdf") : ["jpg", "jpeg", "png", "tiff", "tif", "heic"].contains(ext)
     }
 
     private func resumePendingBatch() {

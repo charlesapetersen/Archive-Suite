@@ -76,7 +76,7 @@ struct TimeEstimator {
         let w = sequentialOCR ? 1.0 : maxWorkers
         if preOCRedInput {
             if enableTagging || enableCollectionSegmentation {
-                ocr = ceil(n / maxWorkers) * callSeconds(outputTokens: CostEstimator.estimatedClassificationOutputTokens, speed: speed)
+                ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedClassificationOutputTokens, speed: speed)
             }
         } else {
             ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)

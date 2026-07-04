@@ -775,11 +775,12 @@ extension OCRProcessor {
             do {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)
 
-                // Apply tags from the first page's individual PDF to the merged PDF
-                if let firstJob = jobs.first(where: { $0.sourceURL == firstSource }) {
-                    if !firstJob.appliedTags.isEmpty {
-                        try? MacOSTagger.applyTags(firstJob.appliedTags, to: mergedURL)
-                    }
+                // Apply tags to the merged PDF. Prefer the first page's tags, but fall back to the
+                // first page in the segment that actually has tags, so the merged PDF isn't left
+                // untagged when only a later page carried tags.
+                let segmentJobs = segment.pdfURLs.compactMap { src in jobs.first(where: { $0.sourceURL == src }) }
+                if let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty }) {
+                    try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL)
                 }
 
                 // Delete the individual PDFs that were merged

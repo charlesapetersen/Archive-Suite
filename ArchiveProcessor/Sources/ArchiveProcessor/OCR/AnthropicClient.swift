@@ -60,8 +60,8 @@ struct AnthropicClient {
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
-            let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
-            return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
+            let err = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
+            return OCRResult(text: nil, classification: nil, errorMessage: err.message, errorCode: err.code)
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -78,22 +78,31 @@ struct AnthropicClient {
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
     }
 
-    private static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+    /// Returns a friendly message plus the provider's semantic error code (Anthropic `error.type`,
+    /// e.g. `invalid_request_error`, `request_too_large`), falling back to the HTTP status. Status-code
+    /// classification also runs when the body is empty/non-JSON (some gateway 5xx have no JSON body).
+    private static func parseErrorResponse(data: Data, statusCode: Int) -> (message: String, code: String) {
+        var apiType = ""
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let error = json["error"] as? [String: Any] {
             let errorType = error["type"] as? String ?? ""
+            apiType = errorType
             let message = error["message"] as? String
+            let code = errorType.isEmpty ? "\(statusCode)" : errorType
             if statusCode == 529 || errorType == "overloaded_error" {
-                return "Model in high use. Try again later."
+                return ("Model in high use. Try again later.", code)
             }
             if statusCode == 429 || errorType == "rate_limit_error" {
-                return "Rate limit exceeded. Try again later."
+                return ("Rate limit exceeded. Try again later.", code)
             }
             if let message = message {
-                return message
+                return (message, code)
             }
         }
-        return "API error (\(statusCode))"
+        let fallbackCode = apiType.isEmpty ? "\(statusCode)" : apiType
+        if statusCode == 529 || statusCode == 503 { return ("Model in high use. Try again later.", fallbackCode) }
+        if statusCode == 429 { return ("Rate limit exceeded. Try again later.", fallbackCode) }
+        return ("API error (\(statusCode))", "\(statusCode)")
     }
 }
 

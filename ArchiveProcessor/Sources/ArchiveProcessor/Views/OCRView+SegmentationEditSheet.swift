@@ -35,7 +35,8 @@ struct SegmentationEditSheet: View {
             .padding(.vertical, 4)
 
             // Show OCR text preview
-            if let text = processor.jobs[fileIndex].result?.text, !text.isEmpty {
+            if processor.jobs.indices.contains(fileIndex),
+               let text = processor.jobs[fileIndex].result?.text, !text.isEmpty {
                 GroupBox("OCR Text Preview") {
                     ScrollView {
                         Text(String(text.prefix(500)))
@@ -52,7 +53,9 @@ struct SegmentationEditSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Apply") {
-                    processor.updateClassification(at: fileIndex, to: selectedClassification)
+                    if processor.jobs.indices.contains(fileIndex) {
+                        processor.updateClassification(at: fileIndex, to: selectedClassification)
+                    }
                     onDismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -62,6 +65,7 @@ struct SegmentationEditSheet: View {
         .padding(24)
         .frame(width: 360)
         .onAppear {
+            guard processor.jobs.indices.contains(fileIndex) else { onDismiss(); return }
             if let cls = processor.jobs[fileIndex].result?.classification ?? processor.jobs[fileIndex].classification {
                 selectedClassification = cls
             }

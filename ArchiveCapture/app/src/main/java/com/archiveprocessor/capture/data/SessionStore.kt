@@ -39,7 +39,12 @@ class SessionStore(context: Context) {
             }
             val tmp = File(file.parentFile, "session.json.tmp")
             tmp.writeText(root.toString())
-            tmp.renameTo(file)
+            if (!tmp.renameTo(file)) {
+                // renameTo returns false (no throw) on some filesystems if the destination exists —
+                // fall back to an overwrite copy so the durable state can't silently lag reality.
+                tmp.copyTo(file, overwrite = true)
+                tmp.delete()
+            }
         } catch (e: Exception) {
             // Never crash the capture flow because of a persistence hiccup.
         }

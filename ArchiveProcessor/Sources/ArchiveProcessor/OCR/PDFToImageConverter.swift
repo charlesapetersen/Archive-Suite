@@ -19,11 +19,21 @@ struct PDFToImageConverter {
         guard let document = PDFDocument(url: pdfURL),
               let page = document.page(at: 0) else { return nil }
 
-        // Render at 2x scale for good OCR quality (typical archival photos are high-res)
+        // Size to the VISIBLE page — the media box is unrotated, so swap W/H when the page's /Rotate
+        // is 90/270; otherwise a rotated scan renders with the wrong aspect and gets clipped.
         let pageRect = page.bounds(for: .mediaBox)
-        let scale: CGFloat = 2.0
-        let width = Int(pageRect.width * scale)
-        let height = Int(pageRect.height * scale)
+        let rotatedQuarter = abs(page.rotation) % 180 == 90
+        let visW = rotatedQuarter ? pageRect.height : pageRect.width
+        let visH = rotatedQuarter ? pageRect.width : pageRect.height
+        guard visW > 0, visH > 0 else { return nil }
+
+        // Render at ~2x for OCR quality, but clamp the long edge so an oversized page can't allocate a
+        // multi-GB bitmap (matches the OCR pipeline's max dimension).
+        let longEdge = max(visW, visH)
+        let scale = min(2.0, CGFloat(ImageEncoding.maxOCRDimension) / longEdge)
+        let width = max(1, Int(visW * scale))
+        let height = max(1, Int(visH * scale))
+        let pixelSize = CGSize(width: width, height: height)
 
         guard let context = CGContext(
             data: nil,
@@ -35,13 +45,13 @@ struct PDFToImageConverter {
             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
         ) else { return nil }
 
-        // White background
+        // White background (JPEG has no alpha), then composite the rotation-aware page thumbnail —
+        // `PDFPage.thumbnail(of:for:)` bakes in the page's /Rotate so content stays upright.
         context.setFillColor(CGColor.white)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-        // Scale and draw
-        context.scaleBy(x: scale, y: scale)
-        page.draw(with: .mediaBox, to: context)
+        context.fill(CGRect(origin: .zero, size: pixelSize))
+        let thumb = page.thumbnail(of: pixelSize, for: .mediaBox)
+        guard let cgThumb = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        context.draw(cgThumb, in: CGRect(origin: .zero, size: pixelSize))
 
         guard let cgImage = context.makeImage() else { return nil }
 

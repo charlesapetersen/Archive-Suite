@@ -224,12 +224,14 @@ class OCRProcessor: ObservableObject {
         let confirmCollectionIDs: Bool
         let reviewDocumentSegmentation: Bool
         let customPrompt: String?
+        let taggingMode: TaggingMode
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
              enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
-             reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil) {
+             reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
+             taggingMode: TaggingMode = .automatic) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -239,6 +241,7 @@ class OCRProcessor: ObservableObject {
             self.confirmCollectionIDs = confirmCollectionIDs
             self.reviewDocumentSegmentation = reviewDocumentSegmentation
             self.customPrompt = customPrompt
+            self.taggingMode = taggingMode
         }
 
         init(from decoder: Decoder) throws {
@@ -257,6 +260,7 @@ class OCRProcessor: ObservableObject {
             confirmCollectionIDs = try c.decodeIfPresent(Bool.self, forKey: .confirmCollectionIDs) ?? false
             reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
             customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
+            taggingMode = try c.decodeIfPresent(TaggingMode.self, forKey: .taggingMode) ?? .automatic
         }
     }
 

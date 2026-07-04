@@ -9,17 +9,24 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 
-/** CameraX analyzer that decodes QR codes with ML Kit and reports the first raw value once. */
-class QrAnalyzer(private val onQr: (String) -> Unit) : ImageAnalysis.Analyzer {
+/** CameraX analyzer that decodes QR codes with ML Kit and reports the first raw value once.
+ *  Closeable: call [close] when the pairing UI goes away so the native ML Kit detector is released. */
+class QrAnalyzer(private val onQr: (String) -> Unit) : ImageAnalysis.Analyzer, java.io.Closeable {
     private val scanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
     )
     @Volatile private var done = false
+    @Volatile private var closed = false
+
+    override fun close() { closed = true; runCatching { scanner.close() } }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
         val media = imageProxy.image
-        if (media == null || done) {
+        // `closed`: frames can still arrive after the pairing UI leaves (the controller is bound to the
+        // Activity lifecycle), so no-op once closed — calling scanner.process on a closed ML Kit
+        // detector throws on the main thread.
+        if (media == null || done || closed) {
             imageProxy.close()
             return
         }

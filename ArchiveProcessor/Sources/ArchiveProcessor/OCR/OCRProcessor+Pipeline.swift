@@ -100,6 +100,7 @@ extension OCRProcessor {
         collectionSegments = []
         outputURLMap = [:]
         currentModel = pending.model
+        taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         for i in jobs.indices { jobs[i].status = .processing }
         progress = 0
@@ -138,7 +139,10 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
-        // Tagging (before collection segmentation, matching main workflow order)
+        // Tagging (before collection segmentation, matching main workflow order).
+        // Switch on the persisted taggingMode so a batch submitted in Human / Auto-date / manual-seg
+        // mode isn't silently downgraded to automatic tagging after a relaunch (and .none/.copySource
+        // correctly skip LLM tagging).
         if pending.enableTagging && !passSourceTags {
             statusMessage = "Segmenting documents…"
             let segmenter = DocumentSegmenter()
@@ -147,12 +151,30 @@ extension OCRProcessor {
             segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
-            await performTaggingPhase(
-                provider: pending.provider, model: pending.model,
-                thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                enableSegmentJSON: pending.enableSegmentJSON
-            )
+            switch pending.taggingMode {
+            case .automatic:
+                await performTaggingPhase(
+                    provider: pending.provider, model: pending.model,
+                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                    outputDirectory: pending.outputDirectory,
+                    enableSegmentJSON: pending.enableSegmentJSON
+                )
+            case .autoDate:
+                await performManualTaggingPhase(
+                    mode: pending.taggingMode, provider: pending.provider, model: pending.model,
+                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON
+                )
+            case .human, .autoDateManualSeg:
+                await performManualSegmentAndTag(
+                    autoDate: pending.taggingMode.autoFillsDate,
+                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
+                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                    enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs
+                )
+            case .none, .copySource:
+                break
+            }
         }
 
         guard !Task.isCancelled else { return }
@@ -471,33 +493,6 @@ extension OCRProcessor {
             statusMessage += " \(collectionSegments.count) collections organized."
         }
         postCompletionNotification()
-    }
-    /// Restore a previously completed result without re-saving to pending run.
-    private func handleRestoredResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
-        guard index >= 0 && index < jobs.count else {
-            print("handleRestoredResult: index \(index) out of range (jobs.count = \(jobs.count))")
-            return
-        }
-        let sourceURL = jobs[index].sourceURL
-        jobs[index].result = result
-        jobs[index].classification = result.classification
-        jobs[index].status = result.text != nil ? .succeeded : .failed
-        if result.text == nil {
-            failedFiles.append(sourceURL.lastPathComponent)
-        }
-        let pdfGen = PDFGenerator()
-        let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
-        outputURLMap[sourceURL] = outputURL
-        // Copy source tags to output PDF if pass-through mode is enabled
-        if passSourceTags {
-            let sourceTags = MacOSTagger.readTags(from: sourceURL)
-            if !sourceTags.isEmpty {
-                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
-                jobs[index].appliedTags = sourceTags
-            }
-        }
     }
     /// OCR only specific file indices (for resuming interrupted runs).
     private func performOCRPhaseForIndices(
@@ -951,6 +946,7 @@ extension OCRProcessor {
     }
     /// Present retry dialog and wait for user decision. Returns the action chosen.
     private func promptRetryForFailedFiles() async -> RetryAction {
+        guard !Task.isCancelled else { return .continueWithout }   // don't install a continuation for a cancelled run
         failedFileIndices = jobs.indices.filter { jobs[$0].status == .failed }.sorted()
         guard !failedFileIndices.isEmpty else { return .continueWithout }
 

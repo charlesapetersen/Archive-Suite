@@ -141,6 +141,13 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 }
             }
 
+            // Status line — surfaces capture errors (a failed shutter can't be silent; archival photos
+            // can't be re-taken) and the recovered-segment prompt after a restart.
+            if (vm.statusMessage.isNotEmpty()) {
+                Text(vm.statusMessage, color = Color.White, style = MaterialTheme.typography.bodySmall,
+                     modifier = Modifier.fillMaxWidth())
+            }
+
             // Current segment (auto-scrolling; tap a page to toggle its P10 override). Confirmed pages
             // animate out as they reach the Mac, so the strip reflects only what's still transferring.
             if (strip.isNotEmpty()) {
@@ -231,7 +238,12 @@ private fun takePicture(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(results: ImageCapture.OutputFileResults) { onSaved(file) }
-            override fun onError(exception: ImageCaptureException) { /* keep it simple */ }
+            override fun onError(exception: ImageCaptureException) {
+                // A failed capture must NOT be silent — an archival page can't be re-taken. Remove any
+                // partial file and surface the failure so the operator re-shoots.
+                runCatching { file.delete() }
+                vm.reportCaptureError("Capture failed — please retake. (${exception.message ?: "camera error"})")
+            }
         }
     )
 }

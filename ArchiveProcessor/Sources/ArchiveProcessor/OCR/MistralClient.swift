@@ -126,16 +126,13 @@ struct MistralClient {
     }
 
     private static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+        // Status-based classification first, independent of body shape (empty/non-JSON 5xx/429).
+        if statusCode == 503 || statusCode == 529 { return "Model in high use. Try again later." }
+        if statusCode == 429 { return "Rate limit exceeded. Try again later." }
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             // Mistral errors can be {"message": "..."} or {"error": {"message": "..."}}
             let message = (json["message"] as? String)
                 ?? (json["error"] as? [String: Any])?["message"] as? String
-            if statusCode == 503 || statusCode == 529 {
-                return "Model in high use. Try again later."
-            }
-            if statusCode == 429 {
-                return "Rate limit exceeded. Try again later."
-            }
             if let message = message {
                 return message
             }

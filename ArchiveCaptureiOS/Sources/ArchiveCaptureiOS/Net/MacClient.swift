@@ -26,13 +26,16 @@ struct MacClient {
     /// POST one JPEG (raw body) with grouping + minimal-tag headers. Returns true on 2xx.
     /// The Mac requires a non-empty X-Group and a numeric X-Seq (else 400), so both are always sent.
     func postPhoto(jpeg: Data, group: String, seq: Int, type: String,
-                   priority: String?, year: Int?, month: Int?, device: String) async -> Bool {
+                   priority: String?, year: Int?, month: Int?, device: String,
+                   replaces: String? = nil) async -> Bool {
         guard var req = makeRequest("/photo", method: "POST") else { return false }
         req.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
         req.setValue(group, forHTTPHeaderField: "X-Group")
         req.setValue(String(seq), forHTTPHeaderField: "X-Seq")
         req.setValue(type, forHTTPHeaderField: "X-Type")
         req.setValue(device, forHTTPHeaderField: "X-Device")
+        // The old group this photo replaces (reclassify) — the Mac drops the orphaned old copy.
+        if let replaces, !replaces.isEmpty { req.setValue(replaces, forHTTPHeaderField: "X-Replaces") }
         if let p = priority, !p.trimmingCharacters(in: .whitespaces).isEmpty {
             req.setValue(p, forHTTPHeaderField: "X-Priority")
         }

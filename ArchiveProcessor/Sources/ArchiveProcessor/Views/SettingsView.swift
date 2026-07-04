@@ -43,6 +43,7 @@ struct SettingsView: View {
     @AppStorage("gatewayDisplayName") private var gatewayDisplayName: String = ""
     @AppStorage("gatewayInputCost") private var gatewayInputCost: Double = -1
     @AppStorage("gatewayOutputCost") private var gatewayOutputCost: Double = -1
+    @AppStorage("gatewayUpstreamProvider") private var gatewayUpstreamProvider: LLMProvider = .anthropic
 
     @AppStorage("preOCRedInput") private var preOCRedInput: Bool = false
     @AppStorage("batchMode") private var batchMode: Bool = false
@@ -83,7 +84,18 @@ struct SettingsView: View {
     }
 
     private var models: [LLMModel] {
-        selectedProvider.models + customModelStore.allCustomModels.filter { $0.provider == selectedProvider }
+        selectedProvider.models   // already includes this provider's custom models — don't concat (dupes)
+    }
+
+    /// Keep `selectedModel` valid: after a provider switch or a custom-model deletion, if the current
+    /// selection is no longer in the list the Picker shows blank and processing would use a ghost model
+    /// id — so re-point to the same id (fields may have changed) or fall back to the saved/first model.
+    private func ensureValidModelSelection() {
+        if let match = models.first(where: { $0.id == selectedModel.id }) {
+            if match != selectedModel { selectedModel = match }
+        } else {
+            selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
+        }
     }
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
@@ -136,7 +148,8 @@ struct SettingsView: View {
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
-                    rotationMode: rotationMode, useGateway: useGateway)
+                    rotationMode: rotationMode, useGateway: useGateway,
+                    imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
@@ -208,6 +221,14 @@ struct SettingsView: View {
                 TextField("Display name (for PDF headers)", text: $gatewayDisplayName)
                 TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number)
                 TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number)
+                Picker(selection: $gatewayUpstreamProvider) {
+                    ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
+                } label: {
+                    HStack {
+                        Text("Cost profile")
+                        HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
+                    }
+                }
             } else {
                 Picker(selection: Binding(
                     get: { selectedProvider },
@@ -235,6 +256,8 @@ struct SettingsView: View {
                 .onChange(of: selectedModel) { _, m in
                     ModelSelectionStore.saveModel(m, for: selectedProvider)
                 }
+                .onChange(of: selectedProvider) { _, _ in ensureValidModelSelection() }
+                .onChange(of: customModelStore.allCustomModels) { _, _ in ensureValidModelSelection() }
                 if selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
@@ -279,7 +302,13 @@ struct SettingsView: View {
                     // Ignore programmatic reloads (e.g. after the wizard saves, or on appear): if the value
                     // already matches the Keychain, don't re-save, clear the Validated flag, or loop notices.
                     if t == (KeychainHelper.load(account: account) ?? "") { return }
-                    if t.isEmpty { KeychainHelper.delete(account: account) } else { KeychainHelper.save(account: account, password: t) }
+                    if t.isEmpty {
+                        KeychainHelper.delete(account: account)
+                        UserDefaults.standard.set(false, forKey: "keySaveFailed_\(account)")
+                    } else {
+                        let ok = KeychainHelper.save(account: account, password: t)
+                        UserDefaults.standard.set(!ok, forKey: "keySaveFailed_\(account)")   // surface a failed write
+                    }
                     UserDefaults.standard.set(false, forKey: "keyValidated_\(account)")   // manual edit → needs re-validation
                     NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
                 }
@@ -289,7 +318,10 @@ struct SettingsView: View {
 
     /// Small status chip: green "Validated" once the guided wizard's live check passed, else "Saved".
     @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
-        if UserDefaults.standard.bool(forKey: "keyValidated_\(account)") {
+        if hasKey && UserDefaults.standard.bool(forKey: "keySaveFailed_\(account)") {
+            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
+        } else if UserDefaults.standard.bool(forKey: "keyValidated_\(account)") {
             Label("Validated", systemImage: "checkmark.seal.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
         } else if hasKey {

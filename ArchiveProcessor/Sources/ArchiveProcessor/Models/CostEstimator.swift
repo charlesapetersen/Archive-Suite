@@ -82,7 +82,8 @@ struct CostEstimator {
         contextCharCount: Int,
         imageScale: Double = 1.0,
         rotationMode: RotationMode = .off,
-        useGateway: Bool = false
+        useGateway: Bool = false,
+        imageTokenProvider: LLMProvider? = nil
     ) -> CostEstimate {
         // OCR cost (zero when using pre-OCRed PDFs).
         // `imageScale` is the size-target slider fraction; for a standard-size file it equals the
@@ -90,8 +91,10 @@ struct CostEstimator {
         var ocrCost: Double = 0
         var batchOcrCost: Double = 0
         if !preOCRedInput {
-            let scaleArea = imageScale
-            let imgTokens = estimatedImageTokens(for: model.provider) * scaleArea
+            let scaleArea = max(0.01, min(1.0, imageScale))   // defensive clamp against stale/out-of-range values
+            // For a gateway, model.provider is a stand-in (.anthropic); use the caller-supplied upstream
+            // family so a Gemini-behind-gateway isn't under-estimated ~6.7×.
+            let imgTokens = estimatedImageTokens(for: imageTokenProvider ?? model.provider) * scaleArea
             let contextTokens = Double(contextCharCount) / 4.0 // ~4 chars per token
             let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
                 + (sendPreviousImage ? imgTokens : 0)

@@ -31,6 +31,11 @@ struct ToolsView: View {
     @State private var modelTestImage: URL?
     @State private var isRunningModelTest = false
 
+    // Handles so the paid diagnostic loops can be cancelled when their sheet is dismissed (otherwise
+    // they keep firing billable OCR calls for a closed view).
+    @State private var resolutionTask: Task<Void, Never>?
+    @State private var modelTestTask: Task<Void, Never>?
+
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? "") ?? .gemini
         let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
@@ -121,14 +126,20 @@ struct ToolsView: View {
                 isRunning: isRunningModelTest,
                 totalCount: modelTestSelections.count,
                 onSelect: { provider, model in
+                    modelTestTask?.cancel()   // user picked a model — stop the remaining paid test calls
                     selectedProvider = provider
                     selectedModel = model
                     UserDefaults.standard.set(model.id, forKey: "selectedModelId_\(provider.rawValue)")
-                    apiKey = KeychainHelper.load(account: provider.rawValue) ?? ""
+                    apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
                     showModelTestResults = false
                 },
                 onDismiss: { showModelTestResults = false })
         }
+        // Cancel the paid diagnostic loops as soon as their sheet closes, and clear the running flag
+        // unconditionally here (the in-loop reset is skipped on cancel, so it must be reset on close or
+        // the tool card stays permanently disabled).
+        .onChange(of: showResolutionTest) { _, shown in if !shown { resolutionTask?.cancel(); isRunningResolutionTest = false } }
+        .onChange(of: showModelTestResults) { _, shown in if !shown { modelTestTask?.cancel(); isRunningModelTest = false } }
     }
 
     @ViewBuilder private func toolCard(title: String, systemImage: String, detail: String,
@@ -150,6 +161,7 @@ struct ToolsView: View {
     // MARK: Run logic (moved from OCRView; standalone OCR calls)
 
     private func runResolutionTest(imageURL: URL) {
+        resolutionTask?.cancel()   // supersede any in-flight run so results can't interleave
         isRunningResolutionTest = true
         resolutionTestResults = []
         showResolutionTest = true
@@ -159,35 +171,40 @@ struct ToolsView: View {
         let model = gateway?.asLLMModel() ?? selectedModel
         let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil
         let key = apiKey
-        Task {
+        resolutionTask = Task {
             for scale in scales {
+                if Task.isCancelled { break }
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: provider, model: model,
                     thinkingLevel: thinking, apiKey: key,
                     imageScale: Double(scale) / 100.0, gatewayConfig: gateway)
+                if Task.isCancelled { break }
                 resolutionTestResults.append((scale: scale, text: result.text))
             }
-            isRunningResolutionTest = false
+            if !Task.isCancelled { isRunningResolutionTest = false }
         }
     }
 
     private func runModelTest(imageURL: URL) {
+        modelTestTask?.cancel()   // supersede any in-flight run so results can't interleave
         isRunningModelTest = true
         modelTestResults = []
         showModelTestResults = true
         let entries = modelTestSelections
         let scale = imageScale / 100.0
-        Task {
+        modelTestTask = Task {
             for entry in entries {
+                if Task.isCancelled { break }
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: entry.provider, model: entry.model,
                     thinkingLevel: entry.model.supportsThinking ? .low : nil,
                     apiKey: entry.apiKey, imageScale: scale)
+                if Task.isCancelled { break }
                 modelTestResults.append(ModelTestResult(
                     provider: entry.provider, model: entry.model,
                     text: result.text, errorMessage: result.errorMessage))
             }
-            isRunningModelTest = false
+            if !Task.isCancelled { isRunningModelTest = false }
         }
     }
 }

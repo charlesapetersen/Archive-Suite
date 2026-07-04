@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,17 +86,18 @@ private fun Pairing(vm: CaptureViewModel, wired: Boolean, onBack: () -> Unit, on
 
         if (hasCam) {
             val controller = remember { LifecycleCameraController(context) }
+            val analyzer = remember {
+                QrAnalyzer { payload ->
+                    if (!connecting) {
+                        connecting = true
+                        vm.connectFromQr(payload, wired) { ok -> connecting = false; if (ok) onConnected() }
+                    }
+                }
+            }
+            DisposableEffect(Unit) { onDispose { analyzer.close() } }   // release the ML Kit detector
             LaunchedEffect(Unit) {
                 controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-                controller.setImageAnalysisAnalyzer(
-                    ContextCompat.getMainExecutor(context),
-                    QrAnalyzer { payload ->
-                        if (!connecting) {
-                            connecting = true
-                            vm.connectFromQr(payload, wired) { ok -> connecting = false; if (ok) onConnected() }
-                        }
-                    }
-                )
+                controller.setImageAnalysisAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
                 controller.bindToLifecycle(lifecycleOwner)
             }
             AndroidView(

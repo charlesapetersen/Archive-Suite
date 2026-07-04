@@ -1,5 +1,6 @@
 import SwiftUI
 import ImageIO
+import UIKit
 
 /// Main capture UI: camera preview + Box/shutter/Folder, End-segment, and a strip that shows only the
 /// current in-flight work — confirmed uploads leave the phone (photos transfer to the Mac in segments).
@@ -21,7 +22,17 @@ struct CaptureScreen: View {
                 if camera.authorized {
                     CameraPreview(session: camera.session)
                 } else {
-                    Text("Camera permission needed to capture.").foregroundStyle(.white)
+                    VStack(spacing: 12) {
+                        Text("Camera permission needed to capture.").foregroundStyle(.white)
+                        if camera.accessDenied {
+                            Button("Open Settings") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

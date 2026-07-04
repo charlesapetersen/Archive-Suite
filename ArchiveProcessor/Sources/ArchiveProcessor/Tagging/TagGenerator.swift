@@ -45,13 +45,45 @@ struct GeneratedTags: Codable {
     var machineDate: String? {
         guard let y = year else { return nil }
         var date = y
-        if let m = month, let monthNum = Int(m.prefix(2)) {
+        if let m = month, let monthNum = Self.monthNumber(from: m) {
             date += String(format: "-%02d", monthNum)
-            if let d = day, let dayNum = Int(d.replacingOccurrences(of: "Day ", with: "")) {
+            if let d = day, let dayNum = Self.dayNumber(from: d) {
                 date += String(format: "-%02d", dayNum)
             }
         }
         return date
+    }
+
+    /// Parse a month from the "MM Month" tag form ("03 March"), a bare number, or a bare name — so
+    /// the JSON `date` doesn't silently drop a month the user typed as "March" instead of "03 March".
+    static func monthNumber(from s: String) -> Int? {
+        let trimmed = s.trimmingCharacters(in: .whitespaces)
+        if let n = Int(trimmed.prefix(2)), (1...12).contains(n) { return n }
+        if let n = Int(trimmed), (1...12).contains(n) { return n }
+        let lower = trimmed.lowercased()
+        let names = ["january", "february", "march", "april", "may", "june",
+                     "july", "august", "september", "october", "november", "december"]
+        if let idx = names.firstIndex(where: { lower.contains($0) }) { return idx + 1 }
+        return nil
+    }
+
+    /// Parse a day-of-month from "Day 15", "day 15", or "15".
+    static func dayNumber(from s: String) -> Int? {
+        let digits = s.filter { $0.isNumber }
+        guard let n = Int(digits), (1...31).contains(n) else { return nil }
+        return n
+    }
+
+    /// Coerce a JSON value to a trimmed non-empty String — LLMs often return year/month/day as a
+    /// JSON *number* (`"year": 1987`), which `as? String` would drop, spuriously forcing a no-date.
+    static func stringField(_ value: Any?) -> String? {
+        if let s = value as? String {
+            let t = s.trimmingCharacters(in: .whitespaces)
+            return t.isEmpty ? nil : t
+        }
+        if let i = value as? Int { return String(i) }
+        if let d = value as? Double { return String(Int(d)) }
+        return nil
     }
 }
 
@@ -289,11 +321,13 @@ class TagGenerator: ObservableObject {
         }
 
         var tags = GeneratedTags()
-        tags.year = json["year"] as? String
-        tags.month = json["month"] as? String
-        tags.day = json["day"] as? String
+        // Coerce year/month/day: models frequently return these as JSON numbers, not strings.
+        tags.year = GeneratedTags.stringField(json["year"])
+        tags.month = GeneratedTags.stringField(json["month"])
+        tags.day = GeneratedTags.stringField(json["day"])
         tags.dateUncertain = json["date_uncertain"] as? Bool ?? false
-        tags.subjectTags = json["subject_tags"] as? [String] ?? []
+        // Enforce the 2–6 subject-tag contract's upper bound (models sometimes return many more).
+        tags.subjectTags = Array((json["subject_tags"] as? [String] ?? []).prefix(6))
         tags.format = json["format"] as? String
         tags.authorName = json["author_name"] as? String
         tags.recipientName = json["recipient_name"] as? String

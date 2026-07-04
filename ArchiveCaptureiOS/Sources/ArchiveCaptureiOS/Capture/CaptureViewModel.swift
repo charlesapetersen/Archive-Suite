@@ -131,6 +131,7 @@ final class CaptureViewModel: ObservableObject {
     /// Reclassify the selected photo as a single-image box/folder marker (own group) and upload it.
     func reclassifySelected(_ type: GroupType) {
         guard let id = selectedItemId, let i = items.firstIndex(where: { $0.id == id }) else { return }
+        let oldGroupId = items[i].groupId
         items[i].type = type
         items[i].groupId = Self.newGroupId()
         items[i].priority = nil
@@ -138,7 +139,8 @@ final class CaptureViewModel: ObservableObject {
         let updated = items[i]
         clearSelection()
         persist()
-        enqueueUpload(updated)
+        // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
+        enqueueUpload(updated, replaces: oldGroupId)
     }
 
     // MARK: - Grouping / finalize
@@ -162,6 +164,11 @@ final class CaptureViewModel: ObservableObject {
         if n > 0 { flash("Segment → Mac · \(n) page\(n == 1 ? "" : "s")") }
         pendingTagGroupId = nil
         startNewGroup()
+        // If a recovered session had more than one un-sent segment, keep prompting until none remain.
+        if let nextPending = items.first(where: { $0.state == .pending && $0.type == .document }) {
+            currentGroupId = nextPending.groupId
+            pendingTagGroupId = nextPending.groupId
+        }
         persist()
     }
 
@@ -181,7 +188,7 @@ final class CaptureViewModel: ObservableObject {
 
     // MARK: - Upload
 
-    private func enqueueUpload(_ item: CapturedItem) {
+    private func enqueueUpload(_ item: CapturedItem, replaces: String? = nil) {
         guard let c = client else { return }
         setState(item.id, .uploading)
         Task {
@@ -191,7 +198,8 @@ final class CaptureViewModel: ObservableObject {
                 var attempt = 0
                 while !ok && attempt < 3 {
                     ok = await c.postPhoto(jpeg: data, group: item.groupId, seq: item.seq, type: item.type.rawValue,
-                                           priority: item.priority, year: item.year, month: item.month, device: deviceName)
+                                           priority: item.priority, year: item.year, month: item.month, device: deviceName,
+                                           replaces: replaces)
                     attempt += 1
                 }
             }
@@ -271,6 +279,15 @@ final class CaptureViewModel: ObservableObject {
         items.removeAll { $0.state == .uploaded }
         if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
         resumeUploads()
+        // Buffered document pages (captured but never "ended") are only delivered when the operator
+        // ends the segment — so after a restart they'd sit undelivered forever, and an archival photo
+        // can't be re-taken. Surface the recovered segment and re-open its tag card so it can be sent.
+        if let firstPendingDoc = items.first(where: { $0.state == .pending && $0.type == .document }) {
+            currentGroupId = firstPendingDoc.groupId
+            pendingTagGroupId = firstPendingDoc.groupId
+            let n = items.filter { $0.groupId == firstPendingDoc.groupId && $0.type == .document && $0.state == .pending }.count
+            statusMessage = "Recovered \(n) un-sent page\(n == 1 ? "" : "s") — tag & send to finish the segment."
+        }
     }
 
     private func persist() {

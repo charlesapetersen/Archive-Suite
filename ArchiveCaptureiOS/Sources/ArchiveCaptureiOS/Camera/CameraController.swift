@@ -15,20 +15,24 @@ final class CameraController: NSObject, ObservableObject {
     private var completions: [Int64: (Data?) -> Void] = [:]
 
     @Published var authorized = false
+    /// True when access is .denied/.restricted — the UI offers a route to Settings (a previously-denied
+    /// user is otherwise stuck: the shutter is a silent no-op with no way to re-request).
+    @Published var accessDenied = false
 
     func start() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             authorized = true
+            accessDenied = false
             queue.async { self.configureIfNeeded(); self.startRunning() }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async { self.authorized = granted }
+                DispatchQueue.main.async { self.authorized = granted; self.accessDenied = !granted }
                 guard granted else { return }
                 self.queue.async { self.configureIfNeeded(); self.startRunning() }
             }
         default:
-            DispatchQueue.main.async { self.authorized = false }
+            DispatchQueue.main.async { self.authorized = false; self.accessDenied = true }
         }
     }
 

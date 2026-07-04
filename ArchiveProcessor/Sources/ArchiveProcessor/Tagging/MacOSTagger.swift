@@ -21,47 +21,65 @@ struct MacOSTagger {
         return tags
     }
 
-    // Apply macOS Finder tags to a file
-    static func applyTags(_ tags: [String], to url: URL) throws {
-        // In stamping modes, drop any incoming "Unread" so we can re-add it exactly once, last.
-        var incoming = tags
-        if stampUnread {
-            incoming.removeAll { $0.caseInsensitiveCompare("Unread") == .orderedSame }
+    /// Apply macOS Finder tags to a file.
+    /// - Parameter appColor: when non-nil, THIS is the authoritative app color (Red/Purple) and no
+    ///   color detection is done on `tags`, so a *subject* tag that is literally "Red"/"Purple" is
+    ///   never promoted to a Finder color label. When nil, Red/Purple are detected within `tags`.
+    static func applyTags(_ tags: [String], to url: URL, appColor: String? = nil, colorIsAuthoritative: Bool = false) throws {
+        // Copy-source mode (stampUnread == false): pass the source tag names through verbatim. Do NOT
+        // reinterpret color words as Finder labels or touch the label number — the standard color names
+        // round-trip as labels on their own, and manual mapping here would drop one of several colors
+        // or convert a genuine subject tag ("Blue") into a color swatch.
+        if !stampUnread {
+            let verbatim = tags.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            guard !verbatim.isEmpty else { return }
+            try (url as NSURL).setResourceValue(verbatim, forKey: .tagNamesKey)
+            return
         }
-        // Filter empty tags
+
+        // Real-tagging modes: the app assigns exactly one of Red (box) / Purple (folder). Drop any
+        // incoming "Unread" so we can re-add it exactly once, last.
+        var incoming = tags
+        incoming.removeAll { $0.caseInsensitiveCompare("Unread") == .orderedSame }
         let filtered = incoming.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
-        // Build NSURLTagNamesKey-compatible array
-        // Color tags need special treatment via NSURLLabelNumberKey
-        // Only Red (box) and Purple (folder) are assigned in real-tagging modes, so restrict color
-        // detection there — otherwise a subject tag that happens to be a color word (e.g. "Green",
-        // "Blue") would be misapplied as a Finder color label. Copy-source mode passes through all colors.
-        let colorNames: Set<String> = stampUnread
-            ? ["Red", "Purple"]
-            : ["Red", "Purple", "Orange", "Gray", "Green", "Blue", "Yellow"]
-        let colorTagName = filtered.first { colorNames.contains($0) }
-        let textTags = filtered.filter { $0 != colorTagName }
+        let colorTagName: String?
+        let textTags: [String]
+        if colorIsAuthoritative {
+            // The caller (GeneratedTags) supplies the authoritative color; never treat a subject string
+            // as a color even when it's nil — a document about the "Red Scare" keeps "Red" as a text tag.
+            colorTagName = (appColor == "Red" || appColor == "Purple") ? appColor : nil
+            if let c = colorTagName, let idx = filtered.firstIndex(of: c) {
+                var t = filtered; t.remove(at: idx); textTags = t
+            } else {
+                textTags = filtered
+            }
+        } else {
+            // Raw [String] callers: detect Red/Purple within the array (never other color words).
+            let detected = filtered.first { ["Red", "Purple"].contains($0) }
+            colorTagName = detected
+            textTags = filtered.filter { $0 != detected }
+        }
 
         var allTagNames = textTags
         if let color = colorTagName { allTagNames.insert(color, at: 0) }
-        // Real-tagging modes: "Unread" is always the final tag on every output (even if nothing else).
-        if stampUnread { allTagNames.append("Unread") }
-
-        guard !allTagNames.isEmpty else { return }
+        allTagNames.append("Unread")   // always the final tag on every real-tagging output
 
         try (url as NSURL).setResourceValue(allTagNames, forKey: .tagNamesKey)
 
-        // Apply label color if needed
-        if let colorTag = colorTagName {
-            let labelIndex = finderLabelIndex(for: colorTag)
-            if labelIndex >= 0 {
-                try (url as NSURL).setResourceValue(labelIndex, forKey: .labelNumberKey)
-            }
+        // Apply the label color, or clear it to 0 when this page has no color — otherwise a stale
+        // Red/Purple swatch survives a Redo/re-tag where the page's classification changed.
+        if let colorTag = colorTagName, finderLabelIndex(for: colorTag) >= 0 {
+            try (url as NSURL).setResourceValue(finderLabelIndex(for: colorTag), forKey: .labelNumberKey)
+        } else {
+            try (url as NSURL).setResourceValue(0, forKey: .labelNumberKey)
         }
     }
 
     static func applyTags(_ generatedTags: GeneratedTags, to url: URL) throws {
-        try applyTags(generatedTags.allTags, to: url)
+        // Pass the app-assigned color explicitly so a subject tag equal to "Red"/"Purple" isn't
+        // promoted to a Finder color label.
+        try applyTags(generatedTags.allTags, to: url, appColor: generatedTags.colorTag, colorIsAuthoritative: true)
     }
 
     private static func finderLabelIndex(for colorName: String) -> Int {

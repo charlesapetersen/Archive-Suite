@@ -26,7 +26,8 @@ class MacClient(private val endpoint: MacEndpoint) {
     /** POST one JPEG (raw body) with grouping + minimal-tag headers. Returns true on 2xx. */
     fun postPhoto(
         jpeg: ByteArray, group: String, seq: Int, type: String,
-        priority: String?, year: Int?, month: Int?, device: String
+        priority: String?, year: Int?, month: Int?, device: String,
+        replaces: String? = null
     ): Boolean = try {
         val body = jpeg.toRequestBody("image/jpeg".toMediaType())
         val b = Request.Builder().url("${endpoint.baseUrl}/photo")
@@ -38,6 +39,8 @@ class MacClient(private val endpoint: MacEndpoint) {
         if (!priority.isNullOrBlank()) b.header("X-Priority", priority)
         if (year != null) b.header("X-Year", year.toString())
         if (month != null) b.header("X-Month", month.toString())
+        // The old group this photo replaces (reclassify) — the Mac drops the orphaned old copy.
+        if (!replaces.isNullOrBlank()) b.header("X-Replaces", replaces)
         client.newCall(b.post(body).build()).execute().use { it.isSuccessful }
     } catch (e: Exception) {
         false

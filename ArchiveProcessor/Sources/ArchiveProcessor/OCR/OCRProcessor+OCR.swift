@@ -350,7 +350,8 @@ extension OCRProcessor {
             enableSegmentJSON: enableSegmentJSON,
             confirmCollectionIDs: confirmCollectionIDs,
             reviewDocumentSegmentation: reviewDocumentSegmentation,
-            customPrompt: customPrompt
+            customPrompt: customPrompt,
+            taggingMode: taggingMode
         ))
         statusMessage = "Batch submitted. Waiting for results…"
 
@@ -376,9 +377,15 @@ extension OCRProcessor {
         outputDirectory: URL
     ) async {
         var pollCount = 0
+        var consecutiveErrors = 0
         var batchComplete = false
+        let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
+            if pollCount >= maxPolls {
+                statusMessage = "Batch timed out after \(pollCount) status checks."
+                break
+            }
 
             // Poll every 30s for the first ~5 min (few batches finish faster), then back off to 60s.
             let interval: Duration = pollCount < 10 ? .seconds(30) : .seconds(60)
@@ -481,9 +488,34 @@ extension OCRProcessor {
                         batchComplete = true
                     }
                 }
+                consecutiveErrors = 0   // this poll cycle completed without throwing
             } catch {
-                statusMessage = "Error checking batch: \(error.localizedDescription). Retrying…"
+                consecutiveErrors += 1
+                statusMessage = "Error checking batch: \(error.localizedDescription). Retrying… (attempt \(consecutiveErrors))"
+                // A persistently-failing status check (e.g. 404 after the batch expired/was deleted,
+                // or an unrecognized terminal state) must not poll forever.
+                if consecutiveErrors >= 10 {
+                    statusMessage = "Batch status unavailable after \(consecutiveErrors) attempts: \(error.localizedDescription)"
+                    break
+                }
             }
+        }
+
+        // The whole batch is complete (or timed out): any job still `.processing` got no result.
+        // Done ONCE here (not per-chunk in processBatchResults) so multi-chunk Gemini batches don't
+        // falsely fail files whose chunk finished on a later poll. Give each a proper failure output
+        // with a specific reason — in particular, distinguish a locally-unreadable source image
+        // (silently skipped at submit time) from "the provider returned no result for this file".
+        for i in jobs.indices where jobs[i].status == .processing {
+            let url = jobs[i].sourceURL
+            let readable = ImageEncoding.loadImageAsJPEG(url: url, scale: 1.0) != nil
+            let synthetic = OCRResult(
+                text: nil, classification: nil, rotationDegrees: 0,
+                errorMessage: readable ? "No result was returned for this file by the batch."
+                                       : "Could not read the source image (unsupported or corrupt file).",
+                errorCode: readable ? "no_result" : "image_unreadable"
+            )
+            handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
         }
     }
     private func processBatchResults(
@@ -506,14 +538,10 @@ extension OCRProcessor {
             let resolved = Self.mergeRotation(into: result, correction: correction)
             handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
         }
-
-        // Mark any remaining processing jobs as failed (no result returned for them).
-        // Report the filename from the job itself (matches the sibling loop above) rather than
-        // cross-indexing fileURLs, so this stays correct even if the arrays ever diverge.
-        for i in jobs.indices where jobs[i].status == .processing {
-            jobs[i].status = .failed
-            failedFiles.append(jobs[i].sourceURL.lastPathComponent)
-        }
+        // NOTE: do NOT sweep remaining `.processing` jobs to `.failed` here. For multi-chunk Gemini
+        // batches this runs while OTHER chunks are still processing, so it would falsely fail files
+        // whose chunk hasn't finished yet. The sweep is done once in pollBatchUntilComplete after the
+        // whole batch is complete.
     }
     func performOCRPhase(
         fileURLs: [URL],
@@ -698,7 +726,13 @@ extension OCRProcessor {
         jobs[index].classification = result.classification
         jobs[index].status = result.text != nil ? .succeeded : .failed
         if result.text == nil {
-            failedFiles.append(sourceURL.lastPathComponent)
+            // Dedup: a file that fails again on a retry is already in failedFiles. Without this the
+            // "N failed" summary and the .txt log over-count (the same filename listed 2–3×).
+            let name = sourceURL.lastPathComponent
+            if !failedFiles.contains(name) { failedFiles.append(name) }
+        } else {
+            // Succeeded (possibly on retry): make sure a prior failure entry is cleared.
+            failedFiles.removeAll { $0 == sourceURL.lastPathComponent }
         }
         let pdfGen = PDFGenerator()
         // Use original source name for output PDF naming

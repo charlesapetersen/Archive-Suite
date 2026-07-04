@@ -75,6 +75,14 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (items.isNotEmpty()) statusMessage = "Restored ${items.size} photo(s) from last session"
             resumeUploads()
+            // Buffered document pages (captured but never "ended") only leave on End-segment, so after a
+            // restart surface them and re-open the tag card — an archival photo can't be re-taken.
+            items.firstOrNull { it.state == UploadState.PENDING && it.type == GroupType.DOCUMENT }?.let { pend ->
+                currentGroupId = pend.groupId
+                pendingTagGroupId = pend.groupId
+                val n = items.count { it.groupId == pend.groupId && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }
+                statusMessage = "Recovered $n un-sent page${if (n == 1) "" else "s"} — tag & send to finish the segment."
+            }
         }
         startAutoRetry()
     }
@@ -172,6 +180,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         flash(if (type == GroupType.BOX) "Box → Mac" else "Folder → Mac")
     }
 
+    /** Surface a failed camera capture so the operator knows to re-shoot — an archival photo can't be
+     *  re-taken, so a silent drop is unacceptable. */
+    fun reportCaptureError(message: String) {
+        statusMessage = message
+    }
+
     /** Long-press a page thumbnail to toggle a per-page P10 override. */
     fun toggleP10(itemId: Long) {
         val i = items.indexOfFirst { it.id == itemId }
@@ -228,11 +242,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val id = selectedItemId ?: return
         val i = items.indexOfFirst { it.id == id }
         if (i >= 0) {
+            val oldGroupId = items[i].groupId
             val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null, state = UploadState.PENDING)
             items[i] = updated
             clearSelection()
             persist()
-            enqueueUpload(updated)
+            // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
+            enqueueUpload(updated, replaces = oldGroupId)
         }
     }
 
@@ -261,6 +277,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (n > 0) flash("Segment → Mac · $n page${if (n == 1) "" else "s"}")
         pendingTagGroupId = null
         startNewGroup()
+        // If a recovered session had more than one un-sent segment, keep prompting until none remain.
+        items.firstOrNull { it.state == UploadState.PENDING && it.type == GroupType.DOCUMENT }?.let { pend ->
+            currentGroupId = pend.groupId
+            pendingTagGroupId = pend.groupId
+        }
         persist()
     }
 
@@ -277,30 +298,39 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Upload ----
 
-    private fun enqueueUpload(item: CapturedItem) {
+    /** Ids currently being uploaded, so the auto-retry loop and a manual Retry can't both fire the same
+     *  item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). */
+    private val inFlightUploads = mutableSetOf<Long>()
+
+    private fun enqueueUpload(item: CapturedItem, replaces: String? = null) {
         val c = client ?: return
+        if (!inFlightUploads.add(item.id)) return   // already uploading this id — don't double-send
         setState(item.id, UploadState.UPLOADING)
         viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) { runCatching { item.file.readBytes() }.getOrNull() }
-            var ok = false
-            if (bytes != null) {
-                var attempt = 0
-                while (!ok && attempt < 3) {
-                    ok = withContext(Dispatchers.IO) {
-                        c.postPhoto(bytes, item.groupId, item.seq, item.type.wire,
-                            item.priority, item.year, item.month, deviceName)
+            try {
+                val bytes = withContext(Dispatchers.IO) { runCatching { item.file.readBytes() }.getOrNull() }
+                var ok = false
+                if (bytes != null) {
+                    var attempt = 0
+                    while (!ok && attempt < 3) {
+                        ok = withContext(Dispatchers.IO) {
+                            c.postPhoto(bytes, item.groupId, item.seq, item.type.wire,
+                                item.priority, item.year, item.month, deviceName, replaces)
+                        }
+                        attempt++
                     }
-                    attempt++
                 }
+                setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
+                if (ok) {
+                    sentCount += 1
+                    // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
+                    // lets the strip animate it out), so photos transfer in segments instead of piling up.
+                    viewModelScope.launch { delay(650); removeConfirmed(item) }
+                }
+                statusMessage = uploadSummary()
+            } finally {
+                inFlightUploads.remove(item.id)
             }
-            setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
-            if (ok) {
-                sentCount += 1
-                // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
-                // lets the strip animate it out), so photos transfer in segments instead of piling up.
-                viewModelScope.launch { delay(650); removeConfirmed(item) }
-            }
-            statusMessage = uploadSummary()
         }
     }
 

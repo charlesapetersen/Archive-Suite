@@ -87,18 +87,18 @@ struct OpenAICompatibleClient {
     }
 
     static func parseErrorResponse(data: Data, statusCode: Int) -> String {
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let error = json["error"] as? [String: Any] {
-            let message = error["message"] as? String
-            if statusCode == 503 || statusCode == 529 {
-                return "Model in high use. Try again later."
-            }
-            if statusCode == 429 {
-                return "Rate limit exceeded. Try again later."
-            }
-            if let message = message {
+        // Status-based classification first, independent of body shape — gateways (vLLM/LiteLLM/Ollama
+        // shims, CDNs) often return an empty or non-JSON 5xx/429 body.
+        if statusCode == 503 || statusCode == 529 { return "Model in high use. Try again later." }
+        if statusCode == 429 { return "Rate limit exceeded. Try again later." }
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            // Handle the several error shapes arbitrary OpenAI-compatible gateways use.
+            if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
                 return message
             }
+            if let error = json["error"] as? String { return error }
+            if let detail = json["detail"] as? String { return detail }
+            if let message = json["message"] as? String { return message }
         }
         return "API error (\(statusCode))"
     }

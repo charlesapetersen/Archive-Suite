@@ -11,6 +11,11 @@ struct PDFGenerator {
 
         if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB) {
             pdfDocument.insert(imagePage, at: 0)
+        } else {
+            // The source image couldn't be decoded/embedded. Insert a visible placeholder rather than
+            // silently emitting a 1-page (text-only) PDF — that preserves the 2-page archival contract,
+            // keeps PDFTextExtractor's pageCount>=2 heuristic valid, and surfaces the failure.
+            pdfDocument.insert(makePlaceholderImagePage(note: "Original image could not be embedded (\(imageURL.lastPathComponent))."), at: 0)
         }
 
         let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName)
@@ -43,7 +48,15 @@ struct PDFGenerator {
         let embedHeight: Int
         let colorSpace: String
 
-        if noRotation && sourceType == "public.jpeg" && orientation == 1 && underTarget {
+        // The verbatim fast path embeds the original JPEG bytes with a /ColorSpace derived from the
+        // file header. Only take it for definitively RGB/Gray JPEGs — CMYK/YCCK/unknown headers can
+        // disagree with the DCTDecode stream's component count and render page 1 with wrong colors,
+        // so those fall through to the decode+re-encode path where /ColorSpace matches the real image.
+        let headerColorModel = properties?[kCGImagePropertyColorModel] as? String
+        let fastPathColorSafe = headerColorModel == (kCGImagePropertyColorModelRGB as String)
+            || headerColorModel == (kCGImagePropertyColorModelGray as String)
+
+        if noRotation && sourceType == "public.jpeg" && orientation == 1 && underTarget && fastPathColorSafe {
             // Verbatim fast path: unrotated, normal-orientation JPEG already within target → embed the
             // original bytes as-is (no decode, no re-encode). Dims/color-model come from the file header.
             guard let data = try? Data(contentsOf: imageURL),
@@ -52,7 +65,7 @@ struct PDFGenerator {
             jpegData = data
             embedWidth = w
             embedHeight = h
-            colorSpace = Self.pdfColorSpace(forColorModel: properties?[kCGImagePropertyColorModel] as? String)
+            colorSpace = Self.pdfColorSpace(forColorModel: headerColorModel)
         } else {
             // Decode, resolve EXIF orientation, apply any LLM rotation, then encode toward the PDF image
             // size target (targetMB <= 0 → full-resolution encode at quality 0.90, i.e. prior behavior).
@@ -225,10 +238,16 @@ struct PDFGenerator {
         let headerParaStyle = NSMutableParagraphStyle()
         headerParaStyle.lineSpacing = 4
         headerParaStyle.paragraphSpacing = 2
+        // Char-wrap so a single token wider than the text column (long filename/URL) wraps
+        // within the margin instead of clipping past the right edge.
+        headerParaStyle.lineBreakMode = .byCharWrapping
 
         let bodyParaStyle = NSMutableParagraphStyle()
         bodyParaStyle.lineSpacing = 4
         bodyParaStyle.paragraphSpacing = 6
+        // Char-wrap so long unbreakable tokens (URLs, base64/hex blobs, whitespace-free CJK,
+        // dense table rows) wrap instead of overflowing the right margin and being clipped.
+        bodyParaStyle.lineBreakMode = .byCharWrapping
 
         let headerFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
         let bodyFont = NSFont(name: "Georgia", size: 11) ?? NSFont.systemFont(ofSize: 11)
@@ -253,9 +272,24 @@ struct PDFGenerator {
 
         let framesetter = CTFramesetterCreateWithAttributedString(fullString as CFAttributedString)
         let constraintSize = CGSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude)
-        let fitSize = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, CFRangeMake(0, fullString.length), nil, constraintSize, nil)
+        let fullRange = CFRangeMake(0, fullString.length)
+        let measured = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, fullRange, nil, constraintSize, nil)
 
-        let pageHeight = max(792, fitSize.height + 2 * margin)
+        // CTFramesetterSuggestFrameSizeWithConstraints can fractionally under-report the height
+        // CTFrameDraw actually needs (line-origin rounding, trailing paragraph spacing), which
+        // silently drops the last line. Grow the text height until the WHOLE string is verified
+        // visible, so archival OCR text is never clipped. The page grows arbitrarily tall — the
+        // extra whitespace at the bottom is invisible.
+        var textHeight = ceil(measured.height) + 4
+        for _ in 0..<200 {
+            let probeRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
+            let probeFrame = CTFramesetterCreateFrame(framesetter, fullRange, CGPath(rect: probeRect, transform: nil), nil)
+            let visible = CTFrameGetVisibleStringRange(probeFrame)
+            if visible.location + visible.length >= fullString.length { break }
+            textHeight += 24   // grow ~2 lines and re-verify
+        }
+
+        let pageHeight = max(792, textHeight + 2 * margin)
         let pageSize = CGSize(width: pageWidth, height: pageHeight)
 
         let pdfData = NSMutableData()
@@ -269,10 +303,10 @@ struct PDFGenerator {
         context.setFillColor(CGColor.white)
         context.fill(CGRect(origin: .zero, size: pageSize))
 
-        let textOriginY = pageHeight - margin - fitSize.height
-        let textRect = CGRect(x: margin, y: textOriginY, width: textWidth, height: fitSize.height)
+        let textOriginY = pageHeight - margin - textHeight
+        let textRect = CGRect(x: margin, y: textOriginY, width: textWidth, height: textHeight)
         let path = CGPath(rect: textRect, transform: nil)
-        let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, fullString.length), path, nil)
+        let frame = CTFramesetterCreateFrame(framesetter, fullRange, path, nil)
         CTFrameDraw(frame, context)
 
         context.endPDFPage()
@@ -284,6 +318,33 @@ struct PDFGenerator {
     private func pdfPageFromData(_ data: NSMutableData) -> PDFPage? {
         guard let doc = PDFDocument(data: data as Data) else { return nil }
         return doc.page(at: 0)
+    }
+
+    /// A letter-size placeholder used when the original image can't be decoded/embedded, so the
+    /// output PDF still has an image page (preserving the 2-page contract) and the failure is visible.
+    private func makePlaceholderImagePage(note: String) -> PDFPage {
+        let pageSize = CGSize(width: 612, height: 792)
+        let pdfData = NSMutableData()
+        var mediaBox = CGRect(origin: .zero, size: pageSize)
+        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            return PDFPage()
+        }
+        context.beginPDFPage(nil)
+        context.setFillColor(CGColor.white)
+        context.fill(CGRect(origin: .zero, size: pageSize))
+        let attr: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12),
+            .foregroundColor: NSColor.gray
+        ]
+        let noteString = NSAttributedString(string: note, attributes: attr)
+        let fs = CTFramesetterCreateWithAttributedString(noteString as CFAttributedString)
+        let rect = CGRect(x: 54, y: pageSize.height - 120, width: pageSize.width - 108, height: 80)
+        let frame = CTFramesetterCreateFrame(fs, CFRangeMake(0, noteString.length), CGPath(rect: rect, transform: nil), nil)
+        CTFrameDraw(frame, context)
+        context.endPDFPage()
+        context.closePDF()
+        return pdfPageFromData(pdfData) ?? PDFPage()
     }
 
     // MARK: - Multi-page Document Merging

@@ -67,16 +67,28 @@ struct GeminiClient {
             return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
         }
 
-        if let finishReason = first["finishReason"] as? String, finishReason == "RECITATION" {
+        // Surface any non-STOP finish reason with its actual code — not just RECITATION. MAX_TOKENS,
+        // SAFETY, PROHIBITED_CONTENT etc. usually come back with content/parts absent, so without this
+        // they'd collapse into a generic "No content parts" with no error code.
+        let finishReason = first["finishReason"] as? String
+        if finishReason == "RECITATION" {
             return OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
         }
 
         guard let content = first["content"] as? [String: Any],
               let respParts = content["parts"] as? [[String: Any]] else {
+            if let fr = finishReason, fr != "STOP" {
+                return OCRResult(text: nil, classification: nil, errorMessage: "Gemini stopped without returning text (\(fr)).", errorCode: fr)
+            }
             return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
         }
 
         let rawText = respParts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        // Parts present but no text (e.g. only a thinking part, or MAX_TOKENS truncation) → report the
+        // finish reason rather than silently yielding empty text.
+        if rawText.isEmpty, let fr = finishReason, fr != "STOP" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(fr)).", errorCode: fr)
+        }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
     }
@@ -100,6 +112,9 @@ struct GeminiClient {
                 return message
             }
         }
+        // Status-based classification even when the body is empty/non-JSON (gateway/CDN 5xx often are).
+        if statusCode == 503 || statusCode == 529 { return "Model in high use. Try again later." }
+        if statusCode == 429 { return "Rate limit exceeded. Try again later." }
         return "API error (\(statusCode))"
     }
 

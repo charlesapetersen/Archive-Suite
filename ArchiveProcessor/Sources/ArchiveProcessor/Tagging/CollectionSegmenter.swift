@@ -301,43 +301,49 @@ class CollectionSegmenter {
             let folderURL = outputDirectory.appendingPathComponent(collection.collectionName)
             try fm.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
-            // Move/rename PDFs and JSONs
-            for (seqIndex, sourceURL) in collection.fileURLs.enumerated() {
-                let seqNum = String(format: "%05d", seqIndex + 1)
+            // Move/rename PDFs and JSONs. A merged multi-page document has several source URLs that map
+            // to the SAME output PDF; move it once and only advance the sequence number on an actual
+            // move, so numbering stays contiguous (no gaps from the skipped duplicates).
+            var movedCount = 0
+            var movedOutputs = Set<URL>()
+            for sourceURL in collection.fileURLs {
+                guard let pdfURL = outputURLMap[sourceURL],
+                      !movedOutputs.contains(pdfURL),
+                      fm.fileExists(atPath: pdfURL.path) else { continue }
+                movedOutputs.insert(pdfURL)
+                let seqNum = String(format: "%05d", movedCount + 1)
+                movedCount += 1
                 let newBaseName = "\(seqNum) \(collection.collectionName)"
 
-                // Move output PDF
-                if let pdfURL = outputURLMap[sourceURL], fm.fileExists(atPath: pdfURL.path) {
-                    let destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
-                    if fm.fileExists(atPath: destPDF.path) {
-                        try fm.removeItem(at: destPDF)
-                    }
-                    try fm.moveItem(at: pdfURL, to: destPDF)
+                let destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
+                if fm.fileExists(atPath: destPDF.path) {
+                    try fm.removeItem(at: destPDF)
+                }
+                try fm.moveItem(at: pdfURL, to: destPDF)
 
-                    // Also check for a matching JSON file (same base name as original PDF)
-                    let jsonName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
-                    let jsonURL = outputDirectory.appendingPathComponent(jsonName)
-                    if fm.fileExists(atPath: jsonURL.path) {
-                        let jsonFolder = folderURL.appendingPathComponent("JSON Output")
-                        try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
-                        let destJSON = jsonFolder.appendingPathComponent(newBaseName + ".json")
-                        if fm.fileExists(atPath: destJSON.path) {
-                            try fm.removeItem(at: destJSON)
-                        }
-                        try fm.moveItem(at: jsonURL, to: destJSON)
+                // Also check for a matching JSON file (same base name as original PDF)
+                let jsonName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
+                let jsonURL = outputDirectory.appendingPathComponent(jsonName)
+                if fm.fileExists(atPath: jsonURL.path) {
+                    let jsonFolder = folderURL.appendingPathComponent("JSON Output")
+                    try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
+                    let destJSON = jsonFolder.appendingPathComponent(newBaseName + ".json")
+                    if fm.fileExists(atPath: destJSON.path) {
+                        try fm.removeItem(at: destJSON)
                     }
+                    try fm.moveItem(at: jsonURL, to: destJSON)
+                }
 
-                    // Live Capture dual output: move the sibling original image (same base name as
-                    // the PDF) alongside it, renamed to match.
-                    let imgBase = pdfURL.deletingPathExtension().lastPathComponent
-                    for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
-                        let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
-                        if fm.fileExists(atPath: imgURL.path) {
-                            let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
-                            if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
-                            try fm.moveItem(at: imgURL, to: destImg)
-                            break
-                        }
+                // Live Capture dual output: move the sibling original image (same base name as
+                // the PDF) alongside it, renamed to match.
+                let imgBase = pdfURL.deletingPathExtension().lastPathComponent
+                for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
+                    let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
+                    if fm.fileExists(atPath: imgURL.path) {
+                        let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
+                        if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
+                        try fm.moveItem(at: imgURL, to: destImg)
+                        break
                     }
                 }
             }

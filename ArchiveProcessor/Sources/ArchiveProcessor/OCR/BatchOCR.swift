@@ -13,6 +13,24 @@ private func parseBatchErrorBody(data: Data, statusCode: Int) -> String {
     return "API error (\(statusCode))"
 }
 
+/// URL-encodes a value for safe interpolation into a URL query/path component (RFC 3986 unreserved).
+/// Used for the API key and model id so a pasted key with a stray space/newline (or an odd custom
+/// model id) yields a clean thrown error instead of crashing on `URL(string:)!`.
+private func urlComponentEncoded(_ s: String) -> String {
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-._~")
+    return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
+}
+
+/// Builds a URL or throws a clear error (never crashes) for batch requests.
+private func makeBatchURL(_ string: String) throws -> URL {
+    guard let url = URL(string: string) else {
+        throw NSError(domain: "BatchOCR", code: -1,
+                      userInfo: [NSLocalizedDescriptionKey: "Invalid batch request URL (check the API key and model id for stray spaces)."])
+    }
+    return url
+}
+
 // MARK: - Anthropic Batch Client
 
 struct AnthropicBatchClient: Sendable {
@@ -82,7 +100,8 @@ struct AnthropicBatchClient: Sendable {
 
         let body: [String: Any] = ["requests": requests]
 
-        var request = URLRequest(url: URL(string: baseURL)!, timeoutInterval: 300)
+        let reqURL = try makeBatchURL(baseURL)
+        var request = URLRequest(url: reqURL, timeoutInterval: 300)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -125,7 +144,8 @@ struct AnthropicBatchClient: Sendable {
 
     /// Check batch processing status.
     func checkStatus(batchId: String) async throws -> StatusResult {
-        var request = URLRequest(url: URL(string: "\(baseURL)/\(batchId)")!, timeoutInterval: 30)
+        let reqURL = try makeBatchURL("\(baseURL)/\(batchId)")
+        var request = URLRequest(url: reqURL, timeoutInterval: 30)
         request.httpMethod = "GET"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
@@ -359,7 +379,7 @@ struct GeminiBatchClient: Sendable {
 
     /// Create a batch job with the given request body. Returns the batch name.
     private func createBatchJob(body: [String: Any]) async throws -> String {
-        let createURL = URL(string: "\(baseURL)/models/\(model.id):batchGenerateContent?key=\(apiKey)")!
+        let createURL = try makeBatchURL("\(baseURL)/models/\(urlComponentEncoded(model.id)):batchGenerateContent?key=\(urlComponentEncoded(apiKey))")
         var request = URLRequest(url: createURL, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -393,7 +413,7 @@ struct GeminiBatchClient: Sendable {
         let uploadBase = "https://generativelanguage.googleapis.com/upload/v1beta"
 
         // Step 1: Initialize resumable upload
-        let initURL = URL(string: "\(uploadBase)/files?key=\(apiKey)")!
+        let initURL = try makeBatchURL("\(uploadBase)/files?key=\(urlComponentEncoded(apiKey))")
         var initRequest = URLRequest(url: initURL, timeoutInterval: 60)
         initRequest.httpMethod = "POST"
         initRequest.setValue("resumable", forHTTPHeaderField: "X-Goog-Upload-Protocol")
@@ -444,7 +464,7 @@ struct GeminiBatchClient: Sendable {
 
     /// Check batch processing status.
     func checkStatus(batchName: String) async throws -> StatusResult {
-        let statusURL = URL(string: "\(baseURL)/\(batchName)?key=\(apiKey)")!
+        let statusURL = try makeBatchURL("\(baseURL)/\(batchName)?key=\(urlComponentEncoded(apiKey))")
         var request = URLRequest(url: statusURL, timeoutInterval: 30)
         request.httpMethod = "GET"
 
@@ -560,7 +580,7 @@ struct GeminiBatchClient: Sendable {
     /// Retrieve results from a batch output file (fallback if results aren't inlined).
     func retrieveResults(resultFileName: String) async throws -> [String: OCRResult] {
         let downloadBase = "https://generativelanguage.googleapis.com/download/v1beta"
-        let downloadURL = URL(string: "\(downloadBase)/\(resultFileName):download?alt=media&key=\(apiKey)")!
+        let downloadURL = try makeBatchURL("\(downloadBase)/\(resultFileName):download?alt=media&key=\(urlComponentEncoded(apiKey))")
 
         var request = URLRequest(url: downloadURL, timeoutInterval: 120)
         request.httpMethod = "GET"
@@ -656,7 +676,8 @@ struct MistralBatchClient: Sendable {
             "model": model.id
         ]
 
-        var request = URLRequest(url: URL(string: batchURL)!, timeoutInterval: 120)
+        let reqURL = try makeBatchURL(batchURL)
+        var request = URLRequest(url: reqURL, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -682,7 +703,8 @@ struct MistralBatchClient: Sendable {
 
     private func uploadFile(data: Data) async throws -> String {
         let boundary = UUID().uuidString
-        var request = URLRequest(url: URL(string: filesURL)!, timeoutInterval: 300)
+        let reqURL = try makeBatchURL(filesURL)
+        var request = URLRequest(url: reqURL, timeoutInterval: 300)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -719,7 +741,8 @@ struct MistralBatchClient: Sendable {
 
     /// Check batch job status.
     func checkStatus(batchId: String) async throws -> StatusResult {
-        var request = URLRequest(url: URL(string: "\(batchURL)/\(batchId)")!, timeoutInterval: 30)
+        let reqURL = try makeBatchURL("\(batchURL)/\(batchId)")
+        var request = URLRequest(url: reqURL, timeoutInterval: 30)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
@@ -745,7 +768,8 @@ struct MistralBatchClient: Sendable {
 
     /// Retrieve results from the batch output file.
     func retrieveResults(outputFileId: String) async throws -> [String: OCRResult] {
-        var request = URLRequest(url: URL(string: "\(filesURL)/\(outputFileId)/content")!, timeoutInterval: 120)
+        let reqURL = try makeBatchURL("\(filesURL)/\(outputFileId)/content")
+        var request = URLRequest(url: reqURL, timeoutInterval: 120)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
