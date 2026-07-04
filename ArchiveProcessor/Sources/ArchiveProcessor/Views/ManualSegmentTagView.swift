@@ -10,7 +10,7 @@ import AppKit
 /// Keys (image canvas focused):
 ///   ← / →   previous / next photo    X   remove / restore this photo
 ///   B / F / D   mark Box / Folder / Document
-///   Space   Quick Look preview   + / − / 0   zoom (drag or scroll to pan when zoomed)
+///   Space   Quick Look preview   + / − / 0 or ⌘↑ / ⌘↓   zoom (drag or scroll to pan when zoomed)
 ///   ⏎       end the current segment here & tag it
 struct ManualSegmentTagView: View {
     @ObservedObject var processor: OCRProcessor
@@ -57,7 +57,13 @@ struct ManualSegmentTagView: View {
         .onAppear {
             SystemTagsProvider.shared.warmUp()
             canvasFocused = true
-            DispatchQueue.main.async { NSApp.keyWindow?.styleMask.insert(.resizable) }
+            DispatchQueue.main.async {
+                guard let window = NSApp.keyWindow else { return }
+                window.styleMask.insert(.resizable)   // stay user-adjustable
+                if let screen = window.screen ?? NSScreen.main {
+                    window.setFrame(screen.visibleFrame, display: true)   // open maximized
+                }
+            }
         }
     }
 
@@ -130,6 +136,12 @@ struct ManualSegmentTagView: View {
         .onKeyPress(characters: CharacterSet(charactersIn: "+=")) { _ in zoom = min(8, zoom * 1.25); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in zoom = max(1, zoom / 1.25); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "0")) { _ in zoom = 1; return .handled }
+        // ⌘↑ / ⌘↓ are alternative zoom in / out shortcuts (plain ↑/↓ are unused on this canvas).
+        .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            zoom = press.key == .upArrow ? min(8, zoom * 1.25) : max(1, zoom / 1.25)
+            return .handled
+        }
     }
 
     /// The badge shown over the focused image describing its state.

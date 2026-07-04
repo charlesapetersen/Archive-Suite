@@ -1583,6 +1583,9 @@ struct DocumentReviewRow: View {
     @State private var loadedImage: NSImage?
 
     private var rowBackground: Color {
+        // Rotation-only review: we're checking orientation, not classification — keep every row
+        // neutral so box/folder color themes don't distract.
+        if rotationOnly { return Color.gray.opacity(0.10) }
         if item.markedForRemoval { return Color.secondary.opacity(0.10) }
         switch item.classification {
         case .boxLabel: return Color.red.opacity(0.12)
