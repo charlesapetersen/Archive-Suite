@@ -99,8 +99,12 @@ struct OCRPrompt {
         }
 
         if classification == nil {
-            // No classification found — return all text as OCR
-            return (nil, 0, trimmed)
+            // No classification tag — but a rotation tag may still have been parsed. Keep that rotation
+            // (don't drop it to 0) and strip the parsed tag line(s) so "[rotate_N]" isn't left in the text.
+            let text = lines.dropFirst(contentStartLine)
+                .joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (nil, rotationDegrees, text.isEmpty ? nil : text)
         }
 
         let text = lines.dropFirst(contentStartLine)

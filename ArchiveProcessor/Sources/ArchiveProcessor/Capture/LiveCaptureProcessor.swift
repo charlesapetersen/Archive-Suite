@@ -730,8 +730,12 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     nonisolated private static func sanitize(_ name: String) -> String {
-        let cleaned = name.replacingOccurrences(of: "/", with: "-")
+        var cleaned = name.replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-").trimmingCharacters(in: .whitespaces)
+        // A dot-only name (".", "..") would resolve via appendingPathComponent to the output dir's parent
+        // and write OUTSIDE the intended tree — this name is auto-derived from box-label OCR and
+        // auto-accepted in the headless path, so reject it. (Empty also satisfies allSatisfy → fallback.)
+        if cleaned.allSatisfy({ $0 == "." }) { cleaned = "" }
         return cleaned.isEmpty ? "Untitled Collection" : cleaned
     }
 
