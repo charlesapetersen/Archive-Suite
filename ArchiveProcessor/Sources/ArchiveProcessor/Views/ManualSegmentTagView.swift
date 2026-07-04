@@ -16,7 +16,6 @@ struct ManualSegmentTagView: View {
     @ObservedObject var processor: OCRProcessor
     @State private var zoom: CGFloat = 1
     @State private var showPreview = false
-    @State private var reviewWindow: NSWindow?
     @FocusState private var canvasFocused: Bool
 
     private var images: [ManualSegImage] { processor.manualSegImages }
@@ -58,14 +57,7 @@ struct ManualSegmentTagView: View {
         .onAppear {
             SystemTagsProvider.shared.warmUp()
             canvasFocused = true
-            DispatchQueue.main.async {
-                if let window = NSApp.keyWindow {
-                    window.makeMovableFullScreenReview()   // full visible screen, movable, resizable
-                    reviewWindow = window
-                }
-            }
         }
-        .onDisappear { reviewWindow?.close(); reviewWindow = nil }
     }
 
     // MARK: Header
@@ -588,27 +580,56 @@ private struct DayField: View {
     }
 }
 
-// MARK: - Review window styling (shared by the rotation/segmentation review + Segment & Tag)
+// MARK: - Review window presentation (rotation/segmentation review + Segment & Tag)
 
-extension NSWindow {
-    /// Promote an attached sheet into a free-standing, titled, MOVABLE, resizable window that fills the
-    /// visible screen. macOS sheets are anchored to their parent and can't be moved by the user, so we
-    /// detach (endSheet) and give it a real title bar to drag. `setFrame(visibleFrame)` is honored
-    /// verbatim on a detached window (no parent re-clamping), fixing the off-screen sizing. The view's
-    /// `.onDisappear` closes this window when the SwiftUI sheet binding flips false.
-    ///
-    /// Deliberately NO `.closable`/`.miniaturizable`: a title-bar close/minimize would dismiss the
-    /// window WITHOUT resuming the review's continuation, hanging the pipeline. The dialog is dismissed
-    /// only via its own Confirm/Cancel/Finish buttons. `.none` animation avoids an end-sheet flicker.
-    func makeMovableFullScreenReview() {
-        animationBehavior = .none
-        sheetParent?.endSheet(self)
-        styleMask.insert([.titled, .resizable])
-        isMovable = true
-        let hostScreen = screen ?? NSApp.mainWindow?.screen ?? NSScreen.main
-        if let visible = hostScreen?.visibleFrame {
-            setFrame(visible, display: true)
+extension View {
+    /// Present `content` in a real, standalone, MOVABLE + resizable window that fills the visible
+    /// screen — NOT a SwiftUI `.sheet` (sheets are anchored/centered by AppKit and can't be moved,
+    /// and detaching one fights SwiftUI, causing a flash + re-centering). The window is created when
+    /// `isPresented` becomes true and closed when it becomes false (driven by the dialog's own
+    /// Confirm/Finish actions). No close/minimize button, so it can't be dismissed without resuming
+    /// the review's continuation.
+    func reviewWindow<C: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> C) -> some View {
+        background(ReviewWindowPresenter(isPresented: isPresented, content: content))
+    }
+}
+
+private struct ReviewWindowPresenter<Content: View>: NSViewRepresentable {
+    @Binding var isPresented: Bool
+    @ViewBuilder var content: () -> Content
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.sync(isPresented: isPresented, content: content)
+    }
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) { coordinator.closeWindow() }
+
+    final class Coordinator {
+        private var window: NSWindow?
+
+        func sync(isPresented: Bool, content: () -> Content) {
+            if isPresented {
+                guard window == nil else { return }
+                let hosting = NSHostingController(rootView: content())
+                let w = NSWindow(contentViewController: hosting)
+                w.styleMask = [.titled, .resizable]   // titled = draggable title bar; no close/minimize
+                w.title = "Archive Processor"
+                w.isReleasedWhenClosed = false
+                if let visible = (NSApp.mainWindow?.screen ?? NSScreen.main)?.visibleFrame {
+                    w.setFrame(visible, display: true)   // fill the visible screen, fully on-screen
+                }
+                w.makeKeyAndOrderFront(nil)
+                window = w
+            } else {
+                closeWindow()
+            }
         }
-        makeKeyAndOrderFront(nil)
+
+        func closeWindow() {
+            window?.orderOut(nil)
+            window?.close()
+            window = nil
+        }
     }
 }

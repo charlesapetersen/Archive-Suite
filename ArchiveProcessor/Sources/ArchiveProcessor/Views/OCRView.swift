@@ -202,7 +202,9 @@ struct OCRView: View {
         .sheet(isPresented: $processor.awaitingRetryDecision) {
             OCRRetrySheet(processor: processor)
         }
-        .sheet(isPresented: $processor.awaitingDocumentReview) {
+        // Rotation/segmentation review + Segment & Tag open as real, movable, resizable windows filling
+        // the screen (not sheets — sheets are anchored/centered and can't be moved).
+        .reviewWindow(isPresented: $processor.awaitingDocumentReview) {
             DocumentSegmentReviewSheet(processor: processor)
         }
         .sheet(isPresented: $processor.awaitingBoxFolderConfirmation) {
@@ -211,7 +213,7 @@ struct OCRView: View {
         .sheet(isPresented: $processor.awaitingManualTagging) {
             ManualTaggingSheet(processor: processor)
         }
-        .sheet(isPresented: $processor.awaitingManualSegTag) {
+        .reviewWindow(isPresented: $processor.awaitingManualSegTag) {
             ManualSegmentTagView(processor: processor)
         }
         .onChange(of: selectedModel) { _, newModel in
@@ -1364,7 +1366,6 @@ struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
     @State private var thumbnailSize: CGFloat = 400
     @State private var focusedIndex: Int = 0
-    @State private var reviewWindow: NSWindow?
 
     /// Whether New-Document / Continuation options are offered (only when merging or tagging by segment).
     private var showDocClasses: Bool { processor.reviewShowsDocumentClasses }
@@ -1500,15 +1501,6 @@ struct DocumentSegmentReviewSheet: View {
             .padding()
         }
         .frame(minWidth: 1000, idealWidth: 1900, maxWidth: .infinity, minHeight: 800, idealHeight: 1300, maxHeight: .infinity)
-        .onAppear {
-            DispatchQueue.main.async {
-                if let window = NSApp.keyWindow {
-                    window.makeMovableFullScreenReview()
-                    reviewWindow = window
-                }
-            }
-        }
-        .onDisappear { reviewWindow?.close(); reviewWindow = nil }
         .onKeyPress(.upArrow) {
             if focusedIndex > 0 { focusedIndex -= 1 }
             return .handled
