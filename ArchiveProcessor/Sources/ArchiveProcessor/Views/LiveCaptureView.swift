@@ -342,7 +342,8 @@ struct LiveCaptureView: View {
             var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
             getnameinfo(ptr.pointee.ifa_addr, socklen_t(ptr.pointee.ifa_addr.pointee.sa_len),
                         &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
-            address = String(cString: host)
+            // Decode the null-terminated C string without the deprecated [CChar] String(cString:).
+            address = String(decoding: host.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if name == "en0" { break }   // prefer Wi-Fi/primary
         }
         return address

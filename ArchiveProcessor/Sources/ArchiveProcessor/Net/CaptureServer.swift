@@ -49,7 +49,7 @@ final class CaptureServer: @unchecked Sendable {
                 case .failed(let error):
                     if port != nil {
                         // Fixed port busy → fall back to a system-assigned port once.
-                        self?.queue.async { self?.retryWithSystemPort() }
+                        self?.queue.async { [weak self] in self?.retryWithSystemPort() }
                     } else {
                         Task { @MainActor in self?.session?.serverDidFail(error.localizedDescription) }
                     }

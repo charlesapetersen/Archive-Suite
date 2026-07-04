@@ -628,8 +628,11 @@ private struct ReviewWindowPresenter<Content: View>: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.sync(isPresented: isPresented, content: content)
     }
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) { coordinator.closeWindow() }
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        MainActor.assumeIsolated { coordinator.closeWindow() }   // teardown runs on the main thread
+    }
 
+    @MainActor
     final class Coordinator {
         private var window: NSWindow?
 
