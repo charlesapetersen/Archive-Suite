@@ -17,6 +17,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var armed = false
     @Published private(set) var sentCount = 0
     @Published private(set) var transferFlash: String?
+    @Published var captureError: String?   // set when a capture couldn't be written to disk (blocking alert)
 
     private var seqCounter = 0
     private var nextId: Int64 = 1
@@ -78,6 +79,21 @@ final class CaptureViewModel: ObservableObject {
     // MARK: - Capture
 
     func newCaptureFileURL() -> URL { sessionDir.appendingPathComponent("img_\(UUID().uuidString).jpg") }
+
+    /// Durably write a freshly captured JPEG. A capture can't be re-taken, so on a write failure we
+    /// recreate the session directory and retry, then fall back to the temp directory; only if all of
+    /// that fails do we surface a blocking alert (captureError) and return nil — never silently dropping
+    /// the photo. Returns the URL the bytes were written to.
+    func persistCapturedJPEG(_ data: Data) -> URL? {
+        let primary = newCaptureFileURL()
+        if (try? data.write(to: primary, options: .atomic)) != nil { return primary }
+        try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
+        if (try? data.write(to: primary, options: .atomic)) != nil { return primary }
+        let fallback = FileManager.default.temporaryDirectory.appendingPathComponent(primary.lastPathComponent)
+        if (try? data.write(to: fallback, options: .atomic)) != nil { return fallback }
+        captureError = "Couldn't save the last photo (is storage full?). It was NOT captured — free up space and retake it before moving the document."
+        return nil
+    }
 
     /// Main shutter: add a page to the current document segment (buffered until "End segment").
     func addDocumentPhoto(_ fileURL: URL) {
@@ -186,8 +202,11 @@ final class CaptureViewModel: ObservableObject {
     private func enqueueUpload(_ item: CapturedItem, replaces: String? = nil) {
         guard let c = client else { return }
         setState(item.id, .uploading)
+        let fileURL = item.fileURL
         Task {
-            let data = try? Data(contentsOf: item.fileURL)
+            // Read the multi-MB JPEG off the main actor so the live camera UI doesn't hitch on
+            // upload/retry bursts (enqueueUpload runs on the @MainActor view model).
+            let data = await Task.detached { try? Data(contentsOf: fileURL) }.value
             var ok = false
             if let data {
                 var attempt = 0

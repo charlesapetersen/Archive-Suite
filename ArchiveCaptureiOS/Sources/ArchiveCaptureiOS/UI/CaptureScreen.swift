@@ -111,6 +111,14 @@ struct CaptureScreen: View {
         } message: {
             Text("This permanently deletes captured photos still on this phone and can't be undone.")
         }
+        .alert("Photo not saved", isPresented: Binding(
+            get: { vm.captureError != nil },
+            set: { if !$0 { vm.captureError = nil } }
+        )) {
+            Button("OK", role: .cancel) { vm.captureError = nil }
+        } message: {
+            Text(vm.captureError ?? "")
+        }
     }
 
     /// Reclassify a selected page into a Box/Folder if one is selected; otherwise take a new photo.
@@ -121,8 +129,7 @@ struct CaptureScreen: View {
         camera.capturePhoto { data in
             isCapturing = false
             guard let data else { return }
-            let url = vm.newCaptureFileURL()
-            guard (try? data.write(to: url)) != nil else { return }
+            guard let url = vm.persistCapturedJPEG(data) else { return }   // surfaces a blocking alert on failure
             if type == .document { vm.addDocumentPhoto(url) } else { vm.captureMarker(url, type: type) }
         }
     }
