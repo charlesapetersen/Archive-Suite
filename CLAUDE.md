@@ -204,10 +204,30 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 
 ---
 
+## Releasing (macOS DMG + GitHub release)
+
+Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag is the source of truth; `Info.plist` `CFBundleShortVersionString` is left at "1.0". Patch bump for internal-only changes (refactors), minor for user-facing features. Distribution is **owner-only** (ad-hoc signed `CODE_SIGN_IDENTITY "-"`, not notarized) — a fresh macOS may need right-click→Open the first time.
+
+**GitHub CLI gotcha:** the real CLI is **`/opt/homebrew/bin/gh`** — call it by full path, because a shadowing Python tool named `gh` is first on `PATH` (bare `gh` fails with an argparse error). It is authenticated as `charlesapetersen` (`repo` scope), so `gh release create` can publish and upload assets.
+
+Build → package → publish:
+```bash
+cd ArchiveProcessor && xcodegen generate
+xcodebuild -scheme ArchiveProcessor -configuration Release -derivedDataPath ./build/rel build
+APP="ArchiveProcessor/build/rel/Build/Products/Release/ArchiveProcessor.app"   # from repo root
+STAGE=$(mktemp -d); cp -R "$APP" "$STAGE"/; ln -s /Applications "$STAGE/Applications"   # drag-install layout
+hdiutil create -volname "Archive Processor <ver>" -srcfolder "$STAGE" -ov -format UDZO "/tmp/ArchiveProcessor-<ver>.dmg"
+/opt/homebrew/bin/gh release create v<ver> "/tmp/ArchiveProcessor-<ver>.dmg" \
+  --title "Archive Processor <ver>" --target main --notes "…"
+```
+The `.dmg` is a build artifact — never commit it (build under gitignored `build/` or `/tmp`).
+
+---
+
 ## Project Structure
 ```
 Archive Processor/
-├── CLAUDE.md, README.md, POTENTIAL_FEATURES.md, DISTRIBUTION_PLAN.md
+├── CLAUDE.md, README.md, AGENTS.md, POTENTIAL_FEATURES.md, DISTRIBUTION_PLAN.md, CONCURRENT_DEV_PLAN.md
 ├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
 │   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
 ├── ArchiveCapture/                    # Android companion app (Gradle)
@@ -215,4 +235,9 @@ Archive Processor/
 │   └── Sources/ArchiveCaptureiOS/{Net, Capture, Camera, UI}/
 └── Test Files/                        # Do NOT modify; write outputs only
 ```
-See the README's "Project Structure" for the full annotated file tree (Capture/, Net/, and the Views split into OCRView / SettingsView / ToolsView / LiveCaptureView / etc.).
+
+**Two former "god files" are split for concurrent work** (behavior unchanged):
+- `OCR/OCRProcessor.swift` — the `@MainActor` class now holds only stored state + member types; its methods live in `OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift` (extensions) and its top-level model types in `OCRProcessor+Types.swift`. When adding a method, put it in the extension matching its concern; **all stored properties stay in `OCRProcessor.swift`** (Swift extensions can't add stored properties).
+- `Views/OCRView.swift` — the main view; its sheets/rows/diff engine are separate `OCRView+*.swift` files (FileRowView, the review/model/resolution sheets, WordDiff).
+
+See the README's "Project Structure" for the full annotated file tree, and the **Concurrent / multi-agent development** section above for ownership lanes and shared hotspots.

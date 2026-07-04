@@ -278,7 +278,9 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 │   ├── CostEstimator.swift            # Pre-processing cost calculation
 │   └── KeychainHelper.swift           # Secure API key storage
 ├── OCR/
-│   ├── OCRProcessor.swift             # Main batch processing orchestrator
+│   ├── OCRProcessor.swift             # Core @MainActor orchestrator: stored state + member types (methods live in the extensions below)
+│   ├── OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift  # method clusters split by concern (for concurrent work)
+│   ├── OCRProcessor+Types.swift       # top-level review/tag model types (CollectionReviewItem, ManualTagSegment, …)
 │   ├── OCRPrompt.swift                # Prompt builder and response parser
 │   ├── AnthropicClient / GeminiClient / MistralClient / OpenAICompatibleClient (gateway)
 │   ├── BatchOCR.swift                 # Batch clients for all three providers
@@ -301,7 +303,8 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 │   ├── CaptureServer.swift            # NWListener HTTP receiver (Bearer token)
 │   └── USBBridge.swift                # adb reverse tunnel for USB pairing
 └── Views/
-    ├── OCRView.swift                  # Process Files UI + review sheets
+    ├── OCRView.swift                  # Process Files UI — main view (~920 lines; controlPanel + filePanel)
+    ├── OCRView+*.swift                # extracted sheets/rows/diff: FileRowView, OCRRetrySheet, Collection/Document review sheets, Model/Resolution sheets, WordDiff
     ├── SettingsView.swift             # Settings window (⌘,) + live cost pane
     ├── ToolsView.swift                # Compare Models + Test Resolution
     ├── LiveCaptureView.swift          # Live Capture UI (pairing, status, tag card)
