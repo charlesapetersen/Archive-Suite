@@ -128,7 +128,7 @@ struct ManualSegmentTagView: View {
         .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in processor.manualSegSetKind(.folder, at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "dD")) { _ in processor.manualSegSetKind(.document, at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "+=")) { _ in zoom = min(8, zoom * 1.25); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in zoom = max(0.5, zoom / 1.25); return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in zoom = max(1, zoom / 1.25); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "0")) { _ in zoom = 1; return .handled }
     }
 
@@ -321,10 +321,10 @@ private struct ManualSegTagCard: View {
 
             subjectsSection
 
-            HStack(alignment: .bottom, spacing: 12) {
-                dateField("Year", text: $processor.manualSegDraftTags.year, width: 66, prompt: "1968")
-                dateField("Month", text: $processor.manualSegDraftTags.month, width: 118, prompt: "03 March")
-                dateField("Day", text: $processor.manualSegDraftTags.day, width: 78, prompt: "Day 15")
+            HStack(alignment: .top, spacing: 12) {
+                dateField("Year", text: $processor.manualSegDraftTags.year, width: 66)
+                MonthField(month: $processor.manualSegDraftTags.month)
+                DayField(day: $processor.manualSegDraftTags.day)
             }
             Toggle("Date uncertain", isOn: $processor.manualSegDraftTags.dateUncertain)
             if processor.manualSegAutoDate {
@@ -404,10 +404,11 @@ private struct ManualSegTagCard: View {
         }
     }
 
-    private func dateField(_ label: String, text: Binding<String>, width: CGFloat, prompt: String) -> some View {
+    /// A plain date field. No placeholder — empty fields stay blank (no gray example dates).
+    private func dateField(_ label: String, text: Binding<String>, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption2).foregroundStyle(.secondary)
-            TextField(prompt, text: text).textFieldStyle(.roundedBorder).frame(width: width)
+            TextField("", text: text).textFieldStyle(.roundedBorder).frame(width: width)
         }
     }
 
@@ -465,5 +466,111 @@ private struct ManualSegTagCard: View {
     private func onEscape() {
         if input.isEmpty { processor.manualSegCancelTagging() }
         else { input = ""; suggestions = []; highlighted = -1 }
+    }
+}
+
+// MARK: - Month field (autocomplete; stores the canonical "MM Month" tag)
+
+/// Month entry with autocomplete: type a month name (or prefix) or a number 1–12. The stored value
+/// is always the canonical tag form, e.g. "01 January". Empty stays blank (no gray placeholder).
+private struct MonthField: View {
+    @Binding var month: String
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    private static let names = ["January", "February", "March", "April", "May", "June",
+                                "July", "August", "September", "October", "November", "December"]
+
+    /// Months matching the current input — by leading number (1–12) or case-insensitive name prefix.
+    private var matches: [(num: Int, name: String)] {
+        let q = text.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [] }
+        if let n = Int(q) { return (1...12).contains(n) ? [(n, Self.names[n - 1])] : [] }
+        return Self.names.enumerated()
+            .filter { $0.element.lowercased().hasPrefix(q) }
+            .map { (num: $0.offset + 1, name: $0.element) }
+    }
+
+    private func canonical(_ num: Int, _ name: String) -> String { String(format: "%02d %@", num, name) }
+
+    private func accept(_ m: (num: Int, name: String)) {
+        month = canonical(m.num, m.name)
+        text = month
+        focused = false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Month").font(.caption2).foregroundStyle(.secondary)
+            TextField("", text: $text)
+                .textFieldStyle(.roundedBorder).frame(width: 118)
+                .focused($focused)
+                .onSubmit { if let first = matches.first { accept(first) } }
+                .onChange(of: text) { _, v in
+                    // Resolve the model live so a "type then Save" (no blur) still commits the canonical
+                    // month. Ambiguous input (e.g. "j") waits for a pick / Return / blur.
+                    let q = v.trimmingCharacters(in: .whitespaces)
+                    if q.isEmpty { month = "" }
+                    else if matches.count == 1 { month = canonical(matches[0].num, matches[0].name) }
+                }
+                .onChange(of: focused) { _, isFocused in
+                    guard !isFocused else { return }
+                    // Finalize on blur: resolve to a canonical month, clear if empty, else revert.
+                    if let first = matches.first { month = canonical(first.num, first.name); text = month }
+                    else if text.trimmingCharacters(in: .whitespaces).isEmpty { month = ""; text = "" }
+                    else { text = month }
+                }
+                .overlay(alignment: .topLeading) {
+                    if focused, text != month, !matches.isEmpty {
+                        suggestionList.offset(y: 26)
+                    }
+                }
+        }
+        .onAppear { text = month }
+        .onChange(of: month) { _, m in if !focused { text = m } }
+    }
+
+    private var suggestionList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(matches.prefix(6), id: \.num) { m in
+                Text(canonical(m.num, m.name))
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 3).padding(.horizontal, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture { accept(m) }
+            }
+        }
+        .frame(width: 130)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
+        .shadow(radius: 4)
+        .zIndex(1)
+    }
+}
+
+// MARK: - Day field (digits only; stores the "Day N" tag)
+
+/// Day entry that accepts only digits, stored as the canonical tag form "Day 15". Empty stays blank.
+private struct DayField: View {
+    @Binding var day: String
+    @State private var digits = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Day").font(.caption2).foregroundStyle(.secondary)
+            TextField("", text: $digits)
+                .textFieldStyle(.roundedBorder).frame(width: 78)
+                .onChange(of: digits) { _, v in
+                    let filtered = v.filter(\.isNumber)
+                    if filtered != v { digits = filtered; return }   // strip non-digits (retriggers)
+                    day = filtered.isEmpty ? "" : "Day \(filtered)"
+                }
+        }
+        .onAppear { digits = day.filter(\.isNumber) }
+        .onChange(of: day) { _, d in
+            let filtered = d.filter(\.isNumber)
+            if filtered != digits { digits = filtered }   // sync when auto-filled externally
+        }
     }
 }
