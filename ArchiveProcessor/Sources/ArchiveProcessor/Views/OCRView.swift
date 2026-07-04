@@ -438,9 +438,11 @@ struct OCRView: View {
                             Label("Add Files…", systemImage: "plus")
                         }
                         .buttonStyle(.bordered)
+                        .disabled(processor.isProcessing)   // don't mutate the input set mid-run
                         if !droppedFiles.isEmpty {
                             Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                                 .buttonStyle(.bordered)
+                                .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                         }
                     }
                 }
@@ -578,6 +580,12 @@ struct OCRView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .onChange(of: reviewFocusedIndex) { _, newIndex in
                     withAnimation { scrollProxy.scrollTo(newIndex, anchor: .center) }
+                }
+                .onChange(of: processor.awaitingFinalReview) { _, entering in
+                    // Reset review focus each time a review begins — otherwise a smaller second run leaves
+                    // reviewFocusedIndex out of range, so no row shows the focus ring and the 1–4
+                    // classification keys silently do nothing. Covers all entry paths (run/batch/resume).
+                    if entering { reviewFocusedIndex = 0 }
                 }
             }
             if !isInReviewMode {

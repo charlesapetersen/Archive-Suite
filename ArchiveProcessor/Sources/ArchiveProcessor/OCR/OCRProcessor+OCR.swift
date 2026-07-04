@@ -402,6 +402,7 @@ extension OCRProcessor {
         var consecutiveErrors = 0
         var batchComplete = false
         batchPollInterrupted = false
+        var consumedChunkIds = Set<String>()   // Gemini multi-chunk: chunk IDs whose results are already processed
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
@@ -471,6 +472,11 @@ extension OCRProcessor {
                     var stateDisplays: [String] = []
 
                     for singleBatchId in geminiBatchIds {
+                        // Skip chunks whose results were already fetched + turned into PDFs on an earlier
+                        // poll — otherwise every ~1-min poll re-downloads and re-processes (re-rotates,
+                        // re-PDFs) every finished chunk until the slowest lands, multiplying cost + time.
+                        // Count them as complete so allComplete still reflects the whole batch.
+                        if consumedChunkIds.contains(singleBatchId) { stateDisplays.append("succeeded"); continue }
                         let status = try await client.checkStatus(batchName: singleBatchId)
                         let stateDisplay = status.state
                             .replacingOccurrences(of: "BATCH_STATE_", with: "")
@@ -489,6 +495,7 @@ extension OCRProcessor {
                                     let results = try await client.retrieveResults(resultFileName: fileName)
                                     await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
                                 }
+                                consumedChunkIds.insert(singleBatchId)   // don't re-process this chunk on later polls
                             } else {
                                 anyFailed = true
                             }

@@ -101,6 +101,11 @@ extension OCRProcessor {
         outputURLMap = [:]
         currentModel = pending.model
         taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
+        // Apply this run's rotation mode + standard image size, exactly as resumeRun/startProcessing do —
+        // otherwise a resumed batch runs Vision/LLM rotation even when the user's mode is Off, and sizes
+        // against the wrong standard-image target.
+        Self.rotationModeForRun = rotationMode
+        Self.loadStandardImageMB()
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         for i in jobs.indices { jobs[i].status = .processing }
         progress = 0
