@@ -16,4 +16,8 @@ struct CapturedItem: Identifiable, Codable, Equatable {
     var year: Int? = nil
     var month: Int? = nil
     var state: UploadState = .pending
+    // When this photo was reclassified into a new group, the group whose (oldGroup, seq) copy the Mac
+    // should drop (X-Replaces). Stored on the item so EVERY retry/resume re-sends it until it lands —
+    // not just the first attempt — otherwise a failed first upload leaves a stray copy on the Mac.
+    var replacesGroupId: String? = nil
 }

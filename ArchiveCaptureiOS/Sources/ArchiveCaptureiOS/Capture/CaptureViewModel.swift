@@ -152,11 +152,13 @@ final class CaptureViewModel: ObservableObject {
         items[i].groupId = Self.newGroupId()
         items[i].priority = nil
         items[i].state = .pending
+        // Persist the drop-old-copy target on the item so retry/resume/autoRetry all keep sending it.
+        items[i].replacesGroupId = oldGroupId
         let updated = items[i]
         clearSelection()
         persist()
         // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
-        enqueueUpload(updated, replaces: oldGroupId)
+        enqueueUpload(updated)
     }
 
     // MARK: - Grouping / finalize
@@ -199,10 +201,11 @@ final class CaptureViewModel: ObservableObject {
 
     // MARK: - Upload
 
-    private func enqueueUpload(_ item: CapturedItem, replaces: String? = nil) {
+    private func enqueueUpload(_ item: CapturedItem) {
         guard let c = client else { return }
         setState(item.id, .uploading)
         let fileURL = item.fileURL
+        let replaces = item.replacesGroupId   // durable on the item, so retries keep sending X-Replaces
         Task {
             // Read the multi-MB JPEG off the main actor so the live camera UI doesn't hitch on
             // upload/retry bursts (enqueueUpload runs on the @MainActor view model).
