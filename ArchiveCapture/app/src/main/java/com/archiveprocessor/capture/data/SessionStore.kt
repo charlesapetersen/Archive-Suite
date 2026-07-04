@@ -13,9 +13,9 @@ import java.io.File
 class SessionStore(context: Context) {
     private val file = File(context.filesDir, "session.json")
 
-    data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?)
+    data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?, val pendingTagGroupId: String?)
 
-    fun save(items: List<CapturedItem>, seq: Int, nextId: Long, currentGroupId: String) {
+    fun save(items: List<CapturedItem>, seq: Int, nextId: Long, currentGroupId: String, pendingTagGroupId: String?) {
         try {
             val arr = JSONArray()
             for (it in items) {
@@ -36,6 +36,7 @@ class SessionStore(context: Context) {
                 put("seq", seq)
                 put("nextId", nextId)
                 put("group", currentGroupId)
+                if (pendingTagGroupId != null) put("pendingTag", pendingTagGroupId)
             }
             val tmp = File(file.parentFile, "session.json.tmp")
             tmp.writeText(root.toString())
@@ -76,7 +77,8 @@ class SessionStore(context: Context) {
             }
             val nextId = root.optLong("nextId", (items.maxOfOrNull { it.id } ?: 0L) + 1L)
             Restored(items, root.optInt("seq", items.size), nextId,
-                if (root.has("group")) root.getString("group") else null)
+                if (root.has("group")) root.getString("group") else null,
+                if (root.has("pendingTag")) root.getString("pendingTag") else null)
         } catch (e: Exception) {
             null
         }

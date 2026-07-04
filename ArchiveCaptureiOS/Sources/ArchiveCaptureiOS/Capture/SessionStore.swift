@@ -8,6 +8,9 @@ struct SessionStore {
         var seq: Int
         var nextId: Int64
         var groupId: String?
+        /// Non-nil only if the app was mid-tagging a segment when it stopped — so recovery re-opens the
+        /// tag card only in that case, not when the user was still shooting an unfinished segment.
+        var pendingTagGroupId: String?
     }
 
     private let url: URL

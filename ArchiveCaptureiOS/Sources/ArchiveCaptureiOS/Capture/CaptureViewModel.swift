@@ -147,7 +147,7 @@ final class CaptureViewModel: ObservableObject {
 
     func finishDocumentSegment() {
         let hasDocs = items.contains { $0.groupId == currentGroupId && $0.type == .document && $0.state == .pending }
-        if hasDocs { pendingTagGroupId = currentGroupId } else { startNewGroup() }
+        if hasDocs { pendingTagGroupId = currentGroupId; persist() } else { startNewGroup() }
     }
 
     func applyTagsAndContinue(priority: String?, year: Int?, month: Int?) {
@@ -164,15 +164,10 @@ final class CaptureViewModel: ObservableObject {
         if n > 0 { flash("Segment → Mac · \(n) page\(n == 1 ? "" : "s")") }
         pendingTagGroupId = nil
         startNewGroup()
-        // If a recovered session had more than one un-sent segment, keep prompting until none remain.
-        if let nextPending = items.first(where: { $0.state == .pending && $0.type == .document }) {
-            currentGroupId = nextPending.groupId
-            pendingTagGroupId = nextPending.groupId
-        }
         persist()
     }
 
-    func cancelTagSheet() { pendingTagGroupId = nil }
+    func cancelTagSheet() { pendingTagGroupId = nil; persist() }
 
     private func startNewGroup() { currentGroupId = Self.newGroupId(); persist() }
 
@@ -279,19 +274,20 @@ final class CaptureViewModel: ObservableObject {
         items.removeAll { $0.state == .uploaded }
         if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
         resumeUploads()
-        // Buffered document pages (captured but never "ended") are only delivered when the operator
-        // ends the segment — so after a restart they'd sit undelivered forever, and an archival photo
-        // can't be re-taken. Surface the recovered segment and re-open its tag card so it can be sent.
-        if let firstPendingDoc = items.first(where: { $0.state == .pending && $0.type == .document }) {
-            currentGroupId = firstPendingDoc.groupId
-            pendingTagGroupId = firstPendingDoc.groupId
-            let n = items.filter { $0.groupId == firstPendingDoc.groupId && $0.type == .document && $0.state == .pending }.count
-            statusMessage = "Recovered \(n) un-sent page\(n == 1 ? "" : "s") — tag & send to finish the segment."
+        // Recovered buffered document pages stay in the current in-progress segment (currentGroupId was
+        // restored above), so the operator just keeps shooting and taps End segment when ready — we do
+        // NOT assume the segment is finished. Re-open the tag card ONLY if the app stopped while the user
+        // was actually mid-tagging a segment (pendingTagGroupId was persisted).
+        if let taggingGroup = snap.pendingTagGroupId,
+           items.contains(where: { $0.groupId == taggingGroup && $0.type == .document && $0.state == .pending }) {
+            currentGroupId = taggingGroup
+            pendingTagGroupId = taggingGroup
         }
     }
 
     private func persist() {
-        store.save(.init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId))
+        store.save(.init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId,
+                         pendingTagGroupId: pendingTagGroupId))
     }
 
     private func setState(_ id: Int64, _ state: UploadState) {

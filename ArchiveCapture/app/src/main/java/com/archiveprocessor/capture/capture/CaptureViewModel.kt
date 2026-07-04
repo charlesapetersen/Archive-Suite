@@ -75,19 +75,20 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (items.isNotEmpty()) statusMessage = "Restored ${items.size} photo(s) from last session"
             resumeUploads()
-            // Buffered document pages (captured but never "ended") only leave on End-segment, so after a
-            // restart surface them and re-open the tag card — an archival photo can't be re-taken.
-            items.firstOrNull { it.state == UploadState.PENDING && it.type == GroupType.DOCUMENT }?.let { pend ->
-                currentGroupId = pend.groupId
-                pendingTagGroupId = pend.groupId
-                val n = items.count { it.groupId == pend.groupId && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }
-                statusMessage = "Recovered $n un-sent page${if (n == 1) "" else "s"} — tag & send to finish the segment."
+            // Recovered buffered document pages stay in the current in-progress segment (currentGroupId
+            // was restored above) so the operator keeps shooting and taps End segment when ready — we do
+            // NOT assume the segment is finished. Re-open the tag card ONLY if the app stopped while the
+            // user was actually mid-tagging a segment (pendingTag persisted).
+            val tagGroup = r.pendingTagGroupId
+            if (tagGroup != null && items.any { it.groupId == tagGroup && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }) {
+                currentGroupId = tagGroup
+                pendingTagGroupId = tagGroup
             }
         }
         startAutoRetry()
     }
 
-    private fun persist() = store.save(items.toList(), seqCounter, nextId, currentGroupId)
+    private fun persist() = store.save(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId)
 
     /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
     private fun resumeUploads() {
@@ -257,7 +258,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Finish the current document segment → show its tag sheet, then start a fresh document segment. */
     fun finishDocumentSegment() {
         val hasDocs = items.any { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }
-        if (hasDocs) pendingTagGroupId = currentGroupId else startNewGroup()
+        if (hasDocs) { pendingTagGroupId = currentGroupId; persist() } else startNewGroup()
     }
 
     /** Stamp the tag sheet onto the pending segment's photos, enqueue them, then open the next segment. */
@@ -277,16 +278,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (n > 0) flash("Segment → Mac · $n page${if (n == 1) "" else "s"}")
         pendingTagGroupId = null
         startNewGroup()
-        // If a recovered session had more than one un-sent segment, keep prompting until none remain.
-        items.firstOrNull { it.state == UploadState.PENDING && it.type == GroupType.DOCUMENT }?.let { pend ->
-            currentGroupId = pend.groupId
-            pendingTagGroupId = pend.groupId
-        }
         persist()
     }
 
     fun cancelTagSheet() {
         pendingTagGroupId = null
+        persist()
     }
 
     private fun startNewGroup() {
