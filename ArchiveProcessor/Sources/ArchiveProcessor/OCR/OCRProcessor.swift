@@ -206,6 +206,11 @@ class OCRProcessor: ObservableObject {
         let provider: LLMProvider
     }
     var activeBatch: BatchContext?
+    /// Set true when batch polling exits WITHOUT the batch reaching a terminal state (a transient
+    /// network error streak, or the safety timeout). Signals callers to KEEP the pending batch (so it
+    /// stays resumable) instead of deleting it, and tells pollBatchUntilComplete not to mark every
+    /// still-processing file as failed. A completed batch always resets this to false.
+    var batchPollInterrupted = false
 
     // MARK: - Batch Persistence
 

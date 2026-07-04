@@ -119,6 +119,9 @@ extension OCRProcessor {
             outputDirectory: pending.outputDirectory
         )
 
+        // A transient interruption (network streak / timeout) leaves the batch resumable — don't delete
+        // the pending batch or continue into tagging/finalize on incomplete results; let the user Resume.
+        if batchPollInterrupted { activeBatch = nil; return }
         Self.deletePendingBatch()
         activeBatch = nil
 
@@ -278,11 +281,20 @@ extension OCRProcessor {
             // Gather on the main actor.
             var restores: [(index: Int, result: OCRResult, sourceURL: URL, outputURL: URL)] = []
             var toGenerate: [(imageURL: URL, outputURL: URL, fileName: String, result: OCRResult)] = []
-            for (key, result) in pending.completedResults {
+            // Iterate in job-index order and disambiguate colliding base names deterministically, so a
+            // resumed batch reproduces the same unique output paths and never overwrites a sibling whose
+            // source shares its base filename (e.g. two 00001.jpg from different boxes).
+            var takenOutputs = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+            for (key, result) in pending.completedResults.sorted(by: { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }) {
                 guard let index = Int(key), index < jobs.count, index < imageURLs.count else { continue }
                 let sourceURL = jobs[index].sourceURL
                 let baseName = sourceURL.deletingPathExtension().lastPathComponent
-                let outputURL = pending.outputDirectory.appendingPathComponent(baseName + ".pdf")
+                var outputURL = pending.outputDirectory.appendingPathComponent(baseName + ".pdf")
+                var n = 2
+                while takenOutputs.contains(outputURL.standardizedFileURL.path.lowercased()) {
+                    outputURL = pending.outputDirectory.appendingPathComponent("\(baseName) (\(n)).pdf"); n += 1
+                }
+                takenOutputs.insert(outputURL.standardizedFileURL.path.lowercased())
                 restores.append((index, result, sourceURL, outputURL))
                 if !fm.fileExists(atPath: outputURL.path) {
                     toGenerate.append((imageURLs[index], outputURL, sourceURL.lastPathComponent, result))
@@ -750,6 +762,10 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale
                 )
+                // Transient interruption during batch polling: the batch is preserved (resumable) and
+                // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results;
+                // reset isProcessing so the UI isn't stuck, and let the user Resume pending batch.
+                if batchPollInterrupted { isProcessing = false; return }
             } else {
                 // Create pending run for resume-after-restart
                 activePendingRun = PendingRun(

@@ -205,6 +205,24 @@ extension OCRProcessor {
             }
         }
     }
+    /// A per-run output URL for `sourceURL` that never silently overwrites a DIFFERENT source's output.
+    /// Two inputs sharing a base filename (common with per-folder archive numbering — e.g. two 00001.jpg
+    /// from different boxes) would otherwise both map to <dir>/<base>.pdf and clobber each other, losing
+    /// one archival page's OCR with no error. Re-processing the SAME source reuses its already-assigned
+    /// path (idempotent on retry). @MainActor-serial (handleOCRResult runs on the collection loop), so the
+    /// read-then-reserve needs no locking.
+    func uniqueOutputURL(baseName: String, ext: String, in dir: URL, for sourceURL: URL) -> URL {
+        if let existing = outputURLMap[sourceURL] { return existing }
+        let taken = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+        var candidate = dir.appendingPathComponent(baseName + "." + ext)
+        var n = 2
+        while taken.contains(candidate.standardizedFileURL.path.lowercased()) {
+            candidate = dir.appendingPathComponent("\(baseName) (\(n)).\(ext)")
+            n += 1
+        }
+        return candidate
+    }
+
     /// Classify a document using a text-only LLM call (no image).
     private func classifyViaLLM(
         prompt: String,
@@ -365,7 +383,8 @@ extension OCRProcessor {
             fileURLs: fileURLs, outputDirectory: outputDirectory
         )
 
-        Self.deletePendingBatch()
+        // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
+        if !batchPollInterrupted { Self.deletePendingBatch() }
         activeBatch = nil
         progress = 0.7
     }
@@ -382,11 +401,13 @@ extension OCRProcessor {
         var pollCount = 0
         var consecutiveErrors = 0
         var batchComplete = false
+        batchPollInterrupted = false
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
             if pollCount >= maxPolls {
-                statusMessage = "Batch timed out after \(pollCount) status checks."
+                statusMessage = "Batch timed out after \(pollCount) status checks — it's kept so you can resume it."
+                batchPollInterrupted = true
                 break
             }
 
@@ -498,13 +519,21 @@ extension OCRProcessor {
                 // A persistently-failing status check (e.g. 404 after the batch expired/was deleted,
                 // or an unrecognized terminal state) must not poll forever.
                 if consecutiveErrors >= 10 {
-                    statusMessage = "Batch status unavailable after \(consecutiveErrors) attempts: \(error.localizedDescription)"
+                    // Likely a transient network outage, not a dead batch — keep it resumable rather than
+                    // marking every file failed and letting the caller delete the pending batch (which
+                    // would strand a completed, already-paid-for server-side batch with no way back).
+                    statusMessage = "Lost the connection while checking the batch (\(consecutiveErrors) tries). It's kept — use Resume pending batch when you're back online."
+                    batchPollInterrupted = true
                     break
                 }
             }
         }
 
-        // The whole batch is complete (or timed out): any job still `.processing` got no result.
+        // If polling was interrupted transiently (network streak / timeout), leave still-processing jobs
+        // as-is (do NOT mark them failed) and return with the pending batch preserved — the caller keeps
+        // it resumable. Only sweep to failure on a genuine terminal completion.
+        guard !batchPollInterrupted else { return }
+        // The whole batch is complete: any job still `.processing` got no result.
         // Done ONCE here (not per-chunk in processBatchResults) so multi-chunk Gemini batches don't
         // falsely fail files whose chunk finished on a later poll. Give each a proper failure output
         // with a specific reason — in particular, distinguish a locally-unreadable source image
@@ -740,7 +769,7 @@ extension OCRProcessor {
         let pdfGen = PDFGenerator()
         // Use original source name for output PDF naming
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let outputURL = outputDirectory.appendingPathComponent(baseName + ".pdf")
+        let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: sourceURL)
         // Use the provided url (may be temp JPEG) for the image page
         try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
         // Map by original source URL so tagging/collection segmentation can find it

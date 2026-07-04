@@ -75,6 +75,13 @@ extension OCRProcessor {
         // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {
             for w in work {
+                // Never write onto the source itself: when the output dir == the input dir and the source
+                // is a same-base .jpg, the exported-image path equals the original photo, and writeSizedJPEG
+                // would delete/overwrite the irreplaceable original. Skip — the pristine original stays in
+                // place as the image half of the dual output, and organizeOutput's moveSiblingImages step
+                // relocates it non-destructively. Case-insensitive because APFS/HFS+ are case-insensitive by
+                // default (Photo.JPG and photo.jpg are the same file). Mirrors CollectionSegmenter's guard.
+                if w.img.standardizedFileURL.path.compare(w.src.standardizedFileURL.path, options: .caseInsensitive) == .orderedSame { continue }
                 guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB, rotationDegrees: w.rot) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").

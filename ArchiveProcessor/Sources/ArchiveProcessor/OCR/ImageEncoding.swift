@@ -98,6 +98,10 @@ enum ImageEncoding {
     @discardableResult
     static func writeSizedJPEG(from url: URL, to dest: URL, targetMB: Double, rotationDegrees: Int = 0, quality: Double = 0.9) -> Bool {
         let fm = FileManager.default
+        // Defense in depth: never destroy the source. Both paths below removeItem(dest) before writing, so
+        // if dest resolves to the same file as the source this would delete the original. Treat same-file as
+        // a no-op success — the pristine source already is the desired output. (Case-insensitive: APFS/HFS+.)
+        if dest.standardizedFileURL.path.compare(url.standardizedFileURL.path, options: .caseInsensitive) == .orderedSame { return true }
         let noRotation = rotationDegrees % 360 == 0
         // Pristine byte-copy fast path — only valid when there is no rotation to bake in.
         if noRotation, targetMB > 0, let src = CGImageSourceCreateWithURL(url as CFURL, nil) {
