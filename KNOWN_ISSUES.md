@@ -4,6 +4,46 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## 2. Merged multi-page documents leave their exported original images loose in the output dir
+
+**Status:** deferred (2026-07-04). Found by the OCR-pipeline code review. **Misplacement, not data
+loss** — the images are not deleted, just not moved into the collection folder / renamed.
+
+**Repro:** enable *output image file* (`exportOriginals`) **and** *merge documents* **and** collection
+organization, then process a multi-page document.
+
+**Root cause:** `exportOriginalImages` runs before merge, so it writes one `<pageBase>.jpg` per source page
+(`page1.jpg`, `page2.jpg`, …). Merge then collapses the per-page PDFs into `page1_merged.pdf` and points the
+sources' `outputURLMap` at it. In `CollectionSegmenter.organizeOutput`, the merged PDF is moved once (via the
+`movedOutputs` dedup) and the sibling-image move searches for `<mergedBase>.jpg` (`page1_merged.jpg`) — which
+doesn't exist — so the real page images stay in the output dir, unmoved and unrenamed.
+
+**Fix (for later):** pass the per-page exported-image URLs (keyed by source URL, or the segment's page-image
+list) into `organizeOutput`, and for a merged document (one PDF, many page images) number + move EACH page
+image into the collection folder — mirroring `LiveCaptureProcessor.executePlans`'s merged branch (which already
+does exactly this). `organizeOutput` can't recover the per-page names from the merged PDF alone, so it needs
+that mapping threaded in.
+
+---
+
+## 3. Zoomed image installs an app-wide scroll monitor that swallows scroll for other views
+
+**Status:** deferred (2026-07-04). Found by the views code review. **Usability, not data loss.**
+
+**Symptom:** in the Segment & Tag review, zoom a page past 100% (`+`), then try to scroll the filmstrip or
+the tag-card thumbnail strip — the scroll is consumed to pan the zoomed canvas instead. Works again after `0`
+(reset to 100%).
+
+**Root cause:** `ZoomableImageView.startMonitor` uses `NSEvent.addLocalMonitorForEvents(matching: .scrollWheel)`
+— an **app-wide** local monitor. While `pan.zoom > 1` it returns `nil` (consumes) for *every* scroll event in
+the app, not just those over the image.
+
+**Fix (for later):** replace the app-wide monitor with a hosted `NSView` subclass (via `NSViewRepresentable`)
+that overrides `scrollWheel(with:)`, so only scroll events actually routed to that view are consumed. A
+hit-test on the SwiftUI struct isn't directly possible because it holds no reference to its backing NSView.
+
+---
+
 ## 1. Live "Process live" rotation review skips segments restored from a legacy staging manifest
 
 **Status:** deferred (2026-07-03). Low impact, no data loss, transitional. Does NOT recur for

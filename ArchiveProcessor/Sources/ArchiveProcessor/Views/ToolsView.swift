@@ -50,6 +50,14 @@ struct ToolsView: View {
                              outputCostPer1M: gatewayOutputCost >= 0 ? gatewayOutputCost : nil)
     }
 
+    /// Re-read the selected model (for the current provider) and the matching Keychain key. Mirrors the
+    /// init's resolution so switching provider/gateway in Settings updates the Tools diagnostics live.
+    private func reloadModelAndKey() {
+        let modelId = UserDefaults.standard.string(forKey: "selectedModelId_\(selectedProvider.rawValue)") ?? ""
+        selectedModel = selectedProvider.models.first { $0.id == modelId } ?? selectedProvider.models[0]
+        apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -83,7 +91,13 @@ struct ToolsView: View {
             .frame(maxWidth: 620, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onAppear { apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "" }
+        .onAppear { reloadModelAndKey() }
+        // Stay in sync when the provider / gateway / key is changed in the Settings window while the Tools
+        // tab remains visible (no tab switch → no onAppear), so a diagnostic never runs against a stale
+        // model id or the wrong provider's key. (Note: a model change for the SAME provider is persisted to
+        // selectedModelId_<provider>, which isn't observed here — reopening the tab still refreshes it.)
+        .onChange(of: selectedProvider) { _, _ in reloadModelAndKey() }
+        .onChange(of: useGateway) { _, _ in reloadModelAndKey() }
         .sheet(isPresented: $showResolutionDropSheet) {
             ResolutionDropSheet { url in
                 showResolutionDropSheet = false
