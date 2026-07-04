@@ -37,12 +37,11 @@ struct CaptureScreen: View {
                 }
 
                 let uploading = vm.items.filter { $0.state == .uploading }.count
-                if vm.transferFlash != nil || uploading > 0 || vm.sentCount > 0 {
+                if vm.transferFlash != nil || uploading > 0 {
                     HStack(spacing: 8) {
                         if let flash = vm.transferFlash { Text("⤴ \(flash)").foregroundStyle(.green).font(.callout) }
                         Spacer()
                         if uploading > 0 { Text("Transferring \(uploading)…").foregroundStyle(.yellow).font(.caption) }
-                        if vm.sentCount > 0 { Text("\(vm.sentCount) on Mac ✓").foregroundStyle(.white.opacity(0.6)).font(.caption) }
                     }
                 }
 

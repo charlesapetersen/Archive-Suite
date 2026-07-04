@@ -51,6 +51,9 @@ struct ZoomableImageView: View {
             .onAppear { pan.update(zoom: z, fit: fit, viewport: geo.size) }
             .onChange(of: z) { _, nz in pan.update(zoom: nz, fit: fit, viewport: geo.size) }
             .onChange(of: geo.size) { _, v in pan.update(zoom: z, fit: fit, viewport: v) }
+            // Re-anchor to the top whenever a new image loads (e.g. navigating photos): the zoom may be
+            // unchanged, so this is what keeps a >1 zoom top-aligned instead of centered after a swap.
+            .onChange(of: image?.size) { _, _ in pan.update(zoom: z, fit: fit, viewport: geo.size) }
         }
         .onAppear { load(); startMonitor() }
         .onDisappear { stopMonitor() }

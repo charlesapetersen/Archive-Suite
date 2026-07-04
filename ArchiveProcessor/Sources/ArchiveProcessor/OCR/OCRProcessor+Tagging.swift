@@ -553,6 +553,10 @@ extension OCRProcessor {
         } else if let firstVisible = manualSegImages.indices.first(where: { !manualSegConsumed.contains($0) }) {
             manualSegFocus = firstVisible
         }
+        // Once the last document segment is tagged, finish automatically — no explicit Finish click.
+        if manualSegRemainingDocCount == 0 {
+            confirmManualSegTag()
+        }
     }
     func confirmManualSegTag() {
         awaitingManualSegTag = false

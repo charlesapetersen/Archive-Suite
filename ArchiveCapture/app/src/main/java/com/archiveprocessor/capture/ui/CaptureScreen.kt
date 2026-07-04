@@ -131,14 +131,13 @@ fun CaptureScreen(vm: CaptureViewModel) {
 
             // Transfer feedback: segments/markers fly to the Mac; images don't accumulate on the phone.
             val uploading = vm.items.count { it.state == UploadState.UPLOADING }
-            if (vm.transferFlash != null || uploading > 0 || vm.sentCount > 0) {
+            if (vm.transferFlash != null || uploading > 0) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AnimatedVisibility(visible = vm.transferFlash != null, enter = fadeIn(), exit = fadeOut()) {
                         Text("⤴ ${vm.transferFlash ?: ""}", color = Color(0xFF34C759), style = MaterialTheme.typography.labelLarge)
                     }
                     Spacer(Modifier.weight(1f))
                     if (uploading > 0) Text("Transferring $uploading…", color = Color(0xFFFFCC00), style = MaterialTheme.typography.labelMedium)
-                    if (vm.sentCount > 0) Text("${vm.sentCount} on Mac ✓", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                 }
             }
 

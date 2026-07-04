@@ -127,7 +127,8 @@ extension OCRProcessor {
                 fileURL: url,
                 classification: cls,
                 collectionName: collection,
-                isBoxLabel: true
+                isBoxLabel: true,
+                rotationDegrees: index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
             )
         }
     }

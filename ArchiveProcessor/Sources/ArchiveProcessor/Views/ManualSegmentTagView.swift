@@ -14,7 +14,9 @@ import AppKit
 ///   ⏎       end the current segment here & tag it
 struct ManualSegmentTagView: View {
     @ObservedObject var processor: OCRProcessor
-    @State private var zoom: CGFloat = 1
+    // Open (and re-show each photo) zoomed to 150% with the top edge anchored, so the first lines are
+    // readable immediately; ZoomableImageView top-anchors when zoom > 1. Press 0 to fit the whole page.
+    @State private var zoom: CGFloat = 1.5
     @State private var showPreview = false
     @FocusState private var canvasFocused: Bool
 
@@ -281,7 +283,7 @@ struct ManualSegmentTagView: View {
         .transition(.opacity)
     }
 
-    private func resetZoom() { zoom = 1 }
+    private func resetZoom() { zoom = 1.5 }
 }
 
 // MARK: - Tag card (keyboard-driven; fixed width so it never resizes the viewer)
@@ -294,6 +296,7 @@ private struct ManualSegTagCard: View {
     @State private var input = ""
     @State private var suggestions: [String] = []
     @State private var highlighted = -1
+    @FocusState private var yearFocused: Bool
 
     private var subjects: Binding<[String]> {
         Binding(get: { processor.manualSegDraftTags.subjectTags },
@@ -322,10 +325,14 @@ private struct ManualSegTagCard: View {
                 }
             }
 
-            subjectsSection
-
+            // Date first — the user reviews/enters the date (Year is focused on open) before subjects.
             HStack(alignment: .top, spacing: 12) {
-                dateField("Year", text: $processor.manualSegDraftTags.year, width: 66)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Year").font(.caption2).foregroundStyle(.secondary)
+                    TextField("", text: $processor.manualSegDraftTags.year)
+                        .textFieldStyle(.roundedBorder).frame(width: 66)
+                        .focused($yearFocused)
+                }
                 MonthField(month: $processor.manualSegDraftTags.month)
                 DayField(day: $processor.manualSegDraftTags.day)
             }
@@ -340,6 +347,8 @@ private struct ManualSegTagCard: View {
                     }
                 }
             }
+
+            subjectsSection
 
             Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc back")
                 .font(.caption2).foregroundStyle(.tertiary)
@@ -357,6 +366,7 @@ private struct ManualSegTagCard: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.25)))
         .shadow(radius: 20)
         .padding(.vertical, 24)
+        .onAppear { yearFocused = true }   // date-first: start in the Year field, not Subjects
         .onChange(of: input) { _, _ in recompute() }
         .task(id: processor.manualSegTaggingRange) {
             await processor.fetchManualSegDate(forIndices: pageIndices)
@@ -379,7 +389,7 @@ private struct ManualSegTagCard: View {
                     onReturn: { onReturn() },
                     onDeleteWhenEmpty: { deletePrevious() },
                     onEscape: { onEscape() },
-                    focusOnAppear: true
+                    focusOnAppear: false
                 )
                 .frame(minWidth: 140, minHeight: 22)
             }
@@ -404,14 +414,6 @@ private struct ManualSegTagCard: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
             }
-        }
-    }
-
-    /// A plain date field. No placeholder — empty fields stay blank (no gray example dates).
-    private func dateField(_ label: String, text: Binding<String>, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-            TextField("", text: text).textFieldStyle(.roundedBorder).frame(width: width)
         }
     }
 

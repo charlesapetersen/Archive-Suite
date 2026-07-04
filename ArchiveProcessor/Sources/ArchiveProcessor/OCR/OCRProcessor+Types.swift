@@ -13,6 +13,8 @@ struct CollectionReviewItem: Identifiable {
     var collectionName: String
     /// Whether this item was identified as a box label (and thus defines a collection boundary)
     var isBoxLabel: Bool
+    /// Clockwise degrees to correct the image's orientation (from OCR / rotation review), for display.
+    var rotationDegrees: Int = 0
 }
 
 // MARK: - Document Segment Review Item

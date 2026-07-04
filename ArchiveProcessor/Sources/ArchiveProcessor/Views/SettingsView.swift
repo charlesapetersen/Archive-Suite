@@ -51,6 +51,7 @@ struct SettingsView: View {
     @AppStorage("outputImageFile") private var outputImageFile: Bool = true
     @AppStorage("pdfImageSizeMB") private var pdfImageSizeMB: Double = 2.0
     @AppStorage("exportedImageSizeMB") private var exportedImageSizeMB: Double = 3.0
+    @AppStorage("writeLogFile") private var writeLogEnabled: Bool = false
     @AppStorage("ocrWorkerCount") private var ocrWorkerCount: Int = 4
     @AppStorage("rotationModeRaw") private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
     @AppStorage("reviewRotation") private var reviewRotation: Bool = false
@@ -363,6 +364,12 @@ struct SettingsView: View {
                 HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
                 Spacer()
                 Stepper("", value: $ocrWorkerCount, in: 1...12).labelsHidden()
+            }
+            Toggle(isOn: $writeLogEnabled) {
+                HStack {
+                    Text("Write a processing log file")
+                    HelpButton(text: "On: after a run, write a plain-text log to the output folder summarizing the run and listing any files that failed to produce OCR text (with the error reason). Off (default): no log file is written.")
+                }
             }
         }
     }

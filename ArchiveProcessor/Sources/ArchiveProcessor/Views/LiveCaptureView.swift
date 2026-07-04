@@ -188,10 +188,23 @@ struct LiveCaptureView: View {
                         // photos can be processed instead of only cleared.
                         Button("Process \(session.photos.count) →") { session.activateProcessingIfNeeded() }
                             .buttonStyle(.borderedProminent)
-                    } else if !liveProc.staged.isEmpty {
-                        Button("Finish session (\(liveProc.staged.count)) →") { liveProc.finishSession() }
+                    } else {
+                        // Live mode, session active. Always show Finish so the user sees where the
+                        // session ends — grayed with a spinner while segments are still being OCR'd/
+                        // tagged (so it's clear work is happening, not just a "Clear" button), and
+                        // enabled once at least one segment has finished (staged).
+                        let processing = liveProc.statuses.contains { $0.phase == .ocr || $0.phase == .tagging }
+                        HStack(spacing: 8) {
+                            if processing && liveProc.staged.isEmpty {
+                                ProgressView().controlSize(.small)
+                                Text("Processing…").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
+                                liveProc.finishSession()
+                            }
                             .buttonStyle(.borderedProminent)
-                            .disabled(liveProc.isFinalizing)
+                            .disabled(liveProc.staged.isEmpty || liveProc.isFinalizing)
+                        }
                     }
                 }
             }

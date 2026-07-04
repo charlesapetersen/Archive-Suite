@@ -153,17 +153,26 @@ struct CollectionReviewRow: View {
             }
         }
         // Decode off the main thread so the collection-review pane fills without stalling.
-        .task(id: item.fileURL) {
-            loadedImage = await Self.loadThumbnailAsync(url: item.fileURL, maxSize: 500)
+        // Keyed on URL + rotation so it re-renders if either changes; shows the CORRECTED orientation.
+        .task(id: "\(item.fileURL.path)#\(item.rotationDegrees)") {
+            loadedImage = await Self.loadThumbnailAsync(url: item.fileURL, maxSize: 500, rotationDegrees: item.rotationDegrees)
         }
     }
 
-    private static func loadThumbnailAsync(url: URL, maxSize: Int) async -> NSImage? {
+    private static func loadThumbnailAsync(url: URL, maxSize: Int, rotationDegrees: Int) async -> NSImage? {
+        let base: NSImage?
         if url.pathExtension.lowercased() == "pdf" {
             guard let doc = PDFKit.PDFDocument(url: url), let page = doc.page(at: 0) else { return nil }
-            return page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
+            base = page.thumbnail(of: NSSize(width: maxSize, height: maxSize), for: .mediaBox)
+        } else {
+            base = await ArchiveThumbnail.loadImageThumbnail(url: url, maxSize: maxSize)
         }
-        return await ArchiveThumbnail.loadImageThumbnail(url: url, maxSize: maxSize)
+        guard let img = base else { return nil }
+        // Bake in the correction so the box label displays upright (matches the PDF/exported output).
+        guard rotationDegrees % 360 != 0,
+              let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let rotated = ImageEncoding.rotate(cg, byDegreesClockwise: rotationDegrees) else { return img }
+        return NSImage(cgImage: rotated, size: NSSize(width: rotated.width, height: rotated.height))
     }
 
     private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
