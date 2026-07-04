@@ -14,10 +14,10 @@ end-of-session rotation review showed only 2 of 6 pages — yet **all 6 files we
 
 **Root cause (confirmed in code):**
 - `LiveCaptureProcessor.finishSession()` builds `rotationReviewPages` from `retained.values`
-  (`Capture/LiveCaptureProcessor.swift`, ~L459). `retained` holds the per-segment inputs needed to
+  (`Capture/LiveCaptureProcessor.swift`, finishSession ~L470, `for seg in retained.values` ~L475). `retained` holds the per-segment inputs needed to
   regenerate a segment (source URLs, `OCRResult` incl. `rotationDegrees`, tags, model, …).
 - `retained[groupId]` is written **atomically with every `staged.append(...)`** in `finalizeSegment`
-  (~L245–L253), so for any segment the current build finalizes, `staged` and `retained` stay in sync.
+  (`staged.append(...)` ~L261, `retained[groupId] = …` ~L263), so for any segment the current build finalizes, `staged` and `retained` stay in sync.
 - The **only** way `staged` can contain a segment with no `retained` entry is `loadStagingManifest()`
   (~L108) restoring a **legacy-format** staging manifest — a bare `[StagedSegment]` array written
   before retained-persistence (commit `c0312f4`). The new format is `StagingManifest { staged, retained }`;

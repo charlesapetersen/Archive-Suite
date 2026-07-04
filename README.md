@@ -187,7 +187,7 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 - **Drag and drop** images onto the app window
 - **File selection** via standard macOS open panel
 - **Directory selection** — recursively finds all images in the selected folder
-- Supported formats: JPEG, PNG, TIFF, HEIC, BMP, GIF, PDF
+- Supported formats: JPEG, PNG, TIFF, HEIC (plus PDF for pre-OCRed input)
 
 ### Other Features
 
@@ -274,8 +274,11 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 ├── ArchiveProcessorApp.swift          # App entry point (+ Settings scene, ⌘,)
 ├── ContentView.swift                  # Root view: Process Files / Live Capture / Tools tabs
 ├── Models/
-│   ├── ProviderModels.swift           # LLMProvider, LLMModel, TaggingMode, RotationMode, OCRResult
+│   ├── ProviderModels.swift           # LLMProvider, LLMModel, TaggingMode, RotationMode, GatewayConfig, OCRResult
+│   ├── ModelSelectionStore.swift      # User-added custom model IDs (Manage custom models…)
+│   ├── ProviderKeySpec.swift          # Per-provider key format/validation specs (guided setup)
 │   ├── CostEstimator.swift            # Pre-processing cost calculation
+│   ├── TimeEstimator.swift            # Per-phase processing-time estimates
 │   └── KeychainHelper.swift           # Secure API key storage
 ├── OCR/
 │   ├── OCRProcessor.swift             # Core @MainActor orchestrator: stored state + member types (methods live in the extensions below)
@@ -284,6 +287,9 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 │   ├── OCRPrompt.swift                # Prompt builder and response parser
 │   ├── AnthropicClient / GeminiClient / MistralClient / OpenAICompatibleClient (gateway)
 │   ├── BatchOCR.swift                 # Batch clients for all three providers
+│   ├── ImageEncoding.swift            # Image downscaling / base64 encoding for API calls
+│   ├── KeyValidator.swift             # API-key format checks (guided setup)
+│   ├── SampleOCRTester.swift          # Live key confirmation via a synthetic-token OCR call
 │   ├── PDFGenerator.swift             # Output PDF creation
 │   ├── PDFTextExtractor / PDFToImageConverter
 │   ├── RotationDetector / LLMRotationDetector   # local Vision + LLM rotation
@@ -298,18 +304,24 @@ ArchiveProcessor/Sources/ArchiveProcessor/
 │   ├── CaptureModels.swift            # CapturedPhoto, CaptureGroup, MacSegmentTags
 │   ├── CaptureSession.swift           # Session state, durable manifest, pairing, mode
 │   ├── SessionProcessingConfig.swift  # Snapshot of settings for a live session
-│   └── LiveCaptureProcessor.swift     # Streaming coordinator (OCR→tag→PDF→stage→finalize)
+│   ├── LiveCaptureProcessor.swift     # Streaming coordinator (OCR→tag→PDF→stage→finalize)
+│   └── LiveCaptureTestDriver.swift    # Test harness driving the live-staging pipeline
 ├── Net/
 │   ├── CaptureServer.swift            # NWListener HTTP receiver (Bearer token)
 │   └── USBBridge.swift                # adb reverse tunnel for USB pairing
 └── Views/
-    ├── OCRView.swift                  # Process Files UI — main view (~920 lines; controlPanel + filePanel)
-    ├── OCRView+*.swift                # extracted sheets/rows/diff: FileRowView, OCRRetrySheet, Collection/Document review sheets, Model/Resolution sheets, WordDiff
+    ├── OCRView.swift                  # Process Files UI — main view (controlPanel + filePanel)
+    ├── OCRView+*.swift                # extracted sheets/rows/diff: FileRowView, OCRRetrySheet, Segmentation/DocumentSegment/Collection review sheets, ModelSelection/ModelTestResults/ModelTestTypes, Resolution drop/test sheets, WordDiff
     ├── SettingsView.swift             # Settings window (⌘,) + live cost pane
+    ├── ManageModelsView.swift         # Add/remove custom model IDs
+    ├── ProviderKeyWizard.swift        # Guided first-run BYO-key setup
     ├── ToolsView.swift                # Compare Models + Test Resolution
     ├── LiveCaptureView.swift          # Live Capture UI (pairing, status, tag card)
     ├── CollectionFinalizeSheet.swift  # End-of-session collection naming
-    ├── KeyboardTokenField.swift       # Keyboard-driven tag entry
+    ├── BoxFolderConfirmSheet.swift    # Confirm box/folder markers during review
+    ├── ManualSegmentTagView.swift / ManualTaggingSheet.swift  # Manual segmentation + tagging UI
+    ├── TagInputField.swift / KeyboardTokenField.swift         # Keyboard-driven tag entry
+    ├── ArchiveThumbnail.swift / ZoomableImageView.swift       # Thumbnail + pan/zoom image views
     └── DropReceiver.swift             # Native NSView drag-and-drop handler
 
 ArchiveCapture/                        # Android companion app (Kotlin + Compose + CameraX)
@@ -326,17 +338,4 @@ ArchiveCaptureiOS/                     # iPhone companion app (SwiftUI + AVFound
 
 ## Potential Features
 
-- **OpenAI provider** — add GPT-4o and other OpenAI models as an OCR provider
-- **Handwriting recognition mode** — specialized prompting or model selection for handwritten documents
-- **Tag statistics dashboard** — summary view showing tag distribution, date coverage, and collection sizes across a processed batch
-- **Export tag vocabulary from results** — generate a vocabulary CSV from tags actually used across a collection, for reuse in future runs
-- **Batch tag editing** — select multiple files and apply/remove tags in bulk after processing
-- **Search and filter** — search processed files by tag, date range, format, or OCR text content
-- **Template OCR prompts** — save and load named prompt templates for different document types or collections
-- **Side-by-side image viewer** — full-resolution image viewer in the review dialog with pan/zoom for inspecting hard-to-read documents
-- **Undo/redo in review** — track classification and rotation changes with undo support during review
-- **Auto-detect document language** — identify document language and include it in metadata; optionally translate
-- **Duplicate detection** — flag visually similar or identical pages within a collection
-- **Export to CSV/spreadsheet** — export all generated metadata (dates, tags, authors, etc.) as a CSV for use in archival management systems
-- **Finder Quick Look plugin** — preview OCR text and tags directly from Finder without opening the app
-- **Watch folder mode** — monitor a folder and automatically process new images as they appear
+The planned/wishlist backlog — search & browse, exports (CSV / IIIF / EAD), hierarchical tags, handwriting mode, local models, and more — is tracked in [POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md).

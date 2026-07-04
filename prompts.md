@@ -31,11 +31,15 @@ TASK 1 — CLASSIFY this image. On the VERY FIRST LINE write exactly one tag:
   • Same formatting, letterhead, and layout as the previous page with text flowing continuously
   A page is ONLY a continuation if it is clearly part of the same single document. When uncertain, prefer [document_start].
 
-TASK 2 — ORIENTATION. Images may be rotated sideways or upside down. Determine the correct orientation by examining text direction. On line 2, write the clockwise rotation needed to make the image upright:
-[rotate_0] — Image is already correctly oriented.
-[rotate_90] — Image needs 90° clockwise rotation (text reads bottom-to-top on the left side).
-[rotate_180] — Image is upside down and needs 180° rotation.
-[rotate_270] — Image needs 270° clockwise rotation (text reads top-to-bottom on the right side).
+IMPORTANT: These photographs often show multiple papers stacked on top of each other. Other pages may be partially visible in the background. For classification and transcription, focus ONLY on the foreground page — ignore any background pages or partially visible documents.
+
+TASK 2 — ORIENTATION (CRITICAL). Many of these photographs are rotated sideways or upside down as displayed in the raw pixels. You MUST examine the actual pixel orientation of text in the image — do NOT assume the image is upright just because you can read the text. Look at whether text baselines are horizontal, vertical, or inverted relative to the image frame.
+On line 2, write the clockwise rotation needed to make the image upright:
+[rotate_0] — Text baselines are horizontal and text reads left-to-right normally. Image is already correctly oriented.
+[rotate_90] — Text baselines are vertical, reading bottom-to-top on the left side of the image. Needs 90° clockwise rotation.
+[rotate_180] — Text is upside down (baselines horizontal but text is inverted). Needs 180° rotation.
+[rotate_270] — Text baselines are vertical, reading top-to-bottom on the right side of the image. Needs 270° clockwise rotation.
+IMPORTANT: Examine the raw visual orientation of text carefully. If text appears sideways or upside down in the image, it IS rotated — even if you can still read it.
 When the image shows a folder with a tab, orient based on the folder tab and label, not fragments of documents visible inside the folder.
 
 TASK 3 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
@@ -231,18 +235,62 @@ Please respond with ONLY a valid JSON object in this exact format:
 }
 
 Rules:
-- "year": 4-digit year string if determinable, or null if not
-- "month": format "MM MonthName" (e.g. "03 March"), or null if not determinable
+- "year": 4-digit year string. ALWAYS provide a year — if not stated in the document, estimate from nearby documents or contextual clues. Never return null for year.
+- "month": format "MM MonthName" (e.g. "03 March"). Provide ONLY if the month is explicitly stated in THIS document. NEVER infer or estimate the month from context or nearby documents. Return null otherwise.
 - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
 - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
 - "subject_tags": 2–6 general-but-specific subject tags (e.g. "Democratic Party", "taxes", "education", "transportation", "business", "literature", "economics", "foreign policy", "civil rights", "military", "journalism", "science", "health care", "labor unions"). Do NOT use overly broad terms like "politics" or "history".
+  - **When a custom vocabulary is supplied**, this line is replaced with: `2–6 tags chosen ONLY from this controlled vocabulary: ["…", "…"]. Use only tags from this list that are relevant to the document. Do not invent new tags.`
 - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
 - "author_name": author, sender, or writer name if identifiable, or null
 - "recipient_name": recipient or addressee name if identifiable, or null
 - "author_location": author's or sender's location if identifiable, or null
 - "recipient_location": recipient's location if identifiable, or null
 - "publication_name": newspaper, magazine, or publication name if applicable, or null
-- If date_uncertain is true, still attempt to estimate year from nearby documents.
+- Respond with ONLY the JSON object. No commentary.
+```
+
+---
+
+## 6. Comparative Rotation Detection Prompt
+
+**Source:** `LLMRotationDetector.swift` — `detectCorrection(...)`
+
+A cheap vision-LLM (default `gemini-2.5-flash-lite`) is shown the SAME image in four candidate rotations (labeled A–D, at ~800px) and picks the upright one; optionally votes across several label orderings. Anthropic/Gemini only — the gateway and Mistral have no supported multi-image path (caller falls back to local Vision).
+
+```
+You are shown the SAME scanned document in four different rotations, labeled A, B, C, D. Exactly one of them is correctly upright: text horizontal, reading left-to-right, not upside down or sideways. Reply with EXACTLY one letter — A, B, C, or D — for the upright one. Nothing else.
+```
+
+---
+
+## 7. Date-Only Tagging Prompt
+
+**Source:** `TagGenerator.swift` — `generateDateOnly(for:...)`
+
+Used by the auto-date manual tagging mode — cheaper than the full tagging prompt (no subject/format/author fields).
+
+```
+You are a date-extraction assistant for a historical archive.
+
+OCR text of a document:
+---
+{document text, first 3000 chars}
+---
+
+Nearby documents for date-estimation context (use only if this document's date is unclear):
+---
+{context text from up to 3 nearby segments, first 300 chars each, or "(none)"}
+---
+
+Respond with ONLY a valid JSON object in this exact format:
+{ "year": "1987", "month": "03 March", "day": "Day 15", "date_uncertain": false }
+
+Rules:
+- "year": 4-digit year string. ALWAYS provide a year — if not stated, estimate from nearby documents or contextual clues. Never null.
+- "month": format "MM MonthName" (e.g. "03 March"). Provide ONLY if the month is explicitly stated in THIS document. NEVER infer or estimate the month from context or nearby documents. Return null otherwise.
+- "day": format "Day D" (e.g. "Day 15"), or null if not determinable
+- "date_uncertain": true if the year cannot be determined from the document itself (even if estimated from context)
 - Respond with ONLY the JSON object. No commentary.
 ```
 
@@ -251,5 +299,5 @@ Rules:
 ## Notes
 
 - **Mistral OCR** uses Mistral's dedicated OCR endpoint (`/v1/ocr`) and does not receive a custom prompt. It returns markdown-formatted text.
-- The OCR prompt (1) is sent with the image to Anthropic and Gemini providers. For Anthropic, previous page image can also be included alongside the current page image.
+- The OCR prompt (1) is sent with the image to Anthropic and Gemini providers, and also through the **OpenAI-compatible gateway** (`OpenAICompatibleClient` reuses `OCRPrompt.build`). For Anthropic, the previous page image can also be included alongside the current page image.
 - All prompts truncate input text to prevent excessive token usage (2000–3000 chars for document text, 500 chars for previous page context).

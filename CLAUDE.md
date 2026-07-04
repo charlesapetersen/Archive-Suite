@@ -8,7 +8,7 @@ A native macOS app for processing collections of historical archive photographs.
 ## Primary Function 1: OCR
 
 ### LLM Provider & Model Selection
-Dropdown menus for provider and model. No models other than those listed below.
+Dropdown menus for provider and model. The **built-in** models are those listed below — don't silently add others to the built-in lists. Two shipped escape hatches exist for anything not built in (see "Custom models & OpenAI-compatible gateway" below): users can add extra model IDs, or point the app at an OpenAI-compatible endpoint.
 
 **Anthropic**
 - claude-sonnet-4-6
@@ -26,6 +26,10 @@ Dropdown menus for provider and model. No models other than those listed below.
 **Mistral**
 - mistral-ocr-latest (Mistral OCR 3)
   - Note: Mistral returns markdown-formatted text
+
+### Custom models & OpenAI-compatible gateway (shipped)
+- **Custom models:** users can add extra Anthropic/Gemini model IDs via **Manage custom models…** in Settings (`Views/ManageModelsView.swift`, persisted by `Models/ModelSelectionStore.swift`) — so the dropdowns are not limited to the built-in lists above.
+- **OpenAI-compatible gateway:** toggle **Use gateway** in Settings (`@AppStorage` `useGateway` + `gatewayBaseURL`/`gatewayModelID`, with a separate **Gateway** key in Keychain) to route OCR through any OpenAI-compatible chat-completions endpoint (self-hosted or proxied). Client: `OCR/OpenAICompatibleClient.swift` (reuses the shared `OCRPrompt.build`); config is carried as `GatewayConfig` (`Models/ProviderModels.swift`). The gateway path has **no** batch or LLM-rotation support (both are skipped when `useGateway` is on).
 
 ### Thinking Mode
 For models that support low/high thinking, include a dropdown: Low / High.
@@ -166,7 +170,7 @@ Photograph documents with a phone companion app — **Android** (`ArchiveCapture
 - Filesystem tagging: `NSFileManager` extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
 - Networking: URLSession for LLM API calls; an `NWListener` HTTP receiver for Live Capture (`Net/CaptureServer.swift`)
 - Settings: durable settings in `UserDefaults`/`@AppStorage` (shared across the main window and the ⌘, Settings scene) + Keychain for keys
-- Build: XcodeGen — `project.yml` is authoritative; the generated `.xcodeproj` is **not committed** (gitignored), so run `xcodegen generate` after cloning and whenever files are added (never hand-edit `.pbxproj`). Prerequisite: `brew install xcodegen`.
+- Build: XcodeGen — `project.yml` is authoritative; the generated `.xcodeproj` is **not committed** (gitignored). After cloning run **`./bootstrap.sh`** (installs XcodeGen if missing and regenerates every project); thereafter run `xcodegen generate` whenever files are added (never hand-edit `.pbxproj`). Prerequisite if not using bootstrap: `brew install xcodegen`.
 
 ---
 
@@ -227,7 +231,7 @@ The `.dmg` is a build artifact — never commit it (build under gitignored `buil
 ## Project Structure
 ```
 Archive Processor/
-├── CLAUDE.md, README.md, AGENTS.md, POTENTIAL_FEATURES.md, DISTRIBUTION_PLAN.md, CONCURRENT_DEV_PLAN.md
+├── CLAUDE.md, README.md, AGENTS.md, prompts.md, POTENTIAL_FEATURES.md, KNOWN_ISSUES.md, CODE_REVIEW_PLAN.md
 ├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
 │   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
 ├── ArchiveCapture/                    # Android companion app (Gradle)
@@ -239,5 +243,7 @@ Archive Processor/
 **Two former "god files" are split for concurrent work** (behavior unchanged):
 - `OCR/OCRProcessor.swift` — the `@MainActor` class now holds only stored state + member types; its methods live in `OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift` (extensions) and its top-level model types in `OCRProcessor+Types.swift`. When adding a method, put it in the extension matching its concern; **all stored properties stay in `OCRProcessor.swift`** (Swift extensions can't add stored properties).
 - `Views/OCRView.swift` — the main view; its sheets/rows/diff engine are separate `OCRView+*.swift` files (FileRowView, the review/model/resolution sheets, WordDiff).
+
+**Refactor notes (behavior-preserving splits).** The `OCRProcessor` split is deliberately **coarse** (4 concern-extensions, not one-file-per-method): related state-mutating logic stays together, which lowers cross-file tracing cost for an agent — so there is intentionally no `+Persistence`/`+BatchOCR`/`+MainPipeline`. When verifying a future large move-only refactor: run the git move-proof (`git show --color-moved | grep …`) **tty-independently** — piping makes it pass for *any* commit, so it proves nothing on its own; audit access-level changes by **census-diffing** private members rather than grepping (Swift `internal` is keyword-less, so a grep can't see it); gate on a **warnings delta** to catch Swift-6 isolation drift (and beware an initial "0 warnings" that is really a cached build masking pre-existing ones). Testing-coverage gap to remember: the batch/instance-method GUI path (`startProcessing → review → performTaggingPhase → finalize`) is **not** exercised by `LiveCaptureTestDriver`, which only drives the live-staging `nonisolated` statics.
 
 See the README's "Project Structure" for the full annotated file tree, and the **Concurrent / multi-agent development** section above for ownership lanes and shared hotspots.
