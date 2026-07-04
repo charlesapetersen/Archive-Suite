@@ -292,7 +292,8 @@ class CollectionSegmenter {
     func organizeOutput(
         collections: [CollectionSegment],
         outputDirectory: URL,
-        outputURLMap: [URL: URL]
+        outputURLMap: [URL: URL],
+        moveSiblingImages: Bool
     ) throws {
         let fm = FileManager.default
 
@@ -304,7 +305,9 @@ class CollectionSegmenter {
             // Move/rename PDFs and JSONs. A merged multi-page document has several source URLs that map
             // to the SAME output PDF; move it once and only advance the sequence number on an actual
             // move, so numbering stays contiguous (no gaps from the skipped duplicates).
-            var movedCount = 0
+            // Continue numbering from any existing NNNNN files so re-running a collection into an existing
+            // output folder APPENDS instead of restarting at 00001 and deleting/overwriting the earlier run.
+            var movedCount = Self.highestNumberPrefix(in: folderURL, fm: fm)
             var movedOutputs = Set<URL>()
             for sourceURL in collection.fileURLs {
                 guard let pdfURL = outputURLMap[sourceURL],
@@ -334,20 +337,37 @@ class CollectionSegmenter {
                     try fm.moveItem(at: jsonURL, to: destJSON)
                 }
 
-                // Live Capture dual output: move the sibling original image (same base name as
-                // the PDF) alongside it, renamed to match.
-                let imgBase = pdfURL.deletingPathExtension().lastPathComponent
-                for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
-                    let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
-                    if fm.fileExists(atPath: imgURL.path) {
-                        let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
-                        if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
-                        try fm.moveItem(at: imgURL, to: destImg)
-                        break
+                // Two-file (dual) output: move the app-EXPORTED sibling image (same base name as the PDF)
+                // alongside it, renamed to match. Gated on moveSiblingImages: when export is off we must not
+                // sweep up a source original that happens to share the base name (e.g. output dir == input
+                // dir) — with no export, the only same-base image there is the user's irreplaceable original.
+                if moveSiblingImages {
+                    let imgBase = pdfURL.deletingPathExtension().lastPathComponent
+                    for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
+                        let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
+                        if fm.fileExists(atPath: imgURL.path) {
+                            let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
+                            if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
+                            try fm.moveItem(at: imgURL, to: destImg)
+                            break
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// Highest leading NNNNN number among files directly in `folder` (0 if none) — so re-running a
+    /// collection into an existing output folder continues numbering. Mirrors LiveCaptureProcessor's
+    /// append logic (keep the two in sync).
+    private static func highestNumberPrefix(in folder: URL, fm: FileManager) -> Int {
+        guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return 0 }
+        var maxN = 0
+        for u in items {
+            let prefix = u.lastPathComponent.prefix(5)
+            if prefix.count == 5, prefix.allSatisfy(\.isNumber), let n = Int(prefix) { maxN = max(maxN, n) }
+        }
+        return maxN
     }
 
     // MARK: - LLM Calls

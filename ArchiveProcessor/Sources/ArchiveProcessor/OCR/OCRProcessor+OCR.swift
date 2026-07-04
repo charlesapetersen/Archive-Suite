@@ -196,7 +196,8 @@ extension OCRProcessor {
                 try segmenter2.organizeOutput(
                     collections: collectionSegments,
                     outputDirectory: outputDirectory,
-                    outputURLMap: outputURLMap
+                    outputURLMap: outputURLMap,
+                    moveSiblingImages: exportOriginals
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
             } catch {

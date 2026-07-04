@@ -581,8 +581,20 @@ final class LiveCaptureProcessor: ObservableObject {
             return MovePlan(folder: folder, name: name, appending: d.chosenExisting != nil, segments: segs)
         }
         Task { [weak self] in
-            let summary = await Task.detached { Self.executePlans(plans) }.value
+            let outcome = await Task.detached { Self.executePlans(plans) }.value
             guard let self else { return }
+            self.showFinalizeSheet = false
+            self.isFinalizing = false
+            guard outcome.failedMoves == 0 else {
+                // At least one staged output could not be moved into its collection folder. Do NOT delete
+                // the staging dir or clear the session — session.clear() deletes the irreplaceable SOURCE
+                // photos, so deleting now would lose both the processed output and the original. Keep
+                // everything in place so the operator can fix the cause (permissions / free space / a
+                // locked destination) and Finish again; already-moved files are skipped on the retry.
+                self.finalizeSummary = outcome.summary
+                    + " ⚠️ \(outcome.failedMoves) file(s) couldn't be moved — kept in place. Check the output folder and Finish again."
+                return
+            }
             try? FileManager.default.removeItem(at: stagingDir)   // staging emptied into collections
             self.staged.removeAll()
             self.statuses.removeAll()
@@ -592,12 +604,10 @@ final class LiveCaptureProcessor: ObservableObject {
             self.retained.removeAll()
             self.rotationReviewPages.removeAll()
             self.currentCollectionKey = "__unfiled__"
-            self.showFinalizeSheet = false
-            self.isFinalizing = false
             // These source photos are fully processed and filed — clear them from the Captured pane,
             // then show the finalize summary there in their place until new capture begins.
             self.session.clear()
-            self.finalizeSummary = summary
+            self.finalizeSummary = outcome.summary
         }
     }
 
@@ -608,9 +618,23 @@ final class LiveCaptureProcessor: ObservableObject {
         let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
     }
 
-    nonisolated private static func executePlans(_ plans: [MovePlan]) -> String {
+    /// Outcome of moving staged files into their collection folders. `failedMoves > 0` means at least one
+    /// staged output could NOT be filed — the caller must then keep staging + sources (do not delete either).
+    private struct FinalizeOutcome: Sendable { let summary: String; let failedMoves: Int }
+
+    private enum MoveResult { case moved, absent, failed }
+
+    nonisolated private static func executePlans(_ plans: [MovePlan]) -> FinalizeOutcome {
         let fm = FileManager.default
         var movedFiles = 0
+        var failedMoves = 0
+        func doMove(_ src: URL, to dest: URL) {
+            switch move(src, to: dest, fm: fm) {
+            case .moved: movedFiles += 1
+            case .absent: break                 // nothing staged for this slot (e.g. a page whose gen failed)
+            case .failed: failedMoves += 1       // a real move error — the output is still in staging
+            }
+        }
         for plan in plans {
             try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
             var seq = plan.appending ? maxExistingNumber(in: plan.folder) : 0
@@ -622,44 +646,56 @@ final class LiveCaptureProcessor: ObservableObject {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
                         let numStr = String(format: "%05d", seq)
-                        move(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
-                        movedFiles += 1
+                        doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"))
                     }
-                } else {
-                    // Two-file output: number by page image; move each image + its paired/merged PDF.
-                    // Merged multi-page document = one PDF for many images; else 1 PDF per image.
-                    let merged = seg.pdfURLs.count == 1 && seg.imageURLs.count > 1
-                    for (i, img) in seg.imageURLs.enumerated() {
+                } else if seg.pdfURLs.count == 1 && seg.imageURLs.count > 1 {
+                    // Merged multi-page document: one PDF for many page images. Number each image, then the
+                    // single merged PDF at the first number.
+                    for img in seg.imageURLs {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
                         let numStr = String(format: "%05d", seq)
                         let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                        move(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"), fm: fm)
-                        movedFiles += 1
-                        if !merged, i < seg.pdfURLs.count {
-                            move(seg.pdfURLs[i], to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"), fm: fm)
-                            movedFiles += 1
-                        }
+                        doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                     }
-                    if merged, let fn = firstNum, let pdf = seg.pdfURLs.first {
-                        move(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"), fm: fm)
-                        movedFiles += 1
+                    if let fn = firstNum, let pdf = seg.pdfURLs.first {
+                        doMove(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"))
+                    }
+                } else {
+                    // Two-file output, one PDF per page. The PDF list is authoritative (always page-complete);
+                    // an exported image can be missing for a page whose JPEG write failed, so do NOT pair by
+                    // positional index (that off-by-one mispairs pages and orphans the trailing PDF, which
+                    // finalize then deletes). Iterate PDFs and attach the image sharing each PDF's base name.
+                    let imgByBase = Dictionary(seg.imageURLs.map { ($0.deletingPathExtension().lastPathComponent, $0) },
+                                               uniquingKeysWith: { first, _ in first })
+                    for pdf in seg.pdfURLs {
+                        seq += 1
+                        if firstNum == nil { firstNum = seq }
+                        let numStr = String(format: "%05d", seq)
+                        if let img = imgByBase[pdf.deletingPathExtension().lastPathComponent] {
+                            let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
+                            doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
+                        }
+                        doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"))
                     }
                 }
                 if let json = seg.jsonURL, let fn = firstNum {
                     let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)
                     try? fm.createDirectory(at: jf, withIntermediateDirectories: true)
-                    move(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"), fm: fm)
+                    doMove(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"))
                 }
             }
         }
-        return "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
+        let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
+        return FinalizeOutcome(summary: summary, failedMoves: failedMoves)
     }
 
-    nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager) {
-        guard fm.fileExists(atPath: src.path) else { return }
+    /// Move `src` to `dest`, reporting the outcome so the caller can tell a real failure (output stuck in
+    /// staging) apart from a nothing-to-move slot. A missing source is `.absent`, not `.failed`.
+    nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager) -> MoveResult {
+        guard fm.fileExists(atPath: src.path) else { return .absent }
         if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
-        try? fm.moveItem(at: src, to: dest)
+        do { try fm.moveItem(at: src, to: dest); return .moved } catch { return .failed }
     }
 
     /// Highest leading NNNNN number among files directly in a folder (0 if none) — for append numbering.
