@@ -446,11 +446,15 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - End-of-session rotation review (opt-in)
 
-    /// Finish-session entry point. If "Review rotation" is on (and detection isn't Off), present a
-    /// dedicated rotation-review pass over every captured page first; otherwise go straight to naming.
+    /// Finish-session entry point. If "Review rotation" is on, present a dedicated rotation-review
+    /// pass over every captured page first; otherwise go straight to collection naming. "Review
+    /// rotation" is read LIVE (not from the locked session config): it's a Finish-time choice, so
+    /// enabling it after capture started still applies. Pages seed from each page's detected rotation
+    /// (0 if detection was off), and the operator can correct any of them.
     func finishSession() {
-        guard let config, !staged.isEmpty else { return }
-        guard config.reviewRotation, config.rotationMode != .off else { beginFinalize(); return }
+        guard !staged.isEmpty else { return }
+        let wantReview = UserDefaults.standard.bool(forKey: "reviewRotation")
+        guard wantReview else { beginFinalize(); return }
         var pages: [RotationReviewPage] = []
         for seg in retained.values {
             for (i, p) in seg.pages.enumerated() {

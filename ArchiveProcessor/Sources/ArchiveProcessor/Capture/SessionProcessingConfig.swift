@@ -13,8 +13,6 @@ struct SessionProcessingConfig {
     var apiKey: String
     var taggingMode: TaggingMode
     var rotationMode: RotationMode
-    /// Pause at Finish for a dedicated rotation-review pass over all captured pages (opt-in).
-    var reviewRotation: Bool
     var mergeDocuments: Bool
     var outputDirectory: URL
     var contextCharCount: Int
@@ -68,7 +66,6 @@ struct SessionProcessingConfig {
             apiKey: apiKey,
             taggingMode: TaggingMode(rawValue: d.string(forKey: "taggingModeRaw") ?? "") ?? .automatic,
             rotationMode: RotationMode(rawValue: d.string(forKey: "rotationModeRaw") ?? "") ?? .llmSingle,
-            reviewRotation: d.bool(forKey: "reviewRotation"),
             mergeDocuments: d.bool(forKey: "mergeDocuments"),
             outputDirectory: outURL,
             contextCharCount: Int(d.object(forKey: "contextCharCount") as? Double ?? 200),
