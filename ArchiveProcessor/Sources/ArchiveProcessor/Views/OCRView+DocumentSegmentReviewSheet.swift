@@ -15,22 +15,6 @@ struct DocumentSegmentReviewSheet: View {
     /// When true this is the dedicated rotation-review pass — show only the rotation control.
     private var rotationOnly: Bool { processor.reviewRotationOnly }
 
-    private var newDocCount: Int {
-        processor.documentReviewItems.filter { $0.classification == .documentStart }.count
-    }
-
-    private var continuationCount: Int {
-        processor.documentReviewItems.filter { $0.classification == .documentContinuation }.count
-    }
-
-    private var boxCount: Int {
-        processor.documentReviewItems.filter { $0.classification == .boxLabel }.count
-    }
-
-    private var folderCount: Int {
-        processor.documentReviewItems.filter { $0.classification == .folderLabel }.count
-    }
-
     private var removedCount: Int {
         processor.documentReviewItems.filter { $0.markedForRemoval }.count
     }

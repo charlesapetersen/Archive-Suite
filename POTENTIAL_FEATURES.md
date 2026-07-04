@@ -33,6 +33,7 @@
 - **Hierarchical tags** — support nested tag structures (e.g., Politics > Elections > Presidential)
 - **Tag editing UI** — edit applied tags directly in the file pane without reprocessing
 - **Bulk tag operations** — apply/remove tags across multiple files at once
+- **Import a tag vocabulary from CSV / drag-and-drop** — load a controlled subject-tag vocabulary from a CSV or text file. A parser (`loadTagVocabularyFromURL`) existed but was never wired to any UI, so the README wrongly advertised it; the dead code was removed in the 2026-07-04 maintainability pass. Re-add with a file picker + a drop target on the vocabulary editor.
 
 ### Document Processing
 - **Handwriting recognition mode** — specialized prompts and processing for handwritten documents

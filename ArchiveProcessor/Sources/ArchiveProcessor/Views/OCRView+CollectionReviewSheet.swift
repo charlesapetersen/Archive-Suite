@@ -174,19 +174,5 @@ struct CollectionReviewRow: View {
               let rotated = ImageEncoding.rotate(cg, byDegreesClockwise: rotationDegrees) else { return img }
         return NSImage(cgImage: rotated, size: NSSize(width: rotated.width, height: rotated.height))
     }
-
-    private func radioButton(label: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? color : .secondary)
-                    .font(.system(size: 12))
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(selected ? color : .secondary)
-            }
-        }
-        .buttonStyle(.plain)
-    }
 }
 

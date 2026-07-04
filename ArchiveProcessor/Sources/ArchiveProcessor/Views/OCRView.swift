@@ -66,7 +66,6 @@ struct OCRView: View {
 
     // Inline segmentation edit & review navigation
     @State private var editingFileIndex: Int? = nil
-    @State private var csvDropTargeted = false
     @State private var reviewFocusedIndex: Int = 0
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
@@ -792,33 +791,6 @@ struct OCRView: View {
             }
             droppedFiles.append(contentsOf: urls)
         }
-    }
-
-    private func loadTagVocabularyCSV() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
-        panel.message = "Select a CSV or text file containing tag vocabulary"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        loadTagVocabularyFromURL(url)
-    }
-
-    private func loadTagVocabularyFromURL(_ url: URL) {
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return }
-        var tags: [String] = []
-        for line in content.components(separatedBy: .newlines) {
-            for field in line.components(separatedBy: ",") {
-                let tag = field.trimmingCharacters(in: .whitespaces)
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-                    .trimmingCharacters(in: .whitespaces)
-                if !tag.isEmpty { tags.append(tag) }
-            }
-        }
-        var seen = Set<String>()
-        tags = tags.filter { seen.insert($0.lowercased()).inserted }
-        tagVocabulary = tags.joined(separator: "\n")
     }
 
     private func chooseOutputDirectory() {

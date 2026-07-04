@@ -114,11 +114,10 @@ When tagging is enabled, the app:
 
 Define a controlled vocabulary for subject tags to ensure consistent tagging across a collection:
 
-- **Manual entry** — type tags directly, one per line
-- **CSV file loading** — load vocabularies from CSV files via file picker
-- **Drag and drop** — drop CSV files directly onto the vocabulary editor
+- **Manual entry** — type the allowed tags directly, one per line
 
-When a vocabulary is defined, the LLM is constrained to choose only from the provided terms.
+When a vocabulary is defined, the LLM is constrained to choose only from the provided terms. (Importing a
+vocabulary from a CSV file / drag-and-drop is a planned addition — see [POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md).)
 
 ### Collection Segmentation & Organization
 

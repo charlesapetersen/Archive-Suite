@@ -163,8 +163,6 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         default: return 0
         }
     }
-
-    var usesLLM: Bool { self == .llmSingle || self == .llmMajority }
 }
 
 // MARK: - Models
@@ -367,13 +365,6 @@ final class CustomModelStore: ObservableObject, @unchecked Sendable {
 
     func add(_ model: LLMModel) {
         allCustomModels.append(model)
-        save()
-    }
-
-    func remove(at offsets: IndexSet, provider: LLMProvider) {
-        let providerModels = models(for: provider)
-        let idsToRemove = offsets.map { providerModels[$0].id }
-        allCustomModels.removeAll { idsToRemove.contains($0.id) }
         save()
     }
 

@@ -140,7 +140,6 @@ private final class PanState: ObservableObject {
     }
     func setOffset(width: CGFloat, height: CGFloat) { offset = clamp(CGSize(width: width, height: height)) }
     func commit() { last = offset }
-    func reset() { offset = .zero; last = .zero }
 
     private func clamp(_ o: CGSize) -> CGSize {
         CGSize(width: min(maxOffset.width, max(-maxOffset.width, o.width)),
