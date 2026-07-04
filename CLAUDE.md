@@ -166,7 +166,7 @@ Photograph documents with a phone companion app — **Android** (`ArchiveCapture
 - Filesystem tagging: `NSFileManager` extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
 - Networking: URLSession for LLM API calls; an `NWListener` HTTP receiver for Live Capture (`Net/CaptureServer.swift`)
 - Settings: durable settings in `UserDefaults`/`@AppStorage` (shared across the main window and the ⌘, Settings scene) + Keychain for keys
-- Build: XcodeGen — `project.yml` is authoritative; run `xcodegen generate` after adding files (never hand-edit `.pbxproj`)
+- Build: XcodeGen — `project.yml` is authoritative; the generated `.xcodeproj` is **not committed** (gitignored), so run `xcodegen generate` after cloning and whenever files are added (never hand-edit `.pbxproj`). Prerequisite: `brew install xcodegen`.
 
 ---
 

@@ -227,15 +227,26 @@ Photograph documents with a phone and stream them straight into the pipeline —
 
 ## Building
 
+**Prerequisite:** install XcodeGen once — `brew install xcodegen`.
+
+The `.xcodeproj` is **generated and not committed** (`project.yml` is authoritative). So a fresh clone has no project file: you **must** run `xcodegen generate` before opening or building — otherwise Xcode/`xcodebuild` will report a missing project.
+
 **macOS app:**
 
 ```bash
 cd ArchiveProcessor
-xcodegen generate
-open ArchiveProcessor.xcodeproj
+xcodegen generate                 # required after clone, and whenever files are added
+open ArchiveProcessor.xcodeproj   # build & run in Xcode (macOS target)
 ```
 
-Build and run with Xcode (macOS target). Regenerate the project with `xcodegen generate` whenever files are added — `project.yml` is authoritative; don't hand-edit the `.pbxproj`.
+Headless build (CI / quick check):
+
+```bash
+cd ArchiveProcessor && xcodegen generate && \
+  xcodebuild -scheme ArchiveProcessor -configuration Debug build
+```
+
+Regenerate with `xcodegen generate` whenever files are added — `project.yml` is authoritative; never hand-edit the `.pbxproj`.
 
 **Android companion (optional, for Live Capture):**
 
