@@ -86,6 +86,9 @@ struct AnthropicBatchClient: Sendable {
             if let thinking = thinkingLevel {
                 let budget = thinking == .low ? 1024 : 8000
                 params["thinking"] = ["type": "enabled", "budget_tokens": budget]
+                // Anthropic counts thinking tokens against max_tokens; raise the ceiling by the
+                // budget so the transcription isn't silently truncated to the remainder.
+                params["max_tokens"] = 8192 + budget
             }
 
             requests.append([

@@ -46,8 +46,9 @@ struct PDFTextExtractor {
     }
 
     /// Parse text from a page produced by this app's PDFGenerator.
-    /// Format:
+    /// Format (see PDFGenerator.makeTextPage):
     ///   Extracted text.
+    ///   {original filename}
     ///   {Provider} · {Model} · {Date}
     ///   Classification: {Box|Folder|Document Start|Continuation}   (optional)
     ///
@@ -56,6 +57,11 @@ struct PDFTextExtractor {
         let lines = pageText.components(separatedBy: .newlines)
         var bodyStartIndex = 0
         var classification: DocumentClassification? = nil
+        // The provider/model/date line (contains " · ") marks the end of the fixed header.
+        // We must not treat an earlier unknown line (the filename) as the body, but we also
+        // can't rely on a blank separator surviving PDFKit extraction — so the body-break
+        // fallback below is only armed once this line has been seen.
+        var seenMetaLine = false
 
         // Scan header lines
         for (i, line) in lines.enumerated() {
@@ -85,7 +91,14 @@ struct PDFTextExtractor {
 
             // Still in header area
             if trimmed.hasPrefix("Extracted text.") || trimmed.contains(" \u{00B7} ") {
+                if trimmed.contains(" \u{00B7} ") { seenMetaLine = true }
                 bodyStartIndex = i + 1
+                continue
+            }
+
+            // An unknown line before the provider/model/date line (e.g. the filename): skip it,
+            // don't mistake it for body. The real body-break is only armed after the meta line.
+            if !seenMetaLine {
                 continue
             }
 

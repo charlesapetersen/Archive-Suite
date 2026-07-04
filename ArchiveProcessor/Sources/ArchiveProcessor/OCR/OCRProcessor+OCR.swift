@@ -238,13 +238,15 @@ extension OCRProcessor {
     }
     private nonisolated func classifyCallAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
         let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-        var body: [String: Any] = [
+        let body: [String: Any] = [
             "model": model.id, "max_tokens": 64,
             "messages": [["role": "user", "content": prompt]]
         ]
-        if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 512 : 2000]
-        }
+        // No extended thinking on the tiny classification call: a one-word label needs no
+        // reasoning, and Anthropic rejects any request where max_tokens (64) <= budget_tokens
+        // (which silently disabled all Anthropic classification when thinking was on). This
+        // matches the tagging/date calls, which also omit thinking. thinkingLevel is unused here.
+        _ = thinkingLevel
         var request = URLRequest(url: endpoint, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

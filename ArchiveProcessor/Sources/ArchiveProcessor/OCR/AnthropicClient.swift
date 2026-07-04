@@ -44,6 +44,10 @@ struct AnthropicClient {
         if let thinking = thinkingLevel {
             let budget = thinking == .low ? 1024 : 8000
             body["thinking"] = ["type": "enabled", "budget_tokens": budget]
+            // Anthropic counts thinking tokens against max_tokens, so the ceiling must exceed
+            // the budget or the visible transcription is silently truncated to the remainder.
+            // Raise it by the budget to preserve the full output allowance.
+            body["max_tokens"] = 8192 + budget
         }
 
         var request = URLRequest(url: endpoint, timeoutInterval: 120)
