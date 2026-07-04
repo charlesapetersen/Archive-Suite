@@ -134,6 +134,11 @@ struct DocumentSegmentReviewSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Cancel") {
+                    processor.cancel()
+                }
+                .controlSize(.large)
+                .keyboardShortcut(.cancelAction)
                 Button("Confirm") {
                     processor.confirmDocumentReview()
                 }
@@ -208,6 +213,10 @@ struct DocumentSegmentReviewSheet: View {
             }
             return .handled
         }
+        // Return confirms and moves past the dialog; Escape cancels the run. (The window is a bare
+        // NSWindow, so the Confirm/Cancel button key-equivalents don't fire — handle keys here.)
+        .onKeyPress(.return) { processor.confirmDocumentReview(); return .handled }
+        .onKeyPress(.escape) { processor.cancel(); return .handled }
     }
 }
 

@@ -17,6 +17,10 @@ struct ManualSegmentTagView: View {
     // Open (and re-show each photo) zoomed to 150% with the top edge anchored, so the first lines are
     // readable immediately; ZoomableImageView top-anchors when zoom > 1. Press 0 to fit the whole page.
     @State private var zoom: CGFloat = 1.5
+    // Set once the user zooms or scrolls; navigation then PRESERVES the zoom/scroll state instead of
+    // snapping back to 150%-top. `resetToken` is bumped by "0" to force a re-anchor to the top.
+    @State private var viewCustomized = false
+    @State private var resetToken = 0
     @State private var showPreview = false
     @FocusState private var canvasFocused: Bool
 
@@ -72,6 +76,9 @@ struct ManualSegmentTagView: View {
             Spacer(minLength: 12)
             Text("← → photo · ⏎ end & tag · B/F/D · X remove · Space preview")
                 .font(.caption2).foregroundStyle(.tertiary).lineLimit(1).layoutPriority(-1)
+            Button("Cancel") { processor.cancel() }
+                .controlSize(.small)
+                .help("Discard this run and return to the file list. (Esc while browsing.)")
             Button("Finish ▸") { processor.confirmManualSegTag() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -97,7 +104,9 @@ struct ManualSegmentTagView: View {
     private var canvas: some View {
         ZStack(alignment: .topLeading) {
             if let img = focusImage, !processor.manualSegConsumed.contains(focus) {
-                ZoomableImageView(url: img.url, rotationDegrees: img.rotationDegrees, zoom: $zoom)
+                ZoomableImageView(url: img.url, rotationDegrees: img.rotationDegrees, zoom: $zoom,
+                                  anchorTopOnLoad: !viewCustomized, resetToken: resetToken,
+                                  onUserAdjust: { viewCustomized = true })
                 statusBadge(img).padding(10)
             } else {
                 ZStack {
@@ -114,25 +123,27 @@ struct ManualSegmentTagView: View {
         .focusable(true)
         .focused($canvasFocused)
         .onTapGesture { canvasFocused = true }
-        .onKeyPress(.leftArrow) { processor.manualSegAdvanceFocus(-1); resetZoom(); return .handled }
-        .onKeyPress(.rightArrow) { processor.manualSegAdvanceFocus(1); resetZoom(); return .handled }
+        .onKeyPress(.leftArrow) { processor.manualSegAdvanceFocus(-1); return .handled }
+        .onKeyPress(.rightArrow) { processor.manualSegAdvanceFocus(1); return .handled }
         .onKeyPress(.return) { processor.manualSegEndAndTag(); return .handled }
         .onKeyPress(.space) { showPreview.toggle(); return .handled }
         .onKeyPress(.escape) {
             if showPreview { showPreview = false; return .handled }
-            return .ignored
+            processor.cancel(); return .handled   // escape out of the whole dialog (abort the run)
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "xX")) { _ in processor.manualSegToggleRemoved(at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "bB")) { _ in processor.manualSegSetKind(.box, at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in processor.manualSegSetKind(.folder, at: focus); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "dD")) { _ in processor.manualSegSetKind(.document, at: focus); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "+=")) { _ in zoom = min(8, zoom * 1.25); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in zoom = max(1, zoom / 1.25); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "0")) { _ in zoom = 1; return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "+=")) { _ in zoom = min(8, zoom * 1.25); viewCustomized = true; return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in zoom = max(1, zoom / 1.25); viewCustomized = true; return .handled }
+        // 0 resets to the default view: 150%, top-anchored (clears any custom zoom/scroll).
+        .onKeyPress(characters: CharacterSet(charactersIn: "0")) { _ in zoom = 1.5; viewCustomized = false; resetToken += 1; return .handled }
         // ⌘↑ / ⌘↓ are alternative zoom in / out shortcuts (plain ↑/↓ are unused on this canvas).
         .onKeyPress(keys: [.upArrow, .downArrow]) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
             zoom = press.key == .upArrow ? min(8, zoom * 1.25) : max(1, zoom / 1.25)
+            viewCustomized = true
             return .handled
         }
     }
@@ -210,7 +221,7 @@ struct ManualSegmentTagView: View {
             Text("\(i + 1)").font(.caption2).foregroundStyle(isFocus ? Color.accentColor : .secondary)
         }
         .contentShape(Rectangle())
-        .onTapGesture { processor.manualSegFocus = i; resetZoom(); canvasFocused = true }
+        .onTapGesture { processor.manualSegFocus = i; canvasFocused = true }
     }
 
     @ViewBuilder
@@ -283,7 +294,6 @@ struct ManualSegmentTagView: View {
         .transition(.opacity)
     }
 
-    private func resetZoom() { zoom = 1.5 }
 }
 
 // MARK: - Tag card (keyboard-driven; fixed width so it never resizes the viewer)

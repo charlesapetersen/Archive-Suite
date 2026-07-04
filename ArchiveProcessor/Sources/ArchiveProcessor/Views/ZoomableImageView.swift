@@ -9,6 +9,13 @@ struct ZoomableImageView: View {
     let url: URL
     var rotationDegrees: Int = 0
     @Binding var zoom: CGFloat
+    /// When true, a newly-loaded image anchors to its top; when false, the current scroll offset is
+    /// preserved (re-clamped to the new image) so the user's scrolled/zoomed state carries across photos.
+    var anchorTopOnLoad: Bool = true
+    /// Bumping this value forces a re-anchor to the top (used by a "reset to default" key).
+    var resetToken: Int = 0
+    /// Called when the user manually zooms/pans/scrolls, so the caller can mark the view "customized".
+    var onUserAdjust: (() -> Void)? = nil
 
     /// Pan lives in a reference type so the scroll-wheel monitor (an escaping closure) reads and
     /// writes the live offset/bounds rather than a stale @State snapshot.
@@ -31,6 +38,7 @@ struct ZoomableImageView: View {
                         .gesture(
                             DragGesture()
                                 .onChanged { v in
+                                    onUserAdjust?()
                                     pan.setOffset(width: pan.last.width + v.translation.width,
                                                   height: pan.last.height + v.translation.height)
                                 }
@@ -39,7 +47,7 @@ struct ZoomableImageView: View {
                         .gesture(
                             MagnificationGesture()
                                 .updating($pinch) { value, state, _ in state = value }
-                                .onEnded { value in zoom = clampZoom(zoom * value) }
+                                .onEnded { value in zoom = clampZoom(zoom * value); onUserAdjust?() }
                         )
                 } else {
                     ProgressView()
@@ -51,13 +59,18 @@ struct ZoomableImageView: View {
             .onAppear { pan.update(zoom: z, fit: fit, viewport: geo.size) }
             .onChange(of: z) { _, nz in pan.update(zoom: nz, fit: fit, viewport: geo.size) }
             .onChange(of: geo.size) { _, v in pan.update(zoom: z, fit: fit, viewport: v) }
-            // Re-anchor to the top whenever a new image loads (e.g. navigating photos): the zoom may be
-            // unchanged, so this is what keeps a >1 zoom top-aligned instead of centered after a swap.
-            .onChange(of: image?.size) { _, _ in pan.update(zoom: z, fit: fit, viewport: geo.size) }
+            // New image (e.g. navigating photos): anchor to the top by default, or PRESERVE the user's
+            // scroll (re-clamped to the new image) if they've adjusted the view.
+            .onChange(of: image?.size) { _, _ in
+                if anchorTopOnLoad { pan.update(zoom: z, fit: fit, viewport: geo.size) }
+                else { pan.reclamp(zoom: z, fit: fit, viewport: geo.size) }
+            }
+            // "0"/reset bumps resetToken to force a top re-anchor even when the zoom is unchanged.
+            .onChange(of: resetToken) { _, _ in pan.update(zoom: z, fit: fit, viewport: geo.size) }
         }
         .onAppear { load(); startMonitor() }
         .onDisappear { stopMonitor() }
-        .onChange(of: url) { _, _ in load(); pan.reset() }
+        .onChange(of: url) { _, _ in load() }   // pan is handled by the image?.size / anchorTopOnLoad logic
     }
 
     // MARK: Scroll-wheel / trackpad pan (only when zoomed in)
@@ -66,6 +79,7 @@ struct ZoomableImageView: View {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard pan.zoom > 1 else { return event }
+            onUserAdjust?()
             pan.setOffset(width: pan.offset.width + event.scrollingDeltaX,
                           height: pan.offset.height + event.scrollingDeltaY)
             pan.commit()
@@ -85,7 +99,6 @@ struct ZoomableImageView: View {
         } else {
             image = base
         }
-        pan.reset()
     }
 
     private func clampZoom(_ z: CGFloat) -> CGFloat { min(8, max(1, z)) }
@@ -114,6 +127,15 @@ private final class PanState: ObservableObject {
                            height: max(0, (fit.height * zoom - viewport.height) / 2))
         // +maxOffset.height shifts the image down so its top edge sits at the viewport top.
         offset = clamp(CGSize(width: offset.width, height: maxOffset.height))
+        last = offset
+    }
+    /// Recompute bounds for a new image/zoom and clamp the CURRENT offset to them WITHOUT re-anchoring
+    /// to the top — preserves the user's scrolled position across image swaps.
+    func reclamp(zoom: CGFloat, fit: CGSize, viewport: CGSize) {
+        self.zoom = zoom
+        maxOffset = CGSize(width: max(0, (fit.width * zoom - viewport.width) / 2),
+                           height: max(0, (fit.height * zoom - viewport.height) / 2))
+        offset = clamp(offset)
         last = offset
     }
     func setOffset(width: CGFloat, height: CGFloat) { offset = clamp(CGSize(width: width, height: height)) }

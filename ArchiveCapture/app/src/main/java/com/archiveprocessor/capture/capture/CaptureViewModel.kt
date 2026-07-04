@@ -340,9 +340,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val failed = items.count { it.state == UploadState.FAILED }
         val inflight = items.count { it.state == UploadState.PENDING || it.state == UploadState.UPLOADING }
         return buildString {
-            append("$sentCount sent to Mac")
-            if (inflight > 0) append(" · $inflight queued")
-            if (failed > 0) append(" · $failed failed")
+            if (inflight > 0) append("$inflight queued")
+            if (failed > 0) {
+                if (isNotEmpty()) append(" · ")
+                append("$failed failed")
+            }
         }
     }
 }

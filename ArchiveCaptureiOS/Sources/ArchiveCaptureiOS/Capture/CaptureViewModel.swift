@@ -292,9 +292,9 @@ final class CaptureViewModel: ObservableObject {
     private func uploadSummary() -> String {
         let failed = items.filter { $0.state == .failed }.count
         let inflight = items.filter { $0.state == .pending || $0.state == .uploading }.count
-        var s = "\(sentCount) sent to Mac"
-        if inflight > 0 { s += " · \(inflight) queued" }
-        if failed > 0 { s += " · \(failed) failed" }
-        return s
+        var parts: [String] = []
+        if inflight > 0 { parts.append("\(inflight) queued") }
+        if failed > 0 { parts.append("\(failed) failed") }
+        return parts.joined(separator: " · ")
     }
 }

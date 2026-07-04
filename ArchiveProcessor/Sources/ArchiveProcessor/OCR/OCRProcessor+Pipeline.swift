@@ -630,6 +630,18 @@ extension OCRProcessor {
         collectionConfirmationContinuation = nil
         retryContinuation?.resume(returning: .continueWithout)
         retryContinuation = nil
+        // Manual segmentation/tagging + box-folder review continuations (so escaping those dialogs
+        // aborts cleanly without leaking a continuation or leaving the review window open).
+        awaitingManualTagging = false
+        manualTaggingContinuation?.resume()
+        manualTaggingContinuation = nil
+        awaitingManualSegTag = false
+        manualSegTaggingRange = nil
+        manualSegContinuation?.resume()
+        manualSegContinuation = nil
+        awaitingBoxFolderConfirmation = false
+        boxFolderConfirmContinuation?.resume()
+        boxFolderConfirmContinuation = nil
         cleanupTempFiles()
 
         // Cancel server-side batch if active
