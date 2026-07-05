@@ -9,21 +9,20 @@ struct ReadStateCell: View {
     @ObservedObject var model: NavigationModel
     let file: ArchiveFile
     var body: some View {
-        Menu {
+        Button { model.toggleReadState(for: file) } label: {   // C8: single click toggles Read↔Unread
+            Text(file.readState?.rawValue ?? "—")
+                .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
             Button("Read")   { model.setReadStateInline(.read, for: file) }
             Button("Unread") { model.setReadStateInline(.unread, for: file) }
             if file.readState != nil {
                 Divider()
                 Button("Clear read-state") { model.clearReadState(for: file) }
             }
-        } label: {
-            Text(file.readState?.rawValue ?? "—")
-                .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
-        } primaryAction: {
-            model.toggleReadState(for: file)   // C8: single click toggles Read↔Unread; hold for the menu
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Click to toggle Read/Unread · hold for options · ⌘I edits several at once")
+        .help("Click to toggle Read/Unread · right-click for options · ⌘I edits several at once")
     }
 }
 
