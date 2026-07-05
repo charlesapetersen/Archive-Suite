@@ -57,8 +57,21 @@ struct LiveCaptureView: View {
     private var controlPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Live Capture")
-                    .font(.title).fontWeight(.bold)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Live Capture")
+                        .font(.title).fontWeight(.bold)
+                    Spacer()
+                    // Obvious one-click access to the durable backup folder: every photo the phone sends
+                    // is kept there until the run's output is fully written, so the operator can recover
+                    // and copy the originals in Finder if anything goes wrong (even if the app can't relaunch).
+                    Button {
+                        session.revealBackupFolder()
+                    } label: {
+                        Label("Backup Folder", systemImage: "folder")
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Open the Live Capture backup folder in Finder (~/Pictures/Archive Processor Live Capture). Every photo received from the phone is stored there until this run's output is fully written — so you can recover and copy the originals if anything fails.")
+                }
 
                 GroupBox("Connection") {
                     VStack(alignment: .leading, spacing: 10) {

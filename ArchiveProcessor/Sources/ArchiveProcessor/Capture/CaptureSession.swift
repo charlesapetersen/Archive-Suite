@@ -81,19 +81,45 @@ final class CaptureSession: ObservableObject {
         return t
     }
 
-    /// Session id + incoming folder under Application Support.
+    /// Session id + this session's incoming folder (a per-run subfolder of `backupRoot`). Every photo
+    /// received from the phone is written here and kept until the run's output is fully finalized — a
+    /// user-visible backup so the originals can be recovered even if the app fails catastrophically.
     let sessionId: String
     let incomingFolder: URL
+
+    /// Durable, user-VISIBLE parent for all Live Capture session folders: `~/Pictures/Archive Processor
+    /// Live Capture/`. Kept in Pictures (not the hidden Application Support container) so the operator can
+    /// find and copy the raw photos in Finder — including if the app won't launch. Falls back to
+    /// Application Support only if the Pictures directory is somehow unavailable.
+    static var backupRoot: URL {
+        let base = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("Archive Processor Live Capture", isDirectory: true)
+    }
+
+    /// Pre-visible-backup location (older builds stored sessions here). Any session left here is
+    /// migrated into the visible backupRoot on launch (see migrateLegacySessions) so it's never orphaned
+    /// and — critically — so its further photos also land in the Finder-discoverable folder.
+    private static var legacyRoot: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("ArchiveProcessor/LiveCapture", isDirectory: true)
+    }
 
     private lazy var server = CaptureServer(session: self)
 
     init() {
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("ArchiveProcessor/LiveCapture", isDirectory: true)
+        let root = Self.backupRoot
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        // Move any in-flight session left by an older build into the VISIBLE root, so its photos are
+        // Finder-discoverable and every further ingest for it lands there too (not the hidden container).
+        Self.migrateLegacySessions(into: root)
+        // Drop leftover empty session folders (their photos were already cleared at a successful finalize)
+        // so the visible backup root doesn't accumulate clutter that buries the run that still has photos.
+        // Runs before recovery, so it can never touch the active session (which has photos, or is fresh).
+        Self.pruneEmptySessions(under: root)
 
-        // Crash recovery: reload the newest session that still has received-but-unprocessed photos
-        // (a manifest + files on disk), so a Mac crash never orphans received data. Else start fresh.
+        // Crash recovery: reload the newest session that still has received-but-unprocessed photos (a
+        // manifest + files on disk) so a Mac crash never orphans received data; else start fresh.
         if let restored = Self.latestUnprocessedSession(under: root) {
             sessionId = restored.folder.lastPathComponent
             incomingFolder = restored.folder
@@ -211,6 +237,20 @@ final class CaptureSession: ObservableObject {
         photos = []
         writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
+    }
+
+    /// Reveal this session's backup folder in Finder. Every photo the phone sends is stored there until
+    /// the run's output is fully written, so the operator can recover/copy the originals if anything
+    /// fails. Selects the current session folder inside its (visible) parent; if it doesn't exist yet,
+    /// opens the parent so the backup location is still discoverable.
+    func revealBackupFolder() {
+        if FileManager.default.fileExists(atPath: incomingFolder.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([incomingFolder])
+        } else {
+            let root = Self.backupRoot
+            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(root)
+        }
     }
 
     // MARK: - Grouping / handoff
@@ -333,5 +373,35 @@ final class CaptureSession: ObservableObject {
             }
         }
         return nil
+    }
+
+    /// Move any Live Capture session folders left in the legacy Application Support location into the
+    /// visible backup root, so recovery and all further writes use the Finder-discoverable folder.
+    /// Best-effort: a name collision (already migrated) is skipped, and any folder that can't be moved
+    /// is simply left in place. Moving the whole folder keeps each photo with its manifest, and the
+    /// manifest stores bare names, so reloading from the new location rebuilds correct URLs.
+    private static func migrateLegacySessions(into root: URL) {
+        let fm = FileManager.default
+        guard root.standardizedFileURL != legacyRoot.standardizedFileURL,
+              let subdirs = try? fm.contentsOfDirectory(at: legacyRoot, includingPropertiesForKeys: nil) else { return }
+        for folder in subdirs {
+            let dest = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+            if !fm.fileExists(atPath: dest.path) { try? fm.moveItem(at: folder, to: dest) }
+        }
+    }
+
+    /// Remove stale session folders under the backup root that no longer hold any photo (their JPEGs
+    /// were cleared at a successful finalize), so the visible root doesn't accumulate empty folders that
+    /// bury the run still holding photos. NEVER removes a folder that still contains a `.jpg`, so it
+    /// cannot lose received data. Called at launch, before recovery, so it can't touch the active session.
+    private static func pruneEmptySessions(under root: URL) {
+        let fm = FileManager.default
+        guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        for folder in subdirs {
+            guard (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            let contents = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+            let hasPhoto = contents.contains { $0.pathExtension.lowercased() == "jpg" }
+            if !hasPhoto { try? fm.removeItem(at: folder) }
+        }
     }
 }

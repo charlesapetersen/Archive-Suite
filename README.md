@@ -206,6 +206,8 @@ Photograph documents with a phone and stream them straight into the pipeline —
 
 **On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/priority. The card is fully keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add / save, ⌫ to delete the previous tag).
 
+**Backup folder.** Every photo received from the phone is also kept in a durable, easy-to-find folder — **`~/Pictures/Archive Processor Live Capture`** — until the run's output is fully written. A **Backup Folder** button in the Live Capture tab opens it in Finder, so if anything goes wrong you can recover and copy the original photos yourself (they can't be re-taken).
+
 **Two processing modes** (chosen in Settings):
 
 - **Stage for later** — captures collect in Live Capture; send them to Process Files for a normal batch run.
