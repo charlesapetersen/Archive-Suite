@@ -30,5 +30,5 @@ Test Outputs/
 **/xcuserdata/
 *.xcuserstate
 
-# Transient maintenance/resume state (session working files)
+# Transient maintenance/resume state (session working files; incl. test-results/)
 .maintenance/
