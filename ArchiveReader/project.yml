@@ -1,0 +1,61 @@
+name: ArchiveReader
+options:
+  bundleIdPrefix: com.archivereader
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  ArchiveReader:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/ArchiveReader
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.app
+        INFOPLIST_FILE: Sources/ArchiveReader/Info.plist
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        SWIFT_VERSION: "6.0"
+    entitlements:
+      path: Sources/ArchiveReader/ArchiveReader.entitlements
+      properties:
+        # v1 sandboxed for OS-enforced containment of irreplaceable files; non-sandboxed
+        # whole-Mac search is planned long-term (see CLAUDE.md §Stack & Build).
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+
+  ArchiveReaderTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/ArchiveReaderTests
+    dependencies:
+      - target: ArchiveReader
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.tests
+
+schemes:
+  ArchiveReader:
+    build:
+      targets:
+        ArchiveReader: all
+        ArchiveReaderTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ArchiveReaderTests

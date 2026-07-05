@@ -1,0 +1,242 @@
+# Archive Reader — Project Guide
+
+A native macOS app that lets a **historian read through PDFs of historical documents** that were
+tagged by the sibling app **Archive Processor** (same author, `../Archive Processor`). Archive
+Reader is the *reading & triage* companion: find tagged PDFs, list them in chronological order,
+filter by subject / priority / read-state, read them two-up (image + OCR text), copy text and
+file links, and mark them Read as you go.
+
+> **Status:** Planning. This file + `PLAN.md` are the durable record. Product decisions still open
+> are listed in `PLAN.md` (§Decisions). Everything in **Core Directive**, **Verified Facts**, and
+> **Safety Protocol** below is settled and non-negotiable.
+
+---
+
+## CORE DIRECTIVE (bulletproof — this overrides everything)
+
+Archival image files are **irreplaceable** and their tagging was **extremely time-consuming**.
+
+- The app **MUST NOT** delete, move, rename, trash, re-save, or alter any file's **bytes/contents**
+  or **location** — ever.
+- The app **MUST NOT** mangle, drop, or lose any tag *unintentionally*.
+- The app **MAY edit macOS Finder tags** — add / remove / change subject, date, priority, color,
+  and read-state tags, for a single file **or a group** — but **only** as a *deliberate user
+  action*, routed through one audited choke-point (`TagWriter`), applied as a precise **delta**
+  (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
+  (extended-attribute) metadata is the *only* thing the app ever changes; file **bytes and file
+  location never change**. (Read/Unread triage is just the fast-path preset of this same editor.)
+- Everything else — discovery, filtering, viewing, copying — is strictly **read-only**.
+
+This is an architectural property, not a coding-discipline hope: **all tag writes route through the
+single audited `TagWriter`** (see Safety Protocol). No other code imports a file-mutating API, and
+even `TagWriter` never calls a move / rename / delete / content-write API — only the tag-array and
+(deliberately) the color-label metadata.
+
+---
+
+## Verified Facts (measured against the real corpus + Archive Processor source, 2026-07-04)
+
+**Corpus:** `Test files/Brown Gemini/` — ~6,941 two-page PDFs. Real production scale is up to
+**~150,000** files. Filenames like `00001 IMG — Brown.pdf` (note the **em dash** U+2014; production
+paths also contain **non-breaking spaces** U+00A0).
+
+**Tags** are macOS Finder tags:
+- Read: `url.resourceValues(forKeys: [.tagNamesKey]).tagNames` → `[String]`.
+- Write: `(url as NSURL).setResourceValue([String], forKey: .tagNamesKey)`.
+- Color label: `.labelNumberKey` (Red=6 ⇒ box photo, Purple=3 ⇒ folder photo). **Verified:** keeping
+  the color-name token (`"Red"`/`"Purple"`) in the tag array and writing `.tagNamesKey` **preserves
+  `labelNumber`** without writing it (tested on a Red-labeled scratch copy). Still verify-after-write.
+- Spotlight exposes tags as `kMDItemUserTags`.
+
+**Tag facets** (a file's tag array mixes these; classify for display/filter/sort, never lose any):
+- **Year:** 4 digits, e.g. `1980`.
+- **Month:** `MM Month`, e.g. `03 March`.
+- **Day:** `Day N` (unpadded), e.g. `Day 25`, `Day 1`. Often absent.
+- **Date Uncertain:** flags that the date is **speculative** — the file *usually still has a Year
+  tag*. So these files sort by their (speculative) year like any dated file; the nav window renders
+  the derived date in **italics** to signal speculation (never dumped to the end).
+- **Priority:** exactly one of `P7 P8 P9 P10` (P10 highest). Box/folder pages & some docs have none.
+- **Read state:** `Read` or `Unread` (Archive Processor stamps `Unread` last on new output).
+- **Subject:** 2–6 free-form-ish strings (`Jerry Brown`, `DP chapters`, `Economics`, …). May be a
+  controlled vocabulary. **Subjects can collide with other facets** (a subject literally `1984`,
+  `P7`, or `Read`) — facet classification is display-only and must never drive a destructive write.
+
+**PDF structure:** exactly **2 pages** — page 1 = original photographed image (correctly oriented);
+page 2 = OCR text as **real selectable text** (dynamic height). *In this test corpus* page 1 has no
+text; **in production the image page will often also carry a searchable text layer**, so the copy
+tool must work in whichever pane holds the selection. Page-2 header format:
+```
+Extracted text.
+<basename>.jpg
+<Provider> · <Model> · <D Month YYYY>
+Classification: <Box | Folder | Document Start | Continuation>
+<body…>
+```
+Do **not** hard-assume 2 pages: guard against 1-page, >2-page, 0-page, corrupt/encrypted, and
+tagged **non-PDF** images (box/folder markers may be images) — degrade, never crash.
+
+**Document segments (the reading unit).** The reading/triage unit is a *document* — a run of
+consecutive PDFs — which is **finer than** the Red/Purple folder/box markers (a folder holds many
+documents). Segments are recoverable from the page-2 `Classification:` line: verified values are
+`Document Start`, `Continuation`, `Box`, `Folder`. Ordered by the filename sequence within a folder,
+a segment = a `Document Start` plus any following `Continuation` pages (a lone `Start` = 1-page doc);
+`Box`/`Folder` are higher-level markers/provenance. (Sample distribution: ~74% Start, ~19%
+Continuation, rest markers.) The classification lives in the PDF's page-2 **text**, so it's read via
+the content index, not a tag.
+> **Classification is NOT guaranteed present** — older outputs, Mistral/heuristic runs, or
+> hand-added files may lack it. Segment-awareness is therefore a **best-effort enhancement that
+> degrades gracefully**: when the classification is missing, fall back to filename-sequence order +
+> manual multi-select. Never build a core behavior that assumes the classification exists.
+
+**Search:** Spotlight (`mdfind`/`NSMetadataQuery`) finds these by tag fast — a compound 3-facet
+query over 6,941 files returned in **0.38s**; `Read OR Unread` in **0.45s**. Scales to 150k (index
+lookups, not scans). Text-content indexing may lag/miss on some locations. **v1 assumes local disk,
+no cloud drives** (cloud support is deferred — see `PLAN.md` §Future).
+
+**Chronological sort key:** derived **from the Year/Month/Day tags** into a sortable integer
+(e.g. `year*10000 + month*100 + day`, signed for BC). This has **no date-range limit** — medieval
+and ancient dates sort correctly — requires **no** change to Archive Processor and **no** writes to
+files. This is the primary sort key.
+- *Optional future bonus (deferred):* also mirroring the date into the file's **creation date**
+  (`FileManager.setAttributes([.creationDate:])`, verified for 1938/1850; floor ≈ 1677-09-21,
+  range ~1678–2262) would let **Finder itself** browse chronologically and give zero-parse native
+  sort — but it is range-limited and unnecessary for correctness, so it is **not** relied upon.
+
+---
+
+## Safety Protocol — `TagWriter` (the single write choke-point for ALL tag edits)
+
+Every tag write — subject/date/priority/color edits, group edits, and Read/Unread triage — goes
+through **one** function. It is the *entire* write surface. An edit is expressed as a **delta**:
+`{ add: Set<String>, remove: Set<String>, color: ColorChange? }`. A Read/Unread swap is just the
+delta `remove {opposite}, add {target}`. "Set the year to 1981" is `remove {matching Year token(s)},
+add {"1981"}`. All of the following hold for every delta.
+
+1. **Coordinated, metadata-only write.** Wrap in `NSFileCoordinator` with
+   `.contentIndependentMetadataOnly` (never `.forReplacing`, which can re-save content). Open PDFs
+   for reading with `.withoutChanges`.
+2. **Fresh read inside the write block** (avoid TOCTOU): read `.tagNamesKey` + `.labelNumberKey`
+   again immediately before computing/writing.
+3. **Trustworthy-read guard (prevents the catastrophic tag-wipe).** If the read *throws* or returns
+   `nil` tagNames, **ABORT** — never coerce a read failure to `[]`. A file with genuinely zero tags
+   is distinct from an unreadable file; only a *confirmed* array may be written back. (With arbitrary
+   editing now allowed, this guard matters for *every* edit, not just triage.)
+4. **Exact, whole-string, case-insensitive** matching when identifying tokens to remove — never
+   substring (so removing `Unread` never touches a subject `"Read later"`). If the intended target
+   is ambiguous, **refuse and surface**, don't guess.
+5. **Compute the new array losslessly:** `new = (fresh − remove) + add`, preserving every untouched
+   token verbatim; append order stable. Never build the write array from Spotlight's
+   `kMDItemUserTags` (lossy/stale). A **no-op delta writes nothing** (no mod-date churn).
+6. **Do not request `.documentIdentifierKey`** on read (it can *assign & persist* an identifier —
+   a mutation). Use security-scoped bookmarks + re-verify the resolved URL's identity before writing
+   (guards against writing to the wrong file after a Finder move).
+7. **Color label:** write `.labelNumberKey` **only** when the delta explicitly changes color
+   (box/folder). Otherwise never write it; read before/after and restore only on unintended drift.
+8. **Verify by re-read.** Assert the resulting tag **multiset** equals `(old − remove) ∪ add`
+   exactly — nothing else added, removed, or altered; color as intended; file **bytes unchanged**
+   (data-fork hash guard on the writer). Multiset equality, not order (macOS may reorder).
+9. **No blind rollback / no blind restore.** On verify-fail, re-read fresh and reconcile by
+   re-computing the *delta* against current state — never rewrite a stale full array. **Undo = the
+   inverse delta** (`add↔remove`) applied to a fresh read, so undo can never emit or destroy an
+   unrelated token, and it preserves concurrent third-party edits. Bulk/group actions = **one**
+   grouped undo.
+10. **Group edits** show tri-state presence (on all / some / none of the selection, like Finder);
+    "add X" affects only files lacking X, "remove X" only files having it. The Read/Unread fast-path
+    default does **not** add a read-state token to a marker/neither file (option, off).
+11. **Batch = independent idempotent units** (bounded concurrency), never all-or-nothing. Surface
+    partial failures ("12 of 15 updated; 3 could not — Retry"); a row leaves a filtered view only
+    after its write **verified**.
+12. **Append-only audit ledger** of `{path, bookmark, delta, before[], after[], timestamp}` for
+    every change — transparency/history and inverse-delta undo source, *not* blind full-array restore.
+13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no
+    `PDFDocument.write` path exists. The write-surface lint covers *all* write spellings
+    (`setResourceValue(s)`, `setxattr`, `FileManager` mutators, `PDFDocument.write`). The lint is one
+    layer; the real guarantee is that only `TagWriter` imports tag-write APIs and *nothing* imports
+    move/rename/delete/content-write APIs.
+
+Risk tiering (mirrors Archive Processor): `TagWriter` and anything it touches is **Tier-2
+adversarial-review + property/integration tests on scratch copies** on every change. Never test tag
+writes against the real corpus — always a copy.
+
+---
+
+## Architecture (planned)
+
+- **Discovery/filter/sort (tags):** `NSMetadataQuery` scoped to user-granted **archive root(s)**
+  (security-scoped bookmarks). Master universe predicate: `kMDItemUserTags == "Read" ||
+  kMDItemUserTags == "Unread"`. Facet filters combined in-query + in-memory. Live-updating. The
+  filesystem/tags are the **source of truth**.
+- **Content index (full-text + segments):** a background extractor reads each PDF's page-2 text
+  **once** and caches: OCR body (for corpus-wide full-text search), the `Classification:` value (for
+  document segments + markers), and header metadata (provider/model/OCR-date). Stored in
+  **system SQLite FTS5** (`libsqlite3`, OS-provided — *not* a third-party ORM/GRDB dependency).
+  Incremental (only new/changed files). It is a **disposable, rebuildable cache** — deleting it loses
+  nothing; the corpus + tags remain authoritative. This powers v1 full-text search and segment-aware
+  reading without relying on Spotlight content indexing (which was absent on the test copy).
+- **Reading model — the user decides which files open together.** Manual multi-selection in the nav
+  window is the *definitive* grouping mechanism; **the app never auto-groups**. Segment/classification
+  awareness is at most an *optional, opt-in convenience* (e.g. an "extend selection to the next
+  Document Start" command) — never required, and it silently degrades to plain selection when the
+  classification is absent. The content index exists primarily for **full-text search** (v1) and
+  optional provenance display, not for grouping.
+- **Two windows** (SwiftUI scenes): a single **navigation window** (Finder-Smart-Folder-like table)
+  and a **document view window** opened with a selection payload.
+- **Navigation table:** SwiftUI `Table` (NSTableView-backed on macOS 14+), data layer abstracted so
+  an AppKit `NSTableView` swap is possible if `Table` janks at 150k (test early). Columns: Document
+  date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
+- **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
+  draggable gray splitter with center grab handle, **default 2/3 : 1/3** re-applied per document.
+  Up/Down cycles the selection. Intelligent copy + in-doc Find. Degrades for non-2-page/corrupt.
+- **Intelligent copy:** collapse single newlines → space; blank line = paragraph break (keep);
+  de-hyphenate line-end hyphens; works in either pane; optional "skip OCR header" (off by default).
+- **Options panel (⌘,):** link format, newlines-after-link, and more (see `PLAN.md` §Options).
+
+## Stack & Build
+
+- Swift 6, SwiftUI (+ AppKit where needed), **XcodeGen** (`project.yml` authoritative; `.xcodeproj`
+  generated & **gitignored**). PDFKit, `NSMetadataQuery`, `NSURL` resource values, `NSFileCoordinator`.
+- Target macOS 14+. Sandbox posture: **v1 sandboxed**, scoped to a user-granted archive root
+  (start with the provided test-files folder) via a security-scoped bookmark — OS-enforced
+  containment of irreplaceable files. **Non-sandboxed whole-Mac search is planned long-term**, so
+  file access + search go behind a `FileAccessProvider` abstraction: switching posture is an
+  entitlement/config change, not a rewrite.
+- Build: `xcodegen generate` then `xcodebuild -scheme ArchiveReader -configuration Debug build`.
+  Per-worktree DerivedData (`-derivedDataPath ./build/DD`) for concurrent agents, like the sibling.
+
+## Archive Suite (long-term convergence with Archive Processor)
+
+Archive Reader and Archive Processor are two halves of one offering — the Processor *writes* tags,
+the Reader *reads and edits* them — and will eventually ship together as **Archive Suite**. Notably,
+Archive Reader realizes several items already on Archive Processor's own `POTENTIAL_FEATURES.md`
+(full-text search, filter-by-tag, browse, side-by-side original/OCR view).
+
+**The shared contract is the risk.** Both apps must interpret tags, date facets, priorities,
+color/markers, the `Read/Unread` convention, and the 2-page PDF + `Classification:` format
+*identically* — a divergence would corrupt or mis-read irreplaceable data. That contract is the real
+thing to keep in sync (see Verified Facts above; it mirrors Archive Processor's `CLAUDE.md`).
+
+**Recommended approach (staged, low-risk):**
+1. **Now — separate repo, shared contract.** Develop Archive Reader in its own repo with its own
+   XcodeGen project, mirroring Archive Processor's conventions (docs, worktrees, tiered review, push
+   cadence). Keep all domain logic in a **self-contained `Core/` module** (tag facets, `TagWriter`,
+   PDF/classification model, date parsing, link formatting) with **no UI imports**, so it can be
+   lifted out cleanly later. Document the tag/PDF contract identically in both repos.
+2. **At Reader ~M3 (stable core) — extract `ArchiveCore` Swift package.** Move the shared domain into
+   a standalone Swift package; both apps depend on it. This unifies the safety-critical tag code
+   (Processor's `MacOSTagger` + Reader's `TagWriter` reconcile into one audited writer) so it can
+   never drift. This is the appropriate incorporation point — earlier risks churning an unstable API.
+3. **Ship — Archive Suite.** Either a **monorepo** (`Archive Suite/` with `ArchiveProcessor/`,
+   `ArchiveReader/`, `ArchiveCore/`, one `bootstrap.sh`, a shared version tag) distributed as two
+   apps, or a single app with Process/Read modes. A monorepo is preferred once the package exists:
+   one clone, one build, atomic cross-app changes, no submodule friction.
+
+Until step 2, treat the tag/PDF contract as the coupling; keep `Core/` UI-free and package-ready.
+
+## Never
+- Never write to the corpus during development/testing — copy files to the scratchpad first.
+- Never hand-edit `.pbxproj` (edit `project.yml` + regenerate).
+- Never add a tag-writing call outside `TagWriter`; never add a move/rename/delete/content-write
+  call anywhere (not even in `TagWriter`).
+
+See `PLAN.md` for milestones, the keyboard map, the full options list, edge-case rules, the feature
+backlog, and the open decisions awaiting the owner's review.
