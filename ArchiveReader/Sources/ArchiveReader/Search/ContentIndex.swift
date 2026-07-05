@@ -90,6 +90,30 @@ actor ContentIndex {
         return paths
     }
 
+    /// The stored `Classification:` value for a file (nil if absent/unindexed). Uses the path-indexed
+    /// files table for the lookup, then reads the value from the FTS row by rowid.
+    func classification(for path: String) -> String? {
+        guard let sel = prepare("SELECT rowid FROM files WHERE path = ?;") else { return nil }
+        bindText(sel, 1, path)
+        var rowid: Int64?
+        if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
+        sqlite3_finalize(sel)
+        guard let rowid, let stmt = prepare("SELECT classification FROM fts WHERE rowid = ? LIMIT 1;") else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, rowid)
+        if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
+            let s = String(cString: c)
+            return s.isEmpty ? nil : s
+        }
+        return nil
+    }
+
+    func classifications(for paths: [String]) -> [String: String] {
+        var out: [String: String] = [:]
+        for p in paths { if let c = classification(for: p) { out[p] = c } }
+        return out
+    }
+
     func indexedCount() -> Int {
         guard let stmt = prepare("SELECT count(*) FROM files;") else { return 0 }
         defer { sqlite3_finalize(stmt) }

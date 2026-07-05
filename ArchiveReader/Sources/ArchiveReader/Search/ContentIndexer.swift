@@ -49,6 +49,12 @@ final class ContentIndexer: ObservableObject {
         return Set(await index.search(query))
     }
 
+    /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.
+    func classifications(for paths: [String]) async -> [String: String] {
+        try? await index.open()
+        return await index.classifications(for: paths)
+    }
+
     private func setProgress(_ p: (Int, Int)?) { progress = p }
     private func finish() { progress = nil; running = false }
 }

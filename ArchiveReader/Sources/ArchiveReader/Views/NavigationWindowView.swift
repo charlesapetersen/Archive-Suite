@@ -112,6 +112,8 @@ struct NavigationWindowView: View {
             Button("Mark Unread") { model.mark(.unread) }
             Button("Toggle Flag") { model.toggleFlagSelection() }
             Button("Edit Tags…") { showingEditor = true }
+            Divider()
+            Button("Select Document Run") { model.extendSelectionToDocumentRun() }
         } primaryAction: { _ in
             openSelection()   // double-click opens
         }

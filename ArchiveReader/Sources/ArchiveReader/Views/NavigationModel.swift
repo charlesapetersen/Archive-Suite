@@ -64,6 +64,35 @@ final class NavigationModel: ObservableObject {
         runFullTextSearch()   // updates ftsPaths + recompute; filter change also recomputes
     }
 
+    // MARK: Document-run convenience (opt-in; degrades when classification is absent)
+
+    /// Extend the selection to the full document run(s) — a `Document Start` + its `Continuation`
+    /// pages — for each currently-selected file, using the content index's classifications. Works
+    /// over the whole library in filename order; a no-op with a note when classification is missing.
+    func extendSelectionToDocumentRun() {
+        let files = library.files.sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
+        let paths = files.map(\.url.path)
+        let selected = Set(selectedFiles.map(\.url.path))
+        guard !selected.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let cls = await self.indexer.classifications(for: paths)
+            let classifications = paths.map { cls[$0] }
+            var newSel = self.selection
+            for (i, p) in paths.enumerated() where selected.contains(p) {
+                if let range = DocumentRuns.runContaining(i, classifications: classifications) {
+                    for j in range { newSel.insert(files[j].id) }
+                }
+            }
+            if newSel != self.selection {
+                self.selection = newSel
+                self.statusMessage = "Extended selection to document run(s)."
+            } else {
+                self.statusMessage = "No document-run info (classification unavailable)."
+            }
+        }
+    }
+
     // MARK: Notes & flags (app-side, never written to the corpus)
 
     func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.url.path)) }
@@ -102,8 +131,12 @@ final class NavigationModel: ObservableObject {
         }
     }
 
+    /// Selected files resolved against the WHOLE library (not just the filtered `displayed` rows), in
+    /// current sort order — so a selection extended to a document run still opens/copies/marks every
+    /// member even if some are filtered out of the current view.
     var selectedFiles: [ArchiveFile] {
-        displayed.filter { selection.contains($0.id) }
+        let sel = selection
+        return LibrarySort.sorted(library.files.filter { sel.contains($0.id) }, by: sort)
     }
 
     /// Unique subject tags across the library, for filter suggestions.
