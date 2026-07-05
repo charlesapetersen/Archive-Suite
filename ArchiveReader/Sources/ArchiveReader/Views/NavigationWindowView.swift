@@ -8,6 +8,7 @@ struct NavigationWindowView: View {
     @State private var showingHealth = false
     @State private var showingSaveDialog = false
     @State private var newSearchName = ""
+    @State private var showingQuickLook = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +29,23 @@ struct NavigationWindowView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Save the current filters and text search as a reusable smart folder.")
+        }
+        .sheet(isPresented: $showingQuickLook) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text(model.selectedFiles.first?.name ?? "Preview").lineLimit(1).truncationMode(.middle)
+                    Spacer()
+                    Button("Done") { showingQuickLook = false }.keyboardShortcut(.defaultAction)
+                }
+                .padding(8)
+                Divider()
+                if let url = model.selectedFiles.first?.url {
+                    QuickLookView(url: url)
+                } else {
+                    ContentUnavailableView("No selection", systemImage: "eye.slash")
+                }
+            }
+            .frame(width: 720, height: 720)
         }
         .navigationTitle("Archive Reader")
     }
@@ -234,6 +252,10 @@ struct NavigationWindowView: View {
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .keyboardShortcut("o", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { showingQuickLook = true } label: { Label("Quick Look", systemImage: "eye") }
+                .keyboardShortcut(.space, modifiers: [])
                 .disabled(model.selection.isEmpty)
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
