@@ -37,6 +37,47 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
   `@Published` back from `self` inside its own synchronous sink. Unit tests missed this; only running
   the GUI surfaced it (verified via `screencapture`).
 
+## SwiftUI `Table` row-render skip via identity-only Equatable (fixed 2026-07-05 — GUI-caught)
+- `ArchiveFile` conformed to `Equatable`/`Hashable` by **`url` only** (treating `==` as *identity*).
+  SwiftUI's `Table` diffs elements by Equatable, so when a tag edit changed a row's *tags* but not its
+  `url`, the Table judged the element "unchanged" and **skipped re-rendering the cell** — marking a
+  file Read left the row visibly "Unread" even though the model was correct. This *masked* the separate
+  Spotlight clobber (below): we never saw "Read" appear, so it looked like the write/optimistic update
+  failed. Fix: **value-based `==`** (url + name + fileType + tags + contentModified) in
+  `ArchiveFile.swift`; row *identity* for selection stays `id` = url.path; url-only `hash` remains valid
+  (value-equal ⇒ same url ⇒ same hash). **Lesson:** for a type used as SwiftUI collection data, make
+  `Equatable` reflect **displayed value**, not identity — identity belongs in `id`. Unit tests missed
+  it; only the live GUI surfaced it (same lesson as the willSet gotcha above).
+
+## Spotlight tag-index lag clobber + the verified-write overlay (fixed 2026-07-05)
+- After a verified `TagWriter` write, Spotlight fires `NSMetadataQueryDidUpdate` but re-emits the
+  **stale** `kMDItemUserTags` until it re-indexes, so `ArchiveLibrary.reload()` overwrote the correct
+  row with the pre-write value (no guaranteed self-heal). Fix: `applyVerifiedWrites(_:)` records
+  `TagWriter`'s re-read `.after`/`.afterLabel` per URL and `reload()` **overlays** it until Spotlight
+  *value-converges* (case/order-insensitive multiset + normalized label) or a 600 s TTL leak-guard
+  (via a coalesced settle `Timer` for when Spotlight goes silent). It **never backslides** within the
+  TTL and is **display-only — no disk write, not even a disk read** (a read-only "disk oracle" variant
+  was considered and rejected as unneeded complexity + a scale hazard). The per-row decision is the
+  pure, unit-tested `overrideDecision`. Replaced the old `applyOptimisticReadState`/`setExactTags`
+  (which reconstructed tags from the model's own stale array); `mark`/`applyEdit`/`undo` now route
+  through one `applyVerifiedWrites` pass (batch O(N+M), one publish; undo displays the inverse-apply's
+  fresh `.after`, Safety §9).
+
+## Reactive/eventual-consistency bugs found by adversarial review (fixed 2026-07-05)
+A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:
+- **`extendSelectionToDocumentRun` selection race:** the `Task` mixed a *pre-await* `selected` snapshot
+  with the *post-await* current `self.selection`, so a selection change during the `await` polluted it.
+  Fix: snapshot the selection before the await and bail if it changed (the selection is the epoch).
+- **`ContentIndexer` dropped live updates:** `guard !running` silently dropped any index request that
+  arrived during a running pass (new/re-OCR'd files never indexed). Fix: coalescing `pending` + relaunch
+  on finish (a tag-only update does not restart a huge initial index, since `needsIndex` skips it).
+- **`ContentIndexer` uncancelled scope change:** the detached task was never cancelled (its
+  `Task.isCancelled` check was dead code), so a stale-scope pass held the slot and the new root was
+  never indexed. Fix: store + cancel the task on an empty-set (scope-clear) call, with a `generation`
+  token so a superseded pass can't clobber newer progress/finish state.
+- **⌘O orphaned the Preview sheet:** the Selection-menu ⌘O stayed enabled over the preview and opened
+  the doc window without dismissing the sheet. Fix: `openSelection()` clears `showingPreview` first.
+
 ## Open risks / to verify
 - **Spotlight content indexing is unreliable here:** `kMDItemTextContent` was `null` on the freshly
   copied test corpus. → Full-text search must use the app's own content index (extract page-2 text

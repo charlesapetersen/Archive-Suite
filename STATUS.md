@@ -5,10 +5,12 @@ Single source of "where are we, what's next," kept current every work session so
 PLAN.md → this file.
 
 ## Current state (2026-07-05)
-- **Milestone:** **ALL PLANNED WORK COMPLETE** — M0–M3 + the entire **High-priority** backlog, plus a
-  full adversarial code review (13 confirmed bugs fixed) and this documentation review.
+- **Milestone:** **ALL PLANNED WORK COMPLETE + GUI SMOKE-TESTED LIVE.** M0–M3 + the entire
+  **High-priority** backlog, a full adversarial code review (13 bugs fixed), a documentation review,
+  and now a **driven interactive GUI smoke test (18/22 steps PASS live, 0 FAIL; 4 covered indirectly)**
+  which caught + fixed the mark-Read display bug (two compounding causes) and 4 reactive-timing bugs.
 - **Build:** GREEN. `cd ArchiveReader && xcodegen generate && xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build` → **BUILD SUCCEEDED**;
-  `xcodebuild … test` → **75/75 pass**; `bash scripts/lint-write-surface.sh` → clean.
+  `xcodebuild … test` → **83/83 pass**; `bash scripts/lint-write-surface.sh` → clean.
 - **Shipped (see CLAUDE.md §Implementation map for the file tree):**
   - **M0** `Core/TagWriter` — single audited write choke-point (delta edits, coordinated metadata-only
     write, trustworthy-read guard, multiset+label verify, drift restore, label-only inverse undo,
@@ -25,17 +27,22 @@ PLAN.md → this file.
     VoiceOver announcements, library-health popover.
   - **High-priority:** `Search/{NotesStore, SavedSearch}` — notes/flags (outside the corpus),
     reading-session resume, saved searches, Quick Look (⌘Y), opt-in document-run selection.
-  - **Tests:** 75 across DocumentTags, FileLink, TagWriter, LibrarySortFilter, ContentIndex,
-    CopyTextCleaner, TagEditing, NotesStore, SavedSearch, DocumentRuns.
-- **Latest commits:** `763a40f` review fixes · `19267be` document-run · `720b738` Quick Look ·
-  `76f36ff` saved searches · `fc7b564` notes/resume · `53b3ebe` tag editor.
+  - **Tests:** 83 across DocumentTags, FileLink, TagWriter, LibrarySortFilter, ContentIndex,
+    CopyTextCleaner, TagEditing, NotesStore, SavedSearch, DocumentRuns, **ArchiveLibraryOverride** (the
+    new pure `overrideDecision` reconciliation, 8 tests).
+- **Latest commits:** `2b4a66b` mark-Read render-skip fix (ArchiveFile value-equality) + smoke results ·
+  `2e9c661` Spotlight-clobber overlay + 4 reactive-timing bugs (multi-agent review) · `af69463` app icon ·
+  `4f11dc7` smoke harness · `cc26aec` willSet 0-of-N fix.
 
-## Next action — remaining work (none blocking; app is feature-complete for v1)
-1. **Manual GUI smoke test (only real gap):** the SwiftUI GUI compiles + the logic is unit-tested, but
-   the GUI has **not been driven at runtime** (this headless env can't launch/interact with the
-   sandboxed app; nested `claude` is blocked). At the machine: launch the app, choose the `Test files`
-   folder as root, confirm the list populates + sorts chronologically, filters + full-text work,
-   mark-Read drops a row from an Unread view, ⌘O opens the two-up viewer, ⌘C copies cleaned text.
+## Next action — remaining work (none blocking; app is feature-complete + GUI-verified for v1)
+1. **GUI smoke test — DONE (2026-07-05).** Driven live on a scratch corpus (`~/Desktop/AR-Smoke`, 30
+   tagged copies) via `screencapture`/System Events/`cliclick`; **18/22 steps PASS, 0 FAIL** (full
+   record + the 4 `[~]` indirectly-covered steps in `SMOKE_TEST.md`). It caught the mark-Read display
+   bug and 4 reactive-timing bugs, all fixed (see `KNOWN_ISSUES.md`). *Optional follow-up:* drive the
+   4 remaining steps live — C (read-state filter), E (subject filter), K (viewer ⌘C/⌘F), S (saved
+   search) — and the exhaustive viewer zoom/splitter. **Automation note:** launch the built app with
+   `open -a` and **verify `ArchiveReader` is frontmost before every click/capture** (the VS Code host
+   reclaims focus; a blind region capture can grab another window — a privacy hazard).
 2. **Perf-check** the nav Table at ~150k (data layer abstracted; AppKit `NSTableView` swap possible).
 3. **Deferred / optional:** Medium & Lower `POTENTIAL_FEATURES` (explicitly out of the overnight
    scope); non-sandboxed whole-Mac search (code-ready — a build-time entitlement flip, see below).
