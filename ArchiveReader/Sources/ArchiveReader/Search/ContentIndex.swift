@@ -19,10 +19,13 @@ actor ContentIndex {
     init(url: URL) { self.url = url }
 
     func open() throws {
+        guard db == nil else { return }   // idempotent — callers open() before every use
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
-            throw IndexError.open(lastMessage)
+            let message = lastMessage
+            sqlite3_close(db); db = nil   // SQLite may allocate a handle even on failure — free it so a retry works
+            throw IndexError.open(message)
         }
         sqlite3_busy_timeout(db, 3000)
         // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.

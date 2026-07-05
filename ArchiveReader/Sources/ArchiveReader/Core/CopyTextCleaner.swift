@@ -42,13 +42,16 @@ enum CopyTextCleaner {
         var result = trimmed[0]
         for i in 1..<trimmed.count {
             let cont = trimmed[i]
-            guard options.collapseSingleNewlines else { result += "\n" + cont; continue }
+            // De-hyphenation is independent of newline-collapsing: a word split by a trailing hyphen
+            // is rejoined even when single line breaks are otherwise preserved.
             if options.deHyphenate, result.hasSuffix("-"),
                isLetter(result.dropLast().last), isLetter(cont.first) {
                 result.removeLast()      // drop the line-split hyphen and join the word halves
                 result += cont
-            } else {
+            } else if options.collapseSingleNewlines {
                 result += " " + cont
+            } else {
+                result += "\n" + cont
             }
         }
         return result

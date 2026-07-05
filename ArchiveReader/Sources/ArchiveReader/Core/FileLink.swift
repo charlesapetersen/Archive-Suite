@@ -36,8 +36,16 @@ struct FileLinkFormatter: Sendable {
         case .markdown:
             return "[\(displayName(for: url))](\(url.absoluteString))"
         case .html:
-            return "<a href=\"\(url.absoluteString)\">\(displayName(for: url))</a>"
+            return "<a href=\"\(url.absoluteString)\">\(htmlEscaped(displayName(for: url)))</a>"
         }
+    }
+
+    /// Escape text for an HTML text node (order matters — `&` first).
+    private func htmlEscaped(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
     /// The clipboard string for a selection of files.

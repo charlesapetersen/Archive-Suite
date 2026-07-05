@@ -14,9 +14,11 @@ final class NavigationModel: ObservableObject {
 
     @Published var filter = LibraryFilter()
     @Published var sort = LibrarySort.default
-    @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection() } }
+    @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection(); refreshSelectionCache() } }
     @Published var fullTextQuery = ""
     @Published private(set) var displayed: [ArchiveFile] = []
+    @Published private(set) var selectedFilesCache: [ArchiveFile] = []
+    @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
@@ -34,7 +36,8 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    self.recompute()
+                    self.refreshSubjectsCache()
+                    self.recompute()                                 // also refreshes the selection cache
                     self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
                     self.restoreSelectionIfNeeded()                  // reading-session resume
                 }
@@ -110,7 +113,14 @@ final class NavigationModel: ObservableObject {
         if !present.isEmpty { selection = present }
     }
     private func persistSelection() {
-        UserDefaults.standard.set(Array(selection), forKey: "lastSelectionPaths")
+        // Cap persistence so a huge multi-select (e.g. Select All over 150k) never serializes a giant
+        // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
+        let paths = Array(selection)
+        if paths.count <= 500 {
+            UserDefaults.standard.set(paths, forKey: "lastSelectionPaths")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "lastSelectionPaths")
+        }
     }
 
     // MARK: Derived
@@ -119,29 +129,40 @@ final class NavigationModel: ObservableObject {
         var base = library.files.filter(filter.matches)
         if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
         displayed = LibrarySort.sorted(base, by: sort)
+        refreshSelectionCache()   // sort order affects the selection cache too
     }
 
+    private var ftsGeneration = 0
     /// Run (or clear) the corpus full-text search, then re-filter. AND-combined with the tag facets.
+    /// A generation token ensures a slower older search can't overwrite a newer one's result.
     func runFullTextSearch() {
         let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
+        ftsGeneration += 1
+        let generation = ftsGeneration
         Task { [weak self] in
             guard let self else { return }
-            self.ftsPaths = q.isEmpty ? nil : await self.indexer.search(q)
+            let result: Set<String>? = q.isEmpty ? nil : await self.indexer.search(q)
+            guard generation == self.ftsGeneration else { return }   // superseded by a newer search
+            self.ftsPaths = result
             self.recompute()
         }
     }
 
-    /// Selected files resolved against the WHOLE library (not just the filtered `displayed` rows), in
-    /// current sort order — so a selection extended to a document run still opens/copies/marks every
-    /// member even if some are filtered out of the current view.
-    var selectedFiles: [ArchiveFile] {
-        let sel = selection
-        return LibrarySort.sorted(library.files.filter { sel.contains($0.id) }, by: sort)
-    }
+    /// Selected files resolved against the WHOLE library (not just filtered `displayed` rows), in sort
+    /// order — so a run/filtered selection still opens/copies/marks every member. Cached (recomputed on
+    /// selection / sort / library change) to avoid an O(N) scan + sort on every SwiftUI render.
+    var selectedFiles: [ArchiveFile] { selectedFilesCache }
 
-    /// Unique subject tags across the library, for filter suggestions.
-    var allSubjects: [String] {
-        Array(Set(library.files.flatMap(\.subjects))).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    /// Unique subject tags across the library, for filter/editor suggestions. Cached (see above).
+    var allSubjects: [String] { allSubjectsCache }
+
+    private func refreshSelectionCache() {
+        let sel = selection
+        selectedFilesCache = LibrarySort.sorted(library.files.filter { sel.contains($0.id) }, by: sort)
+    }
+    private func refreshSubjectsCache() {
+        allSubjectsCache = Array(Set(library.files.flatMap(\.subjects)))
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     // MARK: Root selection
@@ -165,14 +186,18 @@ final class NavigationModel: ObservableObject {
         let urls = selectedFiles.map(\.url)
         guard !urls.isEmpty else { return }
         var batch: [TagWriteResult] = []
+        var succeeded = Set<URL>()
         var failures = 0
         for url in urls {
             do {
                 let r = try TagWriter.setReadState(target, on: url)
+                succeeded.insert(url)             // success OR no-op → the file is in the target state
                 if !r.isNoOp { batch.append(r) }
             } catch { failures += 1 }
         }
-        library.applyOptimisticReadState(target, for: Set(urls))
+        // Only files that actually verified move in the model — a failed write must NOT vanish from a
+        // filtered view (Safety §11).
+        library.applyOptimisticReadState(target, for: succeeded)
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
         statusMessage = failures == 0
             ? "Marked \(batch.count) \(target.rawValue)."

@@ -30,7 +30,9 @@ struct TagDelta: Sendable, Equatable {
 
     enum ColorChange: Sendable, Equatable {
         case set(ArchiveColor)   // box = Red(6) / folder = Purple(3)
-        case clear               // label 0, and drop any Red/Purple token
+        case clear               // label 0, and drop the color token matching the current label
+        case restoreLabel(Int?)  // undo only: set the label verbatim WITHOUT touching the tag array
+                                 // (the delta's add/remove already carries the exact token changes)
     }
 
     var isEmpty: Bool { add.isEmpty && remove.isEmpty && color == nil }
@@ -83,6 +85,8 @@ enum TagWriter {
                     removals.append(current.tokenName)                 // remove only the token matching the actual label
                 }
                 targetLabel = 0
+            case .restoreLabel(let lbl):
+                targetLabel = lbl                                      // undo: label only; never touch tokens
             case nil:
                 break
             }
@@ -183,10 +187,13 @@ enum TagWriter {
 
                 // §9 inverse delta (re-adds what we removed, removes what we added, restores color).
                 let beforeSet = Set(before), afterSet = Set(after)
+                // The token diff alone carries token changes; color is restored as a LABEL-ONLY op so
+                // undo can never add/remove a token the forward op didn't touch (Safety §9), and any
+                // original label value (not just 0/3/6) is restored verbatim.
                 let inverse = TagDelta(
                     add: Array(beforeSet.subtracting(afterSet)),
                     remove: Array(afterSet.subtracting(beforeSet)),
-                    color: normalized(afterLabel) != normalized(beforeLabel) ? colorChange(forLabel: beforeLabel) : nil
+                    color: normalized(afterLabel) != normalized(beforeLabel) ? .restoreLabel(beforeLabel) : nil
                 )
                 box.result = TagWriteResult(url: url, before: before, after: after,
                                             beforeLabel: beforeLabel, afterLabel: afterLabel, inverse: inverse)
@@ -224,15 +231,6 @@ enum TagWriter {
     }
 
     private static func multisetEqual(_ a: [String], _ b: [String]) -> Bool { a.sorted() == b.sorted() }
-
-    private static func colorChange(forLabel label: Int?) -> TagDelta.ColorChange? {
-        switch label ?? 0 {
-        case 6: return .set(.box)
-        case 3: return .set(.folder)
-        case 0: return .clear
-        default: return nil            // a non-box/folder Finder color: leave it to the caller
-        }
-    }
 
     /// A small reference box so the synchronous coordination closure can hand results back out.
     private final class ResultBox { var result: TagWriteResult?; var error: Error? }

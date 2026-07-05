@@ -153,6 +153,30 @@ final class TagWriterTests: XCTestCase {
         XCTAssertFalse(Set(try readTags(url)).contains("Red"))
     }
 
+    // Regression (review finding [1]/[3]): undo of a color change is label-only, so it restores the
+    // label verbatim and never adds/removes a token beyond the recorded diff.
+    func testUndoColorSwapRestoresLabelAndTokensExactly() throws {
+        let url = try makeFile("boxswap.pdf", tags: ["Red", "Jerry Brown"], label: 6)   // box
+        let r = try TagWriter.apply(TagDelta(color: .set(.folder)), to: url)
+        XCTAssertEqual(try readLabel(url), 3)
+        XCTAssertTrue(Set(try readTags(url)).contains("Purple"))
+        XCTAssertFalse(Set(try readTags(url)).contains("Red"))
+        _ = try TagWriter.apply(r.inverse, to: url)                 // undo
+        XCTAssertEqual(Set(try readTags(url)), ["Red", "Jerry Brown"])
+        XCTAssertEqual(try readLabel(url), 6)                       // label restored verbatim
+    }
+
+    func testUndoSetColorOnUncoloredRemovesTokenAndLabel() throws {
+        let url = try makeFile("plaincolor.pdf", tags: ["Jerry Brown", "Unread"], label: nil)
+        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        XCTAssertTrue(Set(try readTags(url)).contains("Red"))
+        _ = try TagWriter.apply(r.inverse, to: url)
+        let after = Set(try readTags(url))
+        XCTAssertFalse(after.contains("Red"))
+        XCTAssertTrue(after.isSuperset(of: ["Jerry Brown", "Unread"]))
+        XCTAssertEqual(try readLabel(url) ?? 0, 0)
+    }
+
     // MARK: Safety guards
 
     func testUnreadableFileIsRefusedNotWiped() throws {

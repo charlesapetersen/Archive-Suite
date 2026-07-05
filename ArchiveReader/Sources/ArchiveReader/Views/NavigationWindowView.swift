@@ -106,6 +106,7 @@ struct NavigationWindowView: View {
         }
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
+            Button("Quick Look") { showingQuickLook = true }
             Button("Copy Link(s)") { model.copyLinks() }
             Divider()
             Button("Mark Read") { model.mark(.read) }
@@ -257,7 +258,7 @@ struct NavigationWindowView: View {
                 .disabled(model.selection.isEmpty)
 
             Button { showingQuickLook = true } label: { Label("Quick Look", systemImage: "eye") }
-                .keyboardShortcut(.space, modifiers: [])
+                .keyboardShortcut("y", modifiers: .command)   // ⌘Y — bare Space would block typing in filter fields
                 .disabled(model.selection.isEmpty)
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }

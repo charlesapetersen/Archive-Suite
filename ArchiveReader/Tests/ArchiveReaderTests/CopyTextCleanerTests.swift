@@ -50,4 +50,10 @@ final class CopyTextCleanerTests: XCTestCase {
         let input = "line one\nline two"
         XCTAssertEqual(CopyTextCleaner.clean(input, options: opts), "line one\nline two")
     }
+
+    // Regression (review finding [13]): de-hyphenation works even when newline-collapsing is OFF.
+    func testDeHyphenationWorksWithCollapseOff() {
+        var opts = CopyTextOptions(); opts.collapseSingleNewlines = false; opts.deHyphenate = true
+        XCTAssertEqual(CopyTextCleaner.clean("wel-\nfare\nstate", options: opts), "welfare\nstate")
+    }
 }

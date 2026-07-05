@@ -20,6 +20,14 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
   concurrent test processes contend on `NSFileCoordinator` and tag writes, ballooning runtimes
   (seen: a 0.07s suite took 448s under contention). Run one build/test at a time.
 
+## Deferred hardening (from the 2026-07-05 code review)
+- **Write-target identity re-verification (Safety §6, low severity):** `TagWriter.mutate` writes to
+  whatever file currently occupies the URL. If a file is moved/replaced in Finder between Spotlight
+  discovery and the write, the delta could apply to the wrong file's tags. v1 assumes stable local
+  files (owner-confirmed). Full fix = capture a stable identity (security-scoped bookmark /
+  `fileResourceIdentifierKey`) at discovery and re-verify inside the coordination block before
+  writing. Tracked for a future hardening pass; do NOT request `.documentIdentifierKey` (it mutates).
+
 ## Open risks / to verify
 - **Spotlight content indexing is unreliable here:** `kMDItemTextContent` was `null` on the freshly
   copied test corpus. → Full-text search must use the app's own content index (extract page-2 text
