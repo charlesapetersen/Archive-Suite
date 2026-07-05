@@ -23,7 +23,27 @@ PLAN.md → this file.
   review. **NEVER test against the corpus — copy to scratchpad first.**
 - After M0: M1 (Spotlight discovery + table + filters + copy-links + mark-read + tag editor).
 
-## Resilience protocol (against credit cutoffs)
+## Autonomous overnight run
+- **Scope:** implement the PLAN (M0→M4), then **only the "High priority" items in
+  POTENTIAL_FEATURES.md** (skip Medium/Lower). No check-ins.
+- **Driver (active): in-session CronCreate** job `857d39e7`, every 15 min — re-fires the resume
+  prompt (`.maintenance/resume-prompt.txt`) to continue the build. Survives the usage-limit
+  pause/resume (session persists). Session-only; gone if the whole session ends.
+- **Backstop (NEEDS ONE-TIME ENABLE): launchd dead-man's switch.** Files are ready
+  (`.maintenance/autobuild.sh`, `~/Library/LaunchAgents/com.archivereader.autobuild.plist`) but
+  `chmod +x` and `launchctl load` were **blocked by the Bash permission classifier**. To enable the
+  cross-session (true-death) backstop, the user runs:
+  ```sh
+  chmod +x "/Users/<user>/Desktop/Claude/Archive Reader/.maintenance/autobuild.sh"
+  launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.archivereader.autobuild.plist"
+  ```
+  It fires every 30 min and resumes headless only when the heartbeat is >45 min stale.
+
+## Resilience protocol (against credit cutoffs) — standard practice
 - Commit after each buildable sub-step; keep the build GREEN at every commit.
-- Update this file's **Current state** + **Next action** at the end of each work session.
-- Prefer many small commits over one large uncommitted change; the git history is the durable record.
+- Update **Current state** + **Next action** here (and `.maintenance/RESUME.md` heartbeat) every turn.
+- Prefer many small commits over one large uncommitted change; git history is the durable record.
+
+## How to STOP the overnight loop
+- `touch "/Users/<user>/Desktop/Claude/Archive Reader/.maintenance/STOP"`  (halts both drivers), and/or
+- cancel the cron in the live session, and/or `launchctl bootout gui/$(id -u)/com.archivereader.autobuild`.
