@@ -8,11 +8,15 @@ import AppKit
 final class NavigationModel: ObservableObject {
     let library = ArchiveLibrary()
     let rootStore = RootFolderStore()
+    let indexer = ContentIndexer()
 
     @Published var filter = LibraryFilter()
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>()
+    @Published var fullTextQuery = ""
     @Published private(set) var displayed: [ArchiveFile] = []
+    @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
+    @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
     @Published var statusMessage = ""
 
@@ -24,7 +28,16 @@ final class NavigationModel: ObservableObject {
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
         library.$files
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.recompute() } }
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.recompute()
+                    self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
+                }
+            }
+            .store(in: &cancellables)
+        indexer.$progress
+            .sink { [weak self] p in MainActor.assumeIsolated { self?.indexingProgress = p } }
             .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
     }
@@ -32,7 +45,19 @@ final class NavigationModel: ObservableObject {
     // MARK: Derived
 
     func recompute() {
-        displayed = LibrarySort.sorted(library.files.filter(filter.matches), by: sort)
+        var base = library.files.filter(filter.matches)
+        if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
+        displayed = LibrarySort.sorted(base, by: sort)
+    }
+
+    /// Run (or clear) the corpus full-text search, then re-filter. AND-combined with the tag facets.
+    func runFullTextSearch() {
+        let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
+        Task { [weak self] in
+            guard let self else { return }
+            self.ftsPaths = q.isEmpty ? nil : await self.indexer.search(q)
+            self.recompute()
+        }
     }
 
     var selectedFiles: [ArchiveFile] {

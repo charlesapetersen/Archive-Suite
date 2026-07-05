@@ -111,14 +111,30 @@ struct NavigationWindowView: View {
 
             TextField("Filter file name…", text: $model.filter.searchText)
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 160)
+
+            HStack(spacing: 3) {
+                Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
+                TextField("Search OCR text…", text: $model.fullTextQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 180)
+                    .onSubmit { model.runFullTextSearch() }
+                if model.ftsPaths != nil {
+                    Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Clear full-text search")
+                }
+            }
 
             Spacer()
 
-            if !model.filter.subjects.isEmpty || !model.filter.priorities.isEmpty
-                || model.filter.read != .all || !model.filter.searchText.isEmpty {
+            if model.filter.isActive || model.ftsPaths != nil {
                 Button("Clear") {
                     model.filter = LibraryFilter()
+                    model.fullTextQuery = ""
+                    model.runFullTextSearch()
                 }
             }
         }
@@ -218,6 +234,10 @@ struct NavigationWindowView: View {
             if model.library.isGathering { ProgressView().controlSize(.small); Text("Searching…") }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
                 .foregroundStyle(.secondary)
+            if let p = model.indexingProgress {
+                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
+                Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.secondary)
+            }
             Spacer()
             if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
             if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
