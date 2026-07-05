@@ -17,7 +17,7 @@ built + tested (`xcodebuild … build/test`, keep 83+ green) and GUI-reviewed on
 4. [x] **Remove "No read-state"** from the filter-bar read-state segmented control.
 5. [x] **"Add subject filter" → "Add tag filter"** with tag autocomplete (native `NSComboBox`:
    inline completion + dropdown of existing tags). Verified in GUI.
-6. [ ] **Right-margin tag cloud.** A panel that expands from the right edge showing all non-date,
+6. [x] **Right-margin tag cloud.** A panel that expands from the right edge showing all non-date,
    non-read-state tags across the *currently viewable* files. Tags listed alphabetically; each tag's
    font size scales with the number of viewable files carrying it.
 7. [x] **Preview arrow-key navigation.** In the Space preview, ↑/↓ move up/down the file list and the

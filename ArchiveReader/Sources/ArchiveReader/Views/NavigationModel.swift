@@ -197,6 +197,18 @@ final class NavigationModel: ObservableObject {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    /// Tag cloud over the *currently displayed* rows: each non-date / non-read-state tag with the
+    /// number of visible files carrying it, in alphabetical order (the view scales font size by count).
+    /// Counts each tag once per file.
+    var tagCloud: [(tag: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for f in displayed {
+            for t in Set(f.tags.topicalTags) { counts[t, default: 0] += 1 }
+        }
+        return counts.map { (tag: $0.key, count: $0.value) }
+            .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
+    }
+
     // MARK: Root selection
 
     func chooseRoot() {

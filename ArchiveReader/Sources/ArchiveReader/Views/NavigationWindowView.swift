@@ -5,13 +5,21 @@ struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
+    @State private var showingTagCloud = false
     @State private var newSearchName = ""
 
     var body: some View {
         VStack(spacing: 0) {
             filterBar
             Divider()
-            table
+            HStack(spacing: 0) {
+                table
+                if showingTagCloud {
+                    Divider()
+                    tagCloudPanel
+                        .transition(.move(edge: .trailing))   // expands in from the right margin
+                }
+            }
             Divider()
             statusBar
         }
@@ -147,6 +155,54 @@ struct NavigationWindowView: View {
     private func displaySubjects(_ file: ArchiveFile) -> String {
         // Dates live in the Document date column, so exclude the date facets (and read-state) here.
         file.tags.topicalTags.joined(separator: ", ")
+    }
+
+    // MARK: Tag cloud (right margin)
+
+    private var tagCloudPanel: some View {
+        let cloud = model.tagCloud
+        let maxCount = max(1, cloud.map(\.count).max() ?? 1)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Tags in view").font(.headline)
+                Spacer()
+                Text("\(cloud.count)").foregroundStyle(.secondary).font(.caption)
+            }
+            .padding(10)
+            Divider()
+            if cloud.isEmpty {
+                Text("No tags in the current view.")
+                    .foregroundStyle(.secondary).font(.callout)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    FlowLayout(spacing: 8) {
+                        ForEach(cloud, id: \.tag) { item in
+                            let active = model.filter.subjects.contains(item.tag)
+                            Button {
+                                if active { model.filter.subjects.remove(item.tag) }
+                                else { model.filter.subjects.insert(item.tag) }
+                            } label: {
+                                Text(item.tag)
+                                    .font(.system(size: tagCloudFontSize(item.count, max: maxCount)))
+                                    .foregroundStyle(active ? Color.accentColor : .primary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("\(item.count) file\(item.count == 1 ? "" : "s") · click to \(active ? "remove" : "add") as a tag filter")
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(width: 240)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    /// Map a tag's file-count to a font size (11…26 pt) relative to the most common visible tag.
+    private func tagCloudFontSize(_ count: Int, max maxCount: Int) -> CGFloat {
+        11 + (CGFloat(count) / CGFloat(maxCount)) * 15
     }
 
     // MARK: Filter bar
@@ -288,6 +344,11 @@ struct NavigationWindowView: View {
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")
 
+            Button { withAnimation(.easeInOut(duration: 0.2)) { showingTagCloud.toggle() } } label: {
+                Label("Tag Cloud", systemImage: "tag.square")
+            }
+            .help("Show a tag cloud of the visible files — larger tags appear on more files (click to filter)")
+
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .disabled(model.selection.isEmpty)
                 .help("Open the selected documents for reading (⌘O)")
@@ -393,6 +454,36 @@ private struct DataQualityView: View {
         HStack {
             Text(label); Spacer()
             Text("\(value)").foregroundStyle(warn ? .orange : .secondary).monospacedDigit()
+        }
+    }
+}
+
+/// A simple wrapping flow layout (left-aligned, wraps to the next row when the width is exceeded).
+/// Used by the tag cloud so variably-sized tags flow like a word cloud.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        let maxW = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+        return CGSize(width: maxW.isFinite ? maxW : x, height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        let maxW = bounds.width
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
+            v.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), anchor: .topLeading, proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
         }
     }
 }
