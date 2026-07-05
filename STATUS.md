@@ -5,9 +5,14 @@ Single source of "where are we, what's next," kept current every work session so
 PLAN.md → this file.
 
 ## Current state (2026-07-05)
-- **Milestone:** M0 + **M1 COMPLETE** (safety core + navigation window). Starting **M1.5** (content index).
+- **Milestone:** **M0, M1, M1.5, M2 COMPLETE** (safety core + navigation window + content index/
+  full-text search + two-up document viewer). The core reading app is functional. Starting **M3**.
 - **Build:** GREEN. `xcodegen generate && xcodebuild … build` → **BUILD SUCCEEDED**;
-  `xcodebuild … test` → **33/33 pass**; `bash scripts/lint-write-surface.sh` → clean.
+  `xcodebuild … test` → **48/48 pass**; `bash scripts/lint-write-surface.sh` → clean.
+- **Latest commits:** `f951711` M2 · `3dc8368` M2a · `45cf2e3` M1.5 · `2d8e9c7` M1 · `91c0afd` M0.
+- **Added since M1:** `Core/CopyTextCleaner` (intelligent copy); `Search/{ContentIndex(SQLite FTS5),
+  PDFTextExtractor, ContentIndexer}`; `Views/{PDFPaneView, DocumentViewerModel, DocumentWindowView}`;
+  full-text search wired into the nav window.
 - **⚠ Verification caveat:** the Core/logic layers are unit-tested (33), but the **SwiftUI GUI has not
   been driven at runtime** (headless env can't launch/interact with the sandboxed app, and nested
   `claude` is blocked). A manual GUI smoke test is pending: launch the app, choose the `Test files`
@@ -26,19 +31,23 @@ PLAN.md → this file.
     mark Read/Unread via TagWriter + undo, open selection; keyboard shortcuts).
   - Tests: DocumentTags, FileLink, TagWriter, LibrarySortFilter (33 total).
 
-## Next action (M1.5 — content index + full-text search)
-1. **Content index** in `Search/` (or `Core/`): a background extractor that, per file in the library,
-   opens the PDF with PDFKit, extracts page-2 (and page-1 if present) text + the `Classification:`
-   line + header metadata, and stores it in a **system SQLite FTS5** DB (`libsqlite3`, no third-party
-   dep) under Application Support — a disposable, rebuildable cache keyed by path + content-mod-date.
-   Incremental (skip unchanged). Run off the main actor; show progress.
-2. **Full-text search** wired into `LibraryFilter`/the nav window: a query box that AND-combines an
-   FTS match (returns matching file paths) with the existing tag facet filters. In-document ⌘F comes
-   with M2's viewer.
-3. Keep it UI-free where possible; guard non-2-page/corrupt/non-PDF (extractor must not crash).
-- Then M2 doc viewer, M3 options/keymap/accessibility, M4 + High-priority backlog.
-- **Also pending:** perf-check the nav Table at ~150k (data layer is abstracted; AppKit NSTableView
-  swap stays possible) and the manual GUI smoke test noted above.
+## Next action (M3 — Options panel + keymap + accessibility + data-quality)
+1. **Options panel (⌘,)** — replace the `OptionsView` scaffold with real settings persisted via
+   `@AppStorage`: link format + newlines-after-link (wire into `FileLinkFormatter`); copy behavior
+   (`CopyTextOptions`: de-hyphenate, collapse-single-newlines, paragraph-on-blank, skip-OCR-header)
+   → thread into `DocumentViewerModel.copyOptions`; default split ratio + per-pane default zoom;
+   date display format; subject-combine default; read-state default; tag-editing prefs
+   (near-dup warning, controlled vocab, large-group confirm threshold); archive-root management.
+2. **Keyboard map** — finalize collision-free shortcuts (see PLAN.md §Keyboard); ensure nav digit
+   type-select doesn't fight priority toggles.
+3. **Accessibility** — honor Reduce Motion (instant row removal), VoiceOver announcements on
+   mark-Read, deterministic focus after a batch leaves the view.
+4. **Data-quality view** — counts of no-date / no-priority / Date-Uncertain / both-Read+Unread /
+   unreadable, from the library.
+- Then **M4** power features, then **High-priority** POTENTIAL_FEATURES only (skip Med/Low).
+- **Still pending (not blocking):** the M1 **tag editor** (⌘I inspector: add/remove subjects, set
+  date/priority/color for single + group via `TagWriter`) was specced but not yet built — do it in
+  M3/M4. Perf-check nav Table at ~150k. Manual GUI smoke test (headless env can't drive the GUI).
 
 ## Autonomous overnight run
 - **Scope:** implement the PLAN (M0→M4), then **only the "High priority" items in
