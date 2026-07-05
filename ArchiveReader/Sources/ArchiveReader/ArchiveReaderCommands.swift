@@ -81,20 +81,37 @@ struct ArchiveReaderCommands: Commands {
             .disabled(nav == nil)
         }
 
-        // Document (document window)
+        // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not
+        // bound here). The focused pane (⌘⌥←/→) is what ⌘↑/⌘↓ zoom.
         CommandMenu("Document") {
-            Button("Copy Text") { doc?.copySelection() }
+            Button("Previous Page in Segment") { doc?.previous() }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .shift]).disabled(doc == nil)
+            Button("Next Page in Segment") { doc?.next() }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .shift]).disabled(doc == nil)
+            Divider()
+            Button("Focus Image Page") { doc?.focusPane(.left) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(doc == nil)
+            Button("Focus Text Page") { doc?.focusPane(.right) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(doc == nil)
+            Divider()
+            Button("Zoom In") { doc?.zoomFocusedIn() }
+                .keyboardShortcut(.upArrow, modifiers: .command).disabled(doc == nil)
+            Button("Zoom Out") { doc?.zoomFocusedOut() }
+                .keyboardShortcut(.downArrow, modifiers: .command).disabled(doc == nil)
+            Button("Fit Page") { doc?.fitFocused() }
+                .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
+            Divider()
+            Button("Copy") { doc?.copyPlainSelection() }
                 .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
+            Button("Copy Cleaned for Prose") { doc?.copySelection() }
+                .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(doc == nil)
             Button("Find…") { doc?.showingFind = true }
                 .keyboardShortcut("f", modifiers: .command).disabled(doc == nil)
             Divider()
             Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(doc == nil)
             Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(doc == nil)
-            Button("Fit Image") { doc?.leftController.fit() }.disabled(doc == nil)
-            Divider()
             Button("Zoom In (Text)") { doc?.rightController.zoomIn() }.disabled(doc == nil)
             Button("Zoom Out (Text)") { doc?.rightController.zoomOut() }.disabled(doc == nil)
-            Button("Fit Text") { doc?.rightController.fit() }.disabled(doc == nil)
         }
     }
 

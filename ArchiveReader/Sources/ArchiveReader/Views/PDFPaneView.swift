@@ -11,6 +11,12 @@ final class PDFPaneController {
     func zoomOut() { adjust(1 / 1.25) }
     func fit()     { pdfView?.autoScales = true }
 
+    /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
+    func focus() {
+        guard let v = pdfView else { return }
+        v.window?.makeFirstResponder(v)
+    }
+
     private func adjust(_ factor: CGFloat) {
         guard let v = pdfView else { return }
         v.autoScales = false
@@ -29,6 +35,12 @@ final class PDFPaneController {
     func cleanedSelection(_ options: CopyTextOptions) -> String? {
         guard let s = pdfView?.currentSelection?.string, !s.isEmpty else { return nil }
         return CopyTextCleaner.clean(s, options: options)
+    }
+
+    /// The current text selection, raw/verbatim (nil if nothing is selected here) — for plain copy.
+    func plainSelection() -> String? {
+        guard let s = pdfView?.currentSelection?.string, !s.isEmpty else { return nil }
+        return s
     }
 
     func findAndSelect(_ query: String) {

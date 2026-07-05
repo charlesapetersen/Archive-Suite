@@ -329,6 +329,18 @@ final class NavigationModel: ObservableObject {
         DocumentSelection(filePaths: selectedFiles.map(\.url.path))
     }
 
+    /// Move the selection one row up/down the *currently displayed* list (single-select), for browsing
+    /// via the preview's ↑/↓. Anchors on the current selection's position in `displayed`.
+    func moveSelectionInList(_ delta: Int) {
+        guard !displayed.isEmpty else { return }
+        let ids = displayed.map(\.id)
+        let sel = selection
+        let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
+        let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
+        let next = max(0, min(ids.count - 1, anchor + delta))
+        selection = [ids[next]]
+    }
+
     /// Reveal (and select) the chosen files in Finder. Read-only — opens Finder pointing at the files;
     /// never moves, renames, or alters anything.
     func revealInFinder() {

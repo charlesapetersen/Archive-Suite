@@ -28,7 +28,7 @@ struct NavigationWindowView: View {
             Text("Save the current filters and text search as a reusable smart folder.")
         }
         .sheet(isPresented: $model.showingPreview) {
-            PreviewSheet(selection: model.documentSelection()) {
+            PreviewSheet(selection: model.documentSelection(), nav: model) {
                 model.showingPreview = false
                 openSelection()   // "Open" → jump to the full document window
             }

@@ -5,6 +5,7 @@ import SwiftUI
 /// selected text (⌘C), can jump to the full viewer (⌘O), and dismisses with Space or Esc.
 struct PreviewSheet: View {
     let selection: DocumentSelection
+    @ObservedObject var nav: NavigationModel
     var onOpenFull: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +19,8 @@ struct PreviewSheet: View {
         }
         .frame(width: 940, height: 700)
         .onAppear { model.load(selection) }
+        // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match.
+        .onChange(of: nav.selection) { model.load(nav.documentSelection()) }
         // Space toggles the preview closed (Finder-style); Esc also closes via the Done button.
         .onKeyPress(.space) { dismiss(); return .handled }
     }
@@ -30,17 +33,28 @@ struct PreviewSheet: View {
                 Text(model.positionLabel).foregroundStyle(.secondary)
             }
             Spacer()
+            // ↑/↓ move up/down the file list (live preview follows the selection).
+            Button { nav.moveSelectionInList(-1) } label: { Image(systemName: "chevron.up") }
+                .keyboardShortcut(.upArrow, modifiers: [])
+                .help("Previous file in the list (↑)")
+            Button { nav.moveSelectionInList(1) } label: { Image(systemName: "chevron.down") }
+                .keyboardShortcut(.downArrow, modifiers: [])
+                .help("Next file in the list (↓)")
+            // ←/→ cycle within a multi-file selection that was opened together.
             Button { model.previous() } label: { Image(systemName: "chevron.left") }
                 .keyboardShortcut(.leftArrow, modifiers: [])
                 .disabled(model.index <= 0)
-                .help("Previous document (←)")
+                .help("Previous document in the selection (←)")
             Button { model.next() } label: { Image(systemName: "chevron.right") }
                 .keyboardShortcut(.rightArrow, modifiers: [])
                 .disabled(model.index >= model.urls.count - 1)
-                .help("Next document (→)")
-            Button { model.copySelection() } label: { Image(systemName: "doc.on.doc") }
+                .help("Next document in the selection (→)")
+            Button { model.copyPlainSelection() } label: { Image(systemName: "doc.on.doc") }
                 .keyboardShortcut("c", modifiers: .command)
-                .help("Copy selected text, cleaned for prose (⌘C)")
+                .help("Copy selected text exactly (⌘C)")
+            Button { model.copySelection() } label: { Image(systemName: "doc.on.doc.fill") }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .help("Copy selected text cleaned for prose (⌘⇧C)")
             Button("Open") { onOpenFull() }
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Open in the full document window (⌘O)")

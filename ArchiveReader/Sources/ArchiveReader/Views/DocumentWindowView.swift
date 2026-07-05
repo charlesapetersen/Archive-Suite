@@ -44,10 +44,12 @@ struct DocumentWindowView: View {
                 HStack(spacing: 0) {
                     PDFPaneView(page: model.imagePage, controller: model.leftController)
                         .frame(width: leftW)
+                        .overlay(focusBorder(.left))
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
                         PDFPaneView(page: model.textPage, controller: model.rightController)
                             .frame(maxWidth: .infinity)
+                            .overlay(focusBorder(.right))
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                                description: Text("This document has a single page."))
@@ -57,6 +59,14 @@ struct DocumentWindowView: View {
                 .coordinateSpace(name: "split")
             }
         }
+    }
+
+    /// A thin accent outline on the pane that has keyboard focus, so it's clear which page ⌘↑/⌘↓
+    /// (zoom) and ↑/↓ (scroll) act on. Switch focus with ⌘⌥← / ⌘⌥→.
+    private func focusBorder(_ pane: DocumentViewerModel.Pane) -> some View {
+        Rectangle()
+            .strokeBorder(model.focusedPane == pane ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 2)
+            .allowsHitTesting(false)
     }
 
     private func splitterHandle(total: CGFloat) -> some View {
@@ -96,13 +106,11 @@ struct DocumentWindowView: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
             Button { model.previous() } label: { Label("Previous", systemImage: "chevron.up") }
-                .keyboardShortcut(.upArrow, modifiers: [])
                 .disabled(model.index <= 0)
-                .help("Go to the previous document (↑)")
+                .help("Previous page in this segment (⌘⇧↑)")
             Button { model.next() } label: { Label("Next", systemImage: "chevron.down") }
-                .keyboardShortcut(.downArrow, modifiers: [])
                 .disabled(model.index >= model.urls.count - 1)
-                .help("Go to the next document (↓)")
+                .help("Next page in this segment (⌘⇧↓)")
 
             Divider()
 
@@ -124,8 +132,10 @@ struct DocumentWindowView: View {
 
             Divider()
 
-            Button { model.copySelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
-                .help("Copy the selected text, cleaned for prose (⌘C)")
+            Button { model.copyPlainSelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
+                .help("Copy the selected text exactly (⌘C)")
+            Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
+                .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌘⇧C)")
             Button { model.showingFind = true; findFocused = true } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
             Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {
