@@ -290,6 +290,37 @@ final class NavigationModel: ObservableObject {
         announce(statusMessage)
     }
 
+    // MARK: Inline single-file edits (from the list cells). Editing MULTIPLE files uses the ⌘I
+    // group editor; these act on exactly one file, still via the audited TagWriter + grouped undo.
+
+    func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
+        applyDelta(TagEditing.delta(for: op, given: file.tags), to: file)
+    }
+
+    func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
+        do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true)) }
+        catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
+    }
+
+    func clearReadState(for file: ArchiveFile) {
+        let toks = file.tags.raw.filter { t in
+            ReadState.allCases.contains { $0.rawValue.caseInsensitiveCompare(t) == .orderedSame }
+        }
+        applyDelta(TagDelta(remove: toks), to: file)
+    }
+
+    private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) {
+        guard !delta.isEmpty else { return }
+        do { reflect(try TagWriter.apply(delta, to: file.url)) }
+        catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage) }
+    }
+
+    /// Reflect one verified inline write in the display (overlay) and push it as its own undo step.
+    private func reflect(_ r: TagWriteResult) {
+        library.applyVerifiedWrites([r])
+        if !r.isNoOp { undoStack.append([r]); undoDepth = undoStack.count }
+    }
+
     /// Library data-quality snapshot (for the health popover).
     struct DataQuality: Sendable {
         var total = 0, noDate = 0, noPriority = 0, dateUncertain = 0, bothReadUnread = 0, markers = 0

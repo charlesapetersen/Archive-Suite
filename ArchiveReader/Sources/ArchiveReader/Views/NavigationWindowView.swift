@@ -64,11 +64,9 @@ struct NavigationWindowView: View {
             .width(26)
 
             TableColumn("Document date", sortUsing: ArchiveFileComparator(field: .date)) { file in
-                Text(file.tags.displayDate ?? "—")
-                    .italic(file.dateIsSpeculative)          // Date Uncertain → italic
-                    .foregroundStyle(file.sortDate == nil ? .secondary : .primary)
+                DateCell(model: model, file: file)   // click to edit year/month/day/uncertain
             }
-            .width(min: 110, ideal: 130)
+            .width(min: 110, ideal: 140)
 
             TableColumn("File name", sortUsing: ArchiveFileComparator(field: .name)) { file in
                 HStack(spacing: 6) {
@@ -88,20 +86,19 @@ struct NavigationWindowView: View {
             .width(min: 44, ideal: 56)
 
             TableColumn("File tags", sortUsing: ArchiveFileComparator(field: .subjects)) { file in
-                Text(displaySubjects(file)).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
+                TagsCell(model: model, file: file)   // click to add/remove this file's tags
             }
             .width(min: 160, ideal: 300)
 
             TableColumn("Priority", sortUsing: ArchiveFileComparator(field: .priority)) { file in
-                Text(file.priority.map { "P\($0)" } ?? "—").foregroundStyle(.secondary)
+                PriorityCell(model: model, file: file)
             }
-            .width(min: 54, ideal: 64)
+            .width(min: 60, ideal: 72)
 
             TableColumn("Read", sortUsing: ArchiveFileComparator(field: .readState)) { file in
-                Text(file.readState?.rawValue ?? "—")
-                    .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
+                ReadStateCell(model: model, file: file)
             }
-            .width(min: 60, ideal: 74)
+            .width(min: 70, ideal: 84)
         }
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
@@ -152,11 +149,6 @@ struct NavigationWindowView: View {
     }
 
     /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
-    private func displaySubjects(_ file: ArchiveFile) -> String {
-        // Dates live in the Document date column, so exclude the date facets (and read-state) here.
-        file.tags.topicalTags.joined(separator: ", ")
-    }
-
     // MARK: Tag cloud (right margin)
 
     private var tagCloudPanel: some View {
@@ -459,8 +451,8 @@ private struct DataQualityView: View {
 }
 
 /// A simple wrapping flow layout (left-aligned, wraps to the next row when the width is exceeded).
-/// Used by the tag cloud so variably-sized tags flow like a word cloud.
-private struct FlowLayout: Layout {
+/// Used by the tag cloud (word-cloud) and the inline tag-editor popover (removable chips).
+struct FlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {

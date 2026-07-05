@@ -12,7 +12,7 @@ built + tested (`xcodebuild … build/test`, keep 83+ green) and GUI-reviewed on
    `sortOrder` binding of `ArchiveFileComparator`. (The ⚑ flag column is an action column, not sortable.)
 2. [x] **File tags column excludes date tokens.** Dates show in the Document date column, so the File
    tags column shows only non-date, non-read-state tokens (`DocumentTags.topicalTags`).
-3. [ ] **Inline editing in the list** for tags, priority, read/unread, and document date. For editing
+3. [x] **Inline editing in the list** for tags, priority, read/unread, and document date. For editing
    MULTIPLE selected files at once, use the pop-up editor (the existing group Tag Editor).
 4. [x] **Remove "No read-state"** from the filter-bar read-state segmented control.
 5. [x] **"Add subject filter" → "Add tag filter"** with tag autocomplete (native `NSComboBox`:
