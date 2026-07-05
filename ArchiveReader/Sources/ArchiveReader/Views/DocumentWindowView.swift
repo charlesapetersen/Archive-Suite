@@ -65,7 +65,8 @@ struct DocumentWindowView: View {
                 .fill(Color(nsColor: .tertiaryLabelColor))
                 .frame(width: 3, height: 34)
         }
-        .frame(width: handleWidth, maxHeight: .infinity)
+        .frame(width: handleWidth)
+        .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .onHover { inside in
             if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
