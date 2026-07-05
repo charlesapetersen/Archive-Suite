@@ -10,6 +10,7 @@ struct NavigationWindowView: View {
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @State private var newSearchName = ""
     @State private var renameText = ""
+    @State private var columnCustomization = TableColumnCustomization<ArchiveFile>()   // C1: show/hide/reorder/resize
 
     var body: some View {
         HStack(spacing: 0) {
@@ -76,7 +77,8 @@ struct NavigationWindowView: View {
 
     private var table: some View {
         Table(model.displayed, selection: $model.selection,
-              sortOrder: Binding(get: { model.sortComparators }, set: { model.applyTableSort($0) })) {
+              sortOrder: Binding(get: { model.sortComparators }, set: { model.applyTableSort($0) }),
+              columnCustomization: $columnCustomization) {
             TableColumn("⚑") { file in
                 Button {
                     model.notes.setFlag(!model.notes.isFlagged(file.url.path), for: file.url.path)
@@ -88,11 +90,13 @@ struct NavigationWindowView: View {
                 .help("Flag (app-only; never written to the file)")
             }
             .width(26)
+            .customizationID("flag")
 
             TableColumn("Document date", sortUsing: ArchiveFileComparator(field: .date)) { file in
                 DateCell(model: model, file: file)   // click to edit year/month/day/uncertain
             }
             .width(min: 110, ideal: 140)
+            .customizationID("date")
 
             TableColumn("File name", sortUsing: ArchiveFileComparator(field: .name)) { file in
                 HStack(spacing: 6) {
@@ -105,31 +109,37 @@ struct NavigationWindowView: View {
                 }
             }
             .width(min: 200, ideal: 320)
+            .customizationID("name")
 
             TableColumn("Type", sortUsing: ArchiveFileComparator(field: .fileType)) { file in
                 Text(file.fileType).foregroundStyle(.secondary)
             }
             .width(min: 44, ideal: 56)
+            .customizationID("type")
 
             TableColumn("File tags", sortUsing: ArchiveFileComparator(field: .subjects)) { file in
                 TagsCell(model: model, file: file)   // click to add/remove this file's tags
             }
             .width(min: 160, ideal: 300)
+            .customizationID("tags")
 
             TableColumn("Priority", sortUsing: ArchiveFileComparator(field: .priority)) { file in
                 PriorityCell(model: model, file: file)
             }
             .width(min: 60, ideal: 72)
+            .customizationID("priority")
 
             TableColumn("Read", sortUsing: ArchiveFileComparator(field: .readState)) { file in
                 ReadStateCell(model: model, file: file)
             }
             .width(min: 70, ideal: 84)
+            .customizationID("read")
         }
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
             Button("Preview") { model.showingPreview = true }
             Button("Reveal in Finder") { model.revealInFinder() }
+            Button("Open in Default App") { model.openInDefaultApp() }
             Button("Copy Link(s)") { model.copyLinks() }
             Divider()
             Button("Mark Read") { model.mark(.read) }
@@ -150,6 +160,15 @@ struct NavigationWindowView: View {
             return .handled
         }
         .font(.system(size: listFontSize))   // C3: list density / readability (persisted)
+        .onChange(of: columnCustomization) { _, c in
+            if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: "ar.columnCustomization") }
+        }
+        .onAppear {
+            if let d = UserDefaults.standard.data(forKey: "ar.columnCustomization"),
+               let c = try? JSONDecoder().decode(TableColumnCustomization<ArchiveFile>.self, from: d) {
+                columnCustomization = c
+            }
+        }
     }
 
     /// Status overlay on the results area so the user always knows what's happening — most importantly

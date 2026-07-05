@@ -48,6 +48,7 @@ final class NavigationModel: ObservableObject {
     init() {
         filter.read = AppSettings.defaultReadFilter
         filter.subjectCombine = AppSettings.defaultSubjectCombine
+        restoreViewState()   // last session's filter + sort override the defaults (C2)
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
         library.$files
@@ -209,6 +210,27 @@ final class NavigationModel: ObservableObject {
         if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
         displayed = LibrarySort.sorted(base, by: sort)
         refreshSelectionCache()   // sort order affects the selection cache too
+        persistViewState()        // C2: remember filter + sort across launches
+    }
+
+    // MARK: View-state persistence (C2) — filter + sort survive relaunch (selection is persisted separately)
+
+    private struct ViewState: Codable { var filter: LibraryFilter; var sort: [ARSortDescriptor] }
+    private let viewStateKey = "ar.viewState"
+
+    private func persistViewState() {
+        if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: sort)) {
+            UserDefaults.standard.set(d, forKey: viewStateKey)
+        }
+    }
+    private func restoreViewState() {
+        guard let d = UserDefaults.standard.data(forKey: viewStateKey),
+              let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
+        var f = s.filter
+        // Drop a folder scope that isn't under the current root (root may have changed between launches).
+        if let p = f.pathPrefix, let root = rootStore.root?.path, !p.hasPrefix(root) { f.pathPrefix = nil }
+        filter = f
+        if !s.sort.isEmpty { sort = s.sort }
     }
 
     // MARK: Column-header sorting (bridges the SwiftUI Table sortOrder ↔ the descriptor model)
@@ -489,5 +511,10 @@ final class NavigationModel: ObservableObject {
         let urls = selectedFiles.map(\.url)
         guard !urls.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting(urls)
+    }
+
+    /// Open the selected files in their default app (e.g. Preview). Read-only — just launches/opens.
+    func openInDefaultApp() {
+        for url in selectedFiles.map(\.url) { NSWorkspace.shared.open(url) }
     }
 }

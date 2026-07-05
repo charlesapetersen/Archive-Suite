@@ -68,11 +68,11 @@ struct LibraryFilter: Sendable, Equatable, Codable {
 
 // MARK: - Sorting
 
-enum SortField: String, Sendable, CaseIterable {
+enum SortField: String, Sendable, CaseIterable, Codable {
     case date, name, priority, readState, fileType, subjects
 }
 
-struct ARSortDescriptor: Sendable, Equatable {
+struct ARSortDescriptor: Sendable, Equatable, Codable {
     var field: SortField
     var ascending: Bool = true
 }
