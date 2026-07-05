@@ -5,31 +5,40 @@ Single source of "where are we, what's next," kept current every work session so
 PLAN.md → this file.
 
 ## Current state (2026-07-05)
-- **Milestone:** **M0 COMPLETE** (safety core). Starting **M1** (navigation window).
-- **Build:** GREEN.
-  - `cd ArchiveReader && xcodegen generate && xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build` → **BUILD SUCCEEDED**
-  - `xcodebuild -scheme ArchiveReader -destination 'platform=macOS' -derivedDataPath ./build/DD test` → **24/24 pass**
+- **Milestone:** M0 + **M1 COMPLETE** (safety core + navigation window). Starting **M1.5** (content index).
+- **Build:** GREEN. `xcodegen generate && xcodebuild … build` → **BUILD SUCCEEDED**;
+  `xcodebuild … test` → **33/33 pass**; `bash scripts/lint-write-surface.sh` → clean.
+- **⚠ Verification caveat:** the Core/logic layers are unit-tested (33), but the **SwiftUI GUI has not
+  been driven at runtime** (headless env can't launch/interact with the sandboxed app, and nested
+  `claude` is blocked). A manual GUI smoke test is pending: launch the app, choose the `Test files`
+  folder as root, confirm the list populates, filters work, and mark-Read moves a row out of an
+  Unread view. Treat GUI wiring as "compiles + logic-tested," not "runtime-verified."
 - **Done:**
   - Durable docs; repo scaffold; sandboxed XcodeGen two-window app.
-  - Read-only Core: `DocumentTags`, `TagReading`, `FileLink`.
-  - **`Core/TagWriter.swift`** — the single audited write choke-point: delta edits (add/remove/color),
-    `NSFileCoordinator(.contentIndependentMetadataOnly)`, trustworthy-read guard, multiset+label
-    verify, label-drift restore, inverse-delta undo, batch per-file results, Read/Unread fast path.
-  - Tests: `DocumentTagsTests`, `FileLinkTests`, `TagWriterTests` (24 total). Tier-2 self-review done.
+  - Read-only Core: `DocumentTags` (+displayDate), `TagReading`, `FileLink`, `ArchiveFile`,
+    `LibraryFilter` (filter + multi-level nil-last sort).
+  - **`Core/TagWriter.swift`** — single audited write choke-point (delta edits, coordinated
+    metadata-only write, trustworthy-read guard, multiset+label verify, drift restore, inverse-delta
+    undo, batch). `scripts/lint-write-surface.sh` enforces the write surface.
+  - **M1 navigation window:** `Search/RootFolderStore` (security-scoped bookmark),
+    `Search/ArchiveLibrary` (NSMetadataQuery discovery + optimistic updates),
+    `Views/NavigationModel` + `Views/NavigationWindowView` (table, 3 filters, sort menu, copy-links,
+    mark Read/Unread via TagWriter + undo, open selection; keyboard shortcuts).
+  - Tests: DocumentTags, FileLink, TagWriter, LibrarySortFilter (33 total).
 
-## Next action (M1 — navigation window)
-1. Add a **write-surface lint** script (`scripts/lint-write-surface.sh`): grep app sources; fail if any
-   tag-write API appears outside `TagWriter.swift` or any move/rename/delete/content-write API appears
-   anywhere in the app target. Run before each commit.
-2. **Spotlight discovery** (`Core/`, UI-free): an `NSMetadataQuery` wrapper scoped to a user-granted
-   archive root (security-scoped bookmark), predicate `kMDItemUserTags == "Read" || == "Unread"`,
-   returning items with tags + name + type + dates; live updates.
-3. **Navigation table** (Views): columns Document date (from `DocumentTags.sortDate`, Date-Uncertain
-   italic) · File name · File type · File tags · Read/Unread; multi-level sort (chronological→name);
-   three filters (subject AND/OR · priority P7–P10 · read tri-state); copy links (⌘⇧C); mark Read/Unread
-   via `TagWriter` with grouped undo; open selection (⌘O) → document window.
-4. Perf-check the table at ~150k (abstract data layer so an AppKit `NSTableView` swap stays possible).
-- Then M1.5 content index (full-text search), M2 doc viewer, M3 options, M4 + High-priority backlog.
+## Next action (M1.5 — content index + full-text search)
+1. **Content index** in `Search/` (or `Core/`): a background extractor that, per file in the library,
+   opens the PDF with PDFKit, extracts page-2 (and page-1 if present) text + the `Classification:`
+   line + header metadata, and stores it in a **system SQLite FTS5** DB (`libsqlite3`, no third-party
+   dep) under Application Support — a disposable, rebuildable cache keyed by path + content-mod-date.
+   Incremental (skip unchanged). Run off the main actor; show progress.
+2. **Full-text search** wired into `LibraryFilter`/the nav window: a query box that AND-combines an
+   FTS match (returns matching file paths) with the existing tag facet filters. In-document ⌘F comes
+   with M2's viewer.
+3. Keep it UI-free where possible; guard non-2-page/corrupt/non-PDF (extractor must not crash).
+- Then M2 doc viewer, M3 options/keymap/accessibility, M4 + High-priority backlog.
+- **Also pending:** perf-check the nav Table at ~150k (data layer is abstracted; AppKit NSTableView
+  swap stays possible) and the manual GUI smoke test noted above.
 
 ## Autonomous overnight run
 - **Scope:** implement the PLAN (M0→M4), then **only the "High priority" items in
