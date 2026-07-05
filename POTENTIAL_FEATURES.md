@@ -19,6 +19,17 @@ All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
   not new code. Kept sandboxed for v1 by owner decision.
 
 
+## Non-standard / non-conforming PDFs (deferred from the 2026-07-05 near-term UI list)
+"Standard" = a 2-page PDF (page 1 image + page 2 OCR text), ideally with a `Classification:` line.
+Non-standard = 1-page / >2-page / 0-page / corrupt / encrypted / non-PDF image / no OCR-text layer /
+no classification. The viewer + indexer already **degrade gracefully**; this work is about
+**visibility + triage** (no corpus writes — detection reuses `PDFTextExtractor` / `ContentIndexer`,
+which already know page count, text presence, and the classification):
+- **[S]** Library-Health popover: add counts — non-2-page, no OCR-text layer, unreadable/corrupt, non-PDF.
+- **[S]** A "Non-standard format" filter chip and/or a built-in **"Needs attention"** smart folder.
+- **[S]** A subtle per-row ⚠︎ badge in the list for flagged files.
+- **[M]** A viewer banner on a non-standard doc stating what's missing ("1 page · no OCR text layer").
+
 ## Medium priority
 - **Side-by-side compare** of two selected documents (beyond ↑/↓ cycling) — collate a photo spanning
   two frames, or compare versions.

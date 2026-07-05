@@ -44,6 +44,14 @@ cleaned ⌘⇧C); reworked viewer keys (↑/↓ scroll page, ⌘↑/⌘↓ top-a
 tests green + GUI-verified + committed/pushed. **Scratch corpus moved** off the Desktop to
 `~/Library/Application Support/ArchiveReader/AR-Smoke` (smoke-setup.sh updated).
 
+## ACTIVE PLAN (2026-07-05) → `PLAN_NEAR_TERM_UI.md`
+Owner-approved UI Batch 2 — left sidebar (file tree + smart folders), create-smart-folder-from-filters,
+all of item 4 (small UI wins), and item 5 (tag rename + count badges). **Durable & resumable**: the
+plan's checkboxes are the source of truth; resume at the first `[ ]`. Each milestone builds green +
+tests green + code-reviewed + GUI/smoke-tested + committed/pushed before the next. Item 3 (non-standard
+PDFs) was deferred to `POTENTIAL_FEATURES.md`. **Status: plan written; awaiting owner go-ahead to start
+Milestone A** (or reprioritize).
+
 ## Next action — remaining work (none blocking; app is feature-complete + GUI-verified for v1)
 1. **GUI smoke test — DONE (2026-07-05).** Driven live on a scratch corpus (`~/Library/Application Support/ArchiveReader/AR-Smoke`, 30
    tagged copies) via `screencapture`/System Events/`cliclick`; **18/22 steps PASS, 0 FAIL** (full

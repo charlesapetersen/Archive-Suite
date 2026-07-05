@@ -25,21 +25,11 @@ subtle "filters unsaved" hint when a view isn't yet saved; naming sheet pre-fill
 the active filters. *Reuses:* `SavedSearchStore.add(name:filter:fullTextQuery:)` (already wired) — this
 just makes it first-class and discoverable.
 
-## 3. Handling PDFs that don't match the standard format ★ (consider)
+## 3. Handling PDFs that don't match the standard format — DEFERRED
 
-"Standard" = a 2-page PDF (page 1 image + page 2 OCR text), ideally with a `Classification:` line.
-Non-standard = 1-page / >2-page / 0-page / corrupt / encrypted / non-PDF image / no OCR-text layer /
-no classification. The viewer + indexer already **degrade gracefully**; the gap is **visibility + triage**:
-
-- **3a. [S]** Library-Health popover: add counts — non-2-page, no OCR-text layer, unreadable/corrupt, non-PDF.
-- **3b. [S]** A "Non-standard format" filter chip and/or a built-in **"Needs attention"** smart folder that
-  collects them for triage.
-- **3c. [S]** A subtle per-row badge (⚠︎) in the list for flagged files.
-- **3d. [M]** In the viewer, a clearer banner on a non-standard doc stating what's missing
-  ("1 page · no OCR text layer").
-
-*Reuses:* `PDFTextExtractor` / `ContentIndexer` already know page count, text presence, and the
-classification; this surfaces that signal. No corpus writes.
+Moved to the future-features backlog by owner decision (2026-07-05): see
+[POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md) → "Non-standard / non-conforming PDFs". Not part of the
+current implementation plan.
 
 ## 4. Curated small UI wins (pick any; each [S] unless noted)
 
