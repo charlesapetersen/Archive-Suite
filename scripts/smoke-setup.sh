@@ -6,7 +6,8 @@
 # Usage: ./scripts/smoke-setup.sh [N]      (default N=30 files)
 set -euo pipefail
 SRC="$HOME/Desktop/Claude/Archive Reader/Test files/Brown Gemini"
-DST="$HOME/Desktop/AR-Smoke"
+# Off the Desktop (owner request): a less-visible, Spotlight-indexed location under Application Support.
+DST="$HOME/Library/Application Support/ArchiveReader/AR-Smoke"
 N="${1:-30}"
 
 [ -d "$SRC" ] || { echo "source corpus not found: $SRC" >&2; exit 1; }

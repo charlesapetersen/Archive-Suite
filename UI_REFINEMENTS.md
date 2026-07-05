@@ -22,7 +22,7 @@ built + tested (`xcodebuild … build/test`, keep 83+ green) and GUI-reviewed on
    font size scales with the number of viewable files carrying it.
 7. [x] **Preview arrow-key navigation.** In the Space preview, ↑/↓ move up/down the file list and the
    previewed file changes live to match.
-8. [ ] **Move `AR-Smoke` off the Desktop** to a less-visible location; update `scripts/smoke-setup.sh`.
+8. [x] **Move `AR-Smoke` off the Desktop** to a less-visible location; update `scripts/smoke-setup.sh`.
    (Do LAST, after GUI testing, so it doesn't disrupt the app's root during verification.)
 9. [x] **Reveal in Finder** — from the list, via a keyboard shortcut AND the right-click context menu
    (read-only: `NSWorkspace.activateFileViewerSelecting`).

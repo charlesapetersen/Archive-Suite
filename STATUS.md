@@ -34,8 +34,18 @@ PLAN.md → this file.
   `2e9c661` Spotlight-clobber overlay + 4 reactive-timing bugs (multi-agent review) · `af69463` app icon ·
   `4f11dc7` smoke harness · `cc26aec` willSet 0-of-N fix.
 
+## UI refinement batch (2026-07-05) — 14 owner-requested changes, all shipped (see `UI_REFINEMENTS.md`)
+Header-click column sort (all columns, both directions, multi-level); File-tags column excludes date
+tokens; "Add tag filter" with `NSComboBox` autocomplete; removed "No read-state"; right-margin tag
+cloud (size ∝ visible-file count, click-to-filter); inline list editing of tags/priority/read/date
+(single-file; multi-file via ⌘I); Reveal in Finder (⌘⇧R + context menu); two copy modes (plain ⌘C /
+cleaned ⌘⇧C); reworked viewer keys (↑/↓ scroll page, ⌘↑/⌘↓ top-anchored zoom, ⌘⇧↑/⌘⇧↓ page-in-segment,
+⌘⌥←/→ focus panes with a focus border); preview ↑/↓ browse the file list. Each cluster built + 83
+tests green + GUI-verified + committed/pushed. **Scratch corpus moved** off the Desktop to
+`~/Library/Application Support/ArchiveReader/AR-Smoke` (smoke-setup.sh updated).
+
 ## Next action — remaining work (none blocking; app is feature-complete + GUI-verified for v1)
-1. **GUI smoke test — DONE (2026-07-05).** Driven live on a scratch corpus (`~/Desktop/AR-Smoke`, 30
+1. **GUI smoke test — DONE (2026-07-05).** Driven live on a scratch corpus (`~/Library/Application Support/ArchiveReader/AR-Smoke`, 30
    tagged copies) via `screencapture`/System Events/`cliclick`; **18/22 steps PASS, 0 FAIL** (full
    record + the 4 `[~]` indirectly-covered steps in `SMOKE_TEST.md`). It caught the mark-Read display
    bug and 4 reactive-timing bugs, all fixed (see `KNOWN_ISSUES.md`). *Optional follow-up:* drive the

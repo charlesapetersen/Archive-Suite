@@ -1,11 +1,11 @@
 # Archive Reader — Interactive GUI Smoke Test
 
 Durable record of the manual/driven GUI smoke test. **Resumable:** if interrupted, re-run
-`./scripts/smoke-setup.sh`, relaunch the app pointed at `~/Desktop/AR-Smoke`, and continue at the
+`./scripts/smoke-setup.sh`, relaunch the app pointed at `~/Library/Application Support/ArchiveReader/AR-Smoke`, and continue at the
 first unchecked step. Driven with `screencapture` (see) + `osascript`/System Events + `cliclick`
 (interact). Screenshots land in `.maintenance/smoke/` (gitignored); results are recorded here.
 
-**Safety:** the test runs against a SCRATCH corpus of COPIES (`~/Desktop/AR-Smoke`, 30 tagged PDFs),
+**Safety:** the test runs against a SCRATCH corpus of COPIES (`~/Library/Application Support/ArchiveReader/AR-Smoke`, 30 tagged PDFs),
 never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch the corpus.
 
 - **Environment:** Screen Recording + Accessibility granted; `cliclick 5.1`; app built Debug at
@@ -14,7 +14,7 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
 
 ## Steps
 
-- [x] **A. Launch + discovery** — point the app at `~/Desktop/AR-Smoke`; list shows 30 rows,
+- [x] **A. Launch + discovery** — point the app at `~/Library/Application Support/ArchiveReader/AR-Smoke`; list shows 30 rows,
       "30 shown · 30 total", spinner appeared during gather. **PASS** (2026-07-05, fresh build).
 - [x] **B. Chronological sort (default)** — rows ascend by document date; undated markers sort last.
       **PASS** — Sep 1980 → Oct 1980 → Sep 1982 → undated Red markers (00001/00006) last.
