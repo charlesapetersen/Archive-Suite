@@ -12,6 +12,7 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.subjectCombineAny) private var subjectCombineAny: Bool = false
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
     @AppStorage(SettingsKey.warnNearDuplicate) private var warnNearDuplicate: Bool = true
+    @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
 
     var body: some View {
         Form {
@@ -42,6 +43,12 @@ struct OptionsView: View {
                     Text("No read-state").tag(ReadFilter.noReadState)
                 }
                 Toggle("Combine multiple subject filters with ANY (off = ALL)", isOn: $subjectCombineAny)
+            }
+            Section("File list") {
+                VStack(alignment: .leading) {
+                    Text("List text size: \(Int(listFontSize)) pt (smaller = more compact rows)")
+                    Slider(value: $listFontSize, in: 10...20, step: 1)
+                }
             }
             Section("Tag editing") {
                 Toggle("Warn when a new subject differs only by case from an existing one", isOn: $warnNearDuplicate)

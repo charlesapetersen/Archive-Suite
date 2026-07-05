@@ -5,8 +5,9 @@ struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
-    @State private var showingTagCloud = false
+    @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
+    @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @State private var newSearchName = ""
     @State private var renameText = ""
 
@@ -148,6 +149,7 @@ struct NavigationWindowView: View {
             model.showingPreview = true
             return .handled
         }
+        .font(.system(size: listFontSize))   // C3: list density / readability (persisted)
     }
 
     /// Status overlay on the results area so the user always knows what's happening — most importantly
@@ -431,6 +433,10 @@ struct NavigationWindowView: View {
             if model.library.isGathering { ProgressView().controlSize(.small); Text("Searching…") }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
                 .foregroundStyle(.secondary)
+            if let summary = model.activeFilterSummary {
+                Text("· \(summary)").foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .help("Active filter")
+            }
             if let p = model.indexingProgress {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
                 Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.secondary)

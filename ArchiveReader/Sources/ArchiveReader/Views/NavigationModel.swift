@@ -112,6 +112,29 @@ final class NavigationModel: ObservableObject {
         if !q.isEmpty { parts.append("“\(q)”") }
         return parts.isEmpty ? "Smart Folder" : parts.joined(separator: " · ")
     }
+
+    /// A human-readable summary of the active filter for the status bar (nil when nothing is filtered).
+    var activeFilterSummary: String? {
+        var parts: [String] = []
+        switch filter.read {
+        case .all: break
+        case .read: parts.append("Read")
+        case .unread: parts.append("Unread")
+        case .noReadState: parts.append("No read-state")
+        }
+        if !filter.priorities.isEmpty {
+            parts.append(filter.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        }
+        if !filter.subjects.isEmpty {
+            parts.append("tags: " + filter.subjects.sorted().joined(separator: filter.subjectCombine == .all ? " + " : " / "))
+        }
+        if let p = filter.pathPrefix, !p.isEmpty { parts.append("folder: " + URL(fileURLWithPath: p).lastPathComponent) }
+        let fn = filter.searchText.trimmingCharacters(in: .whitespaces)
+        if !fn.isEmpty { parts.append("name: \(fn)") }
+        let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { parts.append("text: “\(q)”") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
     func applySaved(_ search: SavedSearch) {
         filter = search.filter
         fullTextQuery = search.fullTextQuery
