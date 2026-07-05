@@ -1,106 +1,249 @@
-import AppKit
+// makeicon.swift — regenerates the Archive Reader app icon (and, on request, its sibling).
+//
+// Archive Reader and Archive Processor ship as a coordinated, deliberately-distinguishable PAIR
+// so they are never confused in the macOS app switcher / Dock:
+//   • Reader    = warm AMBER tile + espresso folder + reading glasses (read / triage)
+//   • Processor = cool BLUE tile + manila folder + magnifying glass (OCR / scan)
+// Both are drawn from the SAME code below (only the palette + tool differ) so the pair never
+// drifts. Pure CoreGraphics + ImageIO — no SVG rasterizer / Pillow / ImageMagick required.
+//
+// Regenerate THIS app's icon (writes all 10 sizes straight into the AppIcon.appiconset):
+//   swift scripts/makeicon.swift
+// Render the sibling or a one-off preview:
+//   swift scripts/makeicon.swift processor /path/to/AppIcon.appiconset   # all sizes into a dir
+//   swift scripts/makeicon.swift reader 512 /tmp/preview.png             # single size → file
+// Then rebuild so the .app picks it up:  cd ArchiveReader && xcodegen generate && xcodebuild …
+//
+// This repo's default when run with no arguments:
+let defaultKind = "reader"
 
-let S: CGFloat = 1024
-let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(S), pixelsHigh: Int(S),
-                           bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                           colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-let ctx = NSGraphicsContext.current!.cgContext
+import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 
-func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> NSColor {
-    NSColor(calibratedRed: r, green: g, blue: b, alpha: a)
+let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+func rgb(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> CGColor {
+    CGColor(colorSpace: cs, components: [CGFloat(r/255), CGFloat(g/255), CGFloat(b/255), CGFloat(a)])!
 }
-let folderBack  = rgb(0.79, 0.67, 0.42)
-let folderFront = rgb(0.88, 0.79, 0.56)
-let folderEdge  = rgb(0.72, 0.60, 0.36)
-let page        = rgb(0.98, 0.96, 0.90)
-let pageEdge     = rgb(0.86, 0.83, 0.74)
-let line        = rgb(0.77, 0.74, 0.64)
-let glass        = rgb(0.34, 0.29, 0.22)
 
-func rounded(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> NSBezierPath {
-    NSBezierPath(roundedRect: NSRect(x: x, y: y, width: w, height: h), xRadius: r, yRadius: r)
-}
-func softShadow(_ blur: CGFloat, _ dy: CGFloat, _ alpha: CGFloat) {
-    let s = NSShadow(); s.shadowBlurRadius = blur
-    s.shadowOffset = NSSize(width: 0, height: dy); s.shadowColor = NSColor.black.withAlphaComponent(alpha)
-    s.set()
+struct Palette {
+    let tileTop: CGColor, tileBottom: CGColor
+    let folderBack: CGColor, folderFront: CGColor, tab: CGColor
+    let page: CGColor, line: CGColor
+    let toolMain: CGColor, toolAccent: CGColor
 }
 
-// ---- Folder back + tab (one silhouette) ----
-NSGraphicsContext.current!.saveGraphicsState()
-softShadow(34, -14, 0.28)
-let back = NSBezierPath()
-back.move(to: NSPoint(x: 150, y: 250))
-back.line(to: NSPoint(x: 150, y: 690))
-back.line(to: NSPoint(x: 300, y: 780))     // tab step
-back.line(to: NSPoint(x: 470, y: 780))
-back.line(to: NSPoint(x: 520, y: 700))
-back.line(to: NSPoint(x: 874, y: 700))
-back.line(to: NSPoint(x: 874, y: 250))
-back.close()
-let backRounded = NSBezierPath(roundedRect: NSRect(x: 150, y: 250, width: 724, height: 530), xRadius: 46, yRadius: 46)
-folderBack.setFill(); backRounded.fill()
-NSGraphicsContext.current!.restoreGraphicsState()
+// Processor = cool BLUE tile, warm manila folder, magnifying glass (OCR / scan)
+let processor = Palette(
+    tileTop:    rgb(91, 124, 250),
+    tileBottom: rgb(36,  64, 176),
+    folderBack: rgb(236, 210, 150),
+    folderFront:rgb(216, 184, 116),
+    tab:        rgb(224, 196, 132),
+    page:       rgb(255, 255, 255),
+    line:       rgb(150, 164, 190),
+    toolMain:   rgb(255, 255, 255),
+    toolAccent: rgb(219, 231, 252, 0.9)
+)
 
-// ---- Two document pages peeking above the folder front ----
-func drawPage(cx: CGFloat, angle: CGFloat, lean: CGFloat) {
-    NSGraphicsContext.current!.saveGraphicsState()
-    let t = NSAffineTransform()
-    t.translateX(by: cx, yBy: 470); t.rotate(byDegrees: angle); t.concat()
-    softShadow(16, -6, 0.18)
-    let p = rounded(-165, -70, 330, 470, 14)
-    page.setFill(); p.fill()
-    NSGraphicsContext.current!.restoreGraphicsState()
-    // border + text lines (no shadow)
-    NSGraphicsContext.current!.saveGraphicsState()
-    let t2 = NSAffineTransform()
-    t2.translateX(by: cx, yBy: 470); t2.rotate(byDegrees: angle); t2.concat()
-    pageEdge.setStroke(); let border = rounded(-165, -70, 330, 470, 14); border.lineWidth = 3; border.stroke()
-    line.setFill()
+// Reader = warm AMBER tile, espresso folder, reading glasses (read / triage)
+let reader = Palette(
+    tileTop:    rgb(247, 186, 66),
+    tileBottom: rgb(214, 102, 18),
+    folderBack: rgb(96,  68, 46),
+    folderFront:rgb(74,  50, 32),
+    tab:        rgb(108, 78, 54),
+    page:       rgb(248, 240, 222),
+    line:       rgb(176, 142, 100),
+    toolMain:   rgb(46,  32, 20),
+    toolAccent: rgb(255, 255, 255, 0.16)
+)
+
+func rr(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> CGPath {
+    CGPath(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerWidth: r, cornerHeight: r, transform: nil)
+}
+func fill(_ ctx: CGContext, _ path: CGPath, _ c: CGColor) {
+    ctx.addPath(path); ctx.setFillColor(c); ctx.fillPath()
+}
+func withShadow(_ ctx: CGContext, dy: CGFloat, blur: CGFloat, alpha: CGFloat, _ body: () -> Void) {
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: dy), blur: blur, color: rgb(0, 0, 0, alpha))
+    ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+    body()
+    ctx.endTransparencyLayer()
+    ctx.restoreGState()
+}
+
+func drawPage(_ ctx: CGContext, cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat, angleDeg: CGFloat, p: Palette) {
+    ctx.saveGState()
+    ctx.translateBy(x: cx, y: cy)
+    ctx.rotate(by: angleDeg * .pi / 180)
+    fill(ctx, rr(-w/2, -h/2, w, h, 22), p.page)
+    ctx.setFillColor(p.line)
+    let left = -w/2 + 36
+    let lineW = w - 72
+    let startY = -h/2 + 62
+    let gap: CGFloat = 46
+    let lineH: CGFloat = 16
     for i in 0..<6 {
-        let y = 320 - CGFloat(i) * 58
-        let w: CGFloat = (i == 0) ? 150 : (240 - CGFloat(i % 2) * 40)
-        rounded(-120, y, w, 20, 10).fill()
+        let yy = startY + CGFloat(i) * gap
+        let ww = (i == 5) ? lineW * 0.55 : lineW
+        ctx.addPath(rr(left, yy, ww, lineH, 8)); ctx.fillPath()
     }
-    NSGraphicsContext.current!.restoreGraphicsState()
+    ctx.restoreGState()
 }
-drawPage(cx: 400, angle: -7, lean: 0)
-drawPage(cx: 620, angle: 7, lean: 0)
 
-// ---- Folder front pocket (covers lower half of pages) ----
-NSGraphicsContext.current!.saveGraphicsState()
-softShadow(20, -8, 0.16)
-let front = NSBezierPath(roundedRect: NSRect(x: 150, y: 250, width: 724, height: 300), xRadius: 46, yRadius: 46)
-// square off the top of the pocket
-let frontTop = NSBezierPath(rect: NSRect(x: 150, y: 470, width: 724, height: 90))
-let frontCombined = front.copy() as! NSBezierPath
-frontCombined.append(frontTop)
-folderFront.setFill(); frontCombined.fill()
-NSGraphicsContext.current!.restoreGraphicsState()
-folderEdge.setStroke(); let frontStroke = NSBezierPath(roundedRect: NSRect(x: 150, y: 250, width: 724, height: 300), xRadius: 46, yRadius: 46); frontStroke.lineWidth = 3; frontStroke.stroke()
-
-// ---- Reading glasses (lower-right) ----
-NSGraphicsContext.current!.saveGraphicsState()
-softShadow(14, -6, 0.30)
-glass.setStroke()
-func lens(_ x: CGFloat, _ y: CGFloat) {
-    let l = rounded(x, y, 150, 120, 52); l.lineWidth = 26; l.stroke()
+func drawMagnifier(_ ctx: CGContext, p: Palette) {
+    let cx: CGFloat = 712, cy: CGFloat = 704, outer: CGFloat = 108, stroke: CGFloat = 40
+    let d: CGFloat = 0.70710678
+    let start = CGPoint(x: cx + (outer - 4) * d, y: cy + (outer - 4) * d)
+    let end = CGPoint(x: start.x + 118 * d, y: start.y + 118 * d)
+    // handle
+    ctx.saveGState()
+    ctx.setLineCap(.round)
+    ctx.setLineWidth(48)
+    ctx.setStrokeColor(p.toolMain)
+    ctx.move(to: start); ctx.addLine(to: end); ctx.strokePath()
+    ctx.restoreGState()
+    // glass fill
+    let inner = outer - stroke
+    fill(ctx, CGPath(ellipseIn: CGRect(x: cx - inner, y: cy - inner, width: inner*2, height: inner*2), transform: nil), p.toolAccent)
+    // ring
+    let ringR = outer - stroke/2
+    ctx.saveGState()
+    ctx.setLineWidth(stroke)
+    ctx.setStrokeColor(p.toolMain)
+    ctx.addEllipse(in: CGRect(x: cx - ringR, y: cy - ringR, width: ringR*2, height: ringR*2))
+    ctx.strokePath()
+    ctx.restoreGState()
 }
-lens(560, 150)
-lens(730, 150)
-// bridge
-let bridge = NSBezierPath(); bridge.move(to: NSPoint(x: 710, y: 214)); bridge.line(to: NSPoint(x: 730, y: 214))
-bridge.lineWidth = 22; bridge.lineCapStyle = .round; bridge.stroke()
-// temple arms (angled outward like a resting pair of glasses)
-let armL = NSBezierPath(); armL.move(to: NSPoint(x: 566, y: 205)); armL.line(to: NSPoint(x: 496, y: 250))
-armL.lineWidth = 22; armL.lineCapStyle = .round; armL.stroke()
-let armR = NSBezierPath(); armR.move(to: NSPoint(x: 874, y: 205)); armR.line(to: NSPoint(x: 944, y: 250))
-armR.lineWidth = 22; armR.lineCapStyle = .round; armR.stroke()
-NSGraphicsContext.current!.restoreGraphicsState()
 
-NSGraphicsContext.restoreGraphicsState()
-let out = "/private/tmp/claude-504/-Users-cp1/2101182a-47e6-459b-923f-1b15cb11c35a/scratchpad/icon_1024.png"
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
-print("wrote \(out)")
+func drawGlasses(_ ctx: CGContext, p: Palette) {
+    let cyL: CGFloat = 724
+    let lx: CGFloat = 646, rx: CGFloat = 806
+    let outer: CGFloat = 80, stroke: CGFloat = 30
+    let inner = outer - stroke
+    // lens tint
+    for cx in [lx, rx] {
+        fill(ctx, CGPath(ellipseIn: CGRect(x: cx - inner, y: cyL - inner, width: inner*2, height: inner*2), transform: nil), p.toolAccent)
+    }
+    ctx.saveGState()
+    ctx.setLineCap(.round)
+    ctx.setLineJoin(.round)
+    ctx.setLineWidth(stroke)
+    ctx.setStrokeColor(p.toolMain)
+    let ringR = outer - stroke/2
+    // lenses
+    for cx in [lx, rx] {
+        ctx.addEllipse(in: CGRect(x: cx - ringR, y: cyL - ringR, width: ringR*2, height: ringR*2))
+        ctx.strokePath()
+    }
+    // bridge (bowed up)
+    ctx.move(to: CGPoint(x: lx + ringR - 6, y: cyL - 8))
+    ctx.addQuadCurve(to: CGPoint(x: rx - ringR + 6, y: cyL - 8), control: CGPoint(x: (lx + rx)/2, y: cyL - 46))
+    ctx.strokePath()
+    // temple arms
+    ctx.move(to: CGPoint(x: lx - ringR + 8, y: cyL - 22)); ctx.addLine(to: CGPoint(x: lx - ringR - 54, y: cyL - 50)); ctx.strokePath()
+    ctx.move(to: CGPoint(x: rx + ringR - 8, y: cyL - 22)); ctx.addLine(to: CGPoint(x: rx + ringR + 54, y: cyL - 50)); ctx.strokePath()
+    ctx.restoreGState()
+}
+
+func draw(_ ctx: CGContext, size: CGFloat, kind: String, _ p: Palette) {
+    ctx.interpolationQuality = .high
+    ctx.setAllowsAntialiasing(true)
+    ctx.setShouldAntialias(true)
+    let s = size / 1024
+    ctx.translateBy(x: 0, y: size)
+    ctx.scaleBy(x: 1, y: -1)
+    ctx.scaleBy(x: s, y: s)
+
+    // tile
+    let tile = rr(100, 100, 824, 824, 184)
+    ctx.saveGState()
+    ctx.addPath(tile); ctx.clip()
+    let grad = CGGradient(colorsSpace: cs, colors: [p.tileTop, p.tileBottom] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(grad, start: CGPoint(x: 512, y: 100), end: CGPoint(x: 512, y: 924), options: [])
+    // soft top highlight
+    let hl = CGGradient(colorsSpace: cs, colors: [rgb(255,255,255,0.16), rgb(255,255,255,0)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(hl, start: CGPoint(x: 512, y: 100), end: CGPoint(x: 512, y: 420), options: [])
+    ctx.restoreGState()
+
+    // folder back + tab (behind pages)
+    withShadow(ctx, dy: 14, blur: 34, alpha: 0.30) {
+        fill(ctx, rr(250, 392, 214, 84, 34), p.tab)
+        fill(ctx, rr(250, 430, 524, 350, 46), p.folderBack)
+    }
+    // pages
+    withShadow(ctx, dy: 10, blur: 24, alpha: 0.18) {
+        drawPage(ctx, cx: 452, cy: 378, w: 300, h: 378, angleDeg: -7, p: p)
+        drawPage(ctx, cx: 592, cy: 366, w: 300, h: 378, angleDeg: 6, p: p)
+    }
+    // folder front pocket (in front of pages)
+    withShadow(ctx, dy: 8, blur: 20, alpha: 0.20) {
+        fill(ctx, rr(234, 486, 556, 316, 52), p.folderFront)
+    }
+    // tool
+    withShadow(ctx, dy: 10, blur: 22, alpha: 0.30) {
+        if kind == "processor" { drawMagnifier(ctx, p: p) } else { drawGlasses(ctx, p: p) }
+    }
+}
+
+func render(kind: String, size: Int, path: String, _ p: Palette) {
+    let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    draw(ctx, size: CGFloat(size), kind: kind, p)
+    let img = ctx.makeImage()!
+    let url = URL(fileURLWithPath: path)
+    let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+    CGImageDestinationAddImage(dest, img, nil)
+    CGImageDestinationFinalize(dest)
+}
+
+// The 10 sizes an Xcode macOS AppIcon.appiconset expects.
+let sizeMap: [(String, Int)] = [
+    ("icon_16x16.png", 16),   ("icon_16x16@2x.png", 32),
+    ("icon_32x32.png", 32),   ("icon_32x32@2x.png", 64),
+    ("icon_128x128.png", 128), ("icon_128x128@2x.png", 256),
+    ("icon_256x256.png", 256), ("icon_256x256@2x.png", 512),
+    ("icon_512x512.png", 512), ("icon_512x512@2x.png", 1024),
+]
+
+// This repo's own AppIcon.appiconset, resolved relative to THIS script file (repoRoot = ../).
+func defaultAppiconset(for kind: String) -> String {
+    let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().path
+    let sub = (kind == "processor")
+        ? "ArchiveProcessor/Sources/ArchiveProcessor/Assets.xcassets/AppIcon.appiconset"
+        : "ArchiveReader/Sources/ArchiveReader/Assets.xcassets/AppIcon.appiconset"
+    return "\(repoRoot)/\(sub)"
+}
+
+func palette(for kind: String) -> Palette { kind == "processor" ? processor : reader }
+
+func writeAll(kind: String, into dir: String) {
+    let p = palette(for: kind)
+    for (name, px) in sizeMap { render(kind: kind, size: px, path: "\(dir)/\(name)", p) }
+    print("wrote 10 sizes for \(kind) → \(dir)")
+}
+
+// ---- CLI ----
+let args = CommandLine.arguments
+switch args.count {
+case 1:
+    // No args: regenerate this repo's own icon into its appiconset.
+    writeAll(kind: defaultKind, into: defaultAppiconset(for: defaultKind))
+case 2:
+    // <kind>: regenerate that app's icon; only valid when its appiconset lives in this repo.
+    let kind = args[1]
+    if kind == defaultKind { writeAll(kind: kind, into: defaultAppiconset(for: kind)) }
+    else { FileHandle.standardError.write("This repo holds the \(defaultKind) appiconset; pass an explicit outDir to render \(kind).\n".data(using: .utf8)!); exit(2) }
+case 3 where Int(args[1]) == nil:
+    // <kind> <outDir>: all sizes into an explicit directory.
+    writeAll(kind: args[1], into: args[2])
+case 4 where Int(args[2]) != nil:
+    // <kind> <size> <file>: a single-size preview.
+    render(kind: args[1], size: Int(args[2])!, path: args[3], palette(for: args[1]))
+    print("wrote \(args[2])px \(args[1]) → \(args[3])")
+default:
+    FileHandle.standardError.write("usage: swift makeicon.swift [processor|reader] [outDir | <size> <file>]\n".data(using: .utf8)!); exit(1)
+}
