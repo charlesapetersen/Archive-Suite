@@ -63,8 +63,18 @@ PLAN.md → this file.
   ```
   It fires every 30 min and resumes headless only when the heartbeat is >45 min stale.
 
+## Git remote (2026-07-05)
+- **This repo is the `Archive Suite` monorepo**, PRIVATE at
+  **`github.com/charlesapetersen/Archive-Suite`** (`origin`, `main` tracks `origin/main`). It currently
+  holds only **Archive Reader** at the repo root; `Test files/`, `build/`, `*.xcodeproj/`, and
+  `.maintenance/` are gitignored and were **not** pushed (verified). Use `/opt/homebrew/bin/gh`.
+- **When Archive Processor joins** (per CLAUDE.md §Archive Suite): `git mv` the current root into an
+  `ArchiveReader/` subdir and add `ArchiveProcessor/` (and later `ArchiveCore/`) as siblings — deferred
+  by the owner. History is preserved through the move.
+
 ## Resilience protocol (against credit cutoffs) — standard practice
-- Commit after each buildable sub-step; keep the build GREEN at every commit.
+- Commit after each buildable sub-step; keep the build GREEN at every commit; **`git push origin main`**
+  after committing (remote is the off-machine durable record now that `origin` exists).
 - Update **Current state** + **Next action** here (and `.maintenance/RESUME.md` heartbeat) every turn.
 - Prefer many small commits over one large uncommitted change; git history is the durable record.
 
