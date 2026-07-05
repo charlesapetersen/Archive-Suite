@@ -15,6 +15,14 @@ final class PDFPaneController {
         guard let v = pdfView else { return }
         v.autoScales = false
         v.scaleFactor = max(v.minScaleFactor, min(v.maxScaleFactor, v.scaleFactor * factor))
+        scrollToTop()   // anchor zoom to the TOP of the page (reading starts at the top third), not center
+    }
+
+    /// Scroll so the top-left of the (single) page sits at the top-left of the viewer.
+    private func scrollToTop() {
+        guard let v = pdfView, let page = v.document?.page(at: 0) else { return }
+        let topLeft = CGPoint(x: 0, y: page.bounds(for: v.displayBox).height)
+        v.go(to: PDFDestination(page: page, at: topLeft))
     }
 
     /// The current text selection, cleaned for prose copy (nil if nothing is selected here).

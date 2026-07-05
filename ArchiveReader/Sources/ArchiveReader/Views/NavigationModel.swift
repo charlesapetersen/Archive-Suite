@@ -50,6 +50,10 @@ final class NavigationModel: ObservableObject {
         notes.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
+        // Republish on library changes (isGathering / scope) so the results-area spinner is reactive.
+        library.objectWillChange
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+            .store(in: &cancellables)
         savedSearches.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)

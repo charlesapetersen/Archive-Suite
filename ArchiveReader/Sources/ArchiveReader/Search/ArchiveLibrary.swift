@@ -42,6 +42,7 @@ final class ArchiveLibrary: ObservableObject {
             query.searchScopes = [NSMetadataQueryLocalComputerScope]
             scopeDescription = "This Mac"
         }
+        files = []           // clear prior results so the "processing" spinner shows during (re)gather
         isGathering = true
         query.start()
     }

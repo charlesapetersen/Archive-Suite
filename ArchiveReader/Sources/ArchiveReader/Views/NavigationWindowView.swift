@@ -118,6 +118,30 @@ struct NavigationWindowView: View {
         } primaryAction: { _ in
             openSelection()   // double-click opens
         }
+        .overlay { tableOverlay }
+    }
+
+    /// Status overlay on the results area so the user always knows what's happening — most importantly
+    /// a spinner while Spotlight is finding/loading the tagged files for display.
+    @ViewBuilder private var tableOverlay: some View {
+        if model.rootStore.root == nil {
+            ContentUnavailableView("No archive folder chosen", systemImage: "folder.badge.questionmark",
+                                   description: Text("Choose a folder in the toolbar to browse its tagged PDFs."))
+        } else if model.library.isGathering {
+            VStack(spacing: 12) {
+                ProgressView().controlSize(.large)
+                Text("Finding tagged documents…").font(.headline).foregroundStyle(.secondary)
+                Text("in \(model.library.scopeDescription)").font(.callout).foregroundStyle(.tertiary)
+            }
+            .padding(28)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        } else if model.displayed.isEmpty && !model.library.files.isEmpty {
+            ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
+                                   description: Text("No files match the current filters or search. Use Clear to reset."))
+        } else if model.displayed.isEmpty {
+            ContentUnavailableView("No tagged documents", systemImage: "tray",
+                                   description: Text("No Read/Unread-tagged PDFs were found in this folder."))
+        }
     }
 
     /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
