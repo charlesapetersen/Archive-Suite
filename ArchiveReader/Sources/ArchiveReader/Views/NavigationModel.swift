@@ -2,6 +2,18 @@ import Foundation
 import Combine
 import AppKit
 
+/// A node in the sidebar folder tree, derived from discovered file paths. `path` is the absolute
+/// directory path (identity); `fileCount` is the recursive number of files in the subtree.
+struct FolderNode: Identifiable, Hashable, Sendable {
+    let path: String
+    let name: String
+    var fileCount: Int
+    var children: [FolderNode]
+    var id: String { path }
+    /// `OutlineGroup` wants `nil` (not `[]`) for leaves, so they get no disclosure triangle.
+    var childrenOrNil: [FolderNode]? { children.isEmpty ? nil : children }
+}
+
 /// View model for the navigation window: owns the library + root store, the filter/sort/selection
 /// state, and the (safe) actions. All tag mutations go through `TagWriter`.
 @MainActor
@@ -23,6 +35,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
+    @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
@@ -45,6 +58,7 @@ final class NavigationModel: ObservableObject {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.refreshSubjectsCache()
+                    self.folderTree = self.buildFolderTree()         // sidebar tree from discovered paths
                     self.recompute()                                 // also refreshes the selection cache
                     self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
                     self.restoreSelectionIfNeeded()                  // reading-session resume
@@ -207,6 +221,43 @@ final class NavigationModel: ObservableObject {
         }
         return counts.map { (tag: $0.key, count: $0.value) }
             .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
+    }
+
+    // MARK: Folder tree (sidebar)
+
+    /// Scope the list to a folder subtree (nil = whole root), then recompute.
+    func setFolderScope(_ path: String?) {
+        filter.pathPrefix = path
+    }
+
+    /// Build the sidebar folder tree from the discovered file paths under the archive root — no extra
+    /// disk scan (stays within the tagged universe). Each node's `fileCount` is its recursive total.
+    private func buildFolderTree() -> FolderNode? {
+        guard let rootPath = rootStore.root?.path, !library.files.isEmpty else { return nil }
+        let root = rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath
+        final class Mut { var count = 0; var children: [String: Mut] = [:] }
+        let top = Mut()
+        for f in library.files {
+            top.count += 1                                  // recursive total at the root
+            let path = f.url.path
+            guard path.hasPrefix(root + "/") else { continue }
+            var comps = String(path.dropFirst(root.count + 1)).split(separator: "/").map(String.init)
+            guard comps.count >= 1 else { continue }
+            comps.removeLast()                              // drop the file name → directory components
+            var cur = top
+            for c in comps {
+                let child = cur.children[c] ?? { let m = Mut(); cur.children[c] = m; return m }()
+                child.count += 1
+                cur = child
+            }
+        }
+        func convert(_ m: Mut, path: String, name: String) -> FolderNode {
+            let kids = m.children
+                .map { convert($0.value, path: path + "/" + $0.key, name: $0.key) }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            return FolderNode(path: path, name: name, fileCount: m.count, children: kids)
+        }
+        return convert(top, path: root, name: URL(fileURLWithPath: root).lastPathComponent)
     }
 
     // MARK: Root selection

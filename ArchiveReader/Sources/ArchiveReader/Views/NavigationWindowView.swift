@@ -6,22 +6,31 @@ struct NavigationWindowView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
     @State private var showingTagCloud = false
+    @AppStorage("ar.showSidebar") private var showingSidebar = true
     @State private var newSearchName = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            filterBar
-            Divider()
-            HStack(spacing: 0) {
-                table
-                if showingTagCloud {
-                    Divider()
-                    tagCloudPanel
-                        .transition(.move(edge: .trailing))   // expands in from the right margin
-                }
+        HStack(spacing: 0) {
+            if showingSidebar {
+                SidebarView(model: model)
+                    .frame(width: 210)
+                    .transition(.move(edge: .leading))   // expands in from the left margin
+                Divider()
             }
-            Divider()
-            statusBar
+            VStack(spacing: 0) {
+                filterBar
+                Divider()
+                HStack(spacing: 0) {
+                    table
+                    if showingTagCloud {
+                        Divider()
+                        tagCloudPanel
+                            .transition(.move(edge: .trailing))   // expands in from the right margin
+                    }
+                }
+                Divider()
+                statusBar
+            }
         }
         .frame(minWidth: 900, minHeight: 560)
         .toolbar { toolbarContent }
@@ -298,6 +307,11 @@ struct NavigationWindowView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { showingSidebar.toggle() } } label: {
+                Label("Sidebar", systemImage: "sidebar.left")
+            }
+            .help("Show or hide the folder sidebar")
+
             Button {
                 model.chooseRoot()
             } label: { Label(rootLabel, systemImage: "folder") }

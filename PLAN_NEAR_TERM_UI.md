@@ -32,17 +32,17 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
 ---
 
 ## Milestone A — Left sidebar shell + navigable folder tree (item 1a)
-- [ ] **A1. Path-scope filter.** Add `pathPrefix: String?` to `LibraryFilter` (Codable); `matches()`
+- [x] **A1. Path-scope filter.** Add `pathPrefix: String?` to `LibraryFilter` (Codable); `matches()`
       requires the file's path to be within that folder (compare on path-component boundaries, not raw
       `hasPrefix`, so "…/Brown" doesn't match "…/Brown2"). `nil` = whole root. Unit-test the matcher.
-- [ ] **A2. Folder-tree model.** In `NavigationModel`, derive a `FolderNode` tree (name, full path,
+- [x] **A2. Folder-tree model.** In `NavigationModel`, derive a `FolderNode` tree (name, full path,
       children, fileCount) from `library.files` paths relative to `rootStore.root` — no extra disk scan;
       recompute on library change. (fileCount also feeds D2.)
-- [ ] **A3. Sidebar view + layout.** New `Views/SidebarView.swift`; wrap the window in
+- [x] **A3. Sidebar view + layout.** New `Views/SidebarView.swift`; wrap the window in
       `HStack { if showSidebar { SidebarView; Divider() }; mainContent }`. Folder section uses
       `OutlineGroup`/`DisclosureGroup`; "All Files" clears `pathPrefix`; selecting a folder sets it.
       Toolbar toggle (`sidebar.left`) + persisted width/visibility (`AppSettings`).
-- [ ] **A4. Gate:** build+tests+lint · code review (matcher correctness, nil handling, 150k tree cost)
+- [x] **A4. Gate:** build+tests+lint · code review (matcher correctness, nil handling, 150k tree cost)
       · GUI test (toggle sidebar, expand tree, click folder → list scopes; capture) · commit + push.
 
 ## Milestone B — Smart Folders in the sidebar (1b) + create-from-filters (2)

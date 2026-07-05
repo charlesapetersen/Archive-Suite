@@ -33,6 +33,23 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertFalse(f.matches(none))
     }
 
+    func testPathPrefixMatchesOnComponentBoundary() {
+        let inFolder = file("Brown/00001.pdf", ["Unread"])        // /corpus/Brown/00001.pdf
+        let sibling  = file("Brown2/00002.pdf", ["Unread"])       // /corpus/Brown2/… — must NOT match
+        let deeper   = file("Brown/sub/00003.pdf", ["Unread"])    // nested — matches
+        var f = LibraryFilter(); f.pathPrefix = "/corpus/Brown"
+        XCTAssertTrue(f.matches(inFolder))
+        XCTAssertTrue(f.matches(deeper))
+        XCTAssertFalse(f.matches(sibling))          // boundary: "Brown" is not a prefix of "Brown2"
+        XCTAssertTrue(f.isActive)
+        f.pathPrefix = nil
+        XCTAssertTrue(f.matches(sibling))           // nil = whole root
+        XCTAssertFalse(f.isActive)
+        f.pathPrefix = "/corpus/Brown/"             // trailing slash tolerated
+        XCTAssertTrue(f.matches(inFolder))
+        XCTAssertFalse(f.matches(sibling))
+    }
+
     func testSubjectCombineAndVsOr() {
         let both = file("a", ["Jerry Brown", "Economics", "1980", "Unread"])
         let one = file("b", ["Jerry Brown", "1980", "Unread"])

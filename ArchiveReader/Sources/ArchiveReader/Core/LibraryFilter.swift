@@ -24,13 +24,22 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     var read: ReadFilter = .all
     /// Filename substring match (corpus-wide OCR full-text search arrives in M1.5).
     var searchText: String = ""
+    /// Scope to a folder subtree (from the sidebar file tree). `nil` = the whole root. Optional so
+    /// older persisted smart searches (which lack this key) still decode.
+    var pathPrefix: String? = nil
 
     var isActive: Bool {
         !subjects.isEmpty || !priorities.isEmpty || read != .all
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+            || (pathPrefix?.isEmpty == false)
     }
 
     func matches(_ file: ArchiveFile) -> Bool {
+        // Folder scope — match on a path-component boundary so ".../Brown" never matches ".../Brown2".
+        if let pathPrefix, !pathPrefix.isEmpty {
+            let dir = pathPrefix.hasSuffix("/") ? String(pathPrefix.dropLast()) : pathPrefix
+            if file.url.path != dir, !file.url.path.hasPrefix(dir + "/") { return false }
+        }
         // Read state
         switch read {
         case .all: break
