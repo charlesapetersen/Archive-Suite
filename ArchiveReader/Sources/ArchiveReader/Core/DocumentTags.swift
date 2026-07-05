@@ -65,6 +65,22 @@ struct DocumentTags: Sendable, Equatable {
     /// (`Date Uncertain` flags a speculative year; the file usually still carries a Year tag.)
     var dateIsSpeculative: Bool { dateUncertain }
 
+    /// Tokens for the "File tags" column and the tag cloud: the raw tags minus the date facets
+    /// (year / `MM Month` / `Day N` / `Date Uncertain`) and read-state (`Read`/`Unread`), since those
+    /// have their own columns. Keeps priority / subjects / marker-color tokens, verbatim & in order.
+    var topicalTags: [String] {
+        raw.filter { token in
+            let s = token.trimmingCharacters(in: .whitespaces)
+            if s.isEmpty { return false }
+            if ReadState.allCases.contains(where: { $0.rawValue.caseInsensitiveCompare(s) == .orderedSame }) { return false }
+            if s.caseInsensitiveCompare("Date Uncertain") == .orderedSame { return false }
+            if DocumentTags.parseMonth(s) != nil { return false }
+            if DocumentTags.parseDay(s) != nil { return false }
+            if DocumentTags.parseYear(s) != nil { return false }
+            return true
+        }
+    }
+
     /// Human-readable date for the "Document date" column. `nil` when undated.
     /// Year only → "1980"; +month → "Mar 1980"; +day → "Mar 25, 1980".
     var displayDate: String? {

@@ -141,10 +141,8 @@ struct NavigationWindowView: View {
 
     /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
     private func displaySubjects(_ file: ArchiveFile) -> String {
-        file.tags.raw
-            .filter { $0.caseInsensitiveCompare("Read") != .orderedSame
-                   && $0.caseInsensitiveCompare("Unread") != .orderedSame }
-            .joined(separator: ", ")
+        // Dates live in the Document date column, so exclude the date facets (and read-state) here.
+        file.tags.topicalTags.joined(separator: ", ")
     }
 
     // MARK: Filter bar
@@ -155,7 +153,6 @@ struct NavigationWindowView: View {
                 Text("All").tag(ReadFilter.all)
                 Text("Unread").tag(ReadFilter.unread)
                 Text("Read").tag(ReadFilter.read)
-                Text("No read-state").tag(ReadFilter.noReadState)
             }
             .pickerStyle(.segmented)
             .fixedSize()
@@ -212,7 +209,11 @@ struct NavigationWindowView: View {
         .padding(8)
     }
 
-    @State private var subjectDraft = ""
+    /// Existing tags offered for autocomplete — the library's distinct topical tags, minus any already
+    /// chosen. (`allSubjects` is the deduped topical-tag set the model already maintains.)
+    private var tagSuggestions: [String] {
+        model.allSubjects.filter { !model.filter.subjects.contains($0) }
+    }
     private var subjectFilterField: some View {
         HStack(spacing: 4) {
             ForEach(Array(model.filter.subjects).sorted(), id: \.self) { subj in
@@ -222,24 +223,20 @@ struct NavigationWindowView: View {
                     Label(subj, systemImage: "xmark.circle.fill").labelStyle(.titleAndIcon)
                 }
                 .controlSize(.small)
-                .help("Remove this subject filter")
+                .help("Remove this tag filter")
             }
-            TextField("Add subject filter…", text: $subjectDraft)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 150)
-                .onSubmit {
-                    let s = subjectDraft.trimmingCharacters(in: .whitespaces)
-                    if !s.isEmpty { model.filter.subjects.insert(s) }
-                    subjectDraft = ""
-                }
-                .help("Add a subject tag to filter by (press Return)")
+            TagFilterField(placeholder: "Add tag filter…", suggestions: tagSuggestions) { tag in
+                model.filter.subjects.insert(tag)
+            }
+            .frame(width: 160)
+            .help("Filter by tag — type to autocomplete existing tags; Return adds it")
             if model.filter.subjects.count > 1 {
                 Picker("Match", selection: $model.filter.subjectCombine) {
                     Text("All").tag(SubjectCombine.all)
                     Text("Any").tag(SubjectCombine.any)
                 }
                 .pickerStyle(.segmented).fixedSize().labelsHidden()
-                .help("Match documents having all, or any, of the chosen subjects")
+                .help("Match documents having all, or any, of the chosen tags")
             }
         }
     }
