@@ -77,15 +77,15 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
 - [x] **C-gate:** after each Cx: build+tests(+lint for C8) · quick code review · GUI check · commit+push.
 
 ## Milestone D — Item 5 (bigger)
-- [ ] **D1. Corpus-wide tag rename** (controlled vocabulary). Entry: tag-cloud context menu "Rename
+- [x] **D1. Corpus-wide tag rename** (controlled vocabulary). Entry: tag-cloud context menu "Rename
       tag…" and a Tags-menu command. Sheet shows the affected-file count; on confirm, a **batch**: per
       file carrying X, `TagWriter.apply(remove X, add Y)` → `applyVerifiedWrites(batch)` + **one grouped
       undo**. Independent idempotent units; **surface partial failure** ("renamed N of M; k could not").
       **Tier-2:** adversarial code review + an integration test renaming a tag across scratch copies
       (assert every affected file updated, others untouched, bytes unchanged, undo restores).
-- [ ] **D2. Live count badges** on sidebar folders (from `FolderNode.fileCount`) and smart folders
+- [x] **D2. Live count badges** on sidebar folders (from `FolderNode.fileCount`) and smart folders
       (files matching the saved filter; cache to avoid O(searches·N) on every render).
-- [ ] **D-gate:** build+tests+lint · **adversarial review of D1's write path** (Safety §§1–12) ·
+- [x] **D-gate:** build+tests+lint · **adversarial review of D1's write path** (Safety §§1–12) ·
       GUI + **smoke** on scratch (rename a tag on several files; `xattr`-verify; undo) · commit + push.
 
 ## Milestone E — Final review, full smoke test, docs

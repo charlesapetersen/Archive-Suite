@@ -41,6 +41,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
+    @Published private(set) var smartFolderCounts: [UUID: Int] = [:]   // D2: files matching each saved search
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
@@ -65,6 +66,7 @@ final class NavigationModel: ObservableObject {
                     guard let self else { return }
                     self.refreshSubjectsCache()
                     self.folderTree = self.buildFolderTree()         // sidebar tree from discovered paths
+                    self.refreshSmartFolderCounts()                  // D2 badges
                     self.recompute()                                 // also refreshes the selection cache
                     self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
                     self.restoreSelectionIfNeeded()                  // reading-session resume
@@ -83,7 +85,8 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
         savedSearches.objectWillChange
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+            .receive(on: DispatchQueue.main)   // run after the change commits, so counts see the new set
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send(); self?.refreshSmartFolderCounts() } }
             .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
     }
@@ -309,6 +312,14 @@ final class NavigationModel: ObservableObject {
         filter.pathPrefix = path
     }
 
+    /// D2: recompute each smart folder's matching-file count over the whole library (cached; refreshed
+    /// on library or saved-search changes, so the sidebar isn't O(searches·N) per render).
+    private func refreshSmartFolderCounts() {
+        var counts: [UUID: Int] = [:]
+        for s in savedSearches.searches { counts[s.id] = library.files.filter(s.filter.matches).count }
+        smartFolderCounts = counts
+    }
+
     /// Build the sidebar folder tree from the discovered file paths under the archive root — no extra
     /// disk scan (stays within the tagged universe). Each node's `fileCount` is its recursive total.
     private func buildFolderTree() -> FolderNode? {
@@ -417,6 +428,46 @@ final class NavigationModel: ObservableObject {
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
         statusMessage = "Edited \(batch.count) file\(batch.count == 1 ? "" : "s")"
             + (failures > 0 ? "; \(failures) could not update." : ".")
+        announce(statusMessage)
+    }
+
+    // MARK: Corpus-wide tag rename (D1, Tier-2). Every file carrying `old` gets `old` removed + `new`
+    // added, via the audited TagWriter — one grouped undo, partial failures surfaced, never all-or-nothing.
+
+    @Published var renamingTag: String?     // non-nil while the rename-tag sheet is open (the old tag)
+
+    /// Number of files carrying `tag` (for the rename sheet's "affects N files").
+    func affectedFileCount(forTag tag: String) -> Int {
+        library.files.filter { $0.subjects.contains(tag) }.count
+    }
+
+    /// Open the rename-tag sheet from a menu — seed with the active tag filter, else the top visible tag.
+    func beginRenameTag() {
+        renamingTag = filter.subjects.sorted().first ?? tagCloud.first?.tag
+        if renamingTag == nil { statusMessage = "No tags to rename in the current view."; announce(statusMessage) }
+    }
+
+    func renameTag(from oldTag: String, to newTag: String) {
+        let old = oldTag.trimmingCharacters(in: .whitespaces)
+        let new = newTag.trimmingCharacters(in: .whitespaces)
+        guard !old.isEmpty, !new.isEmpty, old != new else { return }
+        let affected = library.files.filter { $0.subjects.contains(old) }
+        guard !affected.isEmpty else { statusMessage = "No files carry the tag “\(old)”."; announce(statusMessage); return }
+        var batch: [TagWriteResult] = []
+        var verified: [TagWriteResult] = []
+        var failures = 0
+        for f in affected {
+            do {
+                let r = try TagWriter.apply(TagDelta(add: [new], remove: [old]), to: f.url)
+                verified.append(r)
+                if !r.isNoOp { batch.append(r) }
+            } catch { failures += 1 }
+        }
+        library.applyVerifiedWrites(verified)
+        if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }   // ONE grouped undo
+        statusMessage = failures == 0
+            ? "Renamed “\(old)” → “\(new)” on \(batch.count) file\(batch.count == 1 ? "" : "s")."
+            : "Renamed \(batch.count); \(failures) could not update."
         announce(statusMessage)
     }
 

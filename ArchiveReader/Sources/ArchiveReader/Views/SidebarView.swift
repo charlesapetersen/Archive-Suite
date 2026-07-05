@@ -15,7 +15,7 @@ struct SidebarView: View {
         List(selection: $selection) {
             Section {
                 ForEach(model.savedSearches.searches) { s in
-                    row(name: s.name, systemImage: "folder.badge.gearshape", count: nil)
+                    row(name: s.name, systemImage: "folder.badge.gearshape", count: model.smartFolderCounts[s.id])
                         .tag(SidebarView.smartPrefix + s.id.uuidString)
                         .contextMenu {
                             Button("Rename…") { model.renamingSearch = s }

@@ -42,6 +42,10 @@ struct NavigationWindowView: View {
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
         .sheet(isPresented: $model.showingEditor) { TagEditorView(model: model) }
+        .sheet(isPresented: Binding(get: { model.renamingTag != nil },
+                                    set: { if !$0 { model.renamingTag = nil } })) {
+            if let t = model.renamingTag { RenameTagSheet(model: model, oldTag: t) }
+        }
         .alert("Save Search", isPresented: $model.showingSaveDialog) {
             TextField("Name", text: $newSearchName)
             Button("Save") { model.saveCurrentSearch(name: newSearchName) }
@@ -237,6 +241,7 @@ struct NavigationWindowView: View {
                                     else { model.filter.subjects.insert(item.tag) }
                                 }
                                 Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
+                                Button("Rename tag…") { model.renamingTag = item.tag }
                                 if model.filter.subjects.count > 1 {
                                     Picker("Match tags", selection: $model.filter.subjectCombine) {
                                         Text("All").tag(SubjectCombine.all)
