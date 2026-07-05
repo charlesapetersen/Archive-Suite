@@ -21,8 +21,15 @@ struct ArchiveFile: Identifiable, Sendable {
     var color: ArchiveColor? { tags.color }
 }
 
-// Identity is the file URL — two records for the same file are the same row.
+// Row *identity* is the file URL (see `id`); row *equality* is by VALUE and must include `tags`.
+// SwiftUI's `Table` diffs elements by Equatable: a url-only `==` made it treat a row whose tags
+// changed (e.g. Unread→Read) as unchanged and skip re-rendering the cell — so marking a file Read
+// left the row visibly "Unread". Comparing the displayed fields forces the row to re-render on edit.
 extension ArchiveFile: Hashable {
-    static func == (lhs: ArchiveFile, rhs: ArchiveFile) -> Bool { lhs.url == rhs.url }
+    static func == (lhs: ArchiveFile, rhs: ArchiveFile) -> Bool {
+        lhs.url == rhs.url && lhs.name == rhs.name && lhs.fileType == rhs.fileType
+            && lhs.tags == rhs.tags && lhs.contentModified == rhs.contentModified
+    }
+    // url-only hash stays valid: value-equal files share a url, so they share a hash (collisions OK).
     func hash(into hasher: inout Hasher) { hasher.combine(url) }
 }
