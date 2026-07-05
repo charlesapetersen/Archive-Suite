@@ -13,6 +13,16 @@ final class SavedSearchCodableTests: XCTestCase {
         let back = try JSONDecoder().decode(LibraryFilter.self, from: data)
         XCTAssertEqual(f, back)
     }
+
+    func testPathPrefixCodableAndBackwardCompat() throws {
+        var f = LibraryFilter(); f.pathPrefix = "/root/Brown"
+        let back = try JSONDecoder().decode(LibraryFilter.self, from: JSONEncoder().encode(f))
+        XCTAssertEqual(back.pathPrefix, "/root/Brown")
+        // A smart folder saved before pathPrefix existed must still decode (→ nil).
+        let old = #"{"subjects":[],"subjectCombine":"all","priorities":[],"read":"all","searchText":""}"#
+        let decoded = try JSONDecoder().decode(LibraryFilter.self, from: Data(old.utf8))
+        XCTAssertNil(decoded.pathPrefix)
+    }
 }
 
 @MainActor
@@ -44,5 +54,16 @@ final class SavedSearchStoreTests: XCTestCase {
         let (store, d, name) = makeStore(); defer { d.removePersistentDomain(forName: name) }
         store.add(name: "   ", filter: LibraryFilter(), fullTextQuery: "")
         XCTAssertTrue(store.searches.isEmpty)
+    }
+
+    func testRenamePersists() {
+        let (store, d, name) = makeStore(); defer { d.removePersistentDomain(forName: name) }
+        store.add(name: "Old", filter: LibraryFilter(), fullTextQuery: "")
+        let id = store.searches[0].id
+        store.rename(id, to: "  New Name  ")
+        XCTAssertEqual(store.searches[0].name, "New Name")            // trimmed
+        store.rename(id, to: "   ")                                    // blank ignored
+        XCTAssertEqual(store.searches[0].name, "New Name")
+        XCTAssertEqual(SavedSearchStore(defaults: d).searches[0].name, "New Name")   // persisted
     }
 }

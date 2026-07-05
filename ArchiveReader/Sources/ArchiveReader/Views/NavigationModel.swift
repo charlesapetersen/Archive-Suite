@@ -32,6 +32,7 @@ final class NavigationModel: ObservableObject {
     @Published var showingEditor = false
     @Published var showingPreview = false
     @Published var showingSaveDialog = false
+    @Published var renamingSearch: SavedSearch?     // non-nil while renaming a smart folder
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
@@ -86,6 +87,30 @@ final class NavigationModel: ObservableObject {
 
     func saveCurrentSearch(name: String) {
         savedSearches.add(name: name, filter: filter, fullTextQuery: fullTextQuery)
+    }
+
+    /// A human-readable default name for "save current filters as a smart folder", built from the
+    /// active filter facets (e.g. "Unread · P8 · Jerry Brown · Batch-A").
+    var suggestedSmartFolderName: String {
+        var parts: [String] = []
+        switch filter.read {
+        case .all: break
+        case .read: parts.append("Read")
+        case .unread: parts.append("Unread")
+        case .noReadState: parts.append("No read-state")
+        }
+        if !filter.priorities.isEmpty {
+            parts.append(filter.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        }
+        if !filter.subjects.isEmpty {
+            parts.append(filter.subjects.sorted().joined(separator: filter.subjectCombine == .all ? " + " : " / "))
+        }
+        if let p = filter.pathPrefix, !p.isEmpty { parts.append(URL(fileURLWithPath: p).lastPathComponent) }
+        let fn = filter.searchText.trimmingCharacters(in: .whitespaces)
+        if !fn.isEmpty { parts.append("name:\(fn)") }
+        let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { parts.append("“\(q)”") }
+        return parts.isEmpty ? "Smart Folder" : parts.joined(separator: " · ")
     }
     func applySaved(_ search: SavedSearch) {
         filter = search.filter

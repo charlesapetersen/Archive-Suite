@@ -34,6 +34,13 @@ final class SavedSearchStore: ObservableObject {
         save()
     }
 
+    func rename(_ id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let i = searches.firstIndex(where: { $0.id == id }) else { return }
+        searches[i].name = trimmed
+        save()
+    }
+
     private func load() {
         if let data = defaults.data(forKey: key),
            let arr = try? JSONDecoder().decode([SavedSearch].self, from: data) {

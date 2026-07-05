@@ -8,6 +8,7 @@ struct NavigationWindowView: View {
     @State private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @State private var newSearchName = ""
+    @State private var renameText = ""
 
     var body: some View {
         HStack(spacing: 0) {
@@ -44,6 +45,21 @@ struct NavigationWindowView: View {
         } message: {
             Text("Save the current filters and text search as a reusable smart folder.")
         }
+        // Pre-fill the save name from the active filters whenever the dialog opens.
+        .onChange(of: model.showingSaveDialog) { _, showing in
+            if showing { newSearchName = model.suggestedSmartFolderName }
+        }
+        .alert("Rename Smart Folder", isPresented: Binding(
+            get: { model.renamingSearch != nil },
+            set: { if !$0 { model.renamingSearch = nil } })) {
+            TextField("Name", text: $renameText)
+            Button("Rename") {
+                if let s = model.renamingSearch { model.savedSearches.rename(s.id, to: renameText) }
+                model.renamingSearch = nil
+            }
+            Button("Cancel", role: .cancel) { model.renamingSearch = nil }
+        }
+        .onChange(of: model.renamingSearch) { _, s in if let s { renameText = s.name } }
         .sheet(isPresented: $model.showingPreview) {
             PreviewSheet(selection: model.documentSelection(), nav: model) {
                 model.showingPreview = false
@@ -259,6 +275,8 @@ struct NavigationWindowView: View {
             Spacer()
 
             if model.filter.isActive || model.ftsPaths != nil {
+                Button("Save as Smart Folder") { model.showingSaveDialog = true }
+                    .help("Save these filters as a smart folder in the sidebar")
                 Button("Clear") {
                     model.filter = LibraryFilter()
                     model.fullTextQuery = ""

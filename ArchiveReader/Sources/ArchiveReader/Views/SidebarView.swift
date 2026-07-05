@@ -9,8 +9,29 @@ struct SidebarView: View {
     @State private var selection: String? = SidebarView.allFilesTag
     static let allFilesTag = "\u{0}ALL"
 
+    static let smartPrefix = "SS:"
+
     var body: some View {
         List(selection: $selection) {
+            Section {
+                ForEach(model.savedSearches.searches) { s in
+                    row(name: s.name, systemImage: "folder.badge.gearshape", count: nil)
+                        .tag(SidebarView.smartPrefix + s.id.uuidString)
+                        .contextMenu {
+                            Button("Rename…") { model.renamingSearch = s }
+                            Button("Delete", role: .destructive) { model.savedSearches.delete(s.id) }
+                        }
+                }
+            } header: {
+                HStack {
+                    Text("Smart Folders")
+                    Spacer()
+                    Button { model.showingSaveDialog = true } label: { Image(systemName: "plus") }
+                        .buttonStyle(.plain)
+                        .help("Save the current filters as a smart folder")
+                }
+            }
+
             Section("Folders") {
                 row(name: "All Files", systemImage: "tray.full", count: model.folderTree?.fileCount)
                     .tag(SidebarView.allFilesTag)
@@ -25,7 +46,15 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .onChange(of: selection) { _, new in
-            model.setFolderScope(new == nil || new == SidebarView.allFilesTag ? nil : new)
+            guard let new else { model.setFolderScope(nil); return }
+            if new.hasPrefix(SidebarView.smartPrefix) {
+                let idStr = String(new.dropFirst(SidebarView.smartPrefix.count))
+                if let s = model.savedSearches.searches.first(where: { $0.id.uuidString == idStr }) {
+                    model.applySaved(s)   // applies the saved filter + OCR query
+                }
+            } else {
+                model.setFolderScope(new == SidebarView.allFilesTag ? nil : new)
+            }
         }
     }
 

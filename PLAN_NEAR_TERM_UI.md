@@ -46,14 +46,14 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
       · GUI test (toggle sidebar, expand tree, click folder → list scopes; capture) · commit + push.
 
 ## Milestone B — Smart Folders in the sidebar (1b) + create-from-filters (2)
-- [ ] **B1. Smart Folders section** pinned at the top of the sidebar: list `SavedSearchStore.searches`;
+- [x] **B1. Smart Folders section** pinned at the top of the sidebar: list `SavedSearchStore.searches`;
       click → `applySaved`; context menu **Rename** / **Delete**. Add `SavedSearchStore.rename(id:name:)`.
-- [ ] **B2. Create from current filters (item 2).** A "+" in the Smart Folders header AND a "Save as
+- [x] **B2. Create from current filters (item 2).** A "+" in the Smart Folders header AND a "Save as
       Smart Folder" button in the filter bar (shown when a filter/search is active) → the save sheet,
       pre-filled with a name derived from the active filters (`NavigationModel.suggestedSmartFolderName`).
       Reuses `SavedSearchStore.add(name:filter:fullTextQuery:)` (captures pathPrefix too).
-- [ ] **B3. "Unsaved filters" hint** near the filter bar when the active view isn't a saved smart folder.
-- [ ] **B4. Gate:** build+tests · code review (name dupes, delete safety, pathPrefix round-trips through
+- [x] **B3. "Unsaved filters" hint** near the filter bar when the active view isn't a saved smart folder.
+- [x] **B4. Gate:** build+tests · code review (name dupes, delete safety, pathPrefix round-trips through
       Codable) · GUI test (create from a filter → appears in sidebar → click re-applies → rename →
       delete; capture) · commit + push. (No corpus writes — smart folders live in UserDefaults.)
 
