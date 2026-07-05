@@ -1,28 +1,234 @@
 import SwiftUI
 
-/// The file-navigation window (Finder-Smart-Folder-like). Scaffolding for now.
-/// M1 adds: Spotlight discovery, the results table (Document date · Name · Type · Tags · Read/Unread),
-/// multi-level sort, the three filters, copy-links, mark-read, and the tag editor.
+/// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
 struct NavigationWindowView: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "books.vertical")
-                .font(.system(size: 52))
-                .foregroundStyle(.secondary)
-            Text("Archive Reader")
-                .font(.largeTitle.bold())
-            Text("File navigation window — foundation scaffold.")
-                .foregroundStyle(.secondary)
-            Text("Spotlight browser, filters (subject · priority · read-state), tag editor, and\ncopy-links arrive in M1. The read-only domain core is already in place.")
-                .font(.callout)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(minWidth: 820, minHeight: 520)
-        .padding(40)
-    }
-}
+    @StateObject private var model = NavigationModel()
+    @Environment(\.openWindow) private var openWindow
 
-#Preview {
-    NavigationWindowView()
+    var body: some View {
+        VStack(spacing: 0) {
+            filterBar
+            Divider()
+            table
+            Divider()
+            statusBar
+        }
+        .frame(minWidth: 900, minHeight: 560)
+        .toolbar { toolbarContent }
+        .onChange(of: model.filter) { model.recompute() }
+        .onChange(of: model.sort) { model.recompute() }
+        .navigationTitle("Archive Reader")
+    }
+
+    // MARK: Table
+
+    private var table: some View {
+        Table(model.displayed, selection: $model.selection) {
+            TableColumn("Document date") { file in
+                Text(file.tags.displayDate ?? "—")
+                    .italic(file.dateIsSpeculative)          // Date Uncertain → italic
+                    .foregroundStyle(file.sortDate == nil ? .secondary : .primary)
+            }
+            .width(min: 110, ideal: 130)
+
+            TableColumn("File name") { file in
+                HStack(spacing: 6) {
+                    if let color = file.color {
+                        Image(systemName: "circle.fill")
+                            .foregroundStyle(color == .box ? .red : .purple)
+                            .font(.system(size: 8))
+                    }
+                    Text(file.name).lineLimit(1).truncationMode(.middle)
+                }
+            }
+            .width(min: 200, ideal: 320)
+
+            TableColumn("Type") { file in Text(file.fileType).foregroundStyle(.secondary) }
+                .width(min: 44, ideal: 56)
+
+            TableColumn("File tags") { file in
+                Text(displaySubjects(file)).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
+            }
+            .width(min: 160, ideal: 300)
+
+            TableColumn("Priority") { file in
+                Text(file.priority.map { "P\($0)" } ?? "—").foregroundStyle(.secondary)
+            }
+            .width(min: 54, ideal: 64)
+
+            TableColumn("Read") { file in
+                Text(file.readState?.rawValue ?? "—")
+                    .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
+            }
+            .width(min: 60, ideal: 74)
+        }
+        .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
+            Button("Open in Document View") { openSelection() }
+            Button("Copy Link(s)") { model.copyLinks() }
+            Divider()
+            Button("Mark Read") { model.mark(.read) }
+            Button("Mark Unread") { model.mark(.unread) }
+        } primaryAction: { _ in
+            openSelection()   // double-click opens
+        }
+    }
+
+    /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
+    private func displaySubjects(_ file: ArchiveFile) -> String {
+        file.tags.raw
+            .filter { $0.caseInsensitiveCompare("Read") != .orderedSame
+                   && $0.caseInsensitiveCompare("Unread") != .orderedSame }
+            .joined(separator: ", ")
+    }
+
+    // MARK: Filter bar
+
+    private var filterBar: some View {
+        HStack(spacing: 12) {
+            Picker("Read state", selection: $model.filter.read) {
+                Text("All").tag(ReadFilter.all)
+                Text("Unread").tag(ReadFilter.unread)
+                Text("Read").tag(ReadFilter.read)
+                Text("No read-state").tag(ReadFilter.noReadState)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .labelsHidden()
+
+            HStack(spacing: 4) {
+                ForEach([10, 9, 8, 7], id: \.self) { p in
+                    Toggle("P\(p)", isOn: Binding(
+                        get: { model.filter.priorities.contains(p) },
+                        set: { on in
+                            if on { model.filter.priorities.insert(p) } else { model.filter.priorities.remove(p) }
+                        }))
+                    .toggleStyle(.button)
+                    .controlSize(.small)
+                }
+            }
+
+            subjectFilterField
+
+            TextField("Filter file name…", text: $model.filter.searchText)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 220)
+
+            Spacer()
+
+            if !model.filter.subjects.isEmpty || !model.filter.priorities.isEmpty
+                || model.filter.read != .all || !model.filter.searchText.isEmpty {
+                Button("Clear") {
+                    model.filter = LibraryFilter()
+                }
+            }
+        }
+        .padding(8)
+    }
+
+    @State private var subjectDraft = ""
+    private var subjectFilterField: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(model.filter.subjects).sorted(), id: \.self) { subj in
+                Button {
+                    model.filter.subjects.remove(subj)
+                } label: {
+                    Label(subj, systemImage: "xmark.circle.fill").labelStyle(.titleAndIcon)
+                }
+                .controlSize(.small)
+            }
+            TextField("Add subject filter…", text: $subjectDraft)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 150)
+                .onSubmit {
+                    let s = subjectDraft.trimmingCharacters(in: .whitespaces)
+                    if !s.isEmpty { model.filter.subjects.insert(s) }
+                    subjectDraft = ""
+                }
+            if model.filter.subjects.count > 1 {
+                Picker("Match", selection: $model.filter.subjectCombine) {
+                    Text("All").tag(SubjectCombine.all)
+                    Text("Any").tag(SubjectCombine.any)
+                }
+                .pickerStyle(.segmented).fixedSize().labelsHidden()
+            }
+        }
+    }
+
+    // MARK: Toolbar + status
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup {
+            Button {
+                model.chooseRoot()
+            } label: { Label(rootLabel, systemImage: "folder") }
+
+            Menu {
+                sortButton("Document date", .date)
+                sortButton("File name", .name)
+                sortButton("Priority", .priority)
+                sortButton("Read state", .readState)
+                Divider()
+                Button("Default (date, then name)") { model.sort = LibrarySort.default }
+            } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
+
+            Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
+                .keyboardShortcut("o", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(model.selection.isEmpty)
+
+            Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
+                .keyboardShortcut("u", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                .keyboardShortcut("z", modifiers: .command)
+                .disabled(model.undoDepth == 0)
+        }
+    }
+
+    private func sortButton(_ title: String, _ field: SortField) -> some View {
+        Button {
+            // Toggle direction if already the primary field; else make it primary, name as tiebreak.
+            if model.sort.first?.field == field {
+                model.sort[0].ascending.toggle()
+            } else {
+                model.sort = [ARSortDescriptor(field: field, ascending: true),
+                              ARSortDescriptor(field: .name, ascending: true)]
+            }
+        } label: {
+            let arrow = model.sort.first?.field == field ? (model.sort.first!.ascending ? " ↑" : " ↓") : ""
+            Text(title + arrow)
+        }
+    }
+
+    private var rootLabel: String {
+        model.rootStore.root?.lastPathComponent ?? "Choose Folder…"
+    }
+
+    private var statusBar: some View {
+        HStack {
+            if model.library.isGathering { ProgressView().controlSize(.small); Text("Searching…") }
+            Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
+                .foregroundStyle(.secondary)
+            Spacer()
+            if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
+            if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
+        }
+        .font(.callout)
+        .padding(.horizontal, 10).padding(.vertical, 6)
+    }
+
+    private func openSelection() {
+        let sel = model.documentSelection()
+        guard !sel.filePaths.isEmpty else { return }
+        openWindow(id: WindowID.document, value: sel)
+    }
 }

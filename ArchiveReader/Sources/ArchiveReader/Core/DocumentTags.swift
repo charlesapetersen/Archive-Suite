@@ -64,6 +64,16 @@ struct DocumentTags: Sendable, Equatable {
     /// When true, the derived date is speculative and should be shown in italics.
     /// (`Date Uncertain` flags a speculative year; the file usually still carries a Year tag.)
     var dateIsSpeculative: Bool { dateUncertain }
+
+    /// Human-readable date for the "Document date" column. `nil` when undated.
+    /// Year only → "1980"; +month → "Mar 1980"; +day → "Mar 25, 1980".
+    var displayDate: String? {
+        guard let year else { return nil }
+        guard let month else { return String(year) }
+        let mon = DocumentTags.monthNames[month.number - 1].prefix(3)
+        if let day { return "\(mon) \(day), \(year)" }
+        return "\(mon) \(year)"
+    }
 }
 
 // MARK: - Parsing
