@@ -17,7 +17,12 @@ changes is a file's **macOS Finder tags** — and only as a deliberate, verified
 action routed through a single audited writer. See [CLAUDE.md](CLAUDE.md) → Core Directive & Safety
 Protocol.
 
-## What it does (planned)
+## What it does
+
+> **Status (2026-07-05):** v1 feature-complete — all planned milestones + the High-priority backlog
+> are shipped; 75 tests pass; a full adversarial code review is done. One gap: a manual GUI smoke
+> test (the logic is unit-tested; the SwiftUI GUI hasn't been driven at runtime yet). See `STATUS.md`.
+
 
 - **Find** every PDF tagged `Read`/`Unread` under your archive root, via Spotlight — fast at 150k+.
 - **Navigation window** (Finder-Smart-Folder-like): columns for Document date · File name · File

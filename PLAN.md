@@ -7,7 +7,7 @@ audit + empirical tests on the real corpus (2026-07-04).
 
 ---
 
-## §Decisions — needs owner review (⚠ = awaiting answer)
+## §Decisions (all resolved with the owner)
 
 **Settled / recommended (owner can override):**
 - **Chronological sort key = derived from tags** (universal, medieval-safe, no Processor change).
@@ -42,7 +42,13 @@ audit + empirical tests on the real corpus (2026-07-04).
 
 ## §Milestones (interruption-resilient; each ends buildable + committed)
 
-**M0 — Skeleton + safety core** *(do first; nothing else ships without it)*
+> **STATUS 2026-07-05 — ALL SHIPPED.** M0, M1, M1.5, M2, M3 and the entire **High-priority**
+> `POTENTIAL_FEATURES` backlog are implemented; a full adversarial code review (13 bugs fixed) and a
+> documentation review are done. 75 tests pass; build + lint clean. Remaining: a manual GUI smoke test
+> and a 150k perf-check (see `STATUS.md`); Medium/Lower backlog deferred. Live file map: `CLAUDE.md`
+> §Implementation map.
+
+**M0 — Skeleton + safety core** ✅ *(do first; nothing else ships without it)*
 - XcodeGen `project.yml`, two empty SwiftUI windows, build clean.
 - `TagWriter` (delta-based; handles all tag edits and the Read/Unread preset) implementing the full
   Safety Protocol (CLAUDE.md).
@@ -50,7 +56,7 @@ audit + empirical tests on the real corpus (2026-07-04).
   collision refusal, arbitrary add/remove-delta correctness, inverse-delta undo, multiset + bytes
   invariant, group tri-state edit, non-2-page guard, write-surface lint. Tier-2 adversarial review.
 
-**M1 — Navigation vertical slice** *(the product's core)*
+**M1 — Navigation vertical slice** ✅ *(the product's core)*
 - `NSMetadataQuery` discovery scoped to a granted root; live updates.
 - Table: columns (Document date · File name · File type · File tags · Read/Unread); date derived
   from tags (Year/Month/`Day N`) → sortable key; Date-Uncertain italic; multi-level sort
@@ -66,7 +72,7 @@ audit + empirical tests on the real corpus (2026-07-04).
   warning from the live corpus tag set. Group edits show Finder-style tri-state (all/some/none).
   All writes go through `TagWriter` (delta + verify + grouped undo).
 
-**M1.5 — Content index (background)**
+**M1.5 — Content index (background)** ✅
 - `libsqlite3` FTS5 index (no third-party dep). Background extractor reads each PDF's page-2 text
   once → caches OCR body + (when present) `Classification:` + header metadata; incremental for
   new/changed files; progress UI; fully rebuildable/disposable. Primary purpose: **full-text
@@ -74,7 +80,7 @@ audit + empirical tests on the real corpus (2026-07-04).
 - **Corpus-wide full-text search** in the nav window (query the FTS index; snippets + ranking),
   combinable with the tag facet filters.
 
-**M2 — Document view window + segment-aware reading**
+**M2 — Document view window + segment-aware reading** ✅
 - Two `PDFView`s (image left / OCR text right); independent per-pane zoom; draggable gray splitter
   w/ center grab handle; **default 2/3 : 1/3** re-applied per document.
 - Up/Down cycles the selected set (lazy-load, don't materialize all).
@@ -85,7 +91,7 @@ audit + empirical tests on the real corpus (2026-07-04).
   optional "skip OCR header". In-doc Find (⌘F). Graceful degrade for non-2-page/corrupt.
 - Mark Read + advance from the viewer.
 
-**M3 — Options panel + polish**
+**M3 — Options panel + polish** ✅
 - Options (⌘,) — see §Options. Finalized collision-free keyboard map (see §Keyboard).
 - Accessibility: honor Reduce Motion (instant row removal), VoiceOver announcements
   ("12 marked Read, removed"), deterministic post-removal focus.

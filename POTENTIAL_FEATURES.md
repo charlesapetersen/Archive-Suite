@@ -4,19 +4,19 @@ Forward-looking backlog. Core roadmap lives in [PLAN.md](PLAN.md) (§Milestones)
 wishlist beyond it. Several items overlap Archive Processor's own backlog — evidence these apps are
 one suite.
 
-## High priority (post-core)
-- **Document-run / provenance convenience** — opt-in "extend selection to next Document Start" and a
-  Box/Folder provenance breadcrumb, driven by the content index (degrades when classification absent;
-  never auto-groups — the user always decides what opens together).
-- **Reading-session resume** — "continue where I left off".
-- **App-side notes / flags stored OUTSIDE the corpus** — bookmark or annotate documents without ever
-  writing to the files.
-- **Corpus data-quality dashboard** — counts of no-date / no-priority / Date-Uncertain /
-  both-Read+Unread (corruption) / unreadable-or-offline files. Turns the reader into a health check.
-- **Quick Look preview** from the nav list (space bar) without opening the full document window.
-- **Saved searches / smart folders** — persist a filter+search combination.
-- **Non-sandboxed whole-Mac search** (v1 is sandboxed to a granted root; access is behind
-  `FileAccessProvider` so this is a config switch).
+## High priority — SHIPPED in v1 (2026-07-05) ✅
+All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
+- ✅ **Document-run / provenance convenience** — opt-in "Select Document Run" via the content index's
+  classification (degrades to a single item when absent; never auto-groups). *Residual:* a dedicated
+  Box/Folder provenance breadcrumb column is not yet surfaced.
+- ✅ **Reading-session resume** — the selection is persisted (≤500) and restored on next launch.
+- ✅ **App-side notes / flags OUTSIDE the corpus** — `NotesStore` (UserDefaults); flag column + editor.
+- ✅ **Corpus data-quality dashboard** — the library-health popover (stethoscope in the status bar).
+- ✅ **Quick Look preview** from the nav list (⌘Y — moved off bare Space so it can't block typing).
+- ✅ **Saved searches / smart folders** — `SavedSearch` + the toolbar "Saved" menu.
+- ◑ **Non-sandboxed whole-Mac search** — code-ready: `ArchiveLibrary.start(scope: nil)` uses the
+  local-computer scope, so this is a build-time entitlement flip (drop `com.apple.security.app-sandbox`),
+  not new code. Kept sandboxed for v1 by owner decision.
 
 
 ## Medium priority

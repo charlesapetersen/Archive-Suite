@@ -5,49 +5,40 @@ Single source of "where are we, what's next," kept current every work session so
 PLAN.md → this file.
 
 ## Current state (2026-07-05)
-- **Milestone:** **M0, M1, M1.5, M2 COMPLETE** (safety core + navigation window + content index/
-  full-text search + two-up document viewer). The core reading app is functional. Starting **M3**.
-- **Build:** GREEN. `xcodegen generate && xcodebuild … build` → **BUILD SUCCEEDED**;
-  `xcodebuild … test` → **48/48 pass**; `bash scripts/lint-write-surface.sh` → clean.
-- **Latest commits:** `f951711` M2 · `3dc8368` M2a · `45cf2e3` M1.5 · `2d8e9c7` M1 · `91c0afd` M0.
-- **Added since M1:** `Core/CopyTextCleaner` (intelligent copy); `Search/{ContentIndex(SQLite FTS5),
-  PDFTextExtractor, ContentIndexer}`; `Views/{PDFPaneView, DocumentViewerModel, DocumentWindowView}`;
-  full-text search wired into the nav window.
-- **⚠ Verification caveat:** the Core/logic layers are unit-tested (33), but the **SwiftUI GUI has not
-  been driven at runtime** (headless env can't launch/interact with the sandboxed app, and nested
-  `claude` is blocked). A manual GUI smoke test is pending: launch the app, choose the `Test files`
-  folder as root, confirm the list populates, filters work, and mark-Read moves a row out of an
-  Unread view. Treat GUI wiring as "compiles + logic-tested," not "runtime-verified."
-- **Done:**
-  - Durable docs; repo scaffold; sandboxed XcodeGen two-window app.
-  - Read-only Core: `DocumentTags` (+displayDate), `TagReading`, `FileLink`, `ArchiveFile`,
-    `LibraryFilter` (filter + multi-level nil-last sort).
-  - **`Core/TagWriter.swift`** — single audited write choke-point (delta edits, coordinated
-    metadata-only write, trustworthy-read guard, multiset+label verify, drift restore, inverse-delta
-    undo, batch). `scripts/lint-write-surface.sh` enforces the write surface.
-  - **M1 navigation window:** `Search/RootFolderStore` (security-scoped bookmark),
-    `Search/ArchiveLibrary` (NSMetadataQuery discovery + optimistic updates),
-    `Views/NavigationModel` + `Views/NavigationWindowView` (table, 3 filters, sort menu, copy-links,
-    mark Read/Unread via TagWriter + undo, open selection; keyboard shortcuts).
-  - Tests: DocumentTags, FileLink, TagWriter, LibrarySortFilter (33 total).
+- **Milestone:** **ALL PLANNED WORK COMPLETE** — M0–M3 + the entire **High-priority** backlog, plus a
+  full adversarial code review (13 confirmed bugs fixed) and this documentation review.
+- **Build:** GREEN. `cd ArchiveReader && xcodegen generate && xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build` → **BUILD SUCCEEDED**;
+  `xcodebuild … test` → **75/75 pass**; `bash scripts/lint-write-surface.sh` → clean.
+- **Shipped (see CLAUDE.md §Implementation map for the file tree):**
+  - **M0** `Core/TagWriter` — single audited write choke-point (delta edits, coordinated metadata-only
+    write, trustworthy-read guard, multiset+label verify, drift restore, label-only inverse undo,
+    batch). Read-only Core: `DocumentTags`, `TagReading`, `TagEditing`, `FileLink`, `ArchiveFile`,
+    `LibraryFilter`, `CopyTextCleaner`, `DocumentRuns`, `AppSettings`. `scripts/lint-write-surface.sh`.
+  - **M1** navigation window: `Search/{RootFolderStore, ArchiveLibrary}` +
+    `Views/{NavigationModel, NavigationWindowView}` — Spotlight discovery, table, 3 filters, multi-level
+    sort, copy-links (⌘⇧C), mark Read/Unread + grouped undo, open (⌘O).
+  - **M1.5** `Search/{ContentIndex (SQLite FTS5), PDFTextExtractor, ContentIndexer}` — corpus full-text
+    search wired into the nav window.
+  - **M2** `Views/{PDFPaneView, DocumentViewerModel, DocumentWindowView}` — two-up viewer, independent
+    zoom, draggable ⅔:⅓ splitter, ↑/↓ cycling, intelligent copy, in-doc find.
+  - **M3** `Views/{TagEditorView, OptionsView}` — group-aware Tag Editor (⌘I), Options (⌘,),
+    VoiceOver announcements, library-health popover.
+  - **High-priority:** `Search/{NotesStore, SavedSearch}` — notes/flags (outside the corpus),
+    reading-session resume, saved searches, Quick Look (⌘Y), opt-in document-run selection.
+  - **Tests:** 75 across DocumentTags, FileLink, TagWriter, LibrarySortFilter, ContentIndex,
+    CopyTextCleaner, TagEditing, NotesStore, SavedSearch, DocumentRuns.
+- **Latest commits:** `763a40f` review fixes · `19267be` document-run · `720b738` Quick Look ·
+  `76f36ff` saved searches · `fc7b564` notes/resume · `53b3ebe` tag editor.
 
-## Next action (M3 — Options panel + keymap + accessibility + data-quality)
-1. **Options panel (⌘,)** — replace the `OptionsView` scaffold with real settings persisted via
-   `@AppStorage`: link format + newlines-after-link (wire into `FileLinkFormatter`); copy behavior
-   (`CopyTextOptions`: de-hyphenate, collapse-single-newlines, paragraph-on-blank, skip-OCR-header)
-   → thread into `DocumentViewerModel.copyOptions`; default split ratio + per-pane default zoom;
-   date display format; subject-combine default; read-state default; tag-editing prefs
-   (near-dup warning, controlled vocab, large-group confirm threshold); archive-root management.
-2. **Keyboard map** — finalize collision-free shortcuts (see PLAN.md §Keyboard); ensure nav digit
-   type-select doesn't fight priority toggles.
-3. **Accessibility** — honor Reduce Motion (instant row removal), VoiceOver announcements on
-   mark-Read, deterministic focus after a batch leaves the view.
-4. **Data-quality view** — counts of no-date / no-priority / Date-Uncertain / both-Read+Unread /
-   unreadable, from the library.
-- Then **M4** power features, then **High-priority** POTENTIAL_FEATURES only (skip Med/Low).
-- **Still pending (not blocking):** the M1 **tag editor** (⌘I inspector: add/remove subjects, set
-  date/priority/color for single + group via `TagWriter`) was specced but not yet built — do it in
-  M3/M4. Perf-check nav Table at ~150k. Manual GUI smoke test (headless env can't drive the GUI).
+## Next action — remaining work (none blocking; app is feature-complete for v1)
+1. **Manual GUI smoke test (only real gap):** the SwiftUI GUI compiles + the logic is unit-tested, but
+   the GUI has **not been driven at runtime** (this headless env can't launch/interact with the
+   sandboxed app; nested `claude` is blocked). At the machine: launch the app, choose the `Test files`
+   folder as root, confirm the list populates + sorts chronologically, filters + full-text work,
+   mark-Read drops a row from an Unread view, ⌘O opens the two-up viewer, ⌘C copies cleaned text.
+2. **Perf-check** the nav Table at ~150k (data layer abstracted; AppKit `NSTableView` swap possible).
+3. **Deferred / optional:** Medium & Lower `POTENTIAL_FEATURES` (explicitly out of the overnight
+   scope); non-sandboxed whole-Mac search (code-ready — a build-time entitlement flip, see below).
 
 ## Autonomous overnight run
 - **Scope:** implement the PLAN (M0→M4), then **only the "High priority" items in

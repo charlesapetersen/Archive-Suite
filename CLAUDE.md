@@ -160,7 +160,7 @@ writes against the real corpus — always a copy.
 
 ---
 
-## Architecture (planned)
+## Architecture
 
 - **Discovery/filter/sort (tags):** `NSMetadataQuery` scoped to user-granted **archive root(s)**
   (security-scoped bookmarks). Master universe predicate: `kMDItemUserTags == "Read" ||
@@ -190,6 +190,47 @@ writes against the real corpus — always a copy.
 - **Intelligent copy:** collapse single newlines → space; blank line = paragraph break (keep);
   de-hyphenate line-end hyphens; works in either pane; optional "skip OCR header" (off by default).
 - **Options panel (⌘,):** link format, newlines-after-link, and more (see `PLAN.md` §Options).
+
+## Implementation map (shipped — v1 feature-complete, 75 tests, 2026-07-05)
+
+`ArchiveReader/Sources/ArchiveReader/`
+```
+ArchiveReaderApp.swift        @main; two scenes (nav Window + document WindowGroup) + Settings (⌘,).
+Core/                         UI-free domain (package-ready → future ArchiveCore):
+  TagWriter.swift             THE single write choke-point. TagDelta{add,remove,color}; apply()/
+                              setReadState()/batch; coordinated metadata-only write; trustworthy-read
+                              guard; multiset+label+bytes verify; label-only .restoreLabel inverse undo.
+  TagEditing.swift            TagEditOp → per-file TagDelta; GroupTagSummary (tri-state across selection).
+  TagReading.swift            Safe read; TagReadResult distinguishes confirmed-empty vs unreadable.
+  DocumentTags.swift          Tag→facet parser (year/month/Day N/priority/read/color/subjects);
+                              sortDate (medieval-safe), displayDate, dateIsSpeculative.
+  LibraryFilter.swift         LibraryFilter (Codable) + LibrarySort (multi-level, nil-last, stable).
+  ArchiveFile.swift           A nav-row record (url identity + parsed tags).
+  FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
+  CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate).
+  DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
+  AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
+Search/                       Discovery + disposable caches (never the corpus):
+  ArchiveLibrary.swift        NSMetadataQuery over Read/Unread tags, scoped to the root; live updates.
+  RootFolderStore.swift       Security-scoped bookmark to the archive root.
+  ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification.
+  ContentIndexer.swift        Background (detached) incremental indexing; async search/classification.
+  PDFTextExtractor.swift      PDFKit text + Classification-line extraction (guards corrupt/non-PDF).
+  NotesStore.swift            Per-file note+flag in UserDefaults (outside the corpus).
+  SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
+Views/
+  NavigationModel.swift       Nav view model: filter/sort/selection, all actions via TagWriter, caches.
+  NavigationWindowView.swift  The results table, filters, toolbar, context menu, sheets.
+  TagEditorView.swift         Group-aware tag editor sheet (⌘I).
+  OptionsView.swift           Settings form (⌘,), @AppStorage.
+  DocumentViewerModel.swift   Loads the selection; page cycling; intelligent copy; find.
+  DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom toolbar.
+  PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/selection/find).
+  QuickLookView.swift         QLPreviewView wrapper (Space→⌘Y preview).
+Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
+```
+`ArchiveReader/Tests/ArchiveReaderTests/` — 10 test files (75 tests). `scripts/lint-write-surface.sh`
+enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build
 
