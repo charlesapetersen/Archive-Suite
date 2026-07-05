@@ -97,32 +97,43 @@ struct DocumentWindowView: View {
             Button { model.previous() } label: { Label("Previous", systemImage: "chevron.up") }
                 .keyboardShortcut(.upArrow, modifiers: [])
                 .disabled(model.index <= 0)
+                .help("Go to the previous document (↑)")
             Button { model.next() } label: { Label("Next", systemImage: "chevron.down") }
                 .keyboardShortcut(.downArrow, modifiers: [])
                 .disabled(model.index >= model.urls.count - 1)
+                .help("Go to the next document (↓)")
 
             Divider()
 
             Button { model.leftController.zoomOut() } label: { Label("Zoom Out Left", systemImage: "minus.magnifyingglass") }
+                .help("Zoom out the image page")
             Button { model.leftController.zoomIn() } label: { Label("Zoom In Left", systemImage: "plus.magnifyingglass") }
+                .help("Zoom in the image page")
             Button { model.leftController.fit() } label: { Label("Fit Left", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .help("Fit the image page to its pane")
 
             Divider()
 
             Button { model.rightController.zoomOut() } label: { Label("Zoom Out Right", systemImage: "minus.magnifyingglass") }
+                .help("Zoom out the OCR text page")
             Button { model.rightController.zoomIn() } label: { Label("Zoom In Right", systemImage: "plus.magnifyingglass") }
+                .help("Zoom in the OCR text page")
             Button { model.rightController.fit() } label: { Label("Fit Right", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .help("Fit the OCR text page to its pane")
 
             Divider()
 
             Button { model.copySelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
                 .keyboardShortcut("c", modifiers: .command)
+                .help("Copy the selected text, cleaned for prose (⌘C)")
             Button { showFind = true; findFocused = true } label: { Label("Find", systemImage: "magnifyingglass") }
                 .keyboardShortcut("f", modifiers: .command)
+                .help("Search for text in this document (⌘F)")
             Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {
                 Label("Reset Layout", systemImage: "rectangle.split.2x1")
             }
             .keyboardShortcut("0", modifiers: [.command, .option])
+            .help("Reset the split and zoom to defaults (⌥⌘0)")
         }
     }
 

@@ -8,7 +8,7 @@ struct NavigationWindowView: View {
     @State private var showingHealth = false
     @State private var showingSaveDialog = false
     @State private var newSearchName = ""
-    @State private var showingQuickLook = false
+    @State private var showingPreview = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,22 +30,11 @@ struct NavigationWindowView: View {
         } message: {
             Text("Save the current filters and text search as a reusable smart folder.")
         }
-        .sheet(isPresented: $showingQuickLook) {
-            VStack(spacing: 0) {
-                HStack {
-                    Text(model.selectedFiles.first?.name ?? "Preview").lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Button("Done") { showingQuickLook = false }.keyboardShortcut(.defaultAction)
-                }
-                .padding(8)
-                Divider()
-                if let url = model.selectedFiles.first?.url {
-                    QuickLookView(url: url)
-                } else {
-                    ContentUnavailableView("No selection", systemImage: "eye.slash")
-                }
+        .sheet(isPresented: $showingPreview) {
+            PreviewSheet(selection: model.documentSelection()) {
+                showingPreview = false
+                openSelection()   // "Open" → jump to the full document window
             }
-            .frame(width: 720, height: 720)
         }
         .navigationTitle("Archive Reader")
     }
@@ -106,7 +95,7 @@ struct NavigationWindowView: View {
         }
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
-            Button("Quick Look") { showingQuickLook = true }
+            Button("Quick Look") { showingPreview = true }
             Button("Copy Link(s)") { model.copyLinks() }
             Divider()
             Button("Mark Read") { model.mark(.read) }
@@ -119,6 +108,13 @@ struct NavigationWindowView: View {
             openSelection()   // double-click opens
         }
         .overlay { tableOverlay }
+        // Focus-scoped Space → preview (fires only when the list has key focus, so Space still types
+        // into the filter text fields).
+        .onKeyPress(.space) {
+            guard !model.selection.isEmpty else { return .ignored }
+            showingPreview = true
+            return .handled
+        }
     }
 
     /// Status overlay on the results area so the user always knows what's happening — most importantly
@@ -165,6 +161,7 @@ struct NavigationWindowView: View {
             .pickerStyle(.segmented)
             .fixedSize()
             .labelsHidden()
+            .help("Filter the list by read state")
 
             HStack(spacing: 4) {
                 ForEach([10, 9, 8, 7], id: \.self) { p in
@@ -175,6 +172,7 @@ struct NavigationWindowView: View {
                         }))
                     .toggleStyle(.button)
                     .controlSize(.small)
+                    .help("Show only documents at priority P\(p)")
                 }
             }
 
@@ -183,6 +181,7 @@ struct NavigationWindowView: View {
             TextField("Filter file name…", text: $model.filter.searchText)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)
+                .help("Filter the list by file name")
 
             HStack(spacing: 3) {
                 Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
@@ -190,6 +189,7 @@ struct NavigationWindowView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
                     .onSubmit { model.runFullTextSearch() }
+                    .help("Search the full OCR text of documents (press Return)")
                 if model.ftsPaths != nil {
                     Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -207,6 +207,7 @@ struct NavigationWindowView: View {
                     model.fullTextQuery = ""
                     model.runFullTextSearch()
                 }
+                .help("Clear all filters and searches")
             }
         }
         .padding(8)
@@ -222,6 +223,7 @@ struct NavigationWindowView: View {
                     Label(subj, systemImage: "xmark.circle.fill").labelStyle(.titleAndIcon)
                 }
                 .controlSize(.small)
+                .help("Remove this subject filter")
             }
             TextField("Add subject filter…", text: $subjectDraft)
                 .textFieldStyle(.roundedBorder)
@@ -231,12 +233,14 @@ struct NavigationWindowView: View {
                     if !s.isEmpty { model.filter.subjects.insert(s) }
                     subjectDraft = ""
                 }
+                .help("Add a subject tag to filter by (press Return)")
             if model.filter.subjects.count > 1 {
                 Picker("Match", selection: $model.filter.subjectCombine) {
                     Text("All").tag(SubjectCombine.all)
                     Text("Any").tag(SubjectCombine.any)
                 }
                 .pickerStyle(.segmented).fixedSize().labelsHidden()
+                .help("Match documents having all, or any, of the chosen subjects")
             }
         }
     }
@@ -249,6 +253,7 @@ struct NavigationWindowView: View {
             Button {
                 model.chooseRoot()
             } label: { Label(rootLabel, systemImage: "folder") }
+                .help("Choose which archive folder to browse")
 
             Menu {
                 sortButton("Document date", .date)
@@ -258,6 +263,7 @@ struct NavigationWindowView: View {
                 Divider()
                 Button("Default (date, then name)") { model.sort = LibrarySort.default }
             } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
+                .help("Choose how the document list is sorted")
 
             Menu {
                 if model.savedSearches.searches.isEmpty {
@@ -276,38 +282,47 @@ struct NavigationWindowView: View {
                 Divider()
                 Button("Save Current Search…") { newSearchName = ""; showingSaveDialog = true }
             } label: { Label("Saved", systemImage: "bookmark") }
+                .help("Apply, save, or delete a saved search (smart folder)")
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(model.selection.isEmpty)
+                .help("Open the selected documents for reading (⌘O)")
 
-            Button { showingQuickLook = true } label: { Label("Quick Look", systemImage: "eye") }
-                .keyboardShortcut("y", modifiers: .command)   // ⌘Y — bare Space would block typing in filter fields
+            Button { showingPreview = true } label: { Label("Preview", systemImage: "eye") }
+                .keyboardShortcut("y", modifiers: .command)   // also Space when the list has focus (see .onKeyPress)
                 .disabled(model.selection.isEmpty)
+                .help("Preview the selection 2-up without opening it (Space or ⌘Y)")
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
+                .help("Copy links to the selected files (⌘⇧C)")
 
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(model.selection.isEmpty)
+                .help("Mark the selected documents as read (⌘R)")
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
                 .keyboardShortcut("u", modifiers: .command)
                 .disabled(model.selection.isEmpty)
+                .help("Mark the selected documents as unread (⌘U)")
 
             Button { showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(model.selection.isEmpty)
+                .help("Edit tags for the selected documents (⌘I)")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
+                .help("Flag or unflag the selection — app-only, never written to the file (⌘⇧F)")
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .keyboardShortcut("z", modifiers: .command)
                 .disabled(model.undoDepth == 0)
+                .help("Undo the last tag change (⌘Z)")
         }
     }
 
