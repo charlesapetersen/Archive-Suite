@@ -9,6 +9,7 @@ final class DocumentViewerModel: ObservableObject {
     @Published var index = 0 { didSet { if index != oldValue { loadCurrent() } } }
     @Published private(set) var current: PDFDocument?
     @Published private(set) var loadError: String?
+    @Published var showingFind = false   // driven by the toolbar and the Document menu
 
     let leftController = PDFPaneController()   // image page (page 0)
     let rightController = PDFPaneController()  // OCR text page (page 1)

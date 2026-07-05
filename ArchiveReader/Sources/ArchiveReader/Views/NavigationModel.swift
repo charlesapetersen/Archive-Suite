@@ -16,6 +16,10 @@ final class NavigationModel: ObservableObject {
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection(); refreshSelectionCache() } }
     @Published var fullTextQuery = ""
+    // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
+    @Published var showingEditor = false
+    @Published var showingPreview = false
+    @Published var showingSaveDialog = false
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []

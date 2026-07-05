@@ -4,11 +4,8 @@ import SwiftUI
 struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @Environment(\.openWindow) private var openWindow
-    @State private var showingEditor = false
     @State private var showingHealth = false
-    @State private var showingSaveDialog = false
     @State private var newSearchName = ""
-    @State private var showingPreview = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,21 +19,23 @@ struct NavigationWindowView: View {
         .toolbar { toolbarContent }
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
-        .sheet(isPresented: $showingEditor) { TagEditorView(model: model) }
-        .alert("Save Search", isPresented: $showingSaveDialog) {
+        .sheet(isPresented: $model.showingEditor) { TagEditorView(model: model) }
+        .alert("Save Search", isPresented: $model.showingSaveDialog) {
             TextField("Name", text: $newSearchName)
             Button("Save") { model.saveCurrentSearch(name: newSearchName) }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Save the current filters and text search as a reusable smart folder.")
         }
-        .sheet(isPresented: $showingPreview) {
+        .sheet(isPresented: $model.showingPreview) {
             PreviewSheet(selection: model.documentSelection()) {
-                showingPreview = false
+                model.showingPreview = false
                 openSelection()   // "Open" → jump to the full document window
             }
         }
         .navigationTitle("Archive Reader")
+        .focusedSceneObject(model)
+        .focusedSceneValue(\.openSelection) { openSelection() }
     }
 
     // MARK: Table
@@ -95,13 +94,13 @@ struct NavigationWindowView: View {
         }
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
-            Button("Quick Look") { showingPreview = true }
+            Button("Preview") { model.showingPreview = true }
             Button("Copy Link(s)") { model.copyLinks() }
             Divider()
             Button("Mark Read") { model.mark(.read) }
             Button("Mark Unread") { model.mark(.unread) }
             Button("Toggle Flag") { model.toggleFlagSelection() }
-            Button("Edit Tags…") { showingEditor = true }
+            Button("Edit Tags…") { model.showingEditor = true }
             Divider()
             Button("Select Document Run") { model.extendSelectionToDocumentRun() }
         } primaryAction: { _ in
@@ -112,7 +111,7 @@ struct NavigationWindowView: View {
         // into the filter text fields).
         .onKeyPress(.space) {
             guard !model.selection.isEmpty else { return .ignored }
-            showingPreview = true
+            model.showingPreview = true
             return .handled
         }
     }
@@ -280,47 +279,39 @@ struct NavigationWindowView: View {
                     }
                 }
                 Divider()
-                Button("Save Current Search…") { newSearchName = ""; showingSaveDialog = true }
+                Button("Save Current Search…") { newSearchName = ""; model.showingSaveDialog = true }
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
-                .keyboardShortcut("o", modifiers: .command)
                 .disabled(model.selection.isEmpty)
                 .help("Open the selected documents for reading (⌘O)")
 
-            Button { showingPreview = true } label: { Label("Preview", systemImage: "eye") }
-                .keyboardShortcut("y", modifiers: .command)   // also Space when the list has focus (see .onKeyPress)
+            Button { model.showingPreview = true } label: { Label("Preview", systemImage: "eye") }
                 .disabled(model.selection.isEmpty)
                 .help("Preview the selection 2-up without opening it (Space or ⌘Y)")
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
                 .help("Copy links to the selected files (⌘⇧C)")
 
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
-                .keyboardShortcut("r", modifiers: .command)
                 .disabled(model.selection.isEmpty)
                 .help("Mark the selected documents as read (⌘R)")
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
-                .keyboardShortcut("u", modifiers: .command)
                 .disabled(model.selection.isEmpty)
                 .help("Mark the selected documents as unread (⌘U)")
 
-            Button { showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
-                .keyboardShortcut("i", modifiers: .command)
+            Button { model.showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
                 .disabled(model.selection.isEmpty)
                 .help("Edit tags for the selected documents (⌘I)")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
-                .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
                 .help("Flag or unflag the selection — app-only, never written to the file (⌘⇧F)")
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .keyboardShortcut("z", modifiers: .command)
                 .disabled(model.undoDepth == 0)
                 .help("Undo the last tag change (⌘Z)")
         }

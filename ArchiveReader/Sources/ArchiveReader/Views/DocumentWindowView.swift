@@ -10,7 +10,6 @@ struct DocumentWindowView: View {
 
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @State private var findText = ""
-    @State private var showFind = false
     @FocusState private var findFocused: Bool
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
@@ -19,7 +18,7 @@ struct DocumentWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if showFind { findBar; Divider() }
+            if model.showingFind { findBar; Divider() }
             content
             Divider()
             statusBar
@@ -27,8 +26,10 @@ struct DocumentWindowView: View {
         .frame(minWidth: 900, minHeight: 600)
         .navigationTitle(model.title)
         .toolbar { toolbar }
+        .focusedSceneObject(model)   // so the Document menu commands act on this window
         .onAppear { fraction = defaultFraction; if let selection { model.load(selection) } }
         .onChange(of: model.index) { fraction = defaultFraction }   // reset layout per document
+        .onChange(of: model.showingFind) { if model.showingFind { findFocused = true } }
     }
 
     @ViewBuilder private var content: some View {
@@ -86,7 +87,7 @@ struct DocumentWindowView: View {
                 .focused($findFocused)
                 .onSubmit { model.find(findText) }
             Button("Find") { model.find(findText) }
-            Button("Done") { showFind = false; findText = "" }
+            Button("Done") { model.showingFind = false; findText = "" }
             Spacer()
         }
         .padding(8)
@@ -124,10 +125,8 @@ struct DocumentWindowView: View {
             Divider()
 
             Button { model.copySelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
-                .keyboardShortcut("c", modifiers: .command)
                 .help("Copy the selected text, cleaned for prose (⌘C)")
-            Button { showFind = true; findFocused = true } label: { Label("Find", systemImage: "magnifyingglass") }
-                .keyboardShortcut("f", modifiers: .command)
+            Button { model.showingFind = true; findFocused = true } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
             Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {
                 Label("Reset Layout", systemImage: "rectangle.split.2x1")

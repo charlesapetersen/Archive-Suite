@@ -14,6 +14,7 @@ struct ArchiveReaderApp: App {
         Window("Archive Reader", id: WindowID.navigation) {
             NavigationWindowView()
         }
+        .commands { ArchiveReaderCommands() }
 
         WindowGroup(id: WindowID.document, for: DocumentSelection.self) { $selection in
             DocumentWindowView(selection: selection)

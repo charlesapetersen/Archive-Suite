@@ -196,6 +196,9 @@ writes against the real corpus — always a copy.
 `ArchiveReader/Sources/ArchiveReader/`
 ```
 ArchiveReaderApp.swift        @main; two scenes (nav Window + document WindowGroup) + Settings (⌘,).
+ArchiveReaderCommands.swift   Menu bar (File · Selection · Tags · Sort & Filter · Document). Menus are
+                              the SINGLE source of the keyboard shortcuts (toolbars don't re-declare
+                              them); commands act on the focused window via @FocusedObject.
 Core/                         UI-free domain (package-ready → future ArchiveCore):
   TagWriter.swift             THE single write choke-point. TagDelta{add,remove,color}; apply()/
                               setReadState()/batch; coordinated metadata-only write; trustworthy-read
@@ -226,7 +229,7 @@ Views/
   DocumentViewerModel.swift   Loads the selection; page cycling; intelligent copy; find.
   DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom toolbar.
   PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/selection/find).
-  QuickLookView.swift         QLPreviewView wrapper (Space→⌘Y preview).
+  PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ←/→ cycle, ⌘C copy, ⌘O open.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```
 `ArchiveReader/Tests/ArchiveReaderTests/` — 10 test files (75 tests). `scripts/lint-write-surface.sh`
