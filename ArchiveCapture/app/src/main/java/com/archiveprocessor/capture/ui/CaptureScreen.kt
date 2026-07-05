@@ -91,6 +91,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
     }
 
     var showClearConfirm by remember { mutableStateOf(false) }
+    var showRepairConfirm by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview — top region only, letterboxed (FIT_CENTER) on black.
@@ -115,6 +116,16 @@ fun CaptureScreen(vm: CaptureViewModel) {
             Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Connection status + Re-pair. Once paired the app goes straight to this screen, so this is
+            // the only way back to the QR scanner — e.g. to switch a USB-paired phone (host 127.0.0.1)
+            // over to Wi-Fi. Captured photos are kept and upload after reconnecting.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(vm.endpoint?.let { "Connected · ${it.name}" } ?: "Not connected",
+                     color = Color(0xFF8E8E93), style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { showRepairConfirm = true }) { Text("Re-pair", color = Color.White) }
+            }
+
             // End segment — above the photos and away from the shutter, to avoid accidental taps.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (vm.items.isNotEmpty()) {
@@ -221,6 +232,17 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 }
             },
             dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") } }
+        )
+    }
+
+    // Re-pair: disconnect and return to the pairing screen (e.g. to move from USB to Wi-Fi). Non-destructive.
+    if (showRepairConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRepairConfirm = false },
+            title = { Text("Re-pair with a Mac?") },
+            text = { Text("Disconnects from ${vm.endpoint?.name ?: "the Mac"} and returns to the pairing screen so you can scan a QR — e.g. to switch from USB to Wi-Fi. Any captured photos are kept and upload once you reconnect.") },
+            confirmButton = { TextButton(onClick = { vm.disconnect(); showRepairConfirm = false }) { Text("Re-pair") } },
+            dismissButton = { TextButton(onClick = { showRepairConfirm = false }) { Text("Cancel") } }
         )
     }
 }

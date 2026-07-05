@@ -8,6 +8,7 @@ struct CaptureScreen: View {
     @ObservedObject var vm: CaptureViewModel
     @StateObject private var camera = CameraController()
     @State private var showClearConfirm = false
+    @State private var showRepairConfirm = false
     @State private var isCapturing = false
 
     /// Current in-flight work: document pages, plus any PENDING/FAILED marker needing attention.
@@ -38,6 +39,14 @@ struct CaptureScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(spacing: 8) {
+                // Connection + Re-pair: once paired the app opens straight to this screen, so this is the
+                // way back to the QR scanner (switch Macs/networks). Captured photos are kept meanwhile.
+                HStack {
+                    Text(vm.endpoint.map { "Connected · \($0.name)" } ?? "Not connected")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Re-pair") { showRepairConfirm = true }.foregroundStyle(.white)
+                }
                 HStack {
                     if !vm.items.isEmpty { Button("Clear") { showClearConfirm = true }.foregroundStyle(.white) }
                     if vm.items.contains(where: { $0.state == .failed }) { Button("Retry") { vm.retryFailed() }.foregroundStyle(.white) }
@@ -110,6 +119,12 @@ struct CaptureScreen: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This permanently deletes captured photos still on this phone and can't be undone.")
+        }
+        .confirmationDialog("Re-pair with a Mac?", isPresented: $showRepairConfirm, titleVisibility: .visible) {
+            Button("Re-pair") { vm.disconnect() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Disconnects from \(vm.endpoint?.name ?? "the Mac") and returns to the pairing screen so you can scan a QR (e.g. to switch Macs or networks). Captured photos are kept and upload once you reconnect.")
         }
         .alert("Photo not saved", isPresented: Binding(
             get: { vm.captureError != nil },
