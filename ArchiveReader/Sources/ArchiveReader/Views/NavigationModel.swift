@@ -9,10 +9,11 @@ final class NavigationModel: ObservableObject {
     let library = ArchiveLibrary()
     let rootStore = RootFolderStore()
     let indexer = ContentIndexer()
+    let notes = NotesStore()
 
     @Published var filter = LibraryFilter()
     @Published var sort = LibrarySort.default
-    @Published var selection = Set<ArchiveFile.ID>()
+    @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection() } }
     @Published var fullTextQuery = ""
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
@@ -34,13 +35,38 @@ final class NavigationModel: ObservableObject {
                     guard let self else { return }
                     self.recompute()
                     self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
+                    self.restoreSelectionIfNeeded()                  // reading-session resume
                 }
             }
             .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated { self?.indexingProgress = p } }
             .store(in: &cancellables)
+        // Republish when notes/flags change so the table's flag column refreshes.
+        notes.objectWillChange
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+            .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
+    }
+
+    // MARK: Notes & flags (app-side, never written to the corpus)
+
+    func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.url.path)) }
+    func setNote(_ note: String, forPath path: String) { notes.setNote(note, for: path) }
+
+    // MARK: Reading-session resume
+
+    private var didRestoreSelection = false
+    private func restoreSelectionIfNeeded() {
+        guard !didRestoreSelection, !library.files.isEmpty else { return }
+        didRestoreSelection = true
+        let saved = Set(UserDefaults.standard.stringArray(forKey: "lastSelectionPaths") ?? [])
+        guard !saved.isEmpty else { return }
+        let present = Set(library.files.map(\.id)).intersection(saved)
+        if !present.isEmpty { selection = present }
+    }
+    private func persistSelection() {
+        UserDefaults.standard.set(Array(selection), forKey: "lastSelectionPaths")
     }
 
     // MARK: Derived

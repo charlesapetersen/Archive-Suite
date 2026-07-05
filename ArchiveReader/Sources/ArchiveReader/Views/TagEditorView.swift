@@ -9,6 +9,7 @@ struct TagEditorView: View {
     @State private var subjectDraft = ""
     @State private var yearDraft = ""
     @State private var dayDraft = ""
+    @State private var noteDraft = ""
 
     var body: some View {
         let s = model.groupSummary
@@ -31,6 +32,8 @@ struct TagEditorView: View {
                     colorSection(s)
                     Divider()
                     readStateSection(s)
+                    Divider()
+                    notesSection(s)
                 }
                 .padding()
             }
@@ -162,6 +165,25 @@ struct TagEditorView: View {
             HStack {
                 facetButton("Read", current: s.commonReadState == .some(.read)) { model.mark(.read) }
                 facetButton("Unread", current: s.commonReadState == .some(.unread)) { model.mark(.unread) }
+            }
+        }
+    }
+
+    // MARK: Notes & flag (app-side, never written to the file)
+
+    @ViewBuilder private func notesSection(_ s: GroupTagSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            title("Notes & flag")
+            Text("Stored in the app — never written to the file.").font(.caption).foregroundStyle(.secondary)
+            Button { model.toggleFlagSelection() } label: { Label("Toggle flag", systemImage: "flag") }
+            if model.selectedFiles.count == 1, let f = model.selectedFiles.first {
+                TextField("Note…", text: $noteDraft, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...5)
+                    .onAppear { noteDraft = model.notes.annotation(for: f.url.path).note }
+                Button("Save note") { model.setNote(noteDraft, forPath: f.url.path) }
+            } else {
+                Text("Select a single file to edit its note.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }

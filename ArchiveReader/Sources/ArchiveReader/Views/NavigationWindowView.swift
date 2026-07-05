@@ -27,6 +27,18 @@ struct NavigationWindowView: View {
 
     private var table: some View {
         Table(model.displayed, selection: $model.selection) {
+            TableColumn("⚑") { file in
+                Button {
+                    model.notes.setFlag(!model.notes.isFlagged(file.url.path), for: file.url.path)
+                } label: {
+                    Image(systemName: model.notes.isFlagged(file.url.path) ? "flag.fill" : "flag")
+                        .foregroundStyle(model.notes.isFlagged(file.url.path) ? Color.orange : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Flag (app-only; never written to the file)")
+            }
+            .width(26)
+
             TableColumn("Document date") { file in
                 Text(file.tags.displayDate ?? "—")
                     .italic(file.dateIsSpeculative)          // Date Uncertain → italic
@@ -71,6 +83,8 @@ struct NavigationWindowView: View {
             Divider()
             Button("Mark Read") { model.mark(.read) }
             Button("Mark Unread") { model.mark(.unread) }
+            Button("Toggle Flag") { model.toggleFlagSelection() }
+            Button("Edit Tags…") { showingEditor = true }
         } primaryAction: { _ in
             openSelection()   // double-click opens
         }
@@ -209,6 +223,10 @@ struct NavigationWindowView: View {
 
             Button { showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
                 .keyboardShortcut("i", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
