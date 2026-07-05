@@ -5,6 +5,7 @@ struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @Environment(\.openWindow) private var openWindow
     @State private var showingEditor = false
+    @State private var showingHealth = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -244,6 +245,10 @@ struct NavigationWindowView: View {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
                 Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.secondary)
             }
+            Button { showingHealth = true } label: { Image(systemName: "stethoscope") }
+                .buttonStyle(.borderless)
+                .help("Library health")
+                .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality) }
             Spacer()
             if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
             if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
@@ -256,5 +261,29 @@ struct NavigationWindowView: View {
         let sel = model.documentSelection()
         guard !sel.filePaths.isEmpty else { return }
         openWindow(id: WindowID.document, value: sel)
+    }
+}
+
+/// A small library-health readout (data-quality counts).
+private struct DataQualityView: View {
+    let q: NavigationModel.DataQuality
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Library health").font(.headline)
+            row("Total files", q.total)
+            row("No date", q.noDate)
+            row("No priority", q.noPriority)
+            row("Date Uncertain", q.dateUncertain)
+            row("Box/folder markers", q.markers)
+            row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
+        }
+        .padding(14)
+        .frame(width: 260)
+    }
+    private func row(_ label: String, _ value: Int, warn: Bool = false) -> some View {
+        HStack {
+            Text(label); Spacer()
+            Text("\(value)").foregroundStyle(warn ? .orange : .secondary).monospacedDigit()
+        }
     }
 }

@@ -103,6 +103,7 @@ final class NavigationModel: ObservableObject {
         statusMessage = failures == 0
             ? "Marked \(batch.count) \(target.rawValue)."
             : "Marked \(batch.count); \(failures) could not update."
+        announce(statusMessage)
     }
 
     func undoLast() {
@@ -140,6 +141,33 @@ final class NavigationModel: ObservableObject {
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
         statusMessage = "Edited \(batch.count) file\(batch.count == 1 ? "" : "s")"
             + (failures > 0 ? "; \(failures) could not update." : ".")
+        announce(statusMessage)
+    }
+
+    /// Library data-quality snapshot (for the health popover).
+    struct DataQuality: Sendable {
+        var total = 0, noDate = 0, noPriority = 0, dateUncertain = 0, bothReadUnread = 0, markers = 0
+    }
+    var dataQuality: DataQuality {
+        var q = DataQuality(); q.total = library.files.count
+        for f in library.files {
+            if f.tags.year == nil { q.noDate += 1 }
+            if f.tags.priority == nil { q.noPriority += 1 }
+            if f.tags.dateUncertain { q.dateUncertain += 1 }
+            if f.color != nil { q.markers += 1 }
+            let hasRead = f.tags.raw.contains { $0.caseInsensitiveCompare("Read") == .orderedSame }
+            let hasUnread = f.tags.raw.contains { $0.caseInsensitiveCompare("Unread") == .orderedSame }
+            if hasRead && hasUnread { q.bothReadUnread += 1 }   // corruption: both state tokens
+        }
+        return q
+    }
+
+    /// VoiceOver announcement (accessibility). Silent no-op if there is no key window.
+    private func announce(_ message: String) {
+        guard !message.isEmpty, let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
+        NSAccessibility.post(element: window, notification: .announcementRequested,
+                             userInfo: [.announcement: message,
+                                        .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
     /// Existing corpus subjects that differ from `candidate` only by case — a likely typo/duplicate.

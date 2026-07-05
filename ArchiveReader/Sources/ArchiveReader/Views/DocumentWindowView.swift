@@ -43,7 +43,7 @@ struct DocumentWindowView: View {
                 HStack(spacing: 0) {
                     PDFPaneView(page: model.imagePage, controller: model.leftController)
                         .frame(width: leftW)
-                    splitter
+                    splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
                         PDFPaneView(page: model.textPage, controller: model.rightController)
                             .frame(maxWidth: .infinity)
@@ -54,29 +54,26 @@ struct DocumentWindowView: View {
                     }
                 }
                 .coordinateSpace(name: "split")
-                .gesture(
-                    DragGesture(minimumDistance: 1, coordinateSpace: .named("split"))
-                        .onChanged { g in
-                            let f = g.location.x / max(total, 1)
-                            fraction = min(0.85, max(0.15, f))
-                        }
-                )
             }
         }
     }
 
-    private var splitter: some View {
+    private func splitterHandle(total: CGFloat) -> some View {
         ZStack {
             Rectangle().fill(Color(nsColor: .separatorColor))
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color(nsColor: .tertiaryLabelColor))
                 .frame(width: 3, height: 34)
         }
-        .frame(width: handleWidth)
+        .frame(width: handleWidth, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onHover { inside in
             if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
         }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .named("split"))
+                .onChanged { g in fraction = min(0.85, max(0.15, g.location.x / max(total, 1))) }
+        )
     }
 
     private var findBar: some View {
