@@ -79,6 +79,11 @@ struct ArchiveReaderCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
             .disabled(nav == nil)
+            Divider()
+            Button("Focus Tag Filter") { nav?.requestFocusTagFilter() }
+                .keyboardShortcut("l", modifiers: .command).disabled(nav == nil)
+            Button("Search OCR Text") { nav?.requestFocusSearch() }
+                .keyboardShortcut("f", modifiers: [.command, .option]).disabled(nav == nil)
         }
 
         // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not

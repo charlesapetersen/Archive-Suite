@@ -8,6 +8,7 @@ import AppKit
 struct TagFilterField: NSViewRepresentable {
     var placeholder: String
     var suggestions: [String]
+    var focusToken: Int = 0        // bump to request keyboard focus (⌘L)
     var onAdd: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onAdd: onAdd) }
@@ -34,11 +35,16 @@ struct TagFilterField: NSViewRepresentable {
             cb.addItems(withObjectValues: suggestions)
         }
         cb.placeholderString = placeholder
+        if focusToken != context.coordinator.lastFocusToken {   // ⌘L requested focus
+            context.coordinator.lastFocusToken = focusToken
+            DispatchQueue.main.async { [weak cb] in cb?.window?.makeFirstResponder(cb) }
+        }
     }
 
     final class Coordinator: NSObject, NSComboBoxDelegate {
         var onAdd: (String) -> Void
         var items: [String] = []
+        var lastFocusToken = 0
         init(onAdd: @escaping (String) -> Void) { self.onAdd = onAdd }
 
         @objc func commit(_ sender: NSComboBox) {

@@ -11,6 +11,8 @@ struct NavigationWindowView: View {
     @State private var newSearchName = ""
     @State private var renameText = ""
     @State private var columnCustomization = TableColumnCustomization<ArchiveFile>()   // C1: show/hide/reorder/resize
+    @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
+    @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
 
     var body: some View {
         HStack(spacing: 0) {
@@ -62,6 +64,8 @@ struct NavigationWindowView: View {
             Button("Cancel", role: .cancel) { model.renamingSearch = nil }
         }
         .onChange(of: model.renamingSearch) { _, s in if let s { renameText = s.name } }
+        .onChange(of: model.focusSearchRequest) { searchFocused = true }              // C5 ⌥⌘F
+        .onChange(of: model.focusTagFilterRequest) { tagFilterFocusToken &+= 1 }       // C5 ⌘L
         .sheet(isPresented: $model.showingPreview) {
             PreviewSheet(selection: model.documentSelection(), nav: model) {
                 model.showingPreview = false
@@ -227,6 +231,21 @@ struct NavigationWindowView: View {
                             }
                             .buttonStyle(.plain)
                             .help("\(item.count) file\(item.count == 1 ? "" : "s") · click to \(active ? "remove" : "add") as a tag filter")
+                            .contextMenu {
+                                Button(active ? "Remove from tag filter" : "Add to tag filter") {
+                                    if active { model.filter.subjects.remove(item.tag) }
+                                    else { model.filter.subjects.insert(item.tag) }
+                                }
+                                Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
+                                if model.filter.subjects.count > 1 {
+                                    Picker("Match tags", selection: $model.filter.subjectCombine) {
+                                        Text("All").tag(SubjectCombine.all)
+                                        Text("Any").tag(SubjectCombine.any)
+                                    }
+                                }
+                                Divider()
+                                Button("Select files with this tag") { model.selectFiles(withTag: item.tag) }
+                            }
                         }
                     }
                     .padding(10)
@@ -282,6 +301,7 @@ struct NavigationWindowView: View {
                 TextField("Search OCR text…", text: $model.fullTextQuery)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
+                    .focused($searchFocused)
                     .onSubmit { model.runFullTextSearch() }
                     .help("Search the full OCR text of documents (press Return)")
                 if model.ftsPaths != nil {
@@ -325,7 +345,8 @@ struct NavigationWindowView: View {
                 .controlSize(.small)
                 .help("Remove this tag filter")
             }
-            TagFilterField(placeholder: "Add tag filter…", suggestions: tagSuggestions) { tag in
+            TagFilterField(placeholder: "Add tag filter…", suggestions: tagSuggestions,
+                           focusToken: tagFilterFocusToken) { tag in
                 model.filter.subjects.insert(tag)
             }
             .frame(width: 160)

@@ -33,6 +33,10 @@ final class NavigationModel: ObservableObject {
     @Published var showingPreview = false
     @Published var showingSaveDialog = false
     @Published var renamingSearch: SavedSearch?     // non-nil while renaming a smart folder
+    @Published private(set) var focusSearchRequest = 0      // C5: menu → focus OCR search
+    @Published private(set) var focusTagFilterRequest = 0   // C5: menu → focus tag filter
+    func requestFocusSearch()    { focusSearchRequest &+= 1 }
+    func requestFocusTagFilter() { focusTagFilterRequest &+= 1 }
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
@@ -179,6 +183,11 @@ final class NavigationModel: ObservableObject {
     // MARK: Notes & flags (app-side, never written to the corpus)
 
     func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.url.path)) }
+
+    /// Select every currently-displayed file that carries `tag` (from the tag cloud context menu).
+    func selectFiles(withTag tag: String) {
+        selection = Set(displayed.filter { $0.tags.topicalTags.contains(tag) }.map(\.id))
+    }
     func setNote(_ note: String, forPath path: String) { notes.setNote(note, for: path) }
 
     // MARK: Reading-session resume
@@ -421,6 +430,11 @@ final class NavigationModel: ObservableObject {
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
         do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true)) }
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
+    }
+
+    /// Single-click toggle for the Read cell: Read → Unread; Unread/none → Read.
+    func toggleReadState(for file: ArchiveFile) {
+        setReadStateInline(file.readState == .read ? .unread : .read, for: file)
     }
 
     func clearReadState(for file: ArchiveFile) {

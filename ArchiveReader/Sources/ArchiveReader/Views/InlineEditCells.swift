@@ -19,9 +19,11 @@ struct ReadStateCell: View {
         } label: {
             Text(file.readState?.rawValue ?? "—")
                 .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
+        } primaryAction: {
+            model.toggleReadState(for: file)   // C8: single click toggles Read↔Unread; hold for the menu
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Set this file's read state (⌘I edits several at once)")
+        .help("Click to toggle Read/Unread · hold for options · ⌘I edits several at once")
     }
 }
 
@@ -63,6 +65,7 @@ struct DateCell: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
+        .help("Click to edit the document date")
         .popover(isPresented: $showing) { popover }
     }
 
@@ -119,6 +122,7 @@ struct TagsCell: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
+        .help("Click to edit this file's tags")
         .popover(isPresented: $showing) { popover }
     }
 

@@ -58,23 +58,23 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
       delete; capture) · commit + push. (No corpus writes — smart folders live in UserDefaults.)
 
 ## Milestone C — Item 4 small UI wins (each sub-item is its own commit)
-- [ ] **C1. Column customization** — show/hide/reorder/resize persisted via SwiftUI
+- [x] **C1. Column customization** — show/hide/reorder/resize persisted via SwiftUI
       `Table(…, columnCustomization:)` + a `.customizationID` per column, backed by `AppStorage`.
-- [ ] **C2. Persist view state** across launches — sort, filter, `fullTextQuery`, tag-cloud open,
+- [x] **C2. Persist view state** across launches — sort, filter, `fullTextQuery`, tag-cloud open,
       sidebar visibility/width. Guard against restoring a `pathPrefix` from a different root.
-- [ ] **C3. Row density (compact/comfortable) + list font size** — `AppStorage`, controls in Options
+- [x] **C3. Row density (compact/comfortable) + list font size** — `AppStorage`, controls in Options
       (⌘,); applied to the table cells.
-- [ ] **C4. Active-filter summary** — a human-readable line in the status bar
+- [x] **C4. Active-filter summary** — a human-readable line in the status bar
       ("Unread · P8 · tag: Jerry Brown · folder: …").
-- [ ] **C5. Focus shortcuts** — ⌘L focus tag filter, ⌥⌘F focus OCR search, Esc clears filters/search
+- [x] **C5. Focus shortcuts** — ⌘L focus tag filter, ⌥⌘F focus OCR search, Esc clears filters/search
       (menu commands + `FocusState`). (Type-to-select is native.)
-- [ ] **C6. Tag-cloud context menu** — right-click a tag → "Add as filter (All / Any)" and
+- [x] **C6. Tag-cloud context menu** — right-click a tag → "Add as filter (All / Any)" and
       "Select files with this tag".
-- [ ] **C7. "Open with Preview / default app"** in the row context menu (read-only via `NSWorkspace`).
-- [ ] **C8. Quick read/unread toggle** — a single-click affordance on the Read cell (⚠ new write path →
+- [x] **C7. "Open with Preview / default app"** in the row context menu (read-only via `NSWorkspace`).
+- [x] **C8. Quick read/unread toggle** — a single-click affordance on the Read cell (⚠ new write path →
       `TagWriter`, verify on scratch), alongside the existing ⌘R/⌘U.
-- [ ] **C9. Tooltips + accessibility pass** for the tag cloud + inline editors.
-- [ ] **C-gate:** after each Cx: build+tests(+lint for C8) · quick code review · GUI check · commit+push.
+- [x] **C9. Tooltips + accessibility pass** for the tag cloud + inline editors.
+- [x] **C-gate:** after each Cx: build+tests(+lint for C8) · quick code review · GUI check · commit+push.
 
 ## Milestone D — Item 5 (bigger)
 - [ ] **D1. Corpus-wide tag rename** (controlled vocabulary). Entry: tag-cloud context menu "Rename
