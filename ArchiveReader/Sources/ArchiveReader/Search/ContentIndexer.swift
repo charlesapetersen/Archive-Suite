@@ -9,7 +9,15 @@ final class ContentIndexer: ObservableObject {
     @Published private(set) var progress: (done: Int, total: Int)?
 
     private let index: ContentIndex
-    private var running = false
+    /// Handle to the running detached pass so a scope change can cancel it (otherwise the stale pass
+    /// holds the slot forever — its `Task.isCancelled` check was dead code without this).
+    private var task: Task<Void, Never>?
+    /// A newer file set requested while a pass was running. Coalesced (newest wins) and launched when
+    /// the current pass finishes, so a live/incremental Spotlight update is never silently dropped.
+    private var pending: [ArchiveFile]?
+    /// Epoch token: each launch/cancel bumps it so a superseded pass's async progress/finish callbacks
+    /// can't clobber the current pass's state (same pattern as NavigationModel.ftsGeneration).
+    private var generation = 0
 
     init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -17,15 +25,33 @@ final class ContentIndexer: ObservableObject {
         index = ContentIndex(url: dir.appendingPathComponent("content-index.sqlite3"))
     }
 
-    /// Incrementally index the given files (skips unchanged). No-op if an index pass is already running.
+    /// Incrementally index the given files (skips unchanged content via `needsIndex`).
+    ///
+    /// - An **empty** set means the library was cleared (a scope change, or no tagged files): cancel any
+    ///   in-flight pass and drop queued work so a stale-scope pass can't starve the new scope. The next
+    ///   non-empty call (the new scope's `DidFinishGathering`) starts a fresh pass promptly.
+    /// - If a pass is **already running**, the request is *coalesced* into `pending` (newest wins) and
+    ///   launched on completion — not dropped. Because `needsIndex` is mtime-based and idempotent, the
+    ///   follow-up pass cheaply skips everything unchanged, so a tag-only update (mark Read, edit tags)
+    ///   does NOT restart the expensive initial extraction from zero.
     func startIndexing(_ files: [ArchiveFile]) {
-        guard !running, !files.isEmpty else { return }
-        running = true
+        guard !files.isEmpty else {
+            generation += 1                 // invalidate any in-flight pass's callbacks
+            task?.cancel(); task = nil; pending = nil; progress = nil
+            return
+        }
+        if task != nil { pending = files; return }
+        launch(files)
+    }
+
+    private func launch(_ files: [ArchiveFile]) {
+        generation += 1
+        let gen = generation
         let idx = index
-        Task.detached(priority: .utility) { [weak self] in
+        task = Task.detached(priority: .utility) { [weak self] in
             try? await idx.open()
             let total = files.count
-            await self?.setProgress((0, total))
+            await self?.report((0, total), gen)
             var done = 0
             for f in files {
                 if Task.isCancelled { break }
@@ -37,9 +63,9 @@ final class ContentIndexer: ObservableObject {
                                           classification: content.classification, body: content.body)
                 }
                 done += 1
-                if done % 100 == 0 || done == total { await self?.setProgress((done, total)) }
+                if done % 100 == 0 || done == total { await self?.report((done, total), gen) }
             }
-            await self?.finish()
+            await self?.finish(gen)
         }
     }
 
@@ -55,6 +81,15 @@ final class ContentIndexer: ObservableObject {
         return await index.classifications(for: paths)
     }
 
-    private func setProgress(_ p: (Int, Int)?) { progress = p }
-    private func finish() { progress = nil; running = false }
+    /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).
+    private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return } ; progress = p }
+
+    /// Called when a pass ends. If it's still the current pass, clear the slot and drain any coalesced
+    /// request; a superseded pass (cancelled or replaced) is ignored so it can't clobber newer state.
+    private func finish(_ gen: Int) {
+        guard gen == generation else { return }
+        task = nil
+        if let next = pending { pending = nil; launch(next) }
+        else { progress = nil }
+    }
 }

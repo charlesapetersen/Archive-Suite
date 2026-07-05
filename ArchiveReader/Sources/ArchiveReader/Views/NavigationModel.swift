@@ -87,13 +87,18 @@ final class NavigationModel: ObservableObject {
     func extendSelectionToDocumentRun() {
         let files = library.files.sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
         let paths = files.map(\.url.path)
+        let snapshot = selection                              // the selection we're extending
         let selected = Set(selectedFiles.map(\.url.path))
         guard !selected.isEmpty else { return }
         Task { [weak self] in
             guard let self else { return }
             let cls = await self.indexer.classifications(for: paths)
+            // The await releases the main actor; if the user changed the selection meanwhile, abandon
+            // this stale run instead of mixing a stale snapshot with the current selection (which would
+            // pollute it). The selection itself is the epoch — no separate generation counter needed.
+            guard self.selection == snapshot else { return }
             let classifications = paths.map { cls[$0] }
-            var newSel = self.selection
+            var newSel = snapshot
             for (i, p) in paths.enumerated() where selected.contains(p) {
                 if let range = DocumentRuns.runContaining(i, classifications: classifications) {
                     for j in range { newSel.insert(files[j].id) }
@@ -198,18 +203,18 @@ final class NavigationModel: ObservableObject {
         let urls = selectedFiles.map(\.url)
         guard !urls.isEmpty else { return }
         var batch: [TagWriteResult] = []
-        var succeeded = Set<URL>()
+        var verified: [TagWriteResult] = []
         var failures = 0
         for url in urls {
             do {
                 let r = try TagWriter.setReadState(target, on: url)
-                succeeded.insert(url)             // success OR no-op → the file is in the target state
-                if !r.isNoOp { batch.append(r) }
+                verified.append(r)               // verified ground truth (incl. no-op) — safe to display
+                if !r.isNoOp { batch.append(r) }  // only real changes go on the undo stack
             } catch { failures += 1 }
         }
-        // Only files that actually verified move in the model — a failed write must NOT vanish from a
-        // filtered view (Safety §11).
-        library.applyOptimisticReadState(target, for: succeeded)
+        // Only verified (non-throwing) writes move a row — a failed write keeps the Spotlight value and
+        // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
+        library.applyVerifiedWrites(verified)
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
         statusMessage = failures == 0
             ? "Marked \(batch.count) \(target.rawValue)."
@@ -220,14 +225,14 @@ final class NavigationModel: ObservableObject {
     func undoLast() {
         guard let batch = undoStack.popLast() else { return }
         undoDepth = undoStack.count
-        var restored = 0
+        var verified: [TagWriteResult] = []
         for r in batch {
-            if (try? TagWriter.apply(r.inverse, to: r.url)) != nil {
-                library.setExactTags(r.before, label: r.beforeLabel, for: r.url)
-                restored += 1
-            }
+            // Undo = inverse delta applied to a FRESH read (§9), preserving any concurrent third-party
+            // edit. Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
+            if let rr = try? TagWriter.apply(r.inverse, to: r.url) { verified.append(rr) }
         }
-        statusMessage = "Undid \(restored) change\(restored == 1 ? "" : "s")."
+        library.applyVerifiedWrites(verified)
+        statusMessage = "Undid \(verified.count) change\(verified.count == 1 ? "" : "s")."
     }
 
     // MARK: Tag editing (single + group, all via TagWriter)
@@ -240,15 +245,18 @@ final class NavigationModel: ObservableObject {
         let files = selectedFiles
         guard !files.isEmpty else { return }
         var batch: [TagWriteResult] = []
+        var verified: [TagWriteResult] = []
         var failures = 0
         for f in files {
             let delta = TagEditing.delta(for: op, given: f.tags)
             if delta.isEmpty { continue }
             do {
                 let r = try TagWriter.apply(delta, to: f.url)
-                if !r.isNoOp { batch.append(r); library.setExactTags(r.after, label: r.afterLabel, for: f.url) }
+                verified.append(r)
+                if !r.isNoOp { batch.append(r) }
             } catch { failures += 1 }
         }
+        library.applyVerifiedWrites(verified)   // one O(N+M) overlay pass (was per-file O(N*M))
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
         statusMessage = "Edited \(batch.count) file\(batch.count == 1 ? "" : "s")"
             + (failures > 0 ? "; \(failures) could not update." : ".")

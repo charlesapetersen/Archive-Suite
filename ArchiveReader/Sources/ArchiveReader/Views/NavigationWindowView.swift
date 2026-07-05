@@ -358,6 +358,10 @@ struct NavigationWindowView: View {
     }
 
     private func openSelection() {
+        // Always dismiss the preview sheet first, so the single ⌘O owner is this path whether it was
+        // triggered by the Selection-menu ⌘O (which stays enabled over the sheet) or the sheet's own
+        // Open button — otherwise the menu shortcut opens the doc window but orphans the sheet.
+        model.showingPreview = false
         let sel = model.documentSelection()
         guard !sel.filePaths.isEmpty else { return }
         openWindow(id: WindowID.document, value: sel)
