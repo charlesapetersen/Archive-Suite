@@ -149,6 +149,21 @@ final class NavigationModel: ObservableObject {
         refreshSelectionCache()   // sort order affects the selection cache too
     }
 
+    // MARK: Column-header sorting (bridges the SwiftUI Table sortOrder ↔ the descriptor model)
+
+    /// The current multi-level sort expressed as Table sort comparators, so a clicked column header
+    /// shows the active-sort chevron/direction. Derived from `sort` (the single source of truth).
+    var sortComparators: [ArchiveFileComparator] {
+        sort.map { ArchiveFileComparator(field: $0.field, order: $0.ascending ? .forward : .reverse) }
+    }
+
+    /// Apply a header-click sort order back into `sort` (preserving first/second-level order). The
+    /// final filename/path tiebreak lives in `LibrarySort.sorted`, so no tiebreak is appended here.
+    func applyTableSort(_ comparators: [ArchiveFileComparator]) {
+        let d = comparators.map { ARSortDescriptor(field: $0.field, ascending: $0.order == .forward) }
+        if !d.isEmpty { sort = d }   // ignore an empty order (keep the current sort)
+    }
+
     private var ftsGeneration = 0
     /// Run (or clear) the corpus full-text search, then re-filter. AND-combined with the tag facets.
     /// A generation token ensures a slower older search can't overwrite a newer one's result.

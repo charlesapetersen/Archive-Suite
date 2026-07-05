@@ -41,7 +41,8 @@ struct NavigationWindowView: View {
     // MARK: Table
 
     private var table: some View {
-        Table(model.displayed, selection: $model.selection) {
+        Table(model.displayed, selection: $model.selection,
+              sortOrder: Binding(get: { model.sortComparators }, set: { model.applyTableSort($0) })) {
             TableColumn("⚑") { file in
                 Button {
                     model.notes.setFlag(!model.notes.isFlagged(file.url.path), for: file.url.path)
@@ -54,14 +55,14 @@ struct NavigationWindowView: View {
             }
             .width(26)
 
-            TableColumn("Document date") { file in
+            TableColumn("Document date", sortUsing: ArchiveFileComparator(field: .date)) { file in
                 Text(file.tags.displayDate ?? "—")
                     .italic(file.dateIsSpeculative)          // Date Uncertain → italic
                     .foregroundStyle(file.sortDate == nil ? .secondary : .primary)
             }
             .width(min: 110, ideal: 130)
 
-            TableColumn("File name") { file in
+            TableColumn("File name", sortUsing: ArchiveFileComparator(field: .name)) { file in
                 HStack(spacing: 6) {
                     if let color = file.color {
                         Image(systemName: "circle.fill")
@@ -73,20 +74,22 @@ struct NavigationWindowView: View {
             }
             .width(min: 200, ideal: 320)
 
-            TableColumn("Type") { file in Text(file.fileType).foregroundStyle(.secondary) }
-                .width(min: 44, ideal: 56)
+            TableColumn("Type", sortUsing: ArchiveFileComparator(field: .fileType)) { file in
+                Text(file.fileType).foregroundStyle(.secondary)
+            }
+            .width(min: 44, ideal: 56)
 
-            TableColumn("File tags") { file in
+            TableColumn("File tags", sortUsing: ArchiveFileComparator(field: .subjects)) { file in
                 Text(displaySubjects(file)).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
             }
             .width(min: 160, ideal: 300)
 
-            TableColumn("Priority") { file in
+            TableColumn("Priority", sortUsing: ArchiveFileComparator(field: .priority)) { file in
                 Text(file.priority.map { "P\($0)" } ?? "—").foregroundStyle(.secondary)
             }
             .width(min: 54, ideal: 64)
 
-            TableColumn("Read") { file in
+            TableColumn("Read", sortUsing: ArchiveFileComparator(field: .readState)) { file in
                 Text(file.readState?.rawValue ?? "—")
                     .foregroundStyle(file.readState == .unread ? Color.accentColor : .secondary)
             }
@@ -254,10 +257,14 @@ struct NavigationWindowView: View {
             Menu {
                 sortButton("Document date", .date)
                 sortButton("File name", .name)
+                sortButton("Type", .fileType)
+                sortButton("File tags", .subjects)
                 sortButton("Priority", .priority)
                 sortButton("Read state", .readState)
                 Divider()
                 Button("Default (date, then name)") { model.sort = LibrarySort.default }
+                Text("Tip: click a column header to sort; click again to reverse.")
+                    .font(.caption).foregroundStyle(.secondary)
             } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
                 .help("Choose how the document list is sorted")
 

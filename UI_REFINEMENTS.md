@@ -6,8 +6,10 @@ built + tested (`xcodebuild … build/test`, keep 83+ green) and GUI-reviewed on
 
 ## Requests
 
-1. [ ] **Column-header sort.** Clicking any list column header sorts by it; toggles direction; supports
-   first- and second-level ordering (click a second column → secondary key). Applies to ALL columns.
+1. [x] **Column-header sort.** Clicking any data column header sorts by it; toggles direction; builds
+   multi-level order (click a 2nd column → it's primary, prior becomes secondary). Verified in GUI
+   (name asc→desc; then Priority primary with name secondary). Keeps `LibrarySort` semantics via a
+   `sortOrder` binding of `ArchiveFileComparator`. (The ⚑ flag column is an action column, not sortable.)
 2. [x] **File tags column excludes date tokens.** Dates show in the Document date column, so the File
    tags column shows only non-date, non-read-state tokens (`DocumentTags.topicalTags`).
 3. [ ] **Inline editing in the list** for tags, priority, read/unread, and document date. For editing

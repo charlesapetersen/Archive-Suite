@@ -60,7 +60,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
 // MARK: - Sorting
 
 enum SortField: String, Sendable, CaseIterable {
-    case date, name, priority, readState, fileType
+    case date, name, priority, readState, fileType, subjects
 }
 
 struct ARSortDescriptor: Sendable, Equatable {
@@ -91,7 +91,7 @@ enum LibrarySort {
         }
     }
 
-    private static func rank(_ a: ArchiveFile, _ b: ArchiveFile, _ d: ARSortDescriptor) -> ComparisonResult {
+    static func rank(_ a: ArchiveFile, _ b: ArchiveFile, _ d: ARSortDescriptor) -> ComparisonResult {
         switch d.field {
         case .date:
             return nilLast(a.sortDate, b.sortDate) { dir(cmp($0, $1), d.ascending) }
@@ -105,7 +105,18 @@ enum LibrarySort {
             return nilLast(a.readState?.rawValue, b.readState?.rawValue) {
                 dir($0.localizedStandardCompare($1), d.ascending)
             }
+        case .subjects:
+            return nilLast(subjectsKey(a), subjectsKey(b)) {
+                dir($0.localizedStandardCompare($1), d.ascending)
+            }
         }
+    }
+
+    /// Sort key for the File-tags column: the topical tags joined, or nil when there are none
+    /// (so files with no topical tags sort last, like other missing facets).
+    private static func subjectsKey(_ f: ArchiveFile) -> String? {
+        let s = f.tags.topicalTags.joined(separator: ", ")
+        return s.isEmpty ? nil : s
     }
 
     // Apply direction only to the *value* comparison; presence (nil-last) is direction-independent.
@@ -125,5 +136,19 @@ enum LibrarySort {
     private static func dir(_ r: ComparisonResult, _ ascending: Bool) -> ComparisonResult {
         if ascending || r == .orderedSame { return r }
         return r == .orderedAscending ? .orderedDescending : .orderedAscending
+    }
+}
+
+/// A `SortComparator` over a single `SortField`, used as the SwiftUI `Table` column sort key so that
+/// clicking a header sorts by that column (and toggles direction / builds multi-level order). It shares
+/// `LibrarySort`'s exact semantics (nil-last, medieval-safe, `localizedStandard`), so header-click and
+/// the Sort menu stay consistent. `order` is applied inside `rank`; nil-last is direction-independent.
+struct ArchiveFileComparator: SortComparator, Identifiable, Hashable {
+    var field: SortField
+    var order: SortOrder = .forward
+    var id: SortField { field }
+
+    func compare(_ a: ArchiveFile, _ b: ArchiveFile) -> ComparisonResult {
+        LibrarySort.rank(a, b, ARSortDescriptor(field: field, ascending: order == .forward))
     }
 }
