@@ -37,6 +37,10 @@ final class NavigationModel: ObservableObject {
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
         library.$files
+            // Deliver ASYNC on the main queue. @Published emits in willSet (before the property is
+            // committed), so a synchronous sink would read the OLD `library.files` inside recompute()
+            // — which made the list show 0 of N. receive(on:) defers until after the value commits.
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }

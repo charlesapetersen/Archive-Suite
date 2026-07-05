@@ -28,6 +28,15 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
   `fileResourceIdentifierKey`) at discovery and re-verify inside the coordination block before
   writing. Tracked for a future hardening pass; do NOT request `.documentIdentifierKey` (it mutates).
 
+## @Published willSet timing (fixed 2026-07-05 — GUI-caught)
+- A Combine subscription on a nested `@Published` (`library.$files`) fires in **willSet**, *before* the
+  property commits. A synchronous sink that reads the stored property (`self.library.files`) inside
+  `recompute()` therefore sees the **old** value — which made the nav list show **0 of N** after a
+  load. Fix: `.receive(on: DispatchQueue.main)` before the sink so it runs after the value commits
+  (or use the value the publisher delivers, not the stored property). **Do not** read a just-changed
+  `@Published` back from `self` inside its own synchronous sink. Unit tests missed this; only running
+  the GUI surfaced it (verified via `screencapture`).
+
 ## Open risks / to verify
 - **Spotlight content indexing is unreliable here:** `kMDItemTextContent` was `null` on the freshly
   copied test corpus. → Full-text search must use the app's own content index (extract page-2 text
