@@ -98,6 +98,7 @@ struct NavigationWindowView: View {
         .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
             Button("Open in Document View") { openSelection() }
             Button("Preview") { model.showingPreview = true }
+            Button("Reveal in Finder") { model.revealInFinder() }
             Button("Copy Link(s)") { model.copyLinks() }
             Divider()
             Button("Mark Read") { model.mark(.read) }

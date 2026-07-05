@@ -38,6 +38,9 @@ struct ArchiveReaderCommands: Commands {
             Button("Preview") { nav?.showingPreview = true }
                 .keyboardShortcut("y", modifiers: .command)
                 .disabled(noSelection)
+            Button("Reveal in Finder") { nav?.revealInFinder() }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(noSelection)
             Button("Copy Link(s)") { nav?.copyLinks() }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(noSelection)

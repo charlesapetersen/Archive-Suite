@@ -323,9 +323,17 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
     }
 
-    // MARK: Open
+    // MARK: Open / reveal
 
     func documentSelection() -> DocumentSelection {
         DocumentSelection(filePaths: selectedFiles.map(\.url.path))
+    }
+
+    /// Reveal (and select) the chosen files in Finder. Read-only — opens Finder pointing at the files;
+    /// never moves, renames, or alters anything.
+    func revealInFinder() {
+        let urls = selectedFiles.map(\.url)
+        guard !urls.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 }

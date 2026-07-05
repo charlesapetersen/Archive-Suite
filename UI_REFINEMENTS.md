@@ -24,7 +24,7 @@ built + tested (`xcodebuild … build/test`, keep 83+ green) and GUI-reviewed on
    previewed file changes live to match.
 8. [ ] **Move `AR-Smoke` off the Desktop** to a less-visible location; update `scripts/smoke-setup.sh`.
    (Do LAST, after GUI testing, so it doesn't disrupt the app's root during verification.)
-9. [ ] **Reveal in Finder** — from the list, via a keyboard shortcut AND the right-click context menu
+9. [x] **Reveal in Finder** — from the list, via a keyboard shortcut AND the right-click context menu
    (read-only: `NSWorkspace.activateFileViewerSelecting`).
 10. [ ] **Two copy modes** in the document viewer / preview: plain/direct copy on **⌘C**, and
     intelligent (prose-cleaned) copy on **⌘⇧C**. (Currently ⌘C is the intelligent copy.)
