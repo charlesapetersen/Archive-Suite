@@ -6,6 +6,8 @@ struct NavigationWindowView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var showingEditor = false
     @State private var showingHealth = false
+    @State private var showingSaveDialog = false
+    @State private var newSearchName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,6 +22,13 @@ struct NavigationWindowView: View {
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
         .sheet(isPresented: $showingEditor) { TagEditorView(model: model) }
+        .alert("Save Search", isPresented: $showingSaveDialog) {
+            TextField("Name", text: $newSearchName)
+            Button("Save") { model.saveCurrentSearch(name: newSearchName) }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Save the current filters and text search as a reusable smart folder.")
+        }
         .navigationTitle("Archive Reader")
     }
 
@@ -204,6 +213,24 @@ struct NavigationWindowView: View {
                 Divider()
                 Button("Default (date, then name)") { model.sort = LibrarySort.default }
             } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
+
+            Menu {
+                if model.savedSearches.searches.isEmpty {
+                    Text("No saved searches")
+                } else {
+                    ForEach(model.savedSearches.searches) { s in
+                        Button(s.name) { model.applySaved(s) }
+                    }
+                    Divider()
+                    Menu("Delete") {
+                        ForEach(model.savedSearches.searches) { s in
+                            Button(s.name, role: .destructive) { model.savedSearches.delete(s.id) }
+                        }
+                    }
+                }
+                Divider()
+                Button("Save Current Search…") { newSearchName = ""; showingSaveDialog = true }
+            } label: { Label("Saved", systemImage: "bookmark") }
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .keyboardShortcut("o", modifiers: .command)

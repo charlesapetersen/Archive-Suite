@@ -6,18 +6,18 @@ import Foundation
 // drives a write (that is TagWriter's exclusive job).
 
 /// Read-state filter — tri-state plus "all" and an explicit "no read-state" (markers / anomalies).
-enum ReadFilter: String, Sendable, CaseIterable {
+enum ReadFilter: String, Sendable, CaseIterable, Codable {
     case all, read, unread, noReadState
 }
 
 /// How multiple selected subject tags combine.
-enum SubjectCombine: String, Sendable, CaseIterable {
+enum SubjectCombine: String, Sendable, CaseIterable, Codable {
     case all   // AND — a file must carry every selected subject
     case any   // OR  — a file must carry at least one
 }
 
 /// The active filter state of the navigation window.
-struct LibraryFilter: Sendable, Equatable {
+struct LibraryFilter: Sendable, Equatable, Codable {
     var subjects: Set<String> = []
     var subjectCombine: SubjectCombine = .all
     var priorities: Set<Int> = []     // empty = any priority

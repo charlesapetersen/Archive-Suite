@@ -10,6 +10,7 @@ final class NavigationModel: ObservableObject {
     let rootStore = RootFolderStore()
     let indexer = ContentIndexer()
     let notes = NotesStore()
+    let savedSearches = SavedSearchStore()
 
     @Published var filter = LibraryFilter()
     @Published var sort = LibrarySort.default
@@ -46,7 +47,21 @@ final class NavigationModel: ObservableObject {
         notes.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
+        savedSearches.objectWillChange
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+            .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
+    }
+
+    // MARK: Saved searches
+
+    func saveCurrentSearch(name: String) {
+        savedSearches.add(name: name, filter: filter, fullTextQuery: fullTextQuery)
+    }
+    func applySaved(_ search: SavedSearch) {
+        filter = search.filter
+        fullTextQuery = search.fullTextQuery
+        runFullTextSearch()   // updates ftsPaths + recompute; filter change also recomputes
     }
 
     // MARK: Notes & flags (app-side, never written to the corpus)
