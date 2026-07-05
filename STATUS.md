@@ -4,24 +4,32 @@ Single source of "where are we, what's next," kept current every work session so
 (e.g. after a usage-credit cutoff) can resume immediately. **Read order:** CLAUDE.md → AGENTS.md →
 PLAN.md → this file.
 
-## Current state (2026-07-04)
-- **Milestone:** M0 (safety core) — foundation laid; `TagWriter` not yet written.
+## Current state (2026-07-05)
+- **Milestone:** **M0 COMPLETE** (safety core). Starting **M1** (navigation window).
 - **Build:** GREEN.
   - `cd ArchiveReader && xcodegen generate && xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build` → **BUILD SUCCEEDED**
-  - `xcodebuild -scheme ArchiveReader -destination 'platform=macOS' -derivedDataPath ./build/DD test` → **11/11 pass**
+  - `xcodebuild -scheme ArchiveReader -destination 'platform=macOS' -derivedDataPath ./build/DD test` → **24/24 pass**
 - **Done:**
-  - Durable docs: CLAUDE.md, PLAN.md, README.md, AGENTS.md, KNOWN_ISSUES.md, POTENTIAL_FEATURES.md, STATUS.md.
-  - Repo scaffold: .gitignore, bootstrap.sh, XcodeGen project (sandboxed), minimal two-window SwiftUI app.
-  - Read-only Core: `DocumentTags` (facet parser), `TagReading` (safe read + trustworthy-read
-    distinction), `FileLink` (link formatting). Tests: `DocumentTagsTests`, `FileLinkTests`.
+  - Durable docs; repo scaffold; sandboxed XcodeGen two-window app.
+  - Read-only Core: `DocumentTags`, `TagReading`, `FileLink`.
+  - **`Core/TagWriter.swift`** — the single audited write choke-point: delta edits (add/remove/color),
+    `NSFileCoordinator(.contentIndependentMetadataOnly)`, trustworthy-read guard, multiset+label
+    verify, label-drift restore, inverse-delta undo, batch per-file results, Read/Unread fast path.
+  - Tests: `DocumentTagsTests`, `FileLinkTests`, `TagWriterTests` (24 total). Tier-2 self-review done.
 
-## Next action
-- **M0 — write `Core/TagWriter.swift`**: the single audited write choke-point implementing the full
-  Safety Protocol (CLAUDE.md): delta edits (`add`/`remove`/color), coordinated metadata-only write,
-  trustworthy-read guard, verify-by-reread (multiset + bytes), inverse-delta undo, color-drift
-  restore, batch idempotence, audit ledger. Then scratch-copy integration tests + Tier-2 adversarial
-  review. **NEVER test against the corpus — copy to scratchpad first.**
-- After M0: M1 (Spotlight discovery + table + filters + copy-links + mark-read + tag editor).
+## Next action (M1 — navigation window)
+1. Add a **write-surface lint** script (`scripts/lint-write-surface.sh`): grep app sources; fail if any
+   tag-write API appears outside `TagWriter.swift` or any move/rename/delete/content-write API appears
+   anywhere in the app target. Run before each commit.
+2. **Spotlight discovery** (`Core/`, UI-free): an `NSMetadataQuery` wrapper scoped to a user-granted
+   archive root (security-scoped bookmark), predicate `kMDItemUserTags == "Read" || == "Unread"`,
+   returning items with tags + name + type + dates; live updates.
+3. **Navigation table** (Views): columns Document date (from `DocumentTags.sortDate`, Date-Uncertain
+   italic) · File name · File type · File tags · Read/Unread; multi-level sort (chronological→name);
+   three filters (subject AND/OR · priority P7–P10 · read tri-state); copy links (⌘⇧C); mark Read/Unread
+   via `TagWriter` with grouped undo; open selection (⌘O) → document window.
+4. Perf-check the table at ~150k (abstract data layer so an AppKit `NSTableView` swap stays possible).
+- Then M1.5 content index (full-text search), M2 doc viewer, M3 options, M4 + High-priority backlog.
 
 ## Autonomous overnight run
 - **Scope:** implement the PLAN (M0→M4), then **only the "High priority" items in

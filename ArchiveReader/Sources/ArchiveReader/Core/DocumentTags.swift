@@ -32,6 +32,9 @@ enum ArchiveColor: Sendable, Equatable {
 
     /// The color-name token Archive Processor also stores in the tag array.
     var tokenName: String { self == .box ? "Red" : "Purple" }
+
+    /// The Finder label number for this color (box = Red = 6, folder = Purple = 3).
+    var labelNumber: Int { self == .box ? 6 : 3 }
 }
 
 /// A file's tags parsed into facets. `raw` is preserved verbatim and is the source of truth.
