@@ -6,6 +6,15 @@ enum LinkFormat: String, Sendable, CaseIterable {
     case posixPath   // /Users/…
     case markdown    // [name](file://…)
     case html        // <a href="file://…">name</a>
+
+    var displayName: String {
+        switch self {
+        case .fileURL: return "file:// URL"
+        case .posixPath: return "POSIX path"
+        case .markdown: return "Markdown link"
+        case .html: return "HTML link"
+        }
+    }
 }
 
 /// Formats file references for the clipboard.

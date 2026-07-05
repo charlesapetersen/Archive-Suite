@@ -21,10 +21,11 @@ final class NavigationModel: ObservableObject {
     @Published var statusMessage = ""
 
     private var undoStack: [[TagWriteResult]] = []
-    private var linkFormatter = FileLinkFormatter()
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        filter.read = AppSettings.defaultReadFilter
+        filter.subjectCombine = AppSettings.defaultSubjectCombine
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
         library.$files
@@ -117,12 +118,44 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Undid \(restored) change\(restored == 1 ? "" : "s")."
     }
 
+    // MARK: Tag editing (single + group, all via TagWriter)
+
+    /// Facet summary across the current selection, for the tag editor's tri-state display.
+    var groupSummary: GroupTagSummary { GroupTagSummary(selectedFiles.map(\.tags)) }
+
+    /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
+    func applyEdit(_ op: TagEditOp) {
+        let files = selectedFiles
+        guard !files.isEmpty else { return }
+        var batch: [TagWriteResult] = []
+        var failures = 0
+        for f in files {
+            let delta = TagEditing.delta(for: op, given: f.tags)
+            if delta.isEmpty { continue }
+            do {
+                let r = try TagWriter.apply(delta, to: f.url)
+                if !r.isNoOp { batch.append(r); library.setExactTags(r.after, label: r.afterLabel, for: f.url) }
+            } catch { failures += 1 }
+        }
+        if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
+        statusMessage = "Edited \(batch.count) file\(batch.count == 1 ? "" : "s")"
+            + (failures > 0 ? "; \(failures) could not update." : ".")
+    }
+
+    /// Existing corpus subjects that differ from `candidate` only by case — a likely typo/duplicate.
+    func nearDuplicateSubjects(of candidate: String) -> [String] {
+        guard AppSettings.warnNearDuplicateTags else { return [] }
+        let c = candidate.trimmingCharacters(in: .whitespaces)
+        guard !c.isEmpty else { return [] }
+        return allSubjects.filter { $0 != c && $0.caseInsensitiveCompare(c) == .orderedSame }
+    }
+
     // MARK: Copy links
 
     func copyLinks() {
         let urls = selectedFiles.map(\.url)
         guard !urls.isEmpty else { return }
-        let text = linkFormatter.clipboardString(for: urls)
+        let text = AppSettings.linkFormatter.clipboardString(for: urls)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."

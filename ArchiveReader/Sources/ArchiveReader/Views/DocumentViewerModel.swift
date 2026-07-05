@@ -13,8 +13,6 @@ final class DocumentViewerModel: ObservableObject {
     let leftController = PDFPaneController()   // image page (page 0)
     let rightController = PDFPaneController()  // OCR text page (page 1)
 
-    var copyOptions = CopyTextOptions()
-
     func load(_ selection: DocumentSelection) {
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
         index = 0
@@ -38,7 +36,8 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Intelligent copy from whichever pane holds the selection.
     func copySelection() {
-        let text = rightController.cleanedSelection(copyOptions) ?? leftController.cleanedSelection(copyOptions)
+        let opts = AppSettings.copyOptions
+        let text = rightController.cleanedSelection(opts) ?? leftController.cleanedSelection(opts)
         guard let text, !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)

@@ -13,7 +13,7 @@ struct DocumentWindowView: View {
     @State private var showFind = false
     @FocusState private var findFocused: Bool
 
-    private let defaultFraction: CGFloat = 0.667
+    private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
     private let minPane: CGFloat = 140
 
@@ -27,7 +27,7 @@ struct DocumentWindowView: View {
         .frame(minWidth: 900, minHeight: 600)
         .navigationTitle(model.title)
         .toolbar { toolbar }
-        .onAppear { if let selection { model.load(selection) } }
+        .onAppear { fraction = defaultFraction; if let selection { model.load(selection) } }
         .onChange(of: model.index) { fraction = defaultFraction }   // reset layout per document
     }
 

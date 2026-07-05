@@ -71,13 +71,17 @@ enum TagWriter {
 
             switch delta.color {
             case .set(let c):
-                additions.append(c.tokenName)                          // keep color token present
-                let other: ArchiveColor = (c == .box) ? .folder : .box
-                removals.append(other.tokenName)                       // drop the opposite color token
+                additions.append(c.tokenName)                          // keep the color token present
+                // Drop the PREVIOUS color's token only if there really is a color label now — so a
+                // subject literally "Red"/"Purple" (with no label) is never stripped.
+                if let current = ArchiveColor(labelNumber: label ?? 0), current != c {
+                    removals.append(current.tokenName)
+                }
                 targetLabel = c.labelNumber
             case .clear:
-                removals.append(ArchiveColor.box.tokenName)
-                removals.append(ArchiveColor.folder.tokenName)
+                if let current = ArchiveColor(labelNumber: label ?? 0) {
+                    removals.append(current.tokenName)                 // remove only the token matching the actual label
+                }
                 targetLabel = 0
             case nil:
                 break

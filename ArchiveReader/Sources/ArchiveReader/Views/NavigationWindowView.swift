@@ -4,6 +4,7 @@ import SwiftUI
 struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @Environment(\.openWindow) private var openWindow
+    @State private var showingEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,7 @@ struct NavigationWindowView: View {
         .toolbar { toolbarContent }
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
+        .sheet(isPresented: $showingEditor) { TagEditorView(model: model) }
         .navigationTitle("Archive Reader")
     }
 
@@ -202,6 +204,10 @@ struct NavigationWindowView: View {
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
                 .keyboardShortcut("u", modifiers: .command)
+                .disabled(model.selection.isEmpty)
+
+            Button { showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
+                .keyboardShortcut("i", modifiers: .command)
                 .disabled(model.selection.isEmpty)
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }

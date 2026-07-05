@@ -109,6 +109,28 @@ final class TagWriterTests: XCTestCase {
         XCTAssertTrue(Set(try readTags(url)).contains("Red"))
     }
 
+    func testClearColorRemovesColorTokenAndLabelButKeepsSubjects() throws {
+        // In macOS a "Red"/"Purple" tag IS the color label (the token and the label are coupled —
+        // Finder auto-assigns label 6/3 for the token). Clearing color removes the color token that
+        // matches the current label and clears the label, while leaving ordinary subjects intact.
+        let url = try makeFile("box.pdf", tags: ["Red", "Cold War", "Unread"], label: 6)
+        _ = try TagWriter.apply(TagDelta(color: .clear), to: url)
+        let after = Set(try readTags(url))
+        XCTAssertFalse(after.contains("Red"))                    // color token removed with the label
+        XCTAssertTrue(after.isSuperset(of: ["Cold War", "Unread"]))  // ordinary subjects preserved
+        XCTAssertEqual(try readLabel(url) ?? 0, 0)
+    }
+
+    func testSetColorSwapsPreviousLabelToken() throws {
+        // Purple folder marker → set to box: "Purple" token dropped, "Red" added, label 6.
+        let url = try makeFile("swapcolor.pdf", tags: ["Purple", "Unread"], label: 3)
+        _ = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        let after = Set(try readTags(url))
+        XCTAssertTrue(after.contains("Red"))
+        XCTAssertFalse(after.contains("Purple"))
+        XCTAssertEqual(try readLabel(url), 6)
+    }
+
     // MARK: Undo via inverse delta
 
     func testInverseDeltaUndoesEdit() throws {

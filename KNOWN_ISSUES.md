@@ -11,6 +11,15 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
   key; sort by a date derived from the tags (no range limit, medieval-safe).
 - Spotlight tag queries are fast (compound 3-facet over 6,941 files ≈ 0.38s) and scale.
 
+## macOS tag/label coupling (verified 2026-07-05)
+- A **`Red`/`Purple` tag token is inseparable from its Finder color label**: setting the token makes
+  macOS auto-assign label 6/3, and there is no "Red subject with no label" state. So `TagWriter`'s
+  color-clear removes the token matching the *actual* label (correct), and a document whose subject
+  is literally "Red"/"Purple" will always appear color-labeled. Non-color subjects are unaffected.
+- **Do not run overlapping `xcodebuild test` invocations** on the same scheme/DerivedData — the
+  concurrent test processes contend on `NSFileCoordinator` and tag writes, ballooning runtimes
+  (seen: a 0.07s suite took 448s under contention). Run one build/test at a time.
+
 ## Open risks / to verify
 - **Spotlight content indexing is unreliable here:** `kMDItemTextContent` was `null` on the freshly
   copied test corpus. → Full-text search must use the app's own content index (extract page-2 text
