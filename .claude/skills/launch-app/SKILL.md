@@ -20,7 +20,7 @@ That's the whole routine. `launch.sh` is reproducible and self-contained:
    newer than every input under `ArchiveProcessor/Sources` + `ArchiveProcessor/project.yml`?
 2. **Build if stale/missing** — `xcodegen generate` + `xcodebuild -scheme ArchiveProcessor -configuration Debug
    -derivedDataPath ./build/DD build`. On failure it prints the tail of `/tmp/ap-launch-build.log` and exits 1.
-3. **Launch** — `open` the app, or if the up-to-date build is already running, bring it to the front (idempotent).
+3. **Launch** — always puts the *current* build in front: `open` it, **relaunch** a stale instance that predates the current build (so you never see an old process after a rebuild), or just foreground the already-current one.
 
 After running it, confirm the app came up and report:
 
