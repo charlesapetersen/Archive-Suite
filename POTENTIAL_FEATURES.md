@@ -4,11 +4,6 @@
 
 ## High Priority
 
-### Search & Browse
-- **Full-text search across processed files** — index OCR text for instant search with highlighted results
-- **Gallery/grid view** — browse processed images with thumbnails, classification badges, and applied tags
-- **Filter by tag** — filter the file list by year, subject, classification, or collection
-
 ### Quality & Accuracy
 - **OCR confidence scoring** — request confidence levels from the LLM and flag low-confidence pages for human review
 - **Side-by-side original/OCR verification view** — show the original image alongside its OCR text in the main review flow (the Tools "Compare Models" tool already shows multiple model outputs side by side)
@@ -20,13 +15,6 @@
 - **Resume interrupted processing (standard runs)** — persist non-batch Files-processing state across restart (Live Capture already resumes via its staging manifest)
 
 ## Medium Priority
-
-### Export & Integration
-- **CSV/spreadsheet export** — export all tags and metadata to CSV for use in archival management systems
-- **IIIF manifest generation** — generate IIIF manifests for digital collection platforms
-- **EAD/Dublin Core export** — export metadata in standard archival description formats
-- **Zotero/Tropy integration** — import/export with popular research tools
-- **Finding aid generation** — auto-generate archival finding aids from processed collections
 
 ### Tagging Enhancements
 - **Tag suggestions from nearby documents** — use surrounding document context to improve tag accuracy
@@ -44,13 +32,10 @@
 ### Collection Management
 - **Nested collection hierarchy** — support sub-collections (Box > Folder > Document)
 - **Collection-level metadata** — assign metadata to entire collections, not just individual documents
-- **Cross-collection deduplication** — identify duplicate documents across different collections
-- **Collection statistics dashboard** — visualize document counts, date ranges, subject distributions per collection
 
 ## Lower Priority
 
 ### Performance & Scale
-- **Thumbnail caching** — cache generated thumbnails for faster review dialog rendering
 - **Incremental processing** — process only new/changed files in a directory
 - **Distributed batch processing** — split large jobs across multiple API keys for faster throughput
 - **Memory-efficient streaming** — stream batch results instead of loading all into memory
@@ -58,7 +43,6 @@
 ### UI Enhancements
 - **Dark mode optimization** — ensure all custom views render correctly in dark mode
 - **Global keyboard shortcuts** — main-window shortcuts for start-processing / switch-provider (review and tag-card dialogs already have full keyboard navigation)
-- **Drag to reorder files** — let users reorder the file list before processing
 
 ### API & Extensibility
 - **First-class OpenAI/GPT-4o provider** — a native OpenAI provider (an OpenAI-compatible gateway already ships for custom/proxied endpoints)
