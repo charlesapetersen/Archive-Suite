@@ -10,11 +10,11 @@ record is in `SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source 
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
-## ⚑ Document-viewer bugs (owner-reported 2026-07-06 — DO NEXT)
-Reader document window (`Views/DocumentWindowView.swift`, `DocumentViewerModel.swift`, `PDFPaneView.swift`).
-- [ ] **DV-1 Open full-screen, then remember size.** The viewer should open occupying the full screen by default; once the user resizes, subsequent opens use the previous window size. (Frame-autosave + first-run maximize.) | needs: gui to fully confirm
-- [ ] **DV-2 Persist zoom + split width across ↑/↓ cycling.** Currently layout resets per document (`onChange(of: index){ fraction = defaultFraction }` + per-pane zoom resets). Keep the same per-pane zoom levels AND the two-up separator width as the user cycles through segments. | needs: gui
-- [ ] **DV-3 Text selection dies after cycling.** Left image pane (and page 1 of a multi-PDF selection) is selectable when first shown, but after cycling to the next page selection stops working on the left — and returning to the first page it's *still* broken. Likely a PDFView/PDFPage reuse or page-detach issue on reload. | needs: gui
+## ⚑ Document-viewer bugs (owner-reported 2026-07-06) — FIXES APPLIED, awaiting owner GUI-verify
+Reader document window (`Views/DocumentWindowView.swift`, `DocumentViewerModel.swift`, `PDFPaneView.swift`). Commit `08e59bb`; compile + 130 tests green.
+- [x] **DV-1 Open full-screen, then remember size.** Fix: `WindowAccessor` → `setFrameUsingName`/`setFrameAutosaveName("ArchiveReaderDocumentWindow")`; first open (no saved frame) maximizes to `screen.visibleFrame`. ← GUI-verify.
+- [x] **DV-2 Persist zoom + split width across ↑/↓ cycling.** Fix: dropped `onChange(of: index){ fraction = default }`; `PDFPaneView` now carries the prior `scaleFactor` across page swaps (only the first page fits). ← GUI-verify.
+- [x] **DV-3 Text selection dies after cycling.** Hypothesis fix: `view.clearSelection()` before the document swap + `view.layoutDocumentView()` after, in the reused `PDFView`. ← **GUI-verify carefully;** if selection still dies after cycling, next step is to force a fresh `PDFView` per page (preserving zoom at the model level).
 
 ## P0 — Finish the Suite publish (network back)
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
