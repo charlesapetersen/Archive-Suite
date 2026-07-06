@@ -10,11 +10,12 @@ record is in `SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source 
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
-## ⚑ Document-viewer bugs (owner-reported 2026-07-06) — FIXES APPLIED, awaiting owner GUI-verify
-Reader document window (`Views/DocumentWindowView.swift`, `DocumentViewerModel.swift`, `PDFPaneView.swift`). Commit `08e59bb`; compile + 130 tests green.
-- [x] **DV-1 Open full-screen, then remember size.** Fix: `WindowAccessor` → `setFrameUsingName`/`setFrameAutosaveName("ArchiveReaderDocumentWindow")`; first open (no saved frame) maximizes to `screen.visibleFrame`. ← GUI-verify.
-- [x] **DV-2 Persist zoom + split width across ↑/↓ cycling.** Fix: dropped `onChange(of: index){ fraction = default }`; `PDFPaneView` now carries the prior `scaleFactor` across page swaps (only the first page fits). ← GUI-verify.
-- [x] **DV-3 Text selection dies after cycling.** Hypothesis fix: `view.clearSelection()` before the document swap + `view.layoutDocumentView()` after, in the reused `PDFView`. ← **GUI-verify carefully;** if selection still dies after cycling, next step is to force a fresh `PDFView` per page (preserving zoom at the model level).
+## ⚑ Document-viewer bugs (owner-reported 2026-07-06) — round-2 fixes, awaiting owner GUI-verify
+Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneView`, `AppSettings`, `ArchiveReaderApp`). Commit `78ec228`; 130 tests green. Round 1 (`08e59bb`) was insufficient per owner testing; round 2 below.
+- [x] **DV-1 Open maximized + remember size + no flash.** `.defaultSize` opens at the remembered-or-screen size (no post-show resize flash); size persisted **on window close** (`onDisappear`) and restored on open. (Round 1's `setFrameAutosaveName` didn't persist under WindowGroup.) ← GUI-verify.
+- [x] **DV-2 Persist zoom + split across cycling, and as the next-open default.** Split persisted on drag-end; per-pane zoom held on the controller + persisted on zoom; both reapplied on open (become defaults). ← GUI-verify.
+- [x] **DV-2b Top-anchored zoom.** `scrollToTop` lays out the doc view then pins the page's top-left, so the top line stays at the top as you zoom. ← GUI-verify.
+- [x] **DV-3 Text selection after cycling (real fix).** Each page now gets a **fresh `PDFView`** (`.id(index)`) — a reused view lost selection after a document swap; a fresh view is the known-good first-show state. Zoom survives via the controller. (Round 1's clearSelection+relayout did NOT fix it — confirmed by owner.) ← GUI-verify.
 
 ## P0 — Finish the Suite publish (network back)
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
