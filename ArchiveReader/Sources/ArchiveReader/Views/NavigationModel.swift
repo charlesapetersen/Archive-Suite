@@ -61,17 +61,7 @@ final class NavigationModel: ObservableObject {
             // committed), so a synchronous sink would read the OLD `library.files` inside recompute()
             // — which made the list show 0 of N. receive(on:) defers until after the value commits.
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.refreshSubjectsCache()
-                    self.folderTree = self.buildFolderTree()         // sidebar tree from discovered paths
-                    self.refreshSmartFolderCounts()                  // D2 badges
-                    self.recompute()                                 // also refreshes the selection cache
-                    self.indexer.startIndexing(self.library.files)   // incremental; no-op if running
-                    self.restoreSelectionIfNeeded()                  // reading-session resume
-                }
-            }
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.libraryDidChange() } }
             .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated { self?.indexingProgress = p } }
@@ -188,8 +178,9 @@ final class NavigationModel: ObservableObject {
     func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.url.path)) }
 
     /// Select every currently-displayed file that carries `tag` (from the tag cloud context menu).
+    /// Matches on `subjects` — the same facet the tag filter uses — so it agrees with the cloud below.
     func selectFiles(withTag tag: String) {
-        selection = Set(displayed.filter { $0.tags.topicalTags.contains(tag) }.map(\.id))
+        selection = Set(displayed.filter { $0.subjects.contains(tag) }.map(\.id))
     }
     func setNote(_ note: String, forPath path: String) { notes.setNote(note, for: path) }
 
@@ -240,7 +231,12 @@ final class NavigationModel: ObservableObject {
               let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
         var f = s.filter
         // Drop a folder scope that isn't under the current root (root may have changed between launches).
-        if let p = f.pathPrefix, let root = rootStore.root?.path, !p.hasPrefix(root) { f.pathPrefix = nil }
+        // Use a path-component boundary — the same test as LibraryFilter.matches — so a sibling root
+        // whose path merely shares a name prefix (Archive vs ArchiveBox) doesn't keep a stale scope.
+        if let p = f.pathPrefix, let rawRoot = rootStore.root?.path {
+            let root = rawRoot.hasSuffix("/") ? String(rawRoot.dropLast()) : rawRoot
+            if p != root, !p.hasPrefix(root + "/") { f.pathPrefix = nil }
+        }
         filter = f
         if !s.sort.isEmpty { sort = s.sort }
     }
@@ -293,19 +289,46 @@ final class NavigationModel: ObservableObject {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    /// Tag cloud over the *currently displayed* rows: each non-date / non-read-state tag with the
-    /// number of visible files carrying it, in alphabetical order (the view scales font size by count).
-    /// Counts each tag once per file.
+    /// Tag cloud over the *currently displayed* rows: each **subject** tag with the number of visible
+    /// files carrying it, alphabetical (the view scales font size by count). Counts each tag once per
+    /// file. Built from `subjects` (not `topicalTags`) so clicking a chip is always a valid subject
+    /// filter — priority (P7–P10) and marker-color have their own dedicated controls, and including
+    /// them here would filter to an empty list (they never appear in `file.subjects`).
     var tagCloud: [(tag: String, count: Int)] {
         var counts: [String: Int] = [:]
         for f in displayed {
-            for t in Set(f.tags.topicalTags) { counts[t, default: 0] += 1 }
+            for t in Set(f.subjects) { counts[t, default: 0] += 1 }
         }
         return counts.map { (tag: $0.key, count: $0.value) }
             .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
     }
 
     // MARK: Folder tree (sidebar)
+
+    // Cheap change-signatures so a tag edit (which never moves files and, for read-state/priority, never
+    // touches subjects) doesn't rebuild path-/subject-invariant derived state on every library emission
+    // (and doesn't re-run it a 2nd/3rd time on the Spotlight echo). Order-independent XOR of element
+    // hashes — a false "unchanged" (hash collision) only yields a briefly-stale cache, self-healing on
+    // the next real change; never a data risk.
+    private var pathsSig = 0, subjectsSig = 0, matchSig = 0
+
+    /// React to a new `library.files`: rebuild only what actually changed, then recompute + index.
+    private func libraryDidChange() {
+        let files = library.files
+        let ps = files.reduce(0) { $0 ^ $1.url.path.hashValue }
+        if ps != pathsSig { pathsSig = ps; folderTree = buildFolderTree() }         // paths → folder tree
+        let ss = files.reduce(0) { acc, f in f.subjects.reduce(acc) { $0 ^ $1.hashValue } }
+        if ss != subjectsSig { subjectsSig = ss; refreshSubjectsCache() }            // subjects → autocomplete
+        let ms = files.reduce(0) { acc, f in
+            var h = Hasher(); h.combine(f.url.path); h.combine(f.readState); h.combine(f.priority)
+            for s in f.subjects { h.combine(s) }
+            return acc ^ h.finalize()
+        }
+        if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
+        recompute()                                     // always — a row's read-state/tags may have moved it
+        indexer.startIndexing(files)                    // incremental; no-op if running
+        restoreSelectionIfNeeded()                      // reading-session resume
+    }
 
     /// Scope the list to a folder subtree (nil = whole root), then recompute.
     func setFolderScope(_ path: String?) {
@@ -361,6 +384,7 @@ final class NavigationModel: ObservableObject {
         panel.message = "Choose the folder that contains your tagged archive PDFs."
         if panel.runModal() == .OK, let url = panel.url {
             rootStore.setRoot(url)
+            filter.pathPrefix = nil   // a folder scope from the old root can't apply to a new one
             library.start(scope: url)
         }
     }
@@ -448,9 +472,9 @@ final class NavigationModel: ObservableObject {
     }
 
     func renameTag(from oldTag: String, to newTag: String) {
-        let old = oldTag.trimmingCharacters(in: .whitespaces)
-        let new = newTag.trimmingCharacters(in: .whitespaces)
-        guard !old.isEmpty, !new.isEmpty, old != new else { return }
+        let old = oldTag                                    // verbatim token identity — must match the
+        let new = newTag.trimmingCharacters(in: .whitespaces)  // sheet's affectedFileCount(forTag: oldTag)
+        guard !old.isEmpty, !new.isEmpty, new != old else { return }
         let affected = library.files.filter { $0.subjects.contains(old) }
         guard !affected.isEmpty else { statusMessage = "No files carry the tag “\(old)”."; announce(statusMessage); return }
         var batch: [TagWriteResult] = []

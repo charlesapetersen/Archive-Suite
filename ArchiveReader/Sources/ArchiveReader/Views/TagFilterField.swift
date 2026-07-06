@@ -55,6 +55,10 @@ struct TagFilterField: NSViewRepresentable {
         }
 
         func comboBoxSelectionDidChange(_ notification: Notification) {
+            // Only commit on a deliberate MOUSE pick from the dropdown. This notification ALSO fires while
+            // arrow-browsing the list; committing then would add a filter and clear the field on every
+            // keystroke. Keyboard navigation commits instead via commit(_:) (the Return action selector).
+            guard let e = NSApp.currentEvent, e.type == .leftMouseUp || e.type == .leftMouseDown else { return }
             guard let cb = notification.object as? NSComboBox else { return }
             let idx = cb.indexOfSelectedItem
             guard idx >= 0, idx < items.count else { return }
