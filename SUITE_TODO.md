@@ -60,6 +60,13 @@ Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneVie
 - [ ] Streaming residuals: defer segment-complete until all pages *uploaded*; `needsResend` for P10/reclassify in-flight; persist `completedDocGroups` across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
 - [ ] KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput`. **Tier-2 file-move**; needs a live pipeline run. | OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M
 
+> **⚠️ PENDING INTEGRATION — do not clobber.** The standalone clone `~/Desktop/Claude/Archive Processor`
+> has unmerged work by another Claude instance: branch `feat/live-capture-cloud-transport` (`9c4334a` —
+> consolidate Live Capture to USB + Google-Drive cloud transport + a cloud plan) + an uncommitted `CLAUDE.md`.
+> **Plan (owner, 2026-07-06):** once that instance finishes, bring the branch into the monorepo (relocate its
+> files under `ArchiveProcessor/`, land on a review branch), then retire the clone. Likely supersedes/feeds
+> the "connectivity UX" item above.
+
 ## P3 — Suite structural
 - [ ] Add a tight Implementation Map to Processor's `CLAUDE.md` (Reader has one; Processor lacks it — token-efficiency directive C.7). | files: ArchiveProcessor/CLAUDE.md | M | low
 - [ ] De-nest per app (do AFTER the P0 upload, build-verify each): `git mv <App>/<App> <App>/macOS`, update `launch.sh` `APPDIR` + `.gitignore`/doc paths + (Processor) `scripts/test-*.sh`; schemes/bundle IDs unchanged. | files: ArchiveReader/, ArchiveProcessor/ | M | med
