@@ -11,6 +11,11 @@ import AppKit
 /// → Safety Protocol). The write path is not yet present — this is the read-only foundation.
 @main
 struct ArchiveReaderApp: App {
+    // Observed so a size change (persisted on window close) re-evaluates `documentDefaultSize`, and the
+    // next document window OPENS at that size — no open-small-then-resize flash (DV-1).
+    @AppStorage(SettingsKey.viewerWinW) private var viewerWinW = 0.0
+    @AppStorage(SettingsKey.viewerWinH) private var viewerWinH = 0.0
+
     var body: some Scene {
         Window("Archive Reader", id: WindowID.navigation) {
             NavigationWindowView()
@@ -27,9 +32,12 @@ struct ArchiveReaderApp: App {
         }
     }
 
-    /// The document window's initial size: the user's last-remembered size, else the full screen.
+    /// The document window's initial size: the user's last-remembered size (tracked via @AppStorage so
+    /// this re-evaluates when it changes), else the full screen.
     private var documentDefaultSize: CGSize {
-        AppSettings.viewerWindowSize ?? (NSScreen.main?.visibleFrame.size ?? CGSize(width: 1400, height: 900))
+        (viewerWinW > 200 && viewerWinH > 200)
+            ? CGSize(width: viewerWinW, height: viewerWinH)
+            : (NSScreen.main?.visibleFrame.size ?? CGSize(width: 1400, height: 900))
     }
 }
 
