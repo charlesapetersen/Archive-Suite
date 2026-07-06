@@ -54,7 +54,10 @@ work in it afterward — encode it into the umbrella `CLAUDE.md` / `AGENTS.md` (
 
 ---
 
-## Current state (verified 2026-07-05)
+## Current state  (Reader re-verified 2026-07-06)
+
+> Reader side re-verified 2026-07-06 (see the Reader entry below). The **Processor** side is being prepared
+> by a separate effort — treat its 2026-07-05 notes as owned/updated there, not here.
 
 **Archive Processor** — `~/Desktop/Claude/Archive Processor`
 - Remote: `git@github.com:charlesapetersen/archiveprocessor.git` (own repo). Mature: **v3.8.2**, tags v3.3.0→v3.8.2.
@@ -63,11 +66,14 @@ work in it afterward — encode it into the umbrella `CLAUDE.md` / `AGENTS.md` (
 - Multi-agent ready (worktrees, `AGENTS.md`). Bundle prefix `com.archiveprocessor`.
 - ⚠️ Working tree dirty: `M ContentView.swift`, untracked `Capture/ProcessFilesTestDriver.swift`.
 
-**Archive Reader** — `~/Desktop/Claude/Archive Reader`
-- Remote: **already** `https://github.com/charlesapetersen/Archive-Suite.git` (the intended monorepo), Reader at repo root. No tags yet, no DMG tooling yet. v1 GUI-verified.
+**Archive Reader** — `~/Desktop/Claude/Archive Reader`  *(re-verified 2026-07-06)*
+- Remote: **already** `https://github.com/charlesapetersen/Archive-Suite.git` (the intended monorepo), Reader at repo root. DMG tooling not yet (Phase D). Now tagged **`pre-suite-merge`** → `1d21190` (revert point, pushed).
 - macOS SwiftUI app (same stack). Sandboxed. Safety-first: never mutates the corpus; only Finder tags via one audited `Core/TagWriter.swift`. Bundle prefix `com.archivereader`.
+- Feature state: v1 **+ UI Batch-2 shipped** — navigable folder-tree sidebar, smart folders (create/apply/rename/delete), corpus-wide tag rename, and an **inline NSTokenField tag editor** with autocomplete. **109 tests + write-surface lint green.** `Core/` stays UI-free — a good `ArchiveCore` foundation (D6/G).
+- `launch.sh` and `bootstrap.sh` verified relocation-safe (cd to own dir + relative `APPDIR="ArchiveReader"` / relative `find project.yml`), so they keep working after Phase A's move into `ArchiveReader/ArchiveReader/`.
 - README already frames Processor as its sibling and anticipates "Archive Suite."
-- ⚠️ Working tree dirty: mid-feature on the nav sidebar (4 modified files: `SavedSearch.swift`, `NavigationModel.swift`, `NavigationWindowView.swift`, `SidebarView.swift`).
+- ✅ **Working tree CLEAN and fully pushed** (`main` = `origin/main`). Phase 0.1–0.4 satisfied on the Reader side.
+- Open (non-blocking, carries into the monorepo): GUI-verify the inline editor's blur-vs-Return fragment behavior; remove the scratch test-tag `InlineTest` left on `Batch-A/00001` during testing.
 
 **No bundle-ID or path collisions.** Both gitignore `build/`, `*.xcodeproj/`, `.maintenance/`, `Test files/`. `launch.sh` in each is a near-mirror; `scripts/makeicon.swift` is near-duplicated.
 
@@ -107,9 +113,14 @@ Archive-Suite/                       # the repo Reader already points at
 
 Legend: `[ ]` todo · `[x]` done · `[~]` in progress. Update the checkbox **and** the State table as you go.
 
-### Phase 0 — Safety net & prerequisites  `[ ]`
+### Phase 0 — Safety net & prerequisites  `[~]`
 Do NOT start the merge with dirty trees or without a backup.
-- [ ] 0.1 Land or stash in-flight work: commit Reader's sidebar work (or `git stash`); commit/stash Processor's `ContentView.swift` + add-or-drop the untracked `ProcessFilesTestDriver.swift`.
+
+> **Reader side DONE (2026-07-06):** tree clean + fully pushed (0.1–0.3) and `pre-suite-merge` created +
+> pushed at commit `1d21190` (0.4). Reader's former mid-sidebar work is long since committed. Remaining
+> Phase 0 work is Processor-side (separate effort) + 0.5 tooling. Leave the boxes `[ ]` until BOTH sides done.
+
+- [ ] 0.1 Land or stash in-flight work: ~~commit Reader's sidebar work~~ (Reader: **done — committed**); commit/stash Processor's `ContentView.swift` + add-or-drop the untracked `ProcessFilesTestDriver.swift` (Processor: separate effort).
 - [ ] 0.2 Confirm clean trees: `git status` shows nothing to commit in **both** repos.
 - [ ] 0.3 Push both repos to their remotes (backup off-machine).
 - [ ] 0.4 Tag a revert point in **each** repo: `git tag pre-suite-merge && git push origin pre-suite-merge`.
@@ -121,10 +132,12 @@ Run in the Suite repo root (`~/Desktop/Claude/Archive Reader`). Everything moves
 cd ~/Desktop/Claude/"Archive Reader"
 git switch -c suite-merge                 # do the merge on a branch; merge to main at the end
 mkdir -p .suite-stage
-for p in $(git ls-tree --name-only HEAD); do
+# null-delimited so any tracked top-level name with spaces is handled safely (Reader's current names
+# have none, but this keeps the step robust). `.suite-stage` is untracked, so ls-tree won't list it.
+while IFS= read -r -d '' p; do
   [ "$p" = "SUITE_MERGE_PLAN.md" ] && continue
   git mv "$p" .suite-stage/
-done
+done < <(git ls-tree -z --name-only HEAD)
 git mv .suite-stage ArchiveReader
 git commit -m "Suite: relocate Archive Reader into ArchiveReader/ subdir"
 ```
@@ -212,5 +225,5 @@ git remote remove processor
 | Overall | PLANNED — not started (awaiting owner go-ahead) |
 | Current phase | — |
 | Branch | `suite-merge` will be created at Phase A (not yet) |
-| Last verified | 2026-07-05 (current-state audit above) |
-| Blocking | Owner approval to execute; land the two dirty working trees first (Phase 0) |
+| Last verified | Reader 2026-07-06 (clean, pushed, `pre-suite-merge` tagged); Processor per separate effort |
+| Blocking | Owner go-ahead to execute Phase A+. **Reader side READY** (0.1–0.4 done). Processor-side Phase 0 handled separately. |
