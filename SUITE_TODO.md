@@ -26,8 +26,9 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 - [x] Reconcile Bonjour service-name mismatch — iOS now advertises `_archivecap._tcp` (matches the Mac) in both `ArchiveCaptureiOS/project.yml` + generated `Info.plist`; iOS project regenerates clean. ✅
 
 ## P2 — Reader features (no network; local build/test)
-- [ ] Non-standard-PDF **detection layer** (non-2-page / no-OCR-layer / corrupt / non-PDF) — land this first; the next three consume it. | files: Views/NavigationModel.swift, Search/PDFTextExtractor.swift, Search/ContentIndexer.swift | S | low
-- [ ] Surface it: counts in a Library-Health popover · "Non-standard format" filter chip + "Needs attention" smart folder · per-row warning badge · viewer banner ("1 page · no OCR text layer"). | files: Core/LibraryFilter.swift, Search/SavedSearch.swift, Views/NavigationWindowView.swift, Views/DocumentWindowView.swift | S–M | low
+- [x] Non-standard-PDF **detection layer** — `Core/PDFFormatStatus.swift` (standard/unreadable/noTextLayer; page count is NOT a defect signal — merged >2-page PDFs are legit); persisted in the v2 content index. **117 tests green, lint clean.** ✅
+- [x] Surface it — filter-bar "N need attention" toggle (`needsAttentionOnly` filter), health-popover row, per-row ⚠ badge. ✅  *(Remaining small piece: the two-up viewer banner in `DocumentWindowView` — "no OCR text layer" — not yet done.)*
+- [ ] Viewer banner on a non-standard doc ("no OCR text layer") in the document window. | files: Views/DocumentWindowView.swift, Views/DocumentViewerModel.swift | S | low
 - [ ] Tag near-duplicate detection (e.g. `Environment` vs `Environtment`) — read-only analysis; rename already ships via TagWriter. | files: Views/NavigationModel.swift, new view | M | low
 - [ ] Duplicate-filename disambiguation — show containing folder/box for same-named files. | files: Views/NavigationModel.swift, Views/NavigationWindowView.swift | S | low
 - [ ] Side-by-side compare of two selected documents (beyond ↑/↓ cycling). | files: Views/DocumentWindowView.swift, new view | L | low
