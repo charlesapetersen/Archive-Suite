@@ -94,3 +94,83 @@ in `loadStagingManifest` would fix it.
 **Repro (approx):** stage a live session with an older build (legacy manifest) → force a restart so the
 session is recovered → *Process* → *Finish session* with "Review rotation" on → review shows only the
 segments finalized in the current run.
+
+---
+
+## Live Capture Wi-Fi pairing fails **silently** when the network blocks device-to-device
+
+**Severity: medium (UX / supportability).** When the phone scans a valid QR but then cannot reach the
+Mac's `CaptureServer`, **nothing happens on the phone** — no spinner, no error, no explanation. The user
+is left pointing the camera at a QR that will never connect. Discovered 2026-07-06 on **airport Wi-Fi**:
+Mac server was confirmed healthy (`*:48627` LISTEN, firewall permits, stealth off, QR encoding the en0
+IP), but the network had **client isolation** (AP isolation) — a phone-browser hit to
+`http://<mac-ip>:48627/ping` also timed out. Common on public/guest/airport/hotel/CGNAT Wi-Fi.
+
+The phone decodes the QR, fires the `/ping` handshake (`MacClient.ping`, ~5s connectTimeout), it times
+out, and the failure is swallowed — the scanner just sits there.
+
+**Fix (make the failure legible + actionable):**
+1. On the scan→connect path, show explicit state: *"Found pairing code — connecting to <ip>:<port>…"* then
+   on `/ping` failure a clear message: *"Can't reach the Mac at <ip>:<port>. This Wi-Fi may block
+   device-to-device connections (common on public/guest networks)."*
+2. Offer concrete fallbacks in that message: **use a USB cable**, **use a personal hotspot** (bypasses AP
+   isolation), or a future cloud relay (see POTENTIAL_FEATURES).
+3. Consider a tiny **reachability preflight**: right after decoding the QR, `GET /ping` with a short
+   timeout and route straight to the diagnostic message on failure, so the user never stares at a dead
+   scanner. Mirror the same on the iOS companion (`MacClient`).
+4. Mac side could also help: the Live Capture tab could note "phone not connecting? your network may block
+   device-to-device — try USB or a hotspot," and/or show the exact host:port it's advertising.
+
+---
+
+## Photos must stream to the Mac per-capture — NOT be held on the phone until "End segment"  [HIGH — data safety]
+
+**Severity: HIGH — violates the core "never lose a photo" invariant.** Observed 2026-07-06 (USB
+Process-live session): took one shot; the phone showed it captured, but after several minutes — with
+`adb reverse` up and `/ping` healthy — the photo had **not** reached the Mac (empty backup folder, no
+receive in the app log). The photo **bytes stay on the phone until the user taps "End segment."**
+
+**Why this is dangerous:** a single segment can be **hundreds of photos** long. Holding an entire
+in-progress segment on the phone means a phone crash / drop / dead battery / app-kill *before* End
+segment loses **all** of those pages at once — irreplaceable archival photos that can't be re-shot.
+Live Capture's whole promise is that a captured photo is never lost.
+
+**Required behavior:** each photo's **bytes** must transfer to the Mac and be written to the durable,
+user-visible backup folder **as it is captured** (streamed continuously), backed by the existing durable
+disk-queue + auto-retry + idempotent re-upload (group+seq) for guaranteed eventual delivery. **"End
+segment" is only the logical/visual grouping** — the moment the on-phone thumbnails "leave" and the
+document boundary is confirmed — and must NOT gate the byte transfer. By the time the user ends a
+segment, the Mac should already hold every page; End segment just finalizes/assembles it.
+
+**Acceptance:** during a long (e.g. 100+ shot) segment, the Mac backup folder fills **continuously** as
+shots are taken, not in one burst at End segment; killing the phone mid-segment loses nothing already
+shot. Tier-2 (Net/ + the phone↔Mac protocol + never-lose-a-photo path) → adversarial review; verify on
+**both** companions (Android + iOS).
+
+---
+
+## Live Capture main-window OCR/progress text is stale while the per-segment tag card is open  [LOW — UX]
+
+**Severity: low (cosmetic/UX).** Observed 2026-07-06 (Process-live, Mac): while the per-segment tag card
+dialog is open, the left-pane status ("0/1 segments processed", "OCR…") does **not** update — it looked
+frozen on "OCR…" for minutes even though OCR had actually completed. It refreshed to "Staged" only after
+the tag card was submitted. Harmless (OCR was fine; provider=Gemini, key present, Mac reaches the API),
+but it makes OCR look **hung** during tagging and cost real diagnosis time in the walkthrough. Fix: keep
+the progress/OCR status live while the tag card is presented (the `@Published` progress updates aren't
+re-rendering behind the modal, or the sheet blocks the main-window refresh). `Views/LiveCaptureView.swift`.
+
+---
+
+## Mac doesn't detect a phone-side Re-pair — stale "paired" state, QR must be re-shown manually  [LOW–MED — UX]
+
+**Severity: low–medium (UX / confusion).** The **Re-pair control on the phone works** (returns the phone
+to the scanner — verified 2026-07-06). But the phone↔Mac protocol has **no disconnect signal**, so when
+the phone re-pairs the Mac keeps its "connected / QR hidden" state; the operator must know to click **Show
+QR** to re-display it. The "listening" status dot staying green further reads as "still paired," which
+confused the operator into thinking Re-pair hadn't worked. **Fix ideas:** (1) when the phone re-pairs,
+have it fire a lightweight `POST /session/disconnect` (or the Mac infers a drop from ping-timeout) so the
+Mac auto-re-shows the QR; (2) distinguish "server listening" from "phone connected" in the status UI
+(e.g., last-seen heartbeat). Also observed alongside: the **`adb reverse` USB forward is torn down** on
+re-pair, so a subsequent **Wired** re-pair needs it re-established (the Mac's `USBBridge` should re-run
+`adb reverse` on reconnect; verify it does). `Net/CaptureServer.swift`, `Net/USBBridge.swift`,
+`Views/LiveCaptureView.swift`, + both companions' capture screens.

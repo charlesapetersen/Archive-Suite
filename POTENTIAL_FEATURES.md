@@ -139,3 +139,46 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   `liveProcessingMode` enum instead of "stage"/"live" magic strings; LLMRotationDetector.rotate →
   ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder.
 - **Value decision:** the recent-years cap differs between the companions (iOS 5, Android 6) — pick one.
+
+### Live Capture transport — bypass networks that block device-to-device
+Motivated 2026-07-06: on airport/guest/hotel/CGNAT Wi-Fi with **client isolation**, phone↔Mac LAN
+connections are blocked, so QR/Wi-Fi pairing can't work at all (see KNOWN_ISSUES for the silent-failure UX
+gap). USB already bypasses this. Options, cheapest first:
+
+- **Personal-hotspot guidance (zero code).** Tell the user to put the Mac + phone on a personal hotspot
+  (phone's own, or the Mac's) — a private AP with no client isolation, so the existing LAN path just works.
+  Document it in-app as the first fallback; near-free to add.
+- **Peer-to-peer, no infrastructure Wi-Fi.** Connect the two devices directly, independent of the AP:
+  iOS `MultipeerConnectivity` (AWDL/Bluetooth/peer-Wi-Fi) for the iPhone companion; **Wi-Fi Direct /
+  Nearby Connections** on Android. Bypasses AP isolation entirely, no cloud, no cable. Medium effort; a
+  new transport behind the same segment-transfer protocol (`CaptureServer` becomes one of several transports).
+- **Cloud relay (works anywhere, incl. remote).** Phone uploads each captured segment to a cloud store
+  (user's Google Drive / Dropbox / iCloud, or a small object store), Mac watches/pulls and feeds the same
+  ingest path. Pros: works across *any* network and even off-site. Cons: needs cloud auth (fits the
+  existing "managed access / BYO keys" initiative), and archival photos transit third-party storage —
+  **privacy call the owner must make**; make it explicit + opt-in. Largest effort; keep the durable
+  disk-queue + idempotent re-upload semantics so "never lose a photo" still holds across a relay.
+- **Reachability preflight + honest diagnostics** regardless of transport (the KNOWN_ISSUES fix): never
+  let the phone sit on a dead scanner — detect unreachability and name the cause + the fallbacks.
+
+### Live Capture output-folder control (in the Live Capture pane)
+Motivated 2026-07-06 during the Android walkthrough: a Process-live **Finish session** wrote the finalized
+collections to **`~/Downloads/`** with **no visible way to choose where** — the operator had to hunt for
+the output. Add an explicit **output-folder picker in the Live Capture pane** (the tagging-mode dropdown +
+output folder already live in the Process Files view — mirror that here) so live-captured collections go
+where the user wants. Show the current destination on the pane; default sensibly (last-used, or a
+dedicated "Archive Processor" folder rather than Downloads). Per the settings-UX convention, give it a `?`
+help popover and gray it out when irrelevant. Confirm whether live finalize currently reuses the Process
+Files `outputDirectory` or has its own — and unify if it makes sense.
+
+### Decide the phone "Finish" button's purpose — currently near-useless
+Found 2026-07-06: the phone capture screen has **"End segment"** (finishes the current document — essential)
+and **"Finish"** (`CaptureViewModel.finishSession()` → `MacClient.sessionComplete()` → `POST
+/session/complete`). But the Mac handler (`CaptureServer.swift:242-244`) does **only** one thing on
+receipt: sets `statusMessage = "Session complete — ready to process."` and returns OK. It does **not**
+start the finalize flow (rotation review → collection naming → output) — the operator must still go to the
+Mac and click **Finish session**. So the phone "Finish" is a weak "I'm done capturing" nudge, easily
+mistaken for actually finishing. **Decision:** either (a) make phone "Finish" actually initiate/enable the
+Mac's finalize flow (let the operator wrap up from the phone without walking to the Mac — most useful), or
+(b) relabel it (e.g. "Tell Mac I'm done") so it's not mistaken for finalizing, or (c) remove it. Keep both
+companions in sync.
