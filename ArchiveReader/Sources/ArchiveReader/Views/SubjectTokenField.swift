@@ -93,20 +93,32 @@ struct SubjectTokenField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTokenField else { return }
-            pendingFragment = tf.currentEditor()?.string ?? ""     // the not-yet-tokenized word, if any
+            // The field editor renders each EXISTING token as a U+FFFC attachment character; the word the
+            // user is currently typing is the run AFTER the last one (for an empty field, the whole
+            // string). Keying off the raw editor string would include the FFFC chips and never match a
+            // plain token, making the drop below silently inert on any file that already has tags.
+            let editor = tf.currentEditor()?.string ?? ""
+            pendingFragment = editor.components(separatedBy: "\u{FFFC}").last ?? editor
         }
 
-        /// Commit on end-editing (blur / Return / Tab). Deliberate token changes (comma/Return-tokenized
-        /// adds, ⌫/× removals) persist; a trailing NOT-yet-tokenized fragment the user was still typing is
-        /// dropped, so clicking away mid-word never writes a stray subject. The model diffs `edited`
-        /// against the edit-start `base`, so a repeated or no-change commit is a harmless no-op.
+        /// Commit on end-editing. Deliberate commits (Return/Tab/Backtab, comma-tokenized adds, ⌫/×
+        /// removals) persist. On an INCIDENTAL blur (clicking another row, switching window/app),
+        /// `NSTokenField` auto-tokenizes whatever half-typed word was in the editor — we DROP that word so
+        /// clicking away mid-type never writes a stray subject (a controlled-vocabulary hazard). The model
+        /// diffs `edited` against the edit-start `base`, so a repeated / no-change commit is a no-op.
         func controlTextDidEndEditing(_ obj: Notification) {
-            guard let tf = obj.object as? NSTokenField, let base = editBase else { editBase = nil; return }
+            guard let tf = obj.object as? NSTokenField, let base = editBase else {
+                editBase = nil; pendingFragment = ""; return
+            }
             var edited = (tf.objectValue as? [String]) ?? []
+            let movement = (obj.userInfo?["NSTextMovement"] as? Int) ?? 0
+            let deliberate = movement == NSTextMovement.return.rawValue
+                || movement == NSTextMovement.tab.rawValue
+                || movement == NSTextMovement.backtab.rawValue
             let frag = pendingFragment.trimmingCharacters(in: .whitespaces)
-            if !frag.isEmpty {
-                // Drop the trailing token that is the just-typed fragment — but only if it's genuinely new
-                // (not one of the base tokens), so an existing subject equal to the fragment isn't dropped.
+            if !deliberate, !frag.isEmpty {
+                // Drop the just-typed, not-yet-committed word — but only if it's genuinely new (not one of
+                // the base tokens), so an existing subject equal to the fragment is never dropped.
                 let baseKeys = Set(base.map { $0.trimmingCharacters(in: .whitespaces) })
                 if !baseKeys.contains(frag),
                    let idx = edited.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces) == frag }) {

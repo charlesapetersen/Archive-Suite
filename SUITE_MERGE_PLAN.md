@@ -20,6 +20,37 @@ as one monorepo with two separate macOS apps, one combined installer, and one pl
 | D5 | History | **Preserve both git histories and Processor's tags** via an unrelated-histories merge after path relocation. |
 | D6 | Shared code | **Defer heavy extraction.** Ship a shared **tag-format contract doc** now (the real coupling); an `ArchiveCore` Swift package is a later, optional phase. |
 | D7 | Installer | **One combined DMG** — both apps + a single `Applications` symlink + "drag both here" artwork + a first-launch (right-click→Open) note. Both apps are ad-hoc signed, not notarized. |
+| D8 | Working directive | **Token-efficient feature-add & maintenance is a first-class goal** of bringing the apps together. Agents are encouraged; speed and quality matter; be efficient with context too. See §Guiding directive. |
+
+---
+
+## Guiding directive — token-efficient feature-add & maintenance
+
+Bringing the apps together is not only about structure; it's an opportunity to make **adding features and
+maintaining both apps cheaper in tokens** without sacrificing speed or quality. Treat context/token cost as
+a real budget alongside wall-clock and correctness. This directive governs how we build the Suite and how we
+work in it afterward — encode it into the umbrella `CLAUDE.md` / `AGENTS.md` (Phase C.7) so it's durable.
+
+**Principles**
+- **Agents are encouraged, right-sized.** Delegate broad searches / multi-file sweeps / independent work to
+  subagents (or a Workflow) so the main thread keeps the *conclusion*, not the file dumps. Match fan-out to
+  the task — a few agents for a small change, a larger pool only for genuinely broad audits. Don't spawn
+  agents (or re-run a search you already delegated) for a single known-location lookup.
+- **Read narrowly, not wholesale.** Prefer scoped reads (the function/region you need), `grep`/Explore to
+  locate, and `git log -- <path>` scoped to a subdir. Avoid loading whole files or the *other* app when a
+  change touches only one.
+- **Structure the repo so a change needs less context.** Per-app authoritative `CLAUDE.md` with an
+  Implementation Map, small single-purpose files (continue the god-file split), clear ownership lanes, and a
+  single shared contract (`SPEC/tag-format.md`) mean an agent can load one app + one spec, not everything.
+- **DRY docs and tooling.** Umbrella-plus-per-app docs with no duplicated prose, one shared launch/icon/
+  bootstrap path — so nobody spends tokens re-deriving or reconciling divergent copies.
+- **Isolate work with worktrees + scoped agents** (per [[AGENTS.md]] lanes) so parallel work doesn't force
+  one context to hold both apps at once.
+- **Batch & cache.** Issue independent tool calls together; keep edits surgical (Edit over full rewrites) so
+  the harness's file-state tracking and prompt cache stay warm.
+- **Guardrail:** efficiency never overrides correctness or the Reader Prime Directive (file safety). When in
+  tension, quality wins — but reach for the *cheapest path that fully meets the bar*, not the most exhaustive
+  one by default.
 
 ---
 
@@ -130,7 +161,8 @@ git remote remove processor
 - [ ] C.3 Root `AGENTS.md` — multi-agent lanes now span two apps + companions; per-worktree `-derivedDataPath ./build/DD`; shared hotspots (`SPEC/tag-format.md`, `project.yml` files, release script).
 - [ ] C.4 Root `.gitignore` — suite-level artifacts (`release/*.dmg`, `/build/`). Per-app `.gitignore` files remain in each subdir (they already cover build/xcodeproj/.maintenance/Test files/Android/etc.).
 - [ ] C.5 `SPEC/tag-format.md` — the shared contract (D6): the exact Finder-tag vocabulary both apps depend on — subject / date facets / priority (P7–P10) / color / read-state, and the chronological convention (`Year` / `MM Month` / `Day N`, medieval-safe, Date-Uncertain italic year). Cite it from both apps' CLAUDE.md as the single source of truth so the writer (Processor) and reader (Reader) never drift.
-- [ ] C.6 (Opportunistic, low-risk) Shared tooling dedup: a root `launch.sh` dispatcher (`./launch.sh reader|processor` → delegates to each app's `launch.sh`); note the near-duplicate `scripts/makeicon.swift` as a future single-source. Keep per-app `launch.sh` working.
+- [ ] C.6 (Opportunistic, low-risk) Shared tooling dedup: a root `launch.sh` dispatcher (`./launch.sh reader|processor` → delegates to each app's `launch.sh`); note the near-duplicate `scripts/makeicon.swift` as a future single-source. Keep per-app `launch.sh` working. (Also serves §Guiding directive — one shared path, no divergent copies.)
+- [ ] C.7 Encode the §Guiding directive (token-efficient feature-add & maintenance) into the umbrella `CLAUDE.md` and `AGENTS.md`: agents right-sized, scoped reads, per-app context isolation via ownership lanes + worktrees, DRY docs/tooling, batch/cache, correctness-and-safety-first guardrail. Make each per-app `CLAUDE.md` carry a tight Implementation Map so an agent loads one app + one spec, not the whole repo.
 
 ### Phase D — Combined installer (one DMG)  `[ ]`
 - [ ] D.1 `release/build-suite-dmg.sh`: for each app — `xcodegen generate` then `xcodebuild -scheme <App> -configuration Release -derivedDataPath ./build/rel build`; stage **both** `ArchiveProcessor.app` + `ArchiveReader.app` into one temp dir; add `ln -s /Applications`; add `release/dmg-background.png`; set window layout + icon positions (AppleScript/`.DS_Store`); `hdiutil create -volname "Archive Suite <ver>" -srcfolder <stage> -ov -format UDZO /tmp/ArchiveSuite-<ver>.dmg`.
