@@ -15,6 +15,8 @@ struct LiveCaptureView: View {
 
     /// App-wide choice (Settings ⌘,): live streaming vs. staging for a later batch run.
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
+    /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
+    @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
 
     var body: some View {
         HSplitView {
@@ -135,6 +137,19 @@ struct LiveCaptureView: View {
                         }
                     }
                     .padding(6)
+                }
+
+                GroupBox("Output folder") {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder").foregroundStyle(.secondary)
+                        Text(outputDirPath.isEmpty ? "Downloads (default)" : URL(fileURLWithPath: outputDirPath).lastPathComponent)
+                            .font(.callout).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { chooseOutputFolder() }.font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(6)
+                    .help("Where finalized live-capture collections are written. Shared with the Process Files output folder; defaults to your Downloads folder. Set it before finishing a session.")
                 }
 
                 if session.serverRunning, session.paired {
@@ -330,6 +345,16 @@ struct LiveCaptureView: View {
     }
 
     // MARK: Handoff
+
+    /// Pick where finalized live collections are written (persists to the shared output-directory setting).
+    private func chooseOutputFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        if panel.runModal() == .OK, let url = panel.url { outputDirPath = url.path }
+    }
 
     private func stageForProcessing() {
         let (files, boundaries, types, priorities, years, months, subjects) = session.orderedFilesAndGroups()

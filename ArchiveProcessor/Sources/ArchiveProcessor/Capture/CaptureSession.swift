@@ -18,6 +18,10 @@ final class CaptureSession: ObservableObject {
     /// document groups already tagged or skipped on the Mac (drives the auto-advancing card).
     @Published private(set) var macTags: [String: MacSegmentTags] = [:]
     @Published private(set) var resolvedGroupIds: Set<String> = []
+    /// Document groups the phone has signalled complete (via `POST /segment/complete` at End segment).
+    /// Photos now stream to the Mac page-by-page as they are shot, so a document group exists mid-segment;
+    /// its tag card must appear only once the segment is complete — this gates `pendingTagGroup`.
+    @Published private(set) var completedDocGroups: Set<String> = []
 
     // MARK: - Live processing mode (streaming vs. batch handoff)
 
@@ -235,6 +239,21 @@ final class CaptureSession: ObservableObject {
     func clear() {
         for p in photos { try? FileManager.default.removeItem(at: p.url) }
         photos = []
+        completedDocGroups.removeAll()
+        writeManifest()
+        statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
+    }
+
+    /// Finalize cleanup: delete ONLY the source photos that were actually filed into output (their URLs
+    /// in `filed`). Any received-but-unfiled page — e.g. a page that streamed in and arrived after its
+    /// segment had already been staged (a straggler) — is KEPT: deleting it would permanently lose an
+    /// irreplaceable photo. Kept pages stay in the backup folder + the Captured pane so the operator can
+    /// re-Process them. (Data-safety guard for per-capture streaming.)
+    func clearFiled(_ filed: Set<URL>) {
+        let removed = photos.filter { filed.contains($0.url) }
+        for p in removed { try? FileManager.default.removeItem(at: p.url) }
+        photos = photos.filter { !filed.contains($0.url) }
+        if photos.isEmpty { completedDocGroups.removeAll() }
         writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
     }
@@ -273,11 +292,36 @@ final class CaptureSession: ObservableObject {
 
     // MARK: - Mac-side tagging (auto-advancing card)
 
-    /// The next completed document group awaiting Mac tagging. A document group is complete on
-    /// arrival (the phone uploads a segment only when it's ended); box/folder are markers that need
-    /// no card, so they're treated as already resolved.
+    /// The next document group ready for the Mac tag card: **complete** (the phone signalled End
+    /// segment via `markSegmentComplete`) and not yet resolved. Pages stream in as shot, so a group
+    /// exists mid-segment — gating on `completedDocGroups` keeps the card from popping before the
+    /// segment is finished. Box/folder markers need no card (finalized on arrival).
     var pendingTagGroup: CaptureGroup? {
-        groups.first { $0.type == .document && !resolvedGroupIds.contains($0.id) }
+        groups.first { $0.type == .document && completedDocGroups.contains($0.id) && !resolvedGroupIds.contains($0.id) }
+    }
+
+    /// The phone ended a document segment (`POST /segment/complete`): attach the segment's tags to its
+    /// already-streamed pages (so the tag card pre-fills), then mark it complete so the card appears.
+    /// A per-page `P10` already on a photo (streamed with it) is never downgraded. Idempotent: re-sending
+    /// the same signal (retry) just re-applies the same tags + is a no-op on the completed set.
+    func markSegmentComplete(groupId: String, priority: String?, year: Int?, month: Int?) {
+        var changed = false
+        for i in photos.indices where photos[i].groupId == groupId {
+            if year != nil { photos[i].year = year }
+            if month != nil { photos[i].month = month }
+            if photos[i].priority != "P10", let priority, !priority.isEmpty { photos[i].priority = priority }
+            changed = true
+        }
+        completedDocGroups.insert(groupId)
+        if changed { _ = writeManifest() }
+    }
+
+    /// Finish (`POST /session/complete`): surface the tag card for any document segment still open — e.g.
+    /// the last segment if the operator finished without tapping End segment — so nothing is stranded.
+    func completeAllOpenDocGroups() {
+        for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id) {
+            completedDocGroups.insert(g.id)
+        }
     }
 
     func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {

@@ -83,16 +83,29 @@ private fun Pairing(vm: CaptureViewModel, wired: Boolean, onBack: () -> Unit, on
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(if (wired) "Wired — scan the QR" else "Wi-Fi — scan the QR", style = MaterialTheme.typography.headlineSmall)
         Text("Point the camera at the QR code in Live Capture on the Mac.", style = MaterialTheme.typography.bodyMedium)
+        if (!wired) {
+            Text(
+                "On public / guest / hotel Wi-Fi that hides devices from each other, the scan may do nothing. " +
+                    "Use a personal hotspot (join both devices to it), or the USB cable instead.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
 
         if (hasCam) {
             val controller = remember { LifecycleCameraController(context) }
+            val analyzerRef = remember { arrayOfNulls<QrAnalyzer>(1) }
             val analyzer = remember {
                 QrAnalyzer { payload ->
                     if (!connecting) {
                         connecting = true
-                        vm.connectFromQr(payload, wired) { ok -> connecting = false; if (ok) onConnected() }
+                        vm.connectFromQr(payload, wired) { ok ->
+                            connecting = false
+                            // Re-arm on failure so simply pointing at the QR again retries — the analyzer
+                            // latches after one decode, so without this a failed scan is a dead end.
+                            if (ok) onConnected() else analyzerRef[0]?.rearm()
+                        }
                     }
-                }
+                }.also { analyzerRef[0] = it }
             }
             DisposableEffect(Unit) { onDispose { analyzer.close() } }   // release the ML Kit detector
             LaunchedEffect(Unit) {

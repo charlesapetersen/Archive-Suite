@@ -18,6 +18,10 @@ class QrAnalyzer(private val onQr: (String) -> Unit) : ImageAnalysis.Analyzer, j
     @Volatile private var done = false
     @Volatile private var closed = false
 
+    /** Re-arm after a decoded QR failed to connect, so pointing at the code again re-fires the callback.
+     *  Without this, `done` latches on the first decode and the scanner is a dead end (can't retry). */
+    fun rearm() { done = false }
+
     override fun close() { closed = true; runCatching { scanner.close() } }
 
     @OptIn(ExperimentalGetImage::class)

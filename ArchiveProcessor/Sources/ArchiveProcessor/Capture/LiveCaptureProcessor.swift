@@ -596,6 +596,9 @@ final class LiveCaptureProcessor: ObservableObject {
                 return
             }
             try? FileManager.default.removeItem(at: stagingDir)   // staging emptied into collections
+            // The exact source pages that were actually staged/filed (each retained segment records its
+            // pages' source URLs). Compute BEFORE clearing `retained`.
+            let filedSources = Set(self.retained.values.flatMap { $0.pages.map { $0.sourceURL } })
             self.staged.removeAll()
             self.statuses.removeAll()
             self.drafts.removeAll()
@@ -604,9 +607,10 @@ final class LiveCaptureProcessor: ObservableObject {
             self.retained.removeAll()
             self.rotationReviewPages.removeAll()
             self.currentCollectionKey = "__unfiled__"
-            // These source photos are fully processed and filed — clear them from the Captured pane,
-            // then show the finalize summary there in their place until new capture begins.
-            self.session.clear()
+            // Clear ONLY the filed source photos from the Captured pane; KEEP any page that streamed in
+            // but was never staged (e.g. a straggler that arrived after its segment finalized) so an
+            // irreplaceable photo is never deleted — it stays in the backup folder + pane, recoverable.
+            self.session.clearFiled(filedSources)
             self.finalizeSummary = outcome.summary
         }
     }

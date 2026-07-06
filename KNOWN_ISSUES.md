@@ -174,3 +174,33 @@ Mac auto-re-shows the QR; (2) distinguish "server listening" from "phone connect
 re-pair, so a subsequent **Wired** re-pair needs it re-established (the Mac's `USBBridge` should re-run
 `adb reverse` on reconnect; verify it does). `Net/CaptureServer.swift`, `Net/USBBridge.swift`,
 `Views/LiveCaptureView.swift`, + both companions' capture screens.
+
+---
+
+## Per-capture streaming — implemented; residual refinements (from the 2026-07-06 Tier-2 review)
+
+Per-capture streaming is now implemented (photos stream to the Mac as shot; End segment sends
+`POST /segment/complete` with the tags; Mac gates the tag card on `completedDocGroups`). An adversarial
+Tier-2 review confirmed one **critical** data-loss path, now **guarded**, plus refinements. **All of this
+needs the on-device Wi-Fi/Run C walkthrough to verify — implemented build-verified only, not yet run on a phone.**
+
+**FIXED (guard shipped): straggler page permanently deleted.** If the tiny `segment/complete` (or
+`session/complete`) signal outraced a still-uploading page, the Mac finalized the segment without it, then
+`session.clear()` deleted its backup → permanent loss of an irreplaceable page. Guard: `finalize` now calls
+`session.clearFiled(filedSourceURLs)` (from `retained[].pages.sourceURL`) — deletes only pages actually
+filed into output and **keeps any un-filed (straggler) page** in the backup folder + Captured pane. No page
+is ever deleted before it's filed. (`LiveCaptureProcessor.finalize`, `CaptureSession.clearFiled`.)
+
+**Residual refinements (next session, device-verify):**
+1. **Straggler still omitted from finalized output (HIGH, not data-loss).** With the guard a straggler isn't
+   lost but isn't auto-filed into its collection either — it lingers unfiled in the Captured pane. Full fix:
+   the phone defers `sendSegmentComplete` (and `finishSession`'s `/session/complete`) until **every page of
+   the segment is confirmed UPLOADED**, so the Mac never finalizes a partial segment. Both companions (record
+   a pending-complete group; flush when all its pages hit UPLOADED, from the upload-success path + auto-retry).
+2. **Per-page P10 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleP10` re-uploads
+   only when `state == UPLOADED`. Fix: a `needsResend` flag the upload-completion handler honors. Both companions.
+3. **Reclassify of a doc page whose `/photo` is in-flight is dropped (MEDIUM).** The `inFlightUploads` guard
+   suppresses the reclassify re-enqueue. Same `needsResend` fix. Both companions.
+4. **`completedDocGroups` not persisted across a Mac restart (LOW).** After a mid-session Mac restart, no
+   document tag card appears until Finish. Fix: persist it in the manifest, or on restore treat every
+   restored document group as complete.

@@ -1,6 +1,19 @@
 import SwiftUI
 import UIKit
 
+/// Explicit connect phase so the pairing UI gives immediate, honest feedback: it names what it's dialing
+/// the instant the QR decodes, and on failure names the cause + the fix (instead of a dead spinner). A
+/// successful connect flips `endpoint` non-nil, so `ContentView` swaps to the capture screen — no
+/// `.connected` case is needed here. Mirrors the plan's P1 `ConnectPhase`.
+enum ConnectPhase: Equatable {
+    case idle
+    case connecting(host: String, port: Int)
+    case unreachable(host: String, port: Int)
+    case refused(host: String, port: Int)
+    case unauthorized(host: String, port: Int)
+    case badQR
+}
+
 /// Owns the capture session: the paired endpoint, the current group, captured items, minimal on-phone
 /// tagging (priority + date), and the durable upload of each item. Mirrors the Android CaptureViewModel,
 /// including the segment-transfer UX (photos leave the phone once the Mac confirms them).
@@ -18,6 +31,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var sentCount = 0
     @Published private(set) var transferFlash: String?
     @Published var captureError: String?   // set when a capture couldn't be written to disk (blocking alert)
+    @Published private(set) var connectPhase: ConnectPhase = .idle   // drives the pairing screen (P1)
 
     private var seqCounter = 0
     private var nextId: Int64 = 1
@@ -42,30 +56,45 @@ final class CaptureViewModel: ObservableObject {
 
     // MARK: - Pairing
 
-    func connect(host: String, port: Int, token: String, name: String = "Mac") async -> Bool {
-        let ep = MacEndpoint(host: host, port: port, token: token, name: name)
-        let ok = await MacClient(endpoint: ep).ping()
-        if ok {
+    /// Clear any prior failure so re-opening the scanner / manual entry starts from a clean slate.
+    func resetConnectPhase() { connectPhase = .idle }
+
+    func connect(host: String, port: Int, token: String, name: String = "Mac") async {
+        await attemptConnect(MacEndpoint(host: host, port: port, token: token, name: name))
+    }
+
+    func connectFromQR(_ payload: String) async {
+        guard let ep = MacEndpoint.fromQRPayload(payload) else { connectPhase = .badQR; return }
+        await attemptConnect(ep)
+    }
+
+    /// Preflight the endpoint with a short-timeout reachability probe, then pair on success or name the
+    /// cause on failure. Sets `.connecting` first so the UI shows "connecting to <ip>:<port>…" immediately.
+    private func attemptConnect(_ ep: MacEndpoint) async {
+        connectPhase = .connecting(host: ep.host, port: ep.port)
+        switch await MacClient(endpoint: ep).reachability() {
+        case .ok:
             endpoint = ep
             client = MacClient(endpoint: ep)
             Self.saveEndpoint(ep)
             statusMessage = "Connected to \(ep.name)"
+            connectPhase = .idle
             resumeUploads()
-        } else {
-            statusMessage = "Could not reach \(host):\(port)"
+        case .unreachable:  connectPhase = .unreachable(host: ep.host, port: ep.port)
+        case .refused:      connectPhase = .refused(host: ep.host, port: ep.port)
+        case .unauthorized: connectPhase = .unauthorized(host: ep.host, port: ep.port)
         }
-        return ok
-    }
-
-    func connectFromQR(_ payload: String) async -> Bool {
-        guard let ep = MacEndpoint.fromQRPayload(payload) else { return false }
-        return await connect(host: ep.host, port: ep.port, token: ep.token, name: ep.name)
     }
 
     func disconnect() {
+        // Best-effort: tell the Mac we're re-pairing so it re-shows the QR (there's no persistent
+        // connection for it to notice the drop). Fire before clearing the client; ignore failure.
+        let c = client
+        if let c { Task { _ = await c.sessionDisconnect() } }
         UserDefaults.standard.removeObject(forKey: Self.endpointKey)
         endpoint = nil
         client = nil
+        connectPhase = .idle
     }
 
     private static func loadEndpoint() -> MacEndpoint? {
@@ -95,15 +124,21 @@ final class CaptureViewModel: ObservableObject {
         return nil
     }
 
-    /// Main shutter: add a page to the current document segment (buffered until "End segment").
+    /// Main shutter: add a page to the current document segment and stream it to the Mac immediately.
     func addDocumentPhoto(_ fileURL: URL) {
         clearSelection()
         seqCounter += 1
-        items.append(CapturedItem(id: nextId, fileURL: fileURL, groupId: currentGroupId, seq: seqCounter, type: .document))
+        let item = CapturedItem(id: nextId, fileURL: fileURL, groupId: currentGroupId, seq: seqCounter, type: .document)
+        items.append(item)
         nextId += 1
         let n = items.filter { $0.groupId == currentGroupId && $0.type == .document }.count
         statusMessage = "Document · \(n) page\(n == 1 ? "" : "s")"
         persist()
+        // Stream the page to the Mac immediately (DATA SAFETY: a segment can be hundreds of photos, so no
+        // page waits for "End segment" — a crash/drop before then must never lose an already-shot page).
+        // The icon stays in the strip until End segment (removeConfirmed keeps current-group docs) so the
+        // operator watches the segment grow; End segment then sends the segment-complete signal + tags.
+        enqueueUpload(item)
     }
 
     /// Box/Folder: a single-image marker (its own group) that uploads immediately.
@@ -124,6 +159,10 @@ final class CaptureViewModel: ObservableObject {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         items[i].priority = (items[i].priority == "P10") ? nil : "P10"
         persist()
+        // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
+        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority,
+        // so a per-page P10 must ride the photo itself.
+        if items[i].state == .uploaded { enqueueUpload(items[i]) }
     }
 
     private func clearSelection() { selectedItemId = nil; armed = false }
@@ -164,25 +203,51 @@ final class CaptureViewModel: ObservableObject {
     // MARK: - Grouping / finalize
 
     func finishDocumentSegment() {
-        let hasDocs = items.contains { $0.groupId == currentGroupId && $0.type == .document && $0.state == .pending }
+        // A segment's pages now stream as shot (so they're UPLOADED/UPLOADING by End segment, not PENDING);
+        // gate the tag sheet on "the current group has any document page," regardless of upload state, so
+        // an empty segment just starts a new group but a real one always gets tagged + a completion signal.
+        let hasDocs = items.contains { $0.groupId == currentGroupId && $0.type == .document }
         if hasDocs { pendingTagGroupId = currentGroupId; persist() } else { startNewGroup() }
     }
 
+    /// End segment: pages already streamed to the Mac; stamp the tags locally (so any not-yet-uploaded page
+    /// carries them), open the next segment, then send the tiny segment-complete signal (which is what makes
+    /// the Mac show this segment's tag card), and drop the already-uploaded pages from the strip.
     func applyTagsAndContinue(priority: String?, year: Int?, month: Int?) {
         guard let gid = pendingTagGroupId else { return }
         if let y = year { noteYear(y) }
-        var n = 0
-        for i in items.indices where items[i].groupId == gid && items[i].type == .document && items[i].state == .pending {
+        let pages = items.filter { $0.groupId == gid && $0.type == .document }.count
+        for i in items.indices where items[i].groupId == gid && items[i].type == .document {
+            // Stamp the segment's tags so any page not yet uploaded (captured offline) carries them when it
+            // uploads; already-uploaded pages get the tags via the segment-complete signal.
             items[i].priority = items[i].priority ?? priority
             items[i].year = year
             items[i].month = month
-            enqueueUpload(items[i])
-            n += 1
+            if items[i].state != .uploaded { enqueueUpload(items[i]) }
         }
-        if n > 0 { flash("Segment → Mac · \(n) page\(n == 1 ? "" : "s")") }
         pendingTagGroupId = nil
-        startNewGroup()
+        startNewGroup()                                    // gid is now finalized (differs from currentGroupId)
+        sendSegmentComplete(group: gid, priority: priority, year: year, month: month)
+        // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
+        for item in items.filter({ $0.groupId == gid && $0.type == .document && $0.state == .uploaded }) {
+            removeConfirmed(item)
+        }
+        if pages > 0 { flash("Segment → Mac · \(pages) page\(pages == 1 ? "" : "s")") }
         persist()
+    }
+
+    /// Tell the Mac a document segment is complete + its tags (End segment). Pages already streamed, so
+    /// this is a tiny no-bytes signal that makes the Mac present the segment's tag card. Retried a few
+    /// times; if it never lands, the phone's "Finish" (session/complete) flushes any still-open segment.
+    private func sendSegmentComplete(group: String, priority: String?, year: Int?, month: Int?) {
+        guard let c = client else { return }
+        Task {
+            var ok = false, attempt = 0
+            while !ok && attempt < 3 {
+                ok = await c.segmentComplete(group: group, priority: priority, year: year, month: month)
+                attempt += 1
+            }
+        }
     }
 
     func cancelTagSheet() { pendingTagGroupId = nil; persist() }
@@ -201,12 +266,19 @@ final class CaptureViewModel: ObservableObject {
 
     // MARK: - Upload
 
+    /// Ids currently uploading, so the auto-retry loop, `resumeUploads`, and a manual Retry can't fire the
+    /// same item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). This
+    /// guard is what lets `resumeUploads` safely re-enqueue everything not yet UPLOADED. Mirrors Android.
+    private var inFlightUploads = Set<Int64>()
+
     private func enqueueUpload(_ item: CapturedItem) {
         guard let c = client else { return }
+        guard inFlightUploads.insert(item.id).inserted else { return }   // already uploading this id
         setState(item.id, .uploading)
         let fileURL = item.fileURL
         let replaces = item.replacesGroupId   // durable on the item, so retries keep sending X-Replaces
         Task {
+            defer { inFlightUploads.remove(item.id) }
             // Read the multi-MB JPEG off the main actor so the live camera UI doesn't hitch on
             // upload/retry bursts (enqueueUpload runs on the @MainActor view model).
             let data = await Task.detached { try? Data(contentsOf: fileURL) }.value
@@ -235,12 +307,12 @@ final class CaptureViewModel: ObservableObject {
 
     func retryFailed() { items.filter { $0.state == .failed }.forEach { enqueueUpload($0) } }
 
-    /// Re-send anything not yet on the Mac: in-flight/failed of any kind, plus a stuck PENDING marker
-    /// (captured while unpaired). Buffered PENDING document pages wait for "End segment" (to be tagged).
+    /// Re-send anything not confirmed on the Mac (in-flight/failed, or still-PENDING). Document pages now
+    /// stream as shot, so a PENDING doc is simply one captured while unpaired/offline — send it too.
+    /// Idempotent on the Mac (same group+seq → replace); the inFlightUploads guard prevents double-sends.
     private func resumeUploads() {
         guard client != nil else { return }
-        items.filter { $0.state == .uploading || $0.state == .failed || ($0.state == .pending && $0.type != .document) }
-            .forEach { enqueueUpload($0) }
+        items.filter { $0.state != .uploaded }.forEach { enqueueUpload($0) }
     }
 
     private func startAutoRetry() {
@@ -249,7 +321,9 @@ final class CaptureViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
                 guard let self else { return }
                 guard self.client != nil else { continue }
-                let needs = self.items.filter { $0.state == .failed || ($0.state == .pending && $0.type != .document) }
+                // Flush anything not confirmed on the Mac — failed uploads and any still-PENDING page
+                // (document pages now stream as shot, so a PENDING doc just hasn't reached the Mac yet).
+                let needs = self.items.filter { $0.state == .failed || $0.state == .pending }
                 needs.forEach { self.enqueueUpload($0) }
             }
         }
@@ -260,6 +334,10 @@ final class CaptureViewModel: ObservableObject {
     private func removeConfirmed(_ item: CapturedItem) {
         guard let i = items.firstIndex(where: { $0.id == item.id && $0.fileURL == item.fileURL }),
               items[i].state == .uploaded else { return }
+        // Document pages stream to the Mac as shot, but their icons stay in the strip until "End segment"
+        // (while they're still in the current, un-ended group) so the operator sees the segment growing.
+        // Markers (complete 1-photo segments) leave as soon as they're confirmed.
+        if items[i].type == .document && items[i].groupId == currentGroupId { return }
         try? FileManager.default.removeItem(at: items[i].fileURL)
         items.remove(at: i)
         if selectedItemId == item.id { clearSelection() }
@@ -272,6 +350,7 @@ final class CaptureViewModel: ObservableObject {
     func clearSession() {
         for item in items { try? FileManager.default.removeItem(at: item.fileURL) }
         items.removeAll()
+        inFlightUploads.removeAll()   // ids reset below; don't let a stale in-flight id block a reused id
         seqCounter = 0
         nextId = 1
         currentGroupId = Self.newGroupId()
@@ -291,17 +370,22 @@ final class CaptureViewModel: ObservableObject {
         seqCounter = snap.seq
         nextId = snap.nextId
         if let g = snap.groupId { currentGroupId = g }
-        // Items already confirmed on the Mac before a crash are safe there — drop them.
-        for item in items where item.state == .uploaded { try? FileManager.default.removeItem(at: item.fileURL) }
-        items.removeAll { $0.state == .uploaded }
+        // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone shows
+        // only what still needs sending. EXCEPT document pages still in the current (un-ended) segment:
+        // those streamed as shot but aren't tagged yet (tags apply at End segment), so keep them so the
+        // operator can finish + tag the recovered segment.
+        let confirmed = items.filter { $0.state == .uploaded && !($0.type == .document && $0.groupId == currentGroupId) }
+        for item in confirmed { try? FileManager.default.removeItem(at: item.fileURL) }
+        items.removeAll { $0.state == .uploaded && !($0.type == .document && $0.groupId == currentGroupId) }
         if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
         resumeUploads()
-        // Recovered buffered document pages stay in the current in-progress segment (currentGroupId was
-        // restored above), so the operator just keeps shooting and taps End segment when ready — we do
-        // NOT assume the segment is finished. Re-open the tag card ONLY if the app stopped while the user
-        // was actually mid-tagging a segment (pendingTagGroupId was persisted).
+        // Recovered document pages stay in the current in-progress segment (currentGroupId was restored
+        // above), so the operator just keeps shooting and taps End segment when ready — we do NOT assume
+        // the segment is finished. Re-open the tag card ONLY if the app stopped while the user was actually
+        // mid-tagging a segment (pendingTagGroupId persisted) and that group still has document pages (any
+        // upload state — they streamed, so they'll be UPLOADED, not PENDING).
         if let taggingGroup = snap.pendingTagGroupId,
-           items.contains(where: { $0.groupId == taggingGroup && $0.type == .document && $0.state == .pending }) {
+           items.contains(where: { $0.groupId == taggingGroup && $0.type == .document }) {
             currentGroupId = taggingGroup
             pendingTagGroupId = taggingGroup
         }

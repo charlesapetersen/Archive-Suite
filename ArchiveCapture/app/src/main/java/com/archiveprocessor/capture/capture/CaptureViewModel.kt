@@ -79,8 +79,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             nextId = r.nextId
             r.groupId?.let { currentGroupId = it }
             // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone
-            // shows only what still needs sending (mirrors the normal post-upload cleanup).
-            items.filter { it.state == UploadState.UPLOADED }.toList().forEach { i ->
+            // shows only what still needs sending. EXCEPT document pages still in the current (un-ended)
+            // segment: those streamed as shot but aren't tagged yet (tags apply at End segment), so keep
+            // them so the operator can finish + tag the recovered segment.
+            items.filter { it.state == UploadState.UPLOADED &&
+                !(it.type == GroupType.DOCUMENT && it.groupId == currentGroupId) }.toList().forEach { i ->
                 runCatching { i.file.delete() }; items.remove(i)
             }
             if (items.isNotEmpty()) statusMessage = "Restored ${items.size} photo(s) from last session"
@@ -90,7 +93,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             // NOT assume the segment is finished. Re-open the tag card ONLY if the app stopped while the
             // user was actually mid-tagging a segment (pendingTag persisted).
             val tagGroup = r.pendingTagGroupId
-            if (tagGroup != null && items.any { it.groupId == tagGroup && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }) {
+            if (tagGroup != null && items.any { it.groupId == tagGroup && it.type == GroupType.DOCUMENT }) {
                 currentGroupId = tagGroup
                 pendingTagGroupId = tagGroup
             }
@@ -122,13 +125,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
     private fun resumeUploads() {
         if (client == null) return
-        // Re-send anything not yet on the Mac: in-flight/failed of any kind, plus a PENDING marker
-        // (box/folder captured while unpaired — it never got enqueued). Buffered PENDING document pages
-        // are intentionally NOT sent here; they wait for "End segment" so they can be tagged first.
-        items.filter {
-            it.state == UploadState.UPLOADING || it.state == UploadState.FAILED ||
-                (it.state == UploadState.PENDING && it.type != GroupType.DOCUMENT)
-        }.forEach { enqueueUpload(it) }
+        // Re-send anything not confirmed on the Mac (in-flight/failed, or still-PENDING). Document pages
+        // now stream as shot, so a PENDING doc is simply one captured while unpaired/offline — send it too.
+        items.filter { it.state != UploadState.UPLOADED }.forEach { enqueueUpload(it) }
     }
 
     /** Background self-heal: periodically re-send failed uploads so an unplug/replug (or any brief
@@ -138,12 +137,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             while (true) {
                 delay(8_000)
-                // Flush failed uploads and any stuck PENDING marker (unpaired capture); leave buffered
-                // document pages alone until "End segment".
-                val needsSend = items.filter {
-                    it.state == UploadState.FAILED ||
-                        (it.state == UploadState.PENDING && it.type != GroupType.DOCUMENT)
-                }
+                // Flush anything not confirmed on the Mac — failed uploads and any still-PENDING page
+                // (document pages now stream as shot, so a PENDING doc just hasn't reached the Mac yet).
+                val needsSend = items.filter { it.state == UploadState.FAILED || it.state == UploadState.PENDING }
                 if (client != null && needsSend.isNotEmpty()) {
                     needsSend.forEach { enqueueUpload(it) }
                 }
@@ -156,17 +152,26 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     fun connect(host: String, port: Int, token: String, name: String = "Mac", onResult: (Boolean) -> Unit) {
         val ep = MacEndpoint(host, port, token, name)
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { MacClient(ep).ping() }
-            if (ok) {
+            val r = withContext(Dispatchers.IO) { MacClient(ep).reachability() }
+            if (r == com.archiveprocessor.capture.net.Reachability.OK) {
                 endpoint = ep
                 client = MacClient(ep)
                 prefs.saveEndpoint(ep)
                 statusMessage = "Connected to ${ep.name}"
                 resumeUploads()
             } else {
-                statusMessage = "Could not reach $host:$port"
+                // Name the cause + the fix, so the operator isn't left staring at a dead scanner.
+                statusMessage = when (r) {
+                    com.archiveprocessor.capture.net.Reachability.UNREACHABLE ->
+                        "Can't reach the Mac at $host:$port. This Wi-Fi may block device-to-device connections (common on public / guest / hotel Wi-Fi). Try a personal hotspot (join both devices to it), a USB cable, or check Live Capture is running on the Mac."
+                    com.archiveprocessor.capture.net.Reachability.REFUSED ->
+                        "Reached the network but nothing is listening at $host:$port — is Live Capture started on the Mac?"
+                    com.archiveprocessor.capture.net.Reachability.UNAUTHORIZED ->
+                        "Reached the Mac but the pairing code was rejected — re-scan the QR (it may be stale)."
+                    else -> "Could not reach $host:$port"
+                }
             }
-            onResult(ok)
+            onResult(r == com.archiveprocessor.capture.net.Reachability.OK)
         }
     }
 
@@ -179,6 +184,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun disconnect() {
+        // Best-effort: tell the Mac we're re-pairing so it re-shows the QR (there's no persistent
+        // connection for it to notice the drop). Fire before clearing the client; ignore failure.
+        client?.let { c -> viewModelScope.launch { withContext(Dispatchers.IO) { runCatching { c.sessionDisconnect() } } } }
         prefs.clearEndpoint()
         endpoint = null
         client = null
@@ -190,14 +198,20 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     // the same path, or CameraX would overwrite the first image and one archival page would be lost.
     fun newCaptureFile(): File = File(sessionDir, "img_${System.currentTimeMillis()}_${UUID.randomUUID()}.jpg")
 
-    /** Main shutter: add a page to the current document segment (buffered until finalized). */
+    /** Main shutter: add a page to the current document segment and stream it to the Mac immediately. */
     fun addDocumentPhoto(file: File) {
         clearSelection()
         seqCounter += 1
-        items.add(CapturedItem(id = nextId++, file = file, groupId = currentGroupId, seq = seqCounter, type = GroupType.DOCUMENT))
+        val item = CapturedItem(id = nextId++, file = file, groupId = currentGroupId, seq = seqCounter, type = GroupType.DOCUMENT)
+        items.add(item)
         val n = items.count { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT }
         statusMessage = "Document · $n page${if (n == 1) "" else "s"}"
         persist()
+        // Stream the page to the Mac immediately (DATA SAFETY: a segment can be hundreds of photos, so no
+        // page waits for "End segment" — a crash/drop before then must never lose an already-shot page).
+        // The icon stays in the strip until End segment (removeConfirmed keeps current-group docs) so the
+        // operator watches the segment grow; End segment then sends the segment-complete signal + tags.
+        enqueueUpload(item)
     }
 
     /** Box/Folder: a single-image marker (never a multi-page segment) — its own group; uploads now. */
@@ -223,8 +237,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val i = items.indexOfFirst { it.id == itemId }
         if (i < 0) return
         val it = items[i]
-        items[i] = it.copy(priority = if (it.priority == "P10") null else "P10")
+        val updated = it.copy(priority = if (it.priority == "P10") null else "P10")
+        items[i] = updated
         persist()
+        // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
+        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority,
+        // so a per-page P10 must ride the photo itself.
+        if (updated.state == UploadState.UPLOADED) enqueueUpload(updated)
     }
 
     private fun clearSelection() { selectedItemId = null; armed = false }
@@ -261,12 +280,15 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Guard by identity + state so a stale delayed-removal can never delete a different/newer photo
         // that reused this id (e.g. after Clear resets the id counter) — only the same, still-UPLOADED file.
         val i = items.indexOfFirst { it.id == item.id && it.file == item.file }
-        if (i >= 0 && items[i].state == UploadState.UPLOADED) {
-            runCatching { items[i].file.delete() }
-            items.removeAt(i)
-            if (selectedItemId == item.id) clearSelection()
-            persist()
-        }
+        if (i < 0 || items[i].state != UploadState.UPLOADED) return
+        // Document pages stream to the Mac as shot, but their icons stay in the strip until "End segment"
+        // (while they're still in the current, un-ended group) so the operator sees the segment growing.
+        // Markers (complete 1-photo segments) leave as soon as they're confirmed.
+        if (items[i].type == GroupType.DOCUMENT && items[i].groupId == currentGroupId) return
+        runCatching { items[i].file.delete() }
+        items.removeAt(i)
+        if (selectedItemId == item.id) clearSelection()
+        persist()
     }
 
     /** Reclassify the selected photo as a single-image box/folder marker (own group) and upload it. */
@@ -291,28 +313,51 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Finish the current document segment → show its tag sheet, then start a fresh document segment. */
     fun finishDocumentSegment() {
-        val hasDocs = items.any { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING }
+        // Any doc page in the current group means there's a segment to tag — regardless of upload state.
+        // (Pages stream as shot, so by End segment they're usually already UPLOADED; checking == PENDING
+        // here would suppress the tag sheet once uploads finish and skip the segment-complete signal.)
+        val hasDocs = items.any { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT }
         if (hasDocs) { pendingTagGroupId = currentGroupId; persist() } else startNewGroup()
     }
 
-    /** Stamp the tag sheet onto the pending segment's photos, enqueue them, then open the next segment. */
+    /** End segment: pages already streamed to the Mac; send the segment-complete signal (with the tags),
+     *  which is what makes the Mac show this segment's tag card, then open the next segment. */
     fun applyTagsAndContinue(priority: String?, year: Int?, month: Int?) {
         val gid = pendingTagGroupId ?: return
         year?.let { prefs.noteYear(it) }
-        var n = 0
+        val pages = items.count { it.groupId == gid && it.type == GroupType.DOCUMENT }
         for (i in items.indices) {
             val it = items[i]
-            if (it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.PENDING) {
+            if (it.groupId == gid && it.type == GroupType.DOCUMENT) {
+                // Stamp the segment's tags so any page not yet uploaded (captured offline) carries them
+                // when it uploads; already-uploaded pages get the tags via the segment-complete signal.
                 val stamped = it.copy(priority = it.priority ?: priority, year = year, month = month)
                 items[i] = stamped
-                enqueueUpload(stamped)
-                n++
+                if (stamped.state != UploadState.UPLOADED) enqueueUpload(stamped)
             }
         }
-        if (n > 0) flash("Segment → Mac · $n page${if (n == 1) "" else "s"}")
         pendingTagGroupId = null
-        startNewGroup()
+        startNewGroup()                    // gid is now finalized (differs from the new currentGroupId)
+        sendSegmentComplete(gid, priority, year, month)   // → the Mac shows this segment's tag card, pre-filled
+        // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
+        items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.UPLOADED }
+            .toList().forEach { removeConfirmed(it) }
+        if (pages > 0) flash("Segment → Mac · $pages page${if (pages == 1) "" else "s"}")
         persist()
+    }
+
+    /** Tell the Mac a document segment is complete + its tags (End segment). Pages already streamed, so
+     *  this is a tiny no-bytes signal that makes the Mac present the segment's tag card. Retried a few
+     *  times; if it never lands, the phone's "Finish" (session/complete) flushes any still-open segment. */
+    private fun sendSegmentComplete(group: String, priority: String?, year: Int?, month: Int?) {
+        val c = client ?: return
+        viewModelScope.launch {
+            var ok = false; var attempt = 0
+            while (!ok && attempt < 3) {
+                ok = withContext(Dispatchers.IO) { c.segmentComplete(group, priority, year, month) }
+                attempt++
+            }
+        }
     }
 
     fun cancelTagSheet() {

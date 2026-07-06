@@ -239,8 +239,36 @@ final class CaptureServer: @unchecked Sendable {
                               json: ["ok": url != nil, "seq": seq])
             }
 
+        case "POST /segment/complete":
+            // The phone ended a document segment. Its pages already streamed in (POST /photo, as shot);
+            // this signal carries the segment's tags + tells the Mac the group is complete so its tag
+            // card can appear (see CaptureSession.markSegmentComplete / pendingTagGroup).
+            guard let groupId = req.headers["x-group"], !groupId.isEmpty, Self.isSafeGroupId(groupId) else {
+                respond(conn, status: "400 Bad Request", json: ["error": "missing or invalid X-Group"])
+                return
+            }
+            let priority = (req.headers["x-priority"]).flatMap { $0.isEmpty ? nil : $0 }
+            let year = (req.headers["x-year"]).flatMap { Int($0) }
+            let month = (req.headers["x-month"]).flatMap { Int($0) }
+            Task { @MainActor [weak self] in
+                self?.session?.markSegmentComplete(groupId: groupId, priority: priority, year: year, month: month)
+            }
+            respond(conn, status: "200 OK", json: ["ok": true])
+
         case "POST /session/complete":
-            Task { @MainActor [weak self] in self?.session?.statusMessage = "Session complete — ready to process." }
+            // Phone finished capturing. Surface the tag card for any still-open document segment (e.g. a
+            // last segment the operator didn't tap End segment on) so nothing is stranded, then nudge.
+            Task { @MainActor [weak self] in
+                self?.session?.completeAllOpenDocGroups()
+                self?.session?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
+            }
+            respond(conn, status: "200 OK", json: ["ok": true])
+
+        case "POST /session/disconnect":
+            // The phone re-paired (best-effort notice; there's no persistent connection for the Mac to
+            // sense the drop). Re-show the pairing QR so the operator can immediately re-scan — instead of
+            // being stuck on a stale "paired" state having to find "Show QR".
+            Task { @MainActor [weak self] in self?.session?.unpairDisplay() }
             respond(conn, status: "200 OK", json: ["ok": true])
 
         default:

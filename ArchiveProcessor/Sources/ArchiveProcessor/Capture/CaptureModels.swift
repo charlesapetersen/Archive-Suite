@@ -27,10 +27,12 @@ struct CapturedPhoto: Identifiable, Equatable {
     let type: CaptureGroupType
     let receivedAt: Date
     /// Minimal on-phone tagging. Priority is per-photo ("P10"…"P7"; a page can override its
-    /// group's default). Year/month are the group's date, repeated on each of its photos.
-    let priority: String?
-    let year: Int?
-    let month: Int?
+    /// group's default). Year/month are the group's date, repeated on each of its photos. Mutable:
+    /// pages stream in as shot (before tagging), then `markSegmentComplete` attaches the segment's
+    /// tags when the phone ends the segment.
+    var priority: String?
+    var year: Int?
+    var month: Int?
 
     static func == (lhs: CapturedPhoto, rhs: CapturedPhoto) -> Bool { lhs.id == rhs.id }
 }
