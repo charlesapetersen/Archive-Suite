@@ -14,13 +14,13 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
 - [x] Publish release: `suite-v1.0.0` LIVE with `ArchiveSuite-1.0.0.dmg` (4.48 MB) attached. ✅
 - [x] Verify online: release published, asset `uploaded`; `origin/main` == locally build-verified tree. ✅
-- [ ] **Phase F (awaiting owner confirm)** — redirect the old `archiveprocessor` README to Archive-Suite, then `gh repo archive charlesapetersen/archiveprocessor`. | needs: owner-confirm
+- [x] **Phase F DONE** — redirect banner pushed to the old `archiveprocessor` README; repo **archived** (read-only, `isArchived=true`). ✅ 2026-07-06
 
 ## P1 — Quick local wins (S, low-risk, no network)
-- [ ] Cite `SPEC/tag-format.md` as the shared-contract source of truth from BOTH per-app `CLAUDE.md` (verified: neither references it yet). | files: ArchiveReader/CLAUDE.md, ArchiveProcessor/CLAUDE.md | S | low
-- [ ] Reconcile Reader `CLAUDE.md` prose to SPEC (code is already correct — doc-only): page-2 filename line is verbatim/any-ext/may-be-absent (drop the `<basename>.jpg` implication); Year is 3–4 digits (not "4"); drop the aspirational "signed for BC" note (no BC token). | files: ArchiveReader/CLAUDE.md | S | low
-- [ ] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects and never drive a facet write (SPEC discrepancy #3). | files: Core/DocumentTags.swift, ArchiveReader/.../Tests/ | S | low
-- [ ] Close stale checkbox: `PLAN_NEAR_TERM_UI` item **E3** appears shipped (`LibraryChangeSignature` in the impl map; NEAR_TERM_UI marked shipped) — confirm & tick. | files: ArchiveReader/PLAN_NEAR_TERM_UI.md | S | low
+- [x] Cite `SPEC/tag-format.md` as the shared-contract source of truth from BOTH per-app `CLAUDE.md`. ✅
+- [x] Reconcile Reader `CLAUDE.md` prose to SPEC (doc-only; code already correct): page-2 line verbatim/any-ext/may-be-absent; Year 3–4 digits; BC note clarified; Box/Folder/OCR-Failed subjects noted. ✅
+- [ ] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects and never drive a facet write (SPEC discrepancy #3). | files: Core/DocumentTags.swift, ArchiveReader/.../Tests/ | S | low  ← NEXT
+- [x] Close stale checkbox: `PLAN_NEAR_TERM_UI` **E3** confirmed shipped & ticked. ✅
 - [ ] Processor: re-add "Import tag vocabulary from CSV" (`loadTagVocabularyFromURL` + file picker + drop target) — pure local, no API. | files: Processor Views/vocabulary editor, Tagging/ | S | low
 - [ ] Processor: bump Android `targetSdk` 34→36 (mandatory ~2026-08-31 for Play updates). | files: ArchiveCapture/app/build.gradle.kts | S | low
 - [ ] Reconcile Bonjour service name mismatch (iOS `_archiveproc._tcp` vs Mac `_archivecap._tcp`) before any mDNS work. | files: companions + Processor Net/ | S | low

@@ -3,11 +3,11 @@
 Bring **Archive Processor** and **Archive Reader** together into a single offering, **Archive Suite**,
 as one monorepo with two separate macOS apps, one combined installer, and one place for maintenance.
 
-> **Status (2026-07-06):** Phases **A–E DONE and PUBLISHED.** `main` pushed to `origin` (== local, 0 diverged);
-> **release live** at github.com/charlesapetersen/Archive-Suite/releases/tag/`suite-v1.0.0` with
-> `ArchiveSuite-1.0.0.dmg` (4.48 MB) attached. Only **Phase F** (redirect + archive the old
-> `archiveprocessor` repo) remains — **awaiting owner confirm** (irreversible-ish; plan gates it on the
-> release being live, which it now is). Near-term local backlog is in `SUITE_TODO.md`.
+> **Status (2026-07-06): COMPLETE (A–F).** Monorepo merged, both apps build, `main` on `origin`,
+> **release live** at github.com/charlesapetersen/Archive-Suite/releases/tag/`suite-v1.0.0`
+> (`ArchiveSuite-1.0.0.dmg`, 4.48 MB), and the old `charlesapetersen/archiveprocessor` repo is
+> **archived** (redirect banner + read-only). Only optional Phase G (shared `ArchiveCore`) remains.
+> Ongoing work now lives in `SUITE_TODO.md`; heavy audit in `.maintenance/OVERNIGHT_QUEUE.md`.
 >
 > This document is the durable, resumable source of truth. Every step is idempotent and re-runnable.
 
@@ -219,10 +219,10 @@ git remote remove processor
 - [x] E.3 Tag `suite-v1.0.0` created + **pushed** (`suite-` prefix — bare `v1.0.0` is Processor's historical tag).
 - [x] E.4 **Release LIVE:** `gh release create suite-v1.0.0` with the DMG → github.com/charlesapetersen/Archive-Suite/releases/tag/suite-v1.0.0 (published, asset `uploaded`).
 
-### Phase F — Deprecate the old Processor repo (D4)  `[ ]  DEFERRED — do only AFTER the Suite release is live online`
-- [ ] F.1 On `charlesapetersen/archiveprocessor`: final commit updating README → "Archive Processor now ships as part of **Archive Suite**: <link>." Optional final release note pointing to the Suite DMG.
-- [ ] F.2 Archive the repo (read-only): `/opt/homebrew/bin/gh repo archive charlesapetersen/archiveprocessor`.
-- [ ] F.3 Update local remotes/notes: the `~/Desktop/Claude/Archive Processor` clone is now historical — future work happens in the Suite monorepo's `ArchiveProcessor/`. (Consider removing the standalone clone once comfortable, or keep as an archived backup.)
+### Phase F — Deprecate the old Processor repo (D4)  `[x]  DONE 2026-07-06`
+- [x] F.1 Redirect banner added to `charlesapetersen/archiveprocessor` README → Archive-Suite (commit `230adab`, pushed to that repo's `main`).
+- [x] F.2 Repo **archived** (read-only): `gh repo archive charlesapetersen/archiveprocessor --yes` → `isArchived=true` (Archive-Suite confirmed still active). Reversible via `gh repo unarchive`.
+- [ ] F.3 (Optional, owner) The `~/Desktop/Claude/Archive Processor` local clone is now historical — future Processor work happens in the monorepo's `ArchiveProcessor/`. Keep or remove the standalone clone at will.
 
 ### Phase G — OPTIONAL later: shared `ArchiveCore` package  `[ ]`
 - [ ] G.1 Only if a concrete shared Swift type earns it (e.g. the tag read/write model). Reader already keeps `Core/` UI-free — good foundation. Extract a UI-free SPM package `ArchiveCore/` consumed by both apps' `project.yml`. Defer until the `SPEC/tag-format.md` contract shows a type worth centralizing; the doc contract (C.5) captures most of the value at a fraction of the cost.
@@ -285,8 +285,7 @@ Facts" and found drift worth fixing in **Archive Reader** (all handled safely to
 ## State
 | Field | Value |
 |-------|-------|
-| Overall | **Executed A–E locally; uploads deferred (owner on a plane).** Nothing remote changed; nothing destructive ran. |
-| Local `main` | `5366aee` — full merge + scaffolding; **120 commits ahead of `origin/main` (unpushed)**; `suite-v1.0.0` tag local-only |
-| Artifacts | `/tmp/ArchiveSuite-1.0.0.dmg` (4.3M, smoke-tested); both apps Release-build green in the monorepo |
-| Remaining | Push `main` + tags; `gh release create suite-v1.0.0` w/ DMG; then Phase F (archive old repo). All network — see §Resume when back online. |
-| Revert | `git reset --hard pre-suite-merge` (Reader) restores the pre-merge tip; `origin/main` is already the pre-merge state |
+| Overall | **COMPLETE (A–F), 2026-07-06.** Merged, built, published, old repo archived. Optional Phase G remains. |
+| Remote | `origin/main` == local; release `suite-v1.0.0` live w/ DMG; `charlesapetersen/archiveprocessor` archived (read-only). |
+| Ongoing work | `SUITE_TODO.md` (prioritized local backlog); heavy audit queued in `.maintenance/OVERNIGHT_QUEUE.md`. |
+| Revert | `git reset --hard pre-suite-merge` restores the pre-merge tip; `gh repo unarchive` reactivates the old repo. |

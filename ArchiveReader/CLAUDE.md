@@ -36,6 +36,10 @@ even `TagWriter` never calls a move / rename / delete / content-write API — on
 
 ## Verified Facts (measured against the real corpus + Archive Processor source, 2026-07-04)
 
+> **Single source of truth:** the tag/PDF contract shared with Archive Processor is authoritatively
+> documented in [`../../SPEC/tag-format.md`](../../SPEC/tag-format.md) (Suite root). The facts below
+> mirror it from the Reader side; if they ever disagree, the SPEC wins and both must be reconciled.
+
 **Corpus:** `Test files/Brown Gemini/` — ~6,941 two-page PDFs. Real production scale is up to
 **~150,000** files. Filenames like `00001 IMG — Brown.pdf` (note the **em dash** U+2014; production
 paths also contain **non-breaking spaces** U+00A0).
@@ -49,7 +53,8 @@ paths also contain **non-breaking spaces** U+00A0).
 - Spotlight exposes tags as `kMDItemUserTags`.
 
 **Tag facets** (a file's tag array mixes these; classify for display/filter/sort, never lose any):
-- **Year:** 4 digits, e.g. `1980`.
+- **Year:** 3–4 digits, e.g. `1980` (or `842`). Archive Processor emits 4-digit years; Reader's
+  `parseYear` accepts **3–4** (medieval-friendly), so don't assume exactly 4.
 - **Month:** `MM Month`, e.g. `03 March`.
 - **Day:** `Day N` (unpadded), e.g. `Day 25`, `Day 1`. Often absent.
 - **Date Uncertain:** flags that the date is **speculative** — the file *usually still has a Year
@@ -60,6 +65,8 @@ paths also contain **non-breaking spaces** U+00A0).
 - **Subject:** 2–6 free-form-ish strings (`Jerry Brown`, `DP chapters`, `Economics`, …). May be a
   controlled vocabulary. **Subjects can collide with other facets** (a subject literally `1984`,
   `P7`, or `Read`) — facet classification is display-only and must never drive a destructive write.
+  Note Archive Processor also emits some *literal* subject tokens: `Box`/`Folder` on marker pages
+  (alongside the color) and `OCR Failed` on OCR failures — Reader treats these as plain subjects.
 
 **PDF structure:** exactly **2 pages** — page 1 = original photographed image (correctly oriented);
 page 2 = OCR text as **real selectable text** (dynamic height). *In this test corpus* page 1 has no
@@ -67,9 +74,9 @@ text; **in production the image page will often also carry a searchable text lay
 tool must work in whichever pane holds the selection. Page-2 header format:
 ```
 Extracted text.
-<basename>.jpg
+<original filename, verbatim>          # any image ext (.jpg/.png/.tiff/.heic); OMITTED if the source name is unknown
 <Provider> · <Model> · <D Month YYYY>
-Classification: <Box | Folder | Document Start | Continuation>
+Classification: <Box | Folder | Document Start | Continuation>          # line may be ABSENT (see below)
 <body…>
 ```
 Do **not** hard-assume 2 pages: guard against 1-page, >2-page, 0-page, corrupt/encrypted, and
@@ -94,7 +101,8 @@ lookups, not scans). Text-content indexing may lag/miss on some locations. **v1 
 no cloud drives** (cloud support is deferred — see `PLAN.md` §Future).
 
 **Chronological sort key:** derived **from the Year/Month/Day tags** into a sortable integer
-(e.g. `year*10000 + month*100 + day`, signed for BC). This has **no date-range limit** — medieval
+(e.g. `year*10000 + month*100 + day`; the arithmetic is BC-capable, though no BC/negative-year token
+exists in the tag vocabulary today). This has **no date-range limit** — medieval
 and ancient dates sort correctly — requires **no** change to Archive Processor and **no** writes to
 files. This is the primary sort key.
 - *Optional future bonus (deferred):* also mirroring the date into the file's **creation date**
@@ -270,7 +278,8 @@ Archive Reader realizes several items already on Archive Processor's own `POTENT
 **The shared contract is the risk.** Both apps must interpret tags, date facets, priorities,
 color/markers, the `Read/Unread` convention, and the 2-page PDF + `Classification:` format
 *identically* — a divergence would corrupt or mis-read irreplaceable data. That contract is the real
-thing to keep in sync (see Verified Facts above; it mirrors Archive Processor's `CLAUDE.md`).
+thing to keep in sync — authoritatively in [`../../SPEC/tag-format.md`](../../SPEC/tag-format.md)
+(the Suite-root contract both apps cite; Verified Facts above mirror it from the Reader side).
 
 **Recommended approach (staged, low-risk):**
 1. **Now — separate repo, shared contract.** Develop Archive Reader in its own repo with its own

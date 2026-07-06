@@ -105,9 +105,9 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
       rows) drive fine. The alert's default button DOES respond to Return (proven by the save flow).
       Chip click-to-filter and custom-name typing are therefore owner-manual checks; the underlying
       logic is unit-tested. Full `SMOKE_TEST.md` expansion + Batch-1 regression still TODO.
-- [ ] **E3. Update docs** — `STATUS.md`, `CLAUDE.md` §Implementation map (add `LibraryChangeSignature`),
-      and mark `NEAR_TERM_UI.md` items done. (Do NOT log the synthetic-input limitation in
-      `KNOWN_ISSUES.md` — it is a test-harness property, not an app defect.) Commit + push.
+- [x] **E3. Update docs** — DONE: `CLAUDE.md` §Implementation map includes `LibraryChangeSignature`,
+      `NEAR_TERM_UI.md` items marked done, `STATUS.md` current. (Synthetic-input limitation intentionally
+      NOT logged in `KNOWN_ISSUES.md` — a test-harness property, not an app defect.)
 
 ## Order & dependencies
 A → B (sidebar is one coherent slice; do first) → C1…C9 (independent; any order) → D1 (needs review) +
