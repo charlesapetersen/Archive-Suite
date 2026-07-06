@@ -1,0 +1,121 @@
+import Foundation
+import AppKit
+import ImageIO
+
+struct GeminiClient {
+    let apiKey: String
+    let model: LLMModel
+    let thinkingLevel: ThinkingLevel?
+
+    func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
+        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+            throw OCRError.imageLoadFailed
+        }
+        let base64 = jpegData.base64EncodedString()
+        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil, customPrompt: customPrompt)
+
+        var parts: [[String: Any]] = []
+
+        // If sending previous image, add it first
+        if let prevURL = previousImageURL, let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale) {
+            parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
+        }
+
+        parts.append(["inlineData": ["mimeType": "image/jpeg", "data": base64]])
+        parts.append(["text": prompt])
+
+        var generationConfig: [String: Any] = [:]
+        if let thinking = thinkingLevel {
+            let budget = thinking == .low ? 1024 : 8000
+            generationConfig["thinkingConfig"] = ["thinkingBudget": budget]
+        }
+
+        var requestBody: [String: Any] = [
+            "contents": [["parts": parts]]
+        ]
+        if !generationConfig.isEmpty {
+            requestBody["generationConfig"] = generationConfig
+        }
+
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model.id):generateContent?key=\(apiKey)"
+        guard let url = URL(string: urlString) else { throw OCRError.networkError("Bad URL") }
+
+        var request = URLRequest(url: url, timeoutInterval: 120)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let (data, response) = try await NetworkSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
+
+        if http.statusCode != 200 {
+            let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
+            return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
+        }
+
+        if let promptFeedback = json["promptFeedback"] as? [String: Any],
+           let blockReason = promptFeedback["blockReason"] as? String {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Content blocked by Gemini: \(blockReason)", errorCode: blockReason)
+        }
+
+        guard let candidates = json["candidates"] as? [[String: Any]],
+              let first = candidates.first else {
+            return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
+        }
+
+        // Surface any non-STOP finish reason with its actual code — not just RECITATION. MAX_TOKENS,
+        // SAFETY, PROHIBITED_CONTENT etc. usually come back with content/parts absent, so without this
+        // they'd collapse into a generic "No content parts" with no error code.
+        let finishReason = first["finishReason"] as? String
+        if finishReason == "RECITATION" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
+        }
+
+        guard let content = first["content"] as? [String: Any],
+              let respParts = content["parts"] as? [[String: Any]] else {
+            if let fr = finishReason, fr != "STOP" {
+                return OCRResult(text: nil, classification: nil, errorMessage: "Gemini stopped without returning text (\(fr)).", errorCode: fr)
+            }
+            return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
+        }
+
+        let rawText = respParts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        // Parts present but no text (e.g. only a thinking part, or MAX_TOKENS truncation) → report the
+        // finish reason rather than silently yielding empty text.
+        if rawText.isEmpty, let fr = finishReason, fr != "STOP" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(fr)).", errorCode: fr)
+        }
+        let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+    }
+
+    static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let error = json["error"] as? [String: Any] {
+            let status = error["status"] as? String ?? ""
+            let message = error["message"] as? String
+            // Handle common error statuses with friendly messages
+            if statusCode == 503 || status == "UNAVAILABLE" {
+                return "Model in high use. Try again later."
+            }
+            if status == "RESOURCE_EXHAUSTED" || statusCode == 429 {
+                return "Rate limit exceeded. Try again later."
+            }
+            if let message = message, message.lowercased().contains("recitation") {
+                return "Gemini refused to OCR this content (Recitation — likely copyrighted material)."
+            }
+            if let message = message {
+                return message
+            }
+        }
+        // Status-based classification even when the body is empty/non-JSON (gateway/CDN 5xx often are).
+        if statusCode == 503 || statusCode == 529 { return "Model in high use. Try again later." }
+        if statusCode == 429 { return "Rate limit exceeded. Try again later." }
+        return "API error (\(statusCode))"
+    }
+
+}
