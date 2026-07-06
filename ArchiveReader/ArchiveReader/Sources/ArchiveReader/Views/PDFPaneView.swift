@@ -3,13 +3,52 @@ import PDFKit
 
 /// Imperative handle to one pane's PDFView — for independent zoom and reading its text selection.
 /// Read-only: the view never edits or writes the document.
+///
+/// The controller (not the PDFView) is the source of truth for zoom, so the level survives both
+/// SwiftUI re-renders and the per-page PDFView rebuild used to keep text selectable (DV-3). The last
+/// zoom is persisted per pane and becomes the default for the next viewer (DV-2).
 @MainActor
 final class PDFPaneController {
     weak var pdfView: PDFView?
+    let key: String                    // "left" / "right" — persistence + default carry-over
+    private var desiredScale: CGFloat?  // nil = fit-to-pane; else an explicit scale factor
 
-    func zoomIn()  { adjust(1.25) }
-    func zoomOut() { adjust(1 / 1.25) }
-    func fit()     { pdfView?.autoScales = true }
+    init(key: String) {
+        self.key = key
+        let saved = AppSettings.viewerZoom(key)
+        desiredScale = saved > 0 ? CGFloat(saved) : nil
+    }
+
+    func zoomIn()  { setScale(baseScale * 1.25) }
+    func zoomOut() { setScale(baseScale / 1.25) }
+    func fit() {
+        desiredScale = nil
+        AppSettings.setViewerZoom(key, 0)
+        applyToView()
+    }
+
+    private var baseScale: CGFloat { desiredScale ?? (pdfView?.scaleFactor ?? 1) }
+
+    private func setScale(_ s: CGFloat) {
+        guard let v = pdfView else { return }
+        let clamped = max(v.minScaleFactor, min(v.maxScaleFactor, s))
+        desiredScale = clamped
+        AppSettings.setViewerZoom(key, Double(clamped))
+        applyToView()
+    }
+
+    /// Apply the current zoom to the (possibly freshly-built) PDFView and pin the page's top edge to
+    /// the top of the pane — reading starts at the top, so a zoom must not drift to the page center.
+    func applyToView() {
+        guard let v = pdfView else { return }
+        if let s = desiredScale {
+            v.autoScales = false
+            v.scaleFactor = s
+        } else {
+            v.autoScales = true
+        }
+        scrollToTop()
+    }
 
     /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
     func focus() {
@@ -17,18 +56,13 @@ final class PDFPaneController {
         v.window?.makeFirstResponder(v)
     }
 
-    private func adjust(_ factor: CGFloat) {
-        guard let v = pdfView else { return }
-        v.autoScales = false
-        v.scaleFactor = max(v.minScaleFactor, min(v.maxScaleFactor, v.scaleFactor * factor))
-        scrollToTop()   // anchor zoom to the TOP of the page (reading starts at the top third), not center
-    }
-
-    /// Scroll so the top-left of the (single) page sits at the top-left of the viewer.
+    /// Scroll so the TOP-left of the (single) page sits at the top-left of the viewer. Lay the
+    /// document view out first so the scroll uses the post-zoom geometry (else it anchors stale).
     private func scrollToTop() {
-        guard let v = pdfView, let page = v.document?.page(at: 0) else { return }
-        let topLeft = CGPoint(x: 0, y: page.bounds(for: v.displayBox).height)
-        v.go(to: PDFDestination(page: page, at: topLeft))
+        guard let v = pdfView, let page = v.currentPage ?? v.document?.page(at: 0) else { return }
+        v.layoutDocumentView()
+        let top = page.bounds(for: v.displayBox).height   // PDF origin is bottom-left → y = height is the top
+        v.go(to: PDFDestination(page: page, at: CGPoint(x: 0, y: top)))
     }
 
     /// The current text selection, cleaned for prose copy (nil if nothing is selected here).
@@ -52,16 +86,13 @@ final class PDFPaneController {
     }
 }
 
-/// Displays a single PDF page (read-only, selectable) in its own PDFView. Rebuilds only when the
-/// page actually changes, so imperative zoom persists across SwiftUI re-renders. The user's zoom is
-/// also carried across ↑/↓ cycling (DV-2): only the very first page fits; later pages keep the
-/// current scale (or stay fitting if the user never zoomed).
+/// Displays a single PDF page (read-only, selectable) in its own PDFView. The parent gives each page
+/// a fresh view (via `.id`), because reusing one PDFView and swapping its document leaves text
+/// selection wedged after cycling (DV-3) — a fresh view is exactly the known-good first-show state.
+/// Zoom is restored from the controller so it still persists across pages (DV-2).
 struct PDFPaneView: NSViewRepresentable {
     let page: PDFPage?
     let controller: PDFPaneController
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator { var shownPage: PDFPage? }
 
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
@@ -70,23 +101,22 @@ struct PDFPaneView: NSViewRepresentable {
         view.autoScales = true
         view.backgroundColor = .windowBackgroundColor
         controller.pdfView = view
+        loadPage(into: view)
         return view
     }
 
     func updateNSView(_ view: PDFView, context: Context) {
-        guard context.coordinator.shownPage !== page else { return }   // only rebuild on page change
-        let isFirstPage = context.coordinator.shownPage == nil
-        context.coordinator.shownPage = page
+        // Keep the controller pointed at the live view, and (re)load if the page changed under a reused
+        // view. With the parent's `.id(page)` this view is normally fresh per page, so this is a no-op
+        // on the common path; it's a safety net for any reuse.
+        controller.pdfView = view
+        if view.document?.page(at: 0)?.string != page?.string { loadPage(into: view) }
+    }
 
-        // DV-2: preserve the user's zoom across cycling — capture it before swapping the document.
-        let priorScale = view.scaleFactor
-        let wasFitting = view.autoScales
-
-        // DV-3: a selection left on the OUTGOING page wedges mouse selection once the document is
-        // swapped in this reused PDFView (selection worked on first show, then died after cycling).
-        // Clear it before the swap, and force a fresh layout pass after, so the new page is selectable.
+    /// Show a COPY of the page in a throwaway one-page document (a PDFPage can belong to only one
+    /// document — copying avoids detaching it from the source), then restore the controller's zoom.
+    private func loadPage(into view: PDFView) {
         view.clearSelection()
-
         if let page, let copy = page.copy() as? PDFPage {
             let doc = PDFDocument()
             doc.insert(copy, at: 0)
@@ -94,15 +124,7 @@ struct PDFPaneView: NSViewRepresentable {
         } else {
             view.document = nil
         }
-        view.layoutDocumentView()   // rebuild the internal page view so text selection re-attaches
-
-        // DV-2: first page fits; afterwards keep the user's zoom (a manual zoom carries over; if they
-        // were still fitting, new pages keep fitting — either way the zoom level stays consistent).
-        if isFirstPage || wasFitting {
-            view.autoScales = true
-        } else {
-            view.autoScales = false
-            view.scaleFactor = priorScale
-        }
+        view.layoutDocumentView()
+        controller.applyToView()   // restore the persisted/current zoom + pin the page top
     }
 }

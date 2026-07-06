@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Archive Reader — a native macOS app for reading & triaging tagged historical-document PDFs.
 ///
@@ -19,10 +20,16 @@ struct ArchiveReaderApp: App {
         WindowGroup(id: WindowID.document, for: DocumentSelection.self) { $selection in
             DocumentWindowView(selection: selection)
         }
+        .defaultSize(documentDefaultSize)   // DV-1: open at the remembered size (or the full screen) — no post-show resize flash
 
         Settings {
             OptionsView()
         }
+    }
+
+    /// The document window's initial size: the user's last-remembered size, else the full screen.
+    private var documentDefaultSize: CGSize {
+        AppSettings.viewerWindowSize ?? (NSScreen.main?.visibleFrame.size ?? CGSize(width: 1400, height: 900))
     }
 }
 

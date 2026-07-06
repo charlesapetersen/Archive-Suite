@@ -13,6 +13,7 @@ struct DocumentWindowView: View {
     @State private var findText = ""
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
+    @State private var docWindow: NSWindow?
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
@@ -34,6 +35,8 @@ struct DocumentWindowView: View {
         .onAppear { fraction = defaultFraction; if let selection { model.load(selection) } }
         // DV-2: the split width + per-pane zoom now persist across ↑/↓ cycling — no per-document reset.
         .onChange(of: model.showingFind) { if model.showingFind { findFocused = true } }
+        // DV-1: on close, the current window size becomes the default for the next viewer.
+        .onDisappear { if let w = docWindow { AppSettings.setViewerWindowSize(w.frame.size) } }
     }
 
     @ViewBuilder private var content: some View {
@@ -46,12 +49,16 @@ struct DocumentWindowView: View {
                 let total = geo.size.width
                 let leftW = max(minPane, min(total - minPane - handleWidth, fraction * total))
                 HStack(spacing: 0) {
+                    // `.id(index)` gives each page a fresh PDFView (DV-3: a reused view loses text
+                    // selection after the document is swapped). Zoom persists via the controller.
                     PDFPaneView(page: model.imagePage, controller: model.leftController)
+                        .id(model.index)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
                         PDFPaneView(page: model.textPage, controller: model.rightController)
+                            .id(model.index)
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
                     } else {
@@ -89,6 +96,7 @@ struct DocumentWindowView: View {
         .gesture(
             DragGesture(minimumDistance: 1, coordinateSpace: .named("split"))
                 .onChanged { g in fraction = min(0.85, max(0.15, g.location.x / max(total, 1))) }
+                .onEnded { _ in AppSettings.setViewerSplitFraction(Double(fraction)) }   // DV-2: last drag = next default
         )
     }
 
@@ -177,11 +185,20 @@ struct DocumentWindowView: View {
     private func configureWindow(_ window: NSWindow) {
         guard !didConfigureWindow else { return }
         didConfigureWindow = true
-        let name = NSWindow.FrameAutosaveName("ArchiveReaderDocumentWindow")
-        let restored = window.setFrameUsingName(name)
-        window.setFrameAutosaveName(name)
-        if !restored, let screen = window.screen ?? NSScreen.main {
-            window.setFrame(screen.visibleFrame, display: true)   // first open → full screen
+        docWindow = window   // kept so onDisappear can persist the final size (DV-1)
+        // Target: the user's remembered size, else maximize (first ever open). The `> 2` guards skip a
+        // redundant setFrame when the scene's `.defaultSize` already opened at the target — avoids the
+        // "small window that jumps to full" flash.
+        let vis = (window.screen ?? NSScreen.main)?.visibleFrame
+        if let size = AppSettings.viewerWindowSize {
+            if abs(window.frame.width - size.width) > 2 || abs(window.frame.height - size.height) > 2 {
+                var frame = window.frame
+                frame.size = size
+                if let vis { frame.origin = CGPoint(x: vis.midX - size.width / 2, y: vis.midY - size.height / 2) }
+                window.setFrame(frame, display: true)
+            }
+        } else if let vis, abs(window.frame.width - vis.width) > 2 || abs(window.frame.height - vis.height) > 2 {
+            window.setFrame(vis, display: true)
         }
     }
 }
