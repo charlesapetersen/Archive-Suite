@@ -3,11 +3,11 @@
 Bring **Archive Processor** and **Archive Reader** together into a single offering, **Archive Suite**,
 as one monorepo with two separate macOS apps, one combined installer, and one place for maintenance.
 
-> **Status (2026-07-06):** EXECUTED locally through Phase E; **network publish deferred** (owner on a
-> plane / limited uploads). Phases A–D **done and committed on local `main`**; Phase E is done except the
-> uploads (DMG built at `/tmp/ArchiveSuite-1.0.0.dmg`; `main` merged + `suite-v1.0.0` tag created **locally**,
-> **not pushed** — `main` is 120 commits ahead of `origin/main`). Phase F not started. **Nothing remote has
-> changed; nothing destructive has run.** Resume the uploads on good connectivity — see §Resume when back online.
+> **Status (2026-07-06):** Phases **A–E DONE and PUBLISHED.** `main` pushed to `origin` (== local, 0 diverged);
+> **release live** at github.com/charlesapetersen/Archive-Suite/releases/tag/`suite-v1.0.0` with
+> `ArchiveSuite-1.0.0.dmg` (4.48 MB) attached. Only **Phase F** (redirect + archive the old
+> `archiveprocessor` repo) remains — **awaiting owner confirm** (irreversible-ish; plan gates it on the
+> release being live, which it now is). Near-term local backlog is in `SUITE_TODO.md`.
 >
 > This document is the durable, resumable source of truth. Every step is idempotent and re-runnable.
 
@@ -213,11 +213,11 @@ git remote remove processor
 - [ ] D.3 Smoke-test the DMG: mount, drag both to a scratch `/Applications`-like dir, launch each once.
 - Guidance goal met: the DMG guides users to drop **both** apps directly into Applications in one motion.
 
-### Phase E — First Suite release (suite-v1.0.0)  `[~]  local done; uploads deferred (plane)`
-- [x] E.1 Merge `suite-merge` → `main` — **done locally** (fast-forward; `main` @ `5366aee`, 120 commits ahead of `origin/main`). **Push deferred** (23 MB of merged history; limited uplink).
-- [x] E.2 Build the combined DMG (Phase D) — `/tmp/ArchiveSuite-1.0.0.dmg` (4.3M), smoke-tested.
-- [x] E.3 Tag — **`suite-v1.0.0` created locally** (annotated), **not pushed**. Bare `v1.0.0` was unavailable (Processor's historical tag) — hence the `suite-` prefix, consistent with D3.
-- [ ] E.4 **DEFERRED (upload):** `/opt/homebrew/bin/gh release create suite-v1.0.0 /tmp/ArchiveSuite-1.0.0.dmg --repo charlesapetersen/Archive-Suite --title "Archive Suite 1.0.0" --notes-file <notes>`. (The `.dmg` is a build artifact — never commit it.) Draft notes: `scratchpad/suite-release-notes.md`.
+### Phase E — First Suite release (suite-v1.0.0)  `[x]  PUBLISHED 2026-07-06`
+- [x] E.1 Merge `suite-merge` → `main` (fast-forward) and **pushed** — `origin/main` @ `59f2b5b`, 0 diverged.
+- [x] E.2 Combined DMG built + smoke-tested (`/tmp/ArchiveSuite-1.0.0.dmg`, 4.48 MB).
+- [x] E.3 Tag `suite-v1.0.0` created + **pushed** (`suite-` prefix — bare `v1.0.0` is Processor's historical tag).
+- [x] E.4 **Release LIVE:** `gh release create suite-v1.0.0` with the DMG → github.com/charlesapetersen/Archive-Suite/releases/tag/suite-v1.0.0 (published, asset `uploaded`).
 
 ### Phase F — Deprecate the old Processor repo (D4)  `[ ]  DEFERRED — do only AFTER the Suite release is live online`
 - [ ] F.1 On `charlesapetersen/archiveprocessor`: final commit updating README → "Archive Processor now ships as part of **Archive Suite**: <link>." Optional final release note pointing to the Suite DMG.
