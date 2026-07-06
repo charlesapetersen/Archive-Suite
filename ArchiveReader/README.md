@@ -21,7 +21,8 @@ Protocol.
 
 > **Status (2026-07-05):** v1 feature-complete — all planned milestones + the High-priority backlog
 > are shipped; 75 tests pass; a full adversarial code review is done. One gap: a manual GUI smoke
-> test (the logic is unit-tested; the SwiftUI GUI hasn't been driven at runtime yet). See `STATUS.md`.
+> test (the logic is unit-tested; the SwiftUI GUI hasn't been driven at runtime yet). (Historical
+> status snapshots are archived under `docs/archive/ArchiveReader/STATUS.md`.)
 
 
 - **Find** every PDF tagged `Read`/`Unread` under your archive root, via Spotlight — fast at 150k+.

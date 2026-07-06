@@ -87,7 +87,7 @@ typing — the rename *mechanism* is proven via the save flow + unit tests).
   `chmod +x` and `launchctl load` were **blocked by the Bash permission classifier**. To enable the
   cross-session (true-death) backstop, the user runs:
   ```sh
-  chmod +x "/Users/<user>/Desktop/Claude/Archive Reader/.maintenance/autobuild.sh"
+  chmod +x "/Users/<user>/Desktop/Claude/Archive Suite/.maintenance/autobuild.sh"
   launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.archivereader.autobuild.plist"
   ```
   It fires every 30 min and resumes headless only when the heartbeat is >45 min stale.
@@ -108,5 +108,5 @@ typing — the rename *mechanism* is proven via the save flow + unit tests).
 - Prefer many small commits over one large uncommitted change; git history is the durable record.
 
 ## How to STOP the overnight loop
-- `touch "/Users/<user>/Desktop/Claude/Archive Reader/.maintenance/STOP"`  (halts both drivers), and/or
+- `touch "/Users/<user>/Desktop/Claude/Archive Suite/.maintenance/STOP"`  (halts both drivers), and/or
 - cancel the cron in the live session, and/or `launchctl bootout gui/$(id -u)/com.archivereader.autobuild`.

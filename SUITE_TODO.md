@@ -3,7 +3,7 @@
 Actionable backlog we can pick up now (network restored 2026-07-06). Harvested from both apps'
 `KNOWN_ISSUES`/`POTENTIAL_FEATURES`/`NEXT_STEPS`/UI docs + the merge follow-ups, deduped and classified.
 Heavy overnight audit is tracked separately in `.maintenance/OVERNIGHT_QUEUE.md`; the full merge/publish
-record is in `SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source =
+record is in `docs/archive/SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source =
 `ArchiveReader/ArchiveReader/Sources/ArchiveReader/`, Processor source =
 `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
 

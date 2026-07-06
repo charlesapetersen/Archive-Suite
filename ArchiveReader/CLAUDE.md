@@ -251,8 +251,9 @@ Views/
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```
-UI is documented as two owner-requested batches in `UI_REFINEMENTS.md` (Batch 1) and
-`PLAN_NEAR_TERM_UI.md` (Batch 2: sidebar, smart folders, item-4 wins, tag rename).
+UI was documented as two owner-requested batches (both shipped, now archived) in
+`docs/archive/ArchiveReader/UI_REFINEMENTS.md` (Batch 1) and `docs/archive/ArchiveReader/PLAN_NEAR_TERM_UI.md`
+(Batch 2: sidebar, smart folders, item-4 wins, tag rename).
 `ArchiveReader/Tests/ArchiveReaderTests/` — 11 test files (95 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 

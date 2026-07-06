@@ -2,7 +2,7 @@
 
 Durable, resumable plan for the three P3 items in `SUITE_TODO.md`: give Processor a tight Implementation
 Map, de-nest the `App/App` folders, and extract a shared `ArchiveCore` package. **Planning only — not
-executed.** Paths are repo-root-relative (`/Users/<user>/Desktop/Claude/Archive Reader`); Reader source =
+executed.** Paths are repo-root-relative (`/Users/<user>/Desktop/Claude/Archive Suite`); Reader source =
 `ArchiveReader/ArchiveReader/Sources/ArchiveReader/`, Processor source =
 `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
 

@@ -5,7 +5,7 @@
 #
 # Usage: ./scripts/smoke-setup.sh [N]      (default N=30 files)
 set -euo pipefail
-SRC="$HOME/Desktop/Claude/Archive Reader/Test files/Brown Gemini"
+SRC="$HOME/Desktop/Claude/Archive Suite/Test files/Brown Gemini"
 # Off the Desktop (owner request): a less-visible, Spotlight-indexed location under Application Support.
 DST="$HOME/Library/Application Support/ArchiveReader/AR-Smoke"
 N="${1:-30}"

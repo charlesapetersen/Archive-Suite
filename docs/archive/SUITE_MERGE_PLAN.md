@@ -76,7 +76,7 @@ work in it afterward — encode it into the umbrella `CLAUDE.md` / `AGENTS.md` (
   Tier-2-reviewed with the one critical data-loss race already guarded; its on-device Wi-Fi/Run C behavior is
   verified next session — **non-blocking** for this structural merge, and can happen in the monorepo.)
 
-**Archive Reader** — `~/Desktop/Claude/Archive Reader`  *(re-verified 2026-07-06)*
+**Archive Reader** — `~/Desktop/Claude/Archive Suite`  *(re-verified 2026-07-06)*
 - Remote: **already** `https://github.com/charlesapetersen/Archive-Suite.git` (the intended monorepo), Reader at repo root. DMG tooling not yet (Phase D). Now tagged **`pre-suite-merge`** → `1d21190` (revert point, pushed).
 - macOS SwiftUI app (same stack). Sandboxed. Safety-first: never mutates the corpus; only Finder tags via one audited `Core/TagWriter.swift`. Bundle prefix `com.archivereader`.
 - Feature state: v1 **+ UI Batch-2 shipped** — navigable folder-tree sidebar, smart folders (create/apply/rename/delete), corpus-wide tag rename, and an **inline NSTokenField tag editor** with autocomplete. **109 tests + write-surface lint green.** `Core/` stays UI-free — a good `ArchiveCore` foundation (D6/G).
@@ -152,7 +152,7 @@ Do NOT start the merge with dirty trees or without a backup.
 
 ### Phase A — Relocate Reader into `ArchiveReader/`  `[x]`
 > **DONE 2026-07-06** (commit `59e57e9` on `main`). Tracked files under `ArchiveReader/`; history preserved (`--follow`); Reader Release build green in new location. Gitignored `.maintenance/` + `Test files/` left at root (now covered by the new root `.gitignore`).
-Run in the Suite repo root (`~/Desktop/Claude/Archive Reader`). Everything moves **except** `.git` and this plan.
+Run in the Suite repo root (`~/Desktop/Claude/Archive Suite`). Everything moves **except** `.git` and this plan.
 ```bash
 cd ~/Desktop/Claude/"Archive Reader"
 git switch -c suite-merge                 # do the merge on a branch; merge to main at the end
@@ -252,7 +252,7 @@ git remote remove processor
 ## Resume when back online (the only remaining work — all uploads)
 
 Local `main` already holds the full merge + scaffolding; the DMG + `suite-v1.0.0` tag exist locally.
-Run these on good connectivity (in `~/Desktop/Claude/Archive Reader`):
+Run these on good connectivity (in `~/Desktop/Claude/Archive Suite`):
 
 ```bash
 # 1) Push the merged history + tags (~23 MB first push).
