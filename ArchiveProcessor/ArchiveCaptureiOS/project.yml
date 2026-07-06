@@ -33,5 +33,5 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCameraUsageDescription: "Used to photograph documents and send them to the Archive Processor Mac app."
         NSLocalNetworkUsageDescription: "Used to connect to the Archive Processor Mac app on your local network to send captured photos."
-        NSBonjourServices: ["_archiveproc._tcp"]
+        NSBonjourServices: ["_archivecap._tcp"]   # must match the Mac's advertised type (CaptureServer.swift)
         ITSAppUsesNonExemptEncryption: false

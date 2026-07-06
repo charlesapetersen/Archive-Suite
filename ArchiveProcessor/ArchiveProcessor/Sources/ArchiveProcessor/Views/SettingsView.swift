@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     /// Posted when the API key changes in Settings, so the main window reloads it from the Keychain.
@@ -477,9 +478,14 @@ struct SettingsView: View {
                         HStack {
                             Text("Tag vocabulary (optional)").font(.caption)
                             HelpButton(text: "One tag per line. When set, the model chooses subject tags only from this controlled vocabulary. Leave blank for free-form tagging.")
+                            Spacer()
+                            Button("Import from CSV…") { importTagVocabularyCSV() }
+                                .font(.caption)
+                                .help("Load a controlled vocabulary from a .csv or .txt file (comma- or line-separated). You can also drag a file onto the box below.")
                         }
                         TextEditor(text: $tagVocabulary).font(.caption).frame(height: 60)
                             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
+                            .onDrop(of: [.fileURL], isTargeted: nil) { providers in loadTagVocabularyFromDrop(providers) }
                     }
                 }
             }
@@ -523,5 +529,43 @@ struct SettingsView: View {
         return GatewayConfig(baseURL: gatewayBaseURL, modelID: gatewayModelID,
                              displayName: gatewayDisplayName.isEmpty ? "Gateway" : gatewayDisplayName,
                              inputCostPer1M: gatewayInputCost, outputCostPer1M: gatewayOutputCost).asLLMModel()
+    }
+
+    // MARK: - Tag-vocabulary CSV import
+
+    /// Open a .csv/.txt file and load it into the controlled tag vocabulary (one tag per line).
+    private func importTagVocabularyCSV() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText, .text]
+        panel.message = "Choose a CSV or text file of subject tags (comma- or line-separated)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadTagVocabulary(from: url)
+    }
+
+    /// Handle a file dropped onto the vocabulary editor. Returns true if a file was accepted.
+    private func loadTagVocabularyFromDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else { return false }
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            guard let url else { return }
+            DispatchQueue.main.async { loadTagVocabulary(from: url) }
+        }
+        return true
+    }
+
+    /// Parse a CSV/text file into a newline-separated vocabulary: split on newlines and commas,
+    /// trim, drop blanks, de-dupe case-insensitively (keep first-seen), preserve order.
+    private func loadTagVocabulary(from url: URL) {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        var seen = Set<String>()
+        var tags: [String] = []
+        for token in text.split(whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "," }) {
+            let tag = token.trimmingCharacters(in: .whitespaces)
+            guard !tag.isEmpty, seen.insert(tag.lowercased()).inserted else { continue }
+            tags.append(tag)
+        }
+        guard !tags.isEmpty else { return }
+        tagVocabulary = tags.joined(separator: "\n")
     }
 }

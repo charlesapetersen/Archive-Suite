@@ -24,7 +24,7 @@
 	<false/>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_archiveproc._tcp</string>
+		<string>_archivecap._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to photograph documents and send them to the Archive Processor Mac app.</string>
