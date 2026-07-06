@@ -122,10 +122,38 @@ End segment the Mac already holds every page; it just finalizes the segment.
 enqueues/POSTs on *segment finish* rather than per shutter — Android `capture/CaptureViewModel.kt`
 (`finishDocumentSegment` path + the durable queue) and its `net/MacClient.postPhoto`; iOS
 `Capture/CaptureViewModel.swift` + `Net/MacClient.postPhoto`. Move the enqueue-to-transport to the
-shutter/capture callback; keep the segment's on-phone thumbnails/grouping UI as-is. Mac
-`CaptureSession.ingest` already does idempotent `(group,seq)` replace and withholds the ack until the
-manifest is durable, so the receive side already supports mid-segment streaming — confirm a
-still-in-progress segment assembles/replaces correctly as later pages arrive.
+shutter/capture callback (Android `addDocumentPhoto`, iOS equivalent), and keep the page's thumbnail in
+the strip until End segment — in the Mac's `CaptureSession.ingest`, idempotent `(group,seq)` replace +
+durable-manifest-before-ack already support mid-segment streaming.
+
+**KEY DESIGN CORRECTION (verified in code 2026-07-06 — this is more than "tweak the UI"):** the Mac
+presents the per-segment tag card via `pendingTagGroup = groups.first { .document && !resolvedGroupIds }`
+(`CaptureSession.swift:279`). Today the whole segment arrives at End segment, so that group is already
+complete when the card appears. **With streaming, a document group exists after page 1**, so the tag card
+would pop **mid-segment**. Fix: the Mac must know when a document segment is *complete*. Add a tiny
+**segment-complete signal** the phone sends at End segment — and have it **carry the segment's tags**
+(priority/year/month) so it solves completion-timing *and* tag attachment in one message, with **no photo
+re-upload**:
+- **Protocol:** `POST /segment/complete` (auth) with `X-Group` + optional `X-Priority`/`X-Year`/`X-Month`.
+  (Mirror on both companions' `MacClient`.)
+- **Mac `CaptureSession`:** track `completedDocGroups: Set<String>`; on the signal, apply the tags to that
+  group's already-received photos (update manifest metadata) and insert the group. Gate
+  `pendingTagGroup` to `.document && completedDocGroups.contains(id) && !resolvedGroupIds.contains(id)` so
+  the tag card appears **only** for a completed segment — preserving today's "card at End segment" UX.
+  Also mark all still-open doc groups complete on `POST /session/complete` (Finish) so the last segment's
+  card still shows if the operator finishes without ending it. `Net/CaptureServer.swift` routes the new
+  endpoint.
+- **Phone:** `applyTagsAndContinue` (End segment) → send the segment-complete signal (with tags) instead
+  of re-uploading pages; remove the segment's icons once it's acked. `resumeUploads`/auto-retry now
+  include document PENDING pages (they stream), and the segment-complete signal is itself
+  retryable/idempotent (re-applying tags to the same group is a no-op-safe replace).
+- **Crash recovery:** a page streamed but its segment-complete not yet sent → on the phone the pages are
+  still shown (current group), operator ends the segment again → signal re-sent; on the Mac the pages are
+  durable (bytes + manifest) and simply await the completion signal. Bytes are never lost either way.
+
+**Rejected simpler alternatives:** (a) re-POST every page with tags at End segment — doubles the transfer
+for a hundreds-of-photo segment; (b) infer completion from "a newer group started" — breaks for the last
+segment and for old clients. The explicit signal is both necessary (tag-card timing) and cheapest.
 
 **Effort: M. Risk: HIGH surface (Net/ + phone↔Mac protocol + the never-lose-a-photo path) → Tier-2
 adversarial review; both companions must match.**

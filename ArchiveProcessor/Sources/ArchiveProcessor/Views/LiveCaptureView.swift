@@ -159,11 +159,29 @@ struct LiveCaptureView: View {
                                     .frame(width: 200, height: 200)
                             }
                             Text("Scan in the Archive Capture app").font(.caption).foregroundStyle(.secondary)
-                            if let ip = Self.primaryIPv4() {
+                            let ips = Self.allIPv4Candidates()
+                            if let ip = Self.primaryIPv4() ?? ips.first {
                                 Text("\(ip):\(session.listenPort)")
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
                             }
+                            // Other interfaces (e.g. bridge100 when the Mac itself is the hotspot) — the
+                            // QR uses the primary, but the operator can try an alternate via manual entry.
+                            let others = ips.filter { $0 != (Self.primaryIPv4() ?? ips.first) }
+                            if !others.isEmpty {
+                                Text("also: " + others.joined(separator: ", "))
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                                    .textSelection(.enabled)
+                            }
+                            // The airport-Wi-Fi failure mode we hit: many public/guest networks isolate
+                            // clients so the phone can't reach the Mac even on the same Wi-Fi — the scan
+                            // just does nothing. Name the fix so the operator isn't stuck.
+                            Text("Phone not connecting? This Wi-Fi may block device-to-device connections (common on public / guest / hotel networks). Fixes: use a **USB cable** (Android), or turn on a **personal hotspot** and join both devices to it.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(6)
@@ -360,6 +378,27 @@ struct LiveCaptureView: View {
             if name == "en0" { break }   // prefer Wi-Fi/primary
         }
         return address
+    }
+
+    /// Every non-loopback IPv4 the Mac currently has (any interface), for the "try an alternate"
+    /// hint — on a personal hotspot the reachable address is often not en0 (e.g. bridge100).
+    static func allIPv4Candidates() -> [String] {
+        var result: [String] = []
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return [] }
+        defer { freeifaddrs(ifaddr) }
+        for ptr in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(ptr.pointee.ifa_flags)
+            guard (flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING),
+                  (flags & IFF_LOOPBACK) == 0,
+                  ptr.pointee.ifa_addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            getnameinfo(ptr.pointee.ifa_addr, socklen_t(ptr.pointee.ifa_addr.pointee.sa_len),
+                        &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
+            let ip = String(decoding: host.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            if !ip.isEmpty, ip != "127.0.0.1", !result.contains(ip) { result.append(ip) }
+        }
+        return result
     }
 }
 
