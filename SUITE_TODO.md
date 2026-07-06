@@ -19,7 +19,7 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 ## P1 — Quick local wins (S, low-risk, no network)
 - [x] Cite `SPEC/tag-format.md` as the shared-contract source of truth from BOTH per-app `CLAUDE.md`. ✅
 - [x] Reconcile Reader `CLAUDE.md` prose to SPEC (doc-only; code already correct): page-2 line verbatim/any-ext/may-be-absent; Year 3–4 digits; BC note clarified; Box/Folder/OCR-Failed subjects noted. ✅
-- [ ] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects and never drive a facet write (SPEC discrepancy #3). | files: Core/DocumentTags.swift, ArchiveReader/.../Tests/ | S | low  ← NEXT
+- [x] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects (SPEC #3) — added; **110 tests green**. ✅
 - [x] Close stale checkbox: `PLAN_NEAR_TERM_UI` **E3** confirmed shipped & ticked. ✅
 - [ ] Processor: re-add "Import tag vocabulary from CSV" (`loadTagVocabularyFromURL` + file picker + drop target) — pure local, no API. | files: Processor Views/vocabulary editor, Tagging/ | S | low
 - [ ] Processor: bump Android `targetSdk` 34→36 (mandatory ~2026-08-31 for Play updates). | files: ArchiveCapture/app/build.gradle.kts | S | low
