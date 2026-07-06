@@ -28,8 +28,8 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 ## P2 — Reader features (no network; local build/test)
 - [x] Non-standard-PDF **detection layer** — `Core/PDFFormatStatus.swift` (standard/unreadable/noTextLayer; page count is NOT a defect signal — merged >2-page PDFs are legit); persisted in the v2 content index. **117 tests green, lint clean.** ✅
 - [x] Surface it — filter-bar "N need attention" toggle (`needsAttentionOnly` filter), health-popover row, per-row ⚠ badge. ✅  *(Remaining small piece: the two-up viewer banner in `DocumentWindowView` — "no OCR text layer" — not yet done.)*
-- [ ] Viewer banner on a non-standard doc ("no OCR text layer") in the document window. | files: Views/DocumentWindowView.swift, Views/DocumentViewerModel.swift | S | low
-- [ ] Tag near-duplicate detection (e.g. `Environment` vs `Environtment`) — read-only analysis; rename already ships via TagWriter. | files: Views/NavigationModel.swift, new view | M | low
+- [x] Viewer banner for image-only docs ("no OCR text layer") in the document window — build green. ✅
+- [x] Tag near-duplicate detection — `Core/TagSimilarity.swift` (union-find + length-scaled Levenshtein) + `SimilarTagsSheet` review UI (Merge drives the existing audited rename). 130 tests green, lint clean. ✅
 - [ ] Duplicate-filename disambiguation — show containing folder/box for same-named files. | files: Views/NavigationModel.swift, Views/NavigationWindowView.swift | S | low
 - [ ] Side-by-side compare of two selected documents (beyond ↑/↓ cycling). | files: Views/DocumentWindowView.swift, new view | L | low
 
