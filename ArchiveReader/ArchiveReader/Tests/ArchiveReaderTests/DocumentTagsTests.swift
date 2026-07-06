@@ -74,6 +74,38 @@ final class DocumentTagsTests: XCTestCase {
         let t = DocumentTags.parse(raw: raw, labelNumber: 6)
         XCTAssertEqual(t.raw, raw)  // never reordered or mutated
     }
+
+    // SPEC/tag-format.md discrepancy #3: Archive Processor emits literal `Box`/`Folder` (on marker
+    // pages, alongside the color) and `OCR Failed` (on OCR failures) as ordinary subject tokens. They
+    // must classify as plain SUBJECTS — never a facet, never the color token — so they can't drive a
+    // destructive write and stay visible for filtering.
+    func testProcessorLiteralSubjectTokensClassifyAsSubjects() {
+        // Box marker: Red label (6) + "Red" color token + literal "Box" subject.
+        let box = DocumentTags.parse(raw: ["Red", "Box", "Unread", "DP chapters"], labelNumber: 6)
+        XCTAssertEqual(box.color, .box)
+        XCTAssertFalse(box.subjects.contains("Red"))   // color token folded, not a subject
+        XCTAssertTrue(box.subjects.contains("Box"))    // literal marker word stays a subject
+        XCTAssertNil(box.year)
+        XCTAssertNil(box.priority)
+
+        // Folder marker: Purple label (3) + "Purple" color token + literal "Folder" subject.
+        let folder = DocumentTags.parse(raw: ["Purple", "Folder", "Unread"], labelNumber: 3)
+        XCTAssertEqual(folder.color, .folder)
+        XCTAssertFalse(folder.subjects.contains("Purple"))
+        XCTAssertTrue(folder.subjects.contains("Folder"))
+
+        // OCR failure: literal "OCR Failed" subject, alongside a normal year.
+        let failed = DocumentTags.parse(raw: ["OCR Failed", "Unread", "1980"], labelNumber: nil)
+        XCTAssertTrue(failed.subjects.contains("OCR Failed"))
+        XCTAssertEqual(failed.year, 1980)              // the literal subject doesn't disturb real facets
+
+        // Each literal token is preserved verbatim and surfaces in topicalTags (never silently dropped).
+        for t in [box, folder, failed] {
+            for token in ["Box", "Folder", "OCR Failed"] where t.raw.contains(token) {
+                XCTAssertTrue(t.topicalTags.contains(token), "\(token) should surface in topicalTags")
+            }
+        }
+    }
 }
 
 /// Tests for file-link formatting / percent-encoding.
