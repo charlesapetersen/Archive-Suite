@@ -22,7 +22,12 @@ final class ContentIndexer: ObservableObject {
     init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveReader", isDirectory: true)
-        index = ContentIndex(url: dir.appendingPathComponent("content-index.sqlite3"))
+        // v2: the schema gained non-standard-PDF columns (page_count/has_text/readable). Because
+        // unchanged files won't re-index into an old DB, bumping the *filename* makes the new schema a
+        // clean full re-index — safe, since the index is an explicitly disposable/rebuildable cache.
+        // (The stale content-index.sqlite3 is left in place: the write-surface lint bans file-delete
+        // APIs app-wide, and the orphan is a rebuildable cache the user can clear.)
+        index = ContentIndex(url: dir.appendingPathComponent("content-index-v2.sqlite3"))
     }
 
     /// Incrementally index the given files (skips unchanged content via `needsIndex`).
@@ -57,10 +62,18 @@ final class ContentIndexer: ObservableObject {
                 if Task.isCancelled { break }
                 let path = f.url.path
                 let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
-                if await idx.needsIndex(path: path, mtime: mtime),
-                   let content = PDFTextExtractor.extract(f.url) {
-                    try? await idx.upsert(path: path, mtime: mtime, name: f.name,
-                                          classification: content.classification, body: content.body)
+                if await idx.needsIndex(path: path, mtime: mtime) {
+                    if let content = PDFTextExtractor.extract(f.url) {
+                        try? await idx.upsert(path: path, mtime: mtime, name: f.name,
+                                              classification: content.classification, body: content.body,
+                                              pageCount: content.pageCount, hasText: !content.body.isEmpty, readable: true)
+                    } else {
+                        // Unreadable (corrupt / encrypted / non-PDF): still record it so it's surfaced as
+                        // needing attention, and so we don't retry the failed extraction every pass.
+                        try? await idx.upsert(path: path, mtime: mtime, name: f.name,
+                                              classification: nil, body: "",
+                                              pageCount: 0, hasText: false, readable: false)
+                    }
                 }
                 done += 1
                 if done % 100 == 0 || done == total { await self?.report((done, total), gen) }
@@ -79,6 +92,18 @@ final class ContentIndexer: ObservableObject {
     func classifications(for paths: [String]) async -> [String: String] {
         try? await index.open()
         return await index.classifications(for: paths)
+    }
+
+    /// Non-standard-PDF status per path (unreadable / no-text-layer / standard), where indexed.
+    func formatStatuses(for paths: [String]) async -> [String: PDFFormatStatus] {
+        try? await index.open()
+        return await index.formatFlags(for: paths)
+    }
+
+    /// Count of indexed files that need attention (unreadable or text-less).
+    func needsAttentionCount() async -> Int {
+        try? await index.open()
+        return await index.needsAttentionCount()
     }
 
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).

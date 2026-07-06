@@ -43,6 +43,8 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
     @Published private(set) var smartFolderCounts: [UUID: Int] = [:]   // D2: files matching each saved search
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
+    @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
+    @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
     @Published var statusMessage = ""
@@ -64,7 +66,10 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.libraryDidChange() } }
             .store(in: &cancellables)
         indexer.$progress
-            .sink { [weak self] p in MainActor.assumeIsolated { self?.indexingProgress = p } }
+            .sink { [weak self] p in MainActor.assumeIsolated {
+                self?.indexingProgress = p
+                if p == nil { self?.refreshFormatStatuses() }   // a pass just finished → fold in new detection flags
+            } }
             .store(in: &cancellables)
         // Republish when notes/flags change so the table's flag column refreshes.
         notes.objectWillChange
@@ -211,9 +216,36 @@ final class NavigationModel: ObservableObject {
     func recompute() {
         var base = library.files.filter(filter.matches)
         if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
+        // Non-standard-PDF filter (like FTS, applied here because the status lives in the async index):
+        // keep only files known to need attention. Files not yet indexed lack a status and are excluded.
+        if filter.needsAttentionOnly {
+            base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
+        }
         displayed = LibrarySort.sorted(base, by: sort)
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
+    }
+
+    /// The detected non-standard-PDF status for a file, if the content index has seen it yet.
+    func formatStatus(for path: String) -> PDFFormatStatus? { formatStatuses[path] }
+
+    private var formatGeneration = 0
+    /// Fold the content index's per-file format flags (+ the corpus needs-attention count) into the
+    /// model, then recompute. Generation-guarded so a slower earlier refresh can't clobber a newer one
+    /// (same pattern as `runFullTextSearch`). Triggered on library change and when an index pass finishes.
+    func refreshFormatStatuses() {
+        formatGeneration += 1
+        let generation = formatGeneration
+        let paths = library.files.map(\.url.path)
+        Task { [weak self] in
+            guard let self else { return }
+            let statuses = await self.indexer.formatStatuses(for: paths)
+            let count = await self.indexer.needsAttentionCount()
+            guard generation == self.formatGeneration else { return }   // superseded by a newer refresh
+            self.formatStatuses = statuses
+            self.needsAttentionCount = count
+            self.recompute()
+        }
     }
 
     // MARK: View-state persistence (C2) — filter + sort survive relaunch (selection is persisted separately)
@@ -322,6 +354,7 @@ final class NavigationModel: ObservableObject {
         if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
         recompute()                                     // always — a row's read-state/tags may have moved it
         indexer.startIndexing(files)                    // incremental; no-op if running
+        refreshFormatStatuses()                         // fold in already-known detection flags for the new set
         restoreSelectionIfNeeded()                      // reading-session resume
     }
 

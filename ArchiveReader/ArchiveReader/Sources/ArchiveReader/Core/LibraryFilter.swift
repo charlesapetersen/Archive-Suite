@@ -27,11 +27,17 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// Scope to a folder subtree (from the sidebar file tree). `nil` = the whole root. Optional so
     /// older persisted smart searches (which lack this key) still decode.
     var pathPrefix: String? = nil
+    /// Restrict the list to files whose non-standard-PDF status `.needsAttention` (unreadable or
+    /// no-text-layer). The status lives in the async content index, so this dimension is applied by
+    /// the model (like full-text search), not inside `matches`. Defaults false; older smart searches
+    /// that lack this key still decode.
+    var needsAttentionOnly: Bool = false
 
     var isActive: Bool {
         !subjects.isEmpty || !priorities.isEmpty || read != .all
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
+            || needsAttentionOnly
     }
 
     func matches(_ file: ArchiveFile) -> Bool {
@@ -63,6 +69,24 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty, file.name.range(of: q, options: .caseInsensitive) == nil { return false }
         return true
+    }
+}
+
+extension LibraryFilter {
+    /// Tolerant decode: every key is optional-with-default, so a smart folder persisted by an older
+    /// build (before `pathPrefix` / `needsAttentionOnly` existed) still decodes. In an extension so the
+    /// synthesized memberwise initializer is preserved; `encode(to:)` stays synthesized.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            subjects:           try c.decodeIfPresent(Set<String>.self, forKey: .subjects) ?? [],
+            subjectCombine:     try c.decodeIfPresent(SubjectCombine.self, forKey: .subjectCombine) ?? .all,
+            priorities:         try c.decodeIfPresent(Set<Int>.self, forKey: .priorities) ?? [],
+            read:               try c.decodeIfPresent(ReadFilter.self, forKey: .read) ?? .all,
+            searchText:         try c.decodeIfPresent(String.self, forKey: .searchText) ?? "",
+            pathPrefix:         try c.decodeIfPresent(String.self, forKey: .pathPrefix),
+            needsAttentionOnly: try c.decodeIfPresent(Bool.self, forKey: .needsAttentionOnly) ?? false
+        )
     }
 }
 

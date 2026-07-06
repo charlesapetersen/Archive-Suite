@@ -126,3 +126,20 @@ struct TagsCell: View {
         .help("Edit tags inline: type to add (autocompletes existing tags), ⌫ or × to remove · ⌘I edits several at once")
     }
 }
+
+/// Read-only per-row badge that flags a *non-standard PDF* — one that couldn't be opened, or opened
+/// with no selectable text. A separate `@ObservedObject` view (not just a cell closure) so it re-renders
+/// when the async content index folds in detection flags, sidestepping `Table`'s row-diff skip. Empty
+/// (no badge) for standard files or files the index hasn't scanned yet. Never triggers a write.
+struct WarningBadgeCell: View {
+    @ObservedObject var model: NavigationModel
+    let file: ArchiveFile
+    var body: some View {
+        if let status = model.formatStatus(for: file.url.path), status.needsAttention {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .help(status.label)
+                .accessibilityLabel("Needs attention: \(status.label)")
+        }
+    }
+}

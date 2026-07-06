@@ -100,6 +100,12 @@ struct NavigationWindowView: View {
             .width(26)
             .customizationID("flag")
 
+            TableColumn("⚠︎") { file in
+                WarningBadgeCell(model: model, file: file)   // non-standard PDF: unreadable / no text layer
+            }
+            .width(24)
+            .customizationID("warning")
+
             TableColumn("Document date", sortUsing: ArchiveFileComparator(field: .date)) { file in
                 DateCell(model: model, file: file)   // click to edit year/month/day/uncertain
             }
@@ -318,6 +324,15 @@ struct NavigationWindowView: View {
                 }
             }
 
+            if model.needsAttentionCount > 0 {
+                Toggle(isOn: $model.filter.needsAttentionOnly) {
+                    Label("\(model.needsAttentionCount) need attention", systemImage: "exclamationmark.triangle")
+                }
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
+            }
+
             Spacer()
 
             if model.filter.isActive || model.ftsPaths != nil {
@@ -489,7 +504,7 @@ struct NavigationWindowView: View {
             Button { showingHealth = true } label: { Image(systemName: "stethoscope") }
                 .buttonStyle(.borderless)
                 .help("Library health")
-                .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality) }
+                .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount) }
             Spacer()
             if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
             if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
@@ -512,6 +527,7 @@ struct NavigationWindowView: View {
 /// A small library-health readout (data-quality counts).
 private struct DataQualityView: View {
     let q: NavigationModel.DataQuality
+    let needsAttention: Int
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Library health").font(.headline)
@@ -521,6 +537,7 @@ private struct DataQualityView: View {
             row("Date Uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
             row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
+            row("Non-standard PDFs (need attention)", needsAttention, warn: needsAttention > 0)
         }
         .padding(14)
         .frame(width: 260)

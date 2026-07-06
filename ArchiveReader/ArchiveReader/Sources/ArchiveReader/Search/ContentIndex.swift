@@ -29,7 +29,9 @@ actor ContentIndex {
         }
         sqlite3_busy_timeout(db, 3000)
         // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.
-        try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL);")
+        // `page_count`/`has_text`/`readable` carry the non-standard-PDF detection (display + triage);
+        // a fresh v2 DB filename (see ContentIndexer) means every row is written with these columns.
+        try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, page_count INTEGER, has_text INTEGER, readable INTEGER);")
         try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, path UNINDEXED);")
     }
 
@@ -48,8 +50,10 @@ actor ContentIndex {
         return true
     }
 
-    /// Insert or replace the indexed text for one file.
-    func upsert(path: String, mtime: Double, name: String, classification: String?, body: String) throws {
+    /// Insert or replace the indexed text + format-detection flags for one file. `readable=false`
+    /// records an unreadable/non-PDF file (empty body) so it can still be surfaced as needing attention.
+    func upsert(path: String, mtime: Double, name: String, classification: String?, body: String,
+                pageCount: Int = 0, hasText: Bool = true, readable: Bool = true) throws {
         try exec("BEGIN;")
         do {
             var rowid: Int64? = nil
@@ -60,13 +64,20 @@ actor ContentIndex {
             }
             if let rowid {
                 try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-                try run("UPDATE files SET mtime = ? WHERE rowid = ?;") {
-                    sqlite3_bind_double($0, 1, mtime); sqlite3_bind_int64($0, 2, rowid)
+                try run("UPDATE files SET mtime = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
+                    sqlite3_bind_double($0, 1, mtime)
+                    sqlite3_bind_int($0, 2, Int32(pageCount))
+                    sqlite3_bind_int($0, 3, hasText ? 1 : 0)
+                    sqlite3_bind_int($0, 4, readable ? 1 : 0)
+                    sqlite3_bind_int64($0, 5, rowid)
                 }
                 try insertFTS(rowid: rowid, body: body, classification: classification, name: name, path: path)
             } else {
-                try run("INSERT INTO files(path, mtime) VALUES(?, ?);") {
+                try run("INSERT INTO files(path, mtime, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?);") {
                     self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
+                    sqlite3_bind_int($0, 3, Int32(pageCount))
+                    sqlite3_bind_int($0, 4, hasText ? 1 : 0)
+                    sqlite3_bind_int($0, 5, readable ? 1 : 0)
                 }
                 let newRow = sqlite3_last_insert_rowid(db)
                 try insertFTS(rowid: newRow, body: body, classification: classification, name: name, path: path)
@@ -115,6 +126,32 @@ actor ContentIndex {
         var out: [String: String] = [:]
         for p in paths { if let c = classification(for: p) { out[p] = c } }
         return out
+    }
+
+    /// Per-path non-standard-PDF status (readable / has-text → `PDFFormatStatus`), for the paths that
+    /// are indexed. Unindexed paths are simply absent from the map. One prepared statement, reset per
+    /// path, so it scales to the whole corpus.
+    func formatFlags(for paths: [String]) -> [String: PDFFormatStatus] {
+        guard !paths.isEmpty, let stmt = prepare("SELECT readable, has_text FROM files WHERE path = ?;") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var out: [String: PDFFormatStatus] = [:]
+        for p in paths {
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            bindText(stmt, 1, p)
+            if sqlite3_step(stmt) == SQLITE_ROW {
+                let readable = sqlite3_column_int(stmt, 0) != 0
+                let hasText  = sqlite3_column_int(stmt, 1) != 0
+                out[p] = PDFFormatStatus.classify(readable: readable, hasText: hasText)
+            }
+        }
+        return out
+    }
+
+    /// Count of indexed files that need attention: unreadable OR opened-but-no-text.
+    func needsAttentionCount() -> Int {
+        guard let stmt = prepare("SELECT count(*) FROM files WHERE readable = 0 OR has_text = 0;") else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
     }
 
     func indexedCount() -> Int {
