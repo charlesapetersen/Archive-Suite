@@ -1,6 +1,9 @@
 # Live Capture — Cloud Transport (Google Drive relay) — Implementation Plan
 
-**Created 2026-07-06. Status: not started.** Durable engineering plan for a **cloud relay** transport:
+**Created 2026-07-06. Status: in progress.** ✅ Step 1 (phone `SegmentTransport` seam) shipped &
+build-verified on iOS + Android. ✅ The make-or-break **`drive.file` cross-client spike PASSED**
+(2026-07-06, §6) — the auth model is validated, no fallback needed. Next: step 2 (`FileRelayTransport`).
+Durable engineering plan for a **cloud relay** transport:
 the phone uploads each captured photo to the user's **Google Drive**, and the Mac watches/pulls and feeds
 the same `CaptureSession.ingest` path. This is the **wireless alternative to the wired (USB) transport** —
 the two transports we commit to maintaining. Read `LIVE_CAPTURE_CONNECTIVITY_PLAN.md` for the connectivity
@@ -210,14 +213,14 @@ objects). Tokens live in **Keychain** (Mac, iOS) / **EncryptedSharedPreferences 
    account** (the email hint disambiguates), and begin uploading into `folderId`.
 3. Re-pair simply re-scans / re-selects the mode; no disconnect signal needed.
 
-**⚠️ VALIDATE FIRST (spike before committing to the design):** confirm that with **`drive.file`**, the **Mac**
-(same GCP project, same user account) can **list/read/delete** photo objects **created by the phone**
-(different platform OAuth client, same project). Web guidance says app-created files are cross-client
-accessible within a project, but this is finicky enough to prove with a 1-day spike. **Fallbacks if it
-misbehaves, cheapest first:** (a) have the Mac create the folder and the phone create files *inside it* (both
-app-created); (b) use the **App Data folder** (`drive.appdata`) if the account/project semantics are cleaner;
-(c) last resort, the **full `drive`** scope (definitely works, but triggers Google's sensitive-scope
-verification for public distribution — acceptable for owner/unverified-app use with the consent warning).
+**✅ VALIDATED 2026-07-06 (spike passed — no longer a risk).** A two-Desktop-client loopback-OAuth spike
+(project `YOUR_GCP_PROJECT`, single test-user account, `drive.file` scope) confirmed that a **different OAuth
+client** can **`get` metadata, `list` by `appProperties`, download media, and `delete`** a file **created by
+another client** in the same project — all HTTP 200/204. So `drive.file` access is **per-project, not
+per-client**: the Mac's Desktop client can fully manage what the phone's iOS/Android client uploads. **No
+fallback needed** (the app stays on the non-sensitive `drive.file` scope; no `drive.appdata`, no full `drive`).
+_Fallbacks retained for reference only, should Google ever change this: (a) Mac creates the folder, phone
+writes inside it; (b) `drive.appdata`; (c) full `drive` scope (sensitive → verification)._
 
 ---
 
@@ -312,12 +315,12 @@ only after the Mac is durably holding it.* Concretely:
 
 ## 12. Sequencing & concrete first step
 
-1. **`SegmentTransport` (phones) + `CaptureReceiver` (Mac) refactor** — behavior-preserving; today's HTTP
-   becomes `HttpTransport`/`CaptureServer`. Independently reviewable; unblocks everything. (Also reconcile the
-   Bonjour service-name mismatch noted in the connectivity plan while in `Net/`.)
+1. ✅ **`SegmentTransport` (phones) refactor — DONE** (`74ed9f0`, build-verified iOS + Android). The Mac-side
+   `CaptureReceiver` role is folded into step 2 (below), where `FileRelayReceiver` gives it a real second
+   implementation. (Still to do while in `Net/`: reconcile the Bonjour service-name mismatch.)
 2. **`CloudBackend` interface + `FileRelayTransport` + `FileRelayReceiver`** → full relay flow validated
    **offline** (§10.1).
-3. **`drive.file` cross-device spike** (§6).
+3. ✅ **`drive.file` cross-device spike — DONE, PASSED** (2026-07-06, §6). Auth model validated; proceed.
 4. **`DriveBackend`** — OAuth (per platform), resumable upload, Changes-feed poller, receipts, delete + sweep.
 5. **Settings/UX** — transport selector, Google sign-in, folder display, status, opt-in copy (§9).
 6. **Tier-2 review + integration/invariant tests** (§10), both companions, then ship behind the opt-in.
