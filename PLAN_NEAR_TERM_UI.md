@@ -111,3 +111,37 @@ suggestedSmartFolderName, renameTag), `Search/SavedSearch.swift` (rename), `View
 (new), `Views/NavigationWindowView.swift` (layout, filter-bar button, column customization, status
 summary, context menus, shortcuts), `Views/OptionsView.swift` (density/font), `Core/AppSettings.swift`
 (persistence), new `Views/RenameTagSheet.swift`, `Tests/…` (pathPrefix matcher, tag-rename integration).
+
+## E1 — adversarial review findings (2026-07-05): 10 confirmed, 0 refuted → fix in E
+All display/navigation/UX; NONE violate the Core Directive (the `TagWriter` write path is clean — no
+data loss). Consolidated to 7 distinct fixes (3 medium, 4 low). Fix, add regression tests where noted,
+build+tests+lint, GUI-verify the cloud + read paths (ask machine availability first), commit.
+
+- [ ] **[med] Tag-cloud priority/marker chips filter to empty.** `tagCloud` is built from
+      `topicalTags` (keeps P7–P10 / Red / Purple) but the subject filter matches `file.subjects` (which
+      excludes them) → clicking a "P8"/"Red" chip empties the list while the chip stays highlighted.
+      Fix: build `tagCloud` from `f.subjects` (drop priority/color — they have P7–P10 toggles); reconcile
+      `selectFiles(withTag:)`. (`NavigationModel.tagCloud` ~302; cloud buttons `NavigationWindowView` ~229/243.)
+- [ ] **[med] Perf at 150k:** the `library.$files` sink rebuilds `folderTree` + `refreshSubjectsCache`
+      + `refreshSmartFolderCounts` (O(searches·N)) + recompute on EVERY emission — 2–3× per mark
+      (applyVerifiedWrites emit + Spotlight echo). Fix: skip buildFolderTree/refreshSubjectsCache when the
+      path set / subject union is unchanged (cheap hash guard — paths are Core-Directive-invariant);
+      debounce/coalesce smartFolderCounts. (`NavigationModel` init sink ~64–74.)
+- [ ] **[med] Sidebar highlight one-way / stale / dead re-click.** `SidebarView.selection` is local
+      @State never reconciled from `filter.pathPrefix`; after Clear / restoreViewState / menu applySaved
+      the highlight is stale, and re-clicking the same row (or "All Files") is a no-op. Fix: drive
+      `List(selection:)` from a computed Binding of `filter.pathPrefix` (+ applied smart folder), or add
+      `.onChange(of: model.filter.pathPrefix)` to reconcile. (`SidebarView` ~9,48.)
+- [ ] **[low] renameTag trims oldTag** → for a whitespace/NBSP-padded tag the write set diverges from
+      the sheet's previewed count (renames a different file or silently does nothing). Fix: don't trim
+      oldTag; trim only newTag; no-op guard `new != oldTag`. Regression test. (`renameTag` ~451.)
+- [ ] **[low] Smart-folder badge ignores the saved OCR query** → over-counts (badge = whole library
+      while the folder opens to a subset). Fix: suppress the numeric badge when `fullTextQuery` non-empty
+      (or compute FTS-aware async). (`refreshSmartFolderCounts` ~319; SidebarView badge.)
+- [ ] **[low] restoreViewState root guard uses raw `hasPrefix`** → a sibling root sharing a name prefix
+      (Archive/ArchiveBox) keeps a stale scope → empty list on relaunch. Fix: component-boundary check
+      mirroring `matches()` (`p == root || p.hasPrefix(root+"/")`); also clear pathPrefix in chooseRoot.
+      Regression test. (`restoreViewState` ~243.)
+- [ ] **[low] TagFilterField autocomplete commits on arrow-browse:** `comboBoxSelectionDidChange` treats
+      keyboard navigation as a commit. Fix: only commit on a mouse pick (check `NSApp.currentEvent?.type`);
+      let Return commit typed text. (`TagFilterField` ~57–64.)
