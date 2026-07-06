@@ -91,15 +91,23 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
       GUI + **smoke** on scratch (rename a tag on several files; `xattr`-verify; undo) · commit + push.
 
 ## Milestone E — Final review, full smoke test, docs
-- [ ] **E1. Adversarial code review** (multi-agent) over the new code — focus on the D1 write path, the
-      reactive/eventual-consistency class (sidebar/filter/state-persistence interactions), and the
-      Equatable/render class. Fix all confirmed findings.
-- [ ] **E2. Extend `SMOKE_TEST.md`** with new steps (sidebar folder-scope, smart-folder
-      create/apply/rename/delete, column-customization + view-state persistence across relaunch, tag
-      rename + undo) **and regression the 14 shipped Batch-1 features**; run the full driven GUI smoke
-      test on the scratch corpus.
-- [ ] **E3. Update docs** — `STATUS.md`, `KNOWN_ISSUES.md`, `CLAUDE.md` §Implementation map, and mark
-      `NEAR_TERM_UI.md` items done. Commit + push.
+- [x] **E1. Adversarial code review** (multi-agent) over the new code. Two passes: (1) 2026-07-05 over
+      the D1 write path + reactive/render classes → 10 confirmed, 0 refuted (see E1 findings below), all
+      fixed. (2) 2026-07-06 re-review of the fix diff itself (4 lenses + adversarial verify) → surfaced
+      the **subjectsSig parity** regression (see E1-follow-up); 2 candidates refuted. All fixed.
+- [x] **E2. GUI smoke of the fixes** (machine free, 2026-07-06). Verified via driven GUI: folder-tree
+      click scoping (Batch-A/B + All Files — highlight+list+status all consistent), tag cloud shows
+      subjects-only, save-smart-folder flow end-to-end + count badge, smart-folder delete. **Harness
+      limitation (NOT an app defect, NOT focus contention — machine was free):** synthetic input
+      (`cliclick`/AX) cannot drive SwiftUI-rendered `.plain` content buttons (tag-cloud chips), nor type
+      into a SwiftUI `.alert` `TextField` — those controls expose no AX label and ignore synthetic
+      clicks, whereas AppKit-bridged elements (menu bar, labeled toolbar items, `List`/`NSTableView`
+      rows) drive fine. The alert's default button DOES respond to Return (proven by the save flow).
+      Chip click-to-filter and custom-name typing are therefore owner-manual checks; the underlying
+      logic is unit-tested. Full `SMOKE_TEST.md` expansion + Batch-1 regression still TODO.
+- [ ] **E3. Update docs** — `STATUS.md`, `CLAUDE.md` §Implementation map (add `LibraryChangeSignature`),
+      and mark `NEAR_TERM_UI.md` items done. (Do NOT log the synthetic-input limitation in
+      `KNOWN_ISSUES.md` — it is a test-harness property, not an app defect.) Commit + push.
 
 ## Order & dependencies
 A → B (sidebar is one coherent slice; do first) → C1…C9 (independent; any order) → D1 (needs review) +
@@ -145,3 +153,20 @@ build+tests+lint, GUI-verify the cloud + read paths (ask machine availability fi
 - [x] **[low] TagFilterField autocomplete commits on arrow-browse:** `comboBoxSelectionDidChange` treats
       keyboard navigation as a commit. Fix: only commit on a mouse pick (check `NSApp.currentEvent?.type`);
       let Return commit typed text. (`TagFilterField` ~57–64.)
+
+## E1-follow-up findings (2026-07-06) — from re-reviewing the E1 fix diff + GUI testing
+Two real regressions introduced BY the E1 fixes; both fixed & verified. Neither touches the write path.
+- [x] **[med, GUI-found] Folder-tree click did not scope the list.** E1 #3's move to a computed
+      `Binding` broke `List(selection:)` for `OutlineGroup` rows — clicking a tree folder moved the
+      highlight but never fired `set`, so `filter.pathPrefix` stayed nil (persisted state confirmed it).
+      And `setFolderScope` never recomputed. **Fix:** `SidebarView` back to a real `@State` selection
+      (natively driven by `List`+`OutlineGroup`) + a `model→selection` sync so the highlight still can't
+      go stale (keeps #3's intent); `setFolderScope` recomputes explicitly with a no-op guard (loop-safe).
+      GUI-verified: Batch-A/B + All Files now scope correctly. (`SidebarView`, `NavigationModel.setFolderScope`.)
+- [x] **[med, review-found] subjectsSig XOR parity.** E1 #2's subjects change-signature XORed the flat
+      per-file subject multiset, so any subject on an EVEN number of files self-cancels (a^a=0) →
+      ~half of renames/group-edits skip `refreshSubjectsCache()` → stale ⌘L autocomplete + near-dup
+      warnings (no data risk). Confirmed independently by all 4 review lenses. **Fix:** extracted the 3
+      signatures to pure `Core/LibraryChangeSignature.swift`; subjects now signatures the DISTINCT union
+      (`Set(files.flatMap(\.subjects))`) so parity can't cancel. +7 regression tests. (Refuted: mouse-gate
+      #7 is fine; smart-folder-shows-"All Files" is the known cosmetic limitation.)

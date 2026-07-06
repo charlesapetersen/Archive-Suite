@@ -4,13 +4,22 @@ Single source of "where are we, what's next," kept current every work session so
 (e.g. after a usage-credit cutoff) can resume immediately. **Read order:** CLAUDE.md → AGENTS.md →
 PLAN.md → this file.
 
-## Current state (2026-07-05)
-- **Milestone:** **ALL PLANNED WORK COMPLETE + GUI SMOKE-TESTED LIVE.** M0–M3 + the entire
-  **High-priority** backlog, a full adversarial code review (13 bugs fixed), a documentation review,
-  and now a **driven interactive GUI smoke test (18/22 steps PASS live, 0 FAIL; 4 covered indirectly)**
-  which caught + fixed the mark-Read display bug (two compounding causes) and 4 reactive-timing bugs.
+## Current state (2026-07-06)
+- **Milestone:** **UI Batch-2 (PLAN_NEAR_TERM_UI Milestones A–E) COMPLETE + GUI-VERIFIED**, on top of
+  v1 (M0–M3 + High-priority backlog). Batch-2 shipped the left sidebar (navigable folder tree + smart
+  folders), create-smart-folder-from-filters, all item-4 UI wins, and item-5 (corpus tag rename + count
+  badges). Two adversarial review passes (E1): the 2026-07-05 pass (10 findings → 7 fixes) and a
+  2026-07-06 re-review of the fix diff that caught the **subjectsSig parity** regression; GUI testing
+  caught the **folder-tree-click-doesn't-scope** regression. Both follow-up regressions fixed & verified.
 - **Build:** GREEN. `cd ArchiveReader && xcodegen generate && xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build` → **BUILD SUCCEEDED**;
-  `xcodebuild … test` → **83/83 pass**; `bash scripts/lint-write-surface.sh` → clean.
+  `xcodebuild … test` → **95/95 pass**; `bash scripts/lint-write-surface.sh` → clean.
+- **Latest commits:** `e4d93d0` E1 follow-up (folder-tree @State scoping + subjectsSig parity via
+  `Core/LibraryChangeSignature` + 7 tests) · `2488df4` E1: 10 review findings → 7 fixes.
+- **GUI-verified (2026-07-06, machine free):** folder-tree scoping (Batch-A/B + All Files consistent),
+  tag cloud = subjects-only, save-smart-folder flow + count badge, delete. **Harness limitation** (not an
+  app defect, not focus contention): synthetic input can't drive SwiftUI `.plain` content buttons /
+  `.alert` text fields (they expose no AX label + ignore synthetic clicks); AppKit-bridged menu bar /
+  labeled toolbar items / `List` rows drive fine. Chip click-to-filter + custom-name typing = owner-manual.
 - **Shipped (see CLAUDE.md §Implementation map for the file tree):**
   - **M0** `Core/TagWriter` — single audited write choke-point (delta edits, coordinated metadata-only
     write, trustworthy-read guard, multiset+label verify, drift restore, label-only inverse undo,
@@ -44,13 +53,13 @@ cleaned ⌘⇧C); reworked viewer keys (↑/↓ scroll page, ⌘↑/⌘↓ top-a
 tests green + GUI-verified + committed/pushed. **Scratch corpus moved** off the Desktop to
 `~/Library/Application Support/ArchiveReader/AR-Smoke` (smoke-setup.sh updated).
 
-## ACTIVE PLAN (2026-07-05) → `PLAN_NEAR_TERM_UI.md`
+## ACTIVE PLAN (2026-07-05) → `PLAN_NEAR_TERM_UI.md` — **COMPLETE (2026-07-06)**
 Owner-approved UI Batch 2 — left sidebar (file tree + smart folders), create-smart-folder-from-filters,
-all of item 4 (small UI wins), and item 5 (tag rename + count badges). **Durable & resumable**: the
-plan's checkboxes are the source of truth; resume at the first `[ ]`. Each milestone builds green +
-tests green + code-reviewed + GUI/smoke-tested + committed/pushed before the next. Item 3 (non-standard
-PDFs) was deferred to `POTENTIAL_FEATURES.md`. **Status: plan written; awaiting owner go-ahead to start
-Milestone A** (or reprioritize).
+all of item 4 (small UI wins), and item 5 (tag rename + count badges). **Milestones A–E all `[x]`.**
+Item 3 (non-standard PDFs) was deferred to `POTENTIAL_FEATURES.md`. Remaining tail (non-blocking):
+full `SMOKE_TEST.md` expansion + Batch-1 regression pass (E2 tail), and the owner-manual GUI checks the
+synthetic-input harness can't drive (tag-cloud chip click-to-filter; smart-folder/tag rename custom-name
+typing — the rename *mechanism* is proven via the save flow + unit tests).
 
 ## Next action — remaining work (none blocking; app is feature-complete + GUI-verified for v1)
 1. **GUI smoke test — DONE (2026-07-05).** Driven live on a scratch corpus (`~/Library/Application Support/ArchiveReader/AR-Smoke`, 30

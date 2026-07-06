@@ -3,8 +3,9 @@
 Iterative, easily-achievable, **UI-focused** work. Ordered; ★ = you requested it. Effort: **[S]** ≈ a
 few hours · **[M]** ≈ ~a day. "Reuses" notes where the plumbing already exists. Nothing here changes
 the safety model — all tag edits still route through the audited `TagWriter`; the rest is display/nav.
-**Status: proposal awaiting your prioritization.** Suggested first slice: **1a + 1b + 2** (the sidebar),
-then **3a–3c** (non-standard triage).
+**Status (2026-07-06): items 1, 2, 4, and 5 SHIPPED** as UI Batch-2 (see `PLAN_NEAR_TERM_UI.md`,
+Milestones A–E, all complete + GUI-verified). **Item 3** (non-standard PDFs) deferred to
+`POTENTIAL_FEATURES.md` per owner. This doc is retained as the original proposal for reference.
 
 ## 1. Left navigation sidebar ★ (first priority)
 

@@ -191,7 +191,7 @@ writes against the real corpus — always a copy.
   de-hyphenate line-end hyphens; works in either pane; optional "skip OCR header" (off by default).
 - **Options panel (⌘,):** link format, newlines-after-link, and more (see `PLAN.md` §Options).
 
-## Implementation map (shipped — v1 feature-complete, 75 tests, 2026-07-05)
+## Implementation map (shipped — v1 + UI Batch-2 complete, 95 tests, 2026-07-06)
 
 `ArchiveReader/Sources/ArchiveReader/`
 ```
@@ -207,8 +207,11 @@ Core/                         UI-free domain (package-ready → future ArchiveCo
   TagReading.swift            Safe read; TagReadResult distinguishes confirmed-empty vs unreadable.
   DocumentTags.swift          Tag→facet parser (year/month/Day N/priority/read/color/subjects);
                               sortDate (medieval-safe), displayDate, dateIsSpeculative.
-  LibraryFilter.swift         LibraryFilter (Codable) + LibrarySort (multi-level, nil-last, stable).
+  LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.
   ArchiveFile.swift           A nav-row record (url identity + parsed tags).
+  LibraryChangeSignature.swift Pure order-independent change-signatures (paths / DISTINCT-subject union /
+                              match-facets) that gate NavigationModel's cache rebuilds. Subjects sig is
+                              over the union (NOT the multiset) so even-count edits can't XOR-cancel.
   FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
   CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate).
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
@@ -242,7 +245,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 ```
 UI is documented as two owner-requested batches in `UI_REFINEMENTS.md` (Batch 1) and
 `PLAN_NEAR_TERM_UI.md` (Batch 2: sidebar, smart folders, item-4 wins, tag rename).
-`ArchiveReader/Tests/ArchiveReaderTests/` — 10 test files (75 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 11 test files (95 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build
