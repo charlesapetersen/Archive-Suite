@@ -120,7 +120,18 @@ struct NavigationWindowView: View {
                             .foregroundStyle(color == .box ? .red : .purple)
                             .font(.system(size: 8))
                     }
-                    Text(file.name).lineLimit(1).truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(file.name).lineLimit(1).truncationMode(.middle)
+                        // When another displayed row shares this filename, surface the containing folder
+                        // so the colliding rows can be told apart (read-only display aid; DuplicateNames).
+                        if model.isDuplicatedName(file.name) {
+                            Label(DuplicateNames.disambiguator(for: file.url), systemImage: "folder")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
                 }
             }
             .width(min: 200, ideal: 320)

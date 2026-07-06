@@ -38,6 +38,7 @@ final class NavigationModel: ObservableObject {
     func requestFocusSearch()    { focusSearchRequest &+= 1 }
     func requestFocusTagFilter() { focusTagFilterRequest &+= 1 }
     @Published private(set) var displayed: [ArchiveFile] = []
+    @Published private(set) var duplicatedNames: Set<String> = []   // base names shared by ≥2 displayed rows
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
@@ -222,12 +223,17 @@ final class NavigationModel: ObservableObject {
             base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
         }
         displayed = LibrarySort.sorted(base, by: sort)
+        duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
     }
 
     /// The detected non-standard-PDF status for a file, if the content index has seen it yet.
     func formatStatus(for path: String) -> PDFFormatStatus? { formatStatuses[path] }
+
+    /// Whether another currently-displayed row shares this file's base name (case-insensitive) — the
+    /// nav list then surfaces the containing folder to disambiguate. Read-only display aid.
+    func isDuplicatedName(_ name: String) -> Bool { DuplicateNames.isDuplicated(name, in: duplicatedNames) }
 
     private var formatGeneration = 0
     /// Fold the content index's per-file format flags (+ the corpus needs-attention count) into the
