@@ -56,15 +56,21 @@ work in it afterward — encode it into the umbrella `CLAUDE.md` / `AGENTS.md` (
 
 ## Current state  (Reader re-verified 2026-07-06)
 
-> Reader side re-verified 2026-07-06 (see the Reader entry below). The **Processor** side is being prepared
-> by a separate effort — treat its 2026-07-05 notes as owned/updated there, not here.
+> Both sides re-verified **2026-07-06** and confirmed merge-ready (Phase 0 satisfied on both). See each entry.
 
 **Archive Processor** — `~/Desktop/Claude/Archive Processor`
 - Remote: `git@github.com:charlesapetersen/archiveprocessor.git` (own repo). Mature: **v3.8.2**, tags v3.3.0→v3.8.2.
 - macOS SwiftUI app (Swift 6, XcodeGen `project.yml` authoritative, `.xcodeproj` gitignored) + **iOS** companion (`ArchiveCaptureiOS/`) + **Android** companion (`ArchiveCapture/`).
 - Release flow (in memory `release-process`): xcodegen → xcodebuild Release → stage `.app` + `ln -s /Applications` → `hdiutil` DMG → `gh release`. Ad-hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
-- Multi-agent ready (worktrees, `AGENTS.md`). Bundle prefix `com.archiveprocessor`.
-- ⚠️ Working tree dirty: `M ContentView.swift`, untracked `Capture/ProcessFilesTestDriver.swift`.
+- Multi-agent ready (worktrees, `AGENTS.md`). Bundle prefix `com.archiveprocessor`. `launch.sh` + `bootstrap.sh`
+  verified relocation-safe (each `cd`s to its own dir; `launch.sh` uses relative `APPDIR="ArchiveProcessor"`;
+  `bootstrap.sh` runs `xcodegen` for every `project.yml` it `find`s — so macOS + iOS regenerate after the move).
+- ✅ **Ready 2026-07-06:** working tree CLEAN + fully pushed; `pre-suite-merge` tagged + pushed (`c7ecc00`).
+  Build-verified this session on **macOS + Android + iOS**. 34 commits since the `v3.8.2` tag — automated test
+  suites (`scripts/test-smoke.sh`, `test-tier2.sh` + `tier2_assert.py`), Live Capture **per-capture streaming**
+  + connectivity diagnostics, and walkthrough/plan docs — all committed. (Streaming is build-verified +
+  Tier-2-reviewed with the one critical data-loss race already guarded; its on-device Wi-Fi/Run C behavior is
+  verified next session — **non-blocking** for this structural merge, and can happen in the monorepo.)
 
 **Archive Reader** — `~/Desktop/Claude/Archive Reader`  *(re-verified 2026-07-06)*
 - Remote: **already** `https://github.com/charlesapetersen/Archive-Suite.git` (the intended monorepo), Reader at repo root. DMG tooling not yet (Phase D). Now tagged **`pre-suite-merge`** → `1d21190` (revert point, pushed).
@@ -105,7 +111,19 @@ Archive-Suite/                       # the repo Reader already points at
 └── ArchiveCore/                     # OPTIONAL / deferred (D6) — shared UI-free package
 ```
 
-**Note the intentional double-naming** `ArchiveReader/ArchiveReader/` (root subdir / inner XcodeGen project dir). Each app's `launch.sh` uses a relative `APPDIR="ArchiveReader"`, so it keeps working unchanged after relocation. We accept the double name rather than rename schemes/targets.
+**On the double-naming** — `ArchiveReader/ArchiveReader/` and `ArchiveProcessor/ArchiveProcessor/` (outer =
+the relocated repo root; inner = that app's XcodeGen **project dir**, which each standalone repo already
+names after the app). It's a harmless byproduct of nesting an app-named project dir under an app-named
+product dir — builds/tooling are unaffected (each `launch.sh` uses a relative `APPDIR`, so the move doesn't
+change it). This merge **keeps it as-is (zero-risk)** — the Reader side is already verified against these
+paths, and re-touching it just to de-nest would add risk to the migration for a purely cosmetic gain.
+
+It is *cosmetic, not useful.* If the nesting bothers you, flatten it as a **separate, per-app,
+build-verified cleanup — ideally AFTER the merge** (so it never entangles the migration): in each app,
+`git mv <App>/<App> <App>/macOS`, then update only that app's `launch.sh` `APPDIR`, its `.gitignore`/doc
+path refs, and (Processor) the `scripts/test-*.sh` paths. The Xcode **scheme / target / `.app` name stay
+`ArchiveProcessor` / `ArchiveReader`** — only the folder is renamed, so schemes and bundle IDs are untouched.
+Deferred by default.
 
 ---
 
@@ -113,18 +131,20 @@ Archive-Suite/                       # the repo Reader already points at
 
 Legend: `[ ]` todo · `[x]` done · `[~]` in progress. Update the checkbox **and** the State table as you go.
 
-### Phase 0 — Safety net & prerequisites  `[~]`
+### Phase 0 — Safety net & prerequisites  `[x]`
 Do NOT start the merge with dirty trees or without a backup.
 
-> **Reader side DONE (2026-07-06):** tree clean + fully pushed (0.1–0.3) and `pre-suite-merge` created +
-> pushed at commit `1d21190` (0.4). Reader's former mid-sidebar work is long since committed. Remaining
-> Phase 0 work is Processor-side (separate effort) + 0.5 tooling. Leave the boxes `[ ]` until BOTH sides done.
+> **BOTH sides DONE (2026-07-06):** Reader — tree clean + pushed, `pre-suite-merge` @ `1d21190`. Processor —
+> tree clean + pushed, `pre-suite-merge` @ `c7ecc00` (its `ContentView.swift` + `ProcessFilesTestDriver.swift`
+> and the 34 commits since `v3.8.2` are all committed). 0.5 tooling confirmed. Phase 0 satisfied on both
+> sides — safe to start Phase A on owner go-ahead.
 
-- [ ] 0.1 Land or stash in-flight work: ~~commit Reader's sidebar work~~ (Reader: **done — committed**); commit/stash Processor's `ContentView.swift` + add-or-drop the untracked `ProcessFilesTestDriver.swift` (Processor: separate effort).
-- [ ] 0.2 Confirm clean trees: `git status` shows nothing to commit in **both** repos.
-- [ ] 0.3 Push both repos to their remotes (backup off-machine).
-- [ ] 0.4 Tag a revert point in **each** repo: `git tag pre-suite-merge && git push origin pre-suite-merge`.
-- [ ] 0.5 Confirm tooling: `xcodegen` installed (`brew install xcodegen`); `gh` = `/opt/homebrew/bin/gh` (the bare `gh` is a shadowing Python tool — see memory `release-process`).
+- [x] 0.1 Land or stash in-flight work: Reader sidebar work **committed**; Processor's `ContentView.swift` +
+  `ProcessFilesTestDriver.swift` (and all this-session work) **committed + pushed**.
+- [x] 0.2 Confirm clean trees: `git status` clean in **both** repos.
+- [x] 0.3 Push both repos to their remotes (backup off-machine).
+- [x] 0.4 Tag a revert point in **each** repo: Reader `pre-suite-merge` @ `1d21190`, Processor @ `c7ecc00` (both pushed).
+- [x] 0.5 Confirm tooling: `xcodegen` present (builds pass); `gh` = `/opt/homebrew/bin/gh` (bare `gh` is a shadowing Python tool — see memory `release-process`).
 
 ### Phase A — Relocate Reader into `ArchiveReader/`  `[ ]`
 Run in the Suite repo root (`~/Desktop/Claude/Archive Reader`). Everything moves **except** `.git` and this plan.
@@ -151,7 +171,9 @@ First relocate Processor's files inside its OWN repo (on a branch), then merge t
 cd ~/Desktop/Claude/"Archive Processor"
 git switch -c suite-relocate
 mkdir -p .suite-stage
-for p in $(git ls-tree --name-only HEAD); do git mv "$p" .suite-stage/; done
+# null-delimited (matches Phase A) so any tracked top-level name is handled safely; `.suite-stage` is
+# untracked, so ls-tree won't list it.
+while IFS= read -r -d '' p; do git mv "$p" .suite-stage/; done < <(git ls-tree -z --name-only HEAD)
 git mv .suite-stage ArchiveProcessor
 git commit -m "Suite: relocate Archive Processor into ArchiveProcessor/ subdir"
 
@@ -225,5 +247,5 @@ git remote remove processor
 | Overall | PLANNED — not started (awaiting owner go-ahead) |
 | Current phase | — |
 | Branch | `suite-merge` will be created at Phase A (not yet) |
-| Last verified | Reader 2026-07-06 (clean, pushed, `pre-suite-merge` tagged); Processor per separate effort |
-| Blocking | Owner go-ahead to execute Phase A+. **Reader side READY** (0.1–0.4 done). Processor-side Phase 0 handled separately. |
+| Last verified | 2026-07-06 — Reader (clean, pushed, `pre-suite-merge` @ `1d21190`) + Processor (clean, pushed, `pre-suite-merge` @ `c7ecc00`, macOS/Android/iOS builds green) |
+| Blocking | **Only owner go-ahead to execute Phase A+.** Phase 0 fully satisfied on BOTH sides. |
