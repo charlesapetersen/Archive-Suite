@@ -1,13 +1,40 @@
 # Live Capture Connectivity — Implementation Plan
 
-**Created 2026-07-06. Status: not started.** Durable engineering plan for the two connectivity
+**Created 2026-07-06. Last updated 2026-07-06.** Durable engineering plan for the two connectivity
 threads flagged in `KNOWN_ISSUES.md` ("Wi-Fi pairing fails silently when the network blocks
 device-to-device") and `POTENTIAL_FEATURES.md` ("Live Capture transport — bypass networks that block
 device-to-device"). This file is the actionable expansion of those two entries — read them for the
 motivation; read this to build.
 
-**Scope:** (1) make the failure legible + actionable (near-term), and (2) add transport bypasses for
-networks with client/AP isolation. Both companions must stay in sync. `Net/` and the phone↔Mac
+## Status (as of 2026-07-06)
+
+Workstream **S**, **P0**, and **P1** shipped the same day this plan was written (commits `d7d2fc3` +
+`c7ecc00`) — so this is **no longer a from-scratch plan**; it is now the record of what landed plus the
+open work (P2/P3 + on-device verification). Each phase below carries a status banner.
+
+| Phase | What | State |
+|-------|------|-------|
+| **S** | Per-capture streaming (data safety) | ✅ **Implemented** (`c7ecc00`) — build-verified on Mac + Android + iOS; Tier-2 adversarial review done (a **critical data-loss race** was found and guarded via `clearFiled`). Residual refinements tracked in `KNOWN_ISSUES.md`. |
+| **P0** | Hotspot guidance + Mac hint + all-IPv4s | ✅ **Implemented** (`d7d2fc3`/`c7ecc00`). Deviation: the hint shows whenever the server is running, not on a 20 s "not paired yet" timer — see P0. |
+| **P1** | Reachability preflight + honest diagnostics | ✅ **Implemented** (`c7ecc00`, Tier-2) — typed result on all companions; Android `QrAnalyzer.rearm()`; a `POST /session/disconnect` Re-pair signal was added too. |
+| — | **On-device Wi-Fi + Run C walkthrough** | ⏳ **OWED — top remaining task.** S/P0/P1 are build-verified only, never run on a phone over Wi-Fi (`NEXT_STEPS.md`, `LIVE_CAPTURE_ANDROID_TEST.md`). |
+| **P2** | Peer-to-peer transport | ❌ **Dropped (2026-07-06)** by the two-transport consolidation — iOS-only + a specialized stack to maintain. See `LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md` §0. |
+| **P3** | Cloud relay | 🔵 **Chosen & concretized as a Google Drive relay** in `LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md`. Owner: privacy is **not** a concern for this path (was the gate). |
+
+**"Use AirDrop / Quick Share instead?"** — evaluated 2026-07-06; **not a viable transport** (no automation
+API, a manual per-file Accept, and Android has no macOS peer at all). See
+[§ Evaluated & rejected: AirDrop / Quick Share](#evaluated--rejected-airdrop--quick-share-as-a-transport).
+
+> **⭐ Transport decision (2026-07-06): consolidated to two fallbacks — USB (shipped) + a Google Drive cloud
+> relay.** **P2 (peer-to-peer) is dropped**, and personal-hotspot is demoted to last-resort (it forces the
+> Mac off venue Wi-Fi onto often-unreliable reading-room cell). The cloud path is specified in detail in
+> **`LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md`**, which **supersedes P2/P3 below**. Rationale: reliability first,
+> few options to maintain, the Mac must keep venue Wi-Fi, privacy is not a concern. LAN Wi-Fi remains the
+> zero-config happy path whenever the network permits device-to-device.
+
+**Scope:** (1) make the failure legible + actionable (near-term) — **done (P0/P1)**; and (2) add transport
+bypasses for networks with client/AP isolation — **now scoped to the Google Drive cloud relay** (see the
+dedicated plan). Both companions must stay in sync. `Net/` and the phone↔Mac
 protocol are **Tier-2 (adversarial review before shipping)** per `CLAUDE.md`. The **"never lose a
 photo" invariant** (durable disk queue + idempotent re-upload) must hold for every new transport.
 
@@ -23,9 +50,11 @@ photo" invariant** (durable disk queue + idempotent re-upload) must hold for eve
   `CaptureSession.swift:72-82`). Rendered as a QR at `LiveCaptureView.swift:331-340`; the raw
   `ip:port` is also shown as selectable text (`LiveCaptureView.swift:162-166`).
 - Server: `Net/CaptureServer.swift` — `NWListener` on fixed port **48627** (`CaptureServer.swift:30`,
-  falls back to a system port if busy). Routes `GET /ping`, `POST /photo`, `POST /session/complete`,
-  all Bearer-authed (`CaptureServer.swift:192-249`). `GET /ping` calls `session.markPaired()` and
-  returns `200 {ok:true}`; a bad token → `401`; unknown route → `404`.
+  falls back to a system port if busy). Routes, all Bearer-authed: `GET /ping` (`:203`), `POST /photo`
+  (`:207`), `POST /segment/complete` (`:242` — **added by Workstream S**, carries `X-Group` + tags),
+  `POST /session/complete` (`:258`), `POST /session/disconnect` (`:267` — **added for the Re-pair
+  signal**). `GET /ping` calls `session.markPaired()` and returns `200 {ok:true}`; a bad token → `401`;
+  unknown route → `404`.
 - The Mac already advertises a Bonjour service `_archivecap._tcp` (`CaptureServer.swift:47`) but no
   companion browses it today (they dial the explicit IP from the QR).
 - USB: `Net/USBBridge.swift` keeps `adb reverse tcp:<port> tcp:<port>` asserted on a 5 s timer
@@ -43,7 +72,7 @@ photo" invariant** (durable disk queue + idempotent re-upload) must hold for eve
   (`Prefs`) + sets `client`; on failure sets `statusMessage = "Could not reach $host:$port"`.
 - `net/MacClient.kt`: `ping()` (`:18-24`) uses OkHttp with **5 s connectTimeout / 30 s callTimeout**;
   returns `Boolean` (any exception → `false`).
-- **The silent-failure trap (Android):** on AP isolation the TCP SYN is dropped → `ping()` times out
+- **The silent-failure trap (Android) — ✅ FIXED by P1 (`c7ecc00`); retained here as the original diagnosis:** on AP isolation the TCP SYN is dropped → `ping()` times out
   at ~5 s → `statusMessage` shows a terse *"Could not reach host:port"* with **no cause, no fallback**.
   Worse, `QrAnalyzer.done` latches `true` on the first decode (`QrAnalyzer.kt:18,37-38`) and the
   analyzer is a single `remember { … }` instance (`ConnectScreen.kt:89`), so **re-pointing at the QR
@@ -60,7 +89,7 @@ photo" invariant** (durable disk queue + idempotent re-upload) must hold for eve
   `await MacClient(endpoint: ep).ping()`; success saves endpoint + sets `client`.
 - `Net/MacClient.swift`: `makeRequest` hardcodes **`timeoutInterval: 30`** (`:10`) for *every* request
   including `ping()` (`:20-24`); returns `Bool`.
-- **The silent-failure trap (iOS):** on AP isolation the user watches a "Connecting…" spinner for
+- **The silent-failure trap (iOS) — ✅ FIXED by P1 (`c7ecc00`); retained here as the original diagnosis:** on AP isolation the user watches a "Connecting…" spinner for
   **up to ~30 s**, then gets a **misleading** message telling them to check they're on the same Wi-Fi
   (they are — the AP is isolating clients). Re-scan works (the sheet is recreated each present, so
   `QRScannerView.Coordinator.handled` resets), but the guidance is wrong and the wait feels dead.
@@ -102,6 +131,17 @@ drop-in impls that leave the queue, retry, and dedup logic untouched.
 ---
 
 ## Workstream S — Per-capture streaming (DATA SAFETY, HIGHEST PRIORITY)
+
+> ✅ **IMPLEMENTED 2026-07-06 (`c7ecc00`) — build-verified on Mac + Android + iOS; Tier-2 adversarial
+> review done.** Pages stream as shot; End segment sends `POST /segment/complete` (`CaptureServer.swift:242`)
+> carrying the tags; the Mac gates its tag card on `completedDocGroups` (`CaptureSession.swift:24`, computed
+> `:299-301`, populated by `markSegmentComplete` `:315` / `completeAllOpenDocGroups` `:323`). The review found
+> a **critical data-loss race** — a still-uploading page finalized out, then `session.clear()` deletes its
+> only copy — now **guarded** by `CaptureSession.clearFiled` (`:252`), which deletes only pages actually filed
+> into output and keeps any straggler. **Owed:** on-device Run C verification + the residual refinements now
+> tracked in `KNOWN_ISSUES.md` ("Per-capture streaming — implemented; residual refinements": straggler
+> omitted-from-output, `needsResend` for P10/reclassify in-flight, `completedDocGroups` persistence). The spec
+> below is retained as the build reference.
 
 **This is separate from connectivity (it's about *when* photos upload, not *how* devices connect) and it
 outranks every phase below.** See the `[HIGH — data safety]` entry in `KNOWN_ISSUES.md`.
@@ -168,6 +208,13 @@ same upload/queue path) and before P2/P3, since any new transport must preserve 
 
 ## Phase P0 — Personal-hotspot guidance + Mac-side hint (near-zero code)
 
+> ✅ **IMPLEMENTED 2026-07-06 (`d7d2fc3`/`c7ecc00`).** Mac client-isolation hint + `allIPv4Candidates()`
+> (`CaptureSession.swift:410`, shown in `LiveCaptureView.swift:177-195`) so the operator can try an alternate
+> address in manual entry; hotspot/USB fallback copy on both companions. **Deviation from the spec below:** the
+> hint shows whenever `session.serverRunning` (`LiveCaptureView.swift:213`), **not** gated on a 20 s
+> `serverReadyAt` "haven't paired yet" timer — that `@Published serverReadyAt` was never added. Simpler; if the
+> always-on hint proves noisy in practice, add the timer as originally specified.
+
 **Goal:** give the operator a working escape hatch *today*, purely with copy + one Mac signal.
 **Effort: S. Risk: very low (copy + a timer-driven label; no protocol change).**
 
@@ -202,6 +249,19 @@ same upload/queue path) and before P2/P3, since any new transport must preserve 
 ---
 
 ## Phase P1 — Reachability preflight + honest diagnostics (the core near-term fix)
+
+> ✅ **IMPLEMENTED 2026-07-06 (`c7ecc00`, Tier-2).** Short-timeout reachability preflight returning a typed
+> result on every companion — iOS `ConnectResult` (`MacClient.swift:8`) + `reachability(timeout:3.5)` (`:37`)
+> and a `ConnectPhase` state machine (`CaptureViewModel.swift:8-15`, `@Published` `:34`); Android
+> `Reachability { OK, UNAUTHORIZED, REFUSED, UNREACHABLE }` (`MacClient.kt:12`) + `reachability()` (`:38`).
+> These drive cause-named messages (unreachable / refused / unauthorized) + a "Try again" retry
+> (`ConnectScreen.swift:78,87,89,100`; Android `CaptureViewModel.kt:155,165-174`). Android `QrAnalyzer.rearm()`
+> (`QrAnalyzer.kt:23`) fixes the latched-scanner dead end. A `POST /session/disconnect`
+> (`CaptureServer.swift:267`) Re-pair signal was added alongside so the Mac re-shows its QR. **Companions
+> diverged slightly:** iOS uses the full `ConnectPhase` enum; Android the flatter `Reachability` enum
+> (functionally equivalent messages) — fine, but note it if you touch both. The iOS upload timeout stays 30 s;
+> only the preflight is short (`MacClient.swift:15-17`). **Owed:** on-device Wi-Fi verification (the build-time
+> check was the `192.0.2.1`/closed-port/wrong-token triad below). The spec + tests below are retained.
 
 **Goal:** the phone never sits on a dead scanner; on failure it names the **cause** and the
 **fallbacks**, and offers a clean **retry**. Implemented identically on both companions.
@@ -275,6 +335,67 @@ token is stale. Today `ping()` collapses all of these to `false`.
   valid QR — assert it now connects (proves `rearm()` fixed the latched-`done` dead end).
 - **Optional Mac-side block:** an `pfctl`/Application-Firewall rule dropping inbound `48627` reproduces
   isolation with a real server present, if you want an end-to-end drop rather than a bogus IP.
+
+---
+
+## Evaluated & rejected: AirDrop / Quick Share as a transport
+
+**Question (2026-07-06):** "Mac and Android now have AirDrop / an AirDrop equivalent — could that work
+around Wi-Fi that blocks device-to-device?" **Verdict: not as an automatable transport for Live Capture —
+but the intuition about the *radio* is correct, and it is exactly what P2 harnesses.** Documented in full
+here so the question doesn't get re-opened.
+
+### What actually exists in 2026 (checked, not assumed)
+- **AirDrop is Apple-only** and has **no third-party send API**. `NSSharingService`/`sendViaAirDrop` and
+  `UIActivityViewController` can *offer* AirDrop, but there is **no API to pick the recipient** (the user
+  taps a device in a picker) and **the recipient must manually Accept every transfer**. Custom app-to-app
+  payloads open in **Files.app / Photos, not the sending app's peer** — bypassing the Mac's
+  `CaptureSession.ingest` (the durable-manifest-before-ack path).
+- **Quick Share (Android) now interoperates with AirDrop — and it *does* reach Macs.** Google shipped this on
+  the **Pixel 10** series (Nov 2025), expanding to more Android devices through 2026 (Google reverse-engineered
+  AirDrop's protocol; Apple made no changes). It works Pixel→Mac: on the phone *Share → Quick Share → pick the
+  Mac*; on the Mac you must first set AirDrop to **"Everyone for 10 minutes"** (or be in contacts) and then
+  **manually Accept** the incoming file. Crucially it is a **system share-sheet feature with no
+  third-party/programmatic API** — an app cannot drive it. (There is still **no general Quick Share macOS
+  client**; the only other Mac option is the unofficial, receive-only NearDrop.)
+
+### Why it can't back Live Capture (either platform)
+Live Capture streams pages **continuously and unattended**, and the Mac must ingest each into the durable
+backup folder via `ingest` (idempotent `(group,seq)`, ack-on-durable) so "never lose a photo" holds.
+AirDrop / Quick-Share-to-AirDrop fails every one of those:
+1. **Manual, per-transfer.** A human tap-to-send on the phone **and** a tap-to-Accept on the Mac, for each
+   transfer — impossible for a hundreds-of-photo segment streaming as it is shot. It reverts to a
+   batch-at-End-segment hand-off — exactly the data-loss shape **Workstream S** removed.
+2. **No API to drive it.** Neither platform exposes a programmatic send an app can call in a loop; both are OS
+   share UIs.
+3. **Lands in the wrong place.** Received files go to the Mac's **Downloads/Photos**, not into the app — so
+   `ingest`, the `(group,seq)` dedup, the tag/priority metadata, and the ack contract are all bypassed. Back to
+   loose files with no idempotency and no delivery guarantee.
+4. **Device-limited on Android.** The interop is **Pixel-10-class / 2026 flagships**, not general Android — it
+   can't be the companion's baseline transport.
+
+### The kernel of truth: it *is* P2 (and it softens the Android asymmetry slightly)
+AirDrop and Quick-Share-to-AirDrop ride a **peer-to-peer radio with no access point** (Apple AWDL / a
+compatible P2P Wi-Fi link), so they genuinely **do** sidestep the client/AP isolation that breaks LAN pairing
+— the instinct is right. The way to *program against that radio* on iOS↔Mac is **`MultipeerConnectivity`**
+(the same AWDL/peer-Wi-Fi/Bluetooth stack, but with delivery callbacks, framed messages, and no manual
+Accept) — i.e. **exactly Phase P2**. Building P2 is how we get AirDrop's bad-network immunity *without* its
+un-automatable UX.
+
+For **Android↔Mac**, the Quick-Share-to-AirDrop interop means newer Androids finally *have* a manual
+peer-to-peer path to a Mac (previously there was none) — but with **no API it is still not a transport we can
+build on**. The P2 recommendation is unchanged: **iOS gets true P2P via MultipeerConnectivity; Android stays
+on USB + personal hotspot** for programmatic transfer.
+
+### The one legitimate (manual, degraded) use — document, don't build
+An operator on a hostile network *could* finish a segment and **manually Quick-Share/AirDrop the batch** to the
+Mac, with the Mac watching `~/Downloads`. That is a hand-driven, local flavour of P3's watched-folder relay:
+manual taps, skips the streaming + ingest invariant, Pixel-10-class-only on Android — an **emergency stopgap
+worth a line in the docs**, not a transport to build. **Net: pursue P2 (MultipeerConnectivity) for the iOS
+peer-to-peer win; do not build on AirDrop / Quick Share directly.**
+
+_(Verified 2026-07-06 via Google Pixel "Quick Share to iPhone/Mac" pages + Pixel support threads, 9to5Google's
+supported-device list, MacRumors/AppleInsider interop coverage, and Apple's `NSSharingService` docs.)_
 
 ---
 
@@ -388,24 +509,30 @@ confirms it has them." Default OFF. Do not enable without the owner's decision.
 
 ---
 
-## Recommended sequencing & first step
+## Recommended sequencing & next step
 
-1. **Ship P1 + P0 together first** — highest value per unit effort. P1 turns both silent-failure
-   traps into an actionable screen; P0's copy/Mac-hint ride along for free. Do the **iOS diagnostics
-   first** (worst offender: ~30 s dead spinner + a *wrong* "same Wi-Fi" message), then Android
-   (fix the latched-`QrAnalyzer` dead end + the terse message), keeping strings identical.
-2. **Then the transport abstraction** (`SegmentTransport` on both phones, `CaptureReceiver` on the
-   Mac) as a behavior-preserving refactor — it unblocks P2/P3 and is independently reviewable.
-3. **P2 iOS MultipeerConnectivity** for true infra-less pairing; keep Android on hotspot/USB.
-4. **P3 cloud relay** last, and only after the owner's privacy decision; build behind
-   `FileRelayTransport` for testing.
+1. ~~**Ship P1 + P0 together first.**~~ ✅ **Done (`c7ecc00`)** — together with **Workstream S** streaming,
+   build-verified on Mac + Android + iOS with a Tier-2 adversarial pass (which caught and guarded a critical
+   data-loss race). The old "first step" (P1 on iOS + mirror on Android) is shipped.
+2. **⏳ NEXT — on-device Wi-Fi + Run C walkthrough (no new code).** S/P0/P1 have never run on a phone over
+   Wi-Fi — the original walkthrough was USB-only because the venue Wi-Fi had client isolation. Validate
+   pairing + the "never lose a photo" failure cases on a **trusted network / personal hotspot** before
+   building any new transport (a new transport must preserve exactly what this pass confirms). Script:
+   `LIVE_CAPTURE_ANDROID_TEST.md` (Run A §A1 + Run C), then the iPhone walkthrough. In the same pass, close
+   the **residual Workstream-S refinements** in `KNOWN_ISSUES.md` (straggler omitted-from-output;
+   `needsResend` for per-page P10 / reclassify while a page is in-flight; `completedDocGroups` persistence).
+3. **Then the transport abstraction** (`SegmentTransport` on both phones, `CaptureReceiver` on the Mac) as a
+   behavior-preserving refactor — **still not started**; it unblocks P2/P3 and is independently reviewable.
+   Reconcile the **Bonjour service-name mismatch** here (`ArchiveCaptureiOS/project.yml:36` `_archiveproc._tcp`
+   vs Mac `_archivecap._tcp` at `CaptureServer.swift:47`) before any mDNS/MC discovery relies on it.
+4. **P2 iOS MultipeerConnectivity** for true infra-less pairing (the real, automatable "AirDrop-like" win —
+   see the AirDrop/Quick-Share evaluation above); keep Android on hotspot/USB.
+5. **P3 cloud relay** last, and only after the owner's privacy decision; build behind `FileRelayTransport`.
 
-**Concrete first step:** implement P1 on iOS — add `ConnectResult`/`ConnectPhase`, a short-timeout
-`reachability()` in `MacClient.swift` that distinguishes timeout / refused / 401 / ok, and rework
-`ConnectScreen.swift` to show *"connecting to <ip>:<port>…"* → a cause-named message + "Try again",
-then mirror it on Android (including `QrAnalyzer.rearm()`), and add the Mac "not paired yet" hint in
-`LiveCaptureView.swift`. Validate entirely with the `192.0.2.1` / wrong-port / wrong-token triad
-described in P1 — no blocked network required. Tier-2 review before shipping.
+**Concrete next step:** run the **on-device Wi-Fi + Run C walkthrough (#2)** to confirm S/P0/P1 on a real phone
+over Wi-Fi — that is the gating item now, since the build-time validation (the `192.0.2.1`/closed-port/
+wrong-token triad in P1) is already done. When ready to build again, start **P2 with the
+`SegmentTransport`/`CaptureReceiver` refactor (#3)**.
 
 ---
 

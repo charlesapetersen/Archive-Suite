@@ -57,14 +57,16 @@ sits on a dead scanner. Make the failure legible + give escape hatches.
   finalize. Empower it (drive the Mac finalize), relabel it, or remove it. `POTENTIAL_FEATURES.md`.
 
 ## Longer-term connectivity (bigger, gated)
-- **P2 — iOS peer-to-peer transport** (MultipeerConnectivity) to bypass infrastructure Wi-Fi entirely;
-  Android has no matching macOS peer, so its bypass stays hotspot/USB. Behind a `SegmentTransport`
-  abstraction. `LIVE_CAPTURE_CONNECTIVITY_PLAN.md` → P2.
-- **P3 — cloud relay** (works off-site). **Owner privacy decision required** (archival photos transit
-  third-party storage); build behind a local `FileRelayTransport` for auth-free testing; preserve the
-  durable-queue + idempotency invariant. `LIVE_CAPTURE_CONNECTIVITY_PLAN.md` → P3.
-- Reconcile the Bonjour service-name mismatch (iOS `_archiveproc._tcp` vs Mac `_archivecap._tcp`) before
-  any mDNS/MultipeerConnectivity discovery work.
+**Decision (2026-07-06): two fallback transports only — USB (shipped) + a Google Drive cloud relay.** P2
+(peer-to-peer / MultipeerConnectivity) is **dropped**; personal-hotspot is last-resort (it forces the Mac
+off venue Wi-Fi onto often-unreliable reading-room cell). LAN Wi-Fi stays the zero-config happy path.
+- **Cloud relay (Google Drive)** — the wireless bypass for client-isolated networks; works off-site too;
+  keeps the Mac on venue Wi-Fi (device↔cloud, no device-to-device; uses the Drive **API**, not the desktop
+  sync app). Detailed, buildable plan: **`LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md`**. First step = the
+  `SegmentTransport`/`CaptureReceiver` refactor + a local `FileRelayTransport` to prove the relay contract
+  auth-free. **Owner: privacy is not a concern for this path** (was the old P3 gate). Reconcile the Bonjour
+  service-name mismatch (`_archiveproc._tcp` vs `_archivecap._tcp`) during the `Net/` refactor.
+- **USB** stays the wired fallback (already shipped).
 
 ---
 
