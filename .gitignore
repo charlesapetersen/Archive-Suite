@@ -1,0 +1,28 @@
+# Archive Suite — root .gitignore (each app also has its own, covering its build/xcodeproj/etc.)
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Build artifacts — apps build under their own subdir; belt-and-suspenders at root too.
+build/
+DerivedData/
+*.xcodeproj/
+**/xcuserdata/
+*.xcuserstate
+
+# Release artifacts — the combined DMG is a build output; NEVER commit it.
+release/*.dmg
+*.dmg
+
+# Transient per-app maintenance / resume state (session working files).
+.maintenance/
+
+# Local test corpora — large, irreplaceable image collections; never version-controlled, never modified.
+Test files/
+Test Files/
+Test Outputs/
+
+# API keys
+*.env
