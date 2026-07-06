@@ -3,9 +3,13 @@
 Bring **Archive Processor** and **Archive Reader** together into a single offering, **Archive Suite**,
 as one monorepo with two separate macOS apps, one combined installer, and one place for maintenance.
 
-> **Status:** PLANNED — awaiting owner go-ahead to execute (owner chose "plan only, then approve").
+> **Status (2026-07-06):** EXECUTED locally through Phase E; **network publish deferred** (owner on a
+> plane / limited uploads). Phases A–D **done and committed on local `main`**; Phase E is done except the
+> uploads (DMG built at `/tmp/ArchiveSuite-1.0.0.dmg`; `main` merged + `suite-v1.0.0` tag created **locally**,
+> **not pushed** — `main` is 120 commits ahead of `origin/main`). Phase F not started. **Nothing remote has
+> changed; nothing destructive has run.** Resume the uploads on good connectivity — see §Resume when back online.
+>
 > This document is the durable, resumable source of truth. Every step is idempotent and re-runnable.
-> If interrupted, read the **State** table, then resume at the first unchecked step. See §Resume.
 
 ---
 
@@ -146,7 +150,8 @@ Do NOT start the merge with dirty trees or without a backup.
 - [x] 0.4 Tag a revert point in **each** repo: Reader `pre-suite-merge` @ `1d21190`, Processor @ `c7ecc00` (both pushed).
 - [x] 0.5 Confirm tooling: `xcodegen` present (builds pass); `gh` = `/opt/homebrew/bin/gh` (bare `gh` is a shadowing Python tool — see memory `release-process`).
 
-### Phase A — Relocate Reader into `ArchiveReader/`  `[ ]`
+### Phase A — Relocate Reader into `ArchiveReader/`  `[x]`
+> **DONE 2026-07-06** (commit `59e57e9` on `main`). Tracked files under `ArchiveReader/`; history preserved (`--follow`); Reader Release build green in new location. Gitignored `.maintenance/` + `Test files/` left at root (now covered by the new root `.gitignore`).
 Run in the Suite repo root (`~/Desktop/Claude/Archive Reader`). Everything moves **except** `.git` and this plan.
 ```bash
 cd ~/Desktop/Claude/"Archive Reader"
@@ -164,7 +169,8 @@ git commit -m "Suite: relocate Archive Reader into ArchiveReader/ subdir"
 - [ ] A.1 Tracked files relocated under `ArchiveReader/` (root now: `.git`, `ArchiveReader/`, `SUITE_MERGE_PLAN.md`).
 - [ ] A.2 Regenerate build state in the new location: `cd ArchiveReader && ./bootstrap.sh` (or `xcodegen generate`), then `./launch.sh` builds & runs. (Gitignored `build/`, `.xcodeproj`, `.maintenance/` don't move with `git mv` — regenerate; delete any stale copies left at the old root.)
 
-### Phase B — Merge Processor in WITH full history  `[ ]`
+### Phase B — Merge Processor in WITH full history  `[x]`
+> **DONE 2026-07-06** (relocate `6cf7be3` on the ex-Processor `suite-relocate` branch; merge `8e3a6fc` on `main`). `--allow-unrelated-histories` merge; companions (Android `ArchiveCapture/` + iOS `ArchiveCaptureiOS/`) present; Processor history + all tags `v1.0.0`–`v3.8.2` carried in; **both apps Release-build green in the monorepo** (B.3). ⚠️ The carried-in bare `v1.0.0` tag means the Suite release tag is namespaced **`suite-v1.0.0`** (see Phase E / D3).
 First relocate Processor's files inside its OWN repo (on a branch), then merge that branch into the Suite repo. Because Reader is under `ArchiveReader/` and Processor under `ArchiveProcessor/`, there are **no path conflicts**.
 ```bash
 # 1) In the Processor repo — relocate onto a branch
@@ -190,7 +196,8 @@ git remote remove processor
 - [ ] B.3 Both apps build from the monorepo: `cd ArchiveProcessor && ./bootstrap.sh && ./launch.sh`; likewise Reader.
 - Alternative if preferred: `git subtree add --prefix=ArchiveProcessor <remote> main`. The relocate-then-merge path above is chosen for cleaner full-history + tags.
 
-### Phase C — Suite scaffolding (umbrella docs + shared tooling)  `[ ]`
+### Phase C — Suite scaffolding (umbrella docs + shared tooling)  `[x]`
+> **DONE 2026-07-06** (commit `5366aee` on `main`). All of C.1–C.7 landed: root `README.md`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, `SPEC/tag-format.md`, and the `./launch.sh reader|processor` dispatcher. The token-efficiency directive is encoded into the umbrella `CLAUDE.md`/`AGENTS.md`. **`SPEC/tag-format.md` surfaced real (pre-existing) contract-drift to fix later** — see §Follow-ups.
 - [ ] C.1 Root `README.md` — the offering: what the Suite is; the **workflow** (Processor *captures/OCRs/tags* → Reader *reads/triages* the tagged PDFs); install both; per-app links.
 - [ ] C.2 Root `CLAUDE.md` — umbrella: repo map, monorepo conventions, release process, links to each app's `CLAUDE.md` (which stay authoritative for their app). Fold in the `release-process` memory (gh path gotcha, DMG steps).
 - [ ] C.3 Root `AGENTS.md` — multi-agent lanes now span two apps + companions; per-worktree `-derivedDataPath ./build/DD`; shared hotspots (`SPEC/tag-format.md`, `project.yml` files, release script).
@@ -199,19 +206,20 @@ git remote remove processor
 - [ ] C.6 (Opportunistic, low-risk) Shared tooling dedup: a root `launch.sh` dispatcher (`./launch.sh reader|processor` → delegates to each app's `launch.sh`); note the near-duplicate `scripts/makeicon.swift` as a future single-source. Keep per-app `launch.sh` working. (Also serves §Guiding directive — one shared path, no divergent copies.)
 - [ ] C.7 Encode the §Guiding directive (token-efficient feature-add & maintenance) into the umbrella `CLAUDE.md` and `AGENTS.md`: agents right-sized, scoped reads, per-app context isolation via ownership lanes + worktrees, DRY docs/tooling, batch/cache, correctness-and-safety-first guardrail. Make each per-app `CLAUDE.md` carry a tight Implementation Map so an agent loads one app + one spec, not the whole repo.
 
-### Phase D — Combined installer (one DMG)  `[ ]`
+### Phase D — Combined installer (one DMG)  `[x]`
+> **DONE 2026-07-06** (in commit `5366aee`). `release/build-suite-dmg.sh` (+ `make-dmg-background.swift` → committed `dmg-background.png`) builds both Release apps, stages both `.app`s + one `Applications` symlink + the background, styles the Finder window (best-effort, plain-DMG fallback), and produces `/tmp/ArchiveSuite-<ver>.dmg`. **Built + smoke-tested `/tmp/ArchiveSuite-1.0.0.dmg` (4.3M):** both apps present + executable, `Applications`→`/Applications`, ad-hoc signed, layout persisted (D.3, verified without launching GUIs).
 - [ ] D.1 `release/build-suite-dmg.sh`: for each app — `xcodegen generate` then `xcodebuild -scheme <App> -configuration Release -derivedDataPath ./build/rel build`; stage **both** `ArchiveProcessor.app` + `ArchiveReader.app` into one temp dir; add `ln -s /Applications`; add `release/dmg-background.png`; set window layout + icon positions (AppleScript/`.DS_Store`); `hdiutil create -volname "Archive Suite <ver>" -srcfolder <stage> -ov -format UDZO /tmp/ArchiveSuite-<ver>.dmg`.
 - [ ] D.2 `release/dmg-background.png`: two app icons → arrow → **Applications**, "drag **both** apps here," plus a first-launch note (right-click → Open; ad-hoc signed / not notarized).
 - [ ] D.3 Smoke-test the DMG: mount, drag both to a scratch `/Applications`-like dir, launch each once.
 - Guidance goal met: the DMG guides users to drop **both** apps directly into Applications in one motion.
 
-### Phase E — First Suite release (v1.0.0)  `[ ]`
-- [ ] E.1 Merge `suite-merge` → `main`; push (`git push -u origin main`).
-- [ ] E.2 Build the combined DMG (Phase D).
-- [ ] E.3 `git tag v1.0.0 && git push origin v1.0.0`.
-- [ ] E.4 `/opt/homebrew/bin/gh release create v1.0.0 /tmp/ArchiveSuite-1.0.0.dmg --repo charlesapetersen/Archive-Suite --title "Archive Suite 1.0.0" --notes "…"`. (The `.dmg` is a build artifact — never commit it.)
+### Phase E — First Suite release (suite-v1.0.0)  `[~]  local done; uploads deferred (plane)`
+- [x] E.1 Merge `suite-merge` → `main` — **done locally** (fast-forward; `main` @ `5366aee`, 120 commits ahead of `origin/main`). **Push deferred** (23 MB of merged history; limited uplink).
+- [x] E.2 Build the combined DMG (Phase D) — `/tmp/ArchiveSuite-1.0.0.dmg` (4.3M), smoke-tested.
+- [x] E.3 Tag — **`suite-v1.0.0` created locally** (annotated), **not pushed**. Bare `v1.0.0` was unavailable (Processor's historical tag) — hence the `suite-` prefix, consistent with D3.
+- [ ] E.4 **DEFERRED (upload):** `/opt/homebrew/bin/gh release create suite-v1.0.0 /tmp/ArchiveSuite-1.0.0.dmg --repo charlesapetersen/Archive-Suite --title "Archive Suite 1.0.0" --notes-file <notes>`. (The `.dmg` is a build artifact — never commit it.) Draft notes: `scratchpad/suite-release-notes.md`.
 
-### Phase F — Deprecate the old Processor repo (D4)  `[ ]`
+### Phase F — Deprecate the old Processor repo (D4)  `[ ]  DEFERRED — do only AFTER the Suite release is live online`
 - [ ] F.1 On `charlesapetersen/archiveprocessor`: final commit updating README → "Archive Processor now ships as part of **Archive Suite**: <link>." Optional final release note pointing to the Suite DMG.
 - [ ] F.2 Archive the repo (read-only): `/opt/homebrew/bin/gh repo archive charlesapetersen/archiveprocessor`.
 - [ ] F.3 Update local remotes/notes: the `~/Desktop/Claude/Archive Processor` clone is now historical — future work happens in the Suite monorepo's `ArchiveProcessor/`. (Consider removing the standalone clone once comfortable, or keep as an archived backup.)
@@ -241,11 +249,44 @@ git remote remove processor
 3. If mid-merge and unsure: `git status`, `git log --oneline -5`, and compare against the phase you were on. To abort cleanly: `git merge --abort` (during Phase B) or reset the `suite-merge` branch to `pre-suite-merge`.
 4. Nothing is destructive until Phase E (push to main) and Phase F (archive old repo) — both explicitly owner-gated.
 
+## Resume when back online (the only remaining work — all uploads)
+
+Local `main` already holds the full merge + scaffolding; the DMG + `suite-v1.0.0` tag exist locally.
+Run these on good connectivity (in `~/Desktop/Claude/Archive Reader`):
+
+```bash
+# 1) Push the merged history + tags (~23 MB first push).
+git push origin main
+git push origin suite-v1.0.0
+git push origin --tags            # optional: also publishes Processor's preserved v1.0.0–v3.8.2 tags
+
+# 2) Publish the release with the combined DMG (rebuild if /tmp was cleared: release/build-suite-dmg.sh 1.0.0).
+/opt/homebrew/bin/gh release create suite-v1.0.0 /tmp/ArchiveSuite-1.0.0.dmg \
+  --repo charlesapetersen/Archive-Suite --title "Archive Suite 1.0.0" \
+  --notes-file /path/to/notes    # draft at scratchpad/suite-release-notes.md
+
+# 3) THEN Phase F — redirect + archive the old repo (only after the Suite release is verified live):
+#    edit archiveprocessor README → point to Archive-Suite; then:
+/opt/homebrew/bin/gh repo archive charlesapetersen/archiveprocessor
+```
+If `/tmp/ArchiveSuite-1.0.0.dmg` is gone (reboot), regenerate with `release/build-suite-dmg.sh 1.0.0`.
+
+## Follow-ups surfaced during the merge (not blocking; pre-existing, carry into the monorepo)
+`SPEC/tag-format.md` reconciled Processor's actual tag-writing code against Reader's documented "Verified
+Facts" and found drift worth fixing in **Archive Reader** (all handled safely today, but should be hardened):
+1. **Page-2 filename line:** Reader assumes `<basename>.jpg` and that the line is present; Processor writes the
+   *verbatim* original name (`.png/.tiff/.heic` possible) and **omits** the line when the source name is nil.
+   Reader must not hard-assume the extension or presence.
+2. **Year width:** Reader's doc says "4 digits"; its parser accepts **3–4** (Processor emits 4). Doc-only nit.
+3. **`Box`/`Folder`/`OCR Failed` as literal subject tags:** emitted by Processor, not enumerated in Reader's
+   facts (Reader classifies them as subjects — harmless, now documented in the spec).
+4. **Sort-key "signed for BC":** aspirational — no BC/negative-year token exists in the vocabulary.
+
 ## State
 | Field | Value |
 |-------|-------|
-| Overall | PLANNED — not started (awaiting owner go-ahead) |
-| Current phase | — |
-| Branch | `suite-merge` will be created at Phase A (not yet) |
-| Last verified | 2026-07-06 — Reader (clean, pushed, `pre-suite-merge` @ `1d21190`) + Processor (clean, pushed, `pre-suite-merge` @ `c7ecc00`, macOS/Android/iOS builds green) |
-| Blocking | **Only owner go-ahead to execute Phase A+.** Phase 0 fully satisfied on BOTH sides. |
+| Overall | **Executed A–E locally; uploads deferred (owner on a plane).** Nothing remote changed; nothing destructive ran. |
+| Local `main` | `5366aee` — full merge + scaffolding; **120 commits ahead of `origin/main` (unpushed)**; `suite-v1.0.0` tag local-only |
+| Artifacts | `/tmp/ArchiveSuite-1.0.0.dmg` (4.3M, smoke-tested); both apps Release-build green in the monorepo |
+| Remaining | Push `main` + tags; `gh release create suite-v1.0.0` w/ DMG; then Phase F (archive old repo). All network — see §Resume when back online. |
+| Revert | `git reset --hard pre-suite-merge` (Reader) restores the pre-merge tip; `origin/main` is already the pre-merge state |
