@@ -1,34 +1,26 @@
 import SwiftUI
 
 /// The left navigation sidebar. A navigable folder tree rooted at the archive root — selecting a
-/// folder scopes the list to that subtree; "All Files" clears the scope. (The Smart Folders section
-/// is added in Milestone B.) Read-only navigation: it only sets the in-memory filter's `pathPrefix`.
+/// folder scopes the list to that subtree; "All Files" clears the scope. A Smart Folders section
+/// (saved searches) sits above it. Read-only navigation: it only sets the in-memory filter's
+/// `pathPrefix` (or applies a saved filter) — it never writes anything to disk.
+///
+/// Selection uses a real `@State` (`List` + `OutlineGroup` drive it natively and reliably) plus a
+/// **two-way sync**: clicking a row performs the action, and any *external* filter change (filter-bar
+/// "Clear", `restoreViewState` on launch, a menu-driven `applySaved`) is mirrored back into the
+/// highlight. A computed `Binding` was tried instead but its `set` did not fire for `OutlineGroup`
+/// tree rows — clicks moved the highlight without scoping the list — so the two-way `@State` is the
+/// robust form. `setFolderScope`'s no-op guard makes the sync loop-safe (a sync-driven re-apply of an
+/// unchanged scope short-circuits).
 struct SidebarView: View {
     @ObservedObject var model: NavigationModel
     static let allFilesTag = "\u{0}ALL"
     static let smartPrefix = "SS:"
 
-    /// The highlighted row tracks the model's *real* folder scope (get), and clicking a row performs
-    /// the action (set). This keeps the highlight from going stale after the filter-bar "Clear",
-    /// `restoreViewState` on launch, or a menu-driven `applySaved`, and makes "All Files" reliably clear
-    /// the scope. Smart folders are actions: applying one snaps the highlight to the resulting scope.
-    private var selection: Binding<String?> {
-        Binding(
-            get: { model.filter.pathPrefix ?? SidebarView.allFilesTag },
-            set: { new in
-                if let new, new.hasPrefix(SidebarView.smartPrefix) {
-                    let id = String(new.dropFirst(SidebarView.smartPrefix.count))
-                    if let s = model.savedSearches.searches.first(where: { $0.id.uuidString == id }) {
-                        model.applySaved(s)   // applies the saved filter + OCR query
-                    }
-                } else {
-                    model.setFolderScope(new == nil || new == SidebarView.allFilesTag ? nil : new)
-                }
-            })
-    }
+    @State private var selection: String?
 
     var body: some View {
-        List(selection: selection) {
+        List(selection: $selection) {
             Section {
                 ForEach(model.savedSearches.searches) { s in
                     // Badge is tag-facet-only, so hide it for smart folders that also carry an OCR query
@@ -64,6 +56,29 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .onAppear { syncSelectionFromModel() }
+        .onChange(of: selection) { _, new in applySelection(new) }
+        .onChange(of: model.filter.pathPrefix) { _, _ in syncSelectionFromModel() }
+    }
+
+    /// Perform the action for a newly-clicked row: apply a saved search, or scope to a folder / clear.
+    private func applySelection(_ new: String?) {
+        if let new, new.hasPrefix(SidebarView.smartPrefix) {
+            let id = String(new.dropFirst(SidebarView.smartPrefix.count))
+            if let s = model.savedSearches.searches.first(where: { $0.id.uuidString == id }) {
+                model.applySaved(s)   // applies the saved filter + OCR query
+            }
+        } else {
+            model.setFolderScope(new == nil || new == SidebarView.allFilesTag ? nil : new)
+        }
+    }
+
+    /// Mirror the model's real folder scope into the highlight (so it never goes stale). A smart-folder
+    /// selection resolves to a concrete scope (its `pathPrefix`, usually nil → "All Files"); smart
+    /// folders are actions, not a durable highlight, matching the prior behavior.
+    private func syncSelectionFromModel() {
+        let want = model.filter.pathPrefix ?? SidebarView.allFilesTag
+        if selection != want { selection = want }
     }
 
     private func row(name: String, systemImage: String, count: Int?) -> some View {

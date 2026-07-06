@@ -305,25 +305,20 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Folder tree (sidebar)
 
-    // Cheap change-signatures so a tag edit (which never moves files and, for read-state/priority, never
-    // touches subjects) doesn't rebuild path-/subject-invariant derived state on every library emission
-    // (and doesn't re-run it a 2nd/3rd time on the Spotlight echo). Order-independent XOR of element
-    // hashes — a false "unchanged" (hash collision) only yields a briefly-stale cache, self-healing on
-    // the next real change; never a data risk.
+    // Cheap change-signatures (see `LibraryChangeSignature`) so a tag edit — which never moves files and,
+    // for read-state/priority, never touches subjects — doesn't rebuild path-/subject-invariant derived
+    // state on every library emission (or re-run it on the Spotlight echo). A false "unchanged" only ever
+    // yields a briefly-stale derived cache, self-healing on the next real change; never a data risk.
     private var pathsSig = 0, subjectsSig = 0, matchSig = 0
 
     /// React to a new `library.files`: rebuild only what actually changed, then recompute + index.
     private func libraryDidChange() {
         let files = library.files
-        let ps = files.reduce(0) { $0 ^ $1.url.path.hashValue }
+        let ps = LibraryChangeSignature.paths(files)
         if ps != pathsSig { pathsSig = ps; folderTree = buildFolderTree() }         // paths → folder tree
-        let ss = files.reduce(0) { acc, f in f.subjects.reduce(acc) { $0 ^ $1.hashValue } }
+        let ss = LibraryChangeSignature.subjects(files)
         if ss != subjectsSig { subjectsSig = ss; refreshSubjectsCache() }            // subjects → autocomplete
-        let ms = files.reduce(0) { acc, f in
-            var h = Hasher(); h.combine(f.url.path); h.combine(f.readState); h.combine(f.priority)
-            for s in f.subjects { h.combine(s) }
-            return acc ^ h.finalize()
-        }
+        let ms = LibraryChangeSignature.matchFacets(files)
         if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
         recompute()                                     // always — a row's read-state/tags may have moved it
         indexer.startIndexing(files)                    // incremental; no-op if running
@@ -331,8 +326,17 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Scope the list to a folder subtree (nil = whole root), then recompute.
+    ///
+    /// Recomputes explicitly rather than leaning on `NavigationWindowView`'s `.onChange(of: filter)`:
+    /// this is driven from the sidebar's `List(selection:)` binding, whose `set` runs *inside* SwiftUI's
+    /// selection-commit (a mutation during a view update). `.onChange` can miss such a change (it may
+    /// reconcile its tracked value to the new one before comparing), which left the highlight moving to
+    /// the clicked row while the list + status bar stayed on the old scope. Recompute here is the
+    /// deterministic path; the `.onChange` still covers filter-bar edits made from their own closures.
     func setFolderScope(_ path: String?) {
+        guard filter.pathPrefix != path else { return }
         filter.pathPrefix = path
+        recompute()
     }
 
     /// D2: recompute each smart folder's matching-file count over the whole library (cached; refreshed
