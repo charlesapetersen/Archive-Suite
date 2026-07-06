@@ -54,6 +54,9 @@ struct ZoomableImageView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            // Hit-test-transparent AppKit probe: supplies this canvas's backing NSView so the
+            // scroll monitor can confine pan-scroll to THIS view's frame (see startMonitor).
+            .background(ViewProbe(pan: pan))
             .clipped()
             .contentShape(Rectangle())
             .onAppear { pan.update(zoom: z, fit: fit, viewport: geo.size) }
@@ -73,17 +76,24 @@ struct ZoomableImageView: View {
         .onChange(of: url) { _, _ in load() }   // pan is handled by the image?.size / anchorTopOnLoad logic
     }
 
-    // MARK: Scroll-wheel / trackpad pan (only when zoomed in)
+    // MARK: Scroll-wheel / trackpad pan (only when zoomed in, and only over this view)
 
     private func startMonitor() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard pan.zoom > 1 else { return event }
+            // SCOPED, not app-wide: only pan+consume when the image is zoomed in AND the scroll
+            // event is over THIS view's backing frame. Otherwise return the event untouched so the
+            // filmstrip / tag-card thumbnail strip / any other view keeps receiving scroll.
+            // `pan.hostView` is the hit-test-transparent probe installed by `ViewProbe` — a SwiftUI
+            // struct owns no backing NSView, so we borrow the probe's frame to hit-test the pointer.
+            guard pan.zoom > 1, let host = pan.hostView, event.window === host.window,
+                  host.bounds.contains(host.convert(event.locationInWindow, from: nil))
+            else { return event }
             onUserAdjust?()
             pan.setOffset(width: pan.offset.width + event.scrollingDeltaX,
                           height: pan.offset.height + event.scrollingDeltaY)
             pan.commit()
-            return nil   // consume while panning the zoomed image
+            return nil   // consume only while panning the zoomed image the pointer is over
         }
     }
     private func stopMonitor() { if let m = scrollMonitor { NSEvent.removeMonitor(m); scrollMonitor = nil } }
@@ -117,6 +127,9 @@ private final class PanState: ObservableObject {
     private(set) var last: CGSize = .zero
     private(set) var zoom: CGFloat = 1
     private var maxOffset: CGSize = .zero
+    /// Backing NSView of the image canvas (from `ViewProbe`), used by the scroll monitor to confine
+    /// pan-scroll to this view's frame. Weak: owned by SwiftUI, may outlive/predecease this state.
+    weak var hostView: NSView?
 
     /// Refresh the zoom + max pan distance, and anchor the TOP of the image to the top of the viewport
     /// (don't zoom toward the center) so the first line of a document stays put as you zoom in. The
@@ -145,4 +158,24 @@ private final class PanState: ObservableObject {
         CGSize(width: min(maxOffset.width, max(-maxOffset.width, o.width)),
                height: min(maxOffset.height, max(-maxOffset.height, o.height)))
     }
+}
+
+/// Hands its backing NSView to `PanState` so the scroll monitor can hit-test the pointer against the
+/// image canvas's frame — scoping pan-scroll to this view instead of swallowing scroll app-wide.
+/// `hitTest` returns nil so the probe is invisible to mouse events, leaving the SwiftUI drag / pinch /
+/// tap gestures on the image completely intact.
+private struct ViewProbe: NSViewRepresentable {
+    let pan: PanState
+    func makeNSView(context: Context) -> HitTransparentView {
+        let v = HitTransparentView()
+        pan.hostView = v
+        return v
+    }
+    func updateNSView(_ nsView: HitTransparentView, context: Context) { pan.hostView = nsView }
+}
+
+/// A layout-only NSView that never intercepts events (so it can't disturb SwiftUI gesture handling);
+/// it exists purely to expose a backing view's `window`/`bounds` for the scroll hit-test.
+private final class HitTransparentView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
