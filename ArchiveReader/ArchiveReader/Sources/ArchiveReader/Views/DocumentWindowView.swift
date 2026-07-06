@@ -19,6 +19,7 @@ struct DocumentWindowView: View {
     var body: some View {
         VStack(spacing: 0) {
             if model.showingFind { findBar; Divider() }
+            if let note = model.formatNote { formatBanner(note); Divider() }
             content
             Divider()
             statusBar
@@ -86,6 +87,17 @@ struct DocumentWindowView: View {
             DragGesture(minimumDistance: 1, coordinateSpace: .named("split"))
                 .onChanged { g in fraction = min(0.85, max(0.15, g.location.x / max(total, 1))) }
         )
+    }
+
+    /// Slim warning strip shown above the panes when the document is image-only (no OCR text layer).
+    private func formatBanner(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(text).font(.callout)
+            Spacer()
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(Color.orange.opacity(0.12))
     }
 
     private var findBar: some View {

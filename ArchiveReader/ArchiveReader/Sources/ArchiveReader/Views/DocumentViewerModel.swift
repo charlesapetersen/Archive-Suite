@@ -51,6 +51,16 @@ final class DocumentViewerModel: ObservableObject {
     }
     var hasTextPage: Bool { textPage != nil }
 
+    /// A one-line warning when the current document is non-standard — image-only with no selectable
+    /// OCR text anywhere. `nil` for a standard document. (Open failures / empty PDFs are already
+    /// surfaced via `loadError`, so this focuses on the no-text-layer case.) Derived from the loaded
+    /// `PDFDocument` — no re-read; mirrors `PDFFormatStatus.noTextLayer`.
+    var formatNote: String? {
+        guard let doc = current, doc.pageCount > 0 else { return nil }
+        let hasText = (0..<doc.pageCount).contains { doc.page(at: $0)?.string?.isEmpty == false }
+        return hasText ? nil : "No OCR text layer — this document is image-only, so text search and copy won’t work here."
+    }
+
     /// Intelligent copy (prose-cleaned) from whichever pane holds the selection — ⌘⇧C.
     func copySelection() {
         let opts = AppSettings.copyOptions
