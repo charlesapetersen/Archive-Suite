@@ -49,18 +49,71 @@ Tier-2 GUI run below is worth your time. The app's own OCR→tag→PDF code is e
 (`Gemini`, `Mistral`, `Anthropic`, `Gateway`). The script reads them at runtime and **never prints
 them**; no key is ever written into this repo.
 
-> **To make Tier 2 unattended too** (optional, recommended follow-up): add a headless entry point to the
-> app — e.g. an env var `AP_PIPELINE_TEST=<inputDir>` that, on launch, runs the Process Files pipeline in
-> a no-review config, writes the PDFs + a result JSON, and exits (mirrors `LiveCaptureTestDriver` for the
-> batch/GUI path, which `CLAUDE.md` notes is currently the untested path). Then this script could assert
-> the real app output. Not built yet — ask and it's a ~half-day change behind a Tier-2 review.
+---
+
+## Tier 2A — Automated pipeline test (`scripts/test-tier2.sh`) — unattended
+
+Drives the **real Process Files pipeline** (OCR → segmentation → tagging → PDF) end-to-end with **no
+clicking**, via a headless hook built into the app (`Capture/ProcessFilesTestDriver.swift`, gated by
+`PROCESSFILES_TESTMODE=1`, inert in normal use). Run it and walk away:
+
+```bash
+./scripts/test-tier2.sh
+```
+
+**How it works (and why it's built this way):**
+- The hook drives a **private, unobserved `OCRProcessor`** (no SwiftUI view watches it) — otherwise the
+  pipeline's rapid `@Published` churn re-evaluates the main view and trips a **Swift-6
+  `swift_task_isCurrentExecutor` crash** in the view graph. Unobserved = identical pipeline, no UI, no crash.
+- A concurrent **auto-pilot** answers every review gate the way a human clicking "Continue" would
+  (accepting the LLM's segmentation/tagging proposals), so it runs fully unattended.
+- The app writes only a `TEST_DONE.txt` marker + a small `manifest.tsv` (per-file classification +
+  status). **All PDF / Finder-tag / sidecar verification is done externally** by `scripts/tier2_assert.py`
+  reading the run dir *after* the app exits (reading tags in-process contends with Spotlight and wedges).
+  Needs `pypdf` (present) for PDF page/header checks.
+- Each case launches the app with env config, waits for the marker, kills the app, asserts, and cleans up
+  the pipeline's `pending_run.json` resume-state so no stale "Resume Run" prompt is left behind.
+
+**Env contract** (all read by the driver; the key is passed straight through, never written to Keychain):
+
+| Var | Meaning |
+|---|---|
+| `PROCESSFILES_TESTMODE=1` | gate (inert otherwise) |
+| `PROCESSFILES_TESTKEY` | API key |
+| `PROCESSFILES_TESTIN` | input image folder |
+| `PROCESSFILES_TESTOUT` | output root (refuses `Test Files/`; writes only a fresh `run-<epoch>/`) |
+| `PROCESSFILES_TAGGING` | `automatic` \| `none` \| `copySource` (manual modes rejected — need human input) |
+| `PROCESSFILES_MAXIMAGES` | image cap (default 8) · `PROCESSFILES_PROVIDER`/`_MODEL` · `PROCESSFILES_EXPORTORIGINALS=1` |
+
+**What each mode verifies** (asserted from disk): every output is a **2-page PDF** with the `Extracted
+text.` page-2 header; **`none`** → no tags; **`copySource`** → source tags copied, no `Unread`;
+**`automatic`** → date (`YYYY` + `MM Month`) + 2–6 subjects, box → **Red**+`Box`, folder → **Purple**+`Folder`,
+**`Unread` stamped last**, JSON sidecar per document; and **segmentation classification vs the
+`Ground Truth Segmentation/*/…csv`** (reported as a match rate). Cost: cheapest models + small caps ≈ cents.
+
+The default suite runs `none` + `copySource` + `automatic` across the Dean and RG-165 ground-truth sets
+plus a dual-output (`exportOriginals`) case. Add lines / raise `MAXIMAGES` for a larger confidence run.
 
 ---
 
-## Tier 2 — GUI functional test (full coverage, incl. full OCR)
+## Tier 2B — GUI functional checklist (manual; the interactive UI itself)
 
-Drive the app by hand (or have Claude drive `launch.sh` + observe). Each row: **do → expect**. Check the
-box when it matches; if not, note it in `KNOWN_ISSUES.md`. Bring the app up with `./launch.sh`.
+Tier 2A covers the pipeline headlessly. This checklist covers the things that **only exist in the live
+UI** (and so aren't exercised headless): the review *dialogs* themselves, the cost estimator, Settings
+controls + help popovers + gray-out, the Tools tab, rotation review, error dialogs, gateway, and custom
+models. Drive the app by hand (`./launch.sh`). Each row: **do → expect**; note failures in `KNOWN_ISSUES.md`.
+
+**Suggested inputs (never modified — outputs only):**
+- **Small OCR set** — 3–4 images from `Test Files/Herrnstein/` (text-heavy letters).
+- **Segmentation set** — `Test Files/Ground Truth Segmentation/Herrnstein/` (has known boundaries +
+  a `test_results/` ground truth to compare the app's box/folder/start/continuation calls against).
+- **Mixed collection** — one folder under `Test Files/` that includes a box photo and a folder photo
+  (to exercise Red/Purple + `Unread`-last).
+- **PDF set** — a handful from the 586 `*.pdf` (pre-OCR'd / re-OCR path).
+
+### 2.0 Launch & shell
+- [ ] `./launch.sh` builds-if-stale and brings up the window (confirm `pgrep -x ArchiveProcessor`).
+- [ ] The three areas are reachable: **Process Files**, **Tools**, **Live Capture**; **Settings** opens with ⌘,.
 
 **Suggested inputs (never modified — outputs only):**
 - **Small OCR set** — 3–4 images from `Test Files/Herrnstein/` (text-heavy letters).
