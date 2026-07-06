@@ -36,22 +36,29 @@ Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneVie
 
 ## P2 — Reader features (no network; local build/test)
 - [x] Non-standard-PDF **detection layer** — `Core/PDFFormatStatus.swift` (standard/unreadable/noTextLayer; page count is NOT a defect signal — merged >2-page PDFs are legit); persisted in the v2 content index. **117 tests green, lint clean.** ✅
-- [x] Surface it — filter-bar "N need attention" toggle (`needsAttentionOnly` filter), health-popover row, per-row ⚠ badge. ✅  *(Remaining small piece: the two-up viewer banner in `DocumentWindowView` — "no OCR text layer" — not yet done.)*
+- [x] Surface it — filter-bar "N need attention" toggle (`needsAttentionOnly` filter), health-popover row, per-row ⚠ badge. ✅
 - [x] Viewer banner for image-only docs ("no OCR text layer") in the document window — build green. ✅
 - [x] Tag near-duplicate detection — `Core/TagSimilarity.swift` (union-find + length-scaled Levenshtein) + `SimilarTagsSheet` review UI (Merge drives the existing audited rename). 130 tests green, lint clean. ✅
-- [ ] Duplicate-filename disambiguation — show containing folder/box for same-named files. | files: Views/NavigationModel.swift, Views/NavigationWindowView.swift | S | low
+- [x] Duplicate-filename disambiguation — `Core/DuplicateNames.swift` + a dimmed containing-folder subtitle for rows sharing a base name. 135 tests green, lint clean. ✅
 - ~~Side-by-side compare of two selected documents~~ — **dropped (owner: not doing this), 2026-07-06.**
 
-## P2 — Processor (implement now; some need a phone/OCR run to fully verify)
-- [ ] Live Capture connectivity UX (P1): legible Wi-Fi failure + reachability preflight + fix Android QR-analyzer latching. Offline-testable with the 192.0.2.1 / closed-port / wrong-token triad. | files: Net/CaptureServer.swift, Net/USBBridge.swift, companions | M | med
-- [ ] Keep OCR/progress live while the per-segment tag card is open (looks hung today). | files: Views/LiveCaptureView.swift | S | low
-- [ ] Re-pair coordination: auto re-show QR on phone re-pair; split "listening" vs "connected"; verify USBBridge re-runs `adb reverse`. | files: Net/CaptureServer.swift, Net/USBBridge.swift, Views/LiveCaptureView.swift, companions | M | med
-- [ ] Output-folder picker in the Live Capture pane (+`?` help + gray-out); unify with Process Files `outputDirectory`. | files: Views/LiveCaptureView.swift, Capture/ | M | low
-- [ ] Streaming residuals: defer segment-complete until all pages *uploaded*; `needsResend` for P10/reclassify in-flight; persist `completedDocGroups` across Mac restart. | files: Capture/LiveCaptureProcessor.swift, companions | M | med
-- [ ] KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput` (Tier-2, file-move path). | files: OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M | med
-- [ ] KNOWN_ISSUES #3: zoomed-image scroll monitor swallows scroll app-wide — replace with a hosted NSView `scrollWheel` override. | files: Views/ZoomableImageView | M | low
-- [ ] Behavior-preserving de-dups (per audit `wf_4373722d-e70`): shared text-completion client; shared finalize/organize helpers; unify box/folder color-retag; small cluster (`highestLeadingNumber`, `monthTag`, `acceptedImageExtensions`, `GatewayConfig.fromDefaults`, `liveProcessingMode`); reconcile iOS(5)/Android(6) recent-years cap. | files: Processor {OCR,Tagging,Capture,Models,Views}, companions | M | low
-- [ ] No-API local features: processing profiles/presets + main-window global shortcuts (start / switch provider). | files: Views/SettingsView.swift, Views/OCRView.swift, new store | M | low
+**→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
+
+## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
+**Done:**
+- [x] KNOWN_ISSUES #3: zoomed-image scroll monitor no longer swallows scroll app-wide — scoped to the image via a hit-test-transparent probe (`ZoomableImageView.swift`); SwiftUI drag/pinch intact, no OCR/output logic touched. Build clean. ✅  ← GUI-verify (zoom a page >100%, confirm the filmstrip scrolls).
+
+**Heads-down doable now (macOS, build-verifiable, NOT phone-gated):**
+- [ ] Behavior-preserving de-dups (audit `wf_4373722d-e70`): shared text-completion client; finalize/organize helpers; box/folder color-retag; small cluster (`highestLeadingNumber`, `monthTag`, `acceptedImageExtensions`, `GatewayConfig.fromDefaults`, `liveProcessingMode`); reconcile iOS(5)/Android(6) recent-years cap. | M | low
+- [ ] No-API local features: processing profiles/presets + main-window global shortcuts (start / switch provider). | Views/SettingsView.swift, Views/OCRView.swift, new store | M | low
+- [ ] Output-folder picker in the Live Capture pane (+`?` help + gray-out); unify with Process Files `outputDirectory`. **Tier-2** (output path) — add the picker + wire the EXISTING setting; don't change write/move logic. | M | low
+- [ ] Connectivity UX — the macOS legible-Wi-Fi-failure + reachability-preflight parts (offline-testable via the 192.0.2.1 / closed-port / wrong-token triad). *Android QR-analyzer latch fix is device-gated (below).* | Net/CaptureServer.swift, Net/USBBridge.swift | M | med
+
+**Live-session / phone-gated (drive Live Capture — ideally a paired phone — to verify; do interactively, like the viewer bugs):**
+- [ ] Keep OCR/progress live while the per-segment tag card is open (looks hung today). | Views/LiveCaptureView.swift | S
+- [ ] Re-pair coordination: auto re-show QR on phone re-pair; split "listening" vs "connected"; verify USBBridge re-runs `adb reverse`. | Net/, Views/LiveCaptureView.swift, companions | M
+- [ ] Streaming residuals: defer segment-complete until all pages *uploaded*; `needsResend` for P10/reclassify in-flight; persist `completedDocGroups` across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
+- [ ] KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput`. **Tier-2 file-move**; needs a live pipeline run. | OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M
 
 ## P3 — Suite structural
 - [ ] Add a tight Implementation Map to Processor's `CLAUDE.md` (Reader has one; Processor lacks it — token-efficiency directive C.7). | files: ArchiveProcessor/CLAUDE.md | M | low
