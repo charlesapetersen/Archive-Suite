@@ -41,6 +41,34 @@ enum TagEditing {
         }
     }
 
+    /// The delta that turns a file's current subject tokens (`old` = `file.subjects`) into the edited
+    /// set (`new`) produced by the inline token editor — a single `TagDelta` so one editing session is
+    /// one write + one undo step. SUBJECTS ONLY: date/priority/read/color facets are edited by their own
+    /// cells and never appear in `new`, so they are neither added nor removed here. Pure/testable.
+    ///
+    /// - Adds = tokens in `new` not already present, trimmed, non-empty, de-duplicated (skips a token
+    ///   already in `old`, matching `TagWriter`'s own "skip if present"). Reordering `old` = no-op.
+    /// - Removes = `old` tokens absent from `new` (verbatim; untouched tokens round-trip through the
+    ///   token field unchanged, so they are not flagged). `TagWriter` removes by exact whole-string match.
+    static func subjectDelta(from old: [String], to new: [String]) -> TagDelta {
+        // Match on a canonical (trimmed) form on BOTH sides so a token that differs only by whitespace
+        // the control introduced is treated as unchanged — never added-and-removed (which would rewrite
+        // an untouched subject). Added tokens are stored in their trimmed form; removed tokens keep the
+        // file's verbatim string (TagWriter removes by exact whole-string match).
+        func key(_ s: String) -> String { s.trimmingCharacters(in: .whitespaces) }
+        let newKeys = Set(new.map(key))
+        var seen = Set(old.map(key))              // don't re-add a subject the file already has
+        var added: [String] = []
+        for t in new {
+            let k = key(t)
+            guard !k.isEmpty, !seen.contains(k) else { continue }
+            seen.insert(k)
+            added.append(k)
+        }
+        let removed = old.filter { !newKeys.contains(key($0)) }
+        return TagDelta(add: added, remove: removed)
+    }
+
     /// Raw tokens (verbatim) of `tags` matching a predicate on the trimmed token.
     private static func tokens(in tags: DocumentTags, where predicate: (String) -> Bool) -> [String] {
         tags.raw.filter { predicate($0.trimmingCharacters(in: .whitespaces)) }

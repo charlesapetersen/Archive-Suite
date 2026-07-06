@@ -506,6 +506,16 @@ final class NavigationModel: ObservableObject {
         applyDelta(TagEditing.delta(for: op, given: file.tags), to: file)
     }
 
+    /// Commit an inline subject-token edit. `base` is the token set the user STARTED editing from
+    /// (snapshotted by the field at edit-begin) — NOT the file's current `subjects`, which may have moved
+    /// under an active edit (a Spotlight echo / group edit / undo to the same file). Diffing against the
+    /// edit-start base means the delta names ONLY what the user actually changed, so `TagWriter`'s fresh
+    /// read preserves any concurrent third-party tag (never dropping an untouched token). Applied as ONE
+    /// delta = one write + one undo step; a no-op edit writes nothing. Subjects only — other facets stay.
+    func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) {
+        applyDelta(TagEditing.subjectDelta(from: base, to: edited), to: file)
+    }
+
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
         do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true)) }
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }

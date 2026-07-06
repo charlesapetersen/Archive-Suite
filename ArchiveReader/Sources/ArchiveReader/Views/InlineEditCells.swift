@@ -107,54 +107,22 @@ struct DateCell: View {
     }
 }
 
-/// File-tags cell — click to add/remove this file's subject tags in a popover.
+/// File-tags cell — INLINE editor (no popover): the file's subject tags render as removable token
+/// chips right in the row; type to add (with autocomplete from existing corpus tags), ⌫/× to remove.
+/// Shows and edits `file.subjects` (priority/color/date facets have their own cells). Commits diff-and-
+/// route through `TagWriter` via `model.commitSubjectEdit`. Multi-file edits still use the ⌘I editor.
 struct TagsCell: View {
     @ObservedObject var model: NavigationModel
     let file: ArchiveFile
-    @State private var showing = false
-    @State private var draft = ""
+    @AppStorage("ar.listFontSize") private var listFontSize = 13.0
 
     var body: some View {
-        Button { showing = true } label: {
-            Text(file.tags.topicalTags.joined(separator: ", "))
-                .lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .help("Click to edit this file's tags")
-        .popover(isPresented: $showing) { popover }
-    }
-
-    private var popover: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Edit tags").font(.headline)
-            Text(file.name).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-            if file.subjects.isEmpty {
-                Text("No tags yet.").font(.callout).foregroundStyle(.secondary)
-            } else {
-                FlowLayout(spacing: 6) {
-                    ForEach(file.subjects, id: \.self) { s in
-                        Button { model.applyEdit(.removeSubject(s), to: file) } label: {
-                            Label(s, systemImage: "xmark.circle.fill").labelStyle(.titleAndIcon)
-                        }
-                        .controlSize(.small)
-                        .help("Remove “\(s)”")
-                    }
-                }
-            }
-            HStack {
-                TextField("Add tag…", text: $draft).textFieldStyle(.roundedBorder).onSubmit(add)
-                Button("Add", action: add).disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            HStack { Spacer(); Button("Done") { showing = false }.keyboardShortcut(.defaultAction) }
-        }
-        .padding(14).frame(width: 340)
-    }
-
-    private func add() {
-        let t = draft.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return }
-        model.applyEdit(.addSubject(t), to: file)
-        draft = ""
+        SubjectTokenField(
+            subjects: file.subjects,
+            suggestions: model.allSubjects,
+            fontSize: listFontSize,
+            commit: { base, edited in model.commitSubjectEdit(from: base, to: edited, for: file) }
+        )
+        .help("Edit tags inline: type to add (autocompletes existing tags), ⌫ or × to remove · ⌘I edits several at once")
     }
 }
