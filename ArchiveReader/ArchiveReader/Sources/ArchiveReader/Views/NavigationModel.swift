@@ -312,6 +312,17 @@ final class NavigationModel: ObservableObject {
     /// Unique subject tags across the library, for filter/editor suggestions. Cached (see above).
     var allSubjects: [String] { allSubjectsCache }
 
+    /// File-count per distinct subject across the WHOLE library (not just the displayed rows), for
+    /// the near-duplicate tag finder. Counts each subject once per file. Computed on demand (the
+    /// finder is opened rarely) — never on the render path.
+    var subjectFileCounts: [String: Int] {
+        var counts: [String: Int] = [:]
+        for f in library.files {
+            for t in Set(f.subjects) { counts[t, default: 0] += 1 }
+        }
+        return counts
+    }
+
     private func refreshSelectionCache() {
         let sel = selection
         selectedFilesCache = LibrarySort.sorted(library.files.filter { sel.contains($0.id) }, by: sort)
@@ -496,6 +507,7 @@ final class NavigationModel: ObservableObject {
     // added, via the audited TagWriter — one grouped undo, partial failures surfaced, never all-or-nothing.
 
     @Published var renamingTag: String?     // non-nil while the rename-tag sheet is open (the old tag)
+    @Published var showingSimilarTags = false   // near-duplicate subject-tag finder sheet
 
     /// Number of files carrying `tag` (for the rename sheet's "affects N files").
     func affectedFileCount(forTag tag: String) -> Int {

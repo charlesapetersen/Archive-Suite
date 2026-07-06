@@ -59,6 +59,8 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("i", modifiers: .command).disabled(noSelection)
             Button("Rename Tag…") { nav?.beginRenameTag() }
                 .disabled(nav == nil)
+            Button("Find Similar Tags…") { nav?.showingSimilarTags = true }
+                .disabled(nav == nil)
             Button("Toggle Flag") { nav?.toggleFlagSelection() }
                 .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(noSelection)
             Divider()

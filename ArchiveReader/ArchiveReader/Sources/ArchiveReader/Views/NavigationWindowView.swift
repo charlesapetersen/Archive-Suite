@@ -46,6 +46,7 @@ struct NavigationWindowView: View {
                                     set: { if !$0 { model.renamingTag = nil } })) {
             if let t = model.renamingTag { RenameTagSheet(model: model, oldTag: t) }
         }
+        .sheet(isPresented: $model.showingSimilarTags) { SimilarTagsSheet(model: model) }
         .alert("Save Search", isPresented: $model.showingSaveDialog) {
             TextField("Name", text: $newSearchName)
             Button("Save") { model.saveCurrentSearch(name: newSearchName) }
@@ -248,6 +249,7 @@ struct NavigationWindowView: View {
                                 }
                                 Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
                                 Button("Rename tag…") { model.renamingTag = item.tag }
+                                Button("Find similar tags…") { model.showingSimilarTags = true }
                                 if model.filter.subjects.count > 1 {
                                     Picker("Match tags", selection: $model.filter.subjectCombine) {
                                         Text("All").tag(SubjectCombine.all)

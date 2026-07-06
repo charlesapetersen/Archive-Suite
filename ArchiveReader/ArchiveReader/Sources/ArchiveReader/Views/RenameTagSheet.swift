@@ -6,8 +6,17 @@ import SwiftUI
 struct RenameTagSheet: View {
     @ObservedObject var model: NavigationModel
     let oldTag: String
-    @State private var newTag = ""
+    @State private var newTag: String
     @Environment(\.dismiss) private var dismiss
+
+    /// `initialNewName` pre-fills the field — used by the similar-tags finder to seed the chosen
+    /// canonical when merging a variant into it. Defaults to empty so the plain rename call site is
+    /// unchanged.
+    init(model: NavigationModel, oldTag: String, initialNewName: String = "") {
+        _model = ObservedObject(wrappedValue: model)
+        self.oldTag = oldTag
+        _newTag = State(initialValue: initialNewName)
+    }
 
     private var count: Int { model.affectedFileCount(forTag: oldTag) }
     private var trimmedNew: String { newTag.trimmingCharacters(in: .whitespaces) }
