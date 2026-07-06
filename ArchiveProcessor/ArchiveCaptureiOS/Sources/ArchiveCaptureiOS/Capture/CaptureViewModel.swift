@@ -20,7 +20,9 @@ enum ConnectPhase: Equatable {
 @MainActor
 final class CaptureViewModel: ObservableObject {
     @Published private(set) var endpoint: MacEndpoint?
-    private var client: MacClient?
+    /// Abstracted behind `SegmentTransport` so a second transport (Google Drive cloud relay) can be
+    /// dropped in without touching the durable queue/retry/dedup below. Today's only impl is `MacClient`.
+    private var client: (any SegmentTransport)?
 
     @Published var items: [CapturedItem] = []
     @Published private(set) var currentGroupId = CaptureViewModel.newGroupId()

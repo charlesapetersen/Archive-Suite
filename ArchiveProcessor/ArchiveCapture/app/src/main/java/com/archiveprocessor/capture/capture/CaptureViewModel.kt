@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.archiveprocessor.capture.data.Prefs
 import com.archiveprocessor.capture.data.SessionStore
 import com.archiveprocessor.capture.net.MacClient
+import com.archiveprocessor.capture.net.SegmentTransport
 import com.archiveprocessor.capture.net.MacEndpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -29,7 +30,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     var endpoint by mutableStateOf(prefs.loadEndpoint())
         private set
-    private var client: MacClient? = endpoint?.let { MacClient(it) }
+    // Abstracted behind SegmentTransport so a second transport (Google Drive cloud relay) can be
+    // dropped in without touching the durable queue/retry/dedup below. Today's only impl is MacClient.
+    private var client: SegmentTransport? = endpoint?.let { MacClient(it) }
 
     val items = mutableStateListOf<CapturedItem>()
     var currentGroupId by mutableStateOf(newGroupId())

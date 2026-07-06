@@ -11,8 +11,9 @@ import java.util.concurrent.TimeUnit
  *  but nothing listening (server not started / wrong port); UNAUTHORIZED = reached the Mac, bad token. */
 enum class Reachability { OK, UNAUTHORIZED, REFUSED, UNREACHABLE }
 
-/** Protocol v2 client for the Archive Processor Live Capture receiver (raw JPEG body + X-* headers). */
-class MacClient(private val endpoint: MacEndpoint) {
+/** Protocol v2 client for the Archive Processor Live Capture receiver (raw JPEG body + X-* headers).
+ *  The default [SegmentTransport]: direct HTTP to the Mac's `CaptureServer`. */
+class MacClient(private val endpoint: MacEndpoint) : SegmentTransport {
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
@@ -53,11 +54,12 @@ class MacClient(private val endpoint: MacEndpoint) {
         Reachability.UNREACHABLE               // no route / unknown host → treat as unreachable
     }
 
-    /** POST one JPEG (raw body) with grouping + minimal-tag headers. Returns true on 2xx. */
-    fun postPhoto(
+    /** POST one JPEG (raw body) with grouping + minimal-tag headers. Returns true on 2xx.
+     *  (Default for `replaces` lives on the [SegmentTransport] interface — an override can't restate it.) */
+    override fun postPhoto(
         jpeg: ByteArray, group: String, seq: Int, type: String,
         priority: String?, year: Int?, month: Int?, device: String,
-        replaces: String? = null
+        replaces: String?
     ): Boolean = try {
         val body = jpeg.toRequestBody("image/jpeg".toMediaType())
         val b = Request.Builder().url("${endpoint.baseUrl}/photo")
@@ -76,7 +78,7 @@ class MacClient(private val endpoint: MacEndpoint) {
         false
     }
 
-    fun sessionComplete(): Boolean = try {
+    override fun sessionComplete(): Boolean = try {
         val req = Request.Builder().url("${endpoint.baseUrl}/session/complete")
             .header("Authorization", auth())
             .post(ByteArray(0).toRequestBody(null)).build()
@@ -87,7 +89,7 @@ class MacClient(private val endpoint: MacEndpoint) {
 
     /** End of a document segment: pages already streamed in via postPhoto; this tells the Mac the group
      *  is complete (so its tag card can appear) and carries the segment's tags. No image bytes. */
-    fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean = try {
+    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean = try {
         val b = Request.Builder().url("${endpoint.baseUrl}/segment/complete")
             .header("Authorization", auth())
             .header("X-Group", group)
@@ -101,7 +103,7 @@ class MacClient(private val endpoint: MacEndpoint) {
 
     /** Best-effort notice that the phone is re-pairing, so the Mac re-shows the pairing QR instead of
      *  sitting on a stale "paired" state. Fire-and-forget (may not reach the Mac if the link is already down). */
-    fun sessionDisconnect(): Boolean = try {
+    override fun sessionDisconnect(): Boolean = try {
         val req = Request.Builder().url("${endpoint.baseUrl}/session/disconnect")
             .header("Authorization", auth())
             .post(ByteArray(0).toRequestBody(null)).build()
