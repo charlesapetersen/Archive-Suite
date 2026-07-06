@@ -13,9 +13,11 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 ## ⚑ Document-viewer bugs (owner-reported 2026-07-06) — round-2 fixes, awaiting owner GUI-verify
 Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneView`, `AppSettings`, `ArchiveReaderApp`). Commit `78ec228`; 130 tests green. Round 1 (`08e59bb`) was insufficient per owner testing; round 2 below.
 - [x] **DV-1 Open maximized + remember size + no flash.** `.defaultSize` opens at the remembered-or-screen size (no post-show resize flash); size persisted **on window close** (`onDisappear`) and restored on open. (Round 1's `setFrameAutosaveName` didn't persist under WindowGroup.) ← GUI-verify.
-- [x] **DV-2 Persist zoom + split across cycling, and as the next-open default.** Split persisted on drag-end; per-pane zoom held on the controller + persisted on zoom; both reapplied on open (become defaults). ← GUI-verify.
-- [x] **DV-2b Top-anchored zoom.** `scrollToTop` lays out the doc view then pins the page's top-left, so the top line stays at the top as you zoom. ← GUI-verify.
-- [x] **DV-3 Text selection after cycling (real fix).** Each page now gets a **fresh `PDFView`** (`.id(index)`) — a reused view lost selection after a document swap; a fresh view is the known-good first-show state. Zoom survives via the controller. (Round 1's clearSelection+relayout did NOT fix it — confirmed by owner.) ← GUI-verify.
+- [x] **DV-3 Text selection after cycling.** Fresh `PDFView` per page (`.id(index)`). ✅ **Owner-confirmed working.**
+- [x] Splitter width persists across cycling + as the next-open default. ✅ **Owner-confirmed.**
+- [~] **DV-2 zoom persistence (round 3).** Round 2 only caught toolbar/keyboard zoom; trackpad **pinch** bypassed it, so zoom didn't persist. Round 3 (`d4eedba`): observe `PDFViewScaleChanged` → capture ANY zoom method → persist per pane → reapply to each fresh page + as default. ← RE-VERIFY (incl. pinch).
+- [~] **DV-2b top-anchored zoom (round 3).** Now pins the page top on every scale change, after layout, + a deferred second scroll (was anchoring on stale pre-zoom geometry). ← RE-VERIFY.
+- [~] **DV-1 flash (round 3).** `.defaultSize` now driven by `@AppStorage` so it tracks the remembered size → window opens at the right size instead of resizing after show. (Owner saw no flash only when remembered≈full-screen — confirmed the stale-defaultSize cause.) ← RE-VERIFY the shrink-then-reopen case.
 
 ## P0 — Finish the Suite publish (network back)
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
