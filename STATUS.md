@@ -58,9 +58,11 @@ Milestone A** (or reprioritize).
    record + the 4 `[~]` indirectly-covered steps in `SMOKE_TEST.md`). It caught the mark-Read display
    bug and 4 reactive-timing bugs, all fixed (see `KNOWN_ISSUES.md`). *Optional follow-up:* drive the
    4 remaining steps live — C (read-state filter), E (subject filter), K (viewer ⌘C/⌘F), S (saved
-   search) — and the exhaustive viewer zoom/splitter. **Automation note:** launch the built app with
-   `open -a` and **verify `ArchiveReader` is frontmost before every click/capture** (the VS Code host
-   reclaims focus; a blind region capture can grab another window — a privacy hazard).
+   search) — and the exhaustive viewer zoom/splitter. **Automation note:** before a GUI run, **ask the
+   owner whether the machine will be free or in use** (see memory `gui-testing-machine-availability`):
+   free → drive everything incl. modal sheets; in use → the focused host app contends for focus, so
+   verify sheet-confirm flows via unit/visual checks + a frontmost-guard (a blind capture could grab
+   another window — a privacy hazard). Launch with `open -a`.
 2. **Perf-check** the nav Table at ~150k (data layer abstracted; AppKit `NSTableView` swap possible).
 3. **Deferred / optional:** Medium & Lower `POTENTIAL_FEATURES` (explicitly out of the overnight
    scope); non-sandboxed whole-Mac search (code-ready — a build-time entitlement flip, see below).

@@ -91,3 +91,39 @@ or location (Core Directive holds). Four additional reactive-timing bugs found b
 review were fixed the same pass (see `KNOWN_ISSUES.md`): `extendSelectionToDocumentRun` selection
 race, `ContentIndexer` dropped-live-update + uncancelled-scope-change, and the ⌘O-orphans-preview
 menu conflict. Follow-up (optional): drive C/E/K/S and the exhaustive viewer zoom/splitter live.
+
+## Batch 2 (2026-07-05) — sidebar, smart folders, item 4, tag rename
+
+Driven on the scratch corpus (given subfolders `Batch-A`/`Batch-B` to exercise the tree). Same legend.
+**Testing note:** whether presented modal sheets/alerts can be driven depends on **whether the
+machine is in use** during the run (a focused host app can contend for keyboard focus) — this is
+session-dependent, not a fixed limitation. **Confirm machine availability with the owner before a GUI
+run:** if the machine is free, drive modal confirms live; if in use, verify those flows via unit tests
++ "sheet opens correctly" and have the owner confirm. In THIS run the machine was in use, so the two
+sheet-confirm flows (save-smart-folder, tag-rename) are `[~]` — verified by unit tests + visual open.
+
+- [x] **Sidebar folder tree + scope** — sidebar shows All Files/Batch-A/Batch-B with recursive counts;
+      selecting Batch-A scopes the list to its 10 files ("10 shown · 31 total"). **PASS** (GUI).
+- [x] **Smart Folders: create from current filters** — "Save as Smart Folder" / File→Save Current
+      Search opens a dialog **pre-filled from the active filter** ("P9"); saving adds a smart folder to
+      the sidebar. **PASS** (GUI: prefilled dialog + smart folder appeared).
+- [~] **Smart folder rename/delete** — `SavedSearchStore.rename`/`delete` unit-tested; context menu wired.
+- [x] **Column customization** — `Table(columnCustomization:)` + per-column IDs, persisted (code + native API).
+- [x] **View-state persistence** — filter + sort persist across launch (Codable, root-guarded); tests cover Codable.
+- [x] **List font size (C3)** — Options slider (ar.listFontSize) applied to the list.
+- [x] **Active-filter summary (C4)** — status bar shows e.g. "· P9" / "· tags: …" when filtering.
+- [~] **Focus shortcuts (C5)** — ⌘L focus tag filter, ⌥⌘F focus OCR search (menu commands → focus signals).
+- [~] **Tag-cloud context menu (C6)** — add/remove filter, filter-to-only, All/Any, select-files-with-tag (wired).
+- [~] **Open in Default App (C7)** — read-only `NSWorkspace.open` in the row context menu.
+- [x] **Read single-click toggle (C8)** — clicking a Read cell flips Unread↔Read (00015 Unread→Read on
+      disk + re-rendered); right-click for explicit set/clear. **PASS** (GUI + `xattr`).
+- [~] **Corpus-wide tag rename (D1, Tier-2)** — unit tests assert the primitive swaps only that tag,
+      preserves other tags, leaves bytes unchanged, and undo (inverse delta) restores it; the rename
+      **sheet opens with the correct affected count** ("Affects 27 files. Undoable as a single step").
+      Live batch-confirm blocked by the host focus limitation above; the write path is fully unit-tested.
+- [x] **Count badges (D2)** — folder counts (10/10/31) + smart-folder counts render in the sidebar. **PASS** (GUI).
+
+**Outcome:** Batch-2 features implemented; sidebar scope, smart-folder create, read-toggle, and count
+badges verified live on disk; sheet-confirm flows (smart-folder save, tag rename) verified via unit
+tests + visual "opens correctly" (host blocks modal automation). No data-integrity issues; every tag
+write routes through `TagWriter`. 88 unit tests green; write-surface lint clean.

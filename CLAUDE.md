@@ -222,16 +222,26 @@ Search/                       Discovery + disposable caches (never the corpus):
   NotesStore.swift            Per-file note+flag in UserDefaults (outside the corpus).
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
 Views/
-  NavigationModel.swift       Nav view model: filter/sort/selection, all actions via TagWriter, caches.
-  NavigationWindowView.swift  The results table, filters, toolbar, context menu, sheets.
+  NavigationModel.swift       Nav view model: filter/sort/selection, folder tree, smart-folder counts,
+                              view-state persistence, inline + corpus-wide edits — all via TagWriter.
+  NavigationWindowView.swift  Results Table (customizable columns), filter bar, sidebar+tag-cloud panels,
+                              toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
+  SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
+                              (List(selection:)+OutlineGroup) that scopes the list via filter.pathPrefix.
+  InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
+                              (menu), DateCell / TagsCell (popovers). Multi-file edits use the ⌘I editor.
+  TagFilterField.swift        NSComboBox-backed tag filter with autocomplete (+focus token for ⌘L).
+  RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I).
-  OptionsView.swift           Settings form (⌘,), @AppStorage.
-  DocumentViewerModel.swift   Loads the selection; page cycling; intelligent copy; find.
-  DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom toolbar.
-  PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/selection/find).
-  PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ←/→ cycle, ⌘C copy, ⌘O open.
+  OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).
+  DocumentViewerModel.swift   Loads the selection; page cycling; focused-pane zoom; plain + intelligent copy.
+  DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom, focus border.
+  PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection/find).
+  PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```
+UI is documented as two owner-requested batches in `UI_REFINEMENTS.md` (Batch 1) and
+`PLAN_NEAR_TERM_UI.md` (Batch 2: sidebar, smart folders, item-4 wins, tag rename).
 `ArchiveReader/Tests/ArchiveReaderTests/` — 10 test files (75 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 

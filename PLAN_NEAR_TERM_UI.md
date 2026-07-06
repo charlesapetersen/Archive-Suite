@@ -19,9 +19,11 @@ Item **3** (non-standard PDFs) is deferred to [POTENTIAL_FEATURES.md](POTENTIAL_
   rename (M-D1). Only `TagWriter` may write tags; nothing may move/rename/delete/rewrite a file.
 - **Commit + push per cluster:** small commits; `git push origin main` after each (remote is the durable
   record). `gh` = `/opt/homebrew/bin/gh`.
-- **GUI automation:** `open -a` the built app; **verify `ArchiveReader` is frontmost before every click
-  or capture** (the VS Code host reclaims focus — a blind region capture can grab another window, a
-  privacy hazard). Window-only captures (`screencapture -R`).
+- **GUI automation:** before a run, **ask the owner whether the machine will be free or in use**
+  (focus contention is session-dependent, not a fixed fact). Machine free → drive everything incl.
+  modal sheets. Machine in use → a focused host app contends for focus, so verify sheet-confirm flows
+  via unit/visual checks + a frontmost-guard before each click/capture (a blind capture could grab
+  another window — a privacy hazard). Launch with `open -a`; window-only captures (`screencapture -R`).
 - **Safety:** only two NEW write paths in this batch — **C8** (read/unread single-click) and **D1** (tag
   rename); both route through the audited `TagWriter`. D1 is **Tier-2** (adversarial review +
   integration test on scratch copies). Everything else is display / navigation / read-only.
