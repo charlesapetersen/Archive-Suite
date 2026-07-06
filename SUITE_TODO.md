@@ -10,6 +10,12 @@ record is in `SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source 
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## ⚑ Document-viewer bugs (owner-reported 2026-07-06 — DO NEXT)
+Reader document window (`Views/DocumentWindowView.swift`, `DocumentViewerModel.swift`, `PDFPaneView.swift`).
+- [ ] **DV-1 Open full-screen, then remember size.** The viewer should open occupying the full screen by default; once the user resizes, subsequent opens use the previous window size. (Frame-autosave + first-run maximize.) | needs: gui to fully confirm
+- [ ] **DV-2 Persist zoom + split width across ↑/↓ cycling.** Currently layout resets per document (`onChange(of: index){ fraction = defaultFraction }` + per-pane zoom resets). Keep the same per-pane zoom levels AND the two-up separator width as the user cycles through segments. | needs: gui
+- [ ] **DV-3 Text selection dies after cycling.** Left image pane (and page 1 of a multi-PDF selection) is selectable when first shown, but after cycling to the next page selection stops working on the left — and returning to the first page it's *still* broken. Likely a PDFView/PDFPage reuse or page-detach issue on reload. | needs: gui
+
 ## P0 — Finish the Suite publish (network back)
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
 - [x] Publish release: `suite-v1.0.0` LIVE with `ArchiveSuite-1.0.0.dmg` (4.48 MB) attached. ✅
@@ -31,7 +37,7 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 - [x] Viewer banner for image-only docs ("no OCR text layer") in the document window — build green. ✅
 - [x] Tag near-duplicate detection — `Core/TagSimilarity.swift` (union-find + length-scaled Levenshtein) + `SimilarTagsSheet` review UI (Merge drives the existing audited rename). 130 tests green, lint clean. ✅
 - [ ] Duplicate-filename disambiguation — show containing folder/box for same-named files. | files: Views/NavigationModel.swift, Views/NavigationWindowView.swift | S | low
-- [ ] Side-by-side compare of two selected documents (beyond ↑/↓ cycling). | files: Views/DocumentWindowView.swift, new view | L | low
+- ~~Side-by-side compare of two selected documents~~ — **dropped (owner: not doing this), 2026-07-06.**
 
 ## P2 — Processor (implement now; some need a phone/OCR run to fully verify)
 - [ ] Live Capture connectivity UX (P1): legible Wi-Fi failure + reachability preflight + fix Android QR-analyzer latching. Offline-testable with the 192.0.2.1 / closed-port / wrong-token triad. | files: Net/CaptureServer.swift, Net/USBBridge.swift, companions | M | med

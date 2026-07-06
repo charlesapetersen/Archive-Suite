@@ -53,8 +53,9 @@ final class PDFPaneController {
 }
 
 /// Displays a single PDF page (read-only, selectable) in its own PDFView. Rebuilds only when the
-/// page actually changes, so imperative zoom persists across SwiftUI re-renders; a new page resets
-/// to fit (the per-document default).
+/// page actually changes, so imperative zoom persists across SwiftUI re-renders. The user's zoom is
+/// also carried across ↑/↓ cycling (DV-2): only the very first page fits; later pages keep the
+/// current scale (or stay fitting if the user never zoomed).
 struct PDFPaneView: NSViewRepresentable {
     let page: PDFPage?
     let controller: PDFPaneController
@@ -74,7 +75,18 @@ struct PDFPaneView: NSViewRepresentable {
 
     func updateNSView(_ view: PDFView, context: Context) {
         guard context.coordinator.shownPage !== page else { return }   // only rebuild on page change
+        let isFirstPage = context.coordinator.shownPage == nil
         context.coordinator.shownPage = page
+
+        // DV-2: preserve the user's zoom across cycling — capture it before swapping the document.
+        let priorScale = view.scaleFactor
+        let wasFitting = view.autoScales
+
+        // DV-3: a selection left on the OUTGOING page wedges mouse selection once the document is
+        // swapped in this reused PDFView (selection worked on first show, then died after cycling).
+        // Clear it before the swap, and force a fresh layout pass after, so the new page is selectable.
+        view.clearSelection()
+
         if let page, let copy = page.copy() as? PDFPage {
             let doc = PDFDocument()
             doc.insert(copy, at: 0)
@@ -82,6 +94,15 @@ struct PDFPaneView: NSViewRepresentable {
         } else {
             view.document = nil
         }
-        view.autoScales = true   // reset to fit for the new document (the per-document default)
+        view.layoutDocumentView()   // rebuild the internal page view so text selection re-attaches
+
+        // DV-2: first page fits; afterwards keep the user's zoom (a manual zoom carries over; if they
+        // were still fitting, new pages keep fitting — either way the zoom level stays consistent).
+        if isFirstPage || wasFitting {
+            view.autoScales = true
+        } else {
+            view.autoScales = false
+            view.scaleFactor = priorScale
+        }
     }
 }

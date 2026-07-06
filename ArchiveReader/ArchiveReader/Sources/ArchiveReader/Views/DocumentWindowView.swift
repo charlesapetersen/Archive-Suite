@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import AppKit
 
 /// The document-view window: a two-up viewer — image page (left) / OCR text page (right) — with an
 /// independent zoom per pane, a draggable splitter defaulting to ⅔ : ⅓ (reset per document), page
@@ -11,6 +12,7 @@ struct DocumentWindowView: View {
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @State private var findText = ""
     @FocusState private var findFocused: Bool
+    @State private var didConfigureWindow = false
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
@@ -25,11 +27,12 @@ struct DocumentWindowView: View {
             statusBar
         }
         .frame(minWidth: 900, minHeight: 600)
+        .background(WindowAccessor { configureWindow($0) })   // DV-1: open maximized, then remember size
         .navigationTitle(model.title)
         .toolbar { toolbar }
         .focusedSceneObject(model)   // so the Document menu commands act on this window
         .onAppear { fraction = defaultFraction; if let selection { model.load(selection) } }
-        .onChange(of: model.index) { fraction = defaultFraction }   // reset layout per document
+        // DV-2: the split width + per-pane zoom now persist across ↑/↓ cycling — no per-document reset.
         .onChange(of: model.showingFind) { if model.showingFind { findFocused = true } }
     }
 
@@ -166,5 +169,33 @@ struct DocumentWindowView: View {
         }
         .font(.callout)
         .padding(.horizontal, 10).padding(.vertical, 6)
+    }
+
+    /// DV-1: on first appearance, restore the saved window frame if one exists; otherwise open
+    /// maximized to the screen. `setFrameAutosaveName` then remembers the user's size/position, so
+    /// later opens reuse it. Runs once per window (guarded).
+    private func configureWindow(_ window: NSWindow) {
+        guard !didConfigureWindow else { return }
+        didConfigureWindow = true
+        let name = NSWindow.FrameAutosaveName("ArchiveReaderDocumentWindow")
+        let restored = window.setFrameUsingName(name)
+        window.setFrameAutosaveName(name)
+        if !restored, let screen = window.screen ?? NSScreen.main {
+            window.setFrame(screen.visibleFrame, display: true)   // first open → full screen
+        }
+    }
+}
+
+/// Reaches the hosting `NSWindow` once the view is in the hierarchy, to apply AppKit-only window
+/// configuration (frame autosave + first-run maximize) that SwiftUI's scene API doesn't expose.
+private struct WindowAccessor: NSViewRepresentable {
+    let onWindow: (NSWindow) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { if let w = v.window { onWindow(w) } }
+        return v
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let w = nsView.window { onWindow(w) }   // in case the window attaches after makeNSView
     }
 }
