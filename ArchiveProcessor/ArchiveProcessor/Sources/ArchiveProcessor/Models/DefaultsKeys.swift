@@ -60,6 +60,8 @@ enum DefaultsKeys {
 
     // Live Capture
     static let liveProcessingMode = "liveProcessingMode"
+    static let liveTransport = "liveTransport"       // which CaptureReceiver: "" / "lan" (default) / "fileRelay" / "cloud"
+    static let liveRelayDir = "liveRelayDir"         // shared directory root for the file-relay transport
 
     // Onboarding / key wizard
     static let hasSeenKeyOnboarding = "hasSeenKeyOnboarding"

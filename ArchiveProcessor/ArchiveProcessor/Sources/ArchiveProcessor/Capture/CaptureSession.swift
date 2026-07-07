@@ -110,6 +110,29 @@ final class CaptureSession: ObservableObject {
     }
 
     private lazy var server = CaptureServer(session: self)
+    /// The file-relay receiver (offline stand-in for the Google Drive relay). Watches a shared directory
+    /// instead of an HTTP port; funnels into the same `ingest`. `epoch = sessionId` so a fresh vs recovered
+    /// launch is distinguishable (published in `_epoch.json`; the phone adopts it — see the spec's A2).
+    private lazy var fileRelay = FileRelayReceiver(
+        session: self, token: token, epoch: sessionId,
+        store: LocalDirectoryStore(dir: Self.relayDir(token: token)),
+        processedURL: incomingFolder.appendingPathComponent("relay-processed.json"))
+
+    /// Which receiver this session runs, from Settings (`DefaultsKeys.liveTransport`), env-overridable for CI.
+    private var transport: CaptureTransport {
+        let raw = ProcessInfo.processInfo.environment["LIVECAPTURE_TRANSPORT"]
+            ?? UserDefaults.standard.string(forKey: DefaultsKeys.liveTransport) ?? ""
+        return CaptureTransport(rawValue: raw) ?? .lan
+    }
+
+    /// The file-relay shared-directory root (`<root>/<token>/`), from Settings/env; defaults under the
+    /// visible backup root. `LIVECAPTURE_RELAYDIR` overrides it for CI.
+    static func relayDir(token: String) -> URL {
+        let base = ProcessInfo.processInfo.environment["LIVECAPTURE_RELAYDIR"]
+            ?? UserDefaults.standard.string(forKey: DefaultsKeys.liveRelayDir)
+            ?? backupRoot.appendingPathComponent("_relay").path
+        return URL(fileURLWithPath: base).appendingPathComponent(token, isDirectory: true)
+    }
 
     init() {
         let root = Self.backupRoot
@@ -137,14 +160,42 @@ final class CaptureSession: ObservableObject {
 
     // MARK: - Server lifecycle
 
+    /// True once the file-relay receiver is watching its directory (the relay analogue of `serverRunning`;
+    /// no port/USB tunnel, so it can't reuse `serverDidStart`).
+    @Published private(set) var relayRunning = false
+    /// Either receiver is up (transport-agnostic gate for the UI).
+    var receiverActive: Bool { serverRunning || relayRunning }
+
     func start() {
-        guard !serverRunning else { return }
-        server.start()
+        switch transport {
+        case .lan:
+            guard !serverRunning else { return }   // BYTE-IDENTICAL to the prior LAN behavior
+            server.start()
+        case .fileRelay, .cloud:
+            fileRelay.start()                       // own idempotency guard; must NOT gate on serverRunning
+        }
     }
 
     func stop() {
         server.stop()
+        fileRelay.stop()                            // both idempotent no-ops if never started
     }
+
+    /// Relay receiver readiness (portless; called on the main actor). Mirrors the AUTOSTART READY line so
+    /// the headless harness can discover the shared dir, but with no port/USBBridge (a watcher has neither).
+    func relayReceiverDidStart(relayDir: String) {
+        relayRunning = true
+        statusMessage = "Live Capture relay watching \(relayDir) — photos arrive as the phone uploads."
+        if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" {
+            let line = "LIVECAPTURE_READY transport=fileRelay token=\(token) relayDir=\(relayDir) folder=\(incomingFolder.path)\n"
+            if let path = ProcessInfo.processInfo.environment["LIVECAPTURE_READYFILE"] {
+                try? line.write(toFile: path, atomically: true, encoding: .utf8)
+            }
+            FileHandle.standardError.write(Data(line.utf8))
+        }
+    }
+    func relayReceiverDidStop() { relayRunning = false }
+    func relayReceiverDidFail(_ message: String) { relayRunning = false; statusMessage = "Relay error: \(message)" }
 
     /// Called by the server (already hopped to the main actor) when it binds/unbinds.
     func serverDidStart(port: UInt16) {
