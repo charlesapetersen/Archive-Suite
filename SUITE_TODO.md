@@ -1,23 +1,23 @@
 # Archive Suite — working to-do queue
 
-Actionable backlog we can pick up now (network restored 2026-07-06). Harvested from both apps'
-`KNOWN_ISSUES`/`POTENTIAL_FEATURES`/`NEXT_STEPS`/UI docs + the merge follow-ups, deduped and classified.
-Heavy overnight audit is tracked separately in `.maintenance/OVERNIGHT_QUEUE.md`; the full merge/publish
-record is in `docs/archive/SUITE_MERGE_PLAN.md`. Paths are repo-root-relative; Reader source =
-`ArchiveReader/ArchiveReader/Sources/ArchiveReader/`, Processor source =
-`ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
+The **near-term** to-do queue for both apps (see root `CLAUDE.md` §Docs & backlog convention). Long-term
+ideas live in each app's `POTENTIAL_FEATURES.md`; detailed in-flight plans live in `execution-plans/`
+(indexed below, deleted when shipped). Heavy overnight audit: `.maintenance/OVERNIGHT_QUEUE.md`.
+Paths repo-root-relative; Reader source = `ArchiveReader/ArchiveReader/Sources/ArchiveReader/`,
+Processor source = `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
 
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
-## ⚑ Document-viewer bugs (owner-reported 2026-07-06) — round-2 fixes, awaiting owner GUI-verify
-Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneView`, `AppSettings`, `ArchiveReaderApp`). Commit `78ec228`; 130 tests green. Round 1 (`08e59bb`) was insufficient per owner testing; round 2 below.
-- [x] **DV-1 Open maximized + remember size + no flash.** `.defaultSize` opens at the remembered-or-screen size (no post-show resize flash); size persisted **on window close** (`onDisappear`) and restored on open. (Round 1's `setFrameAutosaveName` didn't persist under WindowGroup.) ← GUI-verify.
-- [x] **DV-3 Text selection after cycling.** Fresh `PDFView` per page (`.id(index)`). ✅ **Owner-confirmed working.**
-- [x] Splitter width persists across cycling + as the next-open default. ✅ **Owner-confirmed.**
-- [~] **DV-2 zoom persistence (round 3).** Round 2 only caught toolbar/keyboard zoom; trackpad **pinch** bypassed it, so zoom didn't persist. Round 3 (`d4eedba`): observe `PDFViewScaleChanged` → capture ANY zoom method → persist per pane → reapply to each fresh page + as default. ← RE-VERIFY (incl. pinch).
-- [~] **DV-2b top-anchored zoom (round 3).** Now pins the page top on every scale change, after layout, + a deferred second scroll (was anchoring on stale pre-zoom geometry). ← RE-VERIFY.
-- [~] **DV-1 flash (round 3).** `.defaultSize` now driven by `@AppStorage` so it tracks the remembered size → window opens at the right size instead of resizing after show. (Owner saw no flash only when remembered≈full-screen — confirmed the stale-defaultSize cause.) ← RE-VERIFY the shrink-then-reopen case.
+## Active execution plans (`execution-plans/`)
+- **`structural-refactor.md`** — the two open P3 items: extract a shared `ArchiveCore` package, and
+  de-nest the `App/App` folders. (P3.1 Implementation Maps shipped 2026-07-07.)
+
+## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
+All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
+flash; text selection after cycling (fresh `PDFView` per page); zoom persistence across cycling *and* as
+default incl. trackpad-pinch (`PDFViewScaleChanged` capture); top-anchored zoom; splitter persistence.
+Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`ArchiveReaderApp`.
 
 ## P0 — Finish the Suite publish (network back)
 - [x] Push merged history: `main` + `suite-v1.0.0` pushed to `origin` (0 diverged). ✅ 2026-07-06
@@ -52,12 +52,12 @@ Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneVie
 - [ ] Behavior-preserving de-dups (audit `wf_4373722d-e70`): shared text-completion client; finalize/organize helpers; box/folder color-retag; small cluster (`highestLeadingNumber`, `monthTag`, `acceptedImageExtensions`, `GatewayConfig.fromDefaults`, `liveProcessingMode`); reconcile iOS(5)/Android(6) recent-years cap. | M | low
 - [ ] No-API local features: processing profiles/presets + main-window global shortcuts (start / switch provider). | Views/SettingsView.swift, Views/OCRView.swift, new store | M | low
 - [ ] Output-folder picker in the Live Capture pane (+`?` help + gray-out); unify with Process Files `outputDirectory`. **Tier-2** (output path) — add the picker + wire the EXISTING setting; don't change write/move logic. | M | low
-- [ ] Connectivity UX — the macOS legible-Wi-Fi-failure + reachability-preflight parts (offline-testable via the 192.0.2.1 / closed-port / wrong-token triad). *Android QR-analyzer latch fix is device-gated (below).* | Net/CaptureServer.swift, Net/USBBridge.swift | M | med
+- [x] Connectivity UX — **superseded/shipped** by the cloud-transport integration (legible Wi-Fi failure + reachability preflight landed; USB + Drive relay is now the direction). ✅
 
 **Live-session / phone-gated (drive Live Capture — ideally a paired phone — to verify; do interactively, like the viewer bugs):**
 - [ ] Keep OCR/progress live while the per-segment tag card is open (looks hung today). | Views/LiveCaptureView.swift | S
 - [ ] Re-pair coordination: auto re-show QR on phone re-pair; split "listening" vs "connected"; verify USBBridge re-runs `adb reverse`. | Net/, Views/LiveCaptureView.swift, companions | M
-- [ ] Streaming residuals: defer segment-complete until all pages *uploaded*; `needsResend` for P10/reclassify in-flight; persist `completedDocGroups` across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
+- [ ] Streaming residuals (mostly shipped in the cloud-transport work — Finish drain-gate + phone queue-depth + "End segment = the only done action" landed): finish/verify any remainder — `needsResend` for P10/reclassify in-flight, `completedDocGroups` persistence across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
 - [ ] KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput`. **Tier-2 file-move**; needs a live pipeline run. | OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M
 
 > **✅ INTEGRATED 2026-07-07.** The standalone clone's `feat/live-capture-cloud-transport` work — a full
@@ -68,14 +68,16 @@ Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneVie
 > build; offline invariant tests pass (RELAY GOLDEN ✅, FileRelay 8/8). The standalone clone was then
 > **retired**: its 6.3 GB `Test Files` corpus moved into `ArchiveProcessor/Test Files/` (gitignored), the
 > folder deleted, and the stale `com.archivereader.autobuild` launchd relic removed. This **supersedes** the
-> "connectivity UX" item above (cloud/USB transport is the new direction). New plan docs now live at
-> `ArchiveProcessor/LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md` + `LIVE_CAPTURE_FILERELAY_SPEC.md`; owner-gated
-> live Drive testing steps are in there.
+> "connectivity UX" item above (cloud/USB transport is the new direction). The architecture now lives in
+> `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
+> on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
 
-## P3 — Suite structural
-- [ ] Add a tight Implementation Map to Processor's `CLAUDE.md` (Reader has one; Processor lacks it — token-efficiency directive C.7). | files: ArchiveProcessor/CLAUDE.md | M | low
-- [ ] De-nest per app (do AFTER the P0 upload, build-verify each): `git mv <App>/<App> <App>/macOS`, update `launch.sh` `APPDIR` + `.gitignore`/doc paths + (Processor) `scripts/test-*.sh`; schemes/bundle IDs unchanged. | files: ArchiveReader/, ArchiveProcessor/ | M | med
-- [ ] (Long-term / Phase G) Extract shared UI-free `ArchiveCore` SPM package so Reader `TagWriter` + Processor `MacOSTagger` can't drift; largely supersedes the "cite the spec"/drift items. | files: new ArchiveCore/, both project.yml | L | med
+- [ ] **Owner-gated: live Google Drive end-to-end test.** Configure the in-app OAuth client, sign in once, and run a live capture over the Drive relay to confirm the shipped cloud transport end-to-end. | needs: owner | M
+
+## P3 — Suite structural  → detailed plan in `execution-plans/structural-refactor.md`
+- [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
+- [ ] Extract shared `ArchiveCore` package (3a read-only model first; 3b unified write-path deferred behind adversarial review). | files: new ArchiveCore/, both project.yml | L | med
+- [ ] De-nest the `App/App` folders (cosmetic; lowest value). | files: ArchiveReader/, ArchiveProcessor/ | M | med
 
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 - [ ] GUI-verify Reader inline tag editor blur-vs-Return commit (synthetic input can't drive SwiftUI text fields). | files: Views/InlineEditCells.swift, Views/TagFilterField.swift | S | needs: owner

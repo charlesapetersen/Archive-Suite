@@ -47,6 +47,14 @@ real corpus).
 - **Two apps, two bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`) — never merged. Both are ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 
+## Docs & backlog convention
+Three tiers, so nothing sprawls or goes stale:
+- **Near-term work → `SUITE_TODO.md`** (root) — the single live to-do queue; it also **indexes the active execution plans** (below).
+- **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
+- **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
+
+Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). Don't keep a doc "just because" — fold durable bits into these and drop the rest.
+
 ## Working directive — token-efficient feature-add & maintenance
 
 Treat context/token cost as a real budget alongside speed and correctness. Applies to every change in
