@@ -17,6 +17,7 @@ Test Files/
 
 # Android / Gradle
 .gradle/
+.kotlin/
 local.properties
 *.apk
 *.iml

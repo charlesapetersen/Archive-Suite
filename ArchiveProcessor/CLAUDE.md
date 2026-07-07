@@ -99,6 +99,10 @@ Common document types: newspaper articles, magazine articles, letters, memos, re
 
 ### Tags Applied to Each File
 
+> **Single source of truth:** the exact tag vocabulary + 2-page PDF format Archive Processor *writes*
+> (and Archive Reader *reads*) is authoritatively specified in [`../SPEC/tag-format.md`](../SPEC/tag-format.md)
+> (Suite root). Any change to what's written here must update that SPEC and the Reader together.
+
 Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or similar).
 
 **Date tags (most important)**
