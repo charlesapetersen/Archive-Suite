@@ -14,6 +14,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"
+
+        // AppAuth redirect: the reversed-client-ID custom scheme for the Android OAuth client. AppAuth's
+        // library manifest binds its RedirectUriReceiverActivity to this scheme via the placeholder.
+        manifestPlaceholders["appAuthRedirectScheme"] =
+            "com.googleusercontent.apps.YOUR_ANDROID_OAUTH_CLIENT_ID"
     }
 
     buildTypes {
@@ -62,6 +67,9 @@ dependencies {
     // Networking + coroutines
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // On-device Google OAuth for the Drive cloud relay (Custom Tabs + PKCE, RFC 8252).
+    implementation("net.openid:appauth:0.11.1")
 
     // Plain-JVM unit tests (RelayObjectFormat golden byte-check; no emulator/Robolectric).
     testImplementation("junit:junit:4.13.2")

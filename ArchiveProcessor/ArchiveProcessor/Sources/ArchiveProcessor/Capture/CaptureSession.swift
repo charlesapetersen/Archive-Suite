@@ -185,6 +185,9 @@ final class CaptureSession: ObservableObject {
     @Published private(set) var relayRunning = false
     /// Either receiver is up (transport-agnostic gate for the UI).
     var receiverActive: Bool { serverRunning || relayRunning }
+    /// Whether the cloud (Google Drive) transport is selected — the UI shows the cloud pairing QR + relay
+    /// status instead of the LAN ones when true.
+    var isCloudTransport: Bool { transport == .cloud }
 
     func start() {
         switch transport {

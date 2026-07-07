@@ -9,6 +9,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.archiveprocessor.capture.data.Prefs
 import com.archiveprocessor.capture.data.SessionStore
+import com.archiveprocessor.capture.net.DriveAuth
+import com.archiveprocessor.capture.net.DriveClient
+import com.archiveprocessor.capture.net.DriveRelayTransport
 import com.archiveprocessor.capture.net.MacClient
 import com.archiveprocessor.capture.net.SegmentTransport
 import com.archiveprocessor.capture.net.MacEndpoint
@@ -26,13 +29,16 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
     private val sessionDir: File = File(app.filesDir, "capture").apply { mkdirs() }
 
+    /** On-device Google sign-in for the cloud relay; the UI launches its consent flow during pairing. */
+    val driveAuth = DriveAuth(app)
+
     val deviceName: String = android.os.Build.MODEL ?: "Android"
 
     var endpoint by mutableStateOf(prefs.loadEndpoint())
         private set
-    // Abstracted behind SegmentTransport so a second transport (Google Drive cloud relay) can be
-    // dropped in without touching the durable queue/retry/dedup below. Today's only impl is MacClient.
-    private var client: SegmentTransport? = endpoint?.let { MacClient(it) }
+    // Abstracted behind SegmentTransport so the durable queue/retry/dedup below never sees the transport:
+    // LAN/USB → MacClient (HTTP), cloud → DriveRelayTransport (Google Drive). See transportFor().
+    private var client: SegmentTransport? = endpoint?.let { transportFor(it) }
 
     val items = mutableStateListOf<CapturedItem>()
     var currentGroupId by mutableStateOf(newGroupId())
@@ -152,13 +158,19 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Pairing ----
 
+    /** Build the transport for an endpoint: HTTP for LAN/USB, the Google Drive relay for cloud. The
+     *  cloud transport pulls a fresh Google access token per call via [DriveAuth]. */
+    private fun transportFor(ep: MacEndpoint): SegmentTransport =
+        if (ep.isCloud) DriveRelayTransport(DriveClient(token = { driveAuth.accessTokenBlocking() }), ep.token)
+        else MacClient(ep)
+
     fun connect(host: String, port: Int, token: String, name: String = "Mac", onResult: (Boolean) -> Unit) {
         val ep = MacEndpoint(host, port, token, name)
         viewModelScope.launch {
             val r = withContext(Dispatchers.IO) { MacClient(ep).reachability() }
             if (r == com.archiveprocessor.capture.net.Reachability.OK) {
                 endpoint = ep
-                client = MacClient(ep)
+                client = transportFor(ep)
                 prefs.saveEndpoint(ep)
                 statusMessage = "Connected to ${ep.name}"
                 resumeUploads()
@@ -184,6 +196,21 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Wired: reach the Mac at 127.0.0.1 over the adb-reverse tunnel; keep the QR's port + token.
         val host = if (wired) "127.0.0.1" else ep.host
         connect(host, ep.port, ep.token, ep.name, onResult)
+    }
+
+    /** Finish cloud pairing after a successful Google sign-in (the UI drives sign-in, since it needs an
+     *  Activity). No HTTP reachability probe: the first postPhoto resolves the Mac's Drive folder + epoch,
+     *  and if the Mac's cloud session isn't up yet the upload simply stays FAILED and auto-retries — the
+     *  never-lose contract holds, so nothing is ever dropped waiting for the Mac. */
+    fun connectCloud(ep: MacEndpoint, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            endpoint = ep
+            client = transportFor(ep)
+            prefs.saveEndpoint(ep)
+            statusMessage = "Cloud relay ready — uploading to Google Drive"
+            resumeUploads()
+            onResult(true)
+        }
     }
 
     fun disconnect() {
@@ -457,5 +484,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 append("$failed failed")
             }
         }
+    }
+
+    override fun onCleared() {
+        driveAuth.dispose()   // release AppAuth's Custom Tabs service binding
+        super.onCleared()
     }
 }

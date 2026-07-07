@@ -69,6 +69,8 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
     @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
+    @AppStorage(DefaultsKeys.liveTransport) private var liveTransport: String = "lan"
+    @AppStorage(DefaultsKeys.driveClientId) private var driveClientId: String = ""
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @State private var selectedModel: LLMModel
@@ -78,6 +80,12 @@ struct SettingsView: View {
     @State private var gatewayKey = ""
     @State private var showKeyWizard = false
     @State private var showManageModels = false
+    // Cloud-relay Google sign-in (transport = cloud). The secret lives in the Keychain, not @AppStorage.
+    @State private var driveClientSecret = ""
+    @State private var driveSignedIn = false
+    @State private var signingIn = false
+    @State private var driveStatus = ""
+    @State private var driveAuth: DriveAuth? = nil   // retains the auth object across the async loopback flow
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
@@ -519,9 +527,95 @@ struct SettingsView: View {
                     HelpButton(text: "Stage for later: captures collect in Live Capture; send them to Process Files for a normal batch run.\n\nProcess live: each captured segment is OCR'd, tagged, and turned into a PDF as you shoot (using the settings here); confirm collection names at the end.")
                 }
             }
+
+            Picker(selection: $liveTransport) {
+                Text("LAN / USB").tag("lan")
+                Text("Cloud (Google Drive)").tag("cloud")
+            } label: {
+                HStack {
+                    Text("Transport")
+                    HelpButton(text: "How the phone reaches this Mac.\n\nLAN / USB: direct connection over Wi-Fi or a USB cable (default; nothing to set up).\n\nCloud (Google Drive): the phone uploads each photo to a private Drive folder and this Mac pulls them down — use it when the Mac must stay on venue Wi-Fi and USB isn't available. Requires a one-time Google sign-in below (the same account on the Mac and the phone).")
+                }
+            }
+
+            // Cloud credentials + sign-in — grayed out unless the cloud transport is selected (per the
+            // Settings convention: every control has a ? and dims when it doesn't apply).
+            let cloud = liveTransport == "cloud"
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Google client ID").font(.caption)
+                    HelpButton(text: "The OAuth Desktop-app client ID for the Drive relay (from your Google Cloud project, ending in .apps.googleusercontent.com). Stored in app settings; the matching secret goes in the Keychain.")
+                    Spacer()
+                }
+                TextField("…apps.googleusercontent.com", text: $driveClientId)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Text("Client secret").font(.caption)
+                    HelpButton(text: "The OAuth Desktop-app client secret (GOCSPX-…). Saved to the macOS Keychain, never written to disk or settings.")
+                    Spacer()
+                }
+                SecureField("GOCSPX-…", text: $driveClientSecret)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: driveClientSecret) { _, v in _ = KeychainHelper.save(account: "DriveClientSecret", password: v) }
+                HStack(spacing: 10) {
+                    Button(driveSignedIn ? "Re-sign in" : "Sign in to Google Drive") { signInToDrive() }
+                        .disabled(driveClientId.isEmpty || driveClientSecret.isEmpty || signingIn)
+                    if signingIn { ProgressView().controlSize(.small) }
+                    if driveSignedIn {
+                        Label("Signed in", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                        Button("Sign out") { signOutDrive() }.font(.caption)
+                    }
+                    Spacer()
+                }
+                if !driveStatus.isEmpty {
+                    Text(driveStatus).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Sign in with the same Google account on the Mac and the phone. Then Start in Live Capture and scan the cloud QR on the phone.")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+            .disabled(!cloud)
+            .opacity(cloud ? 1 : 0.4)
+            .onAppear { loadDriveState() }
         } header: {
             Text("Live Capture")
         }
+    }
+
+    private func loadDriveState() {
+        driveClientSecret = KeychainHelper.load(account: "DriveClientSecret") ?? ""
+        driveSignedIn = KeychainHelper.load(account: "DriveRefreshToken") != nil
+    }
+
+    /// Owner-gated interactive Google sign-in for the Drive relay: opens the browser + loopback flow, then
+    /// stores the refresh token in the Keychain (via `DriveAuth`). The secret is persisted first so the
+    /// running `CaptureSession.cloudRelay` reads the same credentials.
+    private func signInToDrive() {
+        _ = KeychainHelper.save(account: "DriveClientSecret", password: driveClientSecret)
+        signingIn = true
+        driveStatus = "Opening Google sign-in in your browser — approve access, then return here."
+        let auth = DriveAuth(clientId: driveClientId.trimmingCharacters(in: .whitespaces), clientSecret: driveClientSecret)
+        driveAuth = auth   // signIn captures self weakly; hold a strong ref until the redirect completes
+        auth.signIn { result in
+            // Reduce to a Sendable String? BEFORE the actor hop (the Error itself isn't Sendable).
+            let errorMessage: String? = { if case .failure(let e) = result { return e.localizedDescription }; return nil }()
+            Task { @MainActor in
+                signingIn = false
+                if let errorMessage {
+                    driveSignedIn = false
+                    driveStatus = "Sign-in failed: \(errorMessage)"
+                } else {
+                    driveSignedIn = true
+                    driveStatus = "Signed in to Google Drive."
+                }
+            }
+        }
+    }
+
+    private func signOutDrive() {
+        DriveAuth(clientId: driveClientId, clientSecret: driveClientSecret).signOut()
+        driveSignedIn = false
+        driveStatus = "Signed out."
     }
 
     private var gatewayModel: LLMModel? {

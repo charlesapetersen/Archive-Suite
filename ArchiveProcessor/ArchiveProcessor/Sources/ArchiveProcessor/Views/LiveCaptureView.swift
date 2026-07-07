@@ -78,10 +78,11 @@ struct LiveCaptureView: View {
                 GroupBox("Connection") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Circle().fill(session.serverRunning ? .green : .secondary).frame(width: 8, height: 8)
-                            Text(session.serverRunning ? "Listening" : "Stopped").font(.callout)
+                            let running = session.receiverActive
+                            Circle().fill(running ? .green : .secondary).frame(width: 8, height: 8)
+                            Text(running ? (session.isCloudTransport ? "Watching Drive" : "Listening") : "Stopped").font(.callout)
                             Spacer()
-                            if session.serverRunning {
+                            if running {
                                 Button("Stop") { session.stop() }
                             } else {
                                 Button("Start") { session.start() }
@@ -152,7 +153,25 @@ struct LiveCaptureView: View {
                     .help("Where finalized live-capture collections are written. Shared with the Process Files output folder; defaults to your Downloads folder. Set it before finishing a session.")
                 }
 
-                if session.serverRunning, session.paired {
+                if session.isCloudTransport {
+                    if session.receiverActive, let payload = cloudPairingPayload {
+                        GroupBox("Pair the phone (Cloud)") {
+                            VStack(spacing: 8) {
+                                if let qr = Self.qrImage(from: payload) {
+                                    Image(nsImage: qr).interpolation(.none).resizable().frame(width: 200, height: 200)
+                                }
+                                Text("In Archive Capture, choose Cloud (Google Drive), then scan.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Text("Relay code: \(session.token)")
+                                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                                Text("The phone signs in to the same Google account as this Mac; photos upload to a private Drive folder and appear here.")
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity).padding(6)
+                        }
+                    }
+                } else if session.serverRunning, session.paired {
                     GroupBox("Phone") {
                         HStack(spacing: 6) {
                             Image(systemName: "iphone.gen3").foregroundStyle(.green)
@@ -220,6 +239,19 @@ struct LiveCaptureView: View {
         return (try? JSONSerialization.data(withJSONObject: dict)).flatMap { String(data: $0, encoding: .utf8) }
     }
 
+    /// Cloud pairing payload: `{mode:"cloud", token, name}`. The token IS the relay token the phone needs —
+    /// `DriveRelayTransport` self-discovers the shared Drive folder from it (via `appProperties.relayToken`),
+    /// and reads the epoch from `_epoch.json`. No host/port/IP: the phone talks to Drive, not this Mac.
+    private var cloudPairingPayload: String? {
+        guard session.isCloudTransport, session.receiverActive else { return nil }
+        let dict: [String: Any] = [
+            "mode": "cloud",
+            "token": session.token,
+            "name": Host.current().localizedName ?? "Mac"
+        ]
+        return (try? JSONSerialization.data(withJSONObject: dict)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
     // MARK: Right — live grouped photos
 
     private var capturePanel: some View {
@@ -281,7 +313,7 @@ struct LiveCaptureView: View {
                 } else {
                     VStack(spacing: 8) {
                         Image(systemName: "camera.badge.clock").font(.system(size: 40)).foregroundStyle(.secondary)
-                        Text(session.serverRunning ? "Waiting for photos…\nShoot on the phone; they'll appear here grouped."
+                        Text(session.receiverActive ? "Waiting for photos…\nShoot on the phone; they'll appear here grouped."
                                                    : "Start the server, then pair the phone.")
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
