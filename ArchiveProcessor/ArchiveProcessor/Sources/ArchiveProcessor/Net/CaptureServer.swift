@@ -14,7 +14,7 @@ import Network
 /// Mutable state (`listener`) is only touched on the serial `queue`, and `session` is a
 /// `@MainActor` object always reached via `Task { @MainActor }`, so this is safe to treat as
 /// Sendable for the Network.framework callbacks.
-final class CaptureServer: @unchecked Sendable {
+final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private weak var session: CaptureSession?
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "capture.server")
@@ -212,7 +212,7 @@ final class CaptureServer: @unchecked Sendable {
             // Require an explicit group + numeric seq. Without this, malformed or rogue uploads collapse
             // to a shared (group:"default", seq:0) key and the idempotent-replace logic silently overwrites
             // a real photo — a "photo is never lost" violation. The Android client always sends both.
-            guard let groupId = req.headers["x-group"], !groupId.isEmpty, Self.isSafeGroupId(groupId),
+            guard let groupId = req.headers["x-group"], !groupId.isEmpty, CaptureValidation.isSafeGroupId(groupId),
                   let seq = (req.headers["x-seq"]).flatMap({ Int($0) }), seq >= 0 else {
                 respond(conn, status: "400 Bad Request", json: ["error": "missing or invalid X-Group/X-Seq"])
                 return
@@ -226,7 +226,7 @@ final class CaptureServer: @unchecked Sendable {
             // Optional: the group this upload replaces (phone reclassified an already-sent photo into a
             // new group). After the new copy lands, drop the old (replacesGroup, seq) so it isn't orphaned.
             let replacesGroup = (req.headers["x-replaces"]).flatMap {
-                $0.isEmpty || !Self.isSafeGroupId($0) ? nil : $0
+                $0.isEmpty || !CaptureValidation.isSafeGroupId($0) ? nil : $0
             }
             let jpeg = req.body
             Task { @MainActor [weak self] in
@@ -243,7 +243,7 @@ final class CaptureServer: @unchecked Sendable {
             // The phone ended a document segment. Its pages already streamed in (POST /photo, as shot);
             // this signal carries the segment's tags + tells the Mac the group is complete so its tag
             // card can appear (see CaptureSession.markSegmentComplete / pendingTagGroup).
-            guard let groupId = req.headers["x-group"], !groupId.isEmpty, Self.isSafeGroupId(groupId) else {
+            guard let groupId = req.headers["x-group"], !groupId.isEmpty, CaptureValidation.isSafeGroupId(groupId) else {
                 respond(conn, status: "400 Bad Request", json: ["error": "missing or invalid X-Group"])
                 return
             }
@@ -278,12 +278,7 @@ final class CaptureServer: @unchecked Sendable {
 
     // MARK: - Validation helpers
 
-    /// Group ids become path components in the session/staging folders, so restrict them to a safe
-    /// charset (no path separators, no "..") to prevent traversal/overwrite outside the session dir.
-    private static func isSafeGroupId(_ s: String) -> Bool {
-        guard s.count <= 128, !s.contains("..") else { return false }
-        return s.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
-    }
+    /// `isSafeGroupId` now lives in `CaptureValidation` (shared with `FileRelayReceiver`).
 
     /// Length-checked constant-time compare so the Bearer token isn't leaked via response timing.
     private static func constantTimeEquals(_ a: String, _ b: String) -> Bool {
