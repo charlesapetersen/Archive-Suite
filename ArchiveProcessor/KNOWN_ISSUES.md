@@ -204,3 +204,23 @@ is ever deleted before it's filed. (`LiveCaptureProcessor.finalize`, `CaptureSes
 4. **`completedDocGroups` not persisted across a Mac restart (LOW).** After a mid-session Mac restart, no
    document tag card appears until Finish. Fix: persist it in the manifest, or on restore treat every
    restored document group as complete.
+
+---
+
+## Cloud/relay: reclassify a page whose original document group already finalized → duplicate output  [MEDIUM — relay-amplified]
+
+**Status:** deferred (2026-07-06), from the FileRelay design adversarial review (hole H10, see
+`LIVE_CAPTURE_FILERELAY_SPEC.md` §A11). Fix scoped to the Drive milestone.
+
+`removePhotoIfSafe` no-ops when the old group `isFinalized` (`CaptureSession.swift:231`). Over HTTP this is
+nearly unreachable (uploads are consumed immediately). With a **relay** (objects persist until the Mac drains
+them) the sequence is reachable: a page uploads into group G; the phone's `postPhoto` times out (or its receipt
+is swept) before the phone marks it UPLOADED, so it stays on the phone; G finalizes with the page; the operator
+then reclassifies the still-held page to a Box → the Mac ingests the new marker but `removePhotoIfSafe(G,seq)`
+no-ops (G finalized) → the photo exists in **both** G's collection AND the new marker (duplicate output of an
+irreplaceable photo + wrong classification).
+
+**Fix (Drive milestone):** on ingesting a late `replaces=G` object where G isFinalized, reconcile — remove the
+reclassified page from G's already-staged output (+ renumber), or refuse the reclassify and signal the phone.
+Touches the Tier-2 finalize/staging path + needs a phone-signal channel, hence deferred. For the FileRelay
+milestone the Mac logs the collision and does not expand the existing no-op.
