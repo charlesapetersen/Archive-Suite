@@ -60,12 +60,17 @@ Reader document window (`DocumentWindowView`, `DocumentViewerModel`, `PDFPaneVie
 - [ ] Streaming residuals: defer segment-complete until all pages *uploaded*; `needsResend` for P10/reclassify in-flight; persist `completedDocGroups` across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
 - [ ] KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput`. **Tier-2 file-move**; needs a live pipeline run. | OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M
 
-> **⚠️ PENDING INTEGRATION — do not clobber.** The standalone clone `~/Desktop/Claude/Archive Processor`
-> has unmerged work by another Claude instance: branch `feat/live-capture-cloud-transport` (`9c4334a` —
-> consolidate Live Capture to USB + Google-Drive cloud transport + a cloud plan) + an uncommitted `CLAUDE.md`.
-> **Plan (owner, 2026-07-06):** once that instance finishes, bring the branch into the monorepo (relocate its
-> files under `ArchiveProcessor/`, land on a review branch), then retire the clone. Likely supersedes/feeds
-> the "connectivity UX" item above.
+> **✅ INTEGRATED 2026-07-07.** The standalone clone's `feat/live-capture-cloud-transport` work — a full
+> **Drive-relay cloud-transport** system (D1–D8: `DriveClient`/`DriveObjectStore`/`DriveAuth`/
+> `DriveRelayTransport` for Mac+iOS+Android, `FileRelay`, phone queue-depth + Finish drain-gate;
+> LIVE-validated, already adversarially reviewed) — was ported into the monorepo under `ArchiveProcessor/`
+> as **27 commits (history preserved)** via `git am --directory`, merged to `main`, and pushed. Both apps
+> build; offline invariant tests pass (RELAY GOLDEN ✅, FileRelay 8/8). The standalone clone was then
+> **retired**: its 6.3 GB `Test Files` corpus moved into `ArchiveProcessor/Test Files/` (gitignored), the
+> folder deleted, and the stale `com.archivereader.autobuild` launchd relic removed. This **supersedes** the
+> "connectivity UX" item above (cloud/USB transport is the new direction). New plan docs now live at
+> `ArchiveProcessor/LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md` + `LIVE_CAPTURE_FILERELAY_SPEC.md`; owner-gated
+> live Drive testing steps are in there.
 
 ## P3 — Suite structural
 - [ ] Add a tight Implementation Map to Processor's `CLAUDE.md` (Reader has one; Processor lacks it — token-efficiency directive C.7). | files: ArchiveProcessor/CLAUDE.md | M | low
