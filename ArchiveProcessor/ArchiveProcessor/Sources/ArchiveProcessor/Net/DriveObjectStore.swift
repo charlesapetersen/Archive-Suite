@@ -103,11 +103,23 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
     private func _refreshCache() throws {
         let fid = try _ensureFolder()
         let files = try client.listFiles(query: "'\(esc(fid))' in parents and trashed = false")
-        cache.removeAll(keepingCapacity: true)
+        // Drive has NO name uniqueness: a fileId-loss re-create (phone recovery path) can leave two files
+        // with the same relayName. Keep only the NEWEST per name (by monotone `rev`, then modifiedTime, then
+        // fileId for determinism) and REAP the older duplicates in this one pass — so a stale-metadata version
+        // can never be re-ingested by the receiver after a newer one (the "revert P10/date tags" hazard).
+        var best: [String: (rev: Int, mod: Date?, id: String)] = [:]
+        var reap: [String] = []
         for f in files {
             guard let name = f.appProperties?["relayName"], f.appProperties?["relayRejected"] != "1" else { continue }
-            cache[name] = (f.id, parseTime(f.modifiedTime))
+            let cand = (rev: Int(f.appProperties?["rev"] ?? "") ?? -1, mod: parseTime(f.modifiedTime), id: f.id)
+            if let cur = best[name] {
+                if (cand.rev, cand.mod ?? .distantPast, cand.id) > (cur.rev, cur.mod ?? .distantPast, cur.id) {
+                    reap.append(cur.id); best[name] = cand
+                } else { reap.append(f.id) }
+            } else { best[name] = cand }
         }
+        cache = best.mapValues { (id: $0.id, modified: $0.mod) }
+        for id in reap { try? client.delete(fileId: id) }
     }
 
     /// Resolve a relay name → fileId, refreshing the cache once on a miss.

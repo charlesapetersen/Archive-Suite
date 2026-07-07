@@ -234,7 +234,13 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
         }
 
         scanCount += 1
-        if scanCount % 30 == 0 { sweep() }
+        if scanCount % 30 == 0 {
+            // Re-assert the epoch marker (idempotent) so a transient start-time publish failure — e.g. a Drive
+            // 5xx/rate-limit when the DriveObjectStore first wrote _epoch.json — self-heals instead of leaving
+            // the phone polling forever for an epoch that never appeared (a silent dead session).
+            store.publishEpoch(RelayObjectFormat.encodeEpochMarker(token: token, epoch: epoch))
+            sweep()
+        }
         return report
     }
 

@@ -37,6 +37,15 @@ final class MockDrive: HTTPExecuting, @unchecked Sendable {
         var o: [String: String] = [:]; for (k, v) in d { o[k] = "\(v)" }; return o
     }
     private func parentsOf(_ m: [String: Any]) -> [String] { (m["parents"] as? [Any])?.compactMap { $0 as? String } ?? [] }
+    // Test seam: inject a raw file into the session folder (simulates a phone fileId-loss re-create that
+    // leaves a coexisting same-relayName duplicate — Drive has no name uniqueness).
+    func injectDup(_ name: String, rev: String, media: String) {
+        lock.lock(); defer { lock.unlock() }
+        let folder = store.values.first { $0.mime == "application/vnd.google-apps.folder" }
+        let id = newId()
+        store[id] = File(id: id, name: name, appProps: ["relayName": name, "relayToken": "TESTTK", "rev": rev],
+                         parents: folder.map { [$0.id] } ?? [], media: Data(media.utf8), mime: "")
+    }
 
     func execute(method: String, url: String, headers: [String: String], body: Data?) throws
         -> (status: Int, data: Data, headers: [String: String]) {
@@ -133,6 +142,12 @@ check("quarantine removes from listing", !store.listNames().contains("g1__7.jpg"
 
 store.delete("g1__7.json")
 check("delete removes object", !store.listNames().contains("g1__7.json") && store.readData("g1__7.json") == nil)
+
+// Coexisting same-name duplicates (D7 fix): newest by rev survives, older is reaped, never re-ingested.
+mock.injectDup("dup__9.json", rev: "1", media: "OLD")
+mock.injectDup("dup__9.json", rev: "2", media: "NEW")
+check("dup: newest rev survives (no stale revert)", store.readData("dup__9.json") == Data("NEW".utf8))
+check("dup: listed exactly once (older reaped)", store.listNames().filter { $0 == "dup__9.json" }.count == 1)
 
 print(pass ? "DRIVE STORE (mock): PASS" : "DRIVE STORE (mock): FAIL")
 exit(pass ? 0 : 1)
