@@ -294,6 +294,16 @@ final class CaptureViewModel: ObservableObject {
         for group in endedSegments.keys { trySendSegmentComplete(group: group) }
     }
 
+    /// Heartbeat the count of photos still IN FLIGHT to the Mac (pending/uploading) so the Mac can surface
+    /// "phone still has N photos to send" and hold Finish until they arrive — reaching 0 once they settle.
+    /// FAILED pages are deliberately EXCLUDED: they need a manual Retry and won't arrive on their own, so
+    /// they must not block Finish forever (the operator sees + retries them in the phone's strip).
+    private func sendStatusReport() {
+        guard let c = client else { return }
+        let pending = items.filter { $0.state == .pending || $0.state == .uploading }.count
+        Task { _ = await c.reportStatus(pending: pending) }
+    }
+
     private func startNewGroup() { currentGroupId = Self.newGroupId(); persist() }
 
     // MARK: - Recent years (for the tag sheet's quick chips)
@@ -317,6 +327,7 @@ final class CaptureViewModel: ObservableObject {
         guard let c = client else { return }
         guard inFlightUploads.insert(item.id).inserted else { return }   // already uploading this id
         setState(item.id, .uploading)
+        sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
         let fileURL = item.fileURL
         let replaces = item.replacesGroupId   // durable on the item, so retries keep sending X-Replaces
         Task {
@@ -347,6 +358,7 @@ final class CaptureViewModel: ObservableObject {
                 setState(item.id, .failed)
             }
             statusMessage = uploadSummary()
+            sendStatusReport()   // reflect the new un-sent count promptly (this upload just settled)
         }
     }
 
@@ -393,6 +405,7 @@ final class CaptureViewModel: ObservableObject {
         // Re-drive any ended segment whose completion signal hasn't been acked (each gated on all its
         // pages being uploaded), so a reconnect flushes them.
         resendEndedSegments()
+        sendStatusReport()   // let the Mac know the current un-sent count as soon as we (re)connect
     }
 
     private func startAutoRetry() {
@@ -408,6 +421,9 @@ final class CaptureViewModel: ObservableObject {
                 // Retry any ended segment whose completion signal hasn't been acked (gated on all its
                 // pages being uploaded), so a transient drop at End segment self-heals.
                 self.resendEndedSegments()
+                // Heartbeat the un-sent count (incl. 0 when drained) so the Mac's "phone still has N to
+                // send" stays fresh even while the phone is idle.
+                self.sendStatusReport()
             }
         }
     }

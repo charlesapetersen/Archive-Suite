@@ -26,6 +26,16 @@ protocol SegmentTransport {
 
     /// Best-effort notice that the phone is re-pairing, so the Mac can re-show its pairing QR.
     func sessionDisconnect() async -> Bool
+
+    /// Report how many photos are still un-sent on the phone (a heartbeat), so the Mac can tell the
+    /// operator "the phone still has N photos to send" at Finish. Best-effort.
+    func reportStatus(pending: Int) async -> Bool
+}
+
+extension SegmentTransport {
+    /// Default no-op for transports that don't carry a status channel (the file relays); only the HTTP
+    /// `MacClient` implements it.
+    func reportStatus(pending: Int) async -> Bool { true }
 }
 
 extension MacClient: SegmentTransport {}

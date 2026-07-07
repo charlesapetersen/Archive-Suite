@@ -158,6 +158,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Re-drive any ended segment whose completion signal hasn't been acked (each still gated on all
         // its pages being uploaded), so a reconnect flushes them.
         resendEndedSegments()
+        sendStatusReport()   // let the Mac know the current un-sent count as soon as we (re)connect
     }
 
     /** Background self-heal: periodically re-send failed uploads so an unplug/replug (or any brief
@@ -175,6 +176,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     // Retry any ended segment whose completion signal hasn't been acked (gated on all its
                     // pages being uploaded), so a transient drop at End segment self-heals.
                     resendEndedSegments()
+                    // Heartbeat the un-sent count (incl. 0 when drained) so the Mac's "phone still has N to
+                    // send" stays fresh even while the phone is idle.
+                    sendStatusReport()
                 }
             }
         }
@@ -447,6 +451,16 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         endedSegments.keys.toList().forEach { trySendSegmentComplete(it) }
     }
 
+    /** Heartbeat the count of photos still IN FLIGHT to the Mac (PENDING/UPLOADING) so the Mac can surface
+     *  "phone still has N photos to send" and hold Finish until they arrive — reaching 0 once they settle.
+     *  FAILED pages are deliberately EXCLUDED: they need a manual Retry and won't arrive on their own, so
+     *  they must not block Finish forever (the operator sees + retries them in the phone's strip). */
+    private fun sendStatusReport() {
+        val c = client ?: return
+        val pending = items.count { it.state == UploadState.PENDING || it.state == UploadState.UPLOADING }
+        viewModelScope.launch { withContext(Dispatchers.IO) { runCatching { c.reportStatus(pending) } } }
+    }
+
     private fun startNewGroup() {
         currentGroupId = newGroupId()
         persist()
@@ -466,6 +480,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Durable on the item, so retry / resume / autoRetry keep sending X-Replaces until it lands.
         val replaces = item.replacesGroupId
         setState(item.id, UploadState.UPLOADING)
+        sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
         viewModelScope.launch {
             try {
                 val bytes = withContext(Dispatchers.IO) { runCatching { item.file.readBytes() }.getOrNull() }
@@ -491,6 +506,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     if (endedSegments.containsKey(item.groupId)) trySendSegmentComplete(item.groupId)
                 }
                 statusMessage = uploadSummary()
+                sendStatusReport()   // reflect the new un-sent count promptly (this upload just settled)
             } finally {
                 inFlightUploads.remove(item.id)
             }

@@ -264,6 +264,13 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             }
             respond(conn, status: "200 OK", json: ["ok": true])
 
+        case "POST /phone/status":
+            // Heartbeat: how many photos the phone still has un-sent. Lets the Mac surface "phone still
+            // has N to send" and hold Finish until the phone has drained.
+            let pending = (req.headers["x-pending"]).flatMap { Int($0) } ?? 0
+            Task { @MainActor [weak self] in self?.session?.updatePhonePending(max(0, pending)) }
+            respond(conn, status: "200 OK", json: ["ok": true])
+
         case "POST /session/disconnect":
             // The phone re-paired (best-effort notice; there's no persistent connection for the Mac to
             // sense the drop). Re-show the pairing QR so the operator can immediately re-scan — instead of

@@ -14,6 +14,25 @@ final class CaptureSession: ObservableObject {
     @Published var statusMessage = "Idle"
     @Published private(set) var connectedDeviceName: String?
 
+    /// How many photos the phone still has un-sent (its last heartbeat), + when we last heard it, so the
+    /// Mac can surface "phone still has N to send" and hold Finish until the phone has drained.
+    @Published private(set) var phonePendingCount = 0
+    private var phonePendingAt: Date?
+    /// True only if a FRESH heartbeat (within 20s) says the phone still has photos to send — staleness
+    /// guards against blocking Finish forever if the phone disconnects mid-send.
+    var phonePendingActive: Bool {
+        phonePendingCount > 0 && (phonePendingAt.map { Date().timeIntervalSince($0) < 20 } ?? false)
+    }
+
+    /// Phone heartbeat (`POST /phone/status`): record the un-sent count + freshness, and (during a live
+    /// session) re-evaluate a pending Finish so it advances once the phone has drained.
+    func updatePhonePending(_ count: Int) {
+        phonePendingCount = count
+        phonePendingAt = Date()
+        paired = true
+        if processingMode == .live { liveProcessor.phoneStatusChanged() }
+    }
+
     /// Mac operator's per-segment tags entered during capture (groupId → tags), plus the set of
     /// document groups already tagged or skipped on the Mac (drives the auto-advancing card).
     @Published private(set) var macTags: [String: MacSegmentTags] = [:]

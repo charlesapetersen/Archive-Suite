@@ -100,6 +100,22 @@ final class LiveCaptureProcessor: ObservableObject {
         return base.appendingPathComponent("ArchiveProcessor/LiveStaging", isDirectory: true)
     }
 
+    /// Remove leftover per-session staging subdirs (each embeds archival page images inside its staged PDFs)
+    /// so they can't accumulate unbounded in the hidden staging root. A staging dir is orphaned when its
+    /// session is neither the active one NOR still present in the visible backup root — i.e. it was finalized
+    /// (its sources cleared) or abandoned. NEVER removes a session whose backup folder still exists (it may
+    /// still be resumed), and never the active session, so it cannot discard resumable work.
+    private static func pruneStagingRoot(keeping activeSessionId: String) {
+        let fm = FileManager.default
+        guard let subdirs = try? fm.contentsOfDirectory(at: stagingRoot, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        for dir in subdirs {
+            let sid = dir.lastPathComponent
+            guard sid != activeSessionId else { continue }
+            let backup = CaptureSession.backupRoot.appendingPathComponent(sid, isDirectory: true)
+            if !fm.fileExists(atPath: backup.path) { try? fm.removeItem(at: dir) }
+        }
+    }
+
     /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
     func activate(config: SessionProcessingConfig) {
         self.config = config
@@ -116,6 +132,7 @@ final class LiveCaptureProcessor: ObservableObject {
             ? legacy : fixed
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         stagingDir = dir
+        Self.pruneStagingRoot(keeping: session.sessionId)   // drop leftover staging from finalized/abandoned sessions
         // Arm the shared tagging knobs for this session's writes.
         MacOSTagger.stampUnread = config.taggingMode.stampsUnread
         OCRProcessor.rotationModeForRun = config.rotationMode
@@ -518,13 +535,32 @@ final class LiveCaptureProcessor: ObservableObject {
     func requestFinish() {
         guard !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
         session.completeAllOpenDocGroups()
+        let wasPending = pendingFinish
         pendingFinish = true
+        if !wasPending { startFinishWatchdog() }   // one watchdog per pending-finish episode
         proceedToFinishIfReady()
+    }
+
+    /// While a Finish is pending, re-evaluate periodically so it auto-advances even when nothing else
+    /// re-triggers it — in particular when a phone that was still sending goes silent and its heartbeat
+    /// lapses to stale (`phonePendingActive` flips false at 20s) with no further event to notice it.
+    private func startFinishWatchdog() {
+        Task { [weak self] in
+            while true {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard let self, self.pendingFinish else { return }
+                self.proceedToFinishIfReady()
+            }
+        }
     }
 
     /// Abort a pending Finish (e.g. the operator hit Clear instead of resolving the surfaced cards), so the
     /// Finish button can't stay wedged disabled with nothing left to advance it.
     func cancelPendingFinish() { pendingFinish = false }
+
+    /// The phone's un-sent count changed (a `POST /phone/status` heartbeat). Re-evaluate a pending Finish
+    /// so it advances the moment the phone has drained (and processing is done).
+    func phoneStatusChanged() { proceedToFinishIfReady() }
 
     /// Advance a pending Finish once no tag card is outstanding and nothing is still being processed.
     /// Called after each segment stages and whenever a card is resolved, so a Finish requested mid-run
@@ -537,7 +573,10 @@ final class LiveCaptureProcessor: ObservableObject {
         let stillProcessing = statuses.contains { s in
             (s.phase == .ocr || s.phase == .tagging) && session.groups.contains { $0.id == s.id }
         }
-        guard session.pendingTagGroup == nil, !stillProcessing else { return }
+        // Also wait while a FRESH phone heartbeat says it still has photos to send, so a segment whose pages
+        // are all still in flight isn't omitted. A stale heartbeat (phone disconnected) does NOT block — the
+        // Finish button stays tappable as the escape.
+        guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive else { return }
         pendingFinish = false
         finishSession()
     }

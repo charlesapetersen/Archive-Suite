@@ -25,6 +25,11 @@ interface SegmentTransport {
     /** Signal that a document segment is complete and carry its tags (no image bytes). Idempotent. */
     fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean
 
+    /** Report how many photos are still un-sent on the phone (a heartbeat), so the Mac can tell the
+     *  operator "the phone still has N photos to send" at Finish. Best-effort; the default is a no-op for
+     *  transports that don't carry it (the file relays), so only the HTTP [MacClient] implements it. */
+    fun reportStatus(pending: Int): Boolean = true
+
     /** Signal the capture session is finished (flush any still-open segment on the Mac). */
     fun sessionComplete(): Boolean
 

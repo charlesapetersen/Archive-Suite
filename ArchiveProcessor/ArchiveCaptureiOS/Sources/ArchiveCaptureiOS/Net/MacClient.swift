@@ -101,4 +101,13 @@ struct MacClient {
         do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }
+
+    /// Heartbeat: how many photos are still un-sent on the phone, so the Mac can surface "phone still has
+    /// N photos to send" (and hold Finish until they arrive). No body; best-effort.
+    func reportStatus(pending: Int) async -> Bool {
+        guard var req = makeRequest("/phone/status", method: "POST") else { return false }
+        req.setValue(String(pending), forHTTPHeaderField: "X-Pending")
+        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
+        catch { return false }
+    }
 }

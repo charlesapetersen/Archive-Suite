@@ -101,6 +101,18 @@ class MacClient(private val endpoint: MacEndpoint) : SegmentTransport {
         false
     }
 
+    /** Heartbeat: how many photos are still un-sent on the phone, so the Mac can surface "phone still has
+     *  N photos to send" (and hold Finish until they arrive). No body; best-effort. */
+    override fun reportStatus(pending: Int): Boolean = try {
+        val req = Request.Builder().url("${endpoint.baseUrl}/phone/status")
+            .header("Authorization", auth())
+            .header("X-Pending", pending.toString())
+            .post(ByteArray(0).toRequestBody(null)).build()
+        client.newCall(req).execute().use { it.isSuccessful }
+    } catch (e: Exception) {
+        false
+    }
+
     /** Best-effort notice that the phone is re-pairing, so the Mac re-shows the pairing QR instead of
      *  sitting on a stale "paired" state. Fire-and-forget (may not reach the Mac if the link is already down). */
     override fun sessionDisconnect(): Boolean = try {

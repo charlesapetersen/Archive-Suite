@@ -261,6 +261,10 @@ struct LiveCaptureView: View {
                     .font(.headline)
                 Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s") · \(session.groups.count) group\(session.groups.count == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(.secondary)
+                if session.phonePendingActive {
+                    Label("phone sending \(session.phonePendingCount)", systemImage: "iphone.and.arrow.forward")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 Spacer()
                 if !session.photos.isEmpty {
                     Button("Clear") { session.clear(); liveProc.clearFinalizeSummary(); liveProc.cancelPendingFinish() }
@@ -285,8 +289,13 @@ struct LiveCaptureView: View {
                         HStack(spacing: 8) {
                             if liveProc.pendingFinish {
                                 ProgressView().controlSize(.small)
-                                Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                if session.phonePendingActive {
+                                    Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                } else {
+                                    Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             } else if processing && liveProc.staged.isEmpty {
                                 ProgressView().controlSize(.small)
                                 Text("Processing…").font(.caption).foregroundStyle(.secondary)
