@@ -12,6 +12,10 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 ## Active execution plans (`execution-plans/`)
 - **`structural-refactor.md`** — the two open P3 items: extract a shared `ArchiveCore` package, and
   de-nest the `App/App` folders. (P3.1 Implementation Maps shipped 2026-07-07.)
+- **`android-ui-test-harness.md`** — unattended headless-emulator UI testing for the Android capture
+  companion (pair via manual entry + `adb input`, headless Mac via `LIVECAPTURE_AUTOSTART`, verify on the
+  Mac's backup/manifest files). Enables the phone-gated Processor items below without a physical phone; iOS
+  out of scope (no simulator camera). No app-code change. | tooling | M | needs: gui (headless, self-contained)
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -31,7 +35,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects (SPEC #3) — added; **110 tests green**. ✅
 - [x] Close stale checkbox: near-term-UI item **E3** confirmed shipped & ticked. ✅
 - [x] Processor: "Import tag vocabulary from CSV" — added `Import from CSV…` button + file drop target on the vocabulary editor (`SettingsView.swift`; NSOpenPanel + newline/comma parse, de-dupe). macOS build green, no new warnings. ✅
-- [ ] **BLOCKED (not a quick win):** bump Android `targetSdk` 34→36. AGP is **8.6.1 / Gradle 8.9**, which can't compile `compileSdk 36` (needs AGP ≥8.9); also **no Android SDK/toolchain on this machine**. Requires: upgrade AGP+Gradle, install the API-36 platform, bump compile+targetSdk, then a build + on-device smoke for Android 15/16 behavior changes. Do in an Android-capable session before the ~2026-08-31 Play deadline. | files: ArchiveCapture/ (build.gradle.kts, gradle wrapper) | M | med
+- [ ] **BLOCKED (not a quick win):** bump Android `targetSdk` 34→36. AGP is **8.6.1 / Gradle 8.9**, which can't compile `compileSdk 36` (needs AGP ≥8.9). The Android toolchain IS present (correction 2026-07-07: the Homebrew `android-commandlinetools` cask at `/opt/homebrew/share/android-commandlinetools` — platform-34 + build-tools 34; the app builds/installs here — but the **API-36 platform is not installed**). Requires: upgrade AGP+Gradle, install the API-36 platform, bump compile+targetSdk, then a build + on-device smoke for Android 15/16 behavior changes. Do in an Android-capable session before the ~2026-08-31 Play deadline. | files: ArchiveCapture/ (build.gradle.kts, gradle wrapper) | M | med
 - [x] Reconcile Bonjour service-name mismatch — iOS now advertises `_archivecap._tcp` (matches the Mac) in both `ArchiveCaptureiOS/project.yml` + generated `Info.plist`; iOS project regenerates clean. ✅
 
 ## P2 — Reader features (no network; local build/test)
