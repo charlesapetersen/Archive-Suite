@@ -5,7 +5,32 @@ owner intervention** — pair, capture, group, tag, Save-to-phone, Finish — an
 Mac. Enables the phone-gated Processor items in `SUITE_TODO.md` (tag-card-live, re-pair coordination,
 streaming residuals) to be checked in a self-contained loop.
 
-**Status:** in progress (2026-07-07). Delete this file when the harness is committed + proven (git keeps history).
+**Status:** Android-side PROVEN (2026-07-07) — `ArchiveProcessor/scripts/android-ui-drive.sh` drives a headless
+emulator through pair → capture → End segment → tag sheet → Box marker unattended. Remaining: the real-Mac
+end-to-end (verify on backup/manifest files), gated on the Mac being free (I won't touch a running Mac app).
+Delete this file once that's done + the harness is battle-tested (git keeps history).
+
+**Proven this session (no physical phone, no Mac app, no owner intervention):** booted the `ap_test` AVD
+headless, installed the app (pinned to the emulator serial — never the attached Pixel), and drove the full
+UI against a throwaway HTTP-200 **stub** ("fake Mac receiver" on `10.0.2.2:48628`). The stub logged the exact
+expected protocol: `GET /ping` (pair) · `POST /photo` ×3 (2 pages + Box) · `POST /segment/complete` ×1 (End
+segment → Skip — the End-segment fix firing) · `POST /phone/status` (queue-depth heartbeats). Screenshots of
+each step saved to `/tmp/ap-ui-shots/`.
+
+**Gotchas baked into the harness (learned the hard way):**
+- **Pin to the emulator serial.** A physical phone may be attached and in use — every `adb`/install call must
+  target `emulator-*` (via `ANDROID_SERIAL` + explicit `-s`; install via `adb -s install`, NOT `gradle
+  installDebug`, which can push to all devices).
+- **`hw.keyboard=yes`** on the AVD, else the soft IME covers the Host/Port/Token fields and field-taps miss
+  (all text collapses into the first field).
+- **Re-grant CAMERA after `pm clear`** — the Wi-Fi pairing screen requests it; a revoked-permission dialog
+  blocks navigation.
+- **`adb screencap` misses Compose's ModalBottomSheet** popup; assert tag-sheet steps via `uiautomator`/stub
+  traffic, not the PNG.
+
+**Two verification modes:** (a) **stub** — pure UI, no Mac, fully unattended (`scripts/android-ui-drive.sh
+stub &` then `pair 48628 <token>`); (b) **real Mac** — pair to the running Mac and assert on its backup/manifest
+files (needs the Mac free; headless via `LIVECAPTURE_AUTOSTART`).
 
 **Scope:** Android only. iOS is out — the simulator has no camera and a physical iPhone is deferred (see
 [[iphone-testing-deferred]] / `SUITE_TODO`). No app code change is required (a bonus): pairing uses the
