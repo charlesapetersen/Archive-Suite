@@ -65,4 +65,5 @@ dependencies {
 
     // Plain-JVM unit tests (RelayObjectFormat golden byte-check; no emulator/Robolectric).
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")   // org.json for JVM tests (android.jar's is device-only)
 }
