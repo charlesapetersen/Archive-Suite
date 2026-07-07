@@ -107,7 +107,8 @@ final class DriveClient: @unchecked Sendable {
 
     /// Create a metadata-only file (used for folders: mimeType = application/vnd.google-apps.folder). Returns id.
     func createMetadata(name: String, parents: [String], appProperties: [String: String], mimeType: String?) throws -> String {
-        var meta: [String: Any] = ["name": name, "parents": parents, "appProperties": appProperties]
+        var meta: [String: Any] = ["name": name, "appProperties": appProperties]
+        if !parents.isEmpty { meta["parents"] = parents }   // empty → Drive root (My Drive)
         if let mimeType { meta["mimeType"] = mimeType }
         let body = try JSONSerialization.data(withJSONObject: meta)
         let data = try send("POST", "\(Self.api)/files?fields=id", headers: ["Content-Type": "application/json"], body: body)
@@ -117,7 +118,8 @@ final class DriveClient: @unchecked Sendable {
     /// Create a file with content via multipart/related (metadata + media). Returns id.
     func createFile(name: String, parents: [String], appProperties: [String: String], media: Data, mimeType: String) throws -> String {
         let boundary = "arcap-\(UUID().uuidString)"
-        let meta: [String: Any] = ["name": name, "parents": parents, "appProperties": appProperties]
+        var meta: [String: Any] = ["name": name, "appProperties": appProperties]
+        if !parents.isEmpty { meta["parents"] = parents }
         let metaData = try JSONSerialization.data(withJSONObject: meta)
         var body = Data()
         func add(_ s: String) { body.append(Data(s.utf8)) }
