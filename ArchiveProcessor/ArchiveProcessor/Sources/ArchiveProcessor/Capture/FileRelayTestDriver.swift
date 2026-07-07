@@ -11,9 +11,38 @@ enum FileRelayTestDriver {
     private static var didRun = false
 
     static func runIfRequested(session: CaptureSession) {
-        guard !didRun, ProcessInfo.processInfo.environment["FILERELAY_TESTMODE"] == "1" else { return }
+        guard !didRun else { return }
+        // Golden generator: emit the canonical byte fixtures the iOS + Android writers must match, then stop.
+        if let goldenDir = ProcessInfo.processInfo.environment["FILERELAY_EMIT_GOLDEN"] {
+            didRun = true; emitGolden(to: goldenDir); return
+        }
+        guard ProcessInfo.processInfo.environment["FILERELAY_TESTMODE"] == "1" else { return }
         didRun = true
         Task { await run(session: session) }
+    }
+
+    /// Write the committed golden byte fixtures (SPEC/relay-golden/) for the FIXED inputs + a nasty-unicode
+    /// device fixture (U+2019 + astral emoji + a C0 control) so the golden byte-check (A7/A8) catches any
+    /// Swift↔Kotlin escaping/ordering divergence. The JSON is the fragile cross-platform surface.
+    private static func emitGolden(to dirPath: String) {
+        let dir = URL(fileURLWithPath: dirPath, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        func w(_ name: String, _ data: Data) { try? data.write(to: dir.appendingPathComponent(name), options: .atomic) }
+        let tok = "TESTTK", ep = "EP1"
+        // Fixed fixture: g1/7, document, P8, 1968-03, device X.
+        w("g1__7.json", RelayObjectFormat.encodeSidecar(token: tok, epoch: ep, group: "g1", seq: 7, type: "document",
+            priority: "P8", year: "1968", month: "3", replaces: nil, device: "X"))
+        let fp = RelayObjectFormat.fingerprint(type: "document", priority: "P8", year: "1968", month: "3", replaces: nil)
+        w("g1__7.receipt.json", RelayObjectFormat.encodeReceipt(token: tok, epoch: ep, group: "g1", seq: 7, fp: fp))
+        w("g1.segment.json", RelayObjectFormat.encodeSegment(token: tok, epoch: ep, group: "g1",
+            priority: "P8", year: "1968", month: "3", seqs: "6,7"))
+        w("_session.complete.json", RelayObjectFormat.encodeSessionComplete(token: tok, epoch: ep))
+        w("_epoch.json", RelayObjectFormat.encodeEpochMarker(token: tok, epoch: ep))
+        // Nasty-unicode device fixture (escape check): right-single-quote + grinning-face emoji + C0 SOH.
+        w("nasty__0.json", RelayObjectFormat.encodeSidecar(token: tok, epoch: ep, group: "nasty", seq: 0, type: "document",
+            priority: nil, year: nil, month: nil, replaces: nil, device: "X\u{2019}\u{1F600}\u{01}"))
+        w("input.jpg", Data("jpeg-golden-bytes".utf8))   // trivial passthrough reference
+        NSLog("FILERELAY: emitted golden fixtures to \(dir.path)")
     }
 
     private struct CaseResult: Codable { let name: String; let pass: Bool; let detail: String }

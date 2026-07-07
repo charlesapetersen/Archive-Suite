@@ -103,11 +103,14 @@ enum RelayObjectFormat {
     // MARK: - Encode
 
     static func encodeSidecar(token: String, epoch: String, group: String, seq: Int, type: String,
-                              priority: String?, year: String?, month: String?, replaces: String?) -> Data {
+                              priority: String?, year: String?, month: String?, replaces: String?,
+                              device: String? = nil) -> Data {
+        // fp deliberately excludes `device` (it doesn't change OCR/tags), so a device-name change never
+        // forces a re-ingest — matches the A1 fingerprint contract.
         let fp = fingerprint(type: type, priority: priority, year: year, month: month, replaces: replaces)
         return canonicalJSON(["kind": "photo", "token": token, "epoch": epoch, "group": group,
                               "seq": String(seq), "type": type, "priority": priority, "year": year,
-                              "month": month, "replaces": replaces, "fp": fp])
+                              "month": month, "replaces": replaces, "device": device, "fp": fp])
     }
 
     static func encodeReceipt(token: String, epoch: String, group: String, seq: Int, fp: String) -> Data {
