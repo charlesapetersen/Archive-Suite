@@ -70,6 +70,23 @@ off venue Wi-Fi onto often-unreliable reading-room cell). LAN Wi-Fi stays the ze
 
 ---
 
+## Cloud-relay queue-depth (Finish drain-gate over the Drive relay)
+The phone→Mac **queue-depth heartbeat** (`POST /phone/status` → `phonePendingCount`, which holds "Finish
+session" until the phone has drained and shows "phone sending N"; shipped in `a95f06a`) only works on the
+**direct HTTP (LAN/USB)** path. Over the **cloud/Drive relay** there's no status channel —
+`SegmentTransport.reportStatus` is a no-op there — so the drain-gate does nothing and Finish behaves as
+pre-change. Carry the pending count through the Drive relay **control plane** so the same "wait for the phone
+to finish sending" protection applies over cloud.
+- **Spec:** add a `_phone.status.json`-style control object to `Net/RelayObjectFormat` (phone writes it on
+  each heartbeat; the Mac's `FileRelayReceiver.scanOnce` reads it into `session.updatePhonePending` and
+  refreshes/expires it); implement `reportStatus` in both companions' relay transports
+  (`FileRelayTransport` + `DriveRelayTransport`). Reuse the Mac's existing 20s staleness + finish watchdog.
+- **Effort:** S–M. **Tier-2** (phone↔Mac protocol + relay). Keep Android + iPhone in sync.
+- **Acceptance:** over the Drive relay, "phone sending N" shows on the Mac and Finish waits for the phone to
+  drain, matching LAN/USB; a disconnected phone still auto-advances via staleness.
+
+---
+
 ## Recommended sequence
 1. **P0 streaming + P1 connectivity UX together** (same code path; both Tier-2, one review pass).
 2. **Wi-Fi + Run C walkthrough** on a trusted network to validate P0/P1 end-to-end on a real phone.
