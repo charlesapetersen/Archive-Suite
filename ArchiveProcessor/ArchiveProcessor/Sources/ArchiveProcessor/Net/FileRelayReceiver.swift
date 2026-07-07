@@ -108,6 +108,15 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
         }
     }
 
+    /// Test-only: run start-of-session setup (ensure folder, publish epoch, load the processed set) WITHOUT
+    /// starting the poll timer, so a test can drive `scanOnce()` deterministically (incl. simulating a Mac
+    /// restart by rebuilding the receiver against the same `processedURL`).
+    func prepareForTest() {
+        try? store.ensureSessionFolder()
+        store.publishEpoch(RelayObjectFormat.encodeEpochMarker(token: token, epoch: epoch))
+        loadProcessed()
+    }
+
     // MARK: - The scan (deterministic; the test drives this directly)
 
     private func key(_ group: String, _ seq: Int) -> String { "\(group)\u{1}\(seq)" }

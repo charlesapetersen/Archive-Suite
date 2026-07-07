@@ -31,6 +31,7 @@ struct ContentView: View {
         }
         .onAppear {
             LiveCaptureTestDriver.runIfRequested(session: capture)
+            FileRelayTestDriver.runIfRequested(session: capture)
             ProcessFilesTestDriver.runIfRequested()
             maybePresentKeyOnboarding()
         }

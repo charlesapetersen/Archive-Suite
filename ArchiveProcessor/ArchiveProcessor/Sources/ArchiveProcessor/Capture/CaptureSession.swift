@@ -67,6 +67,14 @@ final class CaptureSession: ObservableObject {
         liveProcessor.activate(config: config)
     }
 
+    /// Test-only: force stage-for-later so `ingest` never triggers OCR (no API key, $0). Used by the
+    /// FileRelay offline invariant driver.
+    func beginStageSessionForTest() { if processingMode == .undecided { processingMode = .stageForLater } }
+
+    /// Test-only: when set, the next `ingest` returns nil (simulating a durable-write failure) so the relay
+    /// receiver's "no receipt / no delete / no processed-entry on a nil ingest" invariant can be exercised.
+    var testForceIngestFailure = false
+
     /// Called by the streaming coordinator when the first segment begins processing.
     func lockSettings() { if config != nil { settingsLocked = true } }
 
@@ -231,6 +239,7 @@ final class CaptureSession: ObservableObject {
     @discardableResult
     func ingest(jpeg: Data, groupId: String, seq: Int, type: CaptureGroupType,
                 priority: String?, year: Int?, month: Int?, deviceName: String?) -> URL? {
+        if testForceIngestFailure { testForceIngestFailure = false; return nil }   // test-only injection
         let name = String(format: "%05d-%@.jpg", seq, groupId)
         let finalURL = incomingFolder.appendingPathComponent(name)
         let tempURL = incomingFolder.appendingPathComponent("." + name + ".part")
