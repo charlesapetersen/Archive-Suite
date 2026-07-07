@@ -115,9 +115,9 @@ When tagging is enabled, the app:
 Define a controlled vocabulary for subject tags to ensure consistent tagging across a collection:
 
 - **Manual entry** — type the allowed tags directly, one per line
+- **Import from CSV** — load a controlled subject-tag vocabulary from a CSV/text file via the **Import from CSV** button or by **dropping** the file onto the vocabulary editor
 
-When a vocabulary is defined, the LLM is constrained to choose only from the provided terms. (Importing a
-vocabulary from a CSV file / drag-and-drop is a planned addition — see [POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md).)
+When a vocabulary is defined, the LLM is constrained to choose only from the provided terms.
 
 ### Collection Segmentation & Organization
 
@@ -204,6 +204,8 @@ Photograph documents with a phone and stream them straight into the pipeline —
 
 **Pairing:** the Mac shows a QR code (host / port / token); the phone scans it (or you can enter host/port/token manually). Works over the LAN; **Android** additionally supports **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired. Once paired, the phone opens straight to the capture screen — use **Re-pair** there to return to the scanner and switch connection (e.g. from USB to Wi-Fi) or Macs; captured photos are kept and upload once reconnected.
 
+**Transports (all behind one seam — same never-lose-a-photo pipeline):** direct **LAN** (default), **USB local relay** (Android, `adb reverse`), and a **Google Drive cloud relay** — the wireless fallback for **client-isolated networks** (public/guest/airport Wi-Fi that blocks device-to-device) and **off-site** capture. In cloud mode the phone uploads each captured object to the user's Google Drive and the Mac pulls + ingests them through the same segment pipeline (the Mac deletes each object after a durable receipt). The Mac side ships; the phone Drive transport is **owner-gated on Google OAuth** (`drive.file` scope).
+
 **On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/priority. The card is fully keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add / save, ⌫ to delete the previous tag).
 
 **Backup folder.** Every photo received from the phone is also kept in a durable, easy-to-find folder — **`~/Pictures/Archive Processor Live Capture`** — until the run's output is fully written. A **Backup Folder** button in the Live Capture tab opens it in Finder, so if anything goes wrong you can recover and copy the original photos yourself (they can't be re-taken).
@@ -220,7 +222,7 @@ Photograph documents with a phone and stream them straight into the pipeline —
 - **Concurrency:** Swift async/await with TaskGroup for parallel processing (Swift 6 strict concurrency)
 - **PDF Generation:** Core Graphics with DCTDecode JPEG embedding and CTFramesetter for text layout
 - **Filesystem Tagging:** NSFileManager extended attributes (`NSURLTagNamesKey`, `NSURLLabelNumberKey`)
-- **Networking:** URLSession with automatic retry and exponential backoff; a lightweight `NWListener` HTTP receiver for Live Capture (Bearer-token auth; `GET /ping`, `POST /photo`, `POST /session/complete`)
+- **Networking:** URLSession with automatic retry and exponential backoff. Live Capture rides one transport-agnostic ingest seam: a lightweight `NWListener` HTTP receiver for the LAN/USB routes (Bearer-token auth; `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`), plus a Google Drive object-store relay (`RelayObjectStore`/`FileRelay`) for the wireless cloud fallback
 - **Settings sharing:** durable settings persist in `UserDefaults`/`@AppStorage` (shared across the main window and the Settings window) + Keychain for API keys
 - **Key Storage:** macOS Keychain via Security framework
 - **Project Generation:** XcodeGen (`project.yml`)

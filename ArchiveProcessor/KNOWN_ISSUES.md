@@ -26,24 +26,6 @@ that mapping threaded in.
 
 ---
 
-## 3. Zoomed image installs an app-wide scroll monitor that swallows scroll for other views
-
-**Status:** deferred (2026-07-04). Found by the views code review. **Usability, not data loss.**
-
-**Symptom:** in the Segment & Tag review, zoom a page past 100% (`+`), then try to scroll the filmstrip or
-the tag-card thumbnail strip — the scroll is consumed to pan the zoomed canvas instead. Works again after `0`
-(reset to 100%).
-
-**Root cause:** `ZoomableImageView.startMonitor` uses `NSEvent.addLocalMonitorForEvents(matching: .scrollWheel)`
-— an **app-wide** local monitor. While `pan.zoom > 1` it returns `nil` (consumes) for *every* scroll event in
-the app, not just those over the image.
-
-**Fix (for later):** replace the app-wide monitor with a hosted `NSView` subclass (via `NSViewRepresentable`)
-that overrides `scrollWheel(with:)`, so only scroll events actually routed to that view are consumed. A
-hit-test on the SwiftUI struct isn't directly possible because it holds no reference to its backing NSView.
-
----
-
 ## 1. Live "Process live" rotation review skips segments restored from a legacy staging manifest
 
 **Status:** deferred (2026-07-03). Low impact, no data loss, transitional. Does NOT recur for
@@ -94,58 +76,6 @@ in `loadStagingManifest` would fix it.
 **Repro (approx):** stage a live session with an older build (legacy manifest) → force a restart so the
 session is recovered → *Process* → *Finish session* with "Review rotation" on → review shows only the
 segments finalized in the current run.
-
----
-
-## Live Capture Wi-Fi pairing fails **silently** when the network blocks device-to-device
-
-**Severity: medium (UX / supportability).** When the phone scans a valid QR but then cannot reach the
-Mac's `CaptureServer`, **nothing happens on the phone** — no spinner, no error, no explanation. The user
-is left pointing the camera at a QR that will never connect. Discovered 2026-07-06 on **airport Wi-Fi**:
-Mac server was confirmed healthy (`*:48627` LISTEN, firewall permits, stealth off, QR encoding the en0
-IP), but the network had **client isolation** (AP isolation) — a phone-browser hit to
-`http://<mac-ip>:48627/ping` also timed out. Common on public/guest/airport/hotel/CGNAT Wi-Fi.
-
-The phone decodes the QR, fires the `/ping` handshake (`MacClient.ping`, ~5s connectTimeout), it times
-out, and the failure is swallowed — the scanner just sits there.
-
-**Fix (make the failure legible + actionable):**
-1. On the scan→connect path, show explicit state: *"Found pairing code — connecting to <ip>:<port>…"* then
-   on `/ping` failure a clear message: *"Can't reach the Mac at <ip>:<port>. This Wi-Fi may block
-   device-to-device connections (common on public/guest networks)."*
-2. Offer concrete fallbacks in that message: **use a USB cable**, **use a personal hotspot** (bypasses AP
-   isolation), or a future cloud relay (see POTENTIAL_FEATURES).
-3. Consider a tiny **reachability preflight**: right after decoding the QR, `GET /ping` with a short
-   timeout and route straight to the diagnostic message on failure, so the user never stares at a dead
-   scanner. Mirror the same on the iOS companion (`MacClient`).
-4. Mac side could also help: the Live Capture tab could note "phone not connecting? your network may block
-   device-to-device — try USB or a hotspot," and/or show the exact host:port it's advertising.
-
----
-
-## Photos must stream to the Mac per-capture — NOT be held on the phone until "End segment"  [HIGH — data safety]
-
-**Severity: HIGH — violates the core "never lose a photo" invariant.** Observed 2026-07-06 (USB
-Process-live session): took one shot; the phone showed it captured, but after several minutes — with
-`adb reverse` up and `/ping` healthy — the photo had **not** reached the Mac (empty backup folder, no
-receive in the app log). The photo **bytes stay on the phone until the user taps "End segment."**
-
-**Why this is dangerous:** a single segment can be **hundreds of photos** long. Holding an entire
-in-progress segment on the phone means a phone crash / drop / dead battery / app-kill *before* End
-segment loses **all** of those pages at once — irreplaceable archival photos that can't be re-shot.
-Live Capture's whole promise is that a captured photo is never lost.
-
-**Required behavior:** each photo's **bytes** must transfer to the Mac and be written to the durable,
-user-visible backup folder **as it is captured** (streamed continuously), backed by the existing durable
-disk-queue + auto-retry + idempotent re-upload (group+seq) for guaranteed eventual delivery. **"End
-segment" is only the logical/visual grouping** — the moment the on-phone thumbnails "leave" and the
-document boundary is confirmed — and must NOT gate the byte transfer. By the time the user ends a
-segment, the Mac should already hold every page; End segment just finalizes/assembles it.
-
-**Acceptance:** during a long (e.g. 100+ shot) segment, the Mac backup folder fills **continuously** as
-shots are taken, not in one burst at End segment; killing the phone mid-segment loses nothing already
-shot. Tier-2 (Net/ + the phone↔Mac protocol + never-lose-a-photo path) → adversarial review; verify on
-**both** companions (Android + iOS).
 
 ---
 

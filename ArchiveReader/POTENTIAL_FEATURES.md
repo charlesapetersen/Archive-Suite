@@ -19,23 +19,20 @@ All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
   not new code. Kept sandboxed for v1 by owner decision.
 
 
-## Non-standard / non-conforming PDFs (deferred from the 2026-07-05 near-term UI list)
-"Standard" = a 2-page PDF (page 1 image + page 2 OCR text), ideally with a `Classification:` line.
-Non-standard = 1-page / >2-page / 0-page / corrupt / encrypted / non-PDF image / no OCR-text layer /
-no classification. The viewer + indexer already **degrade gracefully**; this work is about
-**visibility + triage** (no corpus writes — detection reuses `PDFTextExtractor` / `ContentIndexer`,
-which already know page count, text presence, and the classification):
-- **[S]** Library-Health popover: add counts — non-2-page, no OCR-text layer, unreadable/corrupt, non-PDF.
-- **[S]** A "Non-standard format" filter chip and/or a built-in **"Needs attention"** smart folder.
-- **[S]** A subtle per-row ⚠︎ badge in the list for flagged files.
-- **[M]** A viewer banner on a non-standard doc stating what's missing ("1 page · no OCR text layer").
+## P2 — SHIPPED (2026-07-07) ✅
+The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
+- ✅ **Non-standard / non-conforming PDF handling** — read-only detection (`PDFFormatStatus`: standard /
+  unreadable / no-text-layer; **page count is never a defect signal**) drives the per-row ⚠︎ badge, the
+  library-health counts, a "Needs attention" filter, and a viewer banner naming what's missing.
+- ✅ **Near-duplicate subject-tag detection** (`TagSimilarity`) — Find Similar Tags clusters typos
+  (`Environment` vs `Environtment`) and offers a merge (via the corpus-wide tag rename).
+- ✅ **Duplicate-filename disambiguation** (`DuplicateNames`) — colliding rows show their containing
+  folder; copied link groups carry full paths.
+- ✗ **Side-by-side compare of two documents** — **dropped** (superseded by multi-select + ↑/↓ cycling).
 
 ## Medium priority
-- **Side-by-side compare** of two selected documents (beyond ↑/↓ cycling) — collate a photo spanning
-  two frames, or compare versions.
-- **Duplicate-filename disambiguation** — surface containing folder/box for same-named files.
-- **Tag vocabulary tools** — near-duplicate detection (`Environment` vs corpus typo `Environtment`),
-  optional controlled vocabulary, bulk rename of a subject tag across the corpus (via `TagWriter`).
+- **Controlled subject vocabulary (optional)** — restrict subject tags to an allowed list (near-duplicate
+  detection via `TagSimilarity` and corpus-wide bulk rename already shipped).
 
 ## Lower priority / long-term
 - **Cloud-drive support** (Google Drive / File Provider): conflict-copy handling, materialization

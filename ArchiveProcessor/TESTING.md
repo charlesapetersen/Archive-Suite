@@ -114,18 +114,6 @@ models. Drive the app by hand (`./launch.sh`). Each row: **do → expect**; note
 ### 2.0 Launch & shell
 - [ ] `./launch.sh` builds-if-stale and brings up the window (confirm `pgrep -x ArchiveProcessor`).
 - [ ] The three areas are reachable: **Process Files**, **Tools**, **Live Capture**; **Settings** opens with ⌘,.
-
-**Suggested inputs (never modified — outputs only):**
-- **Small OCR set** — 3–4 images from `Test Files/Herrnstein/` (text-heavy letters).
-- **Segmentation set** — `Test Files/Ground Truth Segmentation/Herrnstein/` (has known boundaries +
-  a `test_results/` ground truth to compare the app's box/folder/start/continuation calls against).
-- **Mixed collection** — one folder under `Test Files/` that includes a box photo and a folder photo
-  (to exercise Red/Purple + `Unread`-last).
-- **PDF set** — a handful from the 586 `*.pdf` (pre-OCR'd / re-OCR path).
-
-### 2.0 Launch & shell
-- [ ] `./launch.sh` builds-if-stale and brings up the window (confirm `pgrep -x ArchiveProcessor`).
-- [ ] The three areas are reachable: **Process Files**, **Tools**, **Live Capture**; **Settings** opens with ⌘,.
 - [ ] No console crash/exception on launch; window renders (not blank).
 
 ### 2.1 Settings (⌘,) — every control, help, and gray-out
@@ -212,6 +200,33 @@ Continuation calls to that folder's `test_results/` ground truth.
 
 **Tier-2 cost budget:** ~50–80 cheap vision/OCR calls total across §2.4–2.14 ≈ well under a dollar on
 `gemini-2.5-flash-lite` / `mistral-ocr-latest`. Stay on the cheap models unless a bug needs a stronger one.
+
+---
+
+## Tier 2C — Live Capture relay/cloud transport (`scripts/test-{filerelay,relay-golden,drive-*}.sh`)
+
+The cloud-transport work (USB local relay + **Google Drive cloud relay**, the `RelayObjectStore` /
+`FileRelayReceiver` seam) has its own Tier-2 scripts. Each launches the built app (or a standalone
+`swiftc` compile of the real relay sources) with a headless env-gated driver, waits for its `DONE.txt`,
+and asserts the emitted `results.json` externally via `scripts/relay_assert.py` (mirrors `tier2_assert.py`).
+Most are **key-free / \$0 / offline**; only the live one touches Google:
+
+- **`test-filerelay.sh`** — key-free. Drives `FileRelayReceiver.scanOnce()` (the offline shared-directory
+  cloud stand-in) through the never-lose-a-photo invariants + the object-format amendments (A1–A11) against
+  a temp relay dir — no OCR, no key, no network.
+- **`test-relay-golden.sh`** — key-free. Cross-platform format guard (A7/A8): each platform's
+  `RelayObjectFormat` must emit **byte-identical** canonical JSON to the committed golden in
+  `SPEC/relay-golden/` (checks iOS via `swiftc` + Android via plain-JVM JUnit) — catches any
+  Swift↔Kotlin escaping / key-order / hex-case drift.
+- **`test-drive-store.sh`** — key-free. Compiles the real `RelayObjectFormat` + `DriveClient` +
+  `DriveObjectStore` against a **mock** Drive HTTP seam (no network/OAuth); asserts name→fileId mapping,
+  idempotent overwrite, list-filtering, quarantine, and per-object delete.
+- **`test-drive-transport.sh`** — key-free. Compiles the real iOS `DriveRelayTransport` against a mock
+  Drive; asserts `postPhoto` returns true **only** after a matching receipt appears (never on a write
+  alone) and rejects stale-fingerprint / wrong-epoch acks.
+- **`test-drive-live.sh`** — **owner-gated; needs a real Drive account + OAuth** (`drive.file` token in
+  `$DRIVE_ACCESS_TOKEN`). The one thing the mocks can't cover: a create/list/read/overwrite/quarantine/
+  delete round-trip against **live** Google Drive in a throwaway folder, then deletes everything it created.
 
 ---
 

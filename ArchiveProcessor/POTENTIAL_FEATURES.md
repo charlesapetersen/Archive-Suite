@@ -1,6 +1,6 @@
 # Potential Features
 
-> Forward-looking backlog only. Items that have since shipped (custom OCR prompts, custom tag vocabularies, multi-page merging, Compare Models, completion notifications, redo-tagging, live-capture resume, the OpenAI-compatible gateway) have been removed from this list — see README.md for what ships today.
+> Forward-looking backlog only. Items that have since shipped (custom OCR prompts, custom tag vocabularies, CSV vocabulary import, multi-page merging, Compare Models, completion notifications, redo-tagging, live-capture resume, the OpenAI-compatible gateway, the Google Drive cloud-relay transport) have been removed from this list — see README.md for what ships today.
 
 ## High Priority
 
@@ -21,7 +21,6 @@
 - **Hierarchical tags** — support nested tag structures (e.g., Politics > Elections > Presidential)
 - **Tag editing UI** — edit applied tags directly in the file pane without reprocessing
 - **Bulk tag operations** — apply/remove tags across multiple files at once
-- **Import a tag vocabulary from CSV / drag-and-drop** — load a controlled subject-tag vocabulary from a CSV or text file. A parser (`loadTagVocabularyFromURL`) existed but was never wired to any UI, so the README wrongly advertised it; the dead code was removed in the 2026-07-04 maintainability pass. Re-add with a file picker + a drop target on the vocabulary editor.
 
 ### Document Processing
 - **Handwriting recognition mode** — specialized prompts and processing for handwritten documents
@@ -139,27 +138,6 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   `liveProcessingMode` enum instead of "stage"/"live" magic strings; LLMRotationDetector.rotate →
   ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder.
 - **Value decision:** the recent-years cap differs between the companions (iOS 5, Android 6) — pick one.
-
-### Live Capture transport — bypass networks that block device-to-device
-Motivated 2026-07-06: on airport/guest/hotel/CGNAT Wi-Fi with **client isolation**, phone↔Mac LAN
-connections are blocked, so QR/Wi-Fi pairing can't work at all (see KNOWN_ISSUES for the silent-failure UX
-gap). USB already bypasses this. Options, cheapest first:
-
-- **Personal-hotspot guidance (zero code).** Tell the user to put the Mac + phone on a personal hotspot
-  (phone's own, or the Mac's) — a private AP with no client isolation, so the existing LAN path just works.
-  Document it in-app as the first fallback; near-free to add.
-- **Peer-to-peer, no infrastructure Wi-Fi.** Connect the two devices directly, independent of the AP:
-  iOS `MultipeerConnectivity` (AWDL/Bluetooth/peer-Wi-Fi) for the iPhone companion; **Wi-Fi Direct /
-  Nearby Connections** on Android. Bypasses AP isolation entirely, no cloud, no cable. Medium effort; a
-  new transport behind the same segment-transfer protocol (`CaptureServer` becomes one of several transports).
-- **Cloud relay (works anywhere, incl. remote).** Phone uploads each captured segment to a cloud store
-  (user's Google Drive / Dropbox / iCloud, or a small object store), Mac watches/pulls and feeds the same
-  ingest path. Pros: works across *any* network and even off-site. Cons: needs cloud auth (fits the
-  existing "managed access / BYO keys" initiative), and archival photos transit third-party storage —
-  **privacy call the owner must make**; make it explicit + opt-in. Largest effort; keep the durable
-  disk-queue + idempotent re-upload semantics so "never lose a photo" still holds across a relay.
-- **Reachability preflight + honest diagnostics** regardless of transport (the KNOWN_ISSUES fix): never
-  let the phone sit on a dead scanner — detect unreachability and name the cause + the fallbacks.
 
 ### Live Capture output-folder control (in the Live Capture pane)
 Motivated 2026-07-06 during the Android walkthrough: a Process-live **Finish session** wrote the finalized
