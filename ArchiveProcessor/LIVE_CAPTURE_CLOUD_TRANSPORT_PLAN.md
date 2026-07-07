@@ -341,3 +341,35 @@ simply drops into. Prove the contract locally before spending a line on OAuth.
 - `CLAUDE.md` — Tier-2 review policy, shared-hotspot rules (change the protocol on all sides together),
   XcodeGen/Gradle build notes, `settings-ux-convention`.
 - `NEXT_STEPS.md` — roadmap index.
+
+---
+
+## Implementation status — Drive backend (2026-07-06)
+
+The FileRelay contract (the offline stand-in) is fully proven (see `LIVE_CAPTURE_FILERELAY_SPEC.md`: Mac
+receiver 8/8 invariants, iOS+Android golden byte-match, iOS transport contract 6/6). The **real Google Drive
+backend (Mac side) is now built and compile/mock-verified**, behind the same proven `RelayObjectStore` seam:
+
+- **`Net/DriveClient.swift`** — Drive REST v3 client behind an injectable `HTTPExecuting` seam (mockable).
+- **`Net/DriveObjectStore.swift`** — `RelayObjectStore` over Drive (name↔fileId via `appProperties.relayName`,
+  create-or-update idempotent overwrite, list/delete/quarantine). Drops into `FileRelayReceiver` UNCHANGED, so
+  the never-lose contract is inherited. **Unit-tested vs a mock Drive: `scripts/test-drive-store.sh` — 8/8.**
+- **`Net/DriveAuth.swift`** — OAuth: autonomous access-token refresh + owner-gated loopback `signIn` (PKCE).
+- **`CaptureSession`** — `.cloud` transport wired (lazy `cloudRelay`); LAN path byte-identical.
+- Adversarial review of this code: `Workflow` run `wf_2b89755d-278` (Drive-quirk lenses).
+- **Note:** `listNames` uses `files.list` (eventually consistent); the plan's Changes-feed optimization
+  (`DriveClient.startPageToken`/`listChanges` are implemented) can replace it later. Multipart upload is used
+  (not resumable) — the receipt-wait + idempotent retry already give interruption-resilience.
+
+### Remaining — OWNER-GATED (needs a browser + a live Google account; not automatable/testable headless)
+1. **Configure the OAuth client in-app.** Set `DefaultsKeys.driveClientId` = the Desktop client id and store
+   the Desktop client secret in the Keychain (account `DriveClientSecret`). (Project `YOUR_GCP_PROJECT`; the
+   `drive.file` cross-client spike already PASSED.)
+2. **Sign in once** (`DriveAuth.signIn`) — a browser opens; approve; the refresh token persists in the Keychain.
+   Fix the PKCE note if the loopback server needs the exact registered port (Desktop clients accept loopback).
+3. **Phone `DriveRelayTransport` (iOS + Android)** — DEFERRED: needs an on-device Google OAuth SDK
+   (GoogleSignIn / AppAuth) added to each project + a phone Drive REST client. Mirror `FileRelayTransport`
+   (swap the shared dir for Drive REST). Not built overnight (untestable + external deps).
+4. **Live integration test** — with a real account: set `liveTransport=cloud`, capture, confirm each page
+   round-trips Drive → the Mac's `ingest` + backup folder, receipts appear, sources auto-delete after durable,
+   and the never-lose invariants (Run C) hold end-to-end. This is the real verification the headless work defers.
