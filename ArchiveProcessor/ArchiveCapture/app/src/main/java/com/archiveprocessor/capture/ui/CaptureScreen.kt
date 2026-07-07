@@ -1,6 +1,9 @@
 package com.archiveprocessor.capture.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,10 +25,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,15 +62,24 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.archiveprocessor.capture.capture.CaptureViewModel
 import com.archiveprocessor.capture.capture.CapturedItem
 import com.archiveprocessor.capture.capture.GroupType
 import com.archiveprocessor.capture.capture.UploadState
 import java.io.File
+
+/** Walk the context wrappers to the hosting Activity (whose window owns the system-bar insets). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +123,16 @@ fun CaptureScreen(vm: CaptureViewModel) {
     var showClearConfirm by remember { mutableStateOf(false) }
     var showRepairConfirm by remember { mutableStateOf(false) }
 
+    // The preview reaches under the translucent status bar, so force light status-bar icons
+    // (clock/wifi/battery) — dark icons would be invisible over the black letterbox. Restored on exit.
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val controller = view.context.findActivity()?.window?.let { WindowCompat.getInsetsController(it, view) }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose { if (previous != null) controller.isAppearanceLightStatusBars = previous }
+    }
+
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview — top region only, letterboxed (FIT_CENTER) on black.
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -125,9 +151,16 @@ fun CaptureScreen(vm: CaptureViewModel) {
             }
         }
 
-        // Controls region (below the preview).
+        // Controls region (below the preview). Padded above the nav bar (edge-to-edge insets) plus an
+        // extra ergonomic lift so the shoot buttons sit higher in the thumb zone; the dark background is
+        // applied first so it still fills down to the bottom edge behind the translucent nav bar.
         Column(
-            Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF141414))
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Connection status + Re-pair. Once paired the app goes straight to this screen, so this is

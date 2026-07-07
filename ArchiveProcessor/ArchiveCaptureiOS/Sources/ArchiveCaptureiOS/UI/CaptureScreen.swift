@@ -37,6 +37,10 @@ struct CaptureScreen: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Preview extends up under the (translucent) status bar so the camera area reaches the very
+            // top of the screen; the clock/wifi/battery overlay the black letterbox (light via the dark
+            // color scheme below). Still aspect-fit — WYSIWYG, no crop.
+            .ignoresSafeArea(edges: .top)
 
             VStack(spacing: 8) {
                 // Connection + Re-pair: once paired the app opens straight to this screen, so this is the
@@ -106,9 +110,14 @@ struct CaptureScreen: View {
                 }
             }
             .padding(12)
+            // Extra bottom lift so the shoot buttons sit higher in the thumb zone (more ergonomic).
+            .padding(.bottom, 18)
             .background(Color(white: 0.08))
         }
         .background(Color.black.ignoresSafeArea())
+        // Dark scheme → white status-bar content (clock/wifi/battery) over the black preview top, and a
+        // consistently dark capture UI. The tag sheet uses only adaptive colors, so it's dark-safe too.
+        .preferredColorScheme(.dark)
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
         // Gesture-dismiss is DISABLED (interactiveDismissDisabled) so an accidental swipe can't silently
