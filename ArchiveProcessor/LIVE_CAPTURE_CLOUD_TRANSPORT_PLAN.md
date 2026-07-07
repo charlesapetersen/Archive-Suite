@@ -352,8 +352,12 @@ backend (Mac side) is now built and compile/mock-verified**, behind the same pro
 
 - **`Net/DriveClient.swift`** — Drive REST v3 client behind an injectable `HTTPExecuting` seam (mockable).
 - **`Net/DriveObjectStore.swift`** — `RelayObjectStore` over Drive (name↔fileId via `appProperties.relayName`,
-  create-or-update idempotent overwrite, list/delete/quarantine). Drops into `FileRelayReceiver` UNCHANGED, so
-  the never-lose contract is inherited. **Unit-tested vs a mock Drive: `scripts/test-drive-store.sh` — 8/8.**
+  create-or-update idempotent overwrite, list/delete/quarantine, dedup-reap of coexisting same-name files by
+  rev). Drops into `FileRelayReceiver` UNCHANGED, so the never-lose contract is inherited. **Unit-tested vs a
+  mock Drive: `scripts/test-drive-store.sh` — 10/10.** **✅ LIVE-VALIDATED against real Google Drive
+  (2026-07-07): `scripts/test-drive-live.sh` — 10/10** (OAuth bearer, multipart create, files.list appProperties
+  queries, media get, delete, quarantine, overwrite, epoch, dedup-reap; auto-cleans up). So the Drive REST
+  integration + auth are proven, not just mocked — the mock matched reality.
 - **`Net/DriveAuth.swift`** — OAuth: autonomous access-token refresh + owner-gated loopback `signIn` (PKCE).
 - **`CaptureSession`** — `.cloud` transport wired (lazy `cloudRelay`); LAN path byte-identical.
 - Adversarial review of this code: `Workflow` run `wf_2b89755d-278` (Drive-quirk lenses).
