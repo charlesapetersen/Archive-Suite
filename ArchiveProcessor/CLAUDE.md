@@ -5,6 +5,37 @@ A native macOS app for processing collections of historical archive photographs.
 
 ---
 
+## ⛑️ Recovery Core Directive (data safety) — bulletproof AND always recoverable
+
+This app writes **irreplaceable data**: archival photos that can never be re-shot. So the bar is not just
+"the app should work" — it is **two independent guarantees**, and *both* must hold for every change to the
+capture/finalize/output path (`Capture/`, `Net/`, `Tagging/`, PDF/image output):
+
+1. **Bulletproof** — the happy path never loses data: durable-manifest-before-ack, idempotent `(group,seq)`,
+   drain-gated finish, crash-resumable staging.
+2. **Strong recovery points** — *when the app fails anyway* (bug, crash, bad move, wrong folder), the
+   operator can still get their files back. Design every destructive step so failure is **recoverable**,
+   not just unlikely.
+
+The three non-negotiable rules that implement this (added 2026-07-07 after a live-capture finalize deleted a
+run's originals — see `KNOWN_ISSUES.md` "finalize deleted a run's originals"):
+
+- **Confirm before you delete.** NEVER delete a source photo until its processed output is *verified on disk
+  at the destination*. Deletion keys off "the output actually landed" (`executePlans` → `filedGroupIds`),
+  **never** off "we staged it" / "finalize returned no hard error." A silently-missing output must keep its
+  source, not drop it.
+- **Trash, don't `rm`.** All post-processing deletions of capture data go through
+  `CaptureSession.trashOrRemove` (macOS Trash), never `FileManager.removeItem`. A wrong call is then
+  recoverable from the Trash.
+- **Keep a second copy until it's safe.** Both the raw source photos **and** the processed PDFs/JPGs/JSON
+  (with tags) live in the **visible backup folder** (`<session>/` and `<session>/_processed/`) until finalize
+  confirms the destination has them. Recovery data is never hidden or hard-purged while a run is in flight.
+
+Guard: this is Tier-2 (adversarial review + a functional test on scratch copies) for any edit to the paths
+above. When "bulletproof" and "recoverable" seem to conflict, ship both — err toward keeping data.
+
+---
+
 ## Primary Function 1: OCR
 
 ### LLM Provider & Model Selection
@@ -141,7 +172,7 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 - **Pairing + connect flow (ground truth).** The Mac shows a QR encoding `{host, port, token, name}` (`LiveCaptureView.pairingPayload`; `host` = the primary `en0`/`en1` IPv4, `token` = the stable 6-char `session.token`; pinned port survives Mac restarts, QR hides once paired). All routes are `Authorization: Bearer <token>` (bad token → 401, unknown route → 404). Both companions gate on a saved endpoint (`endpoint != nil` → capture screen), so a **Re-pair** control (`disconnect()` → `POST /session/disconnect` → the Mac re-shows the QR) is the only way back to the scanner — needed to move a USB-paired phone (saved host `127.0.0.1`) to Wi-Fi or to a different Mac. Captured items are retained across a disconnect and re-upload to the new endpoint. P0/P1 shipped honest connect diagnostics (short reachability preflight → unreachable / refused / unauthorized) so pairing never fails silently.
 - **On the phone:** full-res shutter; **Box** (red) / **Folder** (purple) markers; minimal on-phone tagging (priority P7–P10 + per-page P10, year/month). A **queue-depth heartbeat** (`POST /phone/status`, `X-Pending`) tells the Mac how many photos are still un-sent.
 - **On the Mac:** an auto-advancing, keyboard-driven **tag card** per document segment (subjects via `SystemTagsProvider` autocomplete; editable date/priority), gated on the segment-complete signal so it appears only for a *completed* segment. **Finish is drain-gated** — the Mac surfaces "phone still has N to send" and holds finalize until the heartbeat reports the phone has drained, so no segment finalizes partial.
-- **Backup folder (data safety):** every photo lands in a durable, **user-visible** folder — `~/Pictures/Archive Processor Live Capture/<session>/` (`CaptureSession.backupRoot`) — kept until the run's output is fully finalized (`clear()` runs only on a successful finalize). A **Backup Folder** button in `LiveCaptureView` reveals it in Finder so the operator can recover the originals if anything fails — even if the app won't relaunch. Legacy Application-Support sessions migrate in on launch; empty finalized folders are pruned on launch (never one that still holds a photo).
+- **Backup folder (data safety) — the recovery point.** Every photo lands in a durable, **user-visible** folder — `~/Pictures/Archive Processor Live Capture/<session>/` (`CaptureSession.backupRoot`) — kept until the run's output is fully finalized. As of the **Recovery Core Directive** (below) that folder holds **both** the raw source JPEGs **and**, in a `_processed/` subfolder, the streamed **PDFs/JPGs/JSON with their tags** (`LiveCaptureProcessor.stagingDir(for:)` — staging now lives inside the backup folder, not hidden Application Support). So if the app fails any time before finalize, the operator can recover *both* originals *and* processed output from one Finder folder. A **Backup Folder** button in `LiveCaptureView` reveals it. Finalize deletes a source **only** after its processed output is *confirmed on disk at the destination* (`finalize` keys deletion off `executePlans`'s `filedGroupIds`, never off "was staged"), and all such deletions go to the **Trash** via `CaptureSession.trashOrRemove` — never a hard delete. Legacy Application-Support sessions migrate in on launch; empty finalized folders are pruned on launch (never one that still holds a photo *or* a `_processed` output).
 - **Two processing modes (Settings, `liveProcessingMode`):**
   - **Stage for later** — captures collect, then hand off to Process Files for a batch run.
   - **Process live** — each segment is OCR'd **on arrival**, tagged, turned into a **PDF + renamed original image** (dual output), merged if multi-page, and staged as you shoot. At **Finish session**, confirm each collection's name (auto-suggested from the box-label OCR, **fuzzy-matched against existing folders** to append; new files continue that folder's `NNNNN` numbering). Durable + resumable (staging manifest; failed-OCR retry).
@@ -342,8 +373,13 @@ Capture/                       Live Capture core (Tier-2):
   CaptureModels.swift          CaptureGroupType + captured-photo/group types (mirrors the phone).
   SessionProcessingConfig.swift  Locked snapshot of all processing settings for the session.
   LiveCaptureProcessor.swift   Streams OCR/tag/PDF per segment as it arrives; end-of-session finalize.
+                               Stages into the VISIBLE backup folder (`<session>/_processed/`); finalize
+                               deletes a source only after its output is confirmed at the destination
+                               (`filedGroupIds`), via the Trash. (Recovery Core Directive.)
   LiveCaptureTestDriver·ProcessFilesTestDriver·FileRelayTestDriver.swift   Headless env-gated end-to-end
                                test drivers (live-staging / Process-Files GUI / FileRelay invariants).
+  LiveCaptureRecoveryTestDriver.swift   $0/no-OCR headless self-test (`LIVECAPTURE_RECOVERYTEST=1`) of the
+                               data-safety invariants: confirm-before-delete + trash-not-rm.
 Net/                           Phone↔Mac transports + cloud relay (Tier-2; the protocol is a SHARED HOTSPOT):
   CaptureServer.swift          LAN HTTP/NWListener receiver; Bearer-authed routes (see hotspot list).
   CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.

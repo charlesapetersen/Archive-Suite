@@ -4,6 +4,45 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-07): Live "Process live" finalize deleted a run's originals — 0 files moved, sources gone
+
+**Severity: CRITICAL data loss (no undo). Fixed; see the Recovery Core Directive in `CLAUDE.md`.**
+
+**What happened (real run):** A Live-Capture run (LBJ, ~document photos) was shot, OCR'd, tagged, rotation-
+reviewed, and the operator named the collection at Finish. Result: the destination collection folder was
+**created but empty**, the backup folder held only `manifest.json` = `[]` (zero images), and every source
+JPEG was gone. `finalizeSummary` showed "Finalized 1 collection · **0 files moved**" with **no error**.
+
+**Root cause:** `finalize`'s success gate was `outcome.failedMoves == 0`, where `failedMoves` counted only a
+real `moveItem` throw (`.failed`). A staged output that was **missing** (its file never existed at move time)
+was classified `.absent` — *not* counted. Two facts combined into total loss:
+1. `writeSegmentFiles` appended `stagedPDF` to `pdfURLs` **unconditionally**, even when `pdfGen.generate`
+   silently failed (`try?`) and wrote nothing — a *phantom* output URL in the manifest.
+2. `finalize` computed `filedSources` from **all** of `retained` (i.e. everything *staged*), not from what
+   actually reached the destination, and then `clearFiled`-deleted those sources via `removeItem` (bypassing
+   the Trash). So when every move was `.absent`: gate passed (`failedMoves == 0`), staging dir deleted, all
+   source photos permanently deleted. The intent of the earlier "straggler" guard (below) was right —
+   *delete only what was filed* — but it equated "filed" with "staged".
+
+**Fix (this commit):**
+- `executePlans` now reports `filedGroupIds` (segments whose **every PDF landed at the destination**, verified
+  on disk) + `movedFiles` + `allFiled`. `finalize` deletes a source **only** for a segment in `filedGroupIds`;
+  a missing/failed output keeps its source + staged output in the backup folder for retry/recovery.
+- `writeSegmentFiles` records a PDF/JSON URL **only if the file exists on disk** (no phantoms). A segment that
+  produced no PDF is marked `.failed` (retryable), never silently "staged".
+- All post-processing deletions of capture data go to the **Trash** (`CaptureSession.trashOrRemove`), not `rm`.
+- Staging moved **into the visible backup folder** (`<session>/_processed/`) so processed PDFs (with tags) are
+  recoverable next to the raw sources if the app fails before finalize.
+- Regression: `LiveCaptureRecoveryTestDriver` ($0, no OCR, `LIVECAPTURE_RECOVERYTEST=1`) asserts a missing
+  output is never reported filed, and that `trashOrRemove` trashes rather than hard-deletes.
+
+**Recovery note for the original run:** those source JPEGs were `removeItem`'d (Trash bypassed) so they are
+**not** recoverable from this Mac. The only surviving copy would be the phone's manual **"Save to phone"**
+gallery album (`Pictures/Archive Capture`) *if the operator tapped it* — the phone auto-deletes each page
+~650ms after the Mac acks it, so the app's own queue no longer holds them.
+
+---
+
 ## 2. Merged multi-page documents leave their exported original images loose in the output dir
 
 **Status:** deferred (2026-07-04). Found by the OCR-pipeline code review. **Misplacement, not data
@@ -117,9 +156,12 @@ needs the on-device Wi-Fi/Run C walkthrough to verify — implemented build-veri
 **FIXED (guard shipped): straggler page permanently deleted.** If the tiny `segment/complete` (or
 `session/complete`) signal outraced a still-uploading page, the Mac finalized the segment without it, then
 `session.clear()` deleted its backup → permanent loss of an irreplaceable page. Guard: `finalize` now calls
-`session.clearFiled(filedSourceURLs)` (from `retained[].pages.sourceURL`) — deletes only pages actually
-filed into output and **keeps any un-filed (straggler) page** in the backup folder + Captured pane. No page
-is ever deleted before it's filed. (`LiveCaptureProcessor.finalize`, `CaptureSession.clearFiled`.)
+`session.clearFiled(filedSourceURLs)` — deletes only pages actually filed into output and **keeps any
+un-filed (straggler) page** in the backup folder + Captured pane. No page is ever deleted before it's filed.
+(`LiveCaptureProcessor.finalize`, `CaptureSession.clearFiled`.) **⚠️ Update 2026-07-07:** this guard derived
+`filedSourceURLs` from `retained[].pages.sourceURL` — i.e. everything *staged*, which is **not** the same as
+*filed at the destination*. That gap caused the CRITICAL total-loss bug now fixed at the top of this file
+(`finalize` deleted a run's originals). Deletion now keys off `executePlans.filedGroupIds` (confirmed on disk).
 
 **Residual refinements (next session, device-verify):**
 1. **Straggler still omitted from finalized output (HIGH, not data-loss).** With the guard a straggler isn't

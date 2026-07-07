@@ -32,6 +32,10 @@ final class LiveCaptureProcessor: ObservableObject {
         var imageURLs: [URL]
         var jsonURL: URL?
         var boxLabelText: String?
+        /// Did EVERY source page produce a PDF on disk? `false` ⇒ a page's generation was silently dropped,
+        /// so the segment is INCOMPLETE and finalize must NOT file it (deleting its sources would lose the
+        /// page that has no output). `nil` ⇒ legacy manifest (older builds never dropped a page) → complete.
+        var pagesComplete: Bool?
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -86,32 +90,38 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Fixed, output-folder-INDEPENDENT staging root (hidden in Application Support). Keeping staging out
-    /// of the output folder means changing the output folder mid-session — or relaunching after a change —
-    /// can never strand already-staged (processed) outputs (they used to live under the output folder, so a
-    /// folder change + relaunch left `loadStagingManifest` looking in the wrong place). Falls back to a temp
-    /// dir if Application Support is unavailable.
-    static var stagingRoot: URL {
-        // Durable fallback (the VISIBLE backup root, which always exists and is never OS-purged) rather than
-        // the temp dir, so a session's already-processed staged output isn't silently purged before Finish
-        // if Application Support is somehow unavailable.
+    /// Where a session's processed outputs are staged before end-of-session finalize. As of the **Recovery
+    /// Core Directive** this lives INSIDE the session's VISIBLE backup folder —
+    /// `~/Pictures/Archive Processor Live Capture/<session>/_processed/` — so the staged PDFs/JPGs/JSON
+    /// (with tags) sit right next to the raw source photos and are recoverable in Finder if the app fails
+    /// before finalize. Co-locating them there also removes a whole class of failure (Application-Support
+    /// unavailable, staging pruned out from under the run, session-id mismatch after relaunch) that could
+    /// strand or drop already-processed output. Recovery of both sources + processed output is now unified:
+    /// one session folder, recovered together.
+    static func stagingDir(for session: CaptureSession) -> URL {
+        session.incomingFolder.appendingPathComponent("_processed", isDirectory: true)
+    }
+
+    /// Legacy flat staging parent used by pre-2026-07 builds (`Application Support/ArchiveProcessor/
+    /// LiveStaging/<session>`). Retained ONLY so a session staged by an older build can still resume from
+    /// there, and so orphaned leftovers can be cleaned up. New sessions always stage under the visible
+    /// backup folder (see `stagingDir(for:)`).
+    static var legacyStagingRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? CaptureSession.backupRoot
         return base.appendingPathComponent("ArchiveProcessor/LiveStaging", isDirectory: true)
     }
 
-    /// Remove leftover per-session staging subdirs (each embeds archival page images inside its staged PDFs)
-    /// so they can't accumulate unbounded in the hidden staging root. A staging dir is orphaned when its
-    /// session is neither the active one NOR still present in the visible backup root — i.e. it was finalized
-    /// (its sources cleared) or abandoned. NEVER removes a session whose backup folder still exists (it may
-    /// still be resumed), and never the active session, so it cannot discard resumable work.
-    private static func pruneStagingRoot(keeping activeSessionId: String) {
+    /// Best-effort cleanup of orphaned staging dirs left in the LEGACY flat location by older builds. A
+    /// legacy staging dir is orphaned when its session's backup folder no longer exists (finalized or
+    /// abandoned). NEVER removes one whose backup folder still exists (it may still be resumed from there),
+    /// so it cannot discard resumable work. New sessions stage inside the backup folder, where an empty
+    /// session folder (its `_processed` included) is pruned by `CaptureSession.pruneEmptySessions`.
+    private static func pruneLegacyStaging() {
         let fm = FileManager.default
-        guard let subdirs = try? fm.contentsOfDirectory(at: stagingRoot, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        guard let subdirs = try? fm.contentsOfDirectory(at: legacyStagingRoot, includingPropertiesForKeys: nil) else { return }
         for dir in subdirs {
-            let sid = dir.lastPathComponent
-            guard sid != activeSessionId else { continue }
-            let backup = CaptureSession.backupRoot.appendingPathComponent(sid, isDirectory: true)
+            let backup = CaptureSession.backupRoot.appendingPathComponent(dir.lastPathComponent, isDirectory: true)
             if !fm.fileExists(atPath: backup.path) { try? fm.removeItem(at: dir) }
         }
     }
@@ -119,20 +129,25 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
     func activate(config: SessionProcessingConfig) {
         self.config = config
-        let fixed = Self.stagingRoot.appendingPathComponent(session.sessionId, isDirectory: true)
-        // Back-compat: a session staged by an OLDER build lives under the (legacy) output-folder location.
-        // If that manifest exists and the new fixed location has none, keep using the legacy dir IN PLACE so
-        // its already-staged outputs aren't orphaned by the relocation. New sessions always use `fixed`.
-        let legacy = config.outputDirectory
+        let fm = FileManager.default
+        // Primary (Recovery Core Directive): stage inside the session's VISIBLE backup folder, so processed
+        // PDFs/JPGs (with tags) are recoverable next to the raw sources if the app fails before finalize.
+        let primary = Self.stagingDir(for: session)
+        // Back-compat resume: a session staged by an OLDER build lives under the flat Application-Support
+        // staging root, and an older-still one under the output folder. If the primary has no manifest yet
+        // but a legacy location does, keep using that legacy dir IN PLACE so its already-staged outputs
+        // aren't orphaned (or needlessly re-OCR'd). New sessions always use `primary`.
+        let legacyAppSupport = Self.legacyStagingRoot.appendingPathComponent(session.sessionId, isDirectory: true)
+        let legacyOutput = config.outputDirectory
             .appendingPathComponent(".ArchiveProcessor-LiveStaging", isDirectory: true)
             .appendingPathComponent(session.sessionId, isDirectory: true)
-        let fm = FileManager.default
-        let dir: URL = (!fm.fileExists(atPath: fixed.appendingPathComponent("staging-manifest.json").path)
-                        && fm.fileExists(atPath: legacy.appendingPathComponent("staging-manifest.json").path))
-            ? legacy : fixed
+        func hasManifest(_ d: URL) -> Bool { fm.fileExists(atPath: d.appendingPathComponent("staging-manifest.json").path) }
+        let dir: URL = hasManifest(primary) ? primary
+            : (hasManifest(legacyAppSupport) ? legacyAppSupport
+               : (hasManifest(legacyOutput) ? legacyOutput : primary))
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         stagingDir = dir
-        Self.pruneStagingRoot(keeping: session.sessionId)   // drop leftover staging from finalized/abandoned sessions
+        Self.pruneLegacyStaging()   // best-effort: drop orphaned staging left by older builds
         // Arm the shared tagging knobs for this session's writes.
         MacOSTagger.stampUnread = config.taggingMode.stampsUnread
         OCRProcessor.rotationModeForRun = config.rotationMode
@@ -330,8 +345,13 @@ final class LiveCaptureProcessor: ObservableObject {
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
         persistManifest()
         for p in group.photos { pageTasks[p.id] = nil }   // free memory
+        // Mark the segment FAILED (retryable, pages kept in the backup folder) if it produced no PDF at all,
+        // if SOME page produced no PDF (incomplete → finalize won't file it, so it never partially deletes a
+        // multi-page segment's sources), or if a document yielded no OCR text on any page.
+        let producedOutput = !outcome.pdfURLs.isEmpty
+        let pagesComplete = outcome.pagesComplete ?? true
         let anyText = results.contains { $0.text != nil }
-        if gType == .document && !anyText {
+        if !producedOutput || !pagesComplete || (gType == .document && !anyText) {
             failedGroupIds.insert(groupId); setPhase(groupId, .failed)
         } else {
             failedGroupIds.remove(groupId); setPhase(groupId, .staged)
@@ -404,6 +424,13 @@ final class LiveCaptureProcessor: ObservableObject {
             try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
                                  outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
                                  gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB)
+            // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
+            // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
+            // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
+            // filed, and the irreplaceable source would be deleted (the original data-loss bug). So skip a
+            // page whose PDF didn't write: its source stays in the backup folder and the segment is surfaced
+            // as failed (retryable) because it produced no output.
+            guard fm.fileExists(atPath: stagedPDF.path) else { continue }
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
             try? MacOSTagger.applyTags(tagList, to: stagedPDF)
@@ -419,12 +446,17 @@ final class LiveCaptureProcessor: ObservableObject {
             }
         }
 
+        // Did EVERY source page produce a PDF on disk? Computed BEFORE merge collapses `pdfURLs`. If a page's
+        // generation was silently dropped above, the segment is incomplete — finalize will keep ALL its
+        // sources (never delete a page whose output doesn't exist) and surface it as failed for retry.
+        let pagesComplete = (pdfURLs.count == pages.count)
+
         // Segment JSON (documents only), written from source page names before any merge.
         var jsonURL: URL? = nil
         if writeJSON, type == .document, let firstPDF = pdfURLs.first {
             let jurl = firstPDF.deletingPathExtension().appendingPathExtension("json")
             writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags, to: jurl)
-            jsonURL = jurl
+            if fm.fileExists(atPath: jurl.path) { jsonURL = jurl }   // only record it if it actually wrote
         }
 
         if doMerge, pdfURLs.count > 1 {
@@ -441,7 +473,8 @@ final class LiveCaptureProcessor: ObservableObject {
         }
 
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
-                             pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText)
+                             pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
+                             pagesComplete: pagesComplete)
     }
 
     /// Mirrors `OCRProcessor.writeSegmentJSON`: a metadata sidecar with the OCR body + fields.
@@ -715,33 +748,51 @@ final class LiveCaptureProcessor: ObservableObject {
             guard let self else { return }
             self.showFinalizeSheet = false
             self.isFinalizing = false
-            guard outcome.failedMoves == 0 else {
-                // At least one staged output could not be moved into its collection folder. Do NOT delete
-                // the staging dir or clear the session — session.clear() deletes the irreplaceable SOURCE
-                // photos, so deleting now would lose both the processed output and the original. Keep
-                // everything in place so the operator can fix the cause (permissions / free space / a
-                // locked destination) and Finish again; already-moved files are skipped on the retry.
-                self.finalizeSummary = outcome.summary
-                    + " ⚠️ \(outcome.failedMoves) file(s) couldn't be moved — kept in place. Check the output folder and Finish again."
-                return
-            }
-            try? FileManager.default.removeItem(at: stagingDir)   // staging emptied into collections
-            // The exact source pages that were actually staged/filed (each retained segment records its
-            // pages' source URLs). Compute BEFORE clearing `retained`.
-            let filedSources = Set(self.retained.values.flatMap { $0.pages.map { $0.sourceURL } })
-            self.staged.removeAll()
-            self.statuses.removeAll()
+
+            // DATA-SAFETY GATE (the never-lose-a-photo invariant). Delete a source photo ONLY for a segment
+            // whose processed output actually REACHED its destination collection — `outcome.filedGroupIds`,
+            // confirmed on disk. A segment whose PDF was missing (a swallowed generation failure) or whose
+            // move failed is NOT filed: its source photos AND its staged outputs stay in the visible backup
+            // folder, so an irreplaceable page is never lost — even when finalize "succeeds" with 0 files
+            // moved (the original data-loss bug: a folder was created, nothing moved, every source deleted).
+            // Deletions go to the Trash (recoverable), never a hard rm.
+            let filedGroups = outcome.filedGroupIds
+            let filedSources = Set(self.retained.values
+                .filter { filedGroups.contains($0.groupId) }
+                .flatMap { $0.pages.map { $0.sourceURL } })
+
+            // Drop bookkeeping for the fully-filed segments only; keep any unfiled segment staged for retry.
+            self.staged.removeAll { filedGroups.contains($0.groupId) }
+            self.statuses.removeAll { filedGroups.contains($0.id) }
+            for gid in filedGroups { self.retained[gid] = nil; self.finalizedGroups.remove(gid) }
             self.drafts.removeAll()
-            self.finalizedGroups.removeAll()
-            self.startedPhotoIds.removeAll()
-            self.retained.removeAll()
-            self.rotationReviewPages.removeAll()
-            self.currentCollectionKey = "__unfiled__"
-            // Clear ONLY the filed source photos from the Captured pane; KEEP any page that streamed in
-            // but was never staged (e.g. a straggler that arrived after its segment finalized) so an
-            // irreplaceable photo is never deleted — it stays in the backup folder + pane, recoverable.
+
+            if outcome.allFiled {
+                // Everything landed → staging holds nothing recoverable. Trash it and reset the session.
+                CaptureSession.trashOrRemove(stagingDir)
+                self.startedPhotoIds.removeAll()
+                self.rotationReviewPages.removeAll()
+                self.currentCollectionKey = "__unfiled__"
+                self.finalizeSummary = outcome.summary
+            } else {
+                // Partial/failed: KEEP the unfiled segments staged (their outputs remain in the backup
+                // folder's `_processed`) and KEEP their source photos, for recovery/retry. Persist the
+                // reduced manifest so a crash right now leaves a consistent state.
+                self.persistManifest()
+                let kept = self.staged.count
+                if kept > 0 {
+                    self.finalizeSummary = outcome.summary
+                        + " ⚠️ \(kept) segment\(kept == 1 ? "" : "s") could NOT be filed — their original photos and processed files are KEPT in the Backup Folder (nothing deleted). Check the output folder (permissions / free space / a missing output), then Finish again or recover from the Backup Folder."
+                } else {
+                    // Every document filed, but a secondary file (an exported image or JSON sidecar) couldn't
+                    // be moved. No source was deleted for it; the leftover sits in the Backup Folder.
+                    self.finalizeSummary = outcome.summary
+                        + " ⚠️ All documents were filed, but a secondary file (an image or JSON sidecar) couldn't be moved — check the output folder; the leftover is in the Backup Folder."
+                }
+            }
+            // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
+            // stays in the backup folder + Captured pane, recoverable.
             self.session.clearFiled(filedSources)
-            self.finalizeSummary = outcome.summary
         }
     }
 
@@ -752,9 +803,18 @@ final class LiveCaptureProcessor: ObservableObject {
         let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
     }
 
-    /// Outcome of moving staged files into their collection folders. `failedMoves > 0` means at least one
-    /// staged output could NOT be filed — the caller must then keep staging + sources (do not delete either).
-    private struct FinalizeOutcome: Sendable { let summary: String; let failedMoves: Int }
+    /// Outcome of moving staged files into their collection folders. `filedGroupIds` is the set of segments
+    /// whose *every* PDF output actually reached its destination collection — the ONLY segments whose source
+    /// photos are safe to delete. `failedMoves > 0` (a real move error) or a segment absent from
+    /// `filedGroupIds` (its output was missing/failed) means the caller must KEEP that segment's staging +
+    /// source photos. `allFiled` is true only when every staged segment fully filed with no failures.
+    private struct FinalizeOutcome: Sendable {
+        let summary: String
+        let failedMoves: Int
+        let movedFiles: Int
+        let filedGroupIds: Set<String>
+        let allFiled: Bool
+    }
 
     private enum MoveResult { case moved, absent, failed }
 
@@ -762,17 +822,35 @@ final class LiveCaptureProcessor: ObservableObject {
         let fm = FileManager.default
         var movedFiles = 0
         var failedMoves = 0
-        func doMove(_ src: URL, to dest: URL) {
+        var filedGroupIds = Set<String>()
+        var totalSegments = 0
+        // Move one file; returns true iff it actually LANDED at the destination — so a segment can tell
+        // whether ALL of its authoritative PDF outputs were filed (the gate for deleting its source photo).
+        func doMove(_ src: URL, to dest: URL) -> Bool {
             switch move(src, to: dest, fm: fm) {
-            case .moved: movedFiles += 1
-            case .absent: break                 // nothing staged for this slot (e.g. a page whose gen failed)
-            case .failed: failedMoves += 1       // a real move error — the output is still in staging
+            case .moved: movedFiles += 1; return true
+            case .absent: return false           // nothing staged for this slot (e.g. a page whose gen failed)
+            case .failed: failedMoves += 1; return false   // a real move error — the output is still in staging
             }
         }
         for plan in plans {
             try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
-            var seq = plan.appending ? maxExistingNumber(in: plan.folder) : 0
+            // ALWAYS continue numbering from the folder's existing max (not only when appending). A "new
+            // collection" whose folder already holds numbered files — e.g. a Finish-again retry after a
+            // partial finalize, or the operator reusing a name — must NOT restart at 00001 and collide with
+            // (and overwrite) an already-filed file. `appending` no longer affects numbering; both paths are
+            // now collision-proof.
+            var seq = maxExistingNumber(in: plan.folder)
             for seg in plan.segments {
+                totalSegments += 1
+                // An INCOMPLETE segment (a source page produced no PDF) is NEVER filed: skip it entirely so no
+                // partial output scatters to the destination and none of its source pages are deleted. Its
+                // staged files stay in `_processed` and it's marked failed (retryable) in finalizeSegment.
+                if seg.pagesComplete == false { continue }
+                // PDFs are the authoritative output. A segment counts as "filed" (its source photos safe to
+                // delete) ONLY if it staged at least one PDF and EVERY one reached the destination. Exported
+                // images / JSON are secondary and do NOT gate deletion.
+                var pdfExpected = 0, pdfLanded = 0
                 var firstNum: Int?
                 if seg.imageURLs.isEmpty {
                     // One-file output (PDF only): number by PDF (a merged doc is already a single PDF).
@@ -780,7 +858,8 @@ final class LiveCaptureProcessor: ObservableObject {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
                         let numStr = String(format: "%05d", seq)
-                        doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"))
+                        pdfExpected += 1
+                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")) { pdfLanded += 1 }
                     }
                 } else if seg.pdfURLs.count == 1 && seg.imageURLs.count > 1 {
                     // Merged multi-page document: one PDF for many page images. Number each image, then the
@@ -790,10 +869,11 @@ final class LiveCaptureProcessor: ObservableObject {
                         if firstNum == nil { firstNum = seq }
                         let numStr = String(format: "%05d", seq)
                         let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                        doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
+                        _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                     }
                     if let fn = firstNum, let pdf = seg.pdfURLs.first {
-                        doMove(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf"))
+                        pdfExpected += 1
+                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf")) { pdfLanded += 1 }
                     }
                 } else {
                     // Two-file output, one PDF per page. The PDF list is authoritative (always page-complete);
@@ -808,27 +888,54 @@ final class LiveCaptureProcessor: ObservableObject {
                         let numStr = String(format: "%05d", seq)
                         if let img = imgByBase[pdf.deletingPathExtension().lastPathComponent] {
                             let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                            doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
+                            _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                         }
-                        doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf"))
+                        pdfExpected += 1
+                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")) { pdfLanded += 1 }
                     }
                 }
                 if let json = seg.jsonURL, let fn = firstNum {
                     let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)
                     try? fm.createDirectory(at: jf, withIntermediateDirectories: true)
-                    doMove(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"))
+                    _ = doMove(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"))
                 }
+                // Filed iff it produced ≥1 PDF and ALL of them landed. (No PDF → never filed → source kept.)
+                if pdfExpected > 0 && pdfLanded == pdfExpected { filedGroupIds.insert(seg.groupId) }
             }
         }
+        let allFiled = failedMoves == 0 && filedGroupIds.count == totalSegments
         let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
-        return FinalizeOutcome(summary: summary, failedMoves: failedMoves)
+        return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
+                               filedGroupIds: filedGroupIds, allFiled: allFiled)
+    }
+
+    /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
+    /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as
+    /// filed (otherwise finalize would delete its irreplaceable source). Mirrors what `finalize` consumes.
+    nonisolated static func _recoveryTestFinalizeMove(
+        _ plans: [(folder: URL, name: String, appending: Bool,
+                   segments: [(groupId: String, pdfURLs: [URL], imageURLs: [URL], jsonURL: URL?, complete: Bool)])]
+    ) -> (movedFiles: Int, failedMoves: Int, filedGroupIds: Set<String>, allFiled: Bool) {
+        let mapped: [MovePlan] = plans.map { p in
+            MovePlan(folder: p.folder, name: p.name, appending: p.appending,
+                     segments: p.segments.map { s in
+                         StagedSegment(groupId: s.groupId, type: CaptureGroupType.document.rawValue,
+                                       collectionKey: s.groupId, order: 0, pdfURLs: s.pdfURLs,
+                                       imageURLs: s.imageURLs, jsonURL: s.jsonURL, boxLabelText: nil,
+                                       pagesComplete: s.complete) })
+        }
+        let o = executePlans(mapped)
+        return (o.movedFiles, o.failedMoves, o.filedGroupIds, o.allFiled)
     }
 
     /// Move `src` to `dest`, reporting the outcome so the caller can tell a real failure (output stuck in
     /// staging) apart from a nothing-to-move slot. A missing source is `.absent`, not `.failed`.
     nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager) -> MoveResult {
         guard fm.fileExists(atPath: src.path) else { return .absent }
-        if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
+        // Overwriting an existing destination is now collision-proof (numbering continues from the folder's
+        // max), so this should be unreachable in practice — but if a name ever does collide, send the old
+        // file to the Trash (recoverable), never a hard delete.
+        if fm.fileExists(atPath: dest.path) { CaptureSession.trashOrRemove(dest, fm) }
         do { try fm.moveItem(at: src, to: dest); return .moved } catch { return .failed }
     }
 
