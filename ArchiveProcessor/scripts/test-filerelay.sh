@@ -24,7 +24,9 @@ FILERELAY_TESTOUT="$OUT" \
 FILERELAY_TESTDONE="$OUT/DONE.txt" \
   "$BIN" >"$OUT/app.log" 2>&1 &
 pid=$!
-for i in $(seq 1 60); do [ -f "$OUT/DONE.txt" ] && break; sleep 1; done
+# Up to ~180s: a freshly-built unsigned binary can take ~80s to clear XProtect on first launch before
+# onAppear fires (the driver itself runs in <1s once started).
+for i in $(seq 1 180); do [ -f "$OUT/DONE.txt" ] && break; sleep 1; done
 kill "$pid" 2>/dev/null; pkill -x ArchiveProcessor 2>/dev/null; sleep 1
 
 echo "driver: $(cat "$OUT/DONE.txt" 2>/dev/null || echo '(no marker — timed out; see app.log)')"
