@@ -126,6 +126,18 @@ final class CaptureSession: ObservableObject {
         store: LocalDirectoryStore(dir: Self.relayDir(token: token)),
         processedURL: incomingFolder.appendingPathComponent("relay-processed.json"))
 
+    /// The Google Drive cloud relay: the SAME receiver loop, backed by a `DriveObjectStore` (behind
+    /// `DriveAuth`) instead of a local directory. Constructed lazily + side-effect-free (no network until a
+    /// scan runs); the owner configures the OAuth client + signs in before it can actually reach Drive.
+    private lazy var cloudRelay: FileRelayReceiver = {
+        let auth = DriveAuth(clientId: UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? "",
+                             clientSecret: KeychainHelper.load(account: "DriveClientSecret") ?? "")
+        let client = DriveClient(token: { try auth.accessToken() })
+        return FileRelayReceiver(session: self, token: token, epoch: sessionId,
+                                 store: DriveObjectStore(client: client, token: token),
+                                 processedURL: incomingFolder.appendingPathComponent("relay-processed-cloud.json"))
+    }()
+
     /// Which receiver this session runs, from Settings (`DefaultsKeys.liveTransport`), env-overridable for CI.
     private var transport: CaptureTransport {
         let raw = ProcessInfo.processInfo.environment["LIVECAPTURE_TRANSPORT"]
@@ -179,14 +191,20 @@ final class CaptureSession: ObservableObject {
         case .lan:
             guard !serverRunning else { return }   // BYTE-IDENTICAL to the prior LAN behavior
             server.start()
-        case .fileRelay, .cloud:
+        case .fileRelay:
             fileRelay.start()                       // own idempotency guard; must NOT gate on serverRunning
+        case .cloud:
+            cloudRelay.start()                      // same receiver loop, Drive-backed store
         }
     }
 
     func stop() {
         server.stop()
-        fileRelay.stop()                            // both idempotent no-ops if never started
+        switch transport {                          // stop only the relay in use (avoids constructing the other)
+        case .fileRelay: fileRelay.stop()
+        case .cloud: cloudRelay.stop()
+        case .lan: break
+        }
     }
 
     /// Relay receiver readiness (portless; called on the main actor). Mirrors the AUTOSTART READY line so

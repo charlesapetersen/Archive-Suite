@@ -62,6 +62,7 @@ enum DefaultsKeys {
     static let liveProcessingMode = "liveProcessingMode"
     static let liveTransport = "liveTransport"       // which CaptureReceiver: "" / "lan" (default) / "fileRelay" / "cloud"
     static let liveRelayDir = "liveRelayDir"         // shared directory root for the file-relay transport
+    static let driveClientId = "driveClientId"       // Google OAuth Desktop client id for the cloud relay (secret in Keychain acct "DriveClientSecret")
 
     // Onboarding / key wizard
     static let hasSeenKeyOnboarding = "hasSeenKeyOnboarding"
