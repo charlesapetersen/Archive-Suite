@@ -229,7 +229,7 @@ writes against the real corpus — always a copy.
   `⌘C`/`⌘⇧C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
 
 > **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
-> (`docs/archive/ArchiveReader/UI_REFINEMENTS.md` #14): `↑/↓` now **scroll the focused page** instead
+> (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead
 > of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom is `⌘↑/↓` (not `⌘=`/`⌘-`); reset is `⌥⌘0` (not
 > `⌥⌘=`); `⌘C`/`⌘⇧C` are verbatim/cleaned copy. The document window has **no** Mark-Read (`⌘R`) or
 > copy-link shortcut — those are nav-window only.
@@ -345,9 +345,8 @@ Views/
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```
-UI was documented as two owner-requested batches (both shipped, now archived) in
-`docs/archive/ArchiveReader/UI_REFINEMENTS.md` (Batch 1) and `docs/archive/ArchiveReader/PLAN_NEAR_TERM_UI.md`
-(Batch 2: sidebar, smart folders, item-4 wins, tag rename).
+UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
+item-4 wins, tag rename) — see `git log` for the detail.
 `ArchiveReader/Tests/ArchiveReaderTests/` — 15 test files (135 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 

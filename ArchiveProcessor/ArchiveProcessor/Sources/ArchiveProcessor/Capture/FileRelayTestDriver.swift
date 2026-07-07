@@ -4,7 +4,7 @@ import AppKit
 /// Headless, key-free, $0 invariant test for the FileRelay receiver, gated by `FILERELAY_TESTMODE=1`
 /// (does nothing in normal use). Drives `FileRelayReceiver.scanOnce()` DIRECTLY (no timer, no sleeps) in
 /// stage-for-later mode (so `ingest` never triggers OCR) against a temp relay dir, asserting the
-/// never-lose-a-photo contract + the v2 amendments (LIVE_CAPTURE_FILERELAY_SPEC.md). Writes results.json
+/// never-lose-a-photo contract + the v2 amendments (SPEC/relay-object-format.md). Writes results.json
 /// + DONE.txt for the Tier-2 harness. Test-only scaffolding.
 @MainActor
 enum FileRelayTestDriver {

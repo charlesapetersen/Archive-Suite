@@ -15,7 +15,7 @@ disagree, this spec plus the cited source files are authoritative — not prose 
 cross-platform golden (`ArchiveProcessor/SPEC/relay-golden/`) + `scripts/test-relay-golden.sh` are the
 mechanical guard.
 
-Extracted from `ArchiveProcessor/LIVE_CAPTURE_FILERELAY_SPEC.md` (its **v2 amendments A1–A11 bind over
+Extracted from the pre-merge FileRelay build spec (in git history) (its **v2 amendments A1–A11 bind over
 the v1 base body** where they conflict) and reconciled against the shipped code (paths below). Status:
 **settled for the FileRelay milestone.** The Drive backend inherits these shapes and may only *add* a
 monotone `rev` when coexisting objects demand it (A1/D4).
@@ -215,7 +215,7 @@ phone still holds the only copy and retries.
 
 ## Adversarial amendments A1–A11 (the binding contract points)
 
-These v2 amendments override the v1 base body of `LIVE_CAPTURE_FILERELAY_SPEC.md` and define the shipped
+These v2 amendments override the v1 base body of the pre-merge FileRelay build spec and define the shipped
 contract. Severity in brackets.
 
 | # | Rule | Where enforced |
@@ -266,7 +266,7 @@ contract. Severity in brackets.
 - **This doc lives at the Suite-root `SPEC/`** (beside `tag-format.md`); the **golden fixtures live under
   `ArchiveProcessor/SPEC/relay-golden/`** so they stay version-controlled with the code all three
   platforms build from. Reconciling the two `SPEC/` locations is a deferred cleanup.
-- **Drift folded from the pre-merge `LIVE_CAPTURE_FILERELAY_SPEC.md`** (documented here as the shipped
+- **Drift folded from the pre-merge FileRelay build spec** (documented here as the shipped
   reality):
   1. The v1 §2 sidecar/receipt bodies **omit `fp`**; A1 added it and the shipped code + golden carry it
      in **both**. This spec shows `fp`.

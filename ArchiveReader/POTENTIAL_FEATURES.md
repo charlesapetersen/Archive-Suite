@@ -1,6 +1,6 @@
 # Potential Features
 
-Forward-looking backlog. Core roadmap lives in [PLAN.md](PLAN.md) (§Milestones); this is the
+Forward-looking backlog. Core roadmap lives in [CLAUDE.md](CLAUDE.md); this is the
 wishlist beyond it. Several items overlap Archive Processor's own backlog — evidence these apps are
 one suite.
 

@@ -4,7 +4,7 @@ import CryptoKit
 /// iOS mirror of the Mac's `RelayObjectFormat` — MUST produce byte-identical output (canonical JSON, escape
 /// table, fingerprint) so the Mac receiver reads what this writes. Guarded by the golden byte-check against
 /// `SPEC/relay-golden/`. Keep in lockstep with `ArchiveProcessor/.../Net/RelayObjectFormat.swift` and the
-/// Android `net/RelayObjectFormat.kt`. Governing spec: `LIVE_CAPTURE_FILERELAY_SPEC.md` (v2 amendments bind).
+/// Android `net/RelayObjectFormat.kt`. Governing spec: `SPEC/relay-object-format.md` (v2 amendments bind).
 enum RelayObjectFormat {
 
     // MARK: - Object names

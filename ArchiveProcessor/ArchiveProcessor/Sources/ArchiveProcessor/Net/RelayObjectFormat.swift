@@ -5,7 +5,7 @@ import CryptoKit
 /// backend that proves the cloud-transport contract without OAuth/network. SINGLE SOURCE OF TRUTH for
 /// object names, canonical JSON, the metadata fingerprint (A1), and parse/encode. The iOS + Android
 /// writers mirror this byte-for-byte (guarded by the golden cross-check). Governing spec:
-/// `LIVE_CAPTURE_FILERELAY_SPEC.md` (its v2 amendments bind over the v1 body).
+/// `SPEC/relay-object-format.md` (its v2 amendments bind over the v1 body).
 ///
 /// All object metadata is a **string→string** map (so it maps 1:1 onto Drive `appProperties` later),
 /// serialized with `canonicalJSON` (sorted keys, nil-omitted, fixed escaping, UTF-8) so three platforms

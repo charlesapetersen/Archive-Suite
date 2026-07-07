@@ -29,7 +29,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] Cite `SPEC/tag-format.md` as the shared-contract source of truth from BOTH per-app `CLAUDE.md`. ✅
 - [x] Reconcile Reader `CLAUDE.md` prose to SPEC (doc-only; code already correct): page-2 line verbatim/any-ext/may-be-absent; Year 3–4 digits; BC note clarified; Box/Folder/OCR-Failed subjects noted. ✅
 - [x] Regression test: `Box`/`Folder`/`OCR Failed` classify as plain subjects (SPEC #3) — added; **110 tests green**. ✅
-- [x] Close stale checkbox: `PLAN_NEAR_TERM_UI` **E3** confirmed shipped & ticked. ✅
+- [x] Close stale checkbox: near-term-UI item **E3** confirmed shipped & ticked. ✅
 - [x] Processor: "Import tag vocabulary from CSV" — added `Import from CSV…` button + file drop target on the vocabulary editor (`SettingsView.swift`; NSOpenPanel + newline/comma parse, de-dupe). macOS build green, no new warnings. ✅
 - [ ] **BLOCKED (not a quick win):** bump Android `targetSdk` 34→36. AGP is **8.6.1 / Gradle 8.9**, which can't compile `compileSdk 36` (needs AGP ≥8.9); also **no Android SDK/toolchain on this machine**. Requires: upgrade AGP+Gradle, install the API-36 platform, bump compile+targetSdk, then a build + on-device smoke for Android 15/16 behavior changes. Do in an Android-capable session before the ~2026-08-31 Play deadline. | files: ArchiveCapture/ (build.gradle.kts, gradle wrapper) | M | med
 - [x] Reconcile Bonjour service-name mismatch — iOS now advertises `_archivecap._tcp` (matches the Mac) in both `ArchiveCaptureiOS/project.yml` + generated `Info.plist`; iOS project regenerates clean. ✅

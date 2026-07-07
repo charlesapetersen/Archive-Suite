@@ -6,7 +6,7 @@ import java.security.MessageDigest
  * Pure-Kotlin (no Android API) mirror of the Mac/iOS `RelayObjectFormat`. MUST produce byte-identical
  * canonical JSON so the Mac receiver reads what this writes — guarded by the golden byte-check against
  * `SPEC/relay-golden/`. Keep in lockstep with `ArchiveProcessor/.../Net/RelayObjectFormat.swift` and
- * `ArchiveCaptureiOS/.../Net/RelayObjectFormat.swift`. Spec: `LIVE_CAPTURE_FILERELAY_SPEC.md` (v2 binds).
+ * `ArchiveCaptureiOS/.../Net/RelayObjectFormat.swift`. Spec: `SPEC/relay-object-format.md` (v2 binds).
  *
  * No `org.json` here (keeps it JVM-unit-testable); the transport does its own receipt/epoch parsing.
  */

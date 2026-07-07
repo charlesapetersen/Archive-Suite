@@ -26,8 +26,8 @@ Archive-Suite/
 **The double‑naming** (`ArchiveReader/ArchiveReader/`, `ArchiveProcessor/ArchiveProcessor/`) is a
 harmless byproduct of the merge — outer = the app's dir, inner = that app's XcodeGen project dir. Each
 app's `launch.sh`/`bootstrap.sh` use paths relative to themselves, so it's cosmetic only. It can be
-flattened later as a separate, per‑app, build‑verified cleanup (see `docs/archive/SUITE_MERGE_PLAN.md` §Target
-structure); not worth touching now.
+flattened later as a separate, per‑app, build‑verified cleanup (see `execution-plans/structural-refactor.md`);
+not worth touching now.
 
 ## The shared contract is the risk
 
@@ -89,5 +89,6 @@ this repo:
   ⚠️ Use the **full path** `/opt/homebrew/bin/gh` — a shadowing Python tool named `gh` is first on PATH and fails.
 - Cut DMG/GitHub releases sparingly; push commits frequently.
 
-See [`docs/archive/SUITE_MERGE_PLAN.md`](docs/archive/SUITE_MERGE_PLAN.md) for how the two repos were merged (durable, resumable
-record) and the deferred follow‑ups (shared `ArchiveCore` package; de‑nesting).
+The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
+record). Remaining structural follow‑ups (shared `ArchiveCore` package; de‑nesting) live in
+`execution-plans/structural-refactor.md`.

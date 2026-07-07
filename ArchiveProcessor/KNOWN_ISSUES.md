@@ -210,7 +210,7 @@ is ever deleted before it's filed. (`LiveCaptureProcessor.finalize`, `CaptureSes
 ## Cloud/relay: reclassify a page whose original document group already finalized → duplicate output  [MEDIUM — relay-amplified]
 
 **Status:** deferred (2026-07-06), from the FileRelay design adversarial review (hole H10, see
-`LIVE_CAPTURE_FILERELAY_SPEC.md` §A11). Fix scoped to the Drive milestone.
+`../SPEC/relay-object-format.md` A11). Fix scoped to the Drive milestone.
 
 `removePhotoIfSafe` no-ops when the old group `isFinalized` (`CaptureSession.swift:231`). Over HTTP this is
 nearly unreachable (uploads are consumed immediately). With a **relay** (objects persist until the Mac drains

@@ -32,7 +32,7 @@ protocol RelayObjectStore: Sendable {
 /// A `CaptureReceiver` that drains a shared directory the phone writes into and funnels each page through
 /// `CaptureSession.ingest` — acking (a receipt) and deleting a source object ONLY after `ingest` returned
 /// non-nil. The local stand-in for the Google Drive relay; proves the never-lose-a-photo contract offline.
-/// See `LIVE_CAPTURE_FILERELAY_SPEC.md` (v2 amendments bind). `@unchecked Sendable` + a serial queue for
+/// See `SPEC/relay-object-format.md` (v2 amendments bind). `@unchecked Sendable` + a serial queue for
 /// lifecycle, mirroring `CaptureServer`; `processed` is mutated only inside single-flight `scanOnce`.
 final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
     private weak var session: CaptureSession?

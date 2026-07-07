@@ -6,7 +6,7 @@ import Foundation
 /// Mac-published epoch from `_epoch.json` (A2). Byte-format via `RelayObjectFormat` (golden-guarded).
 ///
 /// This milestone constructs it DIRECTLY from tests (the on-device pairing/UI wiring lands with the Drive
-/// backend, per `LIVE_CAPTURE_FILERELAY_SPEC.md` §8), so the shipped HTTP `MacClient` path is untouched.
+/// backend, per `SPEC/relay-object-format.md` §8), so the shipped HTTP `MacClient` path is untouched.
 struct FileRelayTransport: SegmentTransport {
     let sessionDir: URL          // <relayRoot>/<token>/
     let token: String
