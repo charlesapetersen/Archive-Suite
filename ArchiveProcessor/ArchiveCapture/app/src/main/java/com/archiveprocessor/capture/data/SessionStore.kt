@@ -13,9 +13,15 @@ import java.io.File
 class SessionStore(context: Context) {
     private val file = File(context.filesDir, "session.json")
 
-    data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?, val pendingTagGroupId: String?)
+    /** A document segment the operator has ended whose segment-complete signal the Mac hasn't acked yet.
+     *  Persisted so an app-kill between End segment and the ack can't strand the document. */
+    data class EndedSeg(val group: String, val priority: String?, val year: Int?, val month: Int?)
 
-    fun save(items: List<CapturedItem>, seq: Int, nextId: Long, currentGroupId: String, pendingTagGroupId: String?) {
+    data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?,
+                        val pendingTagGroupId: String?, val endedSegments: List<EndedSeg>)
+
+    fun save(items: List<CapturedItem>, seq: Int, nextId: Long, currentGroupId: String, pendingTagGroupId: String?,
+             endedSegments: List<EndedSeg>) {
         try {
             val arr = JSONArray()
             for (it in items) {
@@ -32,12 +38,22 @@ class SessionStore(context: Context) {
                     it.replacesGroupId?.let { v -> put("replacesGroupId", v) }
                 })
             }
+            val ended = JSONArray()
+            for (e in endedSegments) {
+                ended.put(JSONObject().apply {
+                    put("group", e.group)
+                    e.priority?.let { v -> put("priority", v) }
+                    e.year?.let { v -> put("year", v) }
+                    e.month?.let { v -> put("month", v) }
+                })
+            }
             val root = JSONObject().apply {
                 put("items", arr)
                 put("seq", seq)
                 put("nextId", nextId)
                 put("group", currentGroupId)
                 if (pendingTagGroupId != null) put("pendingTag", pendingTagGroupId)
+                if (ended.length() > 0) put("ended", ended)
             }
             val tmp = File(file.parentFile, "session.json.tmp")
             tmp.writeText(root.toString())
@@ -80,9 +96,22 @@ class SessionStore(context: Context) {
                 )
             }
             val nextId = root.optLong("nextId", (items.maxOfOrNull { it.id } ?: 0L) + 1L)
+            val ended = ArrayList<EndedSeg>()
+            if (root.has("ended")) {
+                val ea = root.getJSONArray("ended")
+                for (i in 0 until ea.length()) {
+                    val o = ea.getJSONObject(i)
+                    ended.add(EndedSeg(
+                        group = o.getString("group"),
+                        priority = if (o.has("priority")) o.getString("priority") else null,
+                        year = if (o.has("year")) o.getInt("year") else null,
+                        month = if (o.has("month")) o.getInt("month") else null))
+                }
+            }
             Restored(items, root.optInt("seq", items.size), nextId,
                 if (root.has("group")) root.getString("group") else null,
-                if (root.has("pendingTag")) root.getString("pendingTag") else null)
+                if (root.has("pendingTag")) root.getString("pendingTag") else null,
+                ended)
         } catch (e: Exception) {
             null
         }

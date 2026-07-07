@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- "Save to phone" writes copies to the shared gallery. On API 29+ MediaStore needs no permission
+         (scoped storage); on API ≤28 it requires WRITE_EXTERNAL_STORAGE, requested at the tap. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application

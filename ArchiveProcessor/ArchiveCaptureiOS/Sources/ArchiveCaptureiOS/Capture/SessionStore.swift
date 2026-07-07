@@ -3,6 +3,15 @@ import Foundation
 /// Durable session persistence so nothing captured is lost before it reaches the Mac (archival photos
 /// can't be re-taken). Mirrors the Android SessionStore.
 struct SessionStore {
+    /// A document segment the operator has ended whose segment-complete signal the Mac hasn't acked yet.
+    /// Persisted so an app-kill between End segment and the ack can't strand the document.
+    struct EndedSeg: Codable {
+        var group: String
+        var priority: String?
+        var year: Int?
+        var month: Int?
+    }
+
     struct Snapshot: Codable {
         var items: [CapturedItem]
         var seq: Int
@@ -11,6 +20,8 @@ struct SessionStore {
         /// Non-nil only if the app was mid-tagging a segment when it stopped — so recovery re-opens the
         /// tag card only in that case, not when the user was still shooting an unfinished segment.
         var pendingTagGroupId: String?
+        /// Ended-but-unacked segments (optional for backward compatibility with older snapshots).
+        var endedSegments: [EndedSeg]?
     }
 
     private let url: URL

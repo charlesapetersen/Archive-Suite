@@ -18,24 +18,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-/** Minimal on-phone tagging shown when a document segment is finished: priority + date.
- *  Subjects are intentionally NOT here — the Mac handles those. */
+/** Minimal on-phone tagging shown when a document segment is finished: priority + date. Subjects are
+ *  intentionally NOT here — the Mac handles those. [onApply] ends the segment (Skip passes nulls) and
+ *  sends it to the Mac to tag; [onCancel] closes without ending it (End segment was a mistake — keep
+ *  shooting the same document). Gesture-dismiss is disabled by the caller, so one of these is always chosen. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SegmentTagSheet(
     recentYears: List<Int>,
-    onApply: (priority: String?, year: Int?, month: Int?) -> Unit
+    onApply: (priority: String?, year: Int?, month: Int?) -> Unit,
+    onCancel: () -> Unit
 ) {
     var priority by remember { mutableStateOf<String?>(null) }
     var year by remember { mutableStateOf<Int?>(null) }
@@ -94,8 +99,12 @@ fun SegmentTagSheet(
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = { onApply(null, null, null) }, modifier = Modifier.weight(1f)) { Text("Skip") }
+            OutlinedButton(onClick = { onApply(null, null, null) }, modifier = Modifier.weight(1f)) { Text("Skip (tag on Mac)") }
             Button(onClick = { onApply(priority, year, month) }, modifier = Modifier.weight(1f)) { Text("Apply & continue") }
+        }
+        // Escape hatch for an accidental End-segment tap: keep the current document open (does NOT end it).
+        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Cancel — keep shooting")
         }
         Spacer(Modifier.height(8.dp))
     }

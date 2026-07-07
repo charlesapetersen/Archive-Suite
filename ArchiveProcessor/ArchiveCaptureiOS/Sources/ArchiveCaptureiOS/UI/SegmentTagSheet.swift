@@ -7,6 +7,8 @@ private let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 struct SegmentTagSheet: View {
     let recentYears: [Int]
     let onApply: (_ priority: String?, _ year: Int?, _ month: Int?) -> Void
+    /// End segment was a mistake — close without ending the segment (keep shooting the same document).
+    let onCancel: () -> Void
 
     @State private var priority: String?
     @State private var year: Int?
@@ -52,11 +54,15 @@ struct SegmentTagSheet: View {
                 }
 
                 HStack(spacing: 12) {
-                    Button("Skip") { onApply(nil, nil, nil) }
+                    Button("Skip (tag on Mac)") { onApply(nil, nil, nil) }
                         .buttonStyle(.bordered).frame(maxWidth: .infinity)
                     Button("Apply & continue") { onApply(priority, year, month) }
                         .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
                 }
+                // Escape hatch for an accidental End-segment tap: keep the current document open (does NOT end it).
+                Button("Cancel — keep shooting", action: onCancel)
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
             }
             .padding(20)
         }

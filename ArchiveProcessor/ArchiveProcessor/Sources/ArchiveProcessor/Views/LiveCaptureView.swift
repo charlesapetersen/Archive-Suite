@@ -263,7 +263,7 @@ struct LiveCaptureView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if !session.photos.isEmpty {
-                    Button("Clear") { session.clear(); liveProc.clearFinalizeSummary() }
+                    Button("Clear") { session.clear(); liveProc.clearFinalizeSummary(); liveProc.cancelPendingFinish() }
                     if liveProcessingMode != "live" {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
@@ -278,18 +278,29 @@ struct LiveCaptureView: View {
                         // Live mode, session active. Always show Finish so the user sees where the
                         // session ends — grayed with a spinner while segments are still being OCR'd/
                         // tagged (so it's clear work is happening, not just a "Clear" button), and
-                        // enabled once at least one segment has finished (staged).
+                        // enabled once at least one segment has finished (staged). If Finish is tapped
+                        // while segments are still processing, we WAIT for them (pendingFinish) so none are
+                        // missing from the rotation review, and any un-tagged/open segment is recovered.
                         let processing = liveProc.statuses.contains { $0.phase == .ocr || $0.phase == .tagging }
                         HStack(spacing: 8) {
-                            if processing && liveProc.staged.isEmpty {
+                            if liveProc.pendingFinish {
+                                ProgressView().controlSize(.small)
+                                Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            } else if processing && liveProc.staged.isEmpty {
                                 ProgressView().controlSize(.small)
                                 Text("Processing…").font(.caption).foregroundStyle(.secondary)
                             }
                             Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
-                                liveProc.finishSession()
+                                liveProc.requestFinish()
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(liveProc.staged.isEmpty || liveProc.isFinalizing)
+                            // Enabled once anything is captured (not only when staged): Finish also recovers
+                            // an un-ended/un-tagged segment (completeAllOpenDocGroups). Kept TAPPABLE while a
+                            // finish is pending so a newly-added, still-un-tagged segment can be recovered by
+                            // re-tapping (no deadlock) — new photos extend the same pending finish rather than
+                            // cancelling it. Only blocked during the actual file move (isFinalizing).
+                            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing)
                         }
                     }
                 }

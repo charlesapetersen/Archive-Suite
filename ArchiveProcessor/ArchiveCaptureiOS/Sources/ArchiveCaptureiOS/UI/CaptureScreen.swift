@@ -45,15 +45,18 @@ struct CaptureScreen: View {
                     Text(vm.endpoint.map { "Connected · \($0.name)" } ?? "Not connected")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
+                    // Backup safety net: copy what's on the phone to Photos if it won't transfer.
+                    if !vm.items.isEmpty { Button("Save to phone") { vm.saveToPhone() }.foregroundStyle(.white) }
                     Button("Re-pair") { showRepairConfirm = true }.foregroundStyle(.white)
                 }
+                // End segment is the ONLY "done" action: a document is finished when you tap it (there is
+                // no separate "Finish" — its pages already streamed to the Mac, so ending the segment sends
+                // the completion signal that makes the Mac present this segment's tag card). Tagging on Mac.
                 HStack {
                     if !vm.items.isEmpty { Button("Clear") { showClearConfirm = true }.foregroundStyle(.white) }
                     if vm.items.contains(where: { $0.state == .failed }) { Button("Retry") { vm.retryFailed() }.foregroundStyle(.white) }
                     Spacer()
                     Button("End segment") { vm.finishDocumentSegment() }.buttonStyle(.borderedProminent)
-                    Spacer()
-                    Button("Finish") { vm.finishSession() }.foregroundStyle(.white)
                 }
 
                 let uploading = vm.items.filter { $0.state == .uploading }.count
@@ -108,11 +111,17 @@ struct CaptureScreen: View {
         .background(Color.black.ignoresSafeArea())
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
+        // Gesture-dismiss is DISABLED (interactiveDismissDisabled) so an accidental swipe can't silently
+        // strand the just-ended document. The operator must choose in the sheet: Apply & continue / Skip
+        // (both end the segment and send it to the Mac) or Cancel — keep shooting (End segment was a
+        // mistake; keep adding to the same document). The binding's set-closure is a harmless no-op after
+        // Apply/Skip (finalizeSegment clears pendingTagGroupId first).
         .sheet(isPresented: Binding(get: { vm.pendingTagGroupId != nil },
                                     set: { if !$0 { vm.cancelTagSheet() } })) {
-            SegmentTagSheet(recentYears: vm.recentYears) { p, y, m in
-                vm.applyTagsAndContinue(priority: p, year: y, month: m)
-            }
+            SegmentTagSheet(recentYears: vm.recentYears,
+                            onApply: { p, y, m in vm.applyTagsAndContinue(priority: p, year: y, month: m) },
+                            onCancel: { vm.cancelTagSheet() })
+                .interactiveDismissDisabled(true)
         }
         .confirmationDialog("Clear all photos?", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("Clear (\(vm.items.count))", role: .destructive) { vm.clearSession() }

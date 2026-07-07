@@ -38,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -77,6 +78,20 @@ fun CaptureScreen(vm: CaptureViewModel) {
     }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCam = it }
     LaunchedEffect(Unit) { if (!hasCam) permLauncher.launch(Manifest.permission.CAMERA) }
+
+    // "Save to phone" → shared gallery. API 29+ needs no permission; API ≤28 needs WRITE_EXTERNAL_STORAGE,
+    // requested here on tap, then the save runs on grant.
+    val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.saveToPhone() else vm.reportCaptureError("Storage permission denied — can't save a backup to the gallery. Enable it in Settings.")
+    }
+    fun requestSaveToPhone() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            vm.saveToPhone()
+        } else {
+            writeLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
 
     val controller = remember { LifecycleCameraController(context) }
     LaunchedEffect(hasCam) { if (hasCam) controller.bindToLifecycle(lifecycleOwner) }
@@ -123,10 +138,17 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 Text(vm.endpoint?.let { "Connected · ${it.name}" } ?: "Not connected",
                      color = Color(0xFF8E8E93), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.weight(1f))
+                // Backup safety net: copy what's on the phone to the gallery if it won't transfer.
+                if (vm.items.isNotEmpty()) {
+                    TextButton(onClick = { requestSaveToPhone() }) { Text("Save to phone", color = Color.White) }
+                }
                 TextButton(onClick = { showRepairConfirm = true }) { Text("Re-pair", color = Color.White) }
             }
 
-            // End segment — above the photos and away from the shutter, to avoid accidental taps.
+            // End segment — above the photos and away from the shutter, to avoid accidental taps. This is
+            // the ONLY "done" action: a document is finished when you tap End segment (there is no separate
+            // "Finish" — its pages already streamed to the Mac, so ending the segment sends the completion
+            // signal that makes the Mac present this segment's tag card). Tagging itself is done on the Mac.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (vm.items.isNotEmpty()) {
                     TextButton(onClick = { showClearConfirm = true }) { Text("Clear", color = Color.White) }
@@ -136,8 +158,6 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 }
                 Spacer(Modifier.weight(1f))
                 Button(onClick = { vm.finishDocumentSegment() }) { Text("End segment") }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { vm.finishSession() }) { Text("Finish", color = Color.White) }
             }
 
             // Transfer feedback: segments/markers fly to the Mac; images don't accumulate on the phone.
@@ -212,11 +232,21 @@ fun CaptureScreen(vm: CaptureViewModel) {
         }
     }
 
-    // Segment tag sheet.
+    // Segment tag sheet. Gesture-dismiss is DISABLED (confirmValueChange blocks swipe-to-hide; the
+    // scrim/back onDismissRequest is a no-op) so an accidental swipe can't silently strand the just-ended
+    // document. The operator must choose: Apply & continue / Skip (both end the segment and send it to the
+    // Mac) or Cancel — keep shooting (End segment was a mistake; keep adding to the same document).
     if (vm.pendingTagGroupId != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(onDismissRequest = { vm.cancelTagSheet() }, sheetState = sheetState) {
-            SegmentTagSheet(recentYears = vm.recentYears()) { p, y, m -> vm.applyTagsAndContinue(p, y, m) }
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden }
+        )
+        ModalBottomSheet(onDismissRequest = { }, sheetState = sheetState) {
+            SegmentTagSheet(
+                recentYears = vm.recentYears(),
+                onApply = { p, y, m -> vm.applyTagsAndContinue(p, y, m) },
+                onCancel = { vm.cancelTagSheet() }
+            )
         }
     }
 

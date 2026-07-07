@@ -53,6 +53,11 @@ final class LiveCaptureProcessor: ObservableObject {
     /// End-of-session finalization state (Phase 3/4).
     @Published var drafts: [CollectionDraft] = []
     @Published var showFinalizeSheet = false
+    /// True after the operator hit "Finish session" while segments are still being OCR'd/tagged: we hold
+    /// off the rotation review / collection naming until every segment is staged, so none are missed.
+    @Published private(set) var pendingFinish = false
+    /// Segments still being processed (OCR or tagging), for the "waiting" message shown while pendingFinish.
+    var processingCount: Int { statuses.filter { $0.phase == .ocr || $0.phase == .tagging }.count }
     @Published private(set) var isFinalizing = false
     @Published private(set) var finalizeSummary: String?
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
@@ -81,13 +86,35 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - Lifecycle
 
+    /// Fixed, output-folder-INDEPENDENT staging root (hidden in Application Support). Keeping staging out
+    /// of the output folder means changing the output folder mid-session — or relaunching after a change —
+    /// can never strand already-staged (processed) outputs (they used to live under the output folder, so a
+    /// folder change + relaunch left `loadStagingManifest` looking in the wrong place). Falls back to a temp
+    /// dir if Application Support is unavailable.
+    static var stagingRoot: URL {
+        // Durable fallback (the VISIBLE backup root, which always exists and is never OS-purged) rather than
+        // the temp dir, so a session's already-processed staged output isn't silently purged before Finish
+        // if Application Support is somehow unavailable.
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? CaptureSession.backupRoot
+        return base.appendingPathComponent("ArchiveProcessor/LiveStaging", isDirectory: true)
+    }
+
     /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
     func activate(config: SessionProcessingConfig) {
         self.config = config
-        let dir = config.outputDirectory
+        let fixed = Self.stagingRoot.appendingPathComponent(session.sessionId, isDirectory: true)
+        // Back-compat: a session staged by an OLDER build lives under the (legacy) output-folder location.
+        // If that manifest exists and the new fixed location has none, keep using the legacy dir IN PLACE so
+        // its already-staged outputs aren't orphaned by the relocation. New sessions always use `fixed`.
+        let legacy = config.outputDirectory
             .appendingPathComponent(".ArchiveProcessor-LiveStaging", isDirectory: true)
             .appendingPathComponent(session.sessionId, isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fm = FileManager.default
+        let dir: URL = (!fm.fileExists(atPath: fixed.appendingPathComponent("staging-manifest.json").path)
+                        && fm.fileExists(atPath: legacy.appendingPathComponent("staging-manifest.json").path))
+            ? legacy : fixed
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         stagingDir = dir
         // Arm the shared tagging knobs for this session's writes.
         MacOSTagger.stampUnread = config.taggingMode.stampsUnread
@@ -176,9 +203,23 @@ final class LiveCaptureProcessor: ObservableObject {
     /// no tag card) also finalize right away.
     func photoIngested(_ photo: CapturedPhoto) {
         guard session.processingMode == .live, let config,
-              !startedPhotoIds.contains(photo.id),
-              !finalizedGroups.contains(photo.groupId) else { return }   // skip already-staged (resume)
+              !startedPhotoIds.contains(photo.id) else { return }   // not live / dup / resume → silent
+        if finalizedGroups.contains(photo.groupId) {
+            // A page arrived for a document already finalized on the Mac — e.g. the operator kept shooting the
+            // SAME document after it was force-completed at Finish, instead of starting a new segment. It can't
+            // join that finished collection; it stays in the backup folder. Surface it (don't drop silently).
+            session.statusMessage = "A late page arrived for an already-finished document — kept in the Backup Folder, not this collection. Tap Box or End segment to start a NEW segment."
+            return
+        }
         startedPhotoIds.insert(photo.id)
+
+        // New capture arrived while a Finish is pending: treat it as another segment to include — the
+        // pending finish KEEPS waiting and will complete once this segment is tagged + processed too (it's
+        // not dropped or force-completed). Just note it. If the operator never ends this new segment, the
+        // Finish button stays tappable (see LiveCaptureView) so they can re-issue the recovery.
+        if pendingFinish {
+            session.statusMessage = "Added to this session — Finish will complete after the new segment is processed too."
+        }
 
         // Pin collection membership now, in capture order (a Box starts a new collection).
         if photo.type == .box { currentCollectionKey = photo.groupId }
@@ -278,6 +319,7 @@ final class LiveCaptureProcessor: ObservableObject {
         } else {
             failedGroupIds.remove(groupId); setPhase(groupId, .staged)
         }
+        proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/priority are layered on later.
@@ -466,6 +508,40 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: - End-of-session rotation review (opt-in)
 
+    /// "Finish session" button entry point. Two jobs before the review can start:
+    ///  1) RECOVER any document that never got a Mac tag card — one the operator ended but whose
+    ///     completion signal never landed, OR never tapped End segment on — by force-completing all still-
+    ///     open doc groups so their cards surface now. This replaces the removed phone "Finish" fallback.
+    ///  2) WAIT for in-flight processing: if any segment is still OCR'ing/tagging (or a tag card is still
+    ///     pending), don't proceed yet — otherwise those segments are missing from the rotation review.
+    /// Once everything is staged, `proceedToFinishIfReady` runs `finishSession`.
+    func requestFinish() {
+        guard !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
+        session.completeAllOpenDocGroups()
+        pendingFinish = true
+        proceedToFinishIfReady()
+    }
+
+    /// Abort a pending Finish (e.g. the operator hit Clear instead of resolving the surfaced cards), so the
+    /// Finish button can't stay wedged disabled with nothing left to advance it.
+    func cancelPendingFinish() { pendingFinish = false }
+
+    /// Advance a pending Finish once no tag card is outstanding and nothing is still being processed.
+    /// Called after each segment stages and whenever a card is resolved, so a Finish requested mid-run
+    /// waits for processing to complete instead of dropping unstaged segments from the review.
+    private func proceedToFinishIfReady() {
+        guard pendingFinish else { return }
+        // Only count segments that still EXIST — a status left at .ocr/.tagging for a group whose photos
+        // were deleted (thumbnail X) or reclassified away (X-Replaces) can never resolve (no group → no tag
+        // card, no finalizeSegment), so it must not block the finish forever. Finalized groups are .staged/.failed.
+        let stillProcessing = statuses.contains { s in
+            (s.phase == .ocr || s.phase == .tagging) && session.groups.contains { $0.id == s.id }
+        }
+        guard session.pendingTagGroup == nil, !stillProcessing else { return }
+        pendingFinish = false
+        finishSession()
+    }
+
     /// Finish-session entry point. If "Review rotation" is on, present a dedicated rotation-review
     /// pass over every captured page first; otherwise go straight to collection naming. "Review
     /// rotation" is read LIVE (not from the locked session config): it's a Finish-time choice, so
@@ -550,9 +626,24 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// Build collection drafts (candidate names + fuzzy-matched existing folders) and show the sheet.
+    /// The output folder to file collections into, read LIVE from Settings at finalize time (not the
+    /// session's locked config). The output folder is only used at the final move, so honoring a change
+    /// made mid-session — via the Live Capture "Output folder" picker or Process Files — is safe and
+    /// expected: both the "Add to" existing-folder list and the destination track the current choice.
+    /// Falls back to the locked config's directory, then Downloads.
+    private var currentOutputDirectory: URL {
+        if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory),
+           FileManager.default.fileExists(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+        return config?.outputDirectory
+            ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser
+    }
+
     func beginFinalize() {
-        guard let config, !staged.isEmpty else { return }
-        let existing = Self.existingCollectionFolders(in: config.outputDirectory)
+        guard config != nil, !staged.isEmpty else { return }
+        let existing = Self.existingCollectionFolders(in: currentOutputDirectory)
         let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
         let orderedKeys = byKey.keys.sorted {
             (byKey[$0]?.map(\.order).min() ?? .max) < (byKey[$1]?.map(\.order).min() ?? .max)
@@ -570,9 +661,9 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// Move staged outputs into their (new or existing) collection folders, continuing numbering.
     func finalize(_ decided: [CollectionDraft]) {
-        guard let config, let stagingDir, !isFinalizing else { return }
+        guard config != nil, let stagingDir, !isFinalizing else { return }
         isFinalizing = true
-        let outputDir = config.outputDirectory
+        let outputDir = currentOutputDirectory   // live output folder (matches the "Add to" list built above)
         let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
         let plans: [MovePlan] = decided.map { d in
             let segs = (byKey[d.id] ?? []).sorted { $0.order < $1.order }
