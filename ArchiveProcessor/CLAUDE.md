@@ -130,17 +130,22 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 
 ## Primary Function 3: Live Capture (phone companion + streaming)
 
-Photograph documents with a phone companion app — **Android** (`ArchiveCapture/`, Kotlin + Compose + CameraX) or **iPhone** (`ArchiveCaptureiOS/`, SwiftUI + AVFoundation, XcodeGen, Swift 5 language mode) — and stream them to the Mac's Live Capture tab. Both companions speak the same `CaptureServer` protocol and share the segment-transfer UX (photos leave the phone as segments are confirmed on the Mac). The iPhone companion holds no API keys and pairs over the LAN (QR or manual host/port/token).
+Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, Kotlin + Compose + CameraX) or **iPhone** (`ArchiveCaptureiOS/`, SwiftUI + AVFoundation, XcodeGen, Swift 5 language mode) — and stream them to the Mac's Live Capture tab. Both companions speak the same protocol + relay contract and share the streaming UX; the phone holds **no API keys** (the Mac does OCR + tagging).
 
-- **On the phone:** full-res shutter; **Box** (red) / **Folder** (purple) markers; **End segment** finishes a document. Minimal on-phone tagging: priority (P7–P10 + per-page P10) and year/month. Durable disk queue with auto-retry — a photo is never lost (archival photos can't be re-taken). Idempotent re-upload on the Mac (same group+seq → replace).
-- **Pairing:** QR (host/port/token, Bearer-auth). LAN or **USB** (`adb reverse` → `127.0.0.1`, auto-run by the Mac). Stable token + pinned port survive Mac restarts; the QR hides once paired. Both companions gate on a saved endpoint (`endpoint != nil` → capture screen), so a **Re-pair** control on the capture screen (calls `disconnect()`) is the only way back to the scanner — needed to switch a USB-paired phone (saved host `127.0.0.1`) to Wi-Fi, or to a different Mac. Captured items are retained across a disconnect and re-upload to the new endpoint.
-- **Mac tagging:** an auto-advancing, keyboard-driven **tag card** per document segment (subjects via `SystemTagsProvider` autocomplete; editable date/priority).
-- **Backup folder (data safety):** every photo the phone sends is written to a durable, **user-visible** folder — `~/Pictures/Archive Processor Live Capture/<session>/` (`CaptureSession.backupRoot`) — and kept until the run's output is fully finalized (`session.clear()` runs only on a successful finalize). A **Backup Folder** button in `LiveCaptureView` reveals it in Finder so the operator can recover/copy the originals if anything fails — even if the app won't relaunch. Legacy Application-Support sessions are migrated into this folder on launch, and empty finalized folders are pruned on launch (never a folder that still holds a photo).
-- **Two modes (chosen in Settings, `liveProcessingMode`):**
+- **Streaming + never-lose-a-photo (the core invariant).** Each photo's bytes upload **as it is shot** (Workstream S) via a durable on-phone disk queue + auto-retry; a page is marked sent only after the Mac's durable ack. On the Mac every page funnels through `CaptureSession.ingest(...)`, which writes the manifest **before** acking and replaces idempotently on `(group, seq)` — so the phone deletes its sole copy of an un-retakeable photo only once the Mac is durable. **"End segment" is the only "done" action** on the phone: the pages have already streamed, so it is purely the logical grouping — it confirms the document boundary and sends the segment's tags; it does **not** gate byte transfer.
+- **Two transports we maintain, behind one seam.** The phone transport is abstracted as `SegmentTransport`, the Mac receiver as `CaptureReceiver`; every receiver calls `ingest` and acks only on a durable return, so the invariant is transport-agnostic.
+  - **LAN (default)** — direct phone→Mac HTTP to `CaptureServer` (`NWListener`, fixed port 48627). Zero-config whenever the venue network permits device-to-device.
+  - **USB local relay** — `Net/USBBridge.swift` keeps `adb reverse` asserted so a USB-tethered Android reaches `127.0.0.1:<port>`; the Mac stays on venue Wi-Fi. Android-only.
+  - **Google Drive cloud relay** — the wireless fallback for client-isolated networks (and off-site capture): the phone uploads each object to the user's Drive, the Mac pulls and feeds the same `ingest`. Built behind the `RelayObjectStore`/`FileRelayReceiver` seam — the offline `FileRelay` shared-directory stand-in proves the whole contract with no auth; `DriveObjectStore` is the production backend (`drive.file` scope, per-file; the Mac deletes each object after durable receipt). Mac side is built + live-validated; the phone `DriveRelayTransport` is **owner-gated** (needs on-device Google OAuth). Canonical object format (names, JSON, fingerprint) → [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md); change all sides together.
+- **Rejected transports (don't re-open):** Mac/phone personal hotspot (forces the Mac off venue Wi-Fi + internet → no live OCR), iOS MultipeerConnectivity/AWDL P2P (iOS-only, a specialized stack to maintain), Bluetooth (far too slow for multi-MB photos), and **AirDrop / Quick Share** (no programmatic API, a manual per-file Accept, and files land in Downloads — bypassing `ingest`, the `(group,seq)` dedup, and the ack contract). Full rationale in `LIVE_CAPTURE_CONNECTIVITY_PLAN.md` + `LIVE_CAPTURE_CLOUD_TRANSPORT_PLAN.md`.
+- **Pairing + connect flow (ground truth).** The Mac shows a QR encoding `{host, port, token, name}` (`LiveCaptureView.pairingPayload`; `host` = the primary `en0`/`en1` IPv4, `token` = the stable 6-char `session.token`; pinned port survives Mac restarts, QR hides once paired). All routes are `Authorization: Bearer <token>` (bad token → 401, unknown route → 404). Both companions gate on a saved endpoint (`endpoint != nil` → capture screen), so a **Re-pair** control (`disconnect()` → `POST /session/disconnect` → the Mac re-shows the QR) is the only way back to the scanner — needed to move a USB-paired phone (saved host `127.0.0.1`) to Wi-Fi or to a different Mac. Captured items are retained across a disconnect and re-upload to the new endpoint. P0/P1 shipped honest connect diagnostics (short reachability preflight → unreachable / refused / unauthorized) so pairing never fails silently.
+- **On the phone:** full-res shutter; **Box** (red) / **Folder** (purple) markers; minimal on-phone tagging (priority P7–P10 + per-page P10, year/month). A **queue-depth heartbeat** (`POST /phone/status`, `X-Pending`) tells the Mac how many photos are still un-sent.
+- **On the Mac:** an auto-advancing, keyboard-driven **tag card** per document segment (subjects via `SystemTagsProvider` autocomplete; editable date/priority), gated on the segment-complete signal so it appears only for a *completed* segment. **Finish is drain-gated** — the Mac surfaces "phone still has N to send" and holds finalize until the heartbeat reports the phone has drained, so no segment finalizes partial.
+- **Backup folder (data safety):** every photo lands in a durable, **user-visible** folder — `~/Pictures/Archive Processor Live Capture/<session>/` (`CaptureSession.backupRoot`) — kept until the run's output is fully finalized (`clear()` runs only on a successful finalize). A **Backup Folder** button in `LiveCaptureView` reveals it in Finder so the operator can recover the originals if anything fails — even if the app won't relaunch. Legacy Application-Support sessions migrate in on launch; empty finalized folders are pruned on launch (never one that still holds a photo).
+- **Two processing modes (Settings, `liveProcessingMode`):**
   - **Stage for later** — captures collect, then hand off to Process Files for a batch run.
   - **Process live** — each segment is OCR'd **on arrival**, tagged, turned into a **PDF + renamed original image** (dual output), merged if multi-page, and staged as you shoot. At **Finish session**, confirm each collection's name (auto-suggested from the box-label OCR, **fuzzy-matched against existing folders** to append; new files continue that folder's `NNNNN` numbering). Durable + resumable (staging manifest; failed-OCR retry).
-- **Key files (Mac):** `Capture/{CaptureModels,CaptureSession,SessionProcessingConfig,LiveCaptureProcessor}.swift`, `Net/{CaptureServer,USBBridge}.swift`, `Views/{LiveCaptureView,CollectionFinalizeSheet,KeyboardTokenField}.swift`.
-- **Key files (iPhone, `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`):** `Net/{MacEndpoint,MacClient}.swift`, `Capture/{CaptureModels,SessionStore,CaptureViewModel}.swift`, `Camera/CameraController.swift`, `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,SegmentTagSheet}.swift`. Its own `project.yml` (`xcodegen generate` after adding files); camera capture needs a physical device (the simulator has no camera).
+- **Per-file locations:** see the **Implementation map** (`Capture/`, `Net/`, `Views/`) + its companion note below.
 
 ---
 
@@ -206,7 +211,7 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 
 **Shared hotspots that force cross-lane coordination:**
 - **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position).
-- **Phone↔Mac protocol:** `Net/CaptureServer.swift` (routes `GET /ping`, `POST /photo`, `POST /session/complete`, `Authorization: Bearer`) ↔ `ArchiveCaptureiOS/.../Net/MacClient.swift`. Change both sides together.
+- **Phone↔Mac protocol:** `Net/CaptureServer.swift` (Bearer-authed routes `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`) ↔ both companions' `MacClient` (`ArchiveCaptureiOS/.../Net/MacClient.swift` + Android `net/MacClient.kt`). The cloud-relay transport shares a second contract — the object format in [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) (`Net/RelayObjectFormat.swift` ↔ the phones' mirror). Change all sides together.
 - **The two `project.yml` files.**
 
 **Rules:** never hand-edit `.pbxproj` (edit `project.yml` + `xcodegen generate`, now also required after clone); keep commits small and rebase often; build-verify before every commit.
@@ -287,3 +292,93 @@ Archive Processor/
 **Refactor notes (behavior-preserving splits).** The `OCRProcessor` split is deliberately **coarse** (4 concern-extensions, not one-file-per-method): related state-mutating logic stays together, which lowers cross-file tracing cost for an agent — so there is intentionally no `+Persistence`/`+BatchOCR`/`+MainPipeline`. When verifying a future large move-only refactor: run the git move-proof (`git show --color-moved | grep …`) **tty-independently** — piping makes it pass for *any* commit, so it proves nothing on its own; audit access-level changes by **census-diffing** private members rather than grepping (Swift `internal` is keyword-less, so a grep can't see it); gate on a **warnings delta** to catch Swift-6 isolation drift (and beware an initial "0 warnings" that is really a cached build masking pre-existing ones). Testing-coverage gap to remember: the batch/instance-method GUI path (`startProcessing → review → performTaggingPhase → finalize`) is **not** exercised by `LiveCaptureTestDriver`, which only drives the live-staging `nonisolated` statics.
 
 See the README's "Project Structure" for the full annotated file tree, and the **Concurrent / multi-agent development** section above for ownership lanes and shared hotspots.
+
+---
+
+## Implementation map
+
+Per-file index (one line each); the folder tree + god-file-split rationale are under "Project Structure"
+above, ownership lanes + shared hotspots under "Concurrent / multi-agent development."
+
+`ArchiveProcessor/Sources/ArchiveProcessor/`
+```
+ArchiveProcessorApp.swift      @main App; main window + ⌘, Settings scene.
+ContentView.swift              Top-level tab host (Process Files · Live Capture · Tools).
+Models/                        UI-free settings, pricing, keys, shared enums:
+  ProviderModels.swift         Persisted, String-backed shared enums (LLMProvider/ThinkingLevel/
+                               DocumentClassification/TaggingMode/RotationMode) + GatewayConfig. SHARED HOTSPOT.
+  DefaultsKeys.swift           Single source of truth for UserDefaults/@AppStorage key strings.
+  ModelSelectionStore.swift    Shared persistence of per-provider selected model + output dir.
+  ProviderKeySpec.swift        Per-provider config driving the guided key-onboarding wizard.
+  KeychainHelper.swift         Store/read API keys in the macOS Keychain.
+  CostEstimator.swift          Per-model cost math (standard vs batch) for the estimator pane.
+  TimeEstimator.swift          Rough wall-clock processing-time estimate for a batch.
+OCR/                           OCR pipeline + provider clients:
+  OCRProcessor.swift           @MainActor Process-Files pipeline controller — stored state here; methods
+                               in +Pipeline/+OCR/+Tagging/+ReviewFlows, types in +Types (see god-file note).
+  AnthropicClient·GeminiClient·MistralClient.swift   Single-shot OCR client per provider.
+  OpenAICompatibleClient.swift OCR via any OpenAI-compatible gateway endpoint.
+  BatchOCR.swift               Batch (discounted, async) OCR clients + shared error-body parsing.
+  OCRPrompt.swift              Shared OCR prompt builder (all providers except Mistral OCR).
+  ImageEncoding.swift          Shared image→JPEG downscale/encode (byte-identical across providers).
+  NetworkSession.swift         Global in-flight-request limiter (the rate-limit choke point).
+  KeyValidator.swift           Validate a pasted key with one cheap live call → plain-English status.
+  RotationDetector.swift       Local (Vision) upright-rotation detection.
+  LLMRotationDetector.swift    Vision-LLM upright-rotation detection (compares the 4 candidates).
+  PDFGenerator.swift           Build the 2-page output PDF (image + dynamic-height OCR-text page).
+  PDFTextExtractor.swift       Read OCR text + classification back out of existing PDFs.
+  PDFToImageConverter.swift    Render PDF pages to JPEGs for OCR input.
+  SampleOCRTester.swift        One-off sample-OCR test helper.
+Tagging/                       Finder-tag writing + segmentation (Tier-2 — writes irreplaceable data):
+  MacOSTagger.swift            Writes Finder tags (subjects/date/priority/color + trailing Unread).
+  TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
+  DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification.
+  CollectionSegmenter.swift    Group files into box/folder collections.
+  SystemTagsProvider.swift     Spotlight-sourced existing-tag autocomplete for tagging UIs.
+Capture/                       Live Capture core (Tier-2):
+  CaptureSession.swift         Owns a live session: incoming folder, token, received photos, receiver
+                               lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),
+                               backup folder, segment-complete / drain-gate state.
+  CaptureModels.swift          CaptureGroupType + captured-photo/group types (mirrors the phone).
+  SessionProcessingConfig.swift  Locked snapshot of all processing settings for the session.
+  LiveCaptureProcessor.swift   Streams OCR/tag/PDF per segment as it arrives; end-of-session finalize.
+  LiveCaptureTestDriver·ProcessFilesTestDriver·FileRelayTestDriver.swift   Headless env-gated end-to-end
+                               test drivers (live-staging / Process-Files GUI / FileRelay invariants).
+Net/                           Phone↔Mac transports + cloud relay (Tier-2; the protocol is a SHARED HOTSPOT):
+  CaptureServer.swift          LAN HTTP/NWListener receiver; Bearer-authed routes (see hotspot list).
+  CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.
+  CaptureValidation.swift      Shared group-id safety (path-traversal guard) for both receivers.
+  USBBridge.swift              Keeps adb reverse asserted so a USB phone reaches 127.0.0.1:<port>.
+  FileRelayReceiver.swift      Watched-directory relay receiver (offline cloud stand-in) + ScanReport.
+  RelayObjectFormat.swift      Canonical relay object names/JSON/fingerprint; see SPEC/relay-object-format.md.
+  DriveObjectStore.swift       RelayObjectStore over Google Drive (the production cloud relay).
+  DriveClient.swift            Drive REST v3 client behind a mockable HTTP seam.
+  DriveAuth.swift              Google OAuth (loopback PKCE, drive.file scope).
+Views/                         SwiftUI (+ AppKit where needed):
+  OCRView.swift                Process Files window; its rows/review/model/resolution sheets + WordDiff live
+                               in OCRView+*.swift (see god-file note).
+  LiveCaptureView.swift        Live Capture tab: pairing QR, session status, tag cards, Backup Folder reveal.
+  SettingsView.swift           The ⌘, Settings scene (grouped Form + pinned live cost-estimate pane).
+  ToolsView.swift              Tools tab: Compare Models + Test Resolution.
+  CollectionFinalizeSheet.swift  End-of-session: name each collection or append to an existing folder.
+  BoxFolderConfirmSheet.swift  Confirm/reclassify every box/folder identification.
+  ManualTaggingSheet·ManualSegmentTagView.swift  Sequential manual per-segment tagging.
+  ManageModelsView.swift       Add/remove custom model IDs (beyond the built-in lists).
+  ProviderKeyWizard.swift      Guided BYO-key onboarding wizard (driven by ProviderKeySpec).
+  TagInputField·KeyboardTokenField.swift  Autocompleting tag entry + its AppKit keystroke field.
+  ArchiveThumbnail·ZoomableImageView.swift  Thumbnail + full-image zoom viewer.
+  DropReceiver.swift           Drag-and-drop file intake.
+```
+
+**Companions** (separate build; the phone↔Mac protocol + relay object format are the only shared surface):
+- **iPhone** — `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`: `App.swift`/`ContentView.swift`;
+  `Camera/CameraController.swift`; `Capture/{CaptureModels,CaptureViewModel,SessionStore}.swift` (durable
+  capture queue); `Net/{MacEndpoint,MacClient,SegmentTransport,FileRelayTransport,DriveRelayTransport,
+  DriveClient,RelayObjectFormat}.swift`; `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,
+  SegmentTagSheet}.swift`. Own `project.yml` (`xcodegen generate` after adding files); camera capture needs
+  a physical device (the simulator has none).
+- **Android** — `ArchiveCapture/` (Gradle, Kotlin + Compose + CameraX), the mirror:
+  `net/{MacClient,MacEndpoint,QrAnalyzer,SegmentTransport,FileRelayTransport,DriveRelayTransport,DriveClient,
+  DriveAuth,RelayObjectFormat}.kt`, `capture/{CaptureModels,CaptureViewModel}.kt`,
+  `data/{SessionStore,PhoneBackup,Prefs}.kt`, `ui/{ConnectScreen,CaptureScreen,SegmentTagSheet}.kt`. Fully
+  independent except the phone↔Mac protocol.

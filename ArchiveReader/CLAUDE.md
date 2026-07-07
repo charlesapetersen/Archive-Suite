@@ -6,9 +6,11 @@ Reader is the *reading & triage* companion: find tagged PDFs, list them in chron
 filter by subject / priority / read-state, read them two-up (image + OCR text), copy text and
 file links, and mark them Read as you go.
 
-> **Status:** Planning. This file + `PLAN.md` are the durable record. Product decisions still open
-> are listed in `PLAN.md` (§Decisions). Everything in **Core Directive**, **Verified Facts**, and
-> **Safety Protocol** below is settled and non-negotiable.
+> **Status:** Shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate tag
+> finder, document-viewer refinements, duplicate-filename disambiguation); 135 tests green. **This
+> file is the durable record** for the Reader. **Core Directive**, **Verified Facts**, and **Safety
+> Protocol** below are settled and non-negotiable; the keyboard map, options, edge-case rules, and
+> decisions are folded into the sections below.
 
 ---
 
@@ -37,7 +39,7 @@ even `TagWriter` never calls a move / rename / delete / content-write API — on
 ## Verified Facts (measured against the real corpus + Archive Processor source, 2026-07-04)
 
 > **Single source of truth:** the tag/PDF contract shared with Archive Processor is authoritatively
-> documented in [`../../SPEC/tag-format.md`](../../SPEC/tag-format.md) (Suite root). The facts below
+> documented in [`../SPEC/tag-format.md`](../SPEC/tag-format.md) (Suite root). The facts below
 > mirror it from the Reader side; if they ever disagree, the SPEC wins and both must be reconciled.
 
 **Corpus:** `Test files/Brown Gemini/` — ~6,941 two-page PDFs. Real production scale is up to
@@ -98,7 +100,7 @@ the content index, not a tag.
 **Search:** Spotlight (`mdfind`/`NSMetadataQuery`) finds these by tag fast — a compound 3-facet
 query over 6,941 files returned in **0.38s**; `Read OR Unread` in **0.45s**. Scales to 150k (index
 lookups, not scans). Text-content indexing may lag/miss on some locations. **v1 assumes local disk,
-no cloud drives** (cloud support is deferred — see `PLAN.md` §Future).
+no cloud drives** (cloud support is deferred — long-term; see `POTENTIAL_FEATURES.md`).
 
 **Chronological sort key:** derived **from the Year/Month/Day tags** into a sortable integer
 (e.g. `year*10000 + month*100 + day`; the arithmetic is BC-capable, though no BC/negative-year token
@@ -193,13 +195,94 @@ writes against the real corpus — always a copy.
   an AppKit `NSTableView` swap is possible if `Table` janks at 150k (test early). Columns: Document
   date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
-  draggable gray splitter with center grab handle, **default 2/3 : 1/3** re-applied per document.
-  Up/Down cycles the selection. Intelligent copy + in-doc Find. Degrades for non-2-page/corrupt.
-- **Intelligent copy:** collapse single newlines → space; blank line = paragraph break (keep);
-  de-hyphenate line-end hyphens; works in either pane; optional "skip OCR header" (off by default).
-- **Options panel (⌘,):** link format, newlines-after-link, and more (see `PLAN.md` §Options).
+  draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
+  and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
+  `↑/↓` **scroll** the focused pane; `⌘⇧↑/↓` cycle the segment (see §Keyboard). Intelligent copy +
+  in-doc Find. Degrades for non-2-page/corrupt.
+- **Intelligent copy** (`⌘⇧C`): collapse single newlines → space; blank line = paragraph break (keep);
+  de-hyphenate line-end hyphens; works in whichever pane holds the selection. `⌘C` copies verbatim.
+- **Options panel (⌘,):** link format, copy-text cleaning, viewer split, nav defaults, list density,
+  near-duplicate warning (see **§Options** below).
 
-## Implementation map (shipped — v1 + UI Batch-2 complete, 95 tests, 2026-07-06)
+## §Keyboard map (the menu bar is the single source of shortcuts — `ArchiveReaderCommands.swift`)
+
+*Navigation window*
+- `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
+- `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
+  `⏎`/double-click or `⌘O` open in the document window
+- `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Edit Tags… · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped; **no redo binding**)
+- `⌘⇧C` Copy Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
+- `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
+- *Menu-only (no shortcut):* Sort by Date/Name/Priority/Read-state · Rename Tag… · Find Similar Tags… ·
+  Save Current Search… · Select Document Run · Open in Default App
+
+*Document window* (the **focused pane** carries an accent border; switch it with `⌘⌥←`/`⌘⌥→`)
+- `↑/↓` **scroll** the focused page (PDFView) — *not* document cycling
+- `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
+- `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
+- `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset split + zoom to defaults
+- `⌘C` copy verbatim · `⌘⇧C` copy cleaned-for-prose (intelligent) · `⌘F` find in document
+- `⌘,` Options (both windows)
+
+*Preview sheet* (opened by `Space`/`⌘Y`)
+- `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
+  `⌘C`/`⌘⇧C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
+
+> **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
+> (`docs/archive/ArchiveReader/UI_REFINEMENTS.md` #14): `↑/↓` now **scroll the focused page** instead
+> of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom is `⌘↑/↓` (not `⌘=`/`⌘-`); reset is `⌥⌘0` (not
+> `⌥⌘=`); `⌘C`/`⌘⇧C` are verbatim/cleaned copy. The document window has **no** Mark-Read (`⌘R`) or
+> copy-link shortcut — those are nav-window only.
+
+## §Options (⌘, — `OptionsView`, read via `AppSettings`)
+
+- **Copying links:** link format (`file://` URL · POSIX path · Markdown · HTML) · blank lines between links (0–5).
+- **Copying text:** collapse single line breaks → spaces (on) · blank line = paragraph break (on) · rejoin hyphenated line-splits (on).
+- **Document viewer:** default split (image %/text %, 0.2–0.8). Per-pane zoom, split position, and window
+  size are **not** toggles — the viewer persists the *last used* value as the next default (DV-1/DV-2).
+- **Navigation defaults:** default read-state filter (All / Unread / Read / No-read-state) · combine subject filters with ANY (off = ALL).
+- **File list:** list text size (10–20 pt; smaller = denser rows).
+- **Tag editing:** warn when a new subject differs only by case from an existing one (on).
+
+> PLAN's §Options listed controls that did **not** ship as toggles (viewer zoom/fit-mode & reset-per-
+> document, "skip OCR header", date-display format, default sort levels, Box/Folder column, controlled-
+> vocabulary restriction, large-edit confirm threshold, animation speed, in-panel archive-root
+> management). The shipped panel is the leaner set above; archive roots are chosen via
+> File ▸ Choose Archive Folder…, not the Options panel.
+
+## §Edge-case rules
+
+- **Not exactly 2 pages / non-PDF / corrupt/encrypted:** probe open + page count; single-pane / "no OCR
+  page" state; `PDFDocument(url:)==nil` guarded. **Page count is never a defect signal** — merged >2-page
+  PDFs are legitimate (`PDFFormatStatus`); a file is flagged only when unreadable or text-less. Tagged
+  non-PDF images stay listed (they carry read-state); the viewer degrades.
+- **Neither Read nor Unread:** tri-state "No-read-state" bucket; markers stay visible, never silently lost.
+- **Read-failure ≠ empty tags:** abort the write (Safety Protocol §3).
+- **Duplicate filenames across boxes:** colliding rows show their containing folder as a subtitle
+  (`DuplicateNames`); copied link groups carry full paths.
+- **Unicode:** normalize (NBSP→space, dash-fold, case/diacritic-fold) for search/type-ahead/sort keys
+  **only**; preserve real bytes for display + link encoding.
+- **Multiple same-facet date tags** (two Years/Months): deterministic rule + flag ambiguous.
+- **Facet-looking subjects** (`1984`, `P7`, `Read`): heuristics + display-only correction; never affects writes.
+
+## §Decisions (settled with the owner; the app ships these)
+
+- **Chronological sort key derived from tags** (universal, medieval-safe, no Processor change);
+  creation-date native sort is a deferred bonus.
+- **Date Uncertain** sorts by its speculative year, rendered *italic* (never dumped to the end).
+- **Discovery = Spotlight** (`NSMetadataQuery`) over granted archive root(s); universe = files tagged
+  `Read`/`Unread`. No third-party ORM (the content index uses OS SQLite FTS5).
+- **Subject filters AND by default** (OR/NOT via toggle); read-state is a tri-state filter; "Mark Read"
+  never adds a read-state token to a marker/neither file (option, off).
+- **Facet classification is display/sort/filter only** — never drives a write.
+- **Full tag editing is first-class** (single + group), always via `TagWriter`; free-form subjects with
+  autocomplete + near-duplicate warning (`TagSimilarity`) to curb fragmentation.
+- **Reading/grouping is user-driven manual multi-selection** — the app never auto-groups; segment
+  awareness is opt-in convenience that degrades silently when the classification is absent.
+- **Full-text OCR search is in v1** via the app's content index (not Spotlight content indexing) + in-doc `⌘F`.
+- **v1 sandboxed** to a granted root; non-sandboxed whole-Mac search is long-term (behind a `FileAccessProvider` abstraction).
+
+## Implementation map (shipped — v1 + P2 complete, 135 tests, 2026-07-07)
 
 `ArchiveReader/Sources/ArchiveReader/`
 ```
@@ -213,16 +296,22 @@ Core/                         UI-free domain (package-ready → future ArchiveCo
                               guard; multiset+label+bytes verify; label-only .restoreLabel inverse undo.
   TagEditing.swift            TagEditOp → per-file TagDelta; GroupTagSummary (tri-state across selection).
   TagReading.swift            Safe read; TagReadResult distinguishes confirmed-empty vs unreadable.
+  TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
+                              Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
   DocumentTags.swift          Tag→facet parser (year/month/Day N/priority/read/color/subjects);
                               sortDate (medieval-safe), displayDate, dateIsSpeculative.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.
   ArchiveFile.swift           A nav-row record (url identity + parsed tags).
+  DuplicateNames.swift        Pure detection of rows sharing a base filename + containing-folder
+                              disambiguator (display aid only; never writes).
   LibraryChangeSignature.swift Pure order-independent change-signatures (paths / DISTINCT-subject union /
                               match-facets) that gate NavigationModel's cache rebuilds. Subjects sig is
                               over the union (NOT the multiset) so even-count edits can't XOR-cancel.
   FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
   CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate).
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
+  PDFFormatStatus.swift       Pure read-only classifier: standard / unreadable / no-text-layer (page
+                              count is NOT a defect signal). Drives the ⚠︎ badge + viewer banner.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        NSMetadataQuery over Read/Unread tags, scoped to the root; live updates.
@@ -241,8 +330,13 @@ Views/
                               (List(selection:)+OutlineGroup) that scopes the list via filter.pathPrefix.
   InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
                               (menu), DateCell / TagsCell (popovers). Multi-file edits use the ⌘I editor.
+  SubjectTokenField.swift     Inline NSTokenField subject editor per row: autocomplete from the corpus;
+                              edit-start-base diff → ONE TagWriter delta; drops half-typed fragments on
+                              incidental blur (controlled-vocabulary + no-lost-tag safety).
   TagFilterField.swift        NSComboBox-backed tag filter with autocomplete (+focus token for ⌘L).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
+  SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
+                              Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I).
   OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).
   DocumentViewerModel.swift   Loads the selection; page cycling; focused-pane zoom; plain + intelligent copy.
@@ -254,7 +348,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 UI was documented as two owner-requested batches (both shipped, now archived) in
 `docs/archive/ArchiveReader/UI_REFINEMENTS.md` (Batch 1) and `docs/archive/ArchiveReader/PLAN_NEAR_TERM_UI.md`
 (Batch 2: sidebar, smart folders, item-4 wins, tag rename).
-`ArchiveReader/Tests/ArchiveReaderTests/` — 11 test files (95 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 15 test files (135 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build
@@ -279,7 +373,7 @@ Archive Reader realizes several items already on Archive Processor's own `POTENT
 **The shared contract is the risk.** Both apps must interpret tags, date facets, priorities,
 color/markers, the `Read/Unread` convention, and the 2-page PDF + `Classification:` format
 *identically* — a divergence would corrupt or mis-read irreplaceable data. That contract is the real
-thing to keep in sync — authoritatively in [`../../SPEC/tag-format.md`](../../SPEC/tag-format.md)
+thing to keep in sync — authoritatively in [`../SPEC/tag-format.md`](../SPEC/tag-format.md)
 (the Suite-root contract both apps cite; Verified Facts above mirror it from the Reader side).
 
 **Recommended approach (staged, low-risk):**
@@ -305,5 +399,6 @@ Until step 2, treat the tag/PDF contract as the coupling; keep `Core/` UI-free a
 - Never add a tag-writing call outside `TagWriter`; never add a move/rename/delete/content-write
   call anywhere (not even in `TagWriter`).
 
-See `PLAN.md` for milestones, the keyboard map, the full options list, edge-case rules, the feature
-backlog, and the open decisions awaiting the owner's review.
+Milestones M0–M3 and the High-priority backlog all shipped; the keyboard map, options, edge-case
+rules, and decisions are folded into the §sections above. Further ideas live in `POTENTIAL_FEATURES.md`,
+open issues in `KNOWN_ISSUES.md`, and the manual smoke test in `SMOKE_TEST.md`.
