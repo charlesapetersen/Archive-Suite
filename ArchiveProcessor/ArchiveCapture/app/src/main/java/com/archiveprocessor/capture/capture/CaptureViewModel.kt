@@ -200,7 +200,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 endpoint = ep
                 client = transportFor(ep)
                 prefs.saveEndpoint(ep)
-                statusMessage = "Connected to ${ep.name}"
+                statusMessage = ""   // connection status is owned by the endpoint-bound header; don't duplicate it here (re-pair showed two lines)
                 resumeUploads()
             } else {
                 // Name the cause + the fix, so the operator isn't left staring at a dead scanner.

@@ -93,7 +93,7 @@ final class CaptureViewModel: ObservableObject {
             endpoint = ep
             client = MacClient(endpoint: ep)
             Self.saveEndpoint(ep)
-            statusMessage = "Connected to \(ep.name)"
+            statusMessage = ""   // connection status is owned by the endpoint-bound header; don't duplicate it here
             connectPhase = .idle
             resumeUploads()
         case .unreachable:  connectPhase = .unreachable(host: ep.host, port: ep.port)

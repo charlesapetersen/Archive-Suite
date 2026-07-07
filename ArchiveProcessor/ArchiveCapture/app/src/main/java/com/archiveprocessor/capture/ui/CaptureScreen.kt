@@ -17,7 +17,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -179,23 +178,20 @@ fun CaptureScreen(vm: CaptureViewModel) {
                      modifier = Modifier.fillMaxWidth())
             }
 
-            // Current segment (auto-scrolling; tap a page to toggle its P10 override). Confirmed pages
-            // animate out as they reach the Mac, so the strip reflects only what's still transferring.
+            // Current segment (auto-scrolling; tap a page to toggle its P10 override). Show EVERY item the
+            // model holds — including pages already UPLOADED — so the operator watches the segment grow as
+            // photos are taken. Membership is decided solely by the model (`removeConfirmed` keeps
+            // current-segment pages); do NOT gate visibility on upload/transfer state here.
             if (strip.isNotEmpty()) {
                 LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(strip, key = { it.id }) { item ->
-                        AnimatedVisibility(
-                            visible = item.state != UploadState.UPLOADED,
-                            exit = fadeOut() + slideOutVertically { -it }
-                        ) {
-                            Thumb(
-                                item = item,
-                                isSelected = vm.selectedItemId == item.id && !vm.armed,
-                                isArmed = vm.selectedItemId == item.id && vm.armed,
-                                onTap = { vm.tapItem(item.id) },
-                                onLongPress = { vm.toggleP10(item.id) }
-                            )
-                        }
+                        Thumb(
+                            item = item,
+                            isSelected = vm.selectedItemId == item.id && !vm.armed,
+                            isArmed = vm.selectedItemId == item.id && vm.armed,
+                            onTap = { vm.tapItem(item.id) },
+                            onLongPress = { vm.toggleP10(item.id) }
+                        )
                     }
                 }
             }
