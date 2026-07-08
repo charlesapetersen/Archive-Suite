@@ -704,6 +704,14 @@ final class LiveCaptureProcessor: ObservableObject {
     /// expected: both the "Add to" existing-folder list and the destination track the current choice.
     /// Falls back to the locked config's directory, then Downloads.
     private var currentOutputDirectory: URL {
+        // Test isolation (data safety): the headless LiveCaptureTestDriver sets LIVECAPTURE_TESTOUT, so
+        // finalize writes into an ISOLATED scratch folder and NEVER the operator's real output corpus. The
+        // move reads THIS, not the driver's `config.outputDirectory`, so without this guard a test run would
+        // silently file into the real folder. Env-only; unset in production. Mirrors LIVECAPTURE_TRANSPORT/
+        // RELAYDIR overrides elsewhere.
+        if let testOut = ProcessInfo.processInfo.environment["LIVECAPTURE_TESTOUT"], !testOut.isEmpty {
+            return URL(fileURLWithPath: testOut)
+        }
         if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory),
            FileManager.default.fileExists(atPath: path) {
             return URL(fileURLWithPath: path)
