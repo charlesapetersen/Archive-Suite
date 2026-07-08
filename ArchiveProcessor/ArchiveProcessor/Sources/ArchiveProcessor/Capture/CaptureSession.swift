@@ -128,6 +128,19 @@ final class CaptureSession: ObservableObject {
         return base.appendingPathComponent("Archive Processor Live Capture", isDirectory: true)
     }
 
+    /// Move an item to the macOS Trash instead of hard-deleting it, so anything the app removes after
+    /// processing stays recoverable (Finder → Put Back). This is the **Recovery Core Directive** in code:
+    /// the app never *permanently* deletes an irreplaceable capture. Falls back to a hard delete ONLY if
+    /// trashing genuinely fails (e.g. a volume with no Trash) — leaving a half-deleted file behind would be
+    /// worse. Returns true iff the item went to the Trash (false = fell back to remove, or nothing was
+    /// there). Safe on a missing path. `nonisolated static` so finalize/cleanup can call it from any context.
+    @discardableResult
+    nonisolated static func trashOrRemove(_ url: URL, _ fm: FileManager = .default) -> Bool {
+        guard fm.fileExists(atPath: url.path) else { return false }
+        do { try fm.trashItem(at: url, resultingItemURL: nil); return true }
+        catch { try? fm.removeItem(at: url); return false }
+    }
+
     /// Pre-visible-backup location (older builds stored sessions here). Any session left here is
     /// migrated into the visible backupRoot on launch (see migrateLegacySessions) so it's never orphaned
     /// and — critically — so its further photos also land in the Finder-discoverable folder.
@@ -319,7 +332,7 @@ final class CaptureSession: ObservableObject {
     }
 
     func removePhoto(_ photo: CapturedPhoto) {
-        try? FileManager.default.removeItem(at: photo.url)
+        Self.trashOrRemove(photo.url)   // to Trash, not a hard delete — recoverable
         photos.removeAll { $0.id == photo.id }
         writeManifest()
     }
@@ -331,13 +344,13 @@ final class CaptureSession: ObservableObject {
     func removePhotoIfSafe(groupId: String, seq: Int) {
         if processingMode == .live && liveProcessor.isFinalized(groupId) { return }
         guard let idx = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) else { return }
-        try? FileManager.default.removeItem(at: photos[idx].url)
+        Self.trashOrRemove(photos[idx].url)   // to Trash, not a hard delete — recoverable
         photos.remove(at: idx)
         writeManifest()
     }
 
     func clear() {
-        for p in photos { try? FileManager.default.removeItem(at: p.url) }
+        for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
         completedDocGroups.removeAll()
         writeManifest()
@@ -351,7 +364,7 @@ final class CaptureSession: ObservableObject {
     /// re-Process them. (Data-safety guard for per-capture streaming.)
     func clearFiled(_ filed: Set<URL>) {
         let removed = photos.filter { filed.contains($0.url) }
-        for p in removed { try? FileManager.default.removeItem(at: p.url) }
+        for p in removed { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = photos.filter { !filed.contains($0.url) }
         if photos.isEmpty { completedDocGroups.removeAll() }
         writeManifest()
@@ -534,10 +547,13 @@ final class CaptureSession: ObservableObject {
         }
     }
 
-    /// Remove stale session folders under the backup root that no longer hold any photo (their JPEGs
-    /// were cleared at a successful finalize), so the visible root doesn't accumulate empty folders that
-    /// bury the run still holding photos. NEVER removes a folder that still contains a `.jpg`, so it
-    /// cannot lose received data. Called at launch, before recovery, so it can't touch the active session.
+    /// Remove stale session folders under the backup root that no longer hold any RECOVERABLE data — i.e.
+    /// neither a captured photo (`.jpg`) NOR any staged/processed output (the visible `_processed` subfolder
+    /// where the streamed PDFs/JPGs/JSON are kept until finalize). Their sources were filed and their
+    /// processed outputs moved into collections at a successful finalize, so the folder holds nothing worth
+    /// recovering. NEVER removes a folder that still contains a photo OR a processed output, so it cannot
+    /// lose received or in-progress data. Called at launch, before recovery, so it can't touch the active
+    /// session. The empty folder itself carries no recovery value, so it's a plain remove (not the Trash).
     private static func pruneEmptySessions(under root: URL) {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
@@ -545,7 +561,10 @@ final class CaptureSession: ObservableObject {
             guard (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
             let contents = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
             let hasPhoto = contents.contains { $0.pathExtension.lowercased() == "jpg" }
-            if !hasPhoto { try? fm.removeItem(at: folder) }
+            let processed = folder.appendingPathComponent("_processed", isDirectory: true)
+            let hasProcessed = ((try? fm.contentsOfDirectory(at: processed, includingPropertiesForKeys: nil)) ?? [])
+                .contains { ["pdf", "jpg", "jpeg", "json"].contains($0.pathExtension.lowercased()) }
+            if !hasPhoto && !hasProcessed { try? fm.removeItem(at: folder) }
         }
     }
 }

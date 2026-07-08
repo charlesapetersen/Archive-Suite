@@ -33,6 +33,7 @@ struct ContentView: View {
             LiveCaptureTestDriver.runIfRequested(session: capture)
             FileRelayTestDriver.runIfRequested(session: capture)
             ProcessFilesTestDriver.runIfRequested()
+            LiveCaptureRecoveryTestDriver.runIfRequested()   // $0 data-safety self-test (env-gated)
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {
