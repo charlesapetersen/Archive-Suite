@@ -107,24 +107,7 @@ struct LiveCaptureView: View {
         }
     }
 
-    // MARK: A1 — shared Processing list (adapter + actions)
-
-    /// Segments mapped into the shared read model. Actions + provider·model line only when expanded, so
-    /// collapsed rows stay compact in the narrow control panel.
-    private var segmentItems: [any ProcessableItem] {
-        let pm = session.config.map { "\($0.provider.rawValue) · \($0.model.displayName)" }
-        return liveProc.statuses.map { s in
-            let expanded = (expandedSegmentID == s.id)
-            return SegmentItem(status: s,
-                               ocrText: liveProc.retainedText(for: s.id),
-                               providerModel: expanded ? pm : nil,
-                               expanded: expanded)
-        }
-    }
-
-    private var segmentActions: ItemActionHandler {
-        ItemActionHandler { action, id in performSegmentAction(action, on: id) }
-    }
+    // MARK: A1 — shared Processing list (per-item actions)
 
     private func performSegmentAction(_ action: ItemAction, on id: String) {
         switch action {
@@ -187,52 +170,17 @@ struct LiveCaptureView: View {
                     .padding(6)
                 }
 
-                GroupBox("Processing") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        let live = liveProcessingMode == LiveProcessingMode.live.rawValue
-                        Label(live ? "Process live" : "Stage for later",
-                              systemImage: live ? "bolt.fill" : "tray.and.arrow.down")
-                            .font(.callout).fontWeight(.medium)
-                        Text(live ? "Each segment is OCR'd & tagged as you capture; finish the session to name collections."
-                                  : "Captures collect here; use Process to send them to the Files tab.")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.tertiary)
-
-                        if live, let cfg = session.config {
-                            Text(cfg.summary).font(.caption2).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if live, !liveProc.statuses.isEmpty {
-                            Divider()
-                            // "Processed" = staged OR filed-image-only (succeededNoText is a warning, not
-                            // in-flight, so it counts as done).
-                            let done = liveProc.statuses.filter { $0.phase == .staged || $0.phase == .succeededNoText }.count
-                            Text("\(done)/\(liveProc.statuses.count) segments processed")
-                                .font(.caption).foregroundStyle(.secondary)
-                            // Shared, detailed, retry-capable list (reasons + per-item actions on expand).
-                            // Min height + internal scroll so the box hosts disclosure without collapsing.
-                            ScrollView {
-                                ProcessableItemListView(
-                                    items: segmentItems,
-                                    selection: $expandedSegmentID,
-                                    badgeStyle: .dot,
-                                    actions: segmentActions)
-                            }
-                            .frame(minHeight: 120, maxHeight: 280)
-                            // Bulk footer = G1 ("Retry failed only") — the all-failed case of the same
-                            // per-item retry path. `succeededNoText` docs are excluded from failedGroupIds,
-                            // so the count no longer over-counts a successfully-filed image-only doc.
-                            if !liveProc.failedGroupIds.isEmpty {
-                                Button("Retry \(liveProc.failedGroupIds.count) failed") {
-                                    liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
-                                }
-                                .font(.caption).foregroundStyle(.red)
-                            }
-                        }
-                    }
-                    .padding(6)
-                }
+                // B2: the Processing status/segment list lives in its own view that OWNS the observation of
+                // `liveProc` (and `session`). When a segment's OCR/tag phase changes while the per-segment
+                // tag card sheet is up, SwiftUI invalidates THIS child directly (it subscribed to liveProc),
+                // so "N/M segments processed" and the per-row "OCR…/Tagging…/Staged" stay live behind the
+                // modal instead of freezing until the sheet is dismissed.
+                LiveProcessingBox(
+                    liveProc: liveProc,
+                    session: session,
+                    liveMode: liveProcessingMode == LiveProcessingMode.live.rawValue,
+                    expandedSegmentID: $expandedSegmentID,
+                    onAction: performSegmentAction)
 
                 // Same setting as the Process Files output folder (DefaultsKeys.outputDirectory, one source
                 // of truth for both panes). Relevant only in "Process live" mode, where segments finalize
@@ -378,7 +326,12 @@ struct LiveCaptureView: View {
                 }
                 Spacer()
                 if !session.photos.isEmpty {
-                    Button("Clear") { session.clear(); liveProc.clearFinalizeSummary(); liveProc.cancelPendingFinish() }
+                    // Clear resets BOTH panes as one (B1): CaptureSession.clear() empties the Captured pane
+                    // (received photos → Trash, recoverable) and clearSessionState() resets the Processing
+                    // pane's in-memory segment/staged state (also cancels any pending Finish + summary). No
+                    // on-disk deletion beyond what session.clear() already does; staged _processed output
+                    // stays recoverable in the backup folder (Recovery Core Directive intact).
+                    Button("Clear") { session.clear(); liveProc.clearSessionState() }
                     if liveProcessingMode != LiveProcessingMode.live.rawValue {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
@@ -578,6 +531,83 @@ struct LiveCaptureView: View {
             if !ip.isEmpty, ip != "127.0.0.1", !result.contains(ip) { result.append(ip) }
         }
         return result
+    }
+}
+
+// MARK: - Processing status box (B2: owns liveProc observation so it refreshes behind the tag-card sheet)
+
+/// The Live Capture "Processing" GroupBox, extracted into its own view so it **independently observes**
+/// `LiveCaptureProcessor` (and `CaptureSession`). Because this child subscribes to `liveProc` directly,
+/// SwiftUI re-renders it whenever a segment's phase/progress changes — even while the parent
+/// `LiveCaptureView` is presenting the per-segment tag card sheet (whose modal presentation otherwise left
+/// the parent-rendered status frozen). View-only fix; the mapping into the shared row model + the per-item
+/// action wiring are unchanged (moved verbatim from `LiveCaptureView`).
+private struct LiveProcessingBox: View {
+    @ObservedObject var liveProc: LiveCaptureProcessor
+    @ObservedObject var session: CaptureSession
+    let liveMode: Bool
+    @Binding var expandedSegmentID: String?
+    let onAction: (ItemAction, String) -> Void
+
+    /// Segments mapped into the shared read model. Actions + provider·model line only when expanded, so
+    /// collapsed rows stay compact in the narrow control panel.
+    private var segmentItems: [any ProcessableItem] {
+        let pm = session.config.map { "\($0.provider.rawValue) · \($0.model.displayName)" }
+        return liveProc.statuses.map { s in
+            let expanded = (expandedSegmentID == s.id)
+            return SegmentItem(status: s,
+                               ocrText: liveProc.retainedText(for: s.id),
+                               providerModel: expanded ? pm : nil,
+                               expanded: expanded)
+        }
+    }
+
+    var body: some View {
+        GroupBox("Processing") {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(liveMode ? "Process live" : "Stage for later",
+                      systemImage: liveMode ? "bolt.fill" : "tray.and.arrow.down")
+                    .font(.callout).fontWeight(.medium)
+                Text(liveMode ? "Each segment is OCR'd & tagged as you capture; finish the session to name collections."
+                              : "Captures collect here; use Process to send them to the Files tab.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.tertiary)
+
+                if liveMode, let cfg = session.config {
+                    Text(cfg.summary).font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if liveMode, !liveProc.statuses.isEmpty {
+                    Divider()
+                    // "Processed" = staged OR filed-image-only (succeededNoText is a warning, not
+                    // in-flight, so it counts as done).
+                    let done = liveProc.statuses.filter { $0.phase == .staged || $0.phase == .succeededNoText }.count
+                    Text("\(done)/\(liveProc.statuses.count) segments processed")
+                        .font(.caption).foregroundStyle(.secondary)
+                    // Shared, detailed, retry-capable list (reasons + per-item actions on expand).
+                    // Min height + internal scroll so the box hosts disclosure without collapsing.
+                    ScrollView {
+                        ProcessableItemListView(
+                            items: segmentItems,
+                            selection: $expandedSegmentID,
+                            badgeStyle: .dot,
+                            actions: ItemActionHandler { action, id in onAction(action, id) })
+                    }
+                    .frame(minHeight: 120, maxHeight: 280)
+                    // Bulk footer = G1 ("Retry failed only") — the all-failed case of the same
+                    // per-item retry path. `succeededNoText` docs are excluded from failedGroupIds,
+                    // so the count no longer over-counts a successfully-filed image-only doc.
+                    if !liveProc.failedGroupIds.isEmpty {
+                        Button("Retry \(liveProc.failedGroupIds.count) failed") {
+                            liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
+                        }
+                        .font(.caption).foregroundStyle(.red)
+                    }
+                }
+            }
+            .padding(6)
+        }
     }
 }
 

@@ -899,6 +899,32 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Clear the "Finalized …" summary (called when new capture begins, or on a manual Clear).
     func clearFinalizeSummary() { if finalizeSummary != nil { finalizeSummary = nil } }
 
+    /// Reconcile the Processing pane with a Captured-pane **Clear** (B1): reset the in-memory/UI state that
+    /// drives the Processing list so both panes empty as one. This is the processing-side mirror of
+    /// `CaptureSession.clear()` (which sends the received source photos to the Trash — recoverable).
+    ///
+    /// DATA SAFETY (Recovery Core Directive, unchanged): this is a **pure in-memory/UI reset** — it performs
+    /// **no** on-disk deletion. Any already-staged processed output stays exactly where it was, in the
+    /// visible backup folder's `_processed/` subfolder (recoverable in Finder), and the staging manifest is
+    /// left untouched on disk. So Clear never hard-deletes a staged/un-filed page: it only forgets the
+    /// segments in memory so the pane agrees with the (now-cleared) Captured pane. In-flight OCR `pageTasks`
+    /// are dropped (their results are simply discarded); a fresh capture after Clear starts a new segment.
+    func clearSessionState() {
+        statuses.removeAll()
+        staged.removeAll()
+        failedGroupIds.removeAll()
+        finalizedGroups.removeAll()
+        startedPhotoIds.removeAll()
+        retained.removeAll()
+        groupCollectionKey.removeAll()
+        groupOCROverride.removeAll()
+        pageTasks.removeAll()
+        rotationReviewPages.removeAll()
+        currentCollectionKey = "__unfiled__"
+        pendingFinish = false
+        clearFinalizeSummary()
+    }
+
     private struct MovePlan: Sendable {
         let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
     }

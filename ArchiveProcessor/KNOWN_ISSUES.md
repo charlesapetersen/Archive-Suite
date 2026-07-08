@@ -128,6 +128,12 @@ but it makes OCR look **hung** during tagging and cost real diagnosis time in th
 the progress/OCR status live while the tag card is presented (the `@Published` progress updates aren't
 re-rendering behind the modal, or the sheet blocks the main-window refresh). `Views/LiveCaptureView.swift`.
 
+**FIXED in code (pending owner GUI-verification).** The Processing status/segment list was extracted into a
+dedicated `LiveProcessingBox` view that **owns** the `@ObservedObject` subscription to `LiveCaptureProcessor`
+(and `CaptureSession`). Because the child subscribes to `liveProc` directly, SwiftUI invalidates it on each
+published phase/progress change even while the parent presents the tag-card sheet — so it no longer freezes
+behind the modal. View-only change (`Views/LiveCaptureView.swift`).
+
 ---
 
 ## Live Capture "Clear" empties the Captured pane but leaves the Processing pane's segments  [LOW — UX]
@@ -139,6 +145,12 @@ panes to empty together. Likely the Clear action resets `CaptureSession`'s recei
 not the `LiveCaptureProcessor`'s staged/segment list that drives the Processing pane; wire Clear to also reset
 (or reconcile) the processor's segment state so both panes clear as one. `Views/LiveCaptureView.swift`,
 `Capture/LiveCaptureProcessor.swift`, `Capture/CaptureSession.swift`.
+
+**FIXED in code (pending owner GUI-verification).** The Clear button now calls a new
+`LiveCaptureProcessor.clearSessionState()` alongside `CaptureSession.clear()`, so the Processing pane's
+in-memory segment/staged state resets together with the Captured pane. It is a **pure in-memory/UI reset** —
+no on-disk deletion beyond what `session.clear()` already did (received photos → Trash); any already-staged
+`_processed` output stays recoverable in the backup folder, so the Recovery Core Directive is unchanged.
 
 ---
 
