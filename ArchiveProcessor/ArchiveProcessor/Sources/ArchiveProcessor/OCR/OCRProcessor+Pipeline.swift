@@ -1006,32 +1006,40 @@ extension OCRProcessor {
 
                 for (attempt, index) in indicesToRetry.enumerated() {
                     guard !Task.isCancelled else { return }
-                    jobs[index].status = .processing
-
-                    let url = imageURLs[index]
-                    let result = await Self.performOCRCall(
-                        imageURL: url,
-                        provider: provider,
-                        model: model,
-                        thinkingLevel: thinkingLevel,
-                        apiKey: apiKey,
-                        previousText: nil,
-                        previousImageURL: nil,
-                        gatewayConfig: currentGateway
-                    )
-
-                    handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
-
-                    if result.text != nil {
-                        failedFiles.removeAll { $0 == jobs[index].sourceURL.lastPathComponent }
-                    }
-
+                    _ = await retryOne(index: index, imageURL: imageURLs[index], provider: provider,
+                                       model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                                       outputDirectory: outputDirectory)
                     progress = Double(attempt + 1) / Double(indicesToRetry.count)
                     statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
                 }
             }
             // Loop back — if there are still failures, the dialog will appear again
         }
+    }
+
+    /// Re-OCR a single file, then regenerate its output PDF (+ re-prune `failedFiles`). Extracted from the
+    /// modal retry loop so the end-of-run modal AND per-item retry share one path — no duplicate logic.
+    /// `imageURL` is the OCR input (may be a temp JPEG for pre-OCRed PDF input); it defaults to the job's
+    /// source. `rotation` (if non-nil) forces the output rotation instead of the detected one (rotate &
+    /// re-run). Returns whether OCR text was produced. Reuses `performOCRCall` + `handleOCRResult` verbatim
+    /// (`handleOCRResult` already updates `jobs[index].status` and prunes/appends `failedFiles`).
+    @discardableResult
+    func retryOne(index: Int, imageURL: URL? = nil, provider: LLMProvider, model: LLMModel,
+                  thinkingLevel: ThinkingLevel?, apiKey: String, outputDirectory: URL,
+                  rotation: Int? = nil) async -> Bool {
+        guard jobs.indices.contains(index) else { return false }
+        jobs[index].status = .processing
+        let ocrURL = imageURL ?? jobs[index].sourceURL
+        var result = await Self.performOCRCall(
+            imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
+            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway)
+        if let rotation {
+            result = OCRResult(text: result.text, classification: result.classification,
+                               rotationDegrees: ((rotation % 360) + 360) % 360,
+                               errorMessage: result.errorMessage, errorCode: result.errorCode)
+        }
+        handleOCRResult(result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
+        return result.text != nil
     }
     /// Request notification permission (call once at app launch).
     static func requestNotificationPermission() {

@@ -18,6 +18,18 @@ struct LiveCaptureView: View {
     /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
 
+    // A1 — shared Processing-list state: which segment is expanded, and the two per-item action sheets.
+    @State private var expandedSegmentID: String?
+    @State private var textViewerTarget: SegmentTextTarget?
+    @State private var modelChoiceTarget: ModelChoiceTarget?
+
+    struct SegmentTextTarget: Identifiable { let id: String }
+    struct ModelChoiceTarget: Identifiable {
+        let groupId: String
+        let includeRotation: Bool
+        var id: String { groupId + (includeRotation ? "-rot" : "-mdl") }
+    }
+
     var body: some View {
         HSplitView {
             controlPanel
@@ -68,6 +80,68 @@ struct LiveCaptureView: View {
         }
         .sheet(isPresented: $liveProc.showRotationReview) {
             LiveRotationReviewSheet(liveProc: liveProc)
+        }
+        // Per-item "retry with model" / "rotate & re-run": pick provider/model (+ rotation), then re-OCR
+        // just this segment via the generalized retry path.
+        .sheet(item: $modelChoiceTarget) { target in
+            ModelChoiceSheet(
+                title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
+                subtitle: "Re-run OCR for this segment; its old staged output is replaced.",
+                includeRotation: target.includeRotation,
+                initialProvider: session.config?.provider ?? .gemini,
+                onApply: { provider, model, thinking, apiKey, rotation in
+                    let ov = LiveCaptureProcessor.OCROverride(
+                        provider: provider, model: model, thinkingLevel: thinking,
+                        apiKey: apiKey, rotation: rotation)
+                    liveProc.retryFailed(groupIds: [target.groupId], override: ov)
+                    modelChoiceTarget = nil
+                },
+                onCancel: { modelChoiceTarget = nil })
+        }
+        // Per-item "view text": the retained OCR text + any error reason.
+        .sheet(item: $textViewerTarget) { target in
+            SegmentTextViewerSheet(
+                text: liveProc.retainedText(for: target.id),
+                errorMessage: liveProc.statuses.first(where: { $0.id == target.id })?.errorMessage,
+                onDismiss: { textViewerTarget = nil })
+        }
+    }
+
+    // MARK: A1 — shared Processing list (adapter + actions)
+
+    /// Segments mapped into the shared read model. Actions + provider·model line only when expanded, so
+    /// collapsed rows stay compact in the narrow control panel.
+    private var segmentItems: [any ProcessableItem] {
+        let pm = session.config.map { "\($0.provider.rawValue) · \($0.model.displayName)" }
+        return liveProc.statuses.map { s in
+            let expanded = (expandedSegmentID == s.id)
+            return SegmentItem(status: s,
+                               ocrText: liveProc.retainedText(for: s.id),
+                               providerModel: expanded ? pm : nil,
+                               expanded: expanded)
+        }
+    }
+
+    private var segmentActions: ItemActionHandler {
+        ItemActionHandler { action, id in performSegmentAction(action, on: id) }
+    }
+
+    private func performSegmentAction(_ action: ItemAction, on id: String) {
+        switch action {
+        case .retry:
+            liveProc.retryFailed(groupIds: [id])
+        case .retryWithModel:
+            modelChoiceTarget = ModelChoiceTarget(groupId: id, includeRotation: false)
+        case .changeRotation:
+            modelChoiceTarget = ModelChoiceTarget(groupId: id, includeRotation: true)
+        case .viewText:
+            textViewerTarget = SegmentTextTarget(id: id)
+        case .revealFiles:
+            let urls = liveProc.stagedURLs(for: id)
+            if !urls.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(urls) }
+            else { session.revealBackupFolder() }
+        case .reclassify, .fileAsImageOnly:
+            break   // not offered by SegmentItem (reclassify is Files-only; image-only is auto per §4a)
         }
     }
 
@@ -131,26 +205,29 @@ struct LiveCaptureView: View {
                         }
                         if live, !liveProc.statuses.isEmpty {
                             Divider()
-                            let done = liveProc.statuses.filter { $0.phase == .staged }.count
+                            // "Processed" = staged OR filed-image-only (succeededNoText is a warning, not
+                            // in-flight, so it counts as done).
+                            let done = liveProc.statuses.filter { $0.phase == .staged || $0.phase == .succeededNoText }.count
                             Text("\(done)/\(liveProc.statuses.count) segments processed")
                                 .font(.caption).foregroundStyle(.secondary)
+                            // Shared, detailed, retry-capable list (reasons + per-item actions on expand).
+                            // Min height + internal scroll so the box hosts disclosure without collapsing.
                             ScrollView {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    ForEach(liveProc.statuses) { s in
-                                        HStack(spacing: 6) {
-                                            Circle().fill(phaseColor(s.phase)).frame(width: 6, height: 6)
-                                            Text("\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p")
-                                                .font(.caption2)
-                                            Spacer()
-                                            Text(s.phase.rawValue).font(.caption2).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
+                                ProcessableItemListView(
+                                    items: segmentItems,
+                                    selection: $expandedSegmentID,
+                                    badgeStyle: .dot,
+                                    actions: segmentActions)
                             }
-                            .frame(maxHeight: 150)
+                            .frame(minHeight: 120, maxHeight: 280)
+                            // Bulk footer = G1 ("Retry failed only") — the all-failed case of the same
+                            // per-item retry path. `succeededNoText` docs are excluded from failedGroupIds,
+                            // so the count no longer over-counts a successfully-filed image-only doc.
                             if !liveProc.failedGroupIds.isEmpty {
-                                Button("Retry \(liveProc.failedGroupIds.count) failed OCR") { liveProc.retryFailed() }
-                                    .font(.caption).foregroundStyle(.red)
+                                Button("Retry \(liveProc.failedGroupIds.count) failed") {
+                                    liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
+                                }
+                                .font(.caption).foregroundStyle(.red)
                             }
                         }
                     }
@@ -402,15 +479,6 @@ struct LiveCaptureView: View {
             group.type == .folder ? Color.purple.opacity(0.06) : Color.gray.opacity(0.05)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func phaseColor(_ phase: LiveCaptureProcessor.SegmentStatus.Phase) -> Color {
-        switch phase {
-        case .ocr: return .orange
-        case .tagging: return .blue
-        case .staged: return .green
-        case .failed: return .red
-        }
     }
 
     // MARK: Handoff
@@ -822,5 +890,110 @@ private struct LiveRotationRow: View {
         .padding(.vertical, 4).padding(.horizontal, 8)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 2))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// MARK: - Live Capture adapter into the shared per-item read model (A1)
+
+/// Maps a `LiveCaptureProcessor.SegmentStatus` (joined with its retained OCR text + provider·model) into
+/// the shared `ProcessableItem`, so the Processing pane renders with the same row/list as the Files pane.
+struct SegmentItem: ProcessableItem {
+    let itemID: String
+    let title: String
+    let subtitle: String?
+    let state: ItemState
+    let classification: DocumentClassification?
+    let rotationDegrees: Int?
+    let ocrText: String?
+    let errorMessage: String?
+    let errorCode: String?
+    let providerModel: String?
+    let availableActions: [ItemAction]
+
+    init(status s: LiveCaptureProcessor.SegmentStatus, ocrText: String?, providerModel: String?, expanded: Bool) {
+        self.itemID = s.id
+        self.title = "\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p"
+        self.subtitle = nil
+        let st = Self.state(for: s)
+        self.state = st
+        self.classification = Self.classification(for: s.type)
+        self.rotationDegrees = nil
+        self.ocrText = ocrText
+        self.errorMessage = s.errorMessage
+        self.errorCode = s.errorCode
+        self.providerModel = providerModel
+        self.availableActions = expanded ? Self.actions(for: st) : []
+    }
+
+    static func state(for s: LiveCaptureProcessor.SegmentStatus) -> ItemState {
+        switch s.phase {
+        case .ocr: return .processing(label: "OCR…")
+        case .tagging: return .processing(label: "Tagging…")
+        case .staged: return .succeeded
+        case .succeededNoText: return .succeededNoText
+        case .failed: return .failed(s.failureKind ?? .noOutput)
+        }
+    }
+
+    static func classification(for type: CaptureGroupType) -> DocumentClassification? {
+        switch type {
+        case .box: return .boxLabel
+        case .folder: return .folderLabel
+        case .document: return nil
+        }
+    }
+
+    /// Actions offered per state. Reclassify is Files-only; file-as-image-only isn't offered here (§4a
+    /// already files a complete image-only doc automatically as `succeededNoText`).
+    static func actions(for state: ItemState) -> [ItemAction] {
+        switch state {
+        case .failed:
+            return [.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles]
+        case .succeededNoText:
+            return [.retry, .retryWithModel, .viewText, .revealFiles]
+        case .succeeded:
+            return [.viewText, .revealFiles]
+        default:
+            return []
+        }
+    }
+}
+
+/// Read-only viewer for a segment's OCR text + any error reason (the shared `viewText` action, Live side).
+private struct SegmentTextViewerSheet: View {
+    let text: String?
+    let errorMessage: String?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("OCR Text").font(.title2).fontWeight(.semibold)
+            if let text, !text.isEmpty {
+                ScrollView {
+                    Text(text)
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+            } else {
+                Text("No OCR text was returned for this segment.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let errorMessage, !errorMessage.isEmpty {
+                GroupBox("Error") {
+                    Text(errorMessage).font(.caption).foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 520, height: 480)
     }
 }

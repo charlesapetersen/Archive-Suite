@@ -19,7 +19,20 @@ final class LiveCaptureProcessor: ObservableObject {
         var type: CaptureGroupType
         var pageCount: Int
         var phase: Phase
-        enum Phase: String { case ocr = "OCR…", tagging = "Tagging…", staged = "Staged", failed = "Failed" }
+        /// A1: failure/label detail, populated at finalize. `failureKind` distinguishes the causes the
+        /// old single `.failed` collapsed; `errorMessage/errorCode` surface the OCR reason (previously
+        /// dropped). These are labeling only — they never affect any finalize/deletion decision.
+        var failureKind: FailureKind? = nil
+        var errorMessage: String? = nil
+        var errorCode: String? = nil
+        /// `succeededNoText`: a document that OCR'd to no text but WAS filed as a complete image-only PDF
+        /// (amber warning, not a hard failure). It is staged + filed exactly as before — only its label
+        /// differs, so bulk "Retry failed" stops over-counting a successfully-filed image-only doc.
+        enum Phase: String {
+            case ocr = "OCR…", tagging = "Tagging…", staged = "Staged"
+            case succeededNoText = "Filed (image-only)"
+            case failed = "Failed"
+        }
     }
 
     /// A staged, fully-processed segment awaiting end-of-session finalization (this is the manifest).
@@ -82,6 +95,18 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Each group's collection, pinned when its first photo arrives (in capture order) so it's
     /// independent of the order segments happen to finalize in.
     private var groupCollectionKey: [String: String] = [:]
+
+    /// Optional per-group OCR override from a per-item "retry with model" / "rotate & re-run". Threaded
+    /// into that group's re-OCR (provider/model) and finalize (forced rotation), then cleared once consumed
+    /// so a later normal re-finalize doesn't reuse it. Absent for the common (session-config) path.
+    struct OCROverride {
+        let provider: LLMProvider
+        let model: LLMModel
+        let thinkingLevel: ThinkingLevel?
+        let apiKey: String
+        let rotation: Int?
+    }
+    private var groupOCROverride: [String: OCROverride] = [:]
 
     private static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
                                             "July", "August", "September", "October", "November", "December"]
@@ -193,14 +218,21 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
-    /// Re-run OCR for segments that produced no text, then re-finalize them.
-    func retryFailed() {
+    /// Re-run OCR for a set of segments, then re-finalize them. Defaults to the full failed set (the bulk
+    /// "Retry failed" / G1 case); pass a single-element set for a per-item retry. `override` (optional)
+    /// re-OCRs those segments with a chosen provider/model and/or forces their output rotation instead of
+    /// the session's locked config. The body is unchanged from the original bulk retry — it just iterates
+    /// the passed set — so the data-safety sequence (delete stale staged output → drop finalized/failed
+    /// bookkeeping → persist the cleaned manifest BEFORE re-processing → re-ingest) is identical. A
+    /// `.staged`/`.succeededNoText` segment is retryable too: old output is deleted first, so it's safe.
+    func retryFailed(groupIds: Set<String>? = nil, override: OCROverride? = nil) {
         guard session.processingMode == .live else { return }
+        let targets = groupIds ?? failedGroupIds
         let fm = FileManager.default
         var toReprocess: [String] = []
-        for gid in Array(failedGroupIds) {
+        for gid in Array(targets) {
             guard let group = session.groups.first(where: { $0.id == gid }) else { failedGroupIds.remove(gid); continue }
-            // Delete the old (failed) staged output + retained state first, so we don't orphan files
+            // Delete the old staged output + retained state first, so we don't orphan files
             // on disk or re-review stale rotation for a segment we're about to regenerate.
             if let old = staged.first(where: { $0.groupId == gid }) {
                 for u in old.pdfURLs { try? fm.removeItem(at: u) }
@@ -212,6 +244,8 @@ final class LiveCaptureProcessor: ObservableObject {
             staged.removeAll { $0.groupId == gid }
             retained[gid] = nil
             for p in group.photos { startedPhotoIds.remove(p.id); pageTasks[p.id] = nil }
+            groupOCROverride[gid] = override    // nil clears any prior override
+            setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
             setPhase(gid, .ocr)
             toReprocess.append(gid)
         }
@@ -228,6 +262,20 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Whether a group has been finalized (staged) this session — the Mac uses this to avoid removing
     /// a reclassified photo's source out from under an already-staged live segment.
     func isFinalized(_ groupId: String) -> Bool { finalizedGroups.contains(groupId) }
+
+    /// OCR text retained for a segment (joined across its pages), for the shared row's text viewer.
+    /// Nil when nothing usable was captured (e.g. an image-only / failed segment).
+    func retainedText(for groupId: String) -> String? {
+        guard let seg = retained[groupId] else { return nil }
+        let joined = seg.texts.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
+
+    /// Staged output files (PDFs + exported images) for a segment, for "Reveal in Finder".
+    func stagedURLs(for groupId: String) -> [URL] {
+        guard let s = staged.first(where: { $0.groupId == groupId }) else { return [] }
+        return s.pdfURLs + s.imageURLs
+    }
 
     // MARK: - Triggers (called by CaptureSession)
 
@@ -259,11 +307,17 @@ final class LiveCaptureProcessor: ObservableObject {
             groupCollectionKey[photo.groupId] = (photo.type == .box) ? photo.groupId : currentCollectionKey
         }
 
+        // A per-item "retry with model" override (if any) re-OCRs this group with the chosen provider/model
+        // via a direct API call (no gateway); otherwise use the session's locked config.
+        let ov = groupOCROverride[photo.groupId]
         pageTasks[photo.id] = Self.ocrTask(
-            imageURL: photo.url, provider: config.provider, model: config.model,
-            thinkingLevel: config.thinkingLevel, apiKey: config.apiKey,
+            imageURL: photo.url,
+            provider: ov?.provider ?? config.provider,
+            model: ov?.model ?? config.model,
+            thinkingLevel: ov.map { $0.thinkingLevel } ?? config.thinkingLevel,
+            apiKey: ov?.apiKey ?? config.apiKey,
             customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
-            imageScale: config.imageScale, gateway: config.gateway)
+            imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil)
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
         upsertStatus(groupId: photo.groupId, type: photo.type, pageCount: pageCount,
@@ -292,15 +346,23 @@ final class LiveCaptureProcessor: ObservableObject {
         let collectionKey = groupCollectionKey[groupId] ?? (group.type == .box ? group.id : currentCollectionKey)
         setPhase(groupId, .tagging)
 
-        // Await the OCR results for this segment's pages (started on arrival).
+        // Await the OCR results for this segment's pages (started on arrival). A per-item "rotate & re-run"
+        // override forces this group's output rotation (the re-OCR itself doesn't re-detect it).
         var results: [OCRResult] = []
         var texts: [String] = []
+        let rotationOverride = groupOCROverride[groupId]?.rotation
         for photo in group.photos {
-            let r = await pageTasks[photo.id]?.value
+            var r = await pageTasks[photo.id]?.value
                 ?? OCRResult(text: nil, classification: nil, errorMessage: "OCR not started", errorCode: nil)
+            if let rot = rotationOverride {
+                r = OCRResult(text: r.text, classification: r.classification,
+                              rotationDegrees: ((rot % 360) + 360) % 360,
+                              errorMessage: r.errorMessage, errorCode: r.errorCode)
+            }
             results.append(r)
             texts.append(r.text ?? "")
         }
+        groupOCROverride[groupId] = nil   // consumed
 
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
         let mac = session.macTags[groupId]
@@ -345,16 +407,33 @@ final class LiveCaptureProcessor: ObservableObject {
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
         persistManifest()
         for p in group.photos { pageTasks[p.id] = nil }   // free memory
-        // Mark the segment FAILED (retryable, pages kept in the backup folder) if it produced no PDF at all,
-        // if SOME page produced no PDF (incomplete → finalize won't file it, so it never partially deletes a
-        // multi-page segment's sources), or if a document yielded no OCR text on any page.
+        // A1 — discriminated failure taxonomy (labeling ONLY; the data-safety gate is unchanged). The
+        // `outcome` (pdfURLs / pagesComplete) already fed the StagedSegment above, and finalize/deletion
+        // keys off `executePlans`' filedGroupIds + `pagesComplete`, NEVER off `failedGroupIds`. So splitting
+        // the label here — and un-conflating the filed image-only doc into `.succeededNoText` — cannot change
+        // when/what gets deleted; it only fixes what the operator sees and what bulk-retry re-runs.
         let producedOutput = !outcome.pdfURLs.isEmpty
         let pagesComplete = outcome.pagesComplete ?? true
         let anyText = results.contains { $0.text != nil }
-        if !producedOutput || !pagesComplete || (gType == .document && !anyText) {
-            failedGroupIds.insert(groupId); setPhase(groupId, .failed)
+        let firstError = results.first(where: { $0.errorMessage != nil })
+        if !producedOutput {
+            // No PDF at all (incl. a true document OCR-empty with no usable PDF). Retryable; sources kept.
+            markFailed(groupId, .noOutput, firstError)
+        } else if !pagesComplete {
+            // Some page produced no PDF → incomplete; finalize won't file it, so it never partially deletes
+            // a multi-page segment's sources. Retryable.
+            markFailed(groupId, .incompleteOutput, firstError)
+        } else if gType == .document && !anyText {
+            // Complete image-only PDF (every page produced a PDF, but no OCR text). It IS staged and WILL be
+            // filed by executePlans exactly as before — this is a WARNING, not a hard failure. Drop it from
+            // failedGroupIds so bulk "Retry failed" stops over-counting a successfully-filed doc.
+            failedGroupIds.remove(groupId)
+            setStatusDetail(groupId, kind: nil, error: firstError)
+            setPhase(groupId, .succeededNoText)
         } else {
-            failedGroupIds.remove(groupId); setPhase(groupId, .staged)
+            failedGroupIds.remove(groupId)
+            setStatusDetail(groupId, kind: nil, error: nil)
+            setPhase(groupId, .staged)
         }
         proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last
     }
@@ -541,6 +620,22 @@ final class LiveCaptureProcessor: ObservableObject {
 
     private func setPhase(_ groupId: String, _ phase: SegmentStatus.Phase) {
         if let idx = statuses.firstIndex(where: { $0.id == groupId }) { statuses[idx].phase = phase }
+    }
+
+    /// Mark a segment failed with a discriminated reason (labeling only — see finalizeSegment). Adds it to
+    /// `failedGroupIds` (retry set) and records the reason for the shared row's failure line.
+    private func markFailed(_ groupId: String, _ kind: FailureKind, _ error: OCRResult?) {
+        failedGroupIds.insert(groupId)
+        setStatusDetail(groupId, kind: kind, error: error)
+        setPhase(groupId, .failed)
+    }
+
+    /// Record a segment's failure/label detail (reason + provider error) for the UI.
+    private func setStatusDetail(_ groupId: String, kind: FailureKind?, error: OCRResult?) {
+        guard let idx = statuses.firstIndex(where: { $0.id == groupId }) else { return }
+        statuses[idx].failureKind = kind
+        statuses[idx].errorMessage = error?.errorMessage
+        statuses[idx].errorCode = error?.errorCode
     }
 
     // MARK: - End-of-session finalization (Phase 3/4)

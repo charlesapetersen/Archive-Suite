@@ -13,8 +13,6 @@ struct OCRRetrySheet: View {
     @State private var selectedThinking: ThinkingLevel = .low
     @State private var apiKey: String = ""
 
-    private var currentModels: [LLMModel] { selectedProvider.models }
-
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -64,42 +62,13 @@ struct OCRRetrySheet: View {
 
             Divider()
 
-            // Provider/Model selection for retry
+            // Provider/Model selection for retry — shared picker (see ModelChoiceView).
             VStack(alignment: .leading, spacing: 12) {
                 Text("Retry with")
                     .font(.headline)
 
-                Picker("Provider", selection: Binding(
-                    get: { selectedProvider },
-                    set: { newProvider in
-                        selectedModel = newProvider.models[0]
-                        apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
-                        selectedProvider = newProvider
-                    }
-                )) {
-                    ForEach(LLMProvider.allCases) { p in
-                        Text(p.rawValue).tag(p)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Model", selection: $selectedModel) {
-                    ForEach(currentModels) { m in
-                        Text(m.displayName).tag(m)
-                    }
-                }
-
-                if selectedModel.supportsThinking {
-                    Picker("Thinking", selection: $selectedThinking) {
-                        ForEach(ThinkingLevel.allCases) { t in
-                            Text(t.rawValue).tag(t)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                SecureField("API Key", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
+                ModelChoiceView(provider: $selectedProvider, model: $selectedModel,
+                                thinkingLevel: $selectedThinking, apiKey: $apiKey)
 
                 // Cost estimate
                 let retryEstimate = CostEstimator.estimate(

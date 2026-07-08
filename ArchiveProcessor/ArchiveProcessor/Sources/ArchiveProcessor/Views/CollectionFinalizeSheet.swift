@@ -25,7 +25,7 @@ struct CollectionFinalizeSheet: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.horizontal, 20).padding(.bottom, 10)
             if !liveProc.failedGroupIds.isEmpty {
-                Label("\(liveProc.failedGroupIds.count) segment(s) produced no OCR text — they'll be filed as image-only PDFs. You can retry from the Live Capture panel before finalizing.",
+                Label("\(liveProc.failedGroupIds.count) segment(s) failed to process and are NOT filed — kept in the Backup Folder. Retry them from the Live Capture panel before finalizing.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.orange)
                     .padding(.horizontal, 20).padding(.bottom, 8)

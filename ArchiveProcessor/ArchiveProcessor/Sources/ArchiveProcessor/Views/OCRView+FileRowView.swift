@@ -3,13 +3,19 @@ import UniformTypeIdentifiers
 import PDFKit
 import ImageIO
 
-// MARK: - File Row
+// MARK: - File Row (Process Files) — thin adapter over the shared ProcessableItemRow
 
+/// Adapts the Files pane's `(url, job, presetClassification)` inputs into the shared `ProcessableItem`
+/// read model and renders the shared row. Behavior/appearance are preserved: same status icons, same
+/// classification capsule/tint, same rotation badge, same applied-tags layout, same red failure line.
 struct FileRowView: View {
     let url: URL
     let job: OCRJob?
     var showTags: Bool = false
     var isFocused: Bool = false
+    /// Per-item actions (populated for the Files disclosure); empty by default so the row stays compact.
+    var actions: ProcessableItemActions = ItemActionHandler { _, _ in }
+    var isExpanded: Bool = false
     /// Live Capture segmentation to show before a job exists (falls back to `job.classification`).
     var presetClassification: DocumentClassification? = nil
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
@@ -25,102 +31,69 @@ struct FileRowView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                statusIcon
-                Text(url.lastPathComponent)
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                if let rotation = job?.result?.rotationDegrees, rotation != 0 {
-                    Text("\(rotation)°")
-                        .font(.caption2)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.15))
-                        .foregroundStyle(.orange)
-                        .clipShape(Capsule())
-                }
-                if let classification = job?.classification ?? presetClassification, shows(classification) {
-                    Text(classification.displayName)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(classificationColor(classification).opacity(0.15))
-                        .foregroundStyle(classificationColor(classification))
-                        .clipShape(Capsule())
-                }
-                if !showTags, let tags = job?.appliedTags, !tags.isEmpty {
-                    Text(tags.prefix(2).joined(separator: " \u{00B7} "))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            if showTags, let tags = job?.appliedTags, !tags.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(tags.filter { $0 != "Red" && $0 != "Purple" }, id: \.self) { tag in
-                        Text(tag)
-                            .font(.caption2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-                }
-                .padding(.leading, 24)
-            }
-            if let job = job, job.status == .failed, let msg = job.result?.errorMessage {
-                Text(msg)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .padding(.leading, 24)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(classificationBackground)
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.accentColor, lineWidth: 2)
-                .opacity(isFocused ? 1 : 0)
-        )
+        ProcessableItemRow(item: fileItem, badgeStyle: .icon, isExpanded: isExpanded,
+                           isFocused: isFocused, showTagsList: showTags, actions: actions)
     }
 
-    private var classificationBackground: Color {
-        guard let classification = job?.classification ?? presetClassification, shows(classification) else { return .clear }
-        switch classification {
-        case .documentStart: return .blue.opacity(0.06)
-        case .documentContinuation: return .green.opacity(0.06)
-        case .boxLabel: return .red.opacity(0.06)
-        case .folderLabel: return .purple.opacity(0.06)
-        }
+    /// Build the normalized read model from this row's inputs.
+    private var fileItem: FileItem {
+        let cls = job?.classification ?? presetClassification
+        let shownClass = (cls != nil && shows(cls!)) ? cls : nil
+        return FileItem(url: url, job: job, shownClassification: shownClass,
+                        availableActions: isExpanded ? Self.filesActions(for: job) : [])
     }
 
-    private func classificationColor(_ c: DocumentClassification) -> Color {
-        switch c {
-        case .boxLabel: return .red
-        case .folderLabel: return .purple
-        case .documentStart: return .blue
-        case .documentContinuation: return .gray
+    /// Actions a Files row offers. Retry/model/rotation only make sense for a failed OCR; every row can
+    /// view text / reclassify during review.
+    static func filesActions(for job: OCRJob?) -> [ItemAction] {
+        var acts: [ItemAction] = []
+        if job?.status == .failed {
+            acts.append(contentsOf: [.retry, .retryWithModel, .changeRotation])
         }
+        acts.append(contentsOf: [.viewText, .reclassify])
+        return acts
+    }
+}
+
+/// Files-pane adapter: maps an `OCRJob` (+ source URL / preset classification) into a `ProcessableItem`.
+struct FileItem: ProcessableItem {
+    let itemID: String
+    let title: String
+    let subtitle: String?
+    let state: ItemState
+    let classification: DocumentClassification?
+    let rotationDegrees: Int?
+    let ocrText: String?
+    let errorMessage: String?
+    let errorCode: String?
+    let providerModel: String?
+    let availableActions: [ItemAction]
+    let appliedTags: [String]
+
+    init(url: URL, job: OCRJob?, shownClassification: DocumentClassification?,
+         availableActions: [ItemAction] = []) {
+        self.itemID = job?.id.uuidString ?? url.path
+        self.title = url.lastPathComponent
+        self.subtitle = nil
+        self.state = Self.state(for: job)
+        self.classification = shownClassification
+        self.rotationDegrees = (job?.result?.rotationDegrees).flatMap { $0 != 0 ? $0 : nil }
+        self.ocrText = job?.result?.text
+        self.errorMessage = job?.result?.errorMessage
+        self.errorCode = job?.result?.errorCode
+        self.providerModel = nil    // Files pane historically doesn't surface provider·model here
+        self.availableActions = availableActions
+        self.appliedTags = job?.appliedTags ?? []
     }
 
-    @ViewBuilder
-    private var statusIcon: some View {
-        switch job?.status {
-        case .processing:
-            ProgressView().scaleEffect(0.6)
-        case .succeeded:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
-        case .failed:
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
-        case .removed:
-            Image(systemName: "trash.circle.fill").foregroundStyle(.secondary).font(.caption)
-        default:
-            Image(systemName: "circle").foregroundStyle(.tertiary).font(.caption)
+    private static func state(for job: OCRJob?) -> ItemState {
+        guard let job else { return .pending }
+        switch job.status {
+        case .pending: return .pending
+        case .processing: return .processing(label: "OCR…")
+        case .succeeded: return .succeeded   // Files: succeeded ⟺ text != nil (see handleOCRResult)
+        case .failed: return .failed(job.result?.errorMessage != nil ? .provider : .ocrEmpty)
+        case .removed: return .removed
         }
     }
 }
