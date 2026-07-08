@@ -46,7 +46,20 @@ struct SessionProcessingConfig {
                 ?? FileManager.default.homeDirectoryForCurrentUser
         }()
 
-        let apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
+        // API key: the Keychain in production. Headless test fallback (env-gated): a headless CI/E2E host
+        // has no GUI Keychain, so when running under ARCHIVEPROC_HEADLESS and the Keychain has no key, fall
+        // back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly.
+        // The key stays in the environment only (never written to disk or logged). PROD: env unset (or a
+        // real Keychain key present) → the Keychain value, exactly as before.
+        let keychainKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
+        let apiKey: String = {
+            if !keychainKey.isEmpty { return keychainKey }
+            let env = ProcessInfo.processInfo.environment
+            if env["ARCHIVEPROC_HEADLESS"] != nil, let envKey = env["LIVECAPTURE_OCRKEY"], !envKey.isEmpty {
+                return envKey
+            }
+            return keychainKey
+        }()
 
         return SessionProcessingConfig(
             provider: provider,

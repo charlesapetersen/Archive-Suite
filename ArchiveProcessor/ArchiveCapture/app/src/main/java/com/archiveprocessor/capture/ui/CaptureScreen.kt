@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.archiveprocessor.capture.BuildConfig
 import com.archiveprocessor.capture.capture.CaptureViewModel
 import com.archiveprocessor.capture.capture.CapturedItem
 import com.archiveprocessor.capture.capture.GroupType
@@ -311,6 +312,30 @@ private fun takePicture(
     onSaved: (File) -> Unit
 ) {
     val file = vm.newCaptureFile()
+    // TEST SEAM (DEBUG-ONLY — stripped from release by the BuildConfig.DEBUG guard). For a deterministic,
+    // headless phone↔Mac E2E: if the harness has pushed an inject image to files/test_inject.jpg
+    // (adb shell run-as … cp … files/test_inject.jpg), use ITS pixels instead of the camera — copied into
+    // the exact URL vm.newCaptureFile() chose — then route through the SAME onSaved() (addDocumentPhoto /
+    // captureMarker) as a real shot. So the durable on-phone queue + upload path is byte-identical to a
+    // real capture; the ONLY change is the pixel source. The inject file is consumed (deleted) so each
+    // shutter tap needs a fresh push. No inject file (or a release build) → the normal CameraX path below
+    // runs UNCHANGED.
+    if (BuildConfig.DEBUG) {
+        val inject = File(context.filesDir, "test_inject.jpg")
+        if (inject.exists()) {
+            val copied = runCatching {
+                inject.inputStream().use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+            }.isSuccess
+            runCatching { inject.delete() }   // consume: each shutter tap needs a fresh push
+            if (copied) {
+                onSaved(file)
+            } else {
+                runCatching { file.delete() }
+                vm.reportCaptureError("Test inject failed — please retake.")
+            }
+            return
+        }
+    }
     val opts = ImageCapture.OutputFileOptions.Builder(file).build()
     controller.takePicture(
         opts,

@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // exposes BuildConfig.DEBUG for the debug-only deterministic capture-inject test seam
     }
 }
 

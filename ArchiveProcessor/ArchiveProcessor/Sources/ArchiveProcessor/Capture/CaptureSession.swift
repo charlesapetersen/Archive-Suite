@@ -33,6 +33,113 @@ final class CaptureSession: ObservableObject {
         if processingMode == .live { liveProcessor.phoneStatusChanged() }
     }
 
+    // MARK: - Headless E2E autopilot (Tier-2 test seam; env-gated, PROD-UNCHANGED when unset)
+
+    /// The headless phone↔Mac E2E needs the Mac to resolve tag cards + finalize with no GUI. These three
+    /// hooks are ALL gated on the existing headless-launch flag `LIVECAPTURE_AUTOSTART=1` PLUS their own
+    /// flag, so with the envs unset (production) they are `false` and nothing below ever runs — behavior is
+    /// byte-identical. They reuse the proven `LiveCaptureTestDriver` polling patterns and do NOT alter the
+    /// Recovery Core Directive: finalize still deletes a source only after its output is confirmed at the
+    /// destination, via the Trash (the `finalize` path is unchanged; we only drive it).
+    private var headlessAutostart: Bool { ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" }
+    /// (a) Auto-resolve each completed document segment's tag card via the EXISTING `skipMacTags`.
+    private var headlessAutoSkipTags: Bool {
+        headlessAutostart && ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSKIPTAGS"] == "1"
+    }
+    /// (b) Auto-drive the EXISTING finish→finalize path when the phone signals session-complete.
+    private var headlessAutoFinalize: Bool {
+        headlessAutostart && ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOFINALIZE"] == "1"
+    }
+    private var headlessFinalizeStarted = false
+
+    /// (a) Resolve every currently complete-but-unresolved document segment via the SAME `skipMacTags` the
+    /// GUI tag card uses (no card, LLM-only tags). Armed by `LIVECAPTURE_AUTOSKIPTAGS`, and also implied by
+    /// `LIVECAPTURE_AUTOFINALIZE` (finalize can't proceed while a card is pending, so it must resolve them
+    /// the same way). `pendingTagGroup` returns the first unresolved group and `skipMacTags` adds it to
+    /// `resolvedGroupIds`, so the loop terminates. No-op in production.
+    private func headlessResolvePendingTags() {
+        guard headlessAutoSkipTags || headlessAutoFinalize else { return }
+        while let g = pendingTagGroup { skipMacTags(groupId: g.id) }
+    }
+
+    /// (b)+(c) Launch the headless finish→finalize autopilot once (guarded), when armed. Called from
+    /// `completeAllOpenDocGroups`, i.e. when the phone's `POST /session/complete` arrives (LAN) or a cloud
+    /// session-complete marker is drained. No-op / never scheduled in production.
+    private func startHeadlessFinalizeIfRequested() {
+        guard headlessAutoFinalize, !headlessFinalizeStarted else { return }
+        // DATA SAFETY: refuse to auto-finalize unattended without an isolated output dir. When
+        // LIVECAPTURE_TESTOUT is unset, `LiveCaptureProcessor.currentOutputDirectory` falls back to the
+        // real Settings output dir, so an autopilot run would file test pages into the operator's real
+        // corpus with no confirmation. Require TESTOUT (mirrors the LiveCaptureTestDriver guard; see the
+        // "Archive test-run safety" invariant). No-op in production (never armed there).
+        guard let out = ProcessInfo.processInfo.environment["LIVECAPTURE_TESTOUT"], !out.isEmpty else { return }
+        headlessFinalizeStarted = true
+        Task { @MainActor [weak self] in await self?.runHeadlessFinalize() }
+    }
+
+    /// Drive the EXISTING Finish path headlessly, honoring the drain gate. `requestFinish` holds until the
+    /// phone has drained (`phonePendingActive`), no segment is still OCR'ing/tagging, and no tag card is
+    /// pending — its watchdog + per-segment staging + heartbeats re-evaluate readiness, exactly like the GUI
+    /// Finish button. When `beginFinalize` surfaces the collection drafts, auto-name any unnamed new
+    /// collection and call the unmodified `finalize`, then (c) write the done-signal for the harness.
+    private func runHeadlessFinalize() async {
+        let lp = liveProcessor
+        headlessResolvePendingTags()
+        lp.requestFinish()
+        // Wait (bounded ~300s) for finishSession → beginFinalize to populate drafts (the point the GUI would
+        // show CollectionFinalizeSheet). Keep resolving any late-completing card while we wait.
+        for _ in 0..<600 {
+            headlessResolvePendingTags()
+            // "Review rotation" is read LIVE in finishSession (not the locked config); when on, the finish
+            // path parks on the rotation-review sheet instead of populating drafts. Drive it exactly as the
+            // GUI "Continue" button would — apply the detected rotations, which always proceeds to
+            // beginFinalize. No operator edits exist headlessly, so this is a faithful straight-through.
+            if lp.showRotationReview { lp.applyRotationReviewAndFinalize() }
+            if let summary = lp.finalizeSummary { writeHeadlessDone(summary: summary); return }
+            if lp.showFinalizeSheet && !lp.drafts.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        // Auto-name any new collection whose candidate name came back empty; append-to-existing drafts and
+        // pre-named ones are left as decided. Then run the EXISTING finalize (same move + data-safety gate).
+        if lp.showFinalizeSheet {
+            var drafts = lp.drafts
+            for i in drafts.indices where drafts[i].chosenExisting == nil
+                && drafts[i].finalName.trimmingCharacters(in: .whitespaces).isEmpty {
+                drafts[i].finalName = drafts.count > 1 ? "Live Capture \(sessionId) \(i + 1)" : "Live Capture \(sessionId)"
+            }
+            lp.finalize(drafts)
+        }
+        // Wait (bounded ~120s) for the move to complete (finalizeSummary is set at the end of `finalize`).
+        for _ in 0..<240 {
+            if lp.finalizeSummary != nil { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        writeHeadlessDone(summary: lp.finalizeSummary ?? "NO SUMMARY (timeout)")
+    }
+
+    /// (c) Signal the harness that the headless run finished so it can stop polling: write `DONE.txt` (the
+    /// finalize summary — collections + counts) into `LIVECAPTURE_TESTOUT` and append a `LIVECAPTURE_DONE …`
+    /// line to `LIVECAPTURE_READYFILE`, mirroring the `LIVECAPTURE_READY` line the harness already parses.
+    /// (Output already files into `LIVECAPTURE_TESTOUT` via `LiveCaptureProcessor.currentOutputDirectory`,
+    /// so nothing lands in the real corpus.) Only ever reached from the env-gated autopilot above.
+    private func writeHeadlessDone(summary: String) {
+        let env = ProcessInfo.processInfo.environment
+        if let out = env["LIVECAPTURE_TESTOUT"], !out.isEmpty {
+            let donePath = (out as NSString).appendingPathComponent("DONE.txt")
+            try? summary.write(toFile: donePath, atomically: true, encoding: .utf8)
+        }
+        let line = "LIVECAPTURE_DONE \(summary)\n"
+        if let path = env["LIVECAPTURE_READYFILE"] {
+            if let fh = FileHandle(forWritingAtPath: path) {
+                fh.seekToEndOfFile(); fh.write(Data(line.utf8)); try? fh.close()
+            } else {
+                try? line.write(toFile: path, atomically: true, encoding: .utf8)
+            }
+        }
+        FileHandle.standardError.write(Data(line.utf8))
+        NSLog("HEADLESS AUTOFINALIZE: \(summary)")
+    }
+
     /// Mac operator's per-segment tags entered during capture (groupId → tags), plus the set of
     /// document groups already tagged or skipped on the Mac (drives the auto-advancing card).
     @Published private(set) var macTags: [String: MacSegmentTags] = [:]
@@ -517,6 +624,7 @@ final class CaptureSession: ObservableObject {
         // the same values), or a Mac restart right after would drop this segment's tag card until Finish.
         let newlyCompleted = completedDocGroups.insert(groupId).inserted
         if changed || newlyCompleted { _ = writeManifest() }
+        headlessResolvePendingTags()   // headless E2E only (env-gated); no-op in production
     }
 
     /// Finish (`POST /session/complete`): surface the tag card for any document segment still open — e.g.
@@ -527,6 +635,10 @@ final class CaptureSession: ObservableObject {
             if completedDocGroups.insert(g.id).inserted { changed = true }
         }
         if changed { _ = writeManifest() }   // persist the completion set (B5-ii) so a restart keeps the cards
+        // Headless E2E only (env-gated): resolve the just-completed cards, then drive the finish→finalize
+        // path (this is called on the phone's POST /session/complete). Both are no-ops in production.
+        headlessResolvePendingTags()
+        startHeadlessFinalizeIfRequested()
     }
 
     func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
