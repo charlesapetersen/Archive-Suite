@@ -2,7 +2,9 @@ import Foundation
 
 /// A single user-intended tag edit. `TagEditing.delta(for:given:)` turns it into a per-file
 /// `TagDelta` that `TagWriter` applies safely. Facet-replacing ops (year/month/day/priority) remove
-/// whatever token that file currently has for the facet, so a heterogeneous group is handled per file.
+/// ONLY the one raw token that file actually consumed for the facet (`DocumentTags.yearToken` etc.),
+/// so a heterogeneous group is handled per file and a subject that merely parses as that facet
+/// (e.g. a subject literally "1984" or "P8") is never destroyed. Classification never drives a write.
 enum TagEditOp: Sendable, Equatable {
     case addSubject(String)
     case removeSubject(String)
@@ -23,11 +25,11 @@ enum TagEditing {
         case .removeSubject(let s):
             return TagDelta(remove: [s])
         case .setYear(let y):
-            return TagDelta(add: y.map { [String($0)] } ?? [], remove: tokens(in: tags) { DocumentTags.parseYear($0) != nil })
+            return TagDelta(add: y.map { [String($0)] } ?? [], remove: tags.yearToken.map { [$0] } ?? [])
         case .setMonth(let m):
-            return TagDelta(add: m.map { [monthToken($0)] } ?? [], remove: tokens(in: tags) { DocumentTags.parseMonth($0) != nil })
+            return TagDelta(add: m.map { [monthToken($0)] } ?? [], remove: tags.monthToken.map { [$0] } ?? [])
         case .setDay(let d):
-            return TagDelta(add: d.map { ["Day \($0)"] } ?? [], remove: tokens(in: tags) { DocumentTags.parseDay($0) != nil })
+            return TagDelta(add: d.map { ["Day \($0)"] } ?? [], remove: tags.dayToken.map { [$0] } ?? [])
         case .setDateUncertain(let on):
             if on {
                 return tags.dateUncertain ? TagDelta() : TagDelta(add: ["Date Uncertain"])
@@ -35,7 +37,7 @@ enum TagEditing {
                 return tags.dateUncertain ? TagDelta(remove: tokens(in: tags) { $0.caseInsensitiveCompare("Date Uncertain") == .orderedSame }) : TagDelta()
             }
         case .setPriority(let p):
-            return TagDelta(add: p.map { ["P\($0)"] } ?? [], remove: tokens(in: tags) { DocumentTags.parsePriority($0) != nil })
+            return TagDelta(add: p.map { ["P\($0)"] } ?? [], remove: tags.priorityToken.map { [$0] } ?? [])
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
         }

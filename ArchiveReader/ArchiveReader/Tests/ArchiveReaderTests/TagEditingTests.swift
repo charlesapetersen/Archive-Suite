@@ -38,6 +38,72 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(d.remove, ["03 March"])
     }
 
+    // MARK: R-1 regression — a facet edit removes ONLY the consumed token, never a colliding subject.
+    //
+    // Parser is "last one wins": the LAST token that parses as a single-valued facet is that facet's
+    // value; every EARLIER matching token is demoted to a subject. A facet-replacing edit must remove
+    // only the recorded consumed token, so a subject that merely parses as that facet survives.
+
+    func testSetYearPreservesCollidingSubject() {
+        // "1980" (last) is the real year; "1984" is a book/topic subject that merely looks like a year.
+        let t = tags(["1984", "Jerry Brown", "1980"])
+        XCTAssertEqual(t.year, 1980)
+        XCTAssertEqual(t.yearToken, "1980")
+        XCTAssertTrue(t.subjects.contains("1984"))          // shadowed year-shaped token kept as subject
+        let d = TagEditing.delta(for: .setYear(1982), given: t)
+        XCTAssertEqual(d.add, ["1982"])
+        XCTAssertEqual(d.remove, ["1980"])                  // ONLY the real year — never the "1984" subject
+    }
+
+    func testSetYearNilClearsOnlyYearToken() {
+        let t = tags(["1984", "1980", "Unread"])            // year=1980; "1984" is a subject
+        XCTAssertTrue(t.subjects.contains("1984"))
+        let d = TagEditing.delta(for: .setYear(nil), given: t)
+        XCTAssertTrue(d.add.isEmpty)
+        XCTAssertEqual(d.remove, ["1980"])                  // clears only the year, not the "1984" subject
+    }
+
+    func testSetPriorityPreservesCollidingSubject() {
+        // "P9" (last) is the real priority; "P8" is a literal subject (e.g. a doc named "P8").
+        let t = tags(["P8", "Economics", "P9"])
+        XCTAssertEqual(t.priority, 9)
+        XCTAssertEqual(t.priorityToken, "P9")
+        XCTAssertTrue(t.subjects.contains("P8"))
+        let d = TagEditing.delta(for: .setPriority(10), given: t)
+        XCTAssertEqual(d.add, ["P10"])
+        XCTAssertEqual(d.remove, ["P9"])                    // ONLY the real priority — never the "P8" subject
+    }
+
+    func testSetMonthWithTwoMonthShapedTokens() {
+        let t = tags(["03 March", "05 May", "1980"])        // two month-shaped tokens; last wins
+        XCTAssertEqual(t.month?.number, 5)
+        XCTAssertEqual(t.monthToken, "05 May")
+        XCTAssertTrue(t.subjects.contains("03 March"))
+        let d = TagEditing.delta(for: .setMonth(7), given: t)
+        XCTAssertEqual(d.add, ["07 July"])
+        XCTAssertEqual(d.remove, ["05 May"])                // demoted "03 March" survives as a subject
+    }
+
+    func testSetDayWithTwoDayShapedTokens() {
+        let t = tags(["Day 3", "Day 25", "1980"])           // two day-shaped tokens; last wins
+        XCTAssertEqual(t.day, 25)
+        XCTAssertEqual(t.dayToken, "Day 25")
+        XCTAssertTrue(t.subjects.contains("Day 3"))
+        let d = TagEditing.delta(for: .setDay(10), given: t)
+        XCTAssertEqual(d.add, ["Day 10"])
+        XCTAssertEqual(d.remove, ["Day 25"])                // demoted "Day 3" survives as a subject
+    }
+
+    func testSingleFacetDocEditsUnchanged() {
+        // No collision → behaves exactly as before the fix (removes the one facet token, keeps the rest).
+        let t = tags(["1980", "03 March", "Day 5", "P9", "Unread", "Jerry Brown"])
+        XCTAssertEqual(TagEditing.delta(for: .setYear(1982), given: t).remove, ["1980"])
+        XCTAssertEqual(TagEditing.delta(for: .setMonth(5), given: t).remove, ["03 March"])
+        XCTAssertEqual(TagEditing.delta(for: .setDay(6), given: t).remove, ["Day 5"])
+        XCTAssertEqual(TagEditing.delta(for: .setPriority(10), given: t).remove, ["P9"])
+        XCTAssertTrue(TagEditing.delta(for: .setYear(nil), given: tags(["Jerry Brown", "Unread"])).remove.isEmpty)  // no year to clear
+    }
+
     func testAddAndRemoveSubject() {
         XCTAssertEqual(TagEditing.delta(for: .addSubject("Taxes"), given: tags(["1980"])).add, ["Taxes"])
         XCTAssertTrue(TagEditing.delta(for: .addSubject("   "), given: tags(["1980"])).isEmpty)
@@ -89,5 +155,22 @@ final class TagEditingTests: XCTestCase {
 
         let after = Set((try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [])
         XCTAssertEqual(after, ["1982", "Unread", "Jerry Brown"])   // year replaced, everything else kept
+    }
+
+    // R-1: an on-disk edit of a real year must NOT destroy a subject that merely parses as a year.
+    func testApplySetYearPreservesCollidingSubjectOnDisk() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("doc.pdf")
+        try Data("x".utf8).write(to: url)
+        // "1980" (last) is the real year; "1984" is a book-title subject.
+        try (url as NSURL).setResourceValue(["1984", "Jerry Brown", "1980"], forKey: .tagNamesKey)
+
+        let current = TagReading.readTags(url)!
+        _ = try TagWriter.apply(TagEditing.delta(for: .setYear(1982), given: current), to: url)
+
+        let after = Set((try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [])
+        XCTAssertEqual(after, ["1984", "Jerry Brown", "1982"])   // real year swapped; "1984" subject SURVIVES
     }
 }

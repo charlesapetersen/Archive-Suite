@@ -53,6 +53,15 @@ struct DocumentTags: Sendable, Equatable {
     var color: ArchiveColor?
     var subjects: [String]     // everything not claimed by another facet, verbatim
 
+    // The EXACT verbatim raw token that was consumed for each single-valued date/priority facet
+    // (the "last one wins" winner). These — never a facet PREDICATE over all tokens — are what a
+    // facet-replacing edit removes, so a subject that merely parses as a facet is never destroyed.
+    // `nil` when the facet is absent. (See CORE DIRECTIVE: classification must not drive a write.)
+    var yearToken: String?
+    var monthToken: String?
+    var dayToken: String?
+    var priorityToken: String?
+
     /// Chronological sort key derived from the date tags. **No epoch limit** (medieval-safe).
     /// `nil` when there is no year → the caller sorts undated rows to the end.
     /// Month/day absent count as 0, so a year-only doc sorts just before its January.
@@ -107,6 +116,14 @@ extension DocumentTags {
         var readState: ReadState?
         var subjects: [String] = []
 
+        // The verbatim raw token consumed for each single-valued date/priority facet ("last one
+        // wins"). When a SECOND token also parses as the same facet, the previous winner is demoted
+        // back to a subject so it stays visible AND so a facet edit only ever removes this one token.
+        var yearToken: String?
+        var monthToken: String?
+        var dayToken: String?
+        var priorityToken: String?
+
         let color = labelNumber.flatMap(ArchiveColor.init(labelNumber:))
 
         for token in raw {
@@ -125,22 +142,26 @@ extension DocumentTags {
             }
             // Priority Pn (7...10).
             if let p = parsePriority(s) {
-                priority = p
+                if let prev = priorityToken { subjects.append(prev) }   // demote the shadowed collision
+                priority = p; priorityToken = token
                 continue
             }
             // Month "MM Month".
             if let m = parseMonth(s) {
-                month = m
+                if let prev = monthToken { subjects.append(prev) }
+                month = m; monthToken = token
                 continue
             }
             // Day "Day N".
             if let d = parseDay(s) {
-                day = d
+                if let prev = dayToken { subjects.append(prev) }
+                day = d; dayToken = token
                 continue
             }
             // Year — bare 3–4 digit number (medieval-friendly: 800, 1215, 1980).
             if let y = parseYear(s) {
-                year = y
+                if let prev = yearToken { subjects.append(prev) }
+                year = y; yearToken = token
                 continue
             }
             // A color-name token that matches the file's actual Finder label is the marker color,
@@ -155,7 +176,8 @@ extension DocumentTags {
         return DocumentTags(
             raw: raw, labelNumber: labelNumber,
             year: year, month: month, day: day, dateUncertain: dateUncertain,
-            priority: priority, readState: readState, color: color, subjects: subjects
+            priority: priority, readState: readState, color: color, subjects: subjects,
+            yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, priorityToken: priorityToken
         )
     }
 
