@@ -33,6 +33,7 @@ struct SidebarView: View {
                             Button("Delete", role: .destructive) { model.savedSearches.delete(s.id) }
                         }
                 }
+                .onMove { from, to in model.savedSearches.move(fromOffsets: from, toOffset: to) }
             } header: {
                 HStack {
                     Text("Smart Folders")
