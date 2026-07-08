@@ -27,5 +27,9 @@ data class CapturedItem(
     // bytes/headers already sent are stale. The upload-completion handler honors this by re-sending with the
     // current fields once the in-flight upload settles — otherwise the change is silently dropped (the
     // in-flight guard suppressed the re-enqueue). Persisted so the intent survives an app kill. Mirrors iOS.
-    val needsResend: Boolean = false
+    val needsResend: Boolean = false,
+    // DISPLAY-ONLY: this photo has been copied to the phone's gallery via "Save to phone". Purely a UI cue
+    // (so a saved photo's thumbnail no longer reads as "failed"); it does NOT affect the upload/queue/dedup
+    // state or the phone↔Mac protocol in any way.
+    val savedToPhone: Boolean = false
 )

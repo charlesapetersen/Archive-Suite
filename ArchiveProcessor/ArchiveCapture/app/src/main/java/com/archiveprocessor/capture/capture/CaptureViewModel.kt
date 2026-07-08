@@ -380,6 +380,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             items[i] = updated
             clearSelection()
             persist()
+            // Parity with capturing a fresh Box/Folder marker (captureMarker flashes both): the reclassify
+            // path was the silent one, so a re-tagged Box gave no confirmation. Display-only banner; the
+            // upload/queue/protocol below is unchanged.
+            flash(if (type == GroupType.BOX) "Box → Mac" else "Folder → Mac")
             // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op
             // otherwise). If the page's original upload is still in flight, defer via needsResend — the
             // in-flight guard would otherwise swallow this re-enqueue and the reclassify would never send.
@@ -395,7 +399,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // (Pages stream as shot, so by End segment they're usually already UPLOADED; checking == PENDING
         // here would suppress the tag sheet once uploads finish and skip the segment-complete signal.)
         val hasDocs = items.any { it.groupId == currentGroupId && it.type == GroupType.DOCUMENT }
-        if (hasDocs) { pendingTagGroupId = currentGroupId; persist() } else startNewGroup()
+        if (hasDocs) { pendingTagGroupId = currentGroupId; persist() }
+        else {
+            // Feedback: tapping End segment with nothing captured yet was silent (looked broken). Tell the
+            // operator instead of quietly rotating an empty group.
+            statusMessage = "No pages in this segment yet — capture a page first."
+            startNewGroup()
+        }
     }
 
     /** Tag sheet → "Apply & continue" or "Skip" (Skip passes nulls): apply the optional pre-fill tags
@@ -438,6 +448,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.UPLOADED }
             .toList().forEach { removeConfirmed(it) }
         trySendSegmentComplete(gid)         // sends now iff all pages already uploaded; else deferred to upload/retry
+        // Feedback (display only): a persistent status line + the transient banner so ending a segment is
+        // never silent. This changes NOTHING about what End segment sends to the Mac (the completion signal
+        // + tags above are untouched).
+        statusMessage = "Segment ended · $pages page${if (pages == 1) "" else "s"}"
         if (pages > 0) flash("Segment → Mac · $pages page${if (pages == 1) "" else "s"}")
     }
 
@@ -557,9 +571,20 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (toSave.isEmpty()) { statusMessage = "No photos to save"; return }
         statusMessage = "Saving ${toSave.size} photo(s) to your gallery…"
         viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) {
-                toSave.count { PhoneBackup.saveJpegToGallery(app, it.file) }
+            // Save off-main; collect which items landed in the gallery.
+            val savedIds = withContext(Dispatchers.IO) {
+                toSave.filter { PhoneBackup.saveJpegToGallery(app, it.file) }.map { it.id }.toHashSet()
             }
+            // DISPLAY-ONLY: flag saved thumbnails so they read as "safe on phone", not "failed". This does
+            // NOT touch upload state / the queue / dedup — a saved page still uploads (or retries) exactly
+            // as before; only the thumbnail's indicator changes.
+            var changed = false
+            savedIds.forEach { id ->
+                val i = items.indexOfFirst { it.id == id }
+                if (i >= 0 && !items[i].savedToPhone) { items[i] = items[i].copy(savedToPhone = true); changed = true }
+            }
+            if (changed) persist()
+            val saved = savedIds.size
             statusMessage = if (saved == toSave.size) "Saved $saved photo(s) to your gallery (Pictures/Archive Capture)"
                             else "Saved $saved of ${toSave.size} — some couldn't be written to the gallery"
             flash("Saved $saved to gallery")

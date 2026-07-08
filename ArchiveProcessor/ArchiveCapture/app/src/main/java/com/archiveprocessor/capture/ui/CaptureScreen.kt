@@ -1,9 +1,6 @@
 package com.archiveprocessor.capture.ui
 
 import android.Manifest
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,7 +45,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,24 +58,17 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.archiveprocessor.capture.capture.CaptureViewModel
 import com.archiveprocessor.capture.capture.CapturedItem
 import com.archiveprocessor.capture.capture.GroupType
 import com.archiveprocessor.capture.capture.UploadState
 import java.io.File
-
-/** Walk the context wrappers to the hosting Activity (whose window owns the system-bar insets). */
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,15 +112,8 @@ fun CaptureScreen(vm: CaptureViewModel) {
     var showClearConfirm by remember { mutableStateOf(false) }
     var showRepairConfirm by remember { mutableStateOf(false) }
 
-    // The preview reaches under the translucent status bar, so force light status-bar icons
-    // (clock/wifi/battery) — dark icons would be invisible over the black letterbox. Restored on exit.
-    val view = LocalView.current
-    DisposableEffect(Unit) {
-        val controller = view.context.findActivity()?.window?.let { WindowCompat.getInsetsController(it, view) }
-        val previous = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose { if (previous != null) controller.isAppearanceLightStatusBars = previous }
-    }
+    // NOTE: system-bar icon contrast is set centrally in MainActivity (light icons whenever the capture
+    // screen — which is always black — is up), so there is no per-screen status-bar override to fight.
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         // Camera preview — top region only, letterboxed (FIT_CENTER) on black.
@@ -174,7 +156,10 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 if (vm.items.isNotEmpty()) {
                     TextButton(onClick = { requestSaveToPhone() }) { Text("Save to phone", color = Color.White) }
                 }
-                TextButton(onClick = { showRepairConfirm = true }) { Text("Re-pair", color = Color.White) }
+                TextButton(
+                    onClick = { showRepairConfirm = true },
+                    modifier = Modifier.semantics { contentDescription = "Re-pair with a Mac" }
+                ) { Text("Re-pair", color = Color.White) }
             }
 
             // End segment — above the photos and away from the shutter, to avoid accidental taps. This is
@@ -189,7 +174,10 @@ fun CaptureScreen(vm: CaptureViewModel) {
                     TextButton(onClick = { vm.retryFailed() }) { Text("Retry", color = Color.White) }
                 }
                 Spacer(Modifier.weight(1f))
-                Button(onClick = { vm.finishDocumentSegment() }) { Text("End segment") }
+                Button(
+                    onClick = { vm.finishDocumentSegment() },
+                    modifier = Modifier.semantics { contentDescription = "End segment" }
+                ) { Text("End segment") }
             }
 
             // Transfer feedback: segments/markers fly to the Mac; images don't accumulate on the phone.
@@ -235,12 +223,17 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
+                val hasSelection = vm.selectedItemId != null
                 Button(
                     onClick = {
                         if (vm.selectedItemId != null) vm.reclassifySelected(GroupType.BOX)
                         else takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.BOX) }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White),
+                    modifier = Modifier.semantics {
+                        contentDescription = if (hasSelection) "Reclassify the selected photo as a box marker"
+                                             else "Box. Capture a box-label marker"
+                    }
                 ) { Text("Box") }
 
                 Button(
@@ -248,6 +241,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                     modifier = Modifier.size(76.dp).border(3.dp, Color.LightGray, CircleShape)
+                        .semantics { contentDescription = "Shutter. Capture a document page" }
                 ) { }
 
                 Button(
@@ -255,7 +249,11 @@ fun CaptureScreen(vm: CaptureViewModel) {
                         if (vm.selectedItemId != null) vm.reclassifySelected(GroupType.FOLDER)
                         else takePicture(context, controller, vm) { vm.captureMarker(it, GroupType.FOLDER) }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2), contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2), contentColor = Color.White),
+                    modifier = Modifier.semantics {
+                        contentDescription = if (hasSelection) "Reclassify the selected photo as a folder marker"
+                                             else "Folder. Capture a folder-label marker"
+                    }
                 ) { Text("Folder") }
             }
         }
@@ -339,7 +337,10 @@ private fun Thumb(
     onLongPress: () -> Unit
 ) {
     val bmp: ImageBitmap? = remember(item.file.path) { decodeThumb(item.file.path) }
-    val stateColor = when (item.state) {
+    // Once a photo is saved to the phone's gallery it is safe locally, so it must no longer READ as failed:
+    // its status dot turns teal (with a saved-badge below) regardless of the upload/queue state, which is
+    // unchanged underneath — this is display state only (the item can still be UPLOADING/FAILED for the Mac).
+    val stateColor = if (item.savedToPhone) Color(0xFF30B0C7) else when (item.state) {
         UploadState.UPLOADED -> Color(0xFF34C759)
         UploadState.UPLOADING -> Color(0xFFFFCC00)
         UploadState.FAILED -> Color(0xFFFF3B30)
@@ -352,15 +353,44 @@ private fun Thumb(
         isP10 -> Color(0xFFFFD60A)       // gold: P10
         else -> null
     }
+    // TalkBack label: type + status (+ P10 / delete-armed) so the thumbnails aren't unlabeled.
+    val typeLabel = when (item.type) {
+        GroupType.DOCUMENT -> "Document page"
+        GroupType.BOX -> "Box marker"
+        GroupType.FOLDER -> "Folder marker"
+    }
+    val statusLabel = when {
+        item.savedToPhone -> "saved to phone gallery"
+        item.state == UploadState.UPLOADED -> "sent to Mac"
+        item.state == UploadState.UPLOADING -> "sending to Mac"
+        item.state == UploadState.FAILED -> "upload failed, will retry"
+        else -> "queued to send"
+    }
+    val a11yLabel = buildString {
+        append(typeLabel); append(", "); append(statusLabel)
+        if (isP10) append(", priority P10")
+        if (isArmed) append(", tap again to delete")
+    }
     Box(
         Modifier.size(64.dp).clip(RoundedCornerShape(6.dp)).background(Color.DarkGray)
             .then(if (ring != null) Modifier.border(3.dp, ring, RoundedCornerShape(6.dp)) else Modifier)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+            .semantics { contentDescription = a11yLabel }
     ) {
         if (bmp != null) {
             Image(bitmap = bmp, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
         Box(Modifier.align(Alignment.BottomStart).padding(3.dp).size(10.dp).clip(CircleShape).background(stateColor))
+        // "Saved to phone" affordance: a small check badge so a gallery-saved photo reads as safe, not failed.
+        if (item.savedToPhone && !isArmed) {
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(2.dp).size(14.dp).clip(CircleShape)
+                    .background(Color(0xFF30B0C7)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✓", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            }
+        }
         if (isP10 && !isArmed) {
             Box(Modifier.align(Alignment.TopEnd).padding(2.dp).clip(RoundedCornerShape(3.dp)).background(Color.Red)) {
                 Text("P10", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 2.dp))

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark counterpart of the framework theme so the window background (shown briefly before Compose
+         draws) is dark in system dark mode, not a light flash. Compose supplies the real UI via
+         ArchiveCaptureTheme, which follows isSystemInDarkTheme(). -->
+    <style name="Theme.ArchiveCapture" parent="android:Theme.Material.NoActionBar" />
+</resources>

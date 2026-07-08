@@ -17,7 +17,9 @@ re-surface. `Capture/CaptureSession.swift`, `Capture/LiveCaptureProcessor.swift`
 
 ---
 
-## Android capture screen controls lack accessibility labels  [LOW — a11y]
+## ✅ FIXED (2026-07-08, Android UI-fixes batch) — Android capture-screen controls lacked accessibility labels  [LOW — a11y]
+
+**FIXED:** `contentDescription` added to the shutter, captured thumbnails, and Box/Folder/End-segment/Re-pair controls. Landed with the connect-flow dark-mode + layout fixes (compile + review verified; on-device TalkBack confirmation deferred to the device visual check). Original report below.
 
 Found in the 2026-07-08 on-device UI review (Pixel 9). The center shutter button (and the preview/status
 controls) have no `contentDescription`, so VoiceOver/TalkBack announces an unlabeled button. No functional or

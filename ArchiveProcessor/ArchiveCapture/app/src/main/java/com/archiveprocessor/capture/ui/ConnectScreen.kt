@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -97,7 +99,17 @@ private fun Pairing(vm: CaptureViewModel, wired: Boolean, onBack: () -> Unit, on
             )
         }
 
-        if (hasCam) {
+        // Middle region: the scanner OR the manual form, never both — so the fields can NEVER render on top
+        // of the black camera preview. Weighted so this region flexes and the header/status text above and
+        // below always keep their own space (no clipping/overrun of the fixed preview box).
+        if (showManual) {
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ManualConnect(vm, wired, onConnected)
+            }
+        } else if (hasCam) {
             val controller = remember { LifecycleCameraController(context) }
             val analyzerRef = remember { arrayOfNulls<QrAnalyzer>(1) }
             val analyzer = remember {
@@ -120,19 +132,24 @@ private fun Pairing(vm: CaptureViewModel, wired: Boolean, onBack: () -> Unit, on
                 controller.bindToLifecycle(lifecycleOwner)
             }
             AndroidView(
-                factory = { PreviewView(it).apply { this.controller = controller } },
+                // COMPATIBLE (TextureView) so the preview composites in the Compose view hierarchy and can't
+                // z-order over sibling text the way the default SurfaceView surface can.
+                factory = { PreviewView(it).apply {
+                    this.controller = controller
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                } },
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
         } else {
-            Text("Camera permission is needed to scan the QR code.", color = MaterialTheme.colorScheme.error)
+            Text("Camera permission is needed to scan the QR code.",
+                 color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
         }
 
         if (vm.statusMessage.isNotEmpty()) Text(vm.statusMessage, style = MaterialTheme.typography.bodySmall)
 
         TextButton(onClick = { showManual = !showManual }) {
-            Text(if (showManual) "Hide manual entry" else "Enter manually instead")
+            Text(if (showManual) "Hide manual entry — scan instead" else "Enter manually instead")
         }
-        if (showManual) ManualConnect(vm, wired, onConnected)
 
         TextButton(onClick = onBack) { Text("← Choose connection type") }
     }
@@ -208,7 +225,21 @@ private fun CloudPairing(vm: CaptureViewModel, onBack: () -> Unit, onConnected: 
             style = MaterialTheme.typography.bodyMedium
         )
 
-        if (hasCam) {
+        // Middle region: the scanner OR the relay-token form, never both — so the field can't render over the
+        // black preview. Weighted so it flexes and the instruction/status text keeps its own space.
+        if (showManual) {
+            var token by remember { mutableStateOf("") }
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(token, { token = it }, label = { Text("Relay token") }, singleLine = true)
+                Button(onClick = {
+                    val t = token.trim()
+                    if (t.isNotEmpty()) proceed(MacEndpoint("", 0, t, "Mac", "cloud", null))
+                }) { Text("Sign in & connect") }
+            }
+        } else if (hasCam) {
             val controller = remember { LifecycleCameraController(context) }
             val analyzer = remember {
                 QrAnalyzer { payload ->
@@ -229,28 +260,23 @@ private fun CloudPairing(vm: CaptureViewModel, onBack: () -> Unit, onConnected: 
                 controller.bindToLifecycle(lifecycleOwner)
             }
             AndroidView(
-                factory = { PreviewView(it).apply { this.controller = controller } },
+                // COMPATIBLE (TextureView) so the preview can't z-order over sibling text (see Pairing).
+                factory = { PreviewView(it).apply {
+                    this.controller = controller
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                } },
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
         } else {
-            Text("Camera permission is needed to scan the QR code.", color = MaterialTheme.colorScheme.error)
+            Text("Camera permission is needed to scan the QR code.",
+                 color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
         }
 
         if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
         else if (vm.statusMessage.isNotEmpty()) Text(vm.statusMessage, style = MaterialTheme.typography.bodySmall)
 
         TextButton(onClick = { showManual = !showManual }) {
-            Text(if (showManual) "Hide manual entry" else "Enter the relay token manually")
-        }
-        if (showManual) {
-            var token by remember { mutableStateOf("") }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(token, { token = it }, label = { Text("Relay token") }, singleLine = true)
-                Button(onClick = {
-                    val t = token.trim()
-                    if (t.isNotEmpty()) proceed(MacEndpoint("", 0, t, "Mac", "cloud", null))
-                }) { Text("Sign in & connect") }
-            }
+            Text(if (showManual) "Hide manual entry — scan instead" else "Enter the relay token manually")
         }
 
         TextButton(onClick = onBack) { Text("← Choose connection type") }

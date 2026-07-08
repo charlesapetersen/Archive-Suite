@@ -37,6 +37,7 @@ class SessionStore(context: Context) {
                     it.month?.let { v -> put("month", v) }
                     it.replacesGroupId?.let { v -> put("replacesGroupId", v) }
                     if (it.needsResend) put("needsResend", true)
+                    if (it.savedToPhone) put("savedToPhone", true)
                 })
             }
             val ended = JSONArray()
@@ -93,7 +94,8 @@ class SessionStore(context: Context) {
                         month = if (o.has("month")) o.getInt("month") else null,
                         state = UploadState.valueOf(o.getString("state")),
                         replacesGroupId = if (o.has("replacesGroupId")) o.getString("replacesGroupId") else null,
-                        needsResend = o.optBoolean("needsResend", false)
+                        needsResend = o.optBoolean("needsResend", false),
+                        savedToPhone = o.optBoolean("savedToPhone", false)
                     )
                 )
             }
