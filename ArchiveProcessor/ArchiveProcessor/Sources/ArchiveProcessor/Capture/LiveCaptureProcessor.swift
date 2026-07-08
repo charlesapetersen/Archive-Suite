@@ -87,6 +87,11 @@ final class LiveCaptureProcessor: ObservableObject {
     private var pageTasks: [UUID: Task<OCRResult, Never>] = [:]
     private var startedPhotoIds: Set<UUID> = []
     private var finalizedGroups: Set<String> = []
+    /// Bumped by `clearSessionState()`. A `finalizeSegment` that SUSPENDED at an `await` before the operator
+    /// hit Clear captures this at its start and re-checks it after each await; if it changed, the session was
+    /// cleared out from under it, so finalize bails cleanly — no re-added state, no stale manifest, no orphan
+    /// output PDF repopulating the just-cleared Processing pane (B8). A no-op when Clear was never pressed.
+    private var clearGeneration = 0
     /// Everything `writeSegmentFiles` needs, retained per finalized segment so the end-of-session
     /// rotation review can regenerate a segment's staged PDF/JPG with corrected rotation. In-memory
     /// for the current run only (rotation review is a same-session step, before finalization).
@@ -339,6 +344,10 @@ final class LiveCaptureProcessor: ObservableObject {
               let group = session.groups.first(where: { $0.id == groupId }) else { return }
         finalizedGroups.insert(groupId)
         session.lockSettings()   // first finalize locks the session's settings
+        // B8: snapshot the clear-generation BEFORE any await. Every await below (box-label OCR, LLM tagging,
+        // the off-main file write) suspends for seconds; if Clear runs during any of them, `clearGeneration`
+        // advances and each post-await guard bails us out cleanly. No await has happened yet at this point.
+        let startedGeneration = clearGeneration
 
         let collectionKey = groupCollectionKey[groupId] ?? (group.type == .box ? group.id : currentCollectionKey)
         setPhase(groupId, .tagging)
@@ -359,6 +368,9 @@ final class LiveCaptureProcessor: ObservableObject {
             results.append(r)
             texts.append(r.text ?? "")
         }
+        // B8: the per-page OCR awaits above can suspend for seconds (box-label OCR). If Clear ran in that
+        // window the session was reset — bail before touching any (now-cleared) state or making the LLM call.
+        guard clearGeneration == startedGeneration else { return }
         groupOCROverride[groupId] = nil   // consumed
 
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
@@ -385,6 +397,11 @@ final class LiveCaptureProcessor: ObservableObject {
         let jsonTags = tags
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB
 
+        // B8: `computeTags` above may have suspended on an LLM tagging call. Re-check BEFORE writing the
+        // output PDF, so a Clear during OCR/tagging bails here and never leaves an orphan PDF in the cleared
+        // session's `_processed/`. (The write is the last unavoidable-before-check step; see the guard below.)
+        guard clearGeneration == startedGeneration else { return }
+
         let outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
             Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
@@ -393,6 +410,12 @@ final class LiveCaptureProcessor: ObservableObject {
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
         }.value
+
+        // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
+        // re-add staged/retained state, set a phase, or persist a stale one-entry manifest — the pane must
+        // stay empty. Bailing deletes nothing (Recovery Directive): any file just written stays recoverable
+        // in `_processed/`; we only decline to re-populate cleared in-memory state.
+        guard clearGeneration == startedGeneration else { return }
 
         staged.append(outcome)
         // Retain the write inputs so an end-of-session rotation review can regenerate this segment.
@@ -910,6 +933,12 @@ final class LiveCaptureProcessor: ObservableObject {
     /// segments in memory so the pane agrees with the (now-cleared) Captured pane. In-flight OCR `pageTasks`
     /// are dropped (their results are simply discarded); a fresh capture after Clear starts a new segment.
     func clearSessionState() {
+        // B8: advance the generation so any in-flight `finalizeSegment` that suspended at an await before this
+        // Clear bails at its next post-await guard instead of repopulating the just-cleared pane / writing a
+        // stale manifest. And CANCEL each outstanding OCR task before dropping it, so its work stops rather
+        // than running to completion after the session was cleared (its result is discarded either way).
+        clearGeneration &+= 1
+        for task in pageTasks.values { task.cancel() }
         statuses.removeAll()
         staged.removeAll()
         failedGroupIds.removeAll()
