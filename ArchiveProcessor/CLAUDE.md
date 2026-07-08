@@ -279,6 +279,23 @@ review of the whole accumulated diff since the last release** (the *find → ref
 defects, a second set of agents tries to refute each, only survivors are real), and a **live smoke test** if
 the OCR/tagging/PDF path changed. Cut the release only after it comes back clean.
 
+**Smoke tests (the cheap regression gate).** Two repeatable, unattended scripts make Tier-1 a one-liner —
+run them before pushing an OCR/pipeline change or as a sanity gate:
+- **`ArchiveProcessor/test-smoke.sh`** — headless end-to-end OCR: reads the Gemini key from the Keychain
+  (never printed/persisted), builds Debug, then drives the **real** Process-Files pipeline
+  (OCR → segmentation → tagging → PDF) on exactly **2 tiny images** via `ProcessFilesTestDriver`
+  (`PROCESSFILES_TESTMODE=1` + `ARCHIVEPROC_HEADLESS=1`), and asserts a `TEST_DONE` marker plus ≥1 output
+  PDF. All I/O is isolated to a `mktemp -d` scratch (own IN/OUT dirs, deleted on exit) — it never writes
+  `Test Files/` or a real corpus. Inputs come from `Test Files/` when present, else 2 synthetic text PNGs
+  are generated (CoreGraphics/CoreText, headless). Spend is tiny (2 images × `gemini-2.5-flash-lite`, a
+  few cents). A key-free run log persists under `.maintenance/test-results/` (gitignored) for FAIL triage.
+- **`ArchiveReader/test-smoke.sh`** — Reader build + full unit-test suite (`xcodebuild test`, ~135 tests);
+  no OCR/network/corpus.
+- **`./test-smoke.sh processor|reader|all`** (Suite root; mirrors `launch.sh`) dispatches to both; default
+  `all` runs Reader (free) then Processor. `chmod +x`'d; the dispatcher calls `bash <script>` so it works
+  even if the exec bit is lost. This is the deeper Tier-1 companion to the pre-existing
+  `scripts/test-smoke.sh` (raw per-provider OCR calls) and `scripts/test-tier2.sh` (multi-case pipeline).
+
 **Cadence:** **push commits to `origin` frequently** — a clean build + Tier-1 self-review (and Tier-2 for
 high-blast-radius diffs) is enough to push; don't hoard local commits. **Releases are the sparse milestone:**
 build a DMG + tag a GitHub release only occasionally (a coherent, release-worthy batch), gated by the Tier-3
