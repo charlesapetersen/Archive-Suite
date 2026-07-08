@@ -11,7 +11,7 @@ struct ResolutionDropSheet: View {
     @State private var isTargeted = false
 
     private let dropTypes: [UTType] = [.fileURL]
-    private let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic"]
+    private let imageExtensions = Set(ImageEncoding.acceptedImageExtensions)
 
     var body: some View {
         VStack(spacing: 16) {

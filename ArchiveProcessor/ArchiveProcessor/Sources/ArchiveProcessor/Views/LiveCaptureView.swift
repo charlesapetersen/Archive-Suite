@@ -14,7 +14,7 @@ struct LiveCaptureView: View {
     var onProcess: () -> Void
 
     /// App-wide choice (Settings ⌘,): live streaming vs. staging for a later batch run.
-    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
+    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
     /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
 
@@ -189,7 +189,7 @@ struct LiveCaptureView: View {
 
                 GroupBox("Processing") {
                     VStack(alignment: .leading, spacing: 8) {
-                        let live = liveProcessingMode == "live"
+                        let live = liveProcessingMode == LiveProcessingMode.live.rawValue
                         Label(live ? "Process live" : "Stage for later",
                               systemImage: live ? "bolt.fill" : "tray.and.arrow.down")
                             .font(.callout).fontWeight(.medium)
@@ -248,7 +248,7 @@ struct LiveCaptureView: View {
                             Spacer()
                             Button("Choose…") { chooseOutputFolder() }.font(.caption)
                         }
-                        if liveProcessingMode != "live" {
+                        if liveProcessingMode != LiveProcessingMode.live.rawValue {
                             Text("Set in Process Files for staged captures — they're filed there, not here.")
                                 .font(.caption2).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -256,7 +256,7 @@ struct LiveCaptureView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(6)
-                    .disabled(liveProcessingMode != "live")
+                    .disabled(liveProcessingMode != LiveProcessingMode.live.rawValue)
                 } label: {
                     HStack(spacing: 6) {
                         Text("Output folder")
@@ -379,7 +379,7 @@ struct LiveCaptureView: View {
                 Spacer()
                 if !session.photos.isEmpty {
                     Button("Clear") { session.clear(); liveProc.clearFinalizeSummary(); liveProc.cancelPendingFinish() }
-                    if liveProcessingMode != "live" {
+                    if liveProcessingMode != LiveProcessingMode.live.rawValue {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
                             .disabled(processor.isProcessing)

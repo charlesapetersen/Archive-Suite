@@ -32,9 +32,8 @@ extension OCRProcessor {
     }
     /// Phone-supplied month for the file at `index`, as an "MM Month" tag (e.g. "03 March"); nil if none.
     private func phoneMonthTag(at index: Int) -> String? {
-        guard index >= 0, index < preGroupedMonths.count,
-              let m = preGroupedMonths[index], (1...12).contains(m) else { return nil }
-        return String(format: "%02d %@", m, Self.englishMonthNames[m - 1])
+        guard index >= 0, index < preGroupedMonths.count, let m = preGroupedMonths[index] else { return nil }
+        return GeneratedTags.monthTag(m)
     }
     /// Live Capture: layer each page's phone-set priority ("P10"…"P7") onto whatever the tagging
     /// phase applied. macOS tag application replaces, so read → append → re-apply; also record it in

@@ -42,13 +42,7 @@ struct ToolsView: View {
         _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
     }
 
-    private var currentGatewayConfig: GatewayConfig? {
-        guard useGateway, !gatewayBaseURL.isEmpty, !gatewayModelID.isEmpty else { return nil }
-        return GatewayConfig(baseURL: gatewayBaseURL, modelID: gatewayModelID,
-                             displayName: gatewayDisplayName.isEmpty ? "API Gateway" : gatewayDisplayName,
-                             inputCostPer1M: gatewayInputCost >= 0 ? gatewayInputCost : nil,
-                             outputCostPer1M: gatewayOutputCost >= 0 ? gatewayOutputCost : nil)
-    }
+    private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
 
     /// Re-read the selected model (for the current provider) and the matching Keychain key. Mirrors the
     /// init's resolution so switching provider/gateway in Settings updates the Tools diagnostics live.

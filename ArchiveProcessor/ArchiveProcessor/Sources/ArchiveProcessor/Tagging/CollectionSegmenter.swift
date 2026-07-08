@@ -307,7 +307,7 @@ class CollectionSegmenter {
             // move, so numbering stays contiguous (no gaps from the skipped duplicates).
             // Continue numbering from any existing NNNNN files so re-running a collection into an existing
             // output folder APPENDS instead of restarting at 00001 and deleting/overwriting the earlier run.
-            var movedCount = Self.highestNumberPrefix(in: folderURL, fm: fm)
+            var movedCount = CollectionNumbering.highestLeadingNumber(in: folderURL, fm: fm)
             var movedOutputs = Set<URL>()
             for sourceURL in collection.fileURLs {
                 guard let pdfURL = outputURLMap[sourceURL],
@@ -343,7 +343,7 @@ class CollectionSegmenter {
                 // dir) — with no export, the only same-base image there is the user's irreplaceable original.
                 if moveSiblingImages {
                     let imgBase = pdfURL.deletingPathExtension().lastPathComponent
-                    for ext in ["jpg", "jpeg", "png", "tiff", "tif", "heic"] {
+                    for ext in ImageEncoding.acceptedImageExtensions {
                         let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
                         if fm.fileExists(atPath: imgURL.path) {
                             let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
@@ -357,21 +357,9 @@ class CollectionSegmenter {
         }
     }
 
-    /// Highest leading NNNNN number among files directly in `folder` (0 if none) — so re-running a
-    /// collection into an existing output folder continues numbering. Mirrors LiveCaptureProcessor's
-    /// append logic (keep the two in sync).
-    private static func highestNumberPrefix(in folder: URL, fm: FileManager) -> Int {
-        guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return 0 }
-        var maxN = 0
-        for u in items {
-            let prefix = u.lastPathComponent.prefix(5)
-            if prefix.count == 5, prefix.allSatisfy(\.isNumber), let n = Int(prefix) { maxN = max(maxN, n) }
-        }
-        return maxN
-    }
-
     // MARK: - LLM Calls
 
+    // Segmentation uses maxTokens 256 / timeout 60 s (see LLMTextClient — the shared request path).
     private func callLLM(
         prompt: String,
         provider: LLMProvider,
@@ -380,82 +368,8 @@ class CollectionSegmenter {
         apiKey: String,
         gatewayConfig: GatewayConfig? = nil
     ) async throws -> String {
-        if let gateway = gatewayConfig {
-            return try await callGateway(prompt: prompt, gateway: gateway)
-        }
-        switch provider {
-        case .anthropic:
-            return try await callAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-        case .gemini:
-            return try await callGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-        case .mistral:
-            return try await callMistralChat(prompt: prompt, apiKey: apiKey)
-        }
-    }
-
-    private func callGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
-        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
-        return try await client.textCompletion(prompt: prompt, maxTokens: 256)
-    }
-
-    private func callAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
-        let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-        var body: [String: Any] = [
-            "model": model.id,
-            "max_tokens": 256,
-            "messages": [["role": "user", "content": prompt]]
-        ]
-        if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 1024 : 4000]
-        }
-        var request = URLRequest(url: endpoint, timeoutInterval: 60)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]] else { throw OCRError.networkError("bad response") }
-        return content.filter { ($0["type"] as? String) == "text" }.compactMap { $0["text"] as? String }.joined()
-    }
-
-    private func callGemini(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model.id):generateContent?key=\(apiKey)"
-        guard let url = URL(string: urlString) else { throw OCRError.networkError("Bad URL") }
-        var body: [String: Any] = ["contents": [["parts": [["text": prompt]]]]]
-        if let thinking = thinkingLevel {
-            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 1024 : 4000]]
-        }
-        var request = URLRequest(url: url, timeoutInterval: 60)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let content = candidates.first?["content"] as? [String: Any],
-              let parts = content["parts"] as? [[String: Any]] else { throw OCRError.networkError("bad response") }
-        return parts.compactMap { $0["text"] as? String }.joined()
-    }
-
-    private func callMistralChat(prompt: String, apiKey: String) async throws -> String {
-        let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
-        let body: [String: Any] = [
-            "model": "mistral-small-latest",
-            "messages": [["role": "user", "content": prompt]],
-            "max_tokens": 256
-        ]
-        var request = URLRequest(url: endpoint, timeoutInterval: 60)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
-              let content = message["content"] as? String else { throw OCRError.networkError("bad response") }
-        return content
+        try await LLMTextClient.complete(prompt: prompt, provider: provider, model: model,
+                                         thinkingLevel: thinkingLevel, apiKey: apiKey,
+                                         gatewayConfig: gatewayConfig, maxTokens: 256, timeout: 60)
     }
 }

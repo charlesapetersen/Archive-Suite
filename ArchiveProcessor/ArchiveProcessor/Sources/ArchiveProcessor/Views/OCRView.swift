@@ -78,16 +78,7 @@ struct OCRView: View {
         _outputDirectory = State(initialValue: ModelSelectionStore.savedOutputDirectory())
     }
 
-    private var currentGatewayConfig: GatewayConfig? {
-        guard useGateway, !gatewayBaseURL.isEmpty, !gatewayModelID.isEmpty else { return nil }
-        return GatewayConfig(
-            baseURL: gatewayBaseURL,
-            modelID: gatewayModelID,
-            displayName: gatewayDisplayName.isEmpty ? "API Gateway" : gatewayDisplayName,
-            inputCostPer1M: gatewayInputCost >= 0 ? gatewayInputCost : nil,
-            outputCostPer1M: gatewayOutputCost >= 0 ? gatewayOutputCost : nil
-        )
-    }
+    private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
 
     private var currentModels: [LLMModel] {
         let builtIn: [LLMModel]
@@ -834,7 +825,7 @@ struct OCRView: View {
         // Mode-aware: pre-OCRed input ingests PDFs; image mode accepts only the documented image
         // formats (JPEG/PNG/TIFF/HEIC) — so a wrong-type file is rejected at the door instead of
         // entering the pipeline and failing later.
-        return preOCRedInput ? (ext == "pdf") : ["jpg", "jpeg", "png", "tiff", "tif", "heic"].contains(ext)
+        return preOCRedInput ? (ext == "pdf") : ImageEncoding.acceptedImageExtensions.contains(ext)
     }
 
     private func resumePendingBatch() {

@@ -68,7 +68,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
     @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
     @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
-    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = "stage"
+    @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
     @AppStorage(DefaultsKeys.liveTransport) private var liveTransport: String = "lan"
     @AppStorage(DefaultsKeys.driveClientId) private var driveClientId: String = ""
 
@@ -583,8 +583,8 @@ struct SettingsView: View {
     @ViewBuilder private var liveCaptureSection: some View {
         Section {
             Picker(selection: $liveProcessingMode) {
-                Text("Stage for later").tag("stage")
-                Text("Process live").tag("live")
+                Text("Stage for later").tag(LiveProcessingMode.stage.rawValue)
+                Text("Process live").tag(LiveProcessingMode.live.rawValue)
             } label: {
                 HStack {
                     Text("When capturing")

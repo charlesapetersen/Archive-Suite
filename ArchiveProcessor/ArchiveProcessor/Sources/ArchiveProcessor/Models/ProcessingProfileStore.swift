@@ -103,7 +103,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.enableSegmentJSON, def: .bool(true)),
         .init(key: DefaultsKeys.tagVocabulary, def: .string("")),
 
-        .init(key: DefaultsKeys.liveProcessingMode, def: .string("stage")),
+        .init(key: DefaultsKeys.liveProcessingMode, def: .string(LiveProcessingMode.stage.rawValue)),
     ]
 
     // MARK: - Snapshot / Apply

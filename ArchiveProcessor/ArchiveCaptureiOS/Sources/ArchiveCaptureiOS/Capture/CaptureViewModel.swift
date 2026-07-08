@@ -313,7 +313,8 @@ final class CaptureViewModel: ObservableObject {
     private func noteYear(_ y: Int) {
         var ys = recentYears.filter { $0 != y }
         ys.insert(y, at: 0)
-        UserDefaults.standard.set(Array(ys.prefix(5)), forKey: Self.recentYearsKey)
+        // Recent-years cap reconciled to 6 to match the Android companion (was 5).
+        UserDefaults.standard.set(Array(ys.prefix(6)), forKey: Self.recentYearsKey)
     }
 
     // MARK: - Upload

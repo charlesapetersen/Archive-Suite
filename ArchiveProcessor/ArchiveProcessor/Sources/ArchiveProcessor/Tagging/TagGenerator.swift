@@ -67,6 +67,16 @@ struct GeneratedTags: Codable {
         return nil
     }
 
+    /// Canonical English month names — the single source for building "MM MonthName" date tags.
+    static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
+                                    "July", "August", "September", "October", "November", "December"]
+
+    /// Build a "MM MonthName" month tag (e.g. "03 March") for a 1...12 month; nil for an out-of-range month.
+    static func monthTag(_ month: Int) -> String? {
+        guard (1...12).contains(month) else { return nil }
+        return String(format: "%02d %@", month, englishMonthNames[month - 1])
+    }
+
     /// Parse a day-of-month from "Day 15", "day 15", or "15".
     static func dayNumber(from s: String) -> Int? {
         let digits = s.filter { $0.isNumber }
@@ -216,6 +226,7 @@ class TagGenerator: ObservableObject {
         }
     }
 
+    // Tagging uses maxTokens 512 / timeout 120 s (see LLMTextClient — the shared request path).
     private func callLLM(
         prompt: String,
         provider: LLMProvider,
@@ -224,84 +235,9 @@ class TagGenerator: ObservableObject {
         apiKey: String,
         gatewayConfig: GatewayConfig? = nil
     ) async throws -> String {
-        if let gateway = gatewayConfig {
-            return try await callGateway(prompt: prompt, gateway: gateway)
-        }
-        switch provider {
-        case .anthropic:
-            return try await callAnthropic(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-        case .gemini:
-            return try await callGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
-        case .mistral:
-            return try await callMistralChat(prompt: prompt, apiKey: apiKey)
-        }
-    }
-
-    private func callGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
-        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
-        return try await client.textCompletion(prompt: prompt, maxTokens: 512)
-    }
-
-    private func callAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
-        let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-        var body: [String: Any] = [
-            "model": model.id,
-            "max_tokens": 512,
-            "messages": [["role": "user", "content": prompt]]
-        ]
-        if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 1024 : 4000]
-        }
-        var request = URLRequest(url: endpoint, timeoutInterval: 120)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]] else { throw OCRError.networkError("bad response") }
-        return content.filter { ($0["type"] as? String) == "text" }.compactMap { $0["text"] as? String }.joined()
-    }
-
-    private func callGemini(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model.id):generateContent?key=\(apiKey)"
-        guard let url = URL(string: urlString) else { throw OCRError.networkError("Bad URL") }
-        var body: [String: Any] = ["contents": [["parts": [["text": prompt]]]]]
-        if let thinking = thinkingLevel {
-            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 1024 : 4000]]
-        }
-        var request = URLRequest(url: url, timeoutInterval: 120)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let content = candidates.first?["content"] as? [String: Any],
-              let parts = content["parts"] as? [[String: Any]] else { throw OCRError.networkError("bad response") }
-        return parts.compactMap { $0["text"] as? String }.joined()
-    }
-
-    // The tagging model is intentionally fixed to mistral-small-latest (cheaper), so no model param.
-    private func callMistralChat(prompt: String, apiKey: String) async throws -> String {
-        let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
-        let body: [String: Any] = [
-            "model": "mistral-small-latest",  // Use cheaper model for tagging
-            "messages": [["role": "user", "content": prompt]],
-            "max_tokens": 512
-        ]
-        var request = URLRequest(url: endpoint, timeoutInterval: 120)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
-              let content = message["content"] as? String else { throw OCRError.networkError("bad response") }
-        return content
+        try await LLMTextClient.complete(prompt: prompt, provider: provider, model: model,
+                                         thinkingLevel: thinkingLevel, apiKey: apiKey,
+                                         gatewayConfig: gatewayConfig, maxTokens: 512, timeout: 120)
     }
 
     private func parseTagResponse(_ raw: String) -> GeneratedTags {

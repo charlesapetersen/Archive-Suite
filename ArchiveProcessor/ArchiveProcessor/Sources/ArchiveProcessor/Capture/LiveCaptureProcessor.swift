@@ -108,9 +108,6 @@ final class LiveCaptureProcessor: ObservableObject {
     }
     private var groupOCROverride: [String: OCROverride] = [:]
 
-    private static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
-                                            "July", "August", "September", "October", "November", "December"]
-
     init(session: CaptureSession) { self.session = session }
 
     // MARK: - Lifecycle
@@ -371,8 +368,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var tags = await computeTags(group: group, segment: segment, mac: mac, config: config)
         // Phone's in-the-room date wins (Mac override beats the phone value).
         if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
-        if let m = mac?.month ?? group.month, (1...12).contains(m) {
-            tags.month = String(format: "%02d %@", m, Self.englishMonthNames[m - 1])
+        if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
+            tags.month = mt
         }
 
         // Snapshot Sendable per-page work for the off-main file writes.
@@ -943,7 +940,7 @@ final class LiveCaptureProcessor: ObservableObject {
             // partial finalize, or the operator reusing a name — must NOT restart at 00001 and collide with
             // (and overwrite) an already-filed file. `appending` no longer affects numbering; both paths are
             // now collision-proof.
-            var seq = maxExistingNumber(in: plan.folder)
+            var seq = CollectionNumbering.highestLeadingNumber(in: plan.folder)
             for seg in plan.segments {
                 totalSegments += 1
                 // An INCOMPLETE segment (a source page produced no PDF) is NEVER filed: skip it entirely so no
@@ -1042,17 +1039,6 @@ final class LiveCaptureProcessor: ObservableObject {
         do { try fm.moveItem(at: src, to: dest); return .moved } catch { return .failed }
     }
 
-    /// Highest leading NNNNN number among files directly in a folder (0 if none) — for append numbering.
-    nonisolated private static func maxExistingNumber(in folder: URL) -> Int {
-        let fm = FileManager.default
-        guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return 0 }
-        var maxN = 0
-        for u in items {
-            let prefix = u.lastPathComponent.prefix(5)
-            if prefix.count == 5, prefix.allSatisfy(\.isNumber), let n = Int(prefix) { maxN = max(maxN, n) }
-        }
-        return maxN
-    }
 
     nonisolated private static func existingCollectionFolders(in dir: URL) -> [URL] {
         let fm = FileManager.default

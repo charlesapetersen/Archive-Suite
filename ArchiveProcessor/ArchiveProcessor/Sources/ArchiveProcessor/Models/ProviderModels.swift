@@ -319,6 +319,16 @@ struct OCRResult: Codable {
     }
 }
 
+// MARK: - Live Processing Mode
+
+/// The two Live Capture processing modes (Settings `liveProcessingMode`). `rawValue` is the string
+/// persisted in UserDefaults — NEVER change "stage"/"live" without a migration. Single source of truth
+/// replacing the "stage"/"live" magic strings scattered across the views + stores.
+enum LiveProcessingMode: String {
+    case stage
+    case live
+}
+
 // MARK: - Gateway Config
 
 struct GatewayConfig: Codable, Equatable {
@@ -343,6 +353,24 @@ struct GatewayConfig: Codable, Equatable {
             outputCostPer1M: outputCostPer1M ?? 0,
             batchDiscount: 0
         )
+    }
+
+    /// Build the gateway config from the shared app settings, or nil when the gateway is disabled or not
+    /// fully configured. Single source of truth for the OCRView / ToolsView `currentGatewayConfig` and
+    /// `SessionProcessingConfig.fromDefaults`, which previously each rebuilt this identically (the view
+    /// `@AppStorage` keys + defaults match these UserDefaults reads exactly, so the result is unchanged).
+    static func fromDefaults(_ d: UserDefaults = .standard) -> GatewayConfig? {
+        guard d.bool(forKey: DefaultsKeys.useGateway) else { return nil }
+        let baseURL = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
+        let modelID = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
+        guard !baseURL.isEmpty, !modelID.isEmpty else { return nil }
+        let inCost = d.object(forKey: DefaultsKeys.gatewayInputCost) as? Double ?? -1
+        let outCost = d.object(forKey: DefaultsKeys.gatewayOutputCost) as? Double ?? -1
+        let name = d.string(forKey: DefaultsKeys.gatewayDisplayName) ?? ""
+        return GatewayConfig(baseURL: baseURL, modelID: modelID,
+                             displayName: name.isEmpty ? "API Gateway" : name,
+                             inputCostPer1M: inCost >= 0 ? inCost : nil,
+                             outputCostPer1M: outCost >= 0 ? outCost : nil)
     }
 }
 

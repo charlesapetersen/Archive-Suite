@@ -25,7 +25,7 @@ import PDFKit
 @MainActor
 enum ProcessFilesTestDriver {
     private static var didRun = false
-    private static let imageExts: Set<String> = ["jpg", "jpeg", "png", "tiff", "tif", "heic"]
+    private static let imageExts = Set(ImageEncoding.acceptedImageExtensions)
 
     static func runIfRequested() {
         guard !didRun,

@@ -36,18 +36,7 @@ struct SessionProcessingConfig {
         let model = (builtIns + custom).first { $0.id == modelId } ?? builtIns.first ?? provider.models[0]
 
         let useGateway = d.bool(forKey: DefaultsKeys.useGateway)
-        let gatewayBaseURL = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
-        let gatewayModelID = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
-        var gateway: GatewayConfig? = nil
-        if useGateway, !gatewayBaseURL.isEmpty, !gatewayModelID.isEmpty {
-            let inCost = d.object(forKey: DefaultsKeys.gatewayInputCost) as? Double ?? -1
-            let outCost = d.object(forKey: DefaultsKeys.gatewayOutputCost) as? Double ?? -1
-            let name = d.string(forKey: DefaultsKeys.gatewayDisplayName) ?? ""
-            gateway = GatewayConfig(baseURL: gatewayBaseURL, modelID: gatewayModelID,
-                                    displayName: name.isEmpty ? "API Gateway" : name,
-                                    inputCostPer1M: inCost >= 0 ? inCost : nil,
-                                    outputCostPer1M: outCost >= 0 ? outCost : nil)
-        }
+        let gateway = GatewayConfig.fromDefaults(d)
 
         let outURL: URL = {
             if let path = d.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {

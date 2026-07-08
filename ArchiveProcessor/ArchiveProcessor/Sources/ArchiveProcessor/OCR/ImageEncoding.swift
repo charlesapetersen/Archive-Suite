@@ -11,6 +11,11 @@ enum ImageEncoding {
     /// separately (PDFGenerator / dual-output copy) and are unaffected. Tunable.
     static let maxOCRDimension = 2048
 
+    /// Canonical set of accepted input image extensions (lowercased). Single source of truth for the
+    /// file-intake / test-driver / collection-move sites that filter by extension. Ordered so the
+    /// collection-move sibling-image lookup keeps its original iteration order.
+    static let acceptedImageExtensions: [String] = ["jpg", "jpeg", "png", "tiff", "tif", "heic"]
+
     /// Load an image as JPEG for upload — efficiently. Reads dimensions from the file header and
     /// decodes straight to the target long edge (honoring EXIF orientation) via a thumbnail request,
     /// so the full-resolution bitmap is never materialized. `scale` (0–1) applies the user's
