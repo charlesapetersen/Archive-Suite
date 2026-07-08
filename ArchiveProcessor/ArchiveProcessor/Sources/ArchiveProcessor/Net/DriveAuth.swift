@@ -24,8 +24,11 @@ final class DriveAuth: @unchecked Sendable {
     private var cached: (token: String, expiry: Date)?
 
     init(clientId: String, clientSecret: String, http: HTTPExecuting = URLSessionHTTP()) {
-        self.clientId = clientId
-        self.clientSecret = clientSecret
+        // Trim whitespace/newlines: a pasted client id/secret very often carries a trailing space or
+        // newline, which Google rejects as `invalid_client` ("client secret is invalid"). Trimming here
+        // covers BOTH the interactive sign-in exchange and the autonomous relay-refresh path.
+        self.clientId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.clientSecret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
         self.http = http
     }
 
