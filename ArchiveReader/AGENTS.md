@@ -6,8 +6,11 @@ for coordinating **multiple concurrent agents/instances**. Mirrors the sibling A
 process.
 
 ## Golden rule
-**One git worktree per agent.** Never run two instances in the same working directory — they clobber
-each other's uncommitted edits and race on the build cache.
+**Worktree-first, mandatory before any edit.** Be in your own git worktree; never work in the primary
+checkout — **even if you think you're the only instance** (you can't know another won't start, and the
+owner doesn't track worktrees). Two instances in one working directory clobber each other's uncommitted
+edits and race the build cache. Suite-wide idempotent first-step check: root [`../CLAUDE.md`](../CLAUDE.md)
+→ "Worktree-first". The commands below isolate a Reader worktree specifically.
 
 ```bash
 git worktree add "../ar-wt-<lane>" -b <branch>              # isolated checkout (paths have a space → quote)

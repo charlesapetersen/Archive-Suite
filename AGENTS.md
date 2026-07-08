@@ -6,8 +6,12 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 
 ## Ground rules
 
-- **One worktree per agent.** `git worktree add ../suite-<lane> <branch>`. Per‑worktree DerivedData
-  (`-derivedDataPath ./build/DD`, already the default in each `launch.sh`) so parallel builds never collide.
+- **Worktree-first — mandatory, not optional.** Before *any* edit/build/commit, be in your own git
+  worktree; never work in the primary checkout, even if you think you're the only instance running. Run the
+  idempotent first-step check in [`CLAUDE.md`](CLAUDE.md) → **"Worktree-first"** (it creates
+  `../suite-wt-<stamp>` only if you're not already isolated, so it's safe to run every session). Per‑worktree
+  DerivedData (`-derivedDataPath ./build/DD`, already the default in each `launch.sh`) keeps parallel builds
+  from colliding. **Remove your worktree once your work is pushed** so they don't pile up for the owner.
 - **After any pull/switch, `xcodegen generate`** (or the app's `bootstrap.sh`) — the `.xcodeproj` is gitignored.
 - **Stay in your lane.** A change scoped to one app touches only that subdir. Loading the *other* app is
   almost always unnecessary (see the token‑efficiency directive in [`CLAUDE.md`](CLAUDE.md)).

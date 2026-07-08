@@ -217,7 +217,12 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 
 ## Concurrent / multi-agent development
 
-Multiple people or AI instances can work in parallel **as long as each gets its own git worktree** — never run two instances in the same working directory (they clobber each other's uncommitted edits and race on the build cache).
+**Worktree-first is mandatory** (suite rule — the idempotent first-step check lives in the root
+[`../CLAUDE.md`](../CLAUDE.md) → "Worktree-first"): before *any* edit/build/commit, be in your own git
+worktree; never work in the primary checkout, **even if you think you're the only instance** — you can't
+know another won't start in parallel, and the owner doesn't track worktrees. With that rule, multiple
+people or AI instances work in parallel safely — each in its own worktree — without clobbering each other's
+uncommitted edits or racing the build cache.
 
 **Worktree lifecycle** (paths contain a space — always quote):
 ```bash

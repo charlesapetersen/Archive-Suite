@@ -8,6 +8,39 @@ that app**; read it before working inside a subdirectory:
 - [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) — the Processor + its iOS/Android capture companions.
 - [`ArchiveReader/CLAUDE.md`](ArchiveReader/CLAUDE.md) — the Reader (incl. its bulletproof file‑safety Core Directive).
 
+## Worktree-first — mandatory before any edit (every agent & instance)
+
+**Before you edit, build, or commit anything in this repo, be in your own dedicated git worktree — never
+work directly in this primary checkout.** This is *unconditional*: do it even if you believe you are the
+only instance running. You cannot know that another instance or subagent won't start in parallel, and
+**the owner does not track worktrees** — so the only coordination-free way to stop parallel instances from
+clobbering each other's uncommitted edits and racing the build cache is that *nobody* works in the primary
+checkout. (A pure read-only / question-answering session that changes nothing is the only exception — don't
+spin up a worktree just to answer a question.)
+
+**Make this your first step — it's idempotent, so it's safe to run at the start of every session:**
+```bash
+# Run from the checkout you were launched in. Creates a worktree ONLY if you're not already in one.
+if [ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]; then
+  stamp="$(date +%Y%m%d-%H%M%S)-$$"
+  git worktree add "../suite-wt-$stamp" -b "wt/<task-slug>-$stamp"   # repo path has a space → keep quotes
+  cd "../suite-wt-$stamp"
+else
+  echo "Already isolated in $(git rev-parse --show-toplevel) — keep working here."
+fi
+```
+Then do **all** edits, builds, and commits from that worktree (use its absolute paths for Read/Edit/Write),
+and run `xcodegen generate` there before building (the `.xcodeproj` is gitignored). Push as normal — every
+worktree shares one `origin/main`. **When your task is pushed, remove your own worktree** so they don't pile
+up for the owner: from the primary checkout, `git worktree remove "../suite-wt-…"` (`./build` is gitignored,
+so it won't block); `git worktree list` / `git worktree prune` clear strays.
+
+**Subagents that write files** must be isolated the same way — pass `isolation: "worktree"` to the Agent
+tool (or `{isolation: 'worktree'}` on a `Workflow` `agent()` call) so each gets its own scratch worktree
+instead of racing in yours.
+
+Ownership lanes, per-app build commands, and shared hotspots: [`AGENTS.md`](AGENTS.md).
+
 ## Repo map
 
 ```
