@@ -18,12 +18,13 @@ SDK="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export ANDROID_HOME="$SDK"
 ADB="$(command -v adb || echo "$SDK/platform-tools/adb")"
 # SAFETY: target ONLY the emulator, never a physical phone that may also be attached (a real device
-# could be in use). Pin every adb + gradle call to the emulator serial via ANDROID_SERIAL (both honor
-# it). Refuse to run if we can't isolate exactly one emulator.
+# could be in use). Pin every adb + gradle call to the emulator serial via ANDROID_SERIAL (both honor it).
+# Derived best-effort at load; the strict "exactly one emulator" check is ENFORCED LAZILY by
+# require_emulator (below) so that `boot` can cold-start the FIRST emulator — the strict check can't run
+# before an emulator exists, but every command that touches a RUNNING emulator still refuses unless one
+# is isolated.
 EMU_SERIAL="${EMU_SERIAL:-$("$ADB" devices | awk '/^emulator-/{print $1}')}"
-[ -n "$EMU_SERIAL" ] || { echo "[harness] FAIL: no emulator found (adb devices shows nothing matching emulator-*)" >&2; exit 1; }
-[ "$(printf '%s\n' "$EMU_SERIAL" | grep -c .)" -eq 1 ] || { echo "[harness] FAIL: multiple emulators: $EMU_SERIAL — set EMU_SERIAL=… explicitly" >&2; exit 1; }
-export ANDROID_SERIAL="$EMU_SERIAL"
+[ -n "$EMU_SERIAL" ] && export ANDROID_SERIAL="$EMU_SERIAL"
 EMULATOR="$SDK/emulator/emulator"
 AVDMANAGER="$SDK/cmdline-tools/latest/bin/avdmanager"
 SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
@@ -38,6 +39,14 @@ APPDIR="$HERE/ArchiveCapture"
 
 log(){ printf '\033[36m[harness]\033[0m %s\n' "$*"; }
 die(){ printf '\033[31m[harness] FAIL:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Enforce the SAFETY invariant lazily: exactly one emulator attached, pinned via ANDROID_SERIAL, never a
+# physical phone. Called by every command that drives a RUNNING emulator (NOT by `boot`, which creates it).
+require_emulator(){
+  EMU_SERIAL="$("$ADB" devices | awk '/^emulator-/{print $1}')"
+  [ -n "$EMU_SERIAL" ] || die "no emulator found (adb devices shows nothing matching emulator-*) — run 'boot' first"
+  [ "$(printf '%s\n' "$EMU_SERIAL" | grep -c .)" -eq 1 ] || die "multiple emulators: $EMU_SERIAL — set EMU_SERIAL=… explicitly"
+  export ANDROID_SERIAL="$EMU_SERIAL"; }
 
 # --- UI observation / driving --------------------------------------------------------------------
 dump(){ "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; "$ADB" shell cat /sdcard/ui.xml 2>/dev/null; }
@@ -77,7 +86,8 @@ ensure_avd(){ [ -x "$EMULATOR" ] || die "emulator not installed — run: sdkmana
     log "set hw.keyboard=yes in $cfg"
   fi; }
 boot(){ ensure_avd; log "booting headless emulator $AVD"; "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
-  "$ADB" wait-for-device; log "waiting for boot…"; until [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do sleep 2; done
+  "$ADB" wait-for-device; require_emulator   # emulator now exists → pin ANDROID_SERIAL for the calls below
+  log "waiting for boot…"; until [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do sleep 2; done
   "$ADB" shell input keyevent 82 >/dev/null 2>&1                    # dismiss the keyguard
   "$ADB" shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1  # never pop the soft IME (would cover buttons)
   log "booted."; }
@@ -87,6 +97,10 @@ install(){ [ -f "$APPDIR/local.properties" ] || echo "sdk.dir=$SDK" > "$APPDIR/l
   ( cd "$APPDIR" && ./gradlew :app:assembleDebug ) || die "assemble failed"
   local apk="$APPDIR/app/build/outputs/apk/debug/app-debug.apk"; [ -f "$apk" ] || die "APK not found: $apk"
   "$ADB" -s "$EMU_SERIAL" install -r "$apk" || die "install to $EMU_SERIAL failed"
+  # Clear app data so every run starts at the CONNECT screen (deterministic pairing). `install -r` keeps
+  # data, so a saved endpoint from a prior run would launch straight to the capture screen and the pairing
+  # taps would miss. (pm clear also revokes CAMERA — re-granted next; pair() re-grants too.)
+  "$ADB" -s "$EMU_SERIAL" shell pm clear "$PKG" >/dev/null 2>&1 || true
   "$ADB" -s "$EMU_SERIAL" shell pm grant "$PKG" android.permission.CAMERA >/dev/null 2>&1 || true; }
 
 launch(){ "$ADB" shell am start -n "$ACT" >/dev/null 2>&1; sleep 2; }
@@ -145,25 +159,28 @@ inject(){ local fx="$1"; [ -f "$fx" ] || die "inject fixture not found: $fx"
 # as a single-page document segment, End segment, then Skip (tags applied by the Mac's LLM). Called by
 # e2e-phone-mac.sh AFTER pairing to the REAL Mac; the Mac auto-skips/finalizes and asserts the round-trip.
 inject_flow(){ local fixdir="$1" gt="$2" i=0
-  while IFS= read -r f; do
+  # Read the doc list on FD 3, NOT stdin: `adb shell` in the loop body forwards stdin to the device until
+  # EOF, so a plain `while read … < <(…)` would let the first adb call swallow the remaining doc lines and
+  # the loop would run only once. FD 3 keeps the list out of adb's reach.
+  while IFS= read -r f <&3; do
     i=$((i+1)); log "e2e doc $i: inject $f + capture"
     inject "$fixdir/$f"
     tap_shutter; shot "doc$i-captured"
     tap_text "End segment"; sleep 2; shot "doc$i-tagsheet"
     tap_text_opt "Skip (tag on Mac)"; sleep 1
-  done < <(python3 -c 'import json,sys
+  done 3< <(python3 -c 'import json,sys
 for d in json.load(open(sys.argv[1])): print(d["file"])' "$gt")
   tap_text_opt "Save to phone"; shot "zz-drained"; }
 
 case "${1:-all}" in
   boot) boot;;
-  install) install;;
-  pair) pair "$2" "$3";;
-  flow) flow;;
-  inject) inject "$2";;
-  inject-flow) inject_flow "$2" "$3";;
-  shot) shot "${2:-shot}";;
+  install) require_emulator; install;;
+  pair) require_emulator; pair "$2" "$3";;
+  flow) require_emulator; flow;;
+  inject) require_emulator; inject "$2";;
+  inject-flow) require_emulator; inject_flow "$2" "$3";;
+  shot) require_emulator; shot "${2:-shot}";;
   stub) stub "${2:-48628}";;
-  all) boot; install; pair "${2:?port}" "${3:?token}"; flow; log "done — screenshots in $OUT";;
+  all) boot; require_emulator; install; pair "${2:?port}" "${3:?token}"; flow; log "done — screenshots in $OUT";;
   *) die "unknown cmd: $1";;
 esac
