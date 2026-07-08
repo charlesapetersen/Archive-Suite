@@ -66,10 +66,16 @@ final class DriveAuth: @unchecked Sendable {
     func signIn(completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
         let verifier = Self.b64url(Self.randomBytes(48))
         let challenge = Self.b64url(Data(SHA256.hash(data: Data(verifier.utf8))))   // PKCE S256
+        let state = Self.b64url(Self.randomBytes(24))   // CSRF guard: echoed back on the redirect, verified below
         let listener = LoopbackRedirectServer()
         do {
-            let port = try listener.start { [weak self] code in
+            let port = try listener.start { [weak self] code, returnedState in
                 guard let self else { return }
+                // Reject a redirect whose `state` doesn't match the one we sent — a foreign/forged callback
+                // must never drive a token exchange. Verified BEFORE exchanging the code.
+                guard returnedState == state else {
+                    completion(.failure(DriveError.oauthStateMismatch)); listener.stop(); return
+                }
                 do {
                     let tokens = try self.exchange(code: code, verifier: verifier, redirect: "http://127.0.0.1:\(listener.port)")
                     if let refresh = tokens["refresh_token"] as? String {
@@ -89,6 +95,7 @@ final class DriveAuth: @unchecked Sendable {
                 .init(name: "code_challenge_method", value: "S256"),
                 .init(name: "access_type", value: "offline"),
                 .init(name: "prompt", value: "consent"),
+                .init(name: "state", value: state),
             ]
             if let url = comps.url { NSWorkspace.shared.open(url) }
         } catch { completion(.failure(error)) }
@@ -123,8 +130,13 @@ private final class LoopbackRedirectServer: @unchecked Sendable {
     private var listener: NWListener?
     private(set) var port: UInt16 = 0
 
-    func start(onCode: @escaping @Sendable (String) -> Void) throws -> UInt16 {
-        let l = try NWListener(using: .tcp)
+    func start(onCode: @escaping @Sendable (String, String?) -> Void) throws -> UInt16 {
+        // Bind the listen socket to the loopback interface ONLY (not 0.0.0.0/all interfaces), so no other
+        // host on the network can reach the transient OAuth redirect server. `port: .any` still lets the
+        // OS pick an ephemeral port, reported via `listener.port`.
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
+        let l = try NWListener(using: params)
         listener = l
         l.newConnectionHandler = { conn in
             conn.start(queue: .global())
@@ -134,10 +146,11 @@ private final class LoopbackRedirectServer: @unchecked Sendable {
                    let pathPart = line.split(separator: " ").dropFirst().first,
                    let comps = URLComponents(string: "http://x\(pathPart)"),
                    let code = comps.queryItems?.first(where: { $0.name == "code" })?.value {
+                    let returnedState = comps.queryItems?.first(where: { $0.name == "state" })?.value
                     let body = "Signed in — you can close this tab and return to Archive Processor."
                     let resp = "HTTP/1.1 200 OK\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
                     conn.send(content: Data(resp.utf8), completion: .contentProcessed { _ in conn.cancel() })
-                    onCode(code)
+                    onCode(code, returnedState)
                 } else { conn.cancel() }
             }
         }

@@ -217,7 +217,16 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             store.delete(seg); report.segmentsApplied.append(group)
         }
 
-        if !sessionCompletes.isEmpty {
+        // A session-complete marker force-completes the whole session (completeAllOpenDocGroups → tag
+        // cards), so it must be gated on token+epoch EXACTLY like the photo/segment branches — the fixed
+        // filename `_session.complete.json` alone is not proof of ownership. Parse each marker's body and
+        // keep only those matching THIS run; a stale marker from a prior run (foreign epoch/token) is left
+        // untouched — not acted on, not deleted (the sweep ages foreign objects out).
+        let mySessionCompletes = sessionCompletes.filter { n in
+            guard let data = store.readData(n), let meta = RelayObjectFormat.parse(data) else { return false }
+            return meta["token"] == token && meta["epoch"] == epoch
+        }
+        if !mySessionCompletes.isEmpty {
             let anyUnprocessed = sidecars.contains { n in
                 guard let id = RelayObjectFormat.identityFromName(n) else { return false }
                 return processed[key(id.group, id.seq)] == nil
@@ -228,7 +237,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
                     s?.completeAllOpenDocGroups()
                     s?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
                 }
-                for n in sessionCompletes { store.delete(n) }
+                for n in mySessionCompletes { store.delete(n) }
                 report.sessionCompleted = true
             }
         }

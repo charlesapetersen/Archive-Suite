@@ -316,6 +316,7 @@ extension OCRProcessor {
     }
     func performBatchOCR(
         fileURLs: [URL],
+        originalFiles: [URL],
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
@@ -362,9 +363,13 @@ extension OCRProcessor {
 
         // Store for cancellation + persist to disk for resume after relaunch
         activeBatch = BatchContext(batchId: batchId, apiKey: apiKey, model: model, thinkingLevel: thinkingLevel, provider: provider)
+        // Persist the ORIGINAL input files (not the ephemeral temp JPEGs `convertPDFInputs` produced for
+        // PDF inputs): the temp <UUID>.jpg paths are purged on relaunch, so a resume that keyed off them
+        // would rebuild wrong output names + never match the fingerprint. Resume re-derives the temp JPEGs
+        // from these originals (mirrors PendingRun / resumeRun). Fingerprint likewise over the originals.
         Self.savePendingBatch(PendingBatch(
             batchId: batchId, provider: provider, model: model,
-            thinkingLevel: thinkingLevel, fileURLs: fileURLs,
+            thinkingLevel: thinkingLevel, fileURLs: originalFiles,
             outputDirectory: outputDirectory, enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
             sendPreviousImage: sendPreviousImage, submittedAt: Date(),
@@ -374,8 +379,9 @@ extension OCRProcessor {
             customPrompt: customPrompt,
             taggingMode: taggingMode,
             runFingerprint: Self.runFingerprint(
-                files: fileURLs, outputDirectory: outputDirectory, taggingMode: taggingMode,
-                enableTagging: enableTagging, batchMode: true)
+                files: originalFiles, outputDirectory: outputDirectory, taggingMode: taggingMode,
+                enableTagging: enableTagging, batchMode: true),
+            exportOriginals: exportOriginals
         ))
         statusMessage = "Batch submitted. Waiting for results…"
 

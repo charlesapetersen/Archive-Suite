@@ -260,12 +260,20 @@ extension OCRProcessor {
         exportedImageMap = [:]
         currentModel = pending.model
         taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
+        // Restore the dual-output (export sized original beside each PDF) behavior the run was submitted
+        // with. Only when the manifest persisted it — a legacy manifest (nil) keeps the live setting the
+        // caller already applied (resumePendingBatch), matching how PendingRun/resumeRun restore it.
+        if let e = pending.exportOriginals { exportOriginals = e }
         // Apply this run's rotation mode + standard image size, exactly as resumeRun/startProcessing do —
         // otherwise a resumed batch runs Vision/LLM rotation even when the user's mode is Off, and sizes
         // against the wrong standard-image target.
         Self.rotationModeForRun = rotationMode
         Self.loadStandardImageMB()
+        // Jobs carry the ORIGINAL source URLs (correct output names + tag targets). For PDF inputs the
+        // persisted temp JPEGs are long gone, so regenerate them from the originals — exactly like
+        // resumeRun — and feed the temp images (not the .pdf) to the result/PDF-embed + retry paths.
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
+        let imageURLs = convertPDFInputs(pending.fileURLs)
         for i in jobs.indices { jobs[i].status = .processing }
         progress = 0
         statusMessage = "Resuming batch…"
@@ -279,20 +287,22 @@ extension OCRProcessor {
         await pollBatchUntilComplete(
             batchId: pending.batchId, provider: pending.provider,
             model: pending.model, thinkingLevel: pending.thinkingLevel,
-            apiKey: apiKey, fileURLs: pending.fileURLs,
+            apiKey: apiKey, fileURLs: imageURLs,
             outputDirectory: pending.outputDirectory
         )
 
         // A transient interruption (network streak / timeout) leaves the batch resumable — don't delete
         // the pending batch or continue into tagging/finalize on incomplete results; let the user Resume.
-        if batchPollInterrupted { activeBatch = nil; return }
+        // Reset isProcessing + re-surface the pending-batch banner (mirrors startProcessing) so the UI
+        // isn't wedged with every Start/Resume button disabled until relaunch.
+        if batchPollInterrupted { activeBatch = nil; isProcessing = false; cleanupTempFiles(); checkForPendingBatch(); return }
         Self.deletePendingBatch()
         activeBatch = nil
 
         guard !Task.isCancelled else { return }
 
         await retryHighUseFailures(
-            fileURLs: pending.fileURLs, provider: pending.provider,
+            fileURLs: imageURLs, provider: pending.provider,
             model: pending.model, thinkingLevel: pending.thinkingLevel,
             apiKey: apiKey, outputDirectory: pending.outputDirectory
         )
@@ -300,7 +310,7 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         await retryLoopForFailedFiles(
-            imageURLs: pending.fileURLs,
+            imageURLs: imageURLs,
             outputDirectory: pending.outputDirectory
         )
 
@@ -367,6 +377,11 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
+        // Dual output: write each original image beside its PDF (same base + tags) BEFORE merge repoints
+        // outputURLMap and before organization moves files — exactly as startProcessing does. Skipped
+        // unless exportOriginals is set (restored above), so the non-dual-output path is unchanged.
+        await exportOriginalImages()
+
         if mergeDocuments {
             performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
         }
@@ -380,13 +395,16 @@ extension OCRProcessor {
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
-                    moveSiblingImages: exportOriginals
+                    moveSiblingImages: exportOriginals,
+                    exportedImageMap: exportedImageMap
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
             } catch {
                 statusMessage = "Error organizing collections: \(error.localizedDescription)"
             }
         }
+
+        cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
         writeLogFile(outputDirectory: pending.outputDirectory)
@@ -423,6 +441,10 @@ extension OCRProcessor {
         pdfToImageMap = [:]
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
+        // Restore the dual-output behavior the run was started with (see PendingRun.exportOriginals). Only
+        // when the manifest persisted it — a legacy manifest (nil) keeps the live setting the caller
+        // already applied (resumePendingRun).
+        if let e = pending.exportOriginals { exportOriginals = e }
         // Restore the run-time knobs the OCR call reads (startProcessing sets these; resume must too,
         // or OCR falls back to the default Local Vision rotation — which stalls the parallel workers).
         Self.rotationModeForRun = rotationMode
@@ -637,6 +659,11 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
 
+        // Dual output: write each original image beside its PDF BEFORE merge repoints outputURLMap and
+        // before organization moves files — exactly as startProcessing does. No-op unless exportOriginals
+        // is set (restored above), so the non-dual-output path is unchanged.
+        await exportOriginalImages()
+
         if mergeDocuments {
             performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
         }
@@ -650,7 +677,8 @@ extension OCRProcessor {
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
-                    moveSiblingImages: exportOriginals
+                    moveSiblingImages: exportOriginals,
+                    exportedImageMap: exportedImageMap
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
             } catch {
@@ -923,6 +951,7 @@ extension OCRProcessor {
             if batchMode && provider.supportsBatch {
                 await performBatchOCR(
                     fileURLs: imageURLs,
+                    originalFiles: files,
                     provider: provider,
                     model: model,
                     thinkingLevel: thinkingLevel,
@@ -958,7 +987,8 @@ extension OCRProcessor {
                     completedResults: [:],
                     runFingerprint: Self.runFingerprint(
                         files: files, outputDirectory: outputDirectory, taggingMode: nil,
-                        enableTagging: enableTagging, batchMode: false)
+                        enableTagging: enableTagging, batchMode: false),
+                    exportOriginals: exportOriginals
                 )
                 Self.savePendingRun(activePendingRun!)
 

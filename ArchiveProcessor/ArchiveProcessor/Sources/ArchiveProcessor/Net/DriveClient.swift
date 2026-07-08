@@ -50,6 +50,7 @@ private final class HTTPResultBox: @unchecked Sendable {
 
 enum DriveError: Error, LocalizedError, CustomStringConvertible {
     case badURL(String), noResponse, transport(String), http(status: Int, body: String), decode(String), notSignedIn
+    case oauthStateMismatch
     var description: String {
         switch self {
         case .badURL(let u): return "bad URL \(u)"
@@ -58,6 +59,7 @@ enum DriveError: Error, LocalizedError, CustomStringConvertible {
         case .http(let s, let b): return "HTTP \(s): \(b.prefix(200))"
         case .decode(let m): return "decode: \(m)"
         case .notSignedIn: return "not signed in to Google Drive"
+        case .oauthStateMismatch: return "OAuth redirect state did not match (possible CSRF); sign-in aborted"
         }
     }
     // Surface the human-readable message through LocalizedError so the UI shows "transport error: …" /

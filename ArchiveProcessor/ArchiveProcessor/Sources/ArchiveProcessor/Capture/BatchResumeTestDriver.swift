@@ -20,6 +20,10 @@ import AppKit
 ///   8. B7 regression: two sources sharing a base filename, assigned outputs in COMPLETION order that
 ///      differs from index order, each resolve back to the SAME output PDF they hold on disk (association
 ///      preserved via the persisted path map) — whereas the legacy index-order derivation would SWAP them.
+///   9. P-1/P-2: `exportOriginals` (dual output) is persisted + round-trips in both PendingRun and
+///      PendingBatch (so a resume restores it), a legacy manifest decodes it as nil (backward-compat), and
+///      a batch manifest persists the ORIGINAL input files (not the ephemeral temp JPEGs) with a matching
+///      fingerprint — the temp-path fingerprint provably diverges.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on an explicit temp manifest url via `_testWritePendingRun`/`_testReadPendingRun`, so it
@@ -203,6 +207,52 @@ enum BatchResumeTestDriver {
         check("legacy index-order derivation WOULD swap (index 0 → 00001.pdf); persisted-path fix diverges",
               legacyResolved[0]?.lastPathComponent == "00001.pdf"
               && resolved[0]?.lastPathComponent != legacyResolved[0]?.lastPathComponent)
+
+        // --- 9: P-1/P-2 — exportOriginals is persisted (dual output survives resume) and the batch
+        // manifest persists the ORIGINAL input files, not the ephemeral temp JPEGs. ---
+        // P-1 (run): a PendingRun round-trips exportOriginals=true, and a legacy manifest (field absent)
+        // decodes it as nil so resume falls back to the live setting (backward-compat).
+        var runExport = run
+        runExport.exportOriginals = true
+        let exportURL = tmp.appendingPathComponent("export_run.json")
+        _ = OCRProcessor._testWritePendingRun(runExport, to: exportURL)
+        let exportLoaded = OCRProcessor._testReadPendingRun(from: exportURL)
+        check("PendingRun round-trips exportOriginals=true (P-1: dual output survives resume)",
+              exportLoaded?.exportOriginals == true)
+        check("legacy PendingRun (no exportOriginals) decodes the field as nil (backward-compat)",
+              loaded?.exportOriginals == nil)
+
+        // P-2 (batch): a PendingBatch built from ORIGINAL files persists those originals (not temp JPEGs)
+        // and stays self-consistent (fingerprint computed over the originals); exportOriginals round-trips.
+        let batch = OCRProcessor.PendingBatch(
+            batchId: "batch-test", provider: .gemini, model: LLMProvider.gemini.models[0],
+            thinkingLevel: nil, fileURLs: files, outputDirectory: outDir, enableTagging: true,
+            enableCollectionSegmentation: false, sendPreviousImage: false, submittedAt: Date(),
+            enableSegmentJSON: true, confirmCollectionIDs: false, reviewDocumentSegmentation: false,
+            customPrompt: nil, taggingMode: .automatic,
+            runFingerprint: OCRProcessor.runFingerprint(
+                files: files, outputDirectory: outDir, taggingMode: .automatic,
+                enableTagging: true, batchMode: true),
+            exportOriginals: true)
+        let batchData = try? JSONEncoder().encode(batch)
+        let batchLoaded = batchData.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingBatch.self, from: $0) }
+        check("PendingBatch persists the ORIGINAL input files (P-2: not ephemeral temp JPEGs)",
+              batchLoaded?.fileURLs == files)
+        check("PendingBatch round-trips exportOriginals=true (P-1)",
+              batchLoaded?.exportOriginals == true)
+        check("PendingBatch is self-consistent — fingerprint over the persisted originals matches (P-2)",
+              batchLoaded.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+        // A batch manifest that (as before the fix) persisted the TEMP-JPEG paths instead would fingerprint
+        // over the temp paths — a DIFFERENT identity than the originals the resume UI presents, so it would
+        // fail the match. Prove the two fingerprints diverge (why persisting originals is required).
+        let tempPaths = [inDir.appendingPathComponent("\(UUID().uuidString).jpg"),
+                         inDir.appendingPathComponent("\(UUID().uuidString).jpg")]
+        let fpOriginals = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: .automatic, enableTagging: true, batchMode: true)
+        let fpTemp = OCRProcessor.runFingerprint(
+            files: tempPaths, outputDirectory: outDir, taggingMode: .automatic, enableTagging: true, batchMode: true)
+        check("temp-JPEG fingerprint differs from the originals' (P-2: why originals must be persisted)",
+              fpOriginals != fpTemp)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

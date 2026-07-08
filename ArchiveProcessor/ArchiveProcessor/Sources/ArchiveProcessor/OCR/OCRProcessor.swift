@@ -240,13 +240,20 @@ class OCRProcessor: ObservableObject {
         /// and reject a torn/tampered one (Tier-2 rule e). Optional for backward-compat with manifests
         /// written before this field existed. See `OCRProcessor.runFingerprint(...)`.
         let runFingerprint: String?
+        /// Whether this run also emits a sized original image beside each PDF (dual output). Persisted at
+        /// submit time so a resume after relaunch restores the SAME dual-output behavior the run was
+        /// started with, rather than reading the live @AppStorage (which the user may have toggled since).
+        /// Optional for backward-compat: a manifest written before this field decodes it as nil, and resume
+        /// falls back to the live setting. NOT part of `runFingerprint` — a runtime knob, not run identity.
+        let exportOriginals: Bool?
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
              enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
              reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
-             taggingMode: TaggingMode = .automatic, runFingerprint: String? = nil) {
+             taggingMode: TaggingMode = .automatic, runFingerprint: String? = nil,
+             exportOriginals: Bool? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -258,6 +265,7 @@ class OCRProcessor: ObservableObject {
             self.customPrompt = customPrompt
             self.taggingMode = taggingMode
             self.runFingerprint = runFingerprint
+            self.exportOriginals = exportOriginals
         }
 
         init(from decoder: Decoder) throws {
@@ -278,6 +286,7 @@ class OCRProcessor: ObservableObject {
             customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
             taggingMode = try c.decodeIfPresent(TaggingMode.self, forKey: .taggingMode) ?? .automatic
             runFingerprint = try c.decodeIfPresent(String.self, forKey: .runFingerprint)
+            exportOriginals = try c.decodeIfPresent(Bool.self, forKey: .exportOriginals)
         }
     }
 
@@ -325,6 +334,11 @@ class OCRProcessor: ObservableObject {
         /// self-consistent, so a torn/tampered/mismatched manifest is ignored rather than misapplied
         /// (Tier-2 rule e). Optional for backward-compat with manifests written before this field.
         var runFingerprint: String? = nil
+        /// Whether this run also emits a sized original image beside each PDF (dual output). Persisted so a
+        /// resume restores the SAME dual-output behavior the run was started with instead of reading the
+        /// live @AppStorage. Optional for backward-compat: a manifest written before this field decodes as
+        /// nil and resume falls back to the live setting. NOT part of `runFingerprint` (a runtime knob).
+        var exportOriginals: Bool? = nil
     }
 
 
