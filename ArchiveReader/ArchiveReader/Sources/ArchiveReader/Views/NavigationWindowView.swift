@@ -85,6 +85,7 @@ struct NavigationWindowView: View {
     // MARK: Table
 
     private var table: some View {
+        ScrollViewReader { proxy in
         Table(model.displayed, selection: $model.selection,
               sortOrder: Binding(get: { model.sortComparators }, set: { model.applyTableSort($0) }),
               columnCustomization: $columnCustomization) {
@@ -185,6 +186,23 @@ struct NavigationWindowView: View {
             model.showingPreview = true
             return .handled
         }
+        // G4 keyboard triage — a focus-scoped key cluster (fires only when the list has key focus, so it
+        // never triggers while typing in the filter / search fields, and bare keys don't shadow the ⌘
+        // menu accelerators). Physical cluster on a US layout: [ = previous unread, ] = next unread,
+        // \ = mark read & advance. Modifier-carrying presses (e.g. ⌘]) are ignored so the menu owns them.
+        .onKeyPress(characters: CharacterSet(charactersIn: "[]\\"), phases: .down) { press in
+            guard press.modifiers.isEmpty else { return .ignored }
+            switch press.characters {
+            case "]":  model.selectNextUnread();     return .handled
+            case "[":  model.selectPreviousUnread(); return .handled
+            case "\\": model.markReadAndAdvance();    return .handled
+            default:   return .ignored
+            }
+        }
+        // Reveal the row a triage action just selected (next/previous-unread, mark-read-and-advance).
+        .onChange(of: model.scrollRequest) {
+            if let id = model.scrollTargetID { withAnimation { proxy.scrollTo(id) } }
+        }
         .font(.system(size: listFontSize))   // C3: list density / readability (persisted)
         .onChange(of: columnCustomization) { _, c in
             if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: "ar.columnCustomization") }
@@ -195,6 +213,7 @@ struct NavigationWindowView: View {
                 columnCustomization = c
             }
         }
+        }   // ScrollViewReader
     }
 
     /// Status overlay on the results area so the user always knows what's happening — most importantly

@@ -47,6 +47,13 @@ struct ArchiveReaderCommands: Commands {
             Divider()
             Button("Select Document Run") { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)
+            Divider()
+            // G4 keyboard triage. Bare ] / [ also work when the list has key focus (text-field-safe);
+            // the ⌘ accelerators are the discoverable menu equivalents.
+            Button("Next Unread") { nav?.selectNextUnread() }
+                .keyboardShortcut("]", modifiers: .command).disabled(nav == nil)
+            Button("Previous Unread") { nav?.selectPreviousUnread() }
+                .keyboardShortcut("[", modifiers: .command).disabled(nav == nil)
         }
 
         // Tags (nav window)
@@ -55,6 +62,10 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("r", modifiers: .command).disabled(noSelection)
             Button("Mark Unread") { nav?.mark(.unread) }
                 .keyboardShortcut("u", modifiers: .command).disabled(noSelection)
+            // G4 one-key triage: mark Read (via TagWriter, undoable) then jump to the next unread.
+            // Bare \ also works when the list has key focus (text-field-safe).
+            Button("Mark Read & Next Unread") { nav?.markReadAndAdvance() }
+                .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(noSelection)
             Button("Edit Tags…") { nav?.showingEditor = true }
                 .keyboardShortcut("i", modifiers: .command).disabled(noSelection)
             Button("Rename Tag…") { nav?.beginRenameTag() }

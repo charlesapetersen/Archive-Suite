@@ -49,6 +49,11 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     @Published private(set) var undoDepth = 0
     @Published var statusMessage = ""
+    // G4 keyboard triage: bumped whenever a triage action wants the newly-selected row scrolled into
+    // view. The window observes the counter (so scrolling to the *same* id twice still fires) and asks
+    // its ScrollViewReader to reveal `scrollTargetID`. Pure UI hint — never a file operation.
+    @Published private(set) var scrollRequest = 0
+    private(set) var scrollTargetID: ArchiveFile.ID?
 
     private var undoStack: [[TagWriteResult]] = []
     private var cancellables = Set<AnyCancellable>()
@@ -479,6 +484,63 @@ final class NavigationModel: ObservableObject {
         }
         library.applyVerifiedWrites(verified)
         statusMessage = "Undid \(verified.count) change\(verified.count == 1 ? "" : "s")."
+    }
+
+    // MARK: Keyboard triage (G4) — fast next/previous-unread navigation + mark-read-and-advance.
+    //
+    // These move the selection and, for the combined action, mark Read; ALL read-state mutation routes
+    // through `mark(.read)` → `TagWriter` (with undo). They add NO new write path — the next/previous
+    // helpers are pure selection math (`TriageNavigation`) and never touch a file.
+
+    private func requestScroll(to id: ArchiveFile.ID) { scrollTargetID = id; scrollRequest &+= 1 }
+
+    /// Select the next document still tagged `Unread` (after the current selection), scrolling it in.
+    func selectNextUnread()     { advanceToUnread(forward: true) }
+    /// Select the previous document still tagged `Unread` (before the current selection).
+    func selectPreviousUnread() { advanceToUnread(forward: false) }
+
+    private func advanceToUnread(forward: Bool) {
+        let rows = displayed
+        guard !rows.isEmpty else { statusMessage = "No documents in view."; announce(statusMessage); return }
+        let ids = rows.map(\.id)
+        let sel = selection
+        let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
+        let isUnread: (Int) -> Bool = { rows[$0].readState == .unread }
+        let target = forward
+            ? TriageNavigation.nextUnread(after: positions.max(), count: rows.count, isUnread: isUnread)
+            : TriageNavigation.previousUnread(before: positions.min(), count: rows.count, isUnread: isUnread)
+        guard let t = target else {
+            statusMessage = "No unread documents in view."; announce(statusMessage); return
+        }
+        let id = ids[t]
+        statusMessage = (sel == [id]) ? "No further unread documents." : ""
+        if !statusMessage.isEmpty { announce(statusMessage) }
+        selection = [id]
+        requestScroll(to: id)
+    }
+
+    /// One-key triage: mark the current selection Read (audited `TagWriter` + undo), then jump to the
+    /// next still-unread document. The next target is resolved BEFORE the write — the just-read rows may
+    /// leave a read-state-filtered view — and excludes the current selection so we never re-land on a row
+    /// we just marked. If nothing unread remains, the selection stays and `mark`'s status stands.
+    func markReadAndAdvance() {
+        let sel = selection
+        guard !sel.isEmpty else { return }
+        var target: ArchiveFile.ID?
+        let rows = displayed
+        if !rows.isEmpty {
+            let ids = rows.map(\.id)
+            let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
+            let isNextUnread: (Int) -> Bool = { rows[$0].readState == .unread && !sel.contains(ids[$0]) }
+            if let t = TriageNavigation.nextUnread(after: positions.max(), count: rows.count, isUnread: isNextUnread) {
+                target = ids[t]
+            }
+        }
+        mark(.read)                       // removes Unread / adds Read via TagWriter; pushes one undo step
+        if let target {
+            selection = [target]
+            requestScroll(to: target)
+        }
     }
 
     // MARK: Tag editing (single + group, all via TagWriter)

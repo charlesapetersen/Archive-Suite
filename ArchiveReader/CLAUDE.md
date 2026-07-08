@@ -211,6 +211,10 @@ writes against the real corpus — always a copy.
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
   `⏎`/double-click or `⌘O` open in the document window
 - `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Edit Tags… · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped; **no redo binding**)
+- **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
+  then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
+  (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
+  mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
 - `⌘⇧C` Copy Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
 - `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
 - *Menu-only (no shortcut):* Sort by Date/Name/Priority/Read-state · Rename Tag… · Find Similar Tags… ·
@@ -310,6 +314,8 @@ Core/                         UI-free domain (package-ready → future ArchiveCo
   FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
   CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate).
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
+  TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
+                              keyboard triage; touches no file — the caller writes via TagWriter.
   PDFFormatStatus.swift       Pure read-only classifier: standard / unreadable / no-text-layer (page
                               count is NOT a defect signal). Drives the ⚠︎ badge + viewer banner.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
@@ -347,7 +353,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 ```
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
-`ArchiveReader/Tests/ArchiveReaderTests/` — 15 test files (135 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (149 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build
