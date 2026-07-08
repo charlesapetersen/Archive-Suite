@@ -130,6 +130,18 @@ re-rendering behind the modal, or the sheet blocks the main-window refresh). `Vi
 
 ---
 
+## Live Capture "Clear" empties the Captured pane but leaves the Processing pane's segments  [LOW — UX]
+
+**Severity: low (cosmetic/UX; no data loss).** Reported by the owner (2026-07-07). In Live Capture, clicking
+**Clear** empties the **Captured** pane (the shot photos disappear) but the **Processing** pane's segment
+rows **remain** — so the two panes disagree about session state after a Clear. Expected: Clear resets both
+panes to empty together. Likely the Clear action resets `CaptureSession`'s received-photos/captured state but
+not the `LiveCaptureProcessor`'s staged/segment list that drives the Processing pane; wire Clear to also reset
+(or reconcile) the processor's segment state so both panes clear as one. `Views/LiveCaptureView.swift`,
+`Capture/LiveCaptureProcessor.swift`, `Capture/CaptureSession.swift`.
+
+---
+
 ## Mac doesn't detect a phone-side Re-pair — stale "paired" state, QR must be re-shown manually  [LOW–MED — UX]
 
 **Severity: low–medium (UX / confusion).** The **Re-pair control on the phone works** (returns the phone
