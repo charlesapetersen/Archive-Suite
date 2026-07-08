@@ -91,12 +91,21 @@ actor ContentIndex {
 
     /// Full-text search → matching file paths. Input is tokenized and quoted so arbitrary user text
     /// can never be an FTS5 syntax error; terms are AND-combined.
-    func search(_ query: String, limit: Int = 5000) -> [String] {
+    ///
+    /// Returns **all** matching paths by default (`limit == nil`). The sole caller uses the result only
+    /// for set-membership AND-ing (`ftsPaths.contains`), so an arbitrary row cap would silently drop
+    /// matches past the cap (by rowid, not relevance) on a large corpus — e.g. a common term over
+    /// ~150k PDFs. `limit` remains available for callers/tests that deliberately want a bounded result.
+    func search(_ query: String, limit: Int? = nil) -> [String] {
         let match = ftsMatchExpression(query)
-        guard !match.isEmpty, let stmt = prepare("SELECT path FROM fts WHERE fts MATCH ? LIMIT ?;") else { return [] }
+        guard !match.isEmpty else { return [] }
+        let sql = limit == nil
+            ? "SELECT path FROM fts WHERE fts MATCH ?;"
+            : "SELECT path FROM fts WHERE fts MATCH ? LIMIT ?;"
+        guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)
-        sqlite3_bind_int(stmt, 2, Int32(limit))
+        if let limit { sqlite3_bind_int(stmt, 2, Int32(limit)) }
         var paths: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let c = sqlite3_column_text(stmt, 0) { paths.append(String(cString: c)) }
@@ -147,11 +156,34 @@ actor ContentIndex {
         return out
     }
 
-    /// Count of indexed files that need attention: unreadable OR opened-but-no-text.
+    /// Count of indexed files that need attention: unreadable OR opened-but-no-text. Corpus-wide over
+    /// the entire (never-pruned, root-shared) index — see `needsAttentionCount(among:)` for the
+    /// current-library-scoped count the UI badge uses.
     func needsAttentionCount() -> Int {
         guard let stmt = prepare("SELECT count(*) FROM files WHERE readable = 0 OR has_text = 0;") else { return 0 }
         defer { sqlite3_finalize(stmt) }
         return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
+    }
+
+    /// Count of files needing attention (unreadable OR opened-but-no-text) **among `paths`** — the
+    /// current library's path set. The index is shared across roots and never pruned, so a corpus-wide
+    /// count over-reports after a root switch (rows for other roots / removed files); scoping to the
+    /// live path set keeps the badge in step with the path-scoped `needsAttentionOnly` filter it drives.
+    /// One prepared statement, reset per path (like `formatFlags`), so it scales to the whole corpus.
+    func needsAttentionCount(among paths: [String]) -> Int {
+        guard !paths.isEmpty, let stmt = prepare("SELECT readable, has_text FROM files WHERE path = ?;") else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        var count = 0
+        for p in paths {
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            bindText(stmt, 1, p)
+            if sqlite3_step(stmt) == SQLITE_ROW {
+                let readable = sqlite3_column_int(stmt, 0) != 0
+                let hasText  = sqlite3_column_int(stmt, 1) != 0
+                if !readable || !hasText { count += 1 }
+            }
+        }
+        return count
     }
 
     func indexedCount() -> Int {

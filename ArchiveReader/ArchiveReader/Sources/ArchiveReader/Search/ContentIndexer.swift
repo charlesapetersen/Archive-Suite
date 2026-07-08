@@ -100,10 +100,12 @@ final class ContentIndexer: ObservableObject {
         return await index.formatFlags(for: paths)
     }
 
-    /// Count of indexed files that need attention (unreadable or text-less).
-    func needsAttentionCount() async -> Int {
+    /// Count of files that need attention (unreadable or text-less) **among the current library's
+    /// paths** — the shared index is never pruned, so a corpus-wide count over-reports after a root
+    /// switch. Scoped so the badge matches the path-scoped `needsAttentionOnly` filter.
+    func needsAttentionCount(among paths: [String]) async -> Int {
         try? await index.open()
-        return await index.needsAttentionCount()
+        return await index.needsAttentionCount(among: paths)
     }
 
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).

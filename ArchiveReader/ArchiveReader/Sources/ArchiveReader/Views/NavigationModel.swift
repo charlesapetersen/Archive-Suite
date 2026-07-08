@@ -145,7 +145,16 @@ final class NavigationModel: ObservableObject {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
     func applySaved(_ search: SavedSearch) {
-        filter = search.filter
+        var f = search.filter
+        // Sanitize a folder scope that isn't under the CURRENT root (a saved search may carry a
+        // pathPrefix from a different/older root; restoring it verbatim would make recompute reject
+        // every file → empty list). Same guard restoreViewState() applies on relaunch.
+        let sanitized = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
+        if sanitized != f.pathPrefix {
+            f.pathPrefix = sanitized
+            statusMessage = "Saved search’s folder scope isn’t under the current archive root — showing the whole root."
+        }
+        filter = f
         fullTextQuery = search.fullTextQuery
         runFullTextSearch()   // updates ftsPaths + recompute; filter change also recomputes
     }
@@ -251,7 +260,7 @@ final class NavigationModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             let statuses = await self.indexer.formatStatuses(for: paths)
-            let count = await self.indexer.needsAttentionCount()
+            let count = await self.indexer.needsAttentionCount(among: paths)   // R-5: scope to the current library
             guard generation == self.formatGeneration else { return }   // superseded by a newer refresh
             self.formatStatuses = statuses
             self.needsAttentionCount = count
@@ -273,15 +282,23 @@ final class NavigationModel: ObservableObject {
         guard let d = UserDefaults.standard.data(forKey: viewStateKey),
               let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
         var f = s.filter
-        // Drop a folder scope that isn't under the current root (root may have changed between launches).
-        // Use a path-component boundary — the same test as LibraryFilter.matches — so a sibling root
-        // whose path merely shares a name prefix (Archive vs ArchiveBox) doesn't keep a stale scope.
-        if let p = f.pathPrefix, let rawRoot = rootStore.root?.path {
-            let root = rawRoot.hasSuffix("/") ? String(rawRoot.dropLast()) : rawRoot
-            if p != root, !p.hasPrefix(root + "/") { f.pathPrefix = nil }
-        }
+        f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
         filter = f
         if !s.sort.isEmpty { sort = s.sort }
+    }
+
+    /// Drop a folder scope (`pathPrefix`) that isn't under `rootPath` — returns nil for a stale prefix,
+    /// otherwise the prefix unchanged. Uses a path-component boundary (the same test as
+    /// `LibraryFilter.matches`) so a sibling root whose path merely shares a name prefix
+    /// (`Archive` vs `ArchiveBox`) doesn't keep a stale scope. When either input is nil there is
+    /// nothing to validate against, so the prefix passes through untouched (preserves prior behavior).
+    /// Pure/`nonisolated` so it's unit-testable off the main actor. Shared by `restoreViewState` and
+    /// `applySaved`, which both restore a persisted filter that may predate a root change.
+    nonisolated static func sanitizedPathPrefix(_ prefix: String?, against rootPath: String?) -> String? {
+        guard let p = prefix, let rawRoot = rootPath else { return prefix }
+        let root = rawRoot.hasSuffix("/") ? String(rawRoot.dropLast()) : rawRoot
+        if p != root, !p.hasPrefix(root + "/") { return nil }
+        return prefix
     }
 
     // MARK: Column-header sorting (bridges the SwiftUI Table sortOrder ↔ the descriptor model)
@@ -444,6 +461,16 @@ final class NavigationModel: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url {
             rootStore.setRoot(url)
             filter.pathPrefix = nil   // a folder scope from the old root can't apply to a new one
+            // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
+            // the new library loads, recompute would AND the new files against those → empty/wrong
+            // results while the search box + FTS indicator stay lit. Clear the full-text search so the
+            // new scope starts clean. (ftsPaths is cleared directly since fullTextQuery="" makes a later
+            // runFullTextSearch a no-op reset anyway.)
+            fullTextQuery = ""
+            ftsPaths = nil
+            ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
+                                 // (which passes the `generation == ftsGeneration` guard) can't repopulate
+                                 // ftsPaths with stale old-root paths after the new library loads.
             library.start(scope: url)
         }
     }

@@ -93,6 +93,53 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    // R-2: search is used only for set-membership AND-ing, so it must return EVERY match — no silent
+    // row cap. A common term over a large corpus previously truncated at 5000 (by rowid), dropping
+    // real matches. Index >5000 files carrying a shared term and assert all come back.
+    func testSearchReturnsAllMatchesBeyond5000() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        let n = 6000
+        for i in 0..<n {
+            try await idx.upsert(path: "/f\(i).pdf", mtime: 1, name: "f\(i)", classification: nil,
+                                 body: "commonterm body \(i)")
+        }
+        let hits = await idx.search("commonterm")
+        XCTAssertEqual(hits.count, n)                          // all matches, not a 5000 cap
+        XCTAssertEqual(Set(hits).count, n)                     // distinct paths
+        // A deliberate bound still applies when a caller asks for one.
+        let capped = await idx.search("commonterm", limit: 10)
+        XCTAssertEqual(capped.count, 10)
+        await idx.close()
+    }
+
+    // R-5: the badge count must be scoped to the CURRENT library's paths — the shared index is never
+    // pruned, so a corpus-wide count over-reports rows from other roots / removed files after a switch.
+    func testNeedsAttentionCountScopedToPaths() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        // "Current root" files: one needs attention (no text).
+        try await idx.upsert(path: "/root/std.pdf", mtime: 1, name: "std", classification: "Document Start",
+                             body: "real ocr text", pageCount: 2, hasText: true, readable: true)
+        try await idx.upsert(path: "/root/notext.pdf", mtime: 1, name: "notext", classification: nil,
+                             body: "", pageCount: 7, hasText: false, readable: true)
+        // Stale rows from a DIFFERENT root that must NOT be counted.
+        try await idx.upsert(path: "/other/bad1.pdf", mtime: 1, name: "bad1", classification: nil,
+                             body: "", pageCount: 0, hasText: false, readable: false)
+        try await idx.upsert(path: "/other/bad2.pdf", mtime: 1, name: "bad2", classification: nil,
+                             body: "", pageCount: 0, hasText: false, readable: false)
+        let corpusWide = await idx.needsAttentionCount()
+        XCTAssertEqual(corpusWide, 3)                          // corpus-wide over-reports (notext + 2 bad)
+        // Scoped to the current library: only /root/notext.pdf counts.
+        let scoped = await idx.needsAttentionCount(among: ["/root/std.pdf", "/root/notext.pdf"])
+        XCTAssertEqual(scoped, 1)
+        let emptyScope = await idx.needsAttentionCount(among: [])
+        XCTAssertEqual(emptyScope, 0)                          // empty scope → 0
+        let missingScope = await idx.needsAttentionCount(among: ["/missing.pdf"])
+        XCTAssertEqual(missingScope, 0)                        // unindexed ignored
+        await idx.close()
+    }
+
     func testReindexClearsUnreadableFlag() async throws {
         let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
         try await idx.open()
