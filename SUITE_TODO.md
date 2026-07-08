@@ -78,7 +78,8 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 > `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
 > on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
 
-- [ ] **Owner-gated: live Google Drive end-to-end test.** Configure the in-app OAuth client, sign in once, and run a live capture over the Drive relay to confirm the shipped cloud transport end-to-end. | needs: owner | M
+- [x] **Owner-gated: live Google Drive end-to-end test — DONE 2026-07-07.** Android phone→Drive→Mac verified end-to-end (sign-in, single photo, multi-page segment + Mac tag card, Box/Folder markers, Finish; photo durable in the Mac session + backup folder). Fixes landed: `DriveError` legibility + `DriveAuth.init` whitespace-trim; console setup (Desktop client for Mac, Android client + SHA-1 + **Custom URI scheme enabled** for the phone) captured in the Processor CLAUDE.md Live Capture section. ✅
+- [ ] **iOS phone Drive relay: on-device OAuth + live E2E** (Android is done; the iOS `DriveRelayTransport` is built + mock-tested but has no on-device Google sign-in yet — mirror the Android AppAuth flow with `ASWebAuthenticationSession`, then verify on a device). | ArchiveCaptureiOS | needs: owner + iPhone | M
 
 ## P3 — Suite structural  → detailed plan in `execution-plans/structural-refactor.md`
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
