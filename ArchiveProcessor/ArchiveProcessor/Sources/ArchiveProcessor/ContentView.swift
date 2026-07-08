@@ -39,6 +39,12 @@ struct ContentView: View {
         .sheet(isPresented: $showKeyOnboarding) {
             ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cycleProviderRequested)) { _ in
+            // ⌘⌥P: cycle the provider app-wide (works from any tab), but stand down while a text field is
+            // being edited so the shortcut never fires mid-typing.
+            guard !TextEditingGuard.isEditingText else { return }
+            ProviderCycler.advance()
+        }
     }
 
     private var mainContent: some View {

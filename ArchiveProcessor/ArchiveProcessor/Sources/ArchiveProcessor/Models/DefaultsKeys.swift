@@ -71,6 +71,9 @@ enum DefaultsKeys {
     // Tools
     static let modelTestSelections = "modelTestSelections"
 
+    // Processing profiles (named snapshots of the durable processing settings; JSON-encoded [ProcessingProfile])
+    static let processingProfiles = "processingProfiles"
+
     // One-time migration flags
     static let contextRemovedMigratedV1 = "contextRemovedMigratedV1"
     static let rotationDefaultMigratedV1 = "rotationDefaultMigratedV1"

@@ -29,6 +29,7 @@ struct ArchiveProcessorApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            ProcessingCommands()
         }
 
         Settings {

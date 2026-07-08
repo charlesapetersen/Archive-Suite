@@ -184,6 +184,18 @@ struct OCRView: View {
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
             apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
         }
+        .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
+        .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
+            // An applied profile may change the model for the *current* provider (no provider change), so
+            // re-sync the derived model/key state explicitly (the provider onChange above covers the rest).
+            syncForProviderChange()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startProcessingRequested)) { _ in
+            // ⌘R: run the normal Start action, but only when it's actually allowed and no field is being
+            // edited — the shortcut is guarded exactly like the Start button.
+            guard !TextEditingGuard.isEditingText, canStartProcessing else { return }
+            startProcessing()
+        }
         .onChange(of: scenePhase) { _, phase in
             // Returning from the Settings window: pick up any changed key / model / output folder.
             guard phase == .active else { return }
@@ -406,7 +418,7 @@ struct OCRView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(droppedFiles.isEmpty || apiKey.isEmpty || outputDirectory == nil || processor.isProcessing || isInReviewMode)
+                .disabled(!canStartProcessing)
 
                 if processor.isProcessing || isInReviewMode {
                     Button("Cancel") { processor.cancel() }
@@ -422,6 +434,21 @@ struct OCRView: View {
     /// Whether the file pane is in an interactive review state
     private var isInReviewMode: Bool {
         processor.awaitingFinalReview
+    }
+
+    /// Whether a run can be started now — the single source of truth for both the Start button's enabled
+    /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
+    /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
+    private var canStartProcessing: Bool {
+        !droppedFiles.isEmpty && !apiKey.isEmpty && outputDirectory != nil && !processor.isProcessing && !isInReviewMode
+    }
+
+    /// Re-point the per-provider selected model + API-key field after `selectedProvider` changes from
+    /// anywhere (the ⌘⌥P cycle shortcut, an applied profile, or a return from Settings), so a run never
+    /// uses a model that belongs to a different provider or the wrong Keychain account.
+    private func syncForProviderChange() {
+        selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
+        apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
     }
 
     private var filePanel: some View {

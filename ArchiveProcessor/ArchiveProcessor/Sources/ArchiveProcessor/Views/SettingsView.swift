@@ -73,6 +73,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.driveClientId) private var driveClientId: String = ""
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
+    @ObservedObject private var profileStore = ProcessingProfileStore.shared
     @State private var selectedModel: LLMModel
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
@@ -86,6 +87,11 @@ struct SettingsView: View {
     @State private var signingIn = false
     @State private var driveStatus = ""
     @State private var driveAuth: DriveAuth? = nil   // retains the auth object across the async loopback flow
+    // Processing profiles (named snapshots of the durable processing settings)
+    @State private var showSaveProfileAlert = false
+    @State private var newProfileName = ""
+    @State private var renamingProfileID: UUID? = nil
+    @State private var renameProfileName = ""
 
     init() {
         let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
@@ -112,6 +118,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             Form {
+                profilesSection
                 liveCaptureSection
                 providerSection
                 apiKeySection
@@ -129,7 +136,64 @@ struct SettingsView: View {
         .frame(width: 680, height: 660)
         .onAppear { reloadKeys() }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
+        .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
+            // A profile just wrote new values into UserDefaults. @AppStorage picks up the scalar settings
+            // automatically; re-sync the derived @State (selected model, key fields) that don't.
+            selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
+            reloadKeys()
+        }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
+        .alert("Save Processing Profile", isPresented: $showSaveProfileAlert) {
+            TextField("Profile name", text: $newProfileName)
+            Button("Save") { profileStore.saveCurrent(as: newProfileName) }
+                .disabled(newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Save the current processing settings as a reusable profile. API keys are never included.")
+        }
+        .alert("Rename Profile", isPresented: Binding(get: { renamingProfileID != nil }, set: { if !$0 { renamingProfileID = nil } })) {
+            TextField("Profile name", text: $renameProfileName)
+            Button("Rename") { if let id = renamingProfileID { profileStore.rename(id, to: renameProfileName) }; renamingProfileID = nil }
+                .disabled(renameProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("Cancel", role: .cancel) { renamingProfileID = nil }
+        }
+    }
+
+    @ViewBuilder private var profilesSection: some View {
+        Section {
+            if profileStore.profiles.isEmpty {
+                Text("No saved profiles yet. Save the current settings to switch between reusable configurations in one click.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(profileStore.profiles) { profile in
+                    HStack {
+                        Text(profile.name).lineLimit(1)
+                        Spacer()
+                        Button("Apply") { profileStore.apply(profile) }
+                            .buttonStyle(.bordered)
+                        Menu {
+                            Button("Rename…") { renameProfileName = profile.name; renamingProfileID = profile.id }
+                            Button("Delete", role: .destructive) { profileStore.delete(profile.id) }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                    }
+                }
+            }
+            Button {
+                newProfileName = ""
+                showSaveProfileAlert = true
+            } label: {
+                Label("Save current settings as a profile…", systemImage: "plus")
+            }
+        } header: {
+            HStack {
+                Text("Profiles")
+                HelpButton(text: "A profile is a named snapshot of these processing settings — provider, model (per provider), thinking level, tagging & rotation modes, batch, resolution/size targets, gateway configuration, live-capture mode, and more. Save the current settings, then Apply a profile any time to restore them everywhere. API keys are never stored in a profile (they stay in the Keychain); a profile only references the provider. The output folder is also left unchanged.")
+            }
+        }
     }
 
     /// Reload the key fields from the Keychain — on appear and whenever a key changes (e.g. the guided
