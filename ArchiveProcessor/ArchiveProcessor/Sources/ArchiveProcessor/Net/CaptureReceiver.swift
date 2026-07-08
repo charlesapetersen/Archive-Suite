@@ -10,11 +10,11 @@ protocol CaptureReceiver: AnyObject, Sendable {
     func stop()
 }
 
-/// Which receiver the Live Capture session runs. Persisted via `DefaultsKeys.liveTransport`
-/// (String-backed — appending cases is safe; never rename an existing rawValue, per the CLAUDE.md
-/// shared-hotspot rule for persisted enums).
+/// Which single receiver a session runs under the CI/test override `LIVECAPTURE_TRANSPORT` only. There is
+/// no user-facing transport setting (A5 removed the picker): production runs LAN + Drive together, chosen
+/// in `CaptureSession.start()`. String-backed — appending cases is safe; never rename an existing rawValue.
 enum CaptureTransport: String {
-    case lan        // CaptureServer — direct HTTP on the LAN (default; behavior unchanged)
+    case lan        // CaptureServer — direct HTTP on the LAN
     case fileRelay  // FileRelayReceiver — a local shared directory (the offline contract fixture)
-    case cloud      // Google Drive relay (not yet built)
+    case cloud      // Google Drive relay
 }

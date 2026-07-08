@@ -202,8 +202,9 @@ private fun CloudPairing(vm: CaptureViewModel, onBack: () -> Unit, onConnected: 
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Cloud — scan the QR", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "In Live Capture on the Mac, set the transport to Cloud (Google Drive) and Start, then scan the " +
-                "cloud QR it shows. You'll sign in to the same Google account the Mac uses.",
+            "Sign the Mac into Google Drive (Settings ▸ Live Capture) and Start in Live Capture, then scan " +
+                "the QR it shows — the same code works for Cloud. You'll sign in to the same Google account " +
+                "the Mac uses.",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -213,8 +214,11 @@ private fun CloudPairing(vm: CaptureViewModel, onBack: () -> Unit, onConnected: 
                 QrAnalyzer { payload ->
                     if (!busy) {
                         val ep = MacEndpoint.fromQrPayload(payload)
-                        if (ep != null && ep.isCloud) proceed(ep)
-                        else { status = "That's a LAN pairing QR — switch the Mac's transport to Cloud first."; analyzerRef[0]?.rearm() }
+                        val relay = ep?.relayToken
+                        // The combined QR carries the relay token (or a legacy cloud QR is all-relay); build a
+                        // cloud endpoint from it — the phone chose Cloud here regardless of the QR's own mode.
+                        if (relay != null) proceed(MacEndpoint("", 0, relay, ep.name, "cloud", ep.account))
+                        else { status = "That QR has no cloud relay code — sign the Mac into Google Drive (Settings ▸ Live Capture), then rescan."; analyzerRef[0]?.rearm() }
                     }
                 }.also { analyzerRef[0] = it }
             }

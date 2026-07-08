@@ -60,7 +60,7 @@ enum DefaultsKeys {
 
     // Live Capture
     static let liveProcessingMode = "liveProcessingMode"
-    static let liveTransport = "liveTransport"       // which CaptureReceiver: "" / "lan" (default) / "fileRelay" / "cloud"
+    static let liveTransport = "liveTransport"       // DEPRECATED (A5 removed the picker); no longer read — LAN+Drive run together. CI uses env LIVECAPTURE_TRANSPORT.
     static let liveRelayDir = "liveRelayDir"         // shared directory root for the file-relay transport
     static let driveClientId = "driveClientId"       // Google OAuth Desktop client id for the cloud relay (secret in Keychain acct "DriveClientSecret")
 

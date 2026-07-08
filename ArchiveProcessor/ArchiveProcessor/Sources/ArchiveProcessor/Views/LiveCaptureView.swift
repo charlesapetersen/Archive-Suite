@@ -154,13 +154,29 @@ struct LiveCaptureView: View {
                         HStack {
                             let running = session.receiverActive
                             Circle().fill(running ? .green : .secondary).frame(width: 8, height: 8)
-                            Text(running ? (session.isCloudTransport ? "Watching Drive" : "Listening") : "Stopped").font(.callout)
+                            Text(running ? "Active" : "Stopped").font(.callout).fontWeight(.medium)
                             Spacer()
                             if running {
                                 Button("Stop") { session.stop() }
                             } else {
                                 Button("Start") { session.start() }
                                     .buttonStyle(.borderedProminent)
+                            }
+                        }
+                        // DUAL receiver status: the Mac always listens on the LAN AND (when signed into Drive)
+                        // watches Google Drive — both run at once, so a single QR serves any phone transport.
+                        if session.receiverActive {
+                            HStack(spacing: 6) {
+                                Circle().fill(session.serverRunning ? .green : .secondary).frame(width: 6, height: 6)
+                                Image(systemName: "wifi").font(.caption2).foregroundStyle(.secondary)
+                                Text(session.serverRunning ? "Listening (Wi-Fi / USB)" : "LAN off").font(.caption)
+                            }
+                            HStack(spacing: 6) {
+                                Circle().fill(session.driveWatching ? .green : .secondary).frame(width: 6, height: 6)
+                                Image(systemName: "cloud").font(.caption2).foregroundStyle(.secondary)
+                                Text(session.driveWatching ? "Watching Drive"
+                                     : (session.isDriveSignedIn ? "Drive starting…" : "Drive off — sign in (Settings ⌘,)"))
+                                    .font(.caption)
                             }
                         }
                         Text(session.statusMessage)
@@ -212,25 +228,7 @@ struct LiveCaptureView: View {
                     }
                 }
 
-                if session.isCloudTransport {
-                    if session.receiverActive, let payload = cloudPairingPayload {
-                        GroupBox("Pair the phone (Cloud)") {
-                            VStack(spacing: 8) {
-                                if let qr = Self.qrImage(from: payload) {
-                                    Image(nsImage: qr).interpolation(.none).resizable().frame(width: 200, height: 200)
-                                }
-                                Text("In Archive Capture, choose Cloud (Google Drive), then scan.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Text("Relay code: \(session.token)")
-                                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                                Text("The phone signs in to the same Google account as this Mac; photos upload to a private Drive folder and appear here.")
-                                    .font(.caption2).foregroundStyle(.tertiary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .frame(maxWidth: .infinity).padding(6)
-                        }
-                    }
-                } else if session.serverRunning, session.paired {
+                if session.serverRunning, session.paired {
                     GroupBox("Phone") {
                         HStack(spacing: 6) {
                             Image(systemName: "iphone.gen3").foregroundStyle(.green)
@@ -251,12 +249,21 @@ struct LiveCaptureView: View {
                                     .resizable()
                                     .frame(width: 200, height: 200)
                             }
-                            Text("Scan in the Archive Capture app").font(.caption).foregroundStyle(.secondary)
+                            Text("Scan in Archive Capture — one code works over USB, Wi-Fi, or Cloud (Google Drive).")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                             let ips = Self.allIPv4Candidates()
                             if let ip = Self.primaryIPv4() ?? ips.first {
                                 Text("\(ip):\(session.listenPort)")
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
+                            }
+                            // When signed into Drive, the same QR also carries the relay code (additive `relay`
+                            // key); a phone that picks Cloud reads it. Shown so it can be typed for manual entry.
+                            if session.isDriveSignedIn {
+                                Text("Cloud relay code: \(session.token)")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.secondary).textSelection(.enabled)
                             }
                             // Other interfaces (e.g. bridge100 when the Mac itself is the hotspot) — the
                             // QR uses the primary, but the operator can try an alternate via manual entry.
@@ -286,28 +293,21 @@ struct LiveCaptureView: View {
         }
     }
 
-    /// JSON pairing payload encoded in the QR: host / port / token / name.
+    /// ONE combined pairing payload encoded in the QR: `{host, port, token, name}` PLUS an OPTIONAL `relay`
+    /// token (emitted only while the Mac is signed into the Drive relay). The extra key is ADDITIVE — an
+    /// older companion that ignores it still pairs over LAN byte-for-byte (when not signed in the payload is
+    /// exactly the original four keys); a current companion reads `relay` and can upload via Drive if the
+    /// operator picks Cloud. `relay` == the session token (the same value `DriveObjectStore` stamps as the
+    /// shared folder's `appProperties.relayToken`), so no separate value is needed.
     private var pairingPayload: String? {
         guard session.serverRunning, let ip = Self.primaryIPv4() else { return nil }
-        let dict: [String: Any] = [
+        var dict: [String: Any] = [
             "host": ip,
             "port": Int(session.listenPort),
             "token": session.token,
             "name": Host.current().localizedName ?? "Mac"
         ]
-        return (try? JSONSerialization.data(withJSONObject: dict)).flatMap { String(data: $0, encoding: .utf8) }
-    }
-
-    /// Cloud pairing payload: `{mode:"cloud", token, name}`. The token IS the relay token the phone needs —
-    /// `DriveRelayTransport` self-discovers the shared Drive folder from it (via `appProperties.relayToken`),
-    /// and reads the epoch from `_epoch.json`. No host/port/IP: the phone talks to Drive, not this Mac.
-    private var cloudPairingPayload: String? {
-        guard session.isCloudTransport, session.receiverActive else { return nil }
-        let dict: [String: Any] = [
-            "mode": "cloud",
-            "token": session.token,
-            "name": Host.current().localizedName ?? "Mac"
-        ]
+        if session.isDriveSignedIn { dict["relay"] = session.token }   // optional Cloud path (additive key)
         return (try? JSONSerialization.data(withJSONObject: dict)).flatMap { String(data: $0, encoding: .utf8) }
     }
 

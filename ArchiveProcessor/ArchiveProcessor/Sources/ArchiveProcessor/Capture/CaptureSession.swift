@@ -170,12 +170,25 @@ final class CaptureSession: ObservableObject {
                                  processedURL: incomingFolder.appendingPathComponent("relay-processed-cloud.json"))
     }()
 
-    /// Which receiver this session runs, from Settings (`DefaultsKeys.liveTransport`), env-overridable for CI.
-    private var transport: CaptureTransport {
-        let raw = ProcessInfo.processInfo.environment["LIVECAPTURE_TRANSPORT"]
-            ?? UserDefaults.standard.string(forKey: DefaultsKeys.liveTransport) ?? ""
-        return CaptureTransport(rawValue: raw) ?? .lan
+    /// CI/test-only transport override (`LIVECAPTURE_TRANSPORT`): forces exactly ONE offline receiver for
+    /// the headless harness (`fileRelay`) or an isolated LAN/cloud run. **Not user-facing** — the Settings
+    /// Transport picker was removed (A5). In production `start()` always runs the LAN `CaptureServer` and
+    /// ADDITIONALLY runs the Drive relay watcher whenever the Mac is signed into Google Drive.
+    private var forcedTestTransport: CaptureTransport? {
+        ProcessInfo.processInfo.environment["LIVECAPTURE_TRANSPORT"].flatMap { CaptureTransport(rawValue: $0) }
     }
+
+    /// Signed into the Google Drive relay: a refresh token is in the Keychain AND a client id is configured.
+    /// Sign-in alone ENABLES the Drive watcher (it is gated to an active session in `start()`/`stop()` to
+    /// save Drive quota) — the operator never picks a "cloud mode". `LIVECAPTURE_DRIVE=1` forces it on for a
+    /// headless cloud test.
+    var isDriveSignedIn: Bool {
+        if ProcessInfo.processInfo.environment["LIVECAPTURE_DRIVE"] == "1" { return true }
+        return KeychainHelper.load(account: "DriveRefreshToken") != nil
+            && !(UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? "").isEmpty
+    }
+    /// True while THIS session started the Drive watcher, so `stop()` tears down only what it started.
+    private var cloudRelayStarted = false
 
     /// The file-relay shared-directory root (`<root>/<token>/`), from Settings/env; defaults under the
     /// visible backup root. `LIVECAPTURE_RELAYDIR` overrides it for CI.
@@ -217,29 +230,37 @@ final class CaptureSession: ObservableObject {
     @Published private(set) var relayRunning = false
     /// Either receiver is up (transport-agnostic gate for the UI).
     var receiverActive: Bool { serverRunning || relayRunning }
-    /// Whether the cloud (Google Drive) transport is selected — the UI shows the cloud pairing QR + relay
-    /// status instead of the LAN ones when true.
-    var isCloudTransport: Bool { transport == .cloud }
+    /// The "Watching Drive" half of the dual status: the Drive relay watcher is currently running.
+    var driveWatching: Bool { relayRunning }
 
+    /// Start receiving. In production this ALWAYS starts the LAN `CaptureServer`, and — when signed into
+    /// Google Drive — ADDITIONALLY starts the Drive relay watcher, so one pairing QR serves a phone that
+    /// chooses Wired, Wi-Fi, OR Cloud with no mode to misconfigure. Under `LIVECAPTURE_TRANSPORT` (CI) it
+    /// starts exactly the one forced receiver instead.
     func start() {
-        switch transport {
-        case .lan:
-            guard !serverRunning else { return }   // BYTE-IDENTICAL to the prior LAN behavior
-            server.start()
-        case .fileRelay:
-            fileRelay.start()                       // own idempotency guard; must NOT gate on serverRunning
-        case .cloud:
-            cloudRelay.start()                      // same receiver loop, Drive-backed store
+        if let forced = forcedTestTransport {
+            switch forced {
+            case .lan: if !serverRunning { server.start() }
+            case .fileRelay: fileRelay.start()                       // own idempotency guard
+            case .cloud: cloudRelay.start(); cloudRelayStarted = true
+            }
+            return
+        }
+        if !serverRunning { server.start() }        // LAN: BYTE-IDENTICAL to the prior default behavior
+        if isDriveSignedIn {                        // Drive watcher auto-runs, gated to this active session
+            cloudRelay.start()
+            cloudRelayStarted = true
         }
     }
 
     func stop() {
         server.stop()
-        switch transport {                          // stop only the relay in use (avoids constructing the other)
-        case .fileRelay: fileRelay.stop()
-        case .cloud: cloudRelay.stop()
-        case .lan: break
+        if let forced = forcedTestTransport {
+            switch forced { case .fileRelay: fileRelay.stop(); case .cloud: cloudRelay.stop(); case .lan: break }
+            cloudRelayStarted = false
+            return
         }
+        if cloudRelayStarted { cloudRelay.stop(); cloudRelayStarted = false }
     }
 
     /// Relay receiver readiness (portless; called on the main actor). Mirrors the AUTOSTART READY line so
