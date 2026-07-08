@@ -31,7 +31,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Used to connect to the Archive Processor Mac app on your local network to send captured photos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Used by "Save to phone" to save a backup copy of captured photos to your Photos library if they can’t transfer to the Mac.</string>
+	<string>Used to save captured photos to your phone's library as a backup, when you tap Save to phone.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
