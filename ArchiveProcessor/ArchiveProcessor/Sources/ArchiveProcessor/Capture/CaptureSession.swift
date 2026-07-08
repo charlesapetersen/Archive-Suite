@@ -29,7 +29,7 @@ final class CaptureSession: ObservableObject {
     func updatePhonePending(_ count: Int) {
         phonePendingCount = count
         phonePendingAt = Date()
-        paired = true
+        notePhoneContact()
         if processingMode == .live { liveProcessor.phoneStatusChanged() }
     }
 
@@ -52,8 +52,50 @@ final class CaptureSession: ObservableObject {
     @Published private(set) var config: SessionProcessingConfig?
     /// Set once the first segment begins processing (the config is already snapshotted).
     @Published private(set) var settingsLocked = false
-    /// True once a phone has paired (pinged) or sent a photo — used to hide the QR.
+    /// True once a phone has paired (pinged) or sent a photo — used to hide the QR. Sticky (it survives a
+    /// quiet phone), so it drives QR *visibility*; live "is a phone actually there right now" is the
+    /// separate `phoneConnected` below. Reset by a phone-side re-pair (`phoneDidDisconnect`).
     @Published private(set) var paired = false
+
+    // MARK: - Phone-connection liveness (B4: "Connected" vs "Listening")
+
+    /// When we last heard from a paired phone — a ping, a `/phone/status` heartbeat, or an ingested photo.
+    /// Drives the honest "Connected" vs merely "Listening" status split so a stale green dot never reads as
+    /// "still paired." Reset to nil on a phone-side re-pair (`POST /session/disconnect` → `phoneDidDisconnect`).
+    @Published private(set) var lastPhoneContactAt: Date?
+    /// Published mirror of "a phone is actively paired (seen within the freshness window)". Stored (not a
+    /// pure computed) so it flips back to false on its own when heartbeats stop: a repeating timer (armed
+    /// while the receiver is up) re-evaluates it, and an explicit re-pair resets it at once.
+    @Published private(set) var phoneConnected = false
+    /// A phone counts as connected only while its last contact is this recent. The companions heartbeat
+    /// every ~8s (their auto-retry loop), so ~25s tolerates a couple of missed beats before going gray.
+    private static let phoneContactWindow: TimeInterval = 25
+    private var connectionTimer: Timer?
+
+    /// Record any phone contact (ping / heartbeat / ingest): refresh the freshness clock, keep the QR hidden
+    /// (`paired`), and mark the phone connected.
+    private func notePhoneContact() {
+        lastPhoneContactAt = Date()
+        paired = true
+        if !phoneConnected { phoneConnected = true }
+    }
+
+    /// Re-evaluate `phoneConnected` from the freshness window (driven by the connection timer) so the dot
+    /// goes gray on its own if a phone leaves WITHOUT a clean re-pair.
+    private func refreshPhoneConnected() {
+        let fresh = lastPhoneContactAt.map { Date().timeIntervalSince($0) < Self.phoneContactWindow } ?? false
+        if phoneConnected != fresh { phoneConnected = fresh }
+    }
+
+    private func startConnectionTimer() {
+        guard connectionTimer == nil else { return }
+        let t = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshPhoneConnected() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        connectionTimer = t
+    }
+    private func stopConnectionTimer() { connectionTimer?.invalidate(); connectionTimer = nil }
 
     /// Streaming coordinator (created on first use). Processes each segment during a `.live` session.
     private(set) lazy var liveProcessor = LiveCaptureProcessor(session: self)
@@ -75,9 +117,25 @@ final class CaptureSession: ObservableObject {
         }
     }
 
-    func markPaired() { paired = true }
-    /// Re-show the pairing QR (e.g. to pair a different phone); doesn't disconnect the current one.
+    func markPaired() { notePhoneContact() }
+    /// Re-show the pairing QR (e.g. to pair a different phone); doesn't disconnect the current one, so the
+    /// live "connected" indicator is left alone (only the sticky QR-hide flag is cleared).
     func unpairDisplay() { paired = false }
+
+    /// The phone re-paired (`POST /session/disconnect`). Reset the pairing + connection indicators and
+    /// re-show the QR automatically, so the operator can immediately re-scan without hunting for "Show QR"
+    /// (B4-i). Received photos + all session/processing state are UNTOUCHED — the phone retains its captures
+    /// and re-uploads them to the new endpoint (idempotent `ingest`), so nothing is lost. Also nudges the
+    /// USB bridge to re-assert `adb reverse` at once so a wired re-pair reconnects without waiting for the
+    /// 5s heal tick (B4-iii). The drain-gate counters (`phonePending*`) are deliberately left to expire on
+    /// their own (20s staleness window) so a re-pair mid-Finish can't prematurely un-gate finalize.
+    func phoneDidDisconnect() {
+        paired = false
+        phoneConnected = false
+        lastPhoneContactAt = nil
+        connectedDeviceName = nil
+        USBBridge.reassertNow()
+    }
 
     /// Start a live session with an explicit config (used by the headless test driver).
     func beginLiveSession(config: SessionProcessingConfig) {
@@ -216,6 +274,11 @@ final class CaptureSession: ObservableObject {
             sessionId = restored.folder.lastPathComponent
             incomingFolder = restored.folder
             photos = restored.photos
+            // Restore which document groups the phone had signalled complete (B5-ii). Without this a
+            // mid-session Mac restart showed NO tag card until Finish — the phone won't re-send the
+            // segment-complete signal for a group it already got acked. A legacy (pre-B5) manifest has no
+            // persisted set, so this is empty and behaves exactly as before for those sessions.
+            completedDocGroups = restored.completed
         } else {
             sessionId = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
@@ -251,9 +314,12 @@ final class CaptureSession: ObservableObject {
             cloudRelay.start()
             cloudRelayStarted = true
         }
+        startConnectionTimer()                      // arm the "phone still here?" freshness re-eval (B4-ii)
     }
 
     func stop() {
+        stopConnectionTimer()
+        phoneConnected = false
         server.stop()
         if let forced = forcedTestTransport {
             switch forced { case .fileRelay: fileRelay.stop(); case .cloud: cloudRelay.stop(); case .lan: break }
@@ -341,7 +407,7 @@ final class CaptureSession: ObservableObject {
         statusMessage = "Received \(photos.count) photo\(photos.count == 1 ? "" : "s")" + (deviceName.map { " from \($0)" } ?? "")
         // New capture began — drop any prior "Finalized …" summary so the Captured pane shows photos.
         liveProcessor.clearFinalizeSummary()
-        paired = true
+        notePhoneContact()   // an ingested photo is fresh phone contact (drives "Connected" + hides the QR)
         // Durability contract: only acknowledge success (→ phone deletes its only copy of an
         // un-retakeable archival photo) once the grouping/tag metadata is durably persisted. If the
         // manifest write fails, return nil → server responds 500 → phone retries. The JPEG is already
@@ -446,16 +512,21 @@ final class CaptureSession: ObservableObject {
             if photos[i].priority != "P10", let priority, !priority.isEmpty { photos[i].priority = priority }
             changed = true
         }
-        completedDocGroups.insert(groupId)
-        if changed { _ = writeManifest() }
+        // completedDocGroups is now persisted in the manifest (B5-ii), so a newly-completed group is a
+        // durable state change on its own — persist even when no photo field changed (e.g. re-tagging with
+        // the same values), or a Mac restart right after would drop this segment's tag card until Finish.
+        let newlyCompleted = completedDocGroups.insert(groupId).inserted
+        if changed || newlyCompleted { _ = writeManifest() }
     }
 
     /// Finish (`POST /session/complete`): surface the tag card for any document segment still open — e.g.
     /// the last segment if the operator finished without tapping End segment — so nothing is stranded.
     func completeAllOpenDocGroups() {
+        var changed = false
         for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id) {
-            completedDocGroups.insert(g.id)
+            if completedDocGroups.insert(g.id).inserted { changed = true }
         }
+        if changed { _ = writeManifest() }   // persist the completion set (B5-ii) so a restart keeps the cards
     }
 
     func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
@@ -497,7 +568,7 @@ final class CaptureSession: ObservableObject {
 
     // MARK: - Durable manifest (crash recovery)
 
-    private struct ManifestEntry: Codable {
+    struct ManifestEntry: Codable {
         let name: String
         let groupId: String
         let seq: Int
@@ -507,34 +578,54 @@ final class CaptureSession: ObservableObject {
         let month: Int?
     }
 
+    /// The on-disk manifest: the per-photo entries PLUS the set of document groups the phone signalled
+    /// complete (B5-ii). Persisting `completedDocGroups` lets a mid-session Mac restart re-surface each
+    /// completed segment's tag card. Older builds wrote a bare `[ManifestEntry]` array — `decodeManifest`
+    /// still accepts that legacy shape (treating the completion set as empty), so recovery is unbroken.
+    struct SessionManifest: Codable {
+        let photos: [ManifestEntry]
+        let completedDocGroups: [String]
+    }
+
     private var manifestURL: URL { incomingFolder.appendingPathComponent("manifest.json") }
 
-    /// Persist per-photo metadata so a Mac crash doesn't lose grouping/tags (the JPEGs don't carry it).
-    /// Returns whether the write succeeded, so `ingest` can withhold the success ack until the
-    /// grouping metadata is durably on disk.
+    /// Persist per-photo metadata + the completed-group set so a Mac crash doesn't lose grouping/tags/
+    /// completion (the JPEGs don't carry it). Returns whether the write succeeded, so `ingest` can withhold
+    /// the success ack until the grouping metadata is durably on disk (the ingest durability contract).
     @discardableResult
     private func writeManifest() -> Bool {
         let entries = photos.map {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
                           type: $0.type.rawValue, priority: $0.priority, year: $0.year, month: $0.month)
         }
-        guard let data = try? JSONEncoder().encode(entries) else { return false }
+        let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups))
+        guard let data = try? JSONEncoder().encode(manifest) else { return false }
         do { try data.write(to: manifestURL, options: .atomic); return true }
         catch { return false }
     }
 
+    /// Decode a session manifest, accepting BOTH the current object form ({photos, completedDocGroups})
+    /// and the legacy bare-array form (pre-B5 builds wrote just `[ManifestEntry]`). A legacy manifest has
+    /// no persisted completion set → empty (its tag cards still surface at Finish, exactly as before).
+    static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>)? {
+        let d = JSONDecoder()
+        if let m = try? d.decode(SessionManifest.self, from: data) { return (m.photos, Set(m.completedDocGroups)) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, []) }
+        return nil
+    }
+
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto])? {
+    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>)? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
         for folder in subdirs.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
             let manifest = folder.appendingPathComponent("manifest.json")
             guard let data = try? Data(contentsOf: manifest),
-                  let entries = try? JSONDecoder().decode([ManifestEntry].self, from: data),
-                  !entries.isEmpty else { continue }
+                  let decoded = decodeManifest(data),
+                  !decoded.entries.isEmpty else { continue }
             var restored: [CapturedPhoto] = []
-            for e in entries {
+            for e in decoded.entries {
                 // Defense-in-depth: never resolve a manifest name that could escape the folder
                 // (a tampered/legacy manifest must not become a path-traversal on restore).
                 guard !e.name.contains("/"), !e.name.contains("..") else { continue }
@@ -547,7 +638,7 @@ final class CaptureSession: ObservableObject {
             }
             if !restored.isEmpty {
                 restored.sort { $0.seq < $1.seq }
-                return (folder, restored)
+                return (folder, restored, decoded.completed)
             }
         }
         return nil

@@ -166,6 +166,19 @@ struct LiveCaptureView: View {
                         // DUAL receiver status: the Mac always listens on the LAN AND (when signed into Drive)
                         // watches Google Drive — both run at once, so a single QR serves any phone transport.
                         if session.receiverActive {
+                            // PHONE connection (B4-ii): split "a phone is actively here" (green · derived from
+                            // the /phone/status heartbeat + recent ingest via `phoneConnected`) from mere
+                            // "receiver listening" below — so a stale green receiver dot never reads as "still
+                            // paired" after the phone re-pairs or walks away.
+                            HStack(spacing: 6) {
+                                Circle().fill(session.phoneConnected ? .green : .secondary).frame(width: 6, height: 6)
+                                Image(systemName: "iphone").font(.caption2).foregroundStyle(.secondary)
+                                Text(session.phoneConnected
+                                     ? (session.connectedDeviceName.map { "Connected · \($0)" } ?? "Connected")
+                                     : "No phone connected")
+                                    .font(.caption)
+                                    .foregroundStyle(session.phoneConnected ? .primary : .secondary)
+                            }
                             HStack(spacing: 6) {
                                 Circle().fill(session.serverRunning ? .green : .secondary).frame(width: 6, height: 6)
                                 Image(systemName: "wifi").font(.caption2).foregroundStyle(.secondary)
@@ -231,8 +244,12 @@ struct LiveCaptureView: View {
                 if session.serverRunning, session.paired {
                     GroupBox("Phone") {
                         HStack(spacing: 6) {
-                            Image(systemName: "iphone.gen3").foregroundStyle(.green)
-                            Text(session.connectedDeviceName.map { "Paired · \($0)" } ?? "Paired")
+                            // Green only while the phone is actually being heard from (`phoneConnected`); a
+                            // paired-but-quiet phone reads "Paired (idle)" rather than a misleading green.
+                            Image(systemName: "iphone.gen3").foregroundStyle(session.phoneConnected ? .green : .secondary)
+                            Text(session.phoneConnected
+                                 ? (session.connectedDeviceName.map { "Connected · \($0)" } ?? "Connected")
+                                 : (session.connectedDeviceName.map { "Paired (idle) · \($0)" } ?? "Paired (idle)"))
                                 .font(.callout)
                             Spacer()
                             Button("Show QR") { session.unpairDisplay() }.font(.caption)

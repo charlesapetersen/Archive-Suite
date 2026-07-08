@@ -176,9 +176,29 @@ final class CaptureViewModel: ObservableObject {
         items[i].priority = (items[i].priority == "P10") ? nil : "P10"
         persist()
         // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
-        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority,
-        // so a per-page P10 must ride the photo itself.
-        if items[i].state == .uploaded { enqueueUpload(items[i]) }
+        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority, so
+        // a per-page P10 must ride the photo itself. If it's still uploading, defer via needsResend so the
+        // toggle isn't dropped (the completion handler re-sends with the current value).
+        resendOrEnqueue(items[i])
+    }
+
+    /// Re-send a just-changed item: enqueue now if it's idle, else flag it to be re-sent when its in-flight
+    /// upload settles. This is the fix for a per-page P10 toggle / reclassify racing an in-flight upload —
+    /// the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change.
+    private func resendOrEnqueue(_ item: CapturedItem) {
+        if inFlightUploads.contains(item.id) { markNeedsResend(item.id) } else { enqueueUpload(item) }
+    }
+
+    private func markNeedsResend(_ id: Int64) {
+        guard let i = items.firstIndex(where: { $0.id == id }), items[i].needsResend != true else { return }
+        items[i].needsResend = true
+        persist()
+    }
+
+    private func clearNeedsResend(_ id: Int64) {
+        guard let i = items.firstIndex(where: { $0.id == id }), items[i].needsResend == true else { return }
+        items[i].needsResend = false
+        persist()
     }
 
     private func clearSelection() { selectedItemId = nil; armed = false }
@@ -212,8 +232,10 @@ final class CaptureViewModel: ObservableObject {
         let updated = items[i]
         clearSelection()
         persist()
-        // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
-        enqueueUpload(updated)
+        // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op
+        // otherwise). If the page's original upload is still in flight, defer via needsResend — the
+        // in-flight guard would otherwise swallow this re-enqueue and the reclassify would never send.
+        resendOrEnqueue(updated)
     }
 
     // MARK: - Grouping / finalize
@@ -349,12 +371,21 @@ final class CaptureViewModel: ObservableObject {
             if ok {
                 sentCount += 1
                 setState(item.id, .uploaded)
-                // Confirmed durably on the Mac → drop it from the phone shortly after (lets the strip
-                // animate it out), so photos transfer in segments instead of piling up.
-                Task { try? await Task.sleep(nanoseconds: 650_000_000); removeConfirmed(item) }
-                // If this was the last outstanding page of an ended segment, its completion signal was
-                // gated waiting for this upload — try it now (no-op if other pages are still in flight).
-                if endedSegments[item.groupId] != nil { trySendSegmentComplete(group: item.groupId) }
+                // A field changed while this upload was in flight (per-page P10 / reclassify): the bytes just
+                // sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
+                // removeConfirmed (that would drop the photo having sent only the old value). The re-enqueue
+                // is scheduled on a fresh Task so it runs after this one's `defer` releases the in-flight guard.
+                if let idx = items.firstIndex(where: { $0.id == item.id }), items[idx].needsResend == true {
+                    clearNeedsResend(item.id)
+                    Task { @MainActor in if let latest = items.first(where: { $0.id == item.id }) { enqueueUpload(latest) } }
+                } else {
+                    // Confirmed durably on the Mac → drop it from the phone shortly after (lets the strip
+                    // animate it out), so photos transfer in segments instead of piling up.
+                    Task { try? await Task.sleep(nanoseconds: 650_000_000); removeConfirmed(item) }
+                    // If this was the last outstanding page of an ended segment, its completion signal was
+                    // gated waiting for this upload — try it now (no-op if other pages are still in flight).
+                    if endedSegments[item.groupId] != nil { trySendSegmentComplete(group: item.groupId) }
+                }
             } else {
                 setState(item.id, .failed)
             }

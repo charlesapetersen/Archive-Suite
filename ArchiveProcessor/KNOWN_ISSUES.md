@@ -4,6 +4,26 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## B9 (LOW) — resolved tag cards re-surface after a mid-session Mac restart; re-entered tags on an already-staged segment are dropped
+
+Found by the B4/B5 review (2026-07-08). `CaptureSession` persists `completedDocGroups` (B5-ii) but NOT
+`resolvedGroupIds`, so after a mid-session Mac restart a group already resolved+finalized re-shows its tag
+card (`pendingTagGroup`); re-tagging it no-ops on the already-baked staging output (the new tags never reach
+it). **Pre-existing root cause** — the same fires at Finish via `completeAllOpenDocGroups` post-restart; B5-ii
+merely triggers it mid-session too. **NO data loss / NO double-file** (guarded by `finalizedGroups.contains`
+in `segmentResolved`). Fix: persist `resolvedGroupIds` (+ `macTags`) in the manifest, OR intersect the restored
+`completedDocGroups` against the processor's persisted `finalizedGroups` on restore so a resolved group doesn't
+re-surface. `Capture/CaptureSession.swift`, `Capture/LiveCaptureProcessor.swift`.
+
+---
+
+## Android capture screen controls lack accessibility labels  [LOW — a11y]
+
+Found in the 2026-07-08 on-device UI review (Pixel 9). The center shutter button (and the preview/status
+controls) have no `contentDescription`, so VoiceOver/TalkBack announces an unlabeled button. No functional or
+data impact. Fix: add content descriptions to the shutter + Box/Folder + End-segment + Re-pair controls
+(`ArchiveCapture/.../ui/CaptureScreen.kt`). Part of the deferred "accessibility pass".
+
 ## ✅ FIXED (2026-07-07): Live "Process live" finalize deleted a run's originals — 0 files moved, sources gone
 
 **Severity: CRITICAL data loss (no undo). Fixed; see the Recovery Core Directive in `CLAUDE.md`.**
@@ -175,6 +195,18 @@ re-pair, so a subsequent **Wired** re-pair needs it re-established (the Mac's `U
 `adb reverse` on reconnect; verify it does). `Net/CaptureServer.swift`, `Net/USBBridge.swift`,
 `Views/LiveCaptureView.swift`, + both companions' capture screens.
 
+**FIXED in code (B4 — pending owner live-verify).** (i) `POST /session/disconnect` now calls a new
+`CaptureSession.phoneDidDisconnect()` (instead of just `unpairDisplay()`), which resets the pairing +
+connection indicators (`paired`, `phoneConnected`, `lastPhoneContactAt`, `connectedDeviceName`) and
+re-shows the QR automatically; received photos + session state are untouched (they re-upload idempotently).
+(ii) The Connection box now splits **"No phone connected" vs "Connected · <device>"** from mere receiver
+"Listening (Wi-Fi / USB)"/"Watching Drive" (A5 rows kept), driven by a new `phoneConnected` — a published
+liveness flag set on any phone contact (ping / `/phone/status` heartbeat / ingest) and expired by a 5s
+freshness timer (25s window) so a stale green dot no longer reads as "still paired." (iii) `USBBridge`
+already re-asserts `adb reverse` on a 5s heal timer (so a wired re-pair self-heals); added
+`USBBridge.reassertNow()`, fired from `phoneDidDisconnect()`, so it re-asserts immediately instead of
+waiting up to 5s. The live re-pair walkthrough (incl. wired) is owner-GUI-gated.
+
 ---
 
 ## Per-capture streaming — implemented; residual refinements (from the 2026-07-06 Tier-2 review)
@@ -202,11 +234,21 @@ un-filed (straggler) page** in the backup folder + Captured pane. No page is eve
    a pending-complete group; flush when all its pages hit UPLOADED, from the upload-success path + auto-retry).
 2. **Per-page P10 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleP10` re-uploads
    only when `state == UPLOADED`. Fix: a `needsResend` flag the upload-completion handler honors. Both companions.
+   **FIXED in code (B5-i — pending owner device-verify):** both companions gained a persisted `needsResend`
+   field on `CapturedItem`. `toggleP10`/`reclassifySelected` now call `resendOrEnqueue`: enqueue if idle, else
+   set `needsResend`. The upload-completion handler, on success, honors `needsResend` by re-sending with the
+   CURRENT fields (and NOT removing the photo) instead of confirming — so a change made mid-upload is never
+   dropped. (iOS `Capture/CaptureViewModel.swift`, Android `capture/CaptureViewModel.kt`.)
 3. **Reclassify of a doc page whose `/photo` is in-flight is dropped (MEDIUM).** The `inFlightUploads` guard
-   suppresses the reclassify re-enqueue. Same `needsResend` fix. Both companions.
+   suppresses the reclassify re-enqueue. Same `needsResend` fix. Both companions. **FIXED in code (B5-i, same
+   `resendOrEnqueue`/`needsResend` path as #2 — pending owner device-verify).**
 4. **`completedDocGroups` not persisted across a Mac restart (LOW).** After a mid-session Mac restart, no
    document tag card appears until Finish. Fix: persist it in the manifest, or on restore treat every
-   restored document group as complete.
+   restored document group as complete. **FIXED in code (B5-ii):** the session manifest is now a
+   `{photos, completedDocGroups}` object (was a bare `[ManifestEntry]` array); `decodeManifest` accepts both
+   shapes so legacy in-flight sessions still recover (completion set empty). `markSegmentComplete`/
+   `completeAllOpenDocGroups` persist the set, and restore rehydrates it. Proven headlessly by
+   `ManifestPersistenceTestDriver` (`LIVECAPTURE_MANIFESTTEST=1` — round-trip + legacy + corrupt-bytes).
 
 ---
 

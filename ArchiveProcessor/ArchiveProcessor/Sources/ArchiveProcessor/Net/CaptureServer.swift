@@ -273,9 +273,10 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
 
         case "POST /session/disconnect":
             // The phone re-paired (best-effort notice; there's no persistent connection for the Mac to
-            // sense the drop). Re-show the pairing QR so the operator can immediately re-scan — instead of
-            // being stuck on a stale "paired" state having to find "Show QR".
-            Task { @MainActor [weak self] in self?.session?.unpairDisplay() }
+            // sense the drop). Reset the pairing + connection indicators and re-show the pairing QR so the
+            // operator can immediately re-scan — instead of being stuck on a stale "paired / connected"
+            // state having to find "Show QR" (B4-i). Also re-asserts the USB reverse tunnel (B4-iii).
+            Task { @MainActor [weak self] in self?.session?.phoneDidDisconnect() }
             respond(conn, status: "200 OK", json: ["ok": true])
 
         default:

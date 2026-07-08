@@ -300,8 +300,26 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         persist()
         // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
         // (idempotent group+seq replace). The segment-complete signal carries only the group's priority,
-        // so a per-page P10 must ride the photo itself.
-        if (updated.state == UploadState.UPLOADED) enqueueUpload(updated)
+        // so a per-page P10 must ride the photo itself. If it's still UPLOADING, defer via needsResend so
+        // the toggle isn't dropped (the completion handler re-sends with the current value).
+        resendOrEnqueue(updated)
+    }
+
+    /** Re-send a just-changed item: enqueue now if it's idle, else flag it to be re-sent when its in-flight
+     *  upload settles. This is the fix for a per-page P10 toggle / reclassify racing an in-flight upload —
+     *  the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change. */
+    private fun resendOrEnqueue(item: CapturedItem) {
+        if (inFlightUploads.contains(item.id)) markNeedsResend(item.id) else enqueueUpload(item)
+    }
+
+    private fun markNeedsResend(id: Long) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i >= 0 && !items[i].needsResend) { items[i] = items[i].copy(needsResend = true); persist() }
+    }
+
+    private fun clearNeedsResend(id: Long) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i >= 0 && items[i].needsResend) { items[i] = items[i].copy(needsResend = false); persist() }
     }
 
     private fun clearSelection() { selectedItemId = null; armed = false }
@@ -362,8 +380,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             items[i] = updated
             clearSelection()
             persist()
-            // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op otherwise).
-            enqueueUpload(updated)
+            // Tell the Mac to drop the old (oldGroupId, seq) copy if it already has it (idempotent no-op
+            // otherwise). If the page's original upload is still in flight, defer via needsResend — the
+            // in-flight guard would otherwise swallow this re-enqueue and the reclassify would never send.
+            resendOrEnqueue(updated)
         }
     }
 
@@ -498,12 +518,22 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
                 if (ok) {
                     sentCount += 1
-                    // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
-                    // lets the strip animate it out), so photos transfer in segments instead of piling up.
-                    viewModelScope.launch { delay(650); removeConfirmed(item) }
-                    // If this was the last outstanding page of an ended segment, its completion signal was
-                    // gated waiting for this upload — try it now (no-op if other pages are still in flight).
-                    if (endedSegments.containsKey(item.groupId)) trySendSegmentComplete(item.groupId)
+                    // A field changed while this upload was in flight (per-page P10 / reclassify): the bytes
+                    // just sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
+                    // removeConfirmed (that would drop the photo having sent only the old value). The
+                    // re-enqueue is launched after `finally` releases the in-flight guard.
+                    val cur = items.firstOrNull { it.id == item.id }
+                    if (cur != null && cur.needsResend) {
+                        clearNeedsResend(item.id)
+                        viewModelScope.launch { items.firstOrNull { it.id == item.id }?.let { enqueueUpload(it) } }
+                    } else {
+                        // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
+                        // lets the strip animate it out), so photos transfer in segments instead of piling up.
+                        viewModelScope.launch { delay(650); removeConfirmed(item) }
+                        // If this was the last outstanding page of an ended segment, its completion signal was
+                        // gated waiting for this upload — try it now (no-op if other pages are still in flight).
+                        if (endedSegments.containsKey(item.groupId)) trySendSegmentComplete(item.groupId)
+                    }
                 }
                 statusMessage = uploadSummary()
                 sendStatusReport()   // reflect the new un-sent count promptly (this upload just settled)
