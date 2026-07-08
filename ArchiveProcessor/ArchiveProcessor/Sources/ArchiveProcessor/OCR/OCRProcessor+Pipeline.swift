@@ -1,7 +1,71 @@
 import Foundation
 import UserNotifications
+import CryptoKit
 
 extension OCRProcessor {
+    // MARK: - Batch/run resume identity (crash-resume, Tier-2)
+
+    /// A stable content fingerprint of a run's *identity* — the exact input set + destination + the
+    /// settings that change what lands on disk. Two runs with the same fingerprint are the SAME job, so
+    /// a persisted manifest may be resumed into the current context; a different fingerprint means a
+    /// different input set / output / settings and MUST NOT be misapplied (Tier-2 rule e). Order-stable
+    /// (inputs are sorted) so re-adding the same files in a different order still matches.
+    /// `taggingMode` is included only when the manifest persists it (batch manifests do; the non-batch
+    /// `PendingRun` does not — it resumes under the live UI mode — so pass nil there, keeping the
+    /// fingerprint computable purely from persisted fields).
+    nonisolated static func runFingerprint(
+        files: [URL], outputDirectory: URL, taggingMode: TaggingMode?,
+        enableTagging: Bool, batchMode: Bool
+    ) -> String {
+        let paths = files.map { $0.standardizedFileURL.path }.sorted()
+        let canonical = ([
+            "out=" + outputDirectory.standardizedFileURL.path,
+            "mode=" + (taggingMode?.rawValue ?? "-"),
+            "tag=" + (enableTagging ? "1" : "0"),
+            "batch=" + (batchMode ? "1" : "0"),
+            "n=\(paths.count)"
+        ] + paths).joined(separator: "\n")
+        let digest = SHA256.hash(data: Data(canonical.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The input file indices a resume must still process: everything NOT already in the manifest's
+    /// completed set. Factored out so `resumeRun` and the headless self-test share ONE definition of
+    /// "skip the done files" — the anti-double-cost guarantee (Tier-2 rule a: never re-OCR a done file).
+    nonisolated static func remainingIndices(totalFiles: Int, completedResults: [String: OCRResult]) -> [Int] {
+        (0..<max(0, totalFiles)).filter { completedResults["\($0)"] == nil }
+    }
+
+    /// Recompute a manifest's fingerprint from its OWN persisted fields and compare to the stored one.
+    /// A mismatch means the file is torn/tampered/internally inconsistent (still-valid JSON but not a
+    /// coherent run) → callers ignore it rather than misapply it. `nil` stored fingerprint (a manifest
+    /// written before the field existed) is treated as consistent for backward-compat.
+    nonisolated static func pendingRunIsSelfConsistent(_ run: PendingRun) -> Bool {
+        guard let stored = run.runFingerprint else { return true }
+        return stored == runFingerprint(
+            files: run.fileURLs, outputDirectory: run.outputDirectory,
+            taggingMode: nil, enableTagging: run.enableTagging, batchMode: false)
+    }
+    nonisolated static func pendingBatchIsSelfConsistent(_ batch: PendingBatch) -> Bool {
+        guard let stored = batch.runFingerprint else { return true }
+        return stored == runFingerprint(
+            files: batch.fileURLs, outputDirectory: batch.outputDirectory,
+            taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true)
+    }
+
+    // MARK: Headless self-test hooks ($0, no network) — see BatchResumeTestDriver
+    // Write/read a manifest to an EXPLICIT url (a temp dir in tests — never the real Application Support
+    // state), so the self-test exercises the real serialization + crash-safe (`.atomic`) write path
+    // without disturbing a user's actual pending run.
+    nonisolated static func _testWritePendingRun(_ run: PendingRun, to url: URL) -> Bool {
+        guard let data = try? JSONEncoder().encode(run) else { return false }
+        do { try data.write(to: url, options: .atomic); return true } catch { return false }
+    }
+    nonisolated static func _testReadPendingRun(from url: URL) -> PendingRun? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(PendingRun.self, from: data)
+    }
+
     private static var pendingBatchURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
@@ -11,7 +75,10 @@ extension OCRProcessor {
     }
     static func savePendingBatch(_ batch: PendingBatch) {
         guard let data = try? JSONEncoder().encode(batch) else { return }
-        try? data.write(to: pendingBatchURL)
+        // Crash-safe: `.atomic` writes to a sibling temp file then renames it into place, so a crash or
+        // power-loss mid-write can never leave a half-written (corrupt) manifest — a reader sees either
+        // the previous complete manifest or the new complete one (Tier-2 rule e).
+        try? data.write(to: pendingBatchURL, options: .atomic)
     }
     private static func loadPendingBatch() -> PendingBatch? {
         guard let data = try? Data(contentsOf: pendingBatchURL) else { return nil }
@@ -33,7 +100,9 @@ extension OCRProcessor {
     }
     private static func savePendingRun(_ run: PendingRun) {
         guard let data = try? JSONEncoder().encode(run) else { return }
-        try? data.write(to: pendingRunURL)
+        // Crash-safe write-then-rename (see savePendingBatch): the incremental per-file manifest is
+        // rewritten after every completed file, so a crash mid-write must not corrupt it (Tier-2 rule e).
+        try? data.write(to: pendingRunURL, options: .atomic)
     }
     private static func loadPendingRun() -> PendingRun? {
         guard let data = try? Data(contentsOf: pendingRunURL) else { return nil }
@@ -55,8 +124,12 @@ extension OCRProcessor {
     }
     /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
-        // Check for pending batch
-        if let pending = Self.loadPendingBatch() {
+        // Check for pending batch. A manifest that fails to decode (corrupt JSON) already loads as nil;
+        // additionally ignore one that is self-inconsistent (torn/tampered — valid JSON but its stored
+        // fingerprint no longer matches its own fields) rather than offering a resume that could misapply
+        // it (Tier-2 rule e). The local file is NOT deleted for a batch — a paid server-side job may
+        // still exist, and dropping the manifest would strand it — it is simply not surfaced.
+        if let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) {
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
             formatter.timeStyle = .short
@@ -66,8 +139,8 @@ extension OCRProcessor {
             pendingBatchInfo = nil
         }
 
-        // Check for pending run
-        if let pending = Self.loadPendingRun() {
+        // Check for pending run (same self-consistency guard).
+        if let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) {
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
             formatter.timeStyle = .short
@@ -89,9 +162,29 @@ extension OCRProcessor {
         Self.deletePendingRun()
         pendingRunInfo = nil
     }
+    /// Whether the persisted incomplete run is the SAME job as the current input+output+settings —
+    /// i.e. resuming it would continue *this* selection, not a different one. Lets a caller auto-resume
+    /// on a match and treat a non-match as a distinct (stale) run to ignore (Tier-2 rule e). Returns
+    /// false when there is no pending run or it is self-inconsistent.
+    func pendingRunMatches(files: [URL], outputDirectory: URL) -> Bool {
+        guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending),
+              let fp = pending.runFingerprint else { return false }
+        return fp == Self.runFingerprint(
+            files: files, outputDirectory: outputDirectory,
+            taggingMode: nil, enableTagging: pending.enableTagging, batchMode: false)
+    }
+    /// Batch counterpart of `pendingRunMatches`.
+    func pendingBatchMatches(files: [URL], outputDirectory: URL) -> Bool {
+        guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending),
+              let fp = pending.runFingerprint else { return false }
+        return fp == Self.runFingerprint(
+            files: files, outputDirectory: outputDirectory,
+            taggingMode: pending.taggingMode, enableTagging: pending.enableTagging, batchMode: true)
+    }
     /// Resume polling a previously submitted batch.
     func resumeBatch(apiKey: String) async {
-        guard let pending = Self.loadPendingBatch() else { return }
+        // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e).
+        guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) else { return }
 
         isProcessing = true
         pendingBatchInfo = nil
@@ -248,7 +341,11 @@ extension OCRProcessor {
     }
     /// Resume an interrupted non-batch run.
     func resumeRun(apiKey: String) async {
-        guard let pending = Self.loadPendingRun() else { return }
+        // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e). `resumeRun` replays
+        // the manifest's OWN persisted input set + output dir (never the current UI selection), so a
+        // stale manifest can never cross-contaminate a different job; `pendingRunMatches(...)` lets a
+        // caller confirm the two are the same run before auto-resuming.
+        guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
 
         isProcessing = true
         pendingRunInfo = nil
@@ -343,10 +440,11 @@ extension OCRProcessor {
             statusMessage = "Restored \(completedCount)/\(total). Resuming OCR…"
         }
 
-        // Run OCR only on files that were NOT already completed
-        let remainingIndices = (0..<pending.fileURLs.count).filter {
-            pending.completedResults["\($0)"] == nil
-        }
+        // Run OCR only on files that were NOT already completed — the anti-double-cost guarantee: a file
+        // whose result is cached in the manifest is never re-OCR'd (Tier-2 rule a). Its output PDF is
+        // regenerated above from the cached result only when missing on disk, never re-charged.
+        let remainingIndices = Self.remainingIndices(
+            totalFiles: pending.fileURLs.count, completedResults: pending.completedResults)
 
         if !remainingIndices.isEmpty {
             if pending.preOCRedInput {
@@ -788,7 +886,10 @@ extension OCRProcessor {
                     sendPreviousImage: segmentationContext.sendPreviousImage,
                     customPrompt: segmentationContext.customPrompt,
                     startedAt: Date(), gatewayConfig: gatewayConfig,
-                    completedResults: [:]
+                    completedResults: [:],
+                    runFingerprint: Self.runFingerprint(
+                        files: files, outputDirectory: outputDirectory, taggingMode: nil,
+                        enableTagging: enableTagging, batchMode: false)
                 )
                 Self.savePendingRun(activePendingRun!)
 

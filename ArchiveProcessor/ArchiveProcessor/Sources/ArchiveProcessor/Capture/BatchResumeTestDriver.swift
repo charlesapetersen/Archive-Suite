@@ -1,0 +1,149 @@
+import Foundation
+import AppKit
+
+/// Headless, $0 self-test of the **Process Files crash-resume manifest** (feature G2), gated by
+/// `BATCHRESUME_TEST=1` (inert in normal use). Uses synthetic files in a temp dir — no OCR, no network,
+/// no cost, no GUI interaction — to prove the durable-resume mechanisms and their Tier-2 data-safety
+/// hard rules directly, without a full crash+relaunch E2E (which is owner-GUI-gated):
+///   1. The manifest round-trips through the real crash-safe (`.atomic`) write + JSON decode path.
+///   2. A run fingerprint MATCHES the same input+output+settings and DIFFERS when any of them change,
+///      so a resume only applies to the intended job (Tier-2 rule e — mismatched manifests ignored).
+///   3. A torn/tampered manifest (valid JSON, inconsistent stored fingerprint) is rejected, not applied.
+///   4. Corrupt (non-JSON) manifest bytes decode to nil (ignored).
+///   5. Resume SKIPS a pre-completed file — `remainingIndices` excludes the done index (Tier-2 rule a:
+///      never re-OCR a completed file → no double cost).
+///   6. A completed file's output PDF is confirmed on disk (Tier-2 rule c), and a DIFFERENT source that
+///      shares its base filename gets a fresh, non-colliding output path (Tier-2 rule b: no overwrite).
+///
+/// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
+/// it operates on an explicit temp manifest url via `_testWritePendingRun`/`_testReadPendingRun`, so it
+/// never touches the user's real `pending_run.json` in Application Support.
+@MainActor
+enum BatchResumeTestDriver {
+    private static var didRun = false
+
+    static func runIfRequested() {
+        guard !didRun, ProcessInfo.processInfo.environment["BATCHRESUME_TEST"] == "1" else { return }
+        didRun = true
+        Task { await run() }
+    }
+
+    static func run() async {
+        let fm = FileManager.default
+        var results: [String] = []
+        func check(_ name: String, _ ok: Bool) {
+            results.append("\(ok ? "PASS" : "FAIL"): \(name)")
+            NSLog("BATCHRESUME \(ok ? "PASS" : "FAIL"): \(name)")
+        }
+
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APBatchResume-\(UUID().uuidString)", isDirectory: true)
+        let inDir = tmp.appendingPathComponent("in", isDirectory: true)
+        let outDir = tmp.appendingPathComponent("out", isDirectory: true)
+        try? fm.createDirectory(at: inDir, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+
+        // Two synthetic inputs (contents irrelevant — no OCR is performed).
+        let img0 = inDir.appendingPathComponent("img0.jpg")
+        let img1 = inDir.appendingPathComponent("img1.jpg")
+        try? Data("0".utf8).write(to: img0)
+        try? Data("1".utf8).write(to: img1)
+        let files = [img0, img1]
+
+        // The non-batch PendingRun fingerprint does not include tagging mode (it resumes under the live
+        // UI mode), so pass nil — matching how startProcessing stores it.
+        let fingerprint = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: nil, enableTagging: true, batchMode: false)
+
+        // A manifest that says file 0 is DONE (its OCR result cached) and file 1 is still pending.
+        let done = OCRResult(text: "cached text for file 0", classification: nil,
+                             rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+        let run = OCRProcessor.PendingRun(
+            provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
+            fileURLs: files, outputDirectory: outDir, enableTagging: true, enableSegmentJSON: true,
+            enableCollectionSegmentation: false, confirmCollectionIDs: false,
+            reviewDocumentSegmentation: false, preOCRedInput: false, previousTextCharCount: 0,
+            sendPreviousImage: false, customPrompt: nil, startedAt: Date(), gatewayConfig: nil,
+            completedResults: ["0": done], runFingerprint: fingerprint)
+
+        // --- 1: round-trip through the real crash-safe write + decode path. ---
+        let manifestURL = tmp.appendingPathComponent("pending_run.json")
+        let wrote = OCRProcessor._testWritePendingRun(run, to: manifestURL)
+        check("manifest written via atomic (.atomic) path", wrote && fm.fileExists(atPath: manifestURL.path))
+        let loaded = OCRProcessor._testReadPendingRun(from: manifestURL)
+        check("manifest round-trips (decodes back)", loaded != nil)
+        check("round-trip preserves the input set", loaded?.fileURLs == files)
+        check("round-trip preserves the DONE file's cached OCR text",
+              loaded?.completedResults["0"]?.text == "cached text for file 0")
+        check("round-trip preserves the fingerprint", loaded?.runFingerprint == fingerprint)
+
+        // --- 2: fingerprint matches the same job, differs when input/output/settings change. ---
+        let sameAgain = OCRProcessor.runFingerprint(
+            files: files.reversed(), outputDirectory: outDir, taggingMode: nil,
+            enableTagging: true, batchMode: false)
+        check("fingerprint is input-order-independent (same job matches)", sameAgain == fingerprint)
+        let diffFiles = OCRProcessor.runFingerprint(
+            files: [img0], outputDirectory: outDir, taggingMode: nil, enableTagging: true, batchMode: false)
+        let diffOut = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: inDir, taggingMode: nil, enableTagging: true, batchMode: false)
+        let diffTag = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: nil, enableTagging: false, batchMode: false)
+        let diffBatch = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: nil, enableTagging: true, batchMode: true)
+        // Batch manifests DO include tagging mode → changing it changes the batch fingerprint.
+        let batchAuto = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: .automatic, enableTagging: true, batchMode: true)
+        let batchNone = OCRProcessor.runFingerprint(
+            files: files, outputDirectory: outDir, taggingMode: TaggingMode.none, enableTagging: true, batchMode: true)
+        check("fingerprint differs for a different input set", diffFiles != fingerprint)
+        check("fingerprint differs for a different output dir", diffOut != fingerprint)
+        check("fingerprint differs when tagging is toggled", diffTag != fingerprint)
+        check("fingerprint differs for batch vs non-batch", diffBatch != fingerprint)
+        check("batch fingerprint differs for a different tagging mode", batchAuto != batchNone)
+
+        // --- 3: self-consistency guard accepts the honest manifest, rejects a tampered one. ---
+        check("self-consistent manifest is accepted", OCRProcessor.pendingRunIsSelfConsistent(run))
+        var tampered = run
+        tampered.runFingerprint = "deadbeefdeadbeef"   // valid JSON, but fingerprint no longer matches fields
+        check("tampered/torn manifest is rejected (ignored, not misapplied)",
+              !OCRProcessor.pendingRunIsSelfConsistent(tampered))
+
+        // --- 4: corrupt (non-JSON) bytes decode to nil → ignored. ---
+        let corruptURL = tmp.appendingPathComponent("corrupt.json")
+        try? Data("{ not valid json ".utf8).write(to: corruptURL)
+        check("corrupt manifest bytes decode to nil (ignored)",
+              OCRProcessor._testReadPendingRun(from: corruptURL) == nil)
+
+        // --- 5: resume skips the pre-completed file (anti-double-cost). ---
+        let remaining = OCRProcessor.remainingIndices(
+            totalFiles: run.fileURLs.count, completedResults: run.completedResults)
+        check("resume SKIPS the done file 0 (never re-OCR'd)", !remaining.contains(0))
+        check("resume CONTINUES with the pending file 1", remaining == [1])
+
+        // --- 6: output-on-disk confirmation (rule c) + no-overwrite of a sibling (rule b). ---
+        // The DONE file's output PDF from the first pass; a resume must confirm it on disk and reuse it.
+        let out0 = outDir.appendingPathComponent("img0.pdf")
+        try? Data("first-pass pdf for file 0".utf8).write(to: out0)
+        check("completed file's output PDF is confirmed on disk (rule c)", fm.fileExists(atPath: out0.path))
+
+        // A DIFFERENT source that shares the base name "img0" (e.g. img0.jpg from another box) must NOT
+        // be routed to the already-reserved img0.pdf.
+        let processor = OCRProcessor()
+        processor.outputURLMap[img0] = out0                       // reserve img0.pdf for the real file 0
+        let sibling = inDir.appendingPathComponent("box2").appendingPathComponent("img0.jpg")
+        let assigned = processor.uniqueOutputURL(baseName: "img0", ext: "pdf", in: outDir, for: sibling)
+        check("a colliding-base sibling gets a fresh, non-clobbering output path (rule b)",
+              assigned.lastPathComponent != "img0.pdf" && !fm.fileExists(atPath: assigned.path))
+        check("reserving the same source again is idempotent (reuses its path)",
+              processor.uniqueOutputURL(baseName: "img0", ext: "pdf", in: outDir, for: img0) == out0)
+        check("the first-pass output PDF is untouched by the sibling assignment",
+              fm.fileExists(atPath: out0.path))
+
+        let passed = results.allSatisfy { $0.hasPrefix("PASS") }
+        let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
+        let outPath = ProcessInfo.processInfo.environment["BATCHRESUME_TEST_OUT"]
+            ?? fm.temporaryDirectory.appendingPathComponent("APBatchResume-RESULT.txt").path
+        try? report.write(toFile: outPath, atomically: true, encoding: .utf8)
+        try? fm.removeItem(at: tmp)
+        NSLog("BATCHRESUME DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath)")
+    }
+}

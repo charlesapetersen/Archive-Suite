@@ -230,13 +230,18 @@ class OCRProcessor: ObservableObject {
         let reviewDocumentSegmentation: Bool
         let customPrompt: String?
         let taggingMode: TaggingMode
+        /// Content fingerprint of this run's identity (sorted input set + destination + the settings
+        /// that change what lands on disk). Lets resume confirm the manifest matches the intended job
+        /// and reject a torn/tampered one (Tier-2 rule e). Optional for backward-compat with manifests
+        /// written before this field existed. See `OCRProcessor.runFingerprint(...)`.
+        let runFingerprint: String?
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
              enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
              reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
-             taggingMode: TaggingMode = .automatic) {
+             taggingMode: TaggingMode = .automatic, runFingerprint: String? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -247,6 +252,7 @@ class OCRProcessor: ObservableObject {
             self.reviewDocumentSegmentation = reviewDocumentSegmentation
             self.customPrompt = customPrompt
             self.taggingMode = taggingMode
+            self.runFingerprint = runFingerprint
         }
 
         init(from decoder: Decoder) throws {
@@ -266,6 +272,7 @@ class OCRProcessor: ObservableObject {
             reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
             customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
             taggingMode = try c.decodeIfPresent(TaggingMode.self, forKey: .taggingMode) ?? .automatic
+            runFingerprint = try c.decodeIfPresent(String.self, forKey: .runFingerprint)
         }
     }
 
@@ -295,6 +302,11 @@ class OCRProcessor: ObservableObject {
         let gatewayConfig: GatewayConfig?
         /// Per-file OCR results keyed by file index. Only succeeded files are stored.
         var completedResults: [String: OCRResult]
+        /// Content fingerprint of this run's identity (sorted input set + destination + the settings
+        /// that change what lands on disk). On resume the manifest is only applied if it is
+        /// self-consistent, so a torn/tampered/mismatched manifest is ignored rather than misapplied
+        /// (Tier-2 rule e). Optional for backward-compat with manifests written before this field.
+        var runFingerprint: String? = nil
     }
 
 

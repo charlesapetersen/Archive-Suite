@@ -372,7 +372,10 @@ extension OCRProcessor {
             confirmCollectionIDs: confirmCollectionIDs,
             reviewDocumentSegmentation: reviewDocumentSegmentation,
             customPrompt: customPrompt,
-            taggingMode: taggingMode
+            taggingMode: taggingMode,
+            runFingerprint: Self.runFingerprint(
+                files: fileURLs, outputDirectory: outputDirectory, taggingMode: taggingMode,
+                enableTagging: enableTagging, batchMode: true)
         ))
         statusMessage = "Batch submitted. Waiting for results…"
 
