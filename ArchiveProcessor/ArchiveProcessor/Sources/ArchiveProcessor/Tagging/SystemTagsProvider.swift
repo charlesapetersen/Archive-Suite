@@ -14,6 +14,10 @@ final class SystemTagsProvider: ObservableObject, @unchecked Sendable {
     /// Only ever mutated on the main actor (see `register` and the gather hop below).
     @Published private(set) var tags: [String] = []
 
+    /// False until the first Spotlight gather completes (fires even with zero tagged files). Lets a tagging
+    /// UI show a "building suggestions…" state instead of silently-empty autocomplete while the query warms.
+    @Published private(set) var isReady = false
+
     private let query = NSMetadataQuery()
     private let gatherQueue: OperationQueue = {
         let q = OperationQueue()
@@ -66,6 +70,7 @@ final class SystemTagsProvider: ObservableObject, @unchecked Sendable {
             var merged = Set(self.tags)
             merged.formUnion(gathered)
             self.tags = merged.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            self.isReady = true   // first gather done → autocomplete is live (empty result set is still "ready")
         }
     }
 

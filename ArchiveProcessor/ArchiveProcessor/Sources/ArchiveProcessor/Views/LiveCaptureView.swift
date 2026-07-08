@@ -26,6 +26,23 @@ struct LiveCaptureView: View {
             capturePanel
                 .padding()
         }
+        // After rotation review, changed segments' PDFs regenerate before the collection-naming sheet
+        // appears — `isFinalizing` is true but no sheet is up, which used to look hung. Surface a throbber
+        // so the operator sees work is still happening. (During the finalize move itself the sheet is up
+        // with its own spinner, so this stays gated off then.)
+        .overlay {
+            if liveProc.isFinalizing && !liveProc.showFinalizeSheet && !liveProc.showRotationReview {
+                ZStack {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    VStack(spacing: 10) {
+                        ProgressView().controlSize(.large)
+                        Text("Finishing — processing segments…").font(.callout).foregroundStyle(.secondary)
+                    }
+                    .padding(24)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
         .onAppear {
             SystemTagsProvider.shared.warmUp()   // prime subject autocomplete
             if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1", !session.serverRunning {
@@ -486,6 +503,8 @@ struct LiveCaptureView: View {
 private struct SegmentTagCard: View {
     let group: CaptureGroup
     @ObservedObject var session: CaptureSession
+    /// Observed so the "building suggestions…" note clears the moment the Spotlight gather finishes.
+    @ObservedObject private var tagsProvider = SystemTagsProvider.shared
 
     @State private var subjects: [String] = []
     @State private var input: String = ""
@@ -566,7 +585,15 @@ private struct SegmentTagCard: View {
 
     private var subjectsSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Subjects").font(.callout).fontWeight(.medium)
+            HStack(spacing: 6) {
+                Text("Subjects").font(.callout).fontWeight(.medium)
+                // The Spotlight tag index is still gathering — tell the operator, so an empty suggestion
+                // list reads as "still loading" rather than "no matching tags." Clears when the query finishes.
+                if !tagsProvider.isReady {
+                    ProgressView().controlSize(.small)
+                    Text("building tag suggestions…").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
             FlowLayout(spacing: 6) {
                 ForEach(subjects, id: \.self) { tag in
                     TagChip(text: tag) { subjects.removeAll { $0 == tag } }
