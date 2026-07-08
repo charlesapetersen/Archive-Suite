@@ -789,8 +789,10 @@ extension OCRProcessor {
                 jobs[index].appliedTags = sourceTags
             }
         }
-        // Persist result for resume-after-restart
-        saveResultToPendingRun(index: index, result: result)
+        // Persist result AND its assigned output path for resume-after-restart. Recording the exact
+        // outputURL (the value uniqueOutputURL just returned for this index) lets resume reuse the same
+        // source→output mapping verbatim, so a duplicate-base-name collision can't be swapped on resume (B7).
+        saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     static func isTimeoutError(_ result: OCRResult) -> Bool {
         if result.errorMessage?.lowercased().contains("timed out") == true

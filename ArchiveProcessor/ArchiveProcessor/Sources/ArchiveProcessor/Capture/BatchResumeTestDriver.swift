@@ -14,6 +14,12 @@ import AppKit
 ///      never re-OCR a completed file → no double cost).
 ///   6. A completed file's output PDF is confirmed on disk (Tier-2 rule c), and a DIFFERENT source that
 ///      shares its base filename gets a fresh, non-colliding output path (Tier-2 rule b: no overwrite).
+///   7. The self-consistency guard runs on the DISK-ROUND-TRIPPED (loaded-from-JSON) manifest, not just
+///      the in-memory struct — accepting an honest one and rejecting a tampered one after a real round trip
+///      — and a legacy manifest (no `completedOutputPaths`) decodes with that field nil (backward-compat).
+///   8. B7 regression: two sources sharing a base filename, assigned outputs in COMPLETION order that
+///      differs from index order, each resolve back to the SAME output PDF they hold on disk (association
+///      preserved via the persisted path map) — whereas the legacy index-order derivation would SWAP them.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on an explicit temp manifest url via `_testWritePendingRun`/`_testReadPendingRun`, so it
@@ -137,6 +143,66 @@ enum BatchResumeTestDriver {
               processor.uniqueOutputURL(baseName: "img0", ext: "pdf", in: outDir, for: img0) == out0)
         check("the first-pass output PDF is untouched by the sibling assignment",
               fm.fileExists(atPath: out0.path))
+
+        // --- 7: self-consistency guard on the DISK-ROUND-TRIPPED manifest (not just the in-memory one). ---
+        check("round-tripped (from-disk) manifest passes self-consistency",
+              loaded.map { OCRProcessor.pendingRunIsSelfConsistent($0) } ?? false)
+        var tamperedRun = run
+        tamperedRun.runFingerprint = "deadbeefdeadbeef"
+        let tamperedURL = tmp.appendingPathComponent("tampered_run.json")
+        _ = OCRProcessor._testWritePendingRun(tamperedRun, to: tamperedURL)
+        let tamperedLoaded = OCRProcessor._testReadPendingRun(from: tamperedURL)
+        check("round-tripped (from-disk) tampered manifest is rejected",
+              tamperedLoaded != nil && !OCRProcessor.pendingRunIsSelfConsistent(tamperedLoaded!))
+        // Backward-compat: `run` was built without completedOutputPaths → the loaded copy has it nil.
+        check("legacy manifest (no completedOutputPaths) round-trips with the field nil",
+              loaded?.completedOutputPaths == nil)
+
+        // --- 8: B7 regression — duplicate base name assigned OUT OF COMPLETION ORDER. ---
+        // Two sources share the base name "00001" across folders. In the original pass file index 1 (boxB)
+        // COMPLETED FIRST → it was assigned the plain "00001.pdf"; index 0 (boxA) completed SECOND →
+        // "00001 (2).pdf". So the persisted completion-order assignment is the INVERSE of index order.
+        let boxA = inDir.appendingPathComponent("boxA").appendingPathComponent("00001.jpg")   // index 0
+        let boxB = inDir.appendingPathComponent("boxB").appendingPathComponent("00001.jpg")   // index 1
+        let dupSources = [boxA, boxB]
+        let outPlain = outDir.appendingPathComponent("00001.pdf")       // on disk for index 1 (finished 1st)
+        let outSecond = outDir.appendingPathComponent("00001 (2).pdf")  // on disk for index 0 (finished 2nd)
+        let dupResults: [String: OCRResult] = [
+            "0": OCRResult(text: "boxA doc", classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil),
+            "1": OCRResult(text: "boxB doc", classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil)]
+        let dupPaths: [String: String] = ["0": outSecond.path, "1": outPlain.path]
+        let dupRun = OCRProcessor.PendingRun(
+            provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
+            fileURLs: dupSources, outputDirectory: outDir, enableTagging: true, enableSegmentJSON: true,
+            enableCollectionSegmentation: false, confirmCollectionIDs: false,
+            reviewDocumentSegmentation: false, preOCRedInput: false, previousTextCharCount: 0,
+            sendPreviousImage: false, customPrompt: nil, startedAt: Date(), gatewayConfig: nil,
+            completedResults: dupResults, completedOutputPaths: dupPaths,
+            runFingerprint: OCRProcessor.runFingerprint(
+                files: dupSources, outputDirectory: outDir, taggingMode: nil, enableTagging: true, batchMode: false))
+        let dupURL = tmp.appendingPathComponent("dup_run.json")
+        _ = OCRProcessor._testWritePendingRun(dupRun, to: dupURL)
+        let dupLoaded = OCRProcessor._testReadPendingRun(from: dupURL)
+        check("persisted output-path map survives the disk round-trip",
+              dupLoaded?.completedOutputPaths == dupPaths)
+        // Resolve outputs from the LOADED manifest — exactly what resumeRun does.
+        let resolved = OCRProcessor.resolveResumeOutputURLs(
+            completedResults: dupLoaded?.completedResults ?? [:],
+            completedOutputPaths: dupLoaded?.completedOutputPaths,
+            sourceURLs: dupLoaded?.fileURLs ?? [],
+            outputDirectory: dupLoaded?.outputDirectory ?? outDir)
+        check("resume maps boxA/00001 (index 0) to its ON-DISK 00001 (2).pdf (association preserved)",
+              resolved[0]?.standardizedFileURL == outSecond.standardizedFileURL)
+        check("resume maps boxB/00001 (index 1) to its ON-DISK 00001.pdf (association preserved)",
+              resolved[1]?.standardizedFileURL == outPlain.standardizedFileURL)
+        // Prove the bug is real: the legacy index-order derivation SWAPS the association (index 0 →
+        // plain 00001.pdf, which on disk belongs to index 1). The persisted-path fix prevents this.
+        let legacyResolved = OCRProcessor.resolveResumeOutputURLs(
+            completedResults: dupResults, completedOutputPaths: nil,
+            sourceURLs: dupSources, outputDirectory: outDir)
+        check("legacy index-order derivation WOULD swap (index 0 → 00001.pdf); persisted-path fix diverges",
+              legacyResolved[0]?.lastPathComponent == "00001.pdf"
+              && resolved[0]?.lastPathComponent != legacyResolved[0]?.lastPathComponent)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

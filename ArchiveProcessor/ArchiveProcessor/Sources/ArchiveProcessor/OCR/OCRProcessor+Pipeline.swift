@@ -36,6 +36,46 @@ extension OCRProcessor {
         (0..<max(0, totalFiles)).filter { completedResults["\($0)"] == nil }
     }
 
+    /// Map each completed file index to the output-PDF URL a resume must restore it to. B7 fix: an index
+    /// with a persisted assignment in `completedOutputPaths` reuses that path VERBATIM, so the source→output
+    /// association recorded on disk (in COMPLETION order by the original pass) is preserved even when two
+    /// sources share a base filename — re-deriving in index order would swap them and mis-tag both PDFs.
+    /// An index WITHOUT a persisted path (a legacy manifest written before the map existed) falls back to
+    /// the old deterministic index-order derivation, disambiguating colliding base names against
+    /// `alreadyTaken` (plus paths claimed earlier in this pass). `sourceURLs` is indexed by file index.
+    /// Factored out so `resumeRun` and the headless self-test exercise ONE definition (Tier-2 DRY).
+    nonisolated static func resolveResumeOutputURLs(
+        completedResults: [String: OCRResult],
+        completedOutputPaths: [String: String]?,
+        sourceURLs: [URL],
+        outputDirectory: URL,
+        alreadyTaken: Set<String> = []
+    ) -> [Int: URL] {
+        var takenOutputs = alreadyTaken
+        var resolved: [Int: URL] = [:]
+        for (key, _) in completedResults.sorted(by: { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }) {
+            guard let index = Int(key), index >= 0, index < sourceURLs.count else { continue }
+            let sourceURL = sourceURLs[index]
+            let outputURL: URL
+            if let persisted = completedOutputPaths?[key] {
+                // Reuse the persisted assignment VERBATIM — the path already on disk for THIS source.
+                outputURL = URL(fileURLWithPath: persisted)
+            } else {
+                // Legacy manifest (no persisted path): re-derive deterministically in index order.
+                let baseName = sourceURL.deletingPathExtension().lastPathComponent
+                var candidate = outputDirectory.appendingPathComponent(baseName + ".pdf")
+                var n = 2
+                while takenOutputs.contains(candidate.standardizedFileURL.path.lowercased()) {
+                    candidate = outputDirectory.appendingPathComponent("\(baseName) (\(n)).pdf"); n += 1
+                }
+                outputURL = candidate
+            }
+            takenOutputs.insert(outputURL.standardizedFileURL.path.lowercased())
+            resolved[index] = outputURL
+        }
+        return resolved
+    }
+
     /// Recompute a manifest's fingerprint from its OWN persisted fields and compare to the stored one.
     /// A mismatch means the file is torn/tampered/internally inconsistent (still-valid JSON but not a
     /// coherent run) → callers ignore it rather than misapply it. `nil` stored fingerprint (a manifest
@@ -111,10 +151,17 @@ extension OCRProcessor {
     private static func deletePendingRun() {
         try? FileManager.default.removeItem(at: pendingRunURL)
     }
-    /// Save a completed OCR result to the pending run on disk.
-    func saveResultToPendingRun(index: Int, result: OCRResult) {
+    /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
+    /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
+    /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
+    /// index order, which would swap outputs for two sources that share a base filename (B7).
+    func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) {
         guard var run = activePendingRun else { return }
         run.completedResults["\(index)"] = result
+        if let outputURL {
+            if run.completedOutputPaths == nil { run.completedOutputPaths = [:] }
+            run.completedOutputPaths?["\(index)"] = outputURL.path
+        }
         activePendingRun = run
         Self.savePendingRun(run)
     }
@@ -129,25 +176,43 @@ extension OCRProcessor {
         // fingerprint no longer matches its own fields) rather than offering a resume that could misapply
         // it (Tier-2 rule e). The local file is NOT deleted for a batch — a paid server-side job may
         // still exist, and dropping the manifest would strand it — it is simply not surfaced.
-        if let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            let dateStr = formatter.string(from: pending.submittedAt)
-            pendingBatchInfo = "Pending batch from \(dateStr): \(pending.fileURLs.count) files via \(pending.provider.rawValue) \(pending.model.displayName)."
+        if let pending = Self.loadPendingBatch() {
+            if Self.pendingBatchIsSelfConsistent(pending) {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                formatter.timeStyle = .short
+                let dateStr = formatter.string(from: pending.submittedAt)
+                pendingBatchInfo = "Pending batch from \(dateStr): \(pending.fileURLs.count) files via \(pending.provider.rawValue) \(pending.model.displayName)."
+            } else {
+                // FAIL-SAFE (Finding 4): a batch is a PAID server-side job. If its manifest fails the
+                // self-consistency guard we must NOT silently hide it (the old `= nil`) and must NEVER
+                // delete it — doing either could strand a paid batch, an unrecoverable loss. Instead keep
+                // the file on disk and SURFACE the situation (plus a prominent log) so the operator can
+                // see the batch still exists and decide what to do.
+                NSLog("[ArchiveProcessor] WARNING: pending BATCH manifest failed the self-consistency check but is being PRESERVED (a paid server-side batch may still exist and must not be stranded).")
+                pendingBatchInfo = "A pending batch was found but its manifest failed a self-consistency check (it may be torn or tampered). It has NOT been discarded — a paid server-side batch may still exist. The manifest was kept for recovery; review before resuming."
+            }
         } else {
             pendingBatchInfo = nil
         }
 
-        // Check for pending run (same self-consistency guard).
-        if let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            let dateStr = formatter.string(from: pending.startedAt)
-            let completed = pending.completedResults.count
-            let total = pending.fileURLs.count
-            pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+        // Check for pending run (same self-consistency guard). A run manifest is local-only (no paid
+        // server-side job), but the guard is still non-destructive: a rejected manifest is KEPT (never
+        // deleted) so its cached results stay available and are not re-charged, and it is surfaced/logged
+        // rather than silently swallowed (Finding 4 — mirror the batch fail-safe).
+        if let pending = Self.loadPendingRun() {
+            if Self.pendingRunIsSelfConsistent(pending) {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                formatter.timeStyle = .short
+                let dateStr = formatter.string(from: pending.startedAt)
+                let completed = pending.completedResults.count
+                let total = pending.fileURLs.count
+                pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+            } else {
+                NSLog("[ArchiveProcessor] WARNING: pending RUN manifest failed the self-consistency check but is being PRESERVED (kept on disk so its cached results are not lost/re-charged).")
+                pendingRunInfo = "An interrupted run was found but its manifest failed a self-consistency check (it may be torn or tampered). It has NOT been discarded; the manifest was kept for recovery."
+            }
         } else {
             pendingRunInfo = nil
         }
@@ -386,20 +451,21 @@ extension OCRProcessor {
             // Gather on the main actor.
             var restores: [(index: Int, result: OCRResult, sourceURL: URL, outputURL: URL)] = []
             var toGenerate: [(imageURL: URL, outputURL: URL, fileName: String, result: OCRResult)] = []
-            // Iterate in job-index order and disambiguate colliding base names deterministically, so a
-            // resumed batch reproduces the same unique output paths and never overwrites a sibling whose
-            // source shares its base filename (e.g. two 00001.jpg from different boxes).
-            var takenOutputs = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+            // Resolve each completed index to the SAME output PDF the original pass assigned it. The
+            // original pass assigns paths in COMPLETION order (via uniqueOutputURL) and persists the exact
+            // path per index in `completedOutputPaths`; `resolveResumeOutputURLs` reuses those verbatim (the
+            // B7 fix) and only re-derives in index order for legacy manifests lacking the map. Factored out
+            // so this restore and the headless self-test share ONE association-preserving definition.
+            let resolvedOutputs = Self.resolveResumeOutputURLs(
+                completedResults: pending.completedResults,
+                completedOutputPaths: pending.completedOutputPaths,
+                sourceURLs: jobs.map { $0.sourceURL },
+                outputDirectory: pending.outputDirectory,
+                alreadyTaken: Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() }))
             for (key, result) in pending.completedResults.sorted(by: { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }) {
-                guard let index = Int(key), index < jobs.count, index < imageURLs.count else { continue }
+                guard let index = Int(key), index < jobs.count, index < imageURLs.count,
+                      let outputURL = resolvedOutputs[index] else { continue }
                 let sourceURL = jobs[index].sourceURL
-                let baseName = sourceURL.deletingPathExtension().lastPathComponent
-                var outputURL = pending.outputDirectory.appendingPathComponent(baseName + ".pdf")
-                var n = 2
-                while takenOutputs.contains(outputURL.standardizedFileURL.path.lowercased()) {
-                    outputURL = pending.outputDirectory.appendingPathComponent("\(baseName) (\(n)).pdf"); n += 1
-                }
-                takenOutputs.insert(outputURL.standardizedFileURL.path.lowercased())
                 restores.append((index, result, sourceURL, outputURL))
                 if !fm.fileExists(atPath: outputURL.path) {
                     toGenerate.append((imageURLs[index], outputURL, sourceURL.lastPathComponent, result))

@@ -300,8 +300,21 @@ class OCRProcessor: ObservableObject {
         let customPrompt: String?
         let startedAt: Date
         let gatewayConfig: GatewayConfig?
-        /// Per-file OCR results keyed by file index. Only succeeded files are stored.
+        /// Per-file OCR result keyed by the file's index string. Stores EVERY completed result —
+        /// INCLUDING failures (`text == nil`) — because `saveResultToPendingRun` is called for every
+        /// finished file. Resume therefore treats a persisted failure as "already attempted" and does
+        /// NOT re-OCR it in the main pass (`remainingIndices` keys off presence in this map, not on
+        /// success); a failed file is re-OCR'd only by the explicit retry loops (`retryHighUseFailures`
+        /// / interactive retry) after the main pass.
         var completedResults: [String: OCRResult]
+        /// The EXACT output-PDF path this run assigned to each completed index (same index string key as
+        /// `completedResults`), recorded in COMPLETION order in the original pass. Resume reuses these
+        /// verbatim instead of re-deriving output paths in index order — re-derivation would swap the
+        /// source→output association for two inputs sharing a base filename across folders (B7): the file
+        /// on disk carries one source's OCR/tags but tagging would then stamp the other source's tags onto
+        /// it. Optional for backward-compat: manifests written before this field decode it as nil, and
+        /// resume falls back to the legacy index-order derivation ONLY for those legacy manifests.
+        var completedOutputPaths: [String: String]? = nil
         /// Content fingerprint of this run's identity (sorted input set + destination + the settings
         /// that change what lands on disk). On resume the manifest is only applied if it is
         /// self-consistent, so a torn/tampered/mismatched manifest is ignored rather than misapplied
