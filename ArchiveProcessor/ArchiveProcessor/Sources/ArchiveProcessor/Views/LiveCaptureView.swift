@@ -234,17 +234,34 @@ struct LiveCaptureView: View {
                     .padding(6)
                 }
 
-                GroupBox("Output folder") {
-                    HStack(spacing: 8) {
-                        Image(systemName: "folder").foregroundStyle(.secondary)
-                        Text(outputDirPath.isEmpty ? "Downloads (default)" : URL(fileURLWithPath: outputDirPath).lastPathComponent)
-                            .font(.callout).lineLimit(1).truncationMode(.middle)
-                        Spacer()
-                        Button("Choose…") { chooseOutputFolder() }.font(.caption)
+                // Same setting as the Process Files output folder (DefaultsKeys.outputDirectory, one source
+                // of truth for both panes). Relevant only in "Process live" mode, where segments finalize
+                // here; in "Stage for later" the picker grays out because captures hand off to Process Files,
+                // which files them from there. Grays the control only — the ? help stays tappable to explain
+                // why. Per the settings-UX convention (every setting: ? help + gray-out when irrelevant).
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder").foregroundStyle(.secondary)
+                            Text(outputDirPath.isEmpty ? "Downloads (default)" : URL(fileURLWithPath: outputDirPath).lastPathComponent)
+                                .font(.callout).lineLimit(1).truncationMode(.middle)
+                            Spacer()
+                            Button("Choose…") { chooseOutputFolder() }.font(.caption)
+                        }
+                        if liveProcessingMode != "live" {
+                            Text("Set in Process Files for staged captures — they're filed there, not here.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(6)
-                    .help("Where finalized live-capture collections are written. Shared with the Process Files output folder; defaults to your Downloads folder. Set it before finishing a session.")
+                    .disabled(liveProcessingMode != "live")
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Output folder")
+                        HelpButton(text: "Where finalized Process live collections are written. This is the SAME setting as the Process Files output folder — one source of truth for both panes — and defaults to your Downloads folder if unset. Set it before finishing a Process live session. In Stage for later mode it's grayed here because captures hand off to Process Files, which files them to this same folder from there.")
+                    }
                 }
 
                 if session.isCloudTransport {
