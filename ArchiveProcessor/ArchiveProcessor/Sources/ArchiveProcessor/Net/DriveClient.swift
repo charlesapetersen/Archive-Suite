@@ -26,12 +26,16 @@ struct URLSessionHTTP: HTTPExecuting {
                 var h: [String: String] = [:]
                 for (k, v) in http.allHeaderFields { if let ks = k as? String, let vs = v as? String { h[ks.lowercased()] = vs } }
                 box.result = (http.statusCode, data ?? Data(), h)
+            } else {
+                // Neither an error nor an HTTPURLResponse — capture what we DID get, so the failure is
+                // legible (a nil/nil completion is the classic App-Sandbox outgoing-connection-denied signature).
+                box.diag = "resp=\(String(describing: resp)) dataBytes=\(data?.count ?? -1)"
             }
             sem.signal()
         }.resume()
         sem.wait()
         if let e = box.error { throw e }
-        guard let r = box.result else { throw DriveError.noResponse }
+        guard let r = box.result else { throw DriveError.transport("no HTTPURLResponse — \(box.diag ?? "resp=nil, err=nil")") }
         return r
     }
 }
@@ -41,19 +45,24 @@ struct URLSessionHTTP: HTTPExecuting {
 private final class HTTPResultBox: @unchecked Sendable {
     var result: (status: Int, data: Data, headers: [String: String])?
     var error: Error?
+    var diag: String?
 }
 
-enum DriveError: Error, CustomStringConvertible {
-    case badURL(String), noResponse, http(status: Int, body: String), decode(String), notSignedIn
+enum DriveError: Error, LocalizedError, CustomStringConvertible {
+    case badURL(String), noResponse, transport(String), http(status: Int, body: String), decode(String), notSignedIn
     var description: String {
         switch self {
         case .badURL(let u): return "bad URL \(u)"
         case .noResponse: return "no HTTP response"
+        case .transport(let m): return "transport error: \(m)"
         case .http(let s, let b): return "HTTP \(s): \(b.prefix(200))"
         case .decode(let m): return "decode: \(m)"
         case .notSignedIn: return "not signed in to Google Drive"
         }
     }
+    // Surface the human-readable message through LocalizedError so the UI shows "transport error: …" /
+    // "HTTP 401: …" instead of the opaque "The operation couldn't be completed. (…DriveError error N)".
+    var errorDescription: String? { description }
 }
 
 /// Thin Google Drive REST v3 client for the relay backend — exactly the calls `DriveObjectStore` needs.
