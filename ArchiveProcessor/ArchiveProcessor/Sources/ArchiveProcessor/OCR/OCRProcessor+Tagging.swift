@@ -59,17 +59,23 @@ extension OCRProcessor {
         let exportedMB = Self.exportedImageMB
         // Snapshot the work on the main actor… The exported image is always a .jpg sized toward the
         // exported-image target (independent of the source/camera size).
+        var imageMap: [URL: URL] = [:]
         let work: [(src: URL, img: URL, pdf: URL, rot: Int)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
                   FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
             // For PDF inputs, export from the converted temp JPEG (the same page image the PDF embeds),
             // not the raw .pdf — matching every PDFGenerator call site.
             let src = pdfToImageMap[job.sourceURL] ?? job.sourceURL
+            // The exported image's name matches the PER-PAGE PDF (base + .jpg) at this point — i.e. BEFORE
+            // merge repoints outputURLMap to a single merged PDF. Record it keyed by the original source so
+            // organizeOutput can file a merged doc's per-page images into the collection folder.
+            let img = pdfURL.deletingPathExtension().appendingPathExtension("jpg")
+            imageMap[job.sourceURL] = img
             // Snapshot the final (post-review) rotation so the exported .jpg matches the rotated PDF.
-            return (src: src, img: pdfURL.deletingPathExtension().appendingPathExtension("jpg"), pdf: pdfURL,
-                    rot: job.result?.rotationDegrees ?? 0)
+            return (src: src, img: img, pdf: pdfURL, rot: job.result?.rotationDegrees ?? 0)
         }
         guard !work.isEmpty else { return }
+        exportedImageMap = imageMap
         // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
         // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {

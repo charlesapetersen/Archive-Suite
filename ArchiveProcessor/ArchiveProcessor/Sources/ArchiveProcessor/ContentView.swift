@@ -35,6 +35,7 @@ struct ContentView: View {
             ProcessFilesTestDriver.runIfRequested()
             LiveCaptureRecoveryTestDriver.runIfRequested()   // $0 data-safety self-test (env-gated)
             BatchResumeTestDriver.runIfRequested()           // $0 Process-Files crash-resume self-test (env-gated)
+            CollectionOrganizeTestDriver.runIfRequested()    // $0 merged-doc image-filing self-test (env-gated)
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {

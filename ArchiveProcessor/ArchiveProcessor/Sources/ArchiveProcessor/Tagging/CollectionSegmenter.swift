@@ -289,11 +289,15 @@ class CollectionSegmenter {
     /// Create collection folders and move/rename output PDFs and JSONs into them.
     /// PDFs are renamed with sequential numbering: "00001 Collection Name.pdf"
     /// JSON files are similarly renamed: "00001 Collection Name.json"
+    /// - Parameter exportedImageMap: source-URL → its per-page exported original image URL, captured
+    ///   BEFORE document merging (which repoints `outputURLMap` to a single merged PDF and so loses the
+    ///   per-page image names). Needed only for the merged + dual-output case; empty otherwise.
     func organizeOutput(
         collections: [CollectionSegment],
         outputDirectory: URL,
         outputURLMap: [URL: URL],
-        moveSiblingImages: Bool
+        moveSiblingImages: Bool,
+        exportedImageMap: [URL: URL] = [:]
     ) throws {
         let fm = FileManager.default
 
@@ -314,6 +318,45 @@ class CollectionSegmenter {
                       !movedOutputs.contains(pdfURL),
                       fm.fileExists(atPath: pdfURL.path) else { continue }
                 movedOutputs.insert(pdfURL)
+
+                // MERGED multi-page document + dual (image) output: several source pages map to this ONE
+                // PDF, and each page also produced its own exported .jpg — named per PAGE (before merge
+                // renamed the PDF), so they can't be found via the merged PDF's base name (that's why the
+                // sibling-image search below misses them). Mirror `LiveCaptureProcessor.executePlans`'s
+                // merged branch: number + move EACH page image, then give the single merged PDF the first
+                // image's number. Threaded in via `exportedImageMap` because organizeOutput can't recover
+                // the per-page names from the merged PDF alone. Moves only — never overwrites/deletes.
+                if moveSiblingImages {
+                    let pageSources = collection.fileURLs.filter { outputURLMap[$0] == pdfURL }
+                    let pageImages = pageSources.compactMap { exportedImageMap[$0] }
+                        .filter { fm.fileExists(atPath: $0.path) }
+                    if pageSources.count > 1 && !pageImages.isEmpty {
+                        var firstNum: Int?
+                        for img in pageImages {
+                            movedCount += 1
+                            if firstNum == nil { firstNum = movedCount }
+                            let base = "\(String(format: "%05d", movedCount)) \(collection.collectionName)"
+                            let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
+                            let destImg = folderURL.appendingPathComponent(base + "." + ext)
+                            if !fm.fileExists(atPath: destImg.path) { try fm.moveItem(at: img, to: destImg) }
+                        }
+                        let pdfNum = firstNum!   // non-nil: pageImages was non-empty
+                        let mergedBaseName = "\(String(format: "%05d", pdfNum)) \(collection.collectionName)"
+                        let destMergedPDF = folderURL.appendingPathComponent(mergedBaseName + ".pdf")
+                        if !fm.fileExists(atPath: destMergedPDF.path) { try fm.moveItem(at: pdfURL, to: destMergedPDF) }
+                        // Matching JSON sidecar (same base name as the merged PDF).
+                        let mergedJSONName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
+                        let mergedJSONURL = outputDirectory.appendingPathComponent(mergedJSONName)
+                        if fm.fileExists(atPath: mergedJSONURL.path) {
+                            let jsonFolder = folderURL.appendingPathComponent("JSON Output")
+                            try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
+                            let destJSON = jsonFolder.appendingPathComponent(mergedBaseName + ".json")
+                            if !fm.fileExists(atPath: destJSON.path) { try fm.moveItem(at: mergedJSONURL, to: destJSON) }
+                        }
+                        continue
+                    }
+                }
+
                 let seqNum = String(format: "%05d", movedCount + 1)
                 movedCount += 1
                 let newBaseName = "\(seqNum) \(collection.collectionName)"

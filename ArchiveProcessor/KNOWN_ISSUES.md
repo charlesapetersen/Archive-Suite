@@ -43,10 +43,23 @@ gallery album (`Pictures/Archive Capture`) *if the operator tapped it* — the p
 
 ---
 
-## 2. Merged multi-page documents leave their exported original images loose in the output dir
+## ✅ FIXED (2026-07-08): Merged multi-page documents left their exported original images loose in the output dir
 
-**Status:** deferred (2026-07-04). Found by the OCR-pipeline code review. **Misplacement, not data
-loss** — the images are not deleted, just not moved into the collection folder / renamed.
+**Status:** FIXED (2026-07-08). Found by the OCR-pipeline code review. Was **misplacement, not data
+loss** — the images were not deleted, just not moved into the collection folder / renamed.
+
+**Fix (this change):** `exportOriginalImages` now records a `source-URL → per-page exported-image URL`
+map (`OCRProcessor.exportedImageMap`) at export time — i.e. BEFORE merge repoints `outputURLMap` to the
+single merged PDF — and threads it into `CollectionSegmenter.organizeOutput`. For a merged multi-page
+document (several source pages → one PDF) with dual output on, `organizeOutput` now NUMBERS + MOVES each
+page image into the collection folder and gives the merged PDF the first image's number, mirroring
+`LiveCaptureProcessor.executePlans`'s merged branch. Moves only, never overwrites (skips a colliding
+destination rather than deleting). Non-merged / no-export / crash-resume paths are unchanged (the merged
+branch fires only when `moveSiblingImages` is on AND >1 source maps to the same PDF AND ≥1 exported image
+exists; the resume paths never populate `exportedImageMap`, so they pass the empty default). Proven by the
+`$0` `CollectionOrganizeTestDriver` (`COLLECTIONORGANIZE_TEST=1`): 10/10 PASS, including the repro
+(per-page images filed as `00001`/`00002` inside the collection folder, none left loose in the output
+root) plus the non-merged, no-export, and no-overwrite regressions.
 
 **Repro:** enable *output image file* (`exportOriginals`) **and** *merge documents* **and** collection
 organization, then process a multi-page document.
@@ -55,13 +68,7 @@ organization, then process a multi-page document.
 (`page1.jpg`, `page2.jpg`, …). Merge then collapses the per-page PDFs into `page1_merged.pdf` and points the
 sources' `outputURLMap` at it. In `CollectionSegmenter.organizeOutput`, the merged PDF is moved once (via the
 `movedOutputs` dedup) and the sibling-image move searches for `<mergedBase>.jpg` (`page1_merged.jpg`) — which
-doesn't exist — so the real page images stay in the output dir, unmoved and unrenamed.
-
-**Fix (for later):** pass the per-page exported-image URLs (keyed by source URL, or the segment's page-image
-list) into `organizeOutput`, and for a merged document (one PDF, many page images) number + move EACH page
-image into the collection folder — mirroring `LiveCaptureProcessor.executePlans`'s merged branch (which already
-does exactly this). `organizeOutput` can't recover the per-page names from the merged PDF alone, so it needs
-that mapping threaded in.
+doesn't exist — so the real page images stayed in the output dir, unmoved and unrenamed.
 
 ---
 

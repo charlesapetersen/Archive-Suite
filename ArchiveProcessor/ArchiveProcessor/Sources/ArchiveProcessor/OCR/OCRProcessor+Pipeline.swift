@@ -257,6 +257,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        exportedImageMap = [:]
         currentModel = pending.model
         taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
         // Apply this run's rotation mode + standard image size, exactly as resumeRun/startProcessing do —
@@ -418,6 +419,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        exportedImageMap = [:]
         pdfToImageMap = [:]
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
@@ -884,6 +886,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        exportedImageMap = [:]
         pdfToImageMap = [:]
         removedSourceURLs = []
         Self.rotationModeForRun = rotationMode
@@ -1092,7 +1095,8 @@ extension OCRProcessor {
                         collections: collectionSegments,
                         outputDirectory: outputDirectory,
                         outputURLMap: outputURLMap,
-                        moveSiblingImages: exportOriginals
+                        moveSiblingImages: exportOriginals,
+                        exportedImageMap: exportedImageMap
                     )
                     statusMessage = "Collections organized into \(collectionSegments.count) folders."
                 } catch {
