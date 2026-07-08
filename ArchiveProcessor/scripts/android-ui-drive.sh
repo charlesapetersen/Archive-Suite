@@ -134,11 +134,34 @@ flow(){ log "capture flow"
   tap_text "Box"; sleep 1; shot 09-box              # a box marker (→ POST /photo)
   tap_text_opt "Save to phone"; shot 10-save; }     # hidden once everything has drained to the Mac
 
+# --- Deterministic capture inject (real phone<->Mac E2E; see e2e-phone-mac.sh) --------------------
+# Stage a known document image where the DEBUG-only capture-inject seam picks it up as the next shot
+# (files/test_inject.jpg). Requires a DEBUG build (release strips the seam). One tap consumes one image.
+inject(){ local fx="$1"; [ -f "$fx" ] || die "inject fixture not found: $fx"
+  "$ADB" push "$fx" /data/local/tmp/inject.jpg >/dev/null || die "adb push failed: $fx"
+  "$ADB" shell run-as "$PKG" cp /data/local/tmp/inject.jpg files/test_inject.jpg || die "inject cp failed (needs debug build + run-as)"; }
+
+# Drive the REAL capture flow for each doc in a ground_truth.json: inject it as the next shot, capture it
+# as a single-page document segment, End segment, then Skip (tags applied by the Mac's LLM). Called by
+# e2e-phone-mac.sh AFTER pairing to the REAL Mac; the Mac auto-skips/finalizes and asserts the round-trip.
+inject_flow(){ local fixdir="$1" gt="$2" i=0
+  while IFS= read -r f; do
+    i=$((i+1)); log "e2e doc $i: inject $f + capture"
+    inject "$fixdir/$f"
+    tap_shutter; shot "doc$i-captured"
+    tap_text "End segment"; sleep 2; shot "doc$i-tagsheet"
+    tap_text_opt "Skip (tag on Mac)"; sleep 1
+  done < <(python3 -c 'import json,sys
+for d in json.load(open(sys.argv[1])): print(d["file"])' "$gt")
+  tap_text_opt "Save to phone"; shot "zz-drained"; }
+
 case "${1:-all}" in
   boot) boot;;
   install) install;;
   pair) pair "$2" "$3";;
   flow) flow;;
+  inject) inject "$2";;
+  inject-flow) inject_flow "$2" "$3";;
   shot) shot "${2:-shot}";;
   stub) stub "${2:-48628}";;
   all) boot; install; pair "${2:?port}" "${3:?token}"; flow; log "done — screenshots in $OUT";;

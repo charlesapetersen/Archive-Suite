@@ -1,0 +1,17 @@
+[
+  {
+    "file": "doc1_memo.jpg",
+    "token": "MEMO-ALPHA-4471",
+    "year": "1962"
+  },
+  {
+    "file": "doc2_letter.jpg",
+    "token": "LETTER-BRAVO-8823",
+    "year": "1958"
+  },
+  {
+    "file": "doc3_report.jpg",
+    "token": "REPORT-CHARLIE-1590",
+    "year": "1974"
+  }
+]

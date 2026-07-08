@@ -296,6 +296,16 @@ run them before pushing an OCR/pipeline change or as a sanity gate:
   even if the exec bit is lost. This is the deeper Tier-1 companion to the pre-existing
   `scripts/test-smoke.sh` (raw per-provider OCR calls) and `scripts/test-tier2.sh` (multi-case pipeline).
 
+**Full phone↔Mac round-trip E2E — `scripts/e2e-phone-mac.sh`** (see `scripts/E2E-PHONE-MAC.md`). The only
+test that exercises *both* real apps end to end: a real headless Mac session (`LIVECAPTURE_AUTOSTART`) paired
+over LAN to the `ap_test` emulator running the identical Android app, which "captures" known fixtures via
+the **debug-only inject seam** (`files/test_inject.jpg`, stripped from release). The Mac OCRs with a real
+key (`LIVECAPTURE_OCRKEY`), auto-skips tag cards (`LIVECAPTURE_AUTOSKIPTAGS`), auto-finalizes
+(`LIVECAPTURE_AUTOFINALIZE`, **gated on `LIVECAPTURE_TESTOUT`** so it can never file into the real corpus)
+and drops `DONE.txt`; then `assert_mac.py` checks each fixture's unique OCR token + year survived the whole
+pipeline, and per-doc phone screencaps are checked. Deterministic + unattended (emulator only). Run:
+`OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh` (falls back to the Keychain key).
+
 **Cadence:** **push commits to `origin` frequently** — a clean build + Tier-1 self-review (and Tier-2 for
 high-blast-radius diffs) is enough to push; don't hoard local commits. **Releases are the sparse milestone:**
 build a DMG + tag a GitHub release only occasionally (a coherent, release-worthy batch), gated by the Tier-3

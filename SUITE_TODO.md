@@ -16,6 +16,10 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   companion (pair via manual entry + `adb input`, headless Mac via `LIVECAPTURE_AUTOSTART`, verify on the
   Mac's backup/manifest files). Enables the phone-gated Processor items below without a physical phone; iOS
   out of scope (no simulator camera). No app-code change. | tooling | M | needs: gui (headless, self-contained)
+  - **Extended to a full phone↔Mac round-trip E2E** (shipped): `scripts/e2e-phone-mac.sh` +
+    `scripts/E2E-PHONE-MAC.md`. Deterministic, unattended: the emulator "captures" known fixtures via a
+    debug-only inject seam → real OCR/tag/PDF/finalize on the Mac → asserts each token + year survived end
+    to end. Backed by env-gated seams (`LIVECAPTURE_OCRKEY`/`AUTOSKIPTAGS`/`AUTOFINALIZE`, `TESTOUT`-isolated).
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
