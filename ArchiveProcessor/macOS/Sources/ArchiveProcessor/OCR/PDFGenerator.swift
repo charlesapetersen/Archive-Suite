@@ -206,6 +206,7 @@ struct PDFGenerator {
 
     private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil, gatewayDisplayName: String? = nil) -> PDFPage {
         let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
         let dateStr = dateFormatter.string(from: Date())
 
