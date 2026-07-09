@@ -139,6 +139,25 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder.
 - **Value decision:** the recent-years cap differs between the companions (iOS 5, Android 6) — pick one.
 
+### Shared `ArchiveCore` Swift package — DRY the tag/PDF model across both apps (deferred)
+Moved here from the near-term queue (`SUITE_TODO.md` §P3) on 2026-07-08 — owner: not near-term. Both apps are
+coupled by the tag/PDF + relay contracts (`SPEC/tag-format.md`, `SPEC/relay-object-format.md`); the SPECs keep
+the *docs* in sync, but the *code* — Reader's read/parse model + `TagWriter`, Processor's `MacOSTagger` — can
+still drift. An `ArchiveCore` SPM package (UI-free) would share it; Reader keeps `Core/` UI-free specifically
+for this. Two stages (sequence before the — also deferred — de-nest, since both churn `project.yml` paths):
+- **3a — read-only shared model (safe, high value).** Create `ArchiveCore/` (SPM, no UI imports); move
+  Reader's read-side `Core/` types in (`DocumentTags` + facet parsing, `PDFFormatStatus`, `TagSimilarity`,
+  `DuplicateNames`, `FileLink`, `CopyTextCleaner`, `DocumentRuns`, pure `LibraryFilter`/`LibrarySort`); point
+  Processor at the same tag/facet + PDF/classification vocabulary; both `project.yml` add it as a local
+  package dependency; move relevant tests in. **No behavior change.** Risk: med (module boundaries,
+  `internal`→`public`, XcodeGen local-package wiring). Verify: both build; Reader tests green; write-surface
+  lint green.
+- **3b — unified audited write path (HIGH risk, deferred behind 3a).** Reconcile Reader's `TagWriter`
+  (delta-based, trustworthy-read guard, verify-after-write, inverse-delta undo) with Processor's `MacOSTagger`
+  (`stampUnread`, color labels, batch) into ONE audited writer, preserving both guarantees (Reader Prime
+  Directive; Processor Tier-2). Gate: full multi-agent adversarial review + property/integration tests on
+  **scratch copies only**, both apps. The SPEC contracts + 3a already capture most of the value.
+
 ### Live Capture output-folder control (in the Live Capture pane)
 Motivated 2026-07-06 during the Android walkthrough: a Process-live **Finish session** wrote the finalized
 collections to **`~/Downloads/`** with **no visible way to choose where** — the operator had to hunt for

@@ -10,8 +10,9 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 (account/manual) | corpus-write (safety-sensitive).
 
 ## Active execution plans (`execution-plans/`)
-- **`structural-refactor.md`** — the two open P3 items: extract a shared `ArchiveCore` package, and
-  de-nest the `App/App` folders. (P3.1 Implementation Maps shipped 2026-07-07.)
+- **`structural-refactor.md`** — de-nest the `App/App` folders (cosmetic, lowest value; P3.1 Implementation
+  Maps shipped 2026-07-07). *(The `ArchiveCore` shared-package extraction moved to
+  `ArchiveProcessor/POTENTIAL_FEATURES.md` — deferred, not near-term.)*
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -82,8 +83,8 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 
 ## P3 — Suite structural  → detailed plan in `execution-plans/structural-refactor.md`
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
-- [ ] Extract shared `ArchiveCore` package (3a read-only model first; 3b unified write-path deferred behind adversarial review). | files: new ArchiveCore/, both project.yml | L | med
 - [ ] De-nest the `App/App` folders (cosmetic; lowest value). | files: ArchiveReader/, ArchiveProcessor/ | M | med
+  - *(`ArchiveCore` shared-package extraction moved to `ArchiveProcessor/POTENTIAL_FEATURES.md` — deferred, 2026-07-08.)*
 
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 - [ ] GUI-verify Reader inline tag editor blur-vs-Return commit (synthetic input can't drive SwiftUI text fields). | files: Views/InlineEditCells.swift, Views/TagFilterField.swift | S | needs: owner
