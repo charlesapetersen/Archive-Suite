@@ -81,10 +81,24 @@ the tag/PDF SPEC) are **Tier-2**: the fix needs an adversarial re-review + a fun
 copy, never the real corpus. A review that only *reads* is safe; only the *fixes* carry risk. Never `--force`
 past a git safety refusal (memory `no-force-override-destructive-git`).
 
+## Batch sizing — how much to run at once (learned 2026-07-09)
+
+`.claude/workflows/review-sweep.js` reviews **several units in parallel** for when you have usage headroom.
+But **do not sweep all ~10 units at once** — that fans out ~80 agents / ~3M tokens and **hits the session
+usage cap mid-run** (finders run, verifiers die → raw, unverified findings; same failure mode as the retired
+15-finder monolith). Safe sizing:
+- **Default: the paced daemon**, one unit per fresh session (sustainable indefinitely; a usage cutoff just
+  pauses it).
+- **With headroom: `review-sweep` on ≤2–3 units at a time**, then triage before the next batch.
+- A single window holds very roughly **~50–60 agents / ~2.5M output tokens** before the cap; size batches well
+  under that and expect refute-verifiers to double the finder count.
+
 ## Relationship to other review tools
 
-- `.claude/workflows/lean-review.js` + this doc = **the paced full-codebase review** (use for "review
-  everything" / audits / overnight).
+- `.claude/workflows/lean-review.js` + this doc = **the paced full-codebase review**, ONE unit per session
+  (use for "review everything" / audits / overnight — the safe default).
+- `.claude/workflows/review-sweep.js` = the **parallel multi-unit** variant for headroom bursts — **≤2–3
+  units per run** (see Batch sizing above).
 - `/code-review` skill = the **working-diff** reviewer (use for the change in front of you).
 - `.maintenance/suite-audit.workflow.js` = the **retired monolith**, kept only as a cautionary reference of
   what NOT to run as one shot. Prefer `lean-review`, one unit at a time.
