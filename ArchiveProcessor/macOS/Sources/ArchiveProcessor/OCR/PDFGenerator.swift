@@ -353,15 +353,20 @@ struct PDFGenerator {
     /// Merge multiple individual per-page PDFs into a single multi-page PDF.
     /// Each source PDF has [image page, text page]. The merged PDF interleaves them:
     /// image1, text1, image2, text2, ...
-    /// Returns the URLs of source PDFs that were merged (for deletion).
+    /// Throws `PDFError.sourceUnreadable` if any source PDF cannot be loaded (fail-loud
+    /// to prevent silent page-drop in this no-undo path).
     func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL) throws {
         let merged = PDFDocument()
         var pageIndex = 0
 
         for pdfURL in sourcePDFs {
-            guard let doc = PDFDocument(url: pdfURL) else { continue }
+            guard let doc = PDFDocument(url: pdfURL) else {
+                throw PDFError.sourceUnreadable(pdfURL)
+            }
             for i in 0..<doc.pageCount {
-                guard let page = doc.page(at: i) else { continue }
+                guard let page = doc.page(at: i) else {
+                    throw PDFError.sourceUnreadable(pdfURL)
+                }
                 merged.insert(page, at: pageIndex)
                 pageIndex += 1
             }
@@ -374,4 +379,5 @@ struct PDFGenerator {
 
 enum PDFError: Error {
     case writeFailed
+    case sourceUnreadable(URL)
 }
