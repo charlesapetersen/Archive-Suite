@@ -299,3 +299,18 @@ pinned `groupCollectionKey` at arrival time, so such a document was assigned to 
 for all not-yet-finalized groups AND already-staged segments using the phone's capture sequence (`CaptureGroup.order`)
 as the source of truth. Also corrects `currentCollectionKey` to the highest-seq box (not the most-recently-arrived).
 Persists the corrected manifest so a crash doesn't revert the fix. (`LiveCaptureProcessor.swift:347–379`.)
+
+---
+
+## ✅ FIXED (2026-07-09): data race on `MacOSTagger.stampUnread`  [MEDIUM — concurrency]
+
+**Status:** FIXED. `nonisolated(unsafe) static var stampUnread` was written on `@MainActor` (from
+`OCRProcessor.taggingMode.didSet` and `LiveCaptureProcessor.startProcessing`) and read from detached
+OCR tasks in `applyTags`. Under Swift 6 strict concurrency the `nonisolated(unsafe)` annotation suppressed
+the diagnostic but did not provide a memory-ordering guarantee — the write on MainActor could be invisible
+to a reader on another thread, causing a live document to be mis-tagged (e.g., Unread stamp missing or
+applied in copy-source mode).
+
+**Fix:** replaced the bare `nonisolated(unsafe) static var` with an `OSAllocatedUnfairLock`-backed computed
+property — same `Bool` get/set interface, zero call-site changes. The lock guarantees the MainActor write is
+visible to any detached-task reader. (`Tagging/MacOSTagger.swift`.)

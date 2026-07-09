@@ -1,13 +1,18 @@
 import Foundation
 import AppKit
+import os
 
 struct MacOSTagger {
 
     /// When true, every file written by `applyTags` gets a trailing "Unread" tag (as the last tag).
     /// Set once per run by the processor from the selected `TaggingMode` (real-tagging modes only —
     /// off for "No tagging" and "Copy source tags"). Written on the main actor before a run begins
-    /// and only read during tagging, so the cross-actor access is safe.
-    nonisolated(unsafe) static var stampUnread = false
+    /// and read during tagging from detached tasks — the lock makes the cross-actor access safe.
+    private static let _stampUnread = OSAllocatedUnfairLock(initialState: false)
+    static var stampUnread: Bool {
+        get { _stampUnread.withLock { $0 } }
+        set { _stampUnread.withLock { $0 = newValue } }
+    }
 
     // Read macOS Finder tags from a file
     static func readTags(from url: URL) -> [String] {
