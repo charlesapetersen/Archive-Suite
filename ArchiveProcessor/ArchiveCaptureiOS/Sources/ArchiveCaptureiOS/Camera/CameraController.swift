@@ -13,13 +13,33 @@ final class CameraController: NSObject, ObservableObject {
     /// (a shared single completion could be overwritten by a rapid second tap → a silently dropped page).
     /// Only ever touched on `queue`, so there's no cross-queue data race.
     private var completions: [Int64: (Data?) -> Void] = [:]
+    /// Whether the controller has been asked to run (tracks start/stop intent across background cycles).
+    private var shouldBeRunning = false
 
     @Published var authorized = false
     /// True when access is .denied/.restricted — the UI offers a route to Settings (a previously-denied
     /// user is otherwise stuck: the shutter is a silent no-op with no way to re-request).
     @Published var accessDenied = false
 
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground),
+                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground),
+                                               name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    @objc private func appDidEnterBackground() {
+        queue.async { if self.session.isRunning { self.session.stopRunning() } }
+    }
+
+    @objc private func appWillEnterForeground() {
+        guard shouldBeRunning else { return }
+        queue.async { self.startRunning() }
+    }
+
     func start() {
+        shouldBeRunning = true
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             authorized = true
@@ -36,7 +56,10 @@ final class CameraController: NSObject, ObservableObject {
         }
     }
 
-    func stop() { queue.async { if self.session.isRunning { self.session.stopRunning() } } }
+    func stop() {
+        shouldBeRunning = false
+        queue.async { if self.session.isRunning { self.session.stopRunning() } }
+    }
 
     private func configureIfNeeded() {
         guard !configured else { return }

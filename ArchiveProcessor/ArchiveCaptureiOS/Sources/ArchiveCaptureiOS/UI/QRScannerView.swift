@@ -33,6 +33,8 @@ struct QRScannerView: UIViewControllerRepresentable {
         weak var metadataDelegate: AVCaptureMetadataOutputObjectsDelegate?
         private let session = AVCaptureSession()
         private var previewLayer: AVCaptureVideoPreviewLayer?
+        private var bgObserver: NSObjectProtocol?
+        private var fgObserver: NSObjectProtocol?
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -40,6 +42,18 @@ struct QRScannerView: UIViewControllerRepresentable {
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 guard granted else { return }
                 DispatchQueue.main.async { self.configure() }
+            }
+            bgObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                DispatchQueue.global(qos: .userInitiated).async { if self.session.isRunning { self.session.stopRunning() } }
+            }
+            fgObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                DispatchQueue.global(qos: .userInitiated).async { if !self.session.isRunning { self.session.startRunning() } }
             }
         }
 
@@ -69,6 +83,8 @@ struct QRScannerView: UIViewControllerRepresentable {
 
         override func viewWillDisappear(_ animated: Bool) {
             super.viewWillDisappear(animated)
+            if let bg = bgObserver { NotificationCenter.default.removeObserver(bg) }
+            if let fg = fgObserver { NotificationCenter.default.removeObserver(fg) }
             DispatchQueue.global(qos: .userInitiated).async { if self.session.isRunning { self.session.stopRunning() } }
         }
     }
