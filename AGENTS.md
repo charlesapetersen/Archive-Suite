@@ -42,5 +42,6 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 Build‑verify the app(s) you touched before merging to `main`:
 `cd <app>/<App> && xcodegen generate && xcodebuild -scheme <App> -configuration Debug -derivedDataPath ./build/DD build`.
 Run the app's tests where present (Reader has an XCTest bundle + `scripts/lint-write-surface.sh`;
-Processor has `scripts/test-smoke.sh` / `test-tier2.sh`). Tag‑write changes are Tier‑2 (adversarial
-review + tests on scratch copies).
+Processor has `scripts/test-smoke.sh` / `test-tier2.sh`, plus `scripts/e2e-phone-mac.sh` — the full
+phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`Net/` changes). Tag‑write
+changes are Tier‑2 (adversarial review + tests on scratch copies).

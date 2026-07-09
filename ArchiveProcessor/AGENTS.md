@@ -28,6 +28,8 @@ Kept here as a glance so this file stands alone; edit the detail in CLAUDE.md, n
   is enough; don't hoard local commits. A DMG + GitHub release is the sparse milestone (see below).
 - **Review tiered by risk** (no human reviewer): every commit builds clean + self-review; high-blast-radius
   changes (`Capture/`, `Net/`, file-writing tag/output, manifest persistence, actor isolation) get an
-  *adversarial* multi-agent review; the **pre-release** batch gets a full find→refute review + live smoke test.
+  *adversarial* multi-agent review — for the Live Capture / phone↔Mac path (`Capture/`, `Net/`) the functional
+  test is `scripts/e2e-phone-mac.sh` (full emulator↔Mac round-trip); the **pre-release** batch gets a full
+  find→refute review + live smoke test.
   Full policy: **CLAUDE.md → "Verification & review policy (no human in the loop)."**
 - Releases: see **CLAUDE.md → Releasing** (use `/opt/homebrew/bin/gh`, not bare `gh`).

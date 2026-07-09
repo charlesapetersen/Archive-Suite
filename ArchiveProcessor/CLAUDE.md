@@ -269,7 +269,9 @@ and self-review the diff (`/code-review`, or read your own diff critically). Che
 
 **Tier 2 — high-blast-radius changes (adversarial, regardless of diff size):** any change touching a class of
 bug that has **no undo** gets a multi-agent *adversarial* review — independent skeptic agents that try to
-break it — plus a targeted functional test where feasible. This tier is triggered by edits to:
+break it — plus a targeted functional test where feasible. **For the Live Capture / phone↔Mac path
+(`Capture/`, `Net/`), that functional test is `scripts/e2e-phone-mac.sh`** — the full round-trip E2E
+(emulator ↔ real headless Mac; details in the Smoke-tests block below). This tier is triggered by edits to:
 - `Capture/`, `Net/` (Live Capture durability, the phone↔Mac protocol, crash-recovery/manifest logic),
 - file-writing tag/output code (`Tagging/MacOSTagger.swift`, PDF/image output, collection numbering that could **overwrite** files),
 - batch/manifest persistence, or anything changing `@MainActor`/`Sendable`/actor isolation.
