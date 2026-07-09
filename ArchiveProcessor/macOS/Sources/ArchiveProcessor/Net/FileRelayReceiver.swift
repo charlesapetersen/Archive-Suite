@@ -178,16 +178,29 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             guard url != nil else { report.ingestFailedLeftForRetry.append(k); continue }   // invariant hinge
 
             processed[k] = Entry(fp: fp, tombstoned: false)
-            if persistProcessedSet { persistProcessed() }     // persist BEFORE deleting the source
+            if persistProcessedSet && !persistProcessed() {    // persist BEFORE deleting the source
+                processed.removeValue(forKey: k)               // revert — not durable, leave source for retry
+                report.ingestFailedLeftForRetry.append(k); continue
+            }
             report.ingested.append(k)
 
             if !chain.isEmpty {                                // A3/A4 reclassify chain
+                var tombKeys: [String] = []
                 for prior in chain where prior != group {
                     await MainActor.run { s?.removePhotoIfSafe(groupId: prior, seq: seq) }
-                    processed[key(prior, seq)] = Entry(fp: "", tombstoned: true)
-                    report.tombstoned.append(key(prior, seq))
+                    let tk = key(prior, seq)
+                    processed[tk] = Entry(fp: "", tombstoned: true)
+                    tombKeys.append(tk)
+                    report.tombstoned.append(tk)
                 }
-                if persistProcessedSet { persistProcessed() }  // A4: tombstones durable before their objects are dropped
+                if persistProcessedSet && !persistProcessed() {  // A4: tombstones durable before their objects are dropped
+                    for tk in tombKeys {
+                        processed.removeValue(forKey: tk)           // revert tombstones
+                        report.tombstoned.removeAll { $0 == tk }
+                    }
+                    // Don't delete source — next scan will re-ingest + re-tombstone
+                    continue
+                }
             }
             writeReceipt(group: group, seq: seq, fp: fp, report: &report)   // == HTTP "200"
             if deleteSourceAfterReceipt { store.delete(sidecar); store.delete(jpg); report.sourcesDeleted.append(k) }

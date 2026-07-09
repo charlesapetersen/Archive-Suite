@@ -24,6 +24,21 @@ post-restart; B5-ii merely triggered it mid-session too. **NO data loss / NO dou
 
 ---
 
+## ✅ FIXED (2026-07-09): FileRelayReceiver.persistProcessed() return ignored — source deletion on persist failure [HIGH]
+
+**FIXED:** Both call sites (post-ingest and post-tombstone) now check `persistProcessed()`'s return value.
+On failure: revert the in-memory `processed` entries, skip receipt-write and source-deletion, and leave the
+source objects for retry on the next scan. `ingest` is idempotent on `(group, seq)`, so re-processing is
+safe. `Net/FileRelayReceiver.swift`. Found by lean-review (`.maintenance/review/Processor-Net.md`).
+
+**Root cause:** `persistProcessed()` returns `Bool` (false on encode/write failure) but both call sites
+(lines 181, 190) discarded the result. If persist failed, the code proceeded to delete the source JPEG +
+sidecar — losing track of the ingested photo on restart (the processed-set file didn't record it) while the
+source was already gone. Low practical likelihood (local filesystem write to a known-writable directory) but
+a **no-undo** data-loss path when it does fire (e.g. disk-full, permission change, sandboxing edge).
+
+---
+
 ## ✅ FIXED (2026-07-08, Android UI-fixes batch) — Android capture-screen controls lacked accessibility labels  [LOW — a11y]
 
 **FIXED:** `contentDescription` added to the shutter, captured thumbnails, and Box/Folder/End-segment/Re-pair controls. Landed with the connect-flow dark-mode + layout fixes (compile + review verified; on-device TalkBack confirmation deferred to the device visual check). Original report below.
