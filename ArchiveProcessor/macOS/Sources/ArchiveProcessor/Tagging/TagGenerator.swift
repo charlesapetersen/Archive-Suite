@@ -248,7 +248,7 @@ class TagGenerator: ObservableObject {
             jsonStr = lines.dropFirst().dropLast().joined(separator: "\n")
         }
         // Find JSON object
-        if let start = jsonStr.firstIndex(of: "{"), let end = jsonStr.lastIndex(of: "}") {
+        if let start = jsonStr.firstIndex(of: "{"), let end = jsonStr.lastIndex(of: "}"), start <= end {
             jsonStr = String(jsonStr[start...end])
         }
 

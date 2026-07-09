@@ -6,9 +6,9 @@ struct OpenAICompatibleClient {
     let apiKey: String
     let modelID: String
 
-    private var chatEndpoint: URL {
+    private var chatEndpoint: URL? {
         let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        return URL(string: "\(base)/chat/completions")!
+        return URL(string: "\(base)/chat/completions")
     }
 
     func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
@@ -78,7 +78,10 @@ struct OpenAICompatibleClient {
     }
 
     private func sendRequest(body: [String: Any], timeoutInterval: TimeInterval) async throws -> (Data, URLResponse) {
-        var request = URLRequest(url: chatEndpoint, timeoutInterval: timeoutInterval)
+        guard let endpoint = chatEndpoint else {
+            throw OCRError.networkError("Invalid gateway URL: \(baseURL)")
+        }
+        var request = URLRequest(url: endpoint, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
