@@ -304,7 +304,12 @@ final class LiveCaptureProcessor: ObservableObject {
         }
 
         // Pin collection membership now, in capture order (a Box starts a new collection).
-        if photo.type == .box { currentCollectionKey = photo.groupId }
+        if photo.type == .box {
+            currentCollectionKey = photo.groupId
+            // Back-fill: on relay transport, docs captured AFTER this box may have arrived first
+            // and been pinned to the wrong (previous) collection. Re-assign using capture-seq order.
+            backfillCollections()
+        }
         if groupCollectionKey[photo.groupId] == nil {
             groupCollectionKey[photo.groupId] = (photo.type == .box) ? photo.groupId : currentCollectionKey
         }
@@ -334,6 +339,43 @@ final class LiveCaptureProcessor: ObservableObject {
     func segmentResolved(groupId: String) {
         guard session.processingMode == .live else { return }
         Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
+    }
+
+    /// Re-assign collection keys for not-yet-finalized groups (and already-staged segments) using the
+    /// phone's capture sequence as the source of truth. Called when a Box arrives out of relay order so
+    /// documents that landed before their Box get corrected before (or after) finalize.
+    private func backfillCollections() {
+        let boxes = session.groups
+            .filter { $0.type == .box }
+            .sorted { $0.order < $1.order }
+        guard !boxes.isEmpty else { return }
+
+        // For a given capture-order, the correct box is the one with the highest order ≤ docOrder.
+        func correctBox(forOrder docOrder: Int) -> CaptureGroup? {
+            boxes.last { $0.order <= docOrder }
+        }
+
+        // Back-fill not-yet-finalized groups
+        for group in session.groups where group.type != .box {
+            guard !finalizedGroups.contains(group.id) else { continue }
+            if let box = correctBox(forOrder: group.order) {
+                groupCollectionKey[group.id] = box.id
+            }
+        }
+
+        // Fix already-staged segments whose collectionKey was pinned before their box arrived
+        var didFixStaged = false
+        for i in staged.indices where staged[i].type != CaptureGroupType.box.rawValue {
+            if let box = correctBox(forOrder: staged[i].order), staged[i].collectionKey != box.id {
+                staged[i].collectionKey = box.id
+                groupCollectionKey[staged[i].groupId] = box.id
+                didFixStaged = true
+            }
+        }
+        if didFixStaged { persistManifest() }
+
+        // Keep currentCollectionKey = the highest-seq box (not just the most-recently-arrived one)
+        if let latest = boxes.last { currentCollectionKey = latest.id }
     }
 
     // MARK: - Finalize one segment

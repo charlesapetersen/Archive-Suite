@@ -284,3 +284,18 @@ irreplaceable photo + wrong classification).
 reclassified page from G's already-staged output (+ renumber), or refuse the reclassify and signal the phone.
 Touches the Tier-2 finalize/staging path + needs a phone-signal channel, hence deferred. For the FileRelay
 milestone the Mac logs the collision and does not expand the existing no-op.
+
+---
+
+## Collection pinned in arrival order on relay transport  [MEDIUM — FIXED]
+
+**Status:** FIXED (2026-07-09).
+
+On relay transport, network reordering could cause a document to arrive before its Box marker. The Mac
+pinned `groupCollectionKey` at arrival time, so such a document was assigned to the *previous* collection
+(or `__unfiled__`), then its source photos were trashed at finalize — filed under the wrong box.
+
+**Fix:** `LiveCaptureProcessor.backfillCollections()` — when a Box arrives, re-resolve collection assignments
+for all not-yet-finalized groups AND already-staged segments using the phone's capture sequence (`CaptureGroup.order`)
+as the source of truth. Also corrects `currentCollectionKey` to the highest-seq box (not the most-recently-arrived).
+Persists the corrected manifest so a crash doesn't revert the fix. (`LiveCaptureProcessor.swift:347–379`.)
