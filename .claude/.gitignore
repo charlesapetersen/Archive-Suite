@@ -1,0 +1,3 @@
+# Local doc-sync backstop state (per-machine, per-session — never committed).
+.docsync-baseline
+.docsync-ok

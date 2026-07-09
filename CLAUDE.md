@@ -8,6 +8,25 @@ that app**; read it before working inside a subdirectory:
 - [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) — the Processor + its iOS/Android capture companions.
 - [`ArchiveReader/CLAUDE.md`](ArchiveReader/CLAUDE.md) — the Reader (incl. its bulletproof file‑safety Core Directive).
 
+## How we work — the loop for every change
+
+The whole per-change checklist in one place, so no rule hides inside a longer section. Every change, in order:
+
+1. **Isolate** — work in your own git worktree, never the primary checkout (→ *Worktree-first*, below).
+2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test.
+3. **Review by risk** — Tier-2 (adversarial review + a functional test) for anything with **no undo**:
+   `Capture/`·`Net/`, file-writing tag/output, manifest/finalize, actor isolation, or the tag/PDF SPEC.
+   Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*.
+4. **Docs move with the code — in the SAME commit** (→ *Docs & backlog convention*, below): flip the
+   shipped `SUITE_TODO.md` checkbox, update `KNOWN_ISSUES.md`, delete a shipped `execution-plans/` plan.
+   `SUITE_TODO.md` is the tracker of record; an unattended run reconciles it **before it ends**.
+5. **Push often, release rarely** — a clean build + self-review is enough to push; a DMG/release is the
+   sparse, Tier-3-gated milestone.
+6. **Clean up** — remove your worktree once the work is pushed.
+
+The sections below are the depth behind these steps. **The owner should never have to catch a skipped one**
+(a doc-sync backstop hook enforces step 4 — see `.claude/hooks/`).
+
 ## Worktree-first — mandatory before any edit (every agent & instance)
 
 **Before you edit, build, or commit anything in this repo, be in your own dedicated git worktree — never
