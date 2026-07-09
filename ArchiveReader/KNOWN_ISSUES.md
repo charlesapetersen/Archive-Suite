@@ -90,8 +90,9 @@ A multi-agent hunt for this bug class (the willSet + clobber category) confirmed
   strings on write (would make the multiset verify false-fail). *Property-test on the real corpus copy.*
 - **Classification is not always present** (`Document Start`/`Continuation` absent on some outputs) —
   segment features must degrade gracefully; never assume presence.
-- **SwiftUI `Table` at ~150k live rows** with multi-sort may jank — abstract the data layer so an
-  AppKit `NSTableView` swap is possible; perf-test early.
+- **RESOLVED (`435b8c4`):** the nav table is now AppKit `NSTableView` (`Views/AppKitTableView.swift`) —
+  virtualized rows + diffable snapshots + 150ms-debounced filter; handles large corpora without the SwiftUI
+  `Table` jank measured at 40k. (Interactive inline cell editing is a follow-up — see the NSTableView note.)
 - **Not every file is a clean 2-page PDF** — guard 1-page/>2-page/0-page/corrupt/encrypted and
   tagged non-PDF images; the two-up viewer must degrade, not crash.
 - **Subject/facet collisions** (a subject literally `1984`, `P7`, `Read`) — facet classification is

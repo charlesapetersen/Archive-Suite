@@ -272,7 +272,7 @@ Build and run on an iPhone with Xcode (iOS 17+; camera capture needs a physical 
 ## Project Structure
 
 ```
-ArchiveProcessor/Sources/ArchiveProcessor/
+ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 ├── ArchiveProcessorApp.swift          # App entry point (+ Settings scene, ⌘,)
 ├── ContentView.swift                  # Root view: Process Files / Live Capture / Tools tabs
 ├── Models/

@@ -123,7 +123,7 @@ Three tiers, so nothing sprawls or goes stale:
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 
-Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). Don't keep a doc "just because" — fold durable bits into these and drop the rest.
+Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.
 
 ## Working directive — token-efficient feature-add & maintenance
 
@@ -160,5 +160,5 @@ this repo:
 - Cut DMG/GitHub releases sparingly; push commits frequently.
 
 The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
-record). Remaining structural follow‑ups (shared `ArchiveCore` package; de‑nesting) live in
-`execution-plans/structural-refactor.md`.
+record). De‑nesting shipped (`7706368`); the remaining structural follow‑up — a shared `ArchiveCore`
+package — is deferred in `ArchiveProcessor/POTENTIAL_FEATURES.md`.

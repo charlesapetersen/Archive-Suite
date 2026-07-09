@@ -7,7 +7,7 @@ filter by subject / priority / read-state, read them two-up (image + OCR text), 
 file links, and mark them Read as you go.
 
 > **Status:** Shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate tag
-> finder, document-viewer refinements, duplicate-filename disambiguation); 135 tests green. **This
+> finder, document-viewer refinements, duplicate-filename disambiguation); 161 tests green. **This
 > file is the durable record** for the Reader. **Core Directive**, **Verified Facts**, and **Safety
 > Protocol** below are settled and non-negotiable; the keyboard map, options, edge-case rules, and
 > decisions are folded into the sections below.
@@ -191,12 +191,11 @@ writes against the real corpus — always a copy.
   optional provenance display, not for grouping.
 - **Two windows** (SwiftUI scenes): a single **navigation window** (Finder-Smart-Folder-like table)
   and a **document view window** opened with a selection payload.
-- **Navigation table:** SwiftUI `Table` (NSTableView-backed on macOS 14+), data layer abstracted so an
-  AppKit `NSTableView` swap is possible. **Perf-checked 2026-07-08 at 40k (synthetic scratch corpus): it
-  JANKS** — scroll stutter, filter-field keystroke lag/beachball (whole-collection main-thread re-diff per
-  keystroke), slow sort; discovery/load itself was fine. **The AppKit `NSTableView` + diffable-data-source
-  swap is CONFIRMED warranted** (tracked in `SUITE_TODO.md`). Columns: Document
-  date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
+- **Navigation table:** an AppKit `NSTableView` wrapped in `NSViewRepresentable` (`Views/AppKitTableView.swift`,
+  shipped `435b8c4`) — virtualized rows + `NSTableViewDiffableDataSource` incremental snapshots + a
+  150ms-debounced filter off the keystroke path, so it stays smooth at scale. (This replaced the SwiftUI
+  `Table`, which at 40k janked: scroll stutter, per-keystroke whole-collection main-thread re-diff, slow sort.)
+  Columns: Document date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
   draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
@@ -289,7 +288,7 @@ writes against the real corpus — always a copy.
 - **Full-text OCR search is in v1** via the app's content index (not Spotlight content indexing) + in-doc `⌘F`.
 - **v1 sandboxed** to a granted root; non-sandboxed whole-Mac search is long-term (behind a `FileAccessProvider` abstraction).
 
-## Implementation map (shipped — v1 + P2 complete, 135 tests, 2026-07-07)
+## Implementation map (shipped — v1 + P2 complete, 161 tests, 2026-07-09)
 
 `macOS/Sources/ArchiveReader/`
 ```
@@ -335,6 +334,9 @@ Views/
                               view-state persistence, inline + corpus-wide edits — all via TagWriter.
   NavigationWindowView.swift  Results Table (customizable columns), filter bar, sidebar+tag-cloud panels,
                               toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
+  AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
+                              virtualized rows, incremental snapshot apply, 150ms-debounced filter;
+                              ContextMenuTableView + ContextMenuActions trampoline to NavigationModel.
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup) that scopes the list via filter.pathPrefix.
   InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
@@ -357,7 +359,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 ```
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
-`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (149 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (161 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build

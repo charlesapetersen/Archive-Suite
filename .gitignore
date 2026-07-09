@@ -26,3 +26,6 @@ Test Outputs/
 
 # API keys
 *.env
+
+# Archived/irrelevant untracked scratch docs (completed-run review reports, etc.) — see old/README.md.
+old/

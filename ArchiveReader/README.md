@@ -20,7 +20,7 @@ Protocol.
 ## What it does
 
 > **Status (2026-07-07):** shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate
-> tag finder, document-viewer refinements, duplicate-filename disambiguation); **135 tests** pass; the
+> tag finder, document-viewer refinements, duplicate-filename disambiguation); **161 tests** pass; the
 > document-viewer flows are owner-verified. `CLAUDE.md` is the authoritative record.
 
 
