@@ -34,9 +34,19 @@ STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is st
 MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min
 BUDGET="${OVERNIGHT_BUDGET:-30}"         # --max-budget-usd per resume session
 
-# Tools a work session legitimately needs. deny wins over allow.
-ALLOW="Bash Edit Write Read Grep Glob Task Agent Workflow TodoWrite NotebookEdit WebFetch WebSearch"
-DENY="Bash(sudo:*) Bash(launchctl:*) Bash(rm -rf:*) Bash(rm -fr:*) Bash(rm -r:*) Bash(rm -R:*) Bash(git push --force:*) Bash(git push -f:*) Bash(git push --force-with-lease:*) Bash(git reset --hard:*) Bash(git clean:*) Bash(git worktree remove --force:*) Bash(git worktree remove -f:*) Bash(git branch -D:*) Bash(shutdown:*) Bash(reboot:*) Bash(halt:*) Bash(diskutil:*) Bash(dd:*) Bash(mkfs:*) Bash(curl:*) Bash(wget:*)"
+# Tools a work session legitimately needs. deny wins over allow. ARRAYS (not strings): patterns contain
+# spaces (e.g. "Bash(rm -rf:*)"), so they MUST each be one argv element — passed as "${DENY[@]}", never
+# unquoted (unquoted word-splits the space and claude sees "-rf:*)" as an unknown option).
+ALLOW=(Bash Edit Write Read Grep Glob Task Agent Workflow TodoWrite NotebookEdit WebFetch WebSearch)
+DENY=(
+  "Bash(sudo:*)" "Bash(launchctl:*)"
+  "Bash(rm -rf:*)" "Bash(rm -fr:*)" "Bash(rm -r:*)" "Bash(rm -R:*)"
+  "Bash(git push --force:*)" "Bash(git push -f:*)" "Bash(git push --force-with-lease:*)"
+  "Bash(git reset --hard:*)" "Bash(git clean:*)"
+  "Bash(git worktree remove --force:*)" "Bash(git worktree remove -f:*)" "Bash(git branch -D:*)"
+  "Bash(shutdown:*)" "Bash(reboot:*)" "Bash(halt:*)"
+  "Bash(diskutil:*)" "Bash(dd:*)" "Bash(mkfs:*)" "Bash(curl:*)" "Bash(wget:*)"
+)
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
@@ -86,8 +96,8 @@ tick() {
       --permission-mode default \
       --model opus --fallback-model sonnet \
       --max-budget-usd "$BUDGET" \
-      --allowedTools $ALLOW \
-      --disallowedTools $DENY \
+      --allowedTools "${ALLOW[@]}" \
+      --disallowedTools "${DENY[@]}" \
       >> "$STATE/last-session.log" 2>&1 &
   local cpid=$!
   ( sleep "$MAXRUN"; kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null ) &
