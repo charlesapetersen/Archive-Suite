@@ -50,7 +50,11 @@ struct FileRowView: View {
         if job?.status == .failed {
             acts.append(contentsOf: [.retry, .retryWithModel, .changeRotation])
         }
-        acts.append(contentsOf: [.viewText, .reclassify])
+        // viewText/reclassify only make sense when an OCR job exists for this row.
+        if job != nil {
+            if job?.result?.text != nil { acts.append(.viewText) }
+            acts.append(.reclassify)
+        }
         return acts
     }
 }

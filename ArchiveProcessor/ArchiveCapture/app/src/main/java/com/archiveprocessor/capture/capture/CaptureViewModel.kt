@@ -518,6 +518,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         setState(item.id, UploadState.UPLOADING)
         sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
         viewModelScope.launch {
+            var resendItem: CapturedItem? = null
             try {
                 val bytes = withContext(Dispatchers.IO) { runCatching { item.file.readBytes() }.getOrNull() }
                 var ok = false
@@ -537,11 +538,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     // A field changed while this upload was in flight (per-page P10 / reclassify): the bytes
                     // just sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
                     // removeConfirmed (that would drop the photo having sent only the old value). The
-                    // re-enqueue is launched after `finally` releases the in-flight guard.
+                    // re-enqueue runs AFTER finally releases the in-flight guard so enqueueUpload can re-add
+                    // the ID (previously it launched inside try, where inFlightUploads still held the old ID,
+                    // causing the re-enqueue to silently no-op).
                     val cur = items.firstOrNull { it.id == item.id }
                     if (cur != null && cur.needsResend) {
                         clearNeedsResend(item.id)
-                        viewModelScope.launch { items.firstOrNull { it.id == item.id }?.let { enqueueUpload(it) } }
+                        resendItem = items.firstOrNull { it.id == item.id }
                     } else {
                         // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
                         // lets the strip animate it out), so photos transfer in segments instead of piling up.
@@ -556,6 +559,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 inFlightUploads.remove(item.id)
             }
+            resendItem?.let { enqueueUpload(it) }
         }
     }
 
@@ -599,6 +603,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         items.clear()
         endedSegments.clear()
         inFlightSegments.clear()
+        inFlightUploads.clear()
         seqCounter = 0
         nextId = 1L
         currentGroupId = newGroupId()
@@ -607,7 +612,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         sentCount = 0
         transferFlash = null
         statusMessage = ""
-        store.clear()
+        viewModelScope.launch(Dispatchers.IO) { store.clear() }
     }
 
     private fun setState(id: Long, state: UploadState) {

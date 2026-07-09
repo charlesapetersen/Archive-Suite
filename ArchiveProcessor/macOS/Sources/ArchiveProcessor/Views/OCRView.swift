@@ -709,6 +709,8 @@ struct OCRView: View {
         switch action {
         case .retry:
             guard let outDir = outputDirectory else { return }
+            // Prevent re-entrant retries while this job is already being OCR'd.
+            guard processor.jobs[jobIndex].status != .processing else { return }
             Task {
                 await processor.retryOne(
                     index: jobIndex, provider: selectedProvider, model: selectedModel,
