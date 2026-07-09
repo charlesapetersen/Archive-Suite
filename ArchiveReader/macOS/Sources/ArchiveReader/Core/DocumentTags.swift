@@ -74,18 +74,23 @@ struct DocumentTags: Sendable, Equatable {
     /// (`Date Uncertain` flags a speculative year; the file usually still carries a Year tag.)
     var dateIsSpeculative: Bool { dateUncertain }
 
-    /// Tokens for the "File tags" column and the tag cloud: the raw tags minus the date facets
-    /// (year / `MM Month` / `Day N` / `Date Uncertain`) and read-state (`Read`/`Unread`), since those
-    /// have their own columns. Keeps priority / subjects / marker-color tokens, verbatim & in order.
+    /// Tokens for the "File tags" column and the tag cloud: the raw tags minus the WINNING date facets
+    /// (yearToken / monthToken / dayToken / `Date Uncertain`) and read-state (`Read`/`Unread`), since
+    /// those have their own columns. Demoted same-facet tokens (e.g. "1984" when year=1980) stay visible.
     var topicalTags: [String] {
-        raw.filter { token in
+        let excluded: Set<String> = {
+            var s = Set<String>()
+            if let t = yearToken { s.insert(t) }
+            if let t = monthToken { s.insert(t) }
+            if let t = dayToken { s.insert(t) }
+            return s
+        }()
+        return raw.filter { token in
             let s = token.trimmingCharacters(in: .whitespaces)
             if s.isEmpty { return false }
             if ReadState.allCases.contains(where: { $0.rawValue.caseInsensitiveCompare(s) == .orderedSame }) { return false }
             if s.caseInsensitiveCompare("Date Uncertain") == .orderedSame { return false }
-            if DocumentTags.parseMonth(s) != nil { return false }
-            if DocumentTags.parseDay(s) != nil { return false }
-            if DocumentTags.parseYear(s) != nil { return false }
+            if excluded.contains(token) { return false }
             return true
         }
     }
