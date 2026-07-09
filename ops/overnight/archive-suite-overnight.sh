@@ -1,28 +1,32 @@
 #!/usr/bin/env bash
-# Archive Suite — autonomous overnight self-resume daemon (L1).
+# Autonomous overnight self-resume daemon (L1) — REUSABLE TEMPLATE.
+# Current instance: Archive Suite. To reuse for another repo, copy this file, edit the PROJECT CONFIG
+# block below (or set the OVERNIGHT_* env vars), and write that repo's L0 plan + L2 resume prompt.
 #
-# Fires a FRESH headless `claude -p` every cycle to advance the durable plan
-# (.maintenance/OVERNIGHT_PLAN.md), one bounded item per session. Resilient to usage cutoffs:
-# an exhausted window just fails fast and the next cycle retries when the cap resets (~5h).
+# Fires a FRESH headless `claude -p` every cycle to advance a durable plan, one bounded item per session.
+# Resilient to usage cutoffs: an exhausted window just fails fast and the next cycle retries when the cap
+# resets (~5h). The durable plan (L0) is the real resilience — any fresh session recovers state from it.
 #
 # HARD SAFETY (see memory: autonomous-plan-cron-resume, no-force-override-destructive-git):
 #   * --permission-mode default (NEVER bypassPermissions / --dangerously-skip-permissions)
 #   * scoped --allowedTools + a destructive --disallowedTools denylist (deny wins over allow)
 #   * per-session --max-budget-usd + wall-clock timeout so no single resume runs away or blows a window
-#   * lives OUTSIDE ~/Desktop (TCC-protected) — the prior launchd attempt died with "Operation not permitted"
-#     exec'ing a script under Desktop.
+#   * script + CLAUDE live OUTSIDE ~/Desktop (TCC-protected) — a prior launchd attempt died with
+#     "Operation not permitted" exec'ing a script under Desktop.
 #
 # Runs as a detached loop (primary; start with: setsid nohup … & ) OR under launchd with KeepAlive.
-# Self-terminates when the plan's "RUN STATUS:" line reads COMPLETE.
+# Self-terminates when the plan's "RUN STATUS:" line reads COMPLETE (a plain greppable line — no markdown).
 set -uo pipefail
 
-REPO="/Users/<user>/Desktop/Claude/Archive Suite"
-PLAN="$REPO/.maintenance/OVERNIGHT_PLAN.md"
-STATE="$HOME/.local/state/archive-overnight"
-LOCK="$STATE/engine.lock"
-LOG="$STATE/daemon.log"
-PROMPT="$STATE/resume-prompt.txt"
-CLAUDE="$HOME/.local/bin/claude"
+# ===== PROJECT CONFIG — to reuse elsewhere, edit these 5 (or set the matching OVERNIGHT_* env vars) =====
+LABEL="${OVERNIGHT_LABEL:-archivesuite}"                            # unique slug: names the state dir + launchd job
+REPO="${OVERNIGHT_REPO:-/Users/<user>/Desktop/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
+PLAN="${OVERNIGHT_PLAN:-$REPO/.maintenance/OVERNIGHT_PLAN.md}"     # L0 durable plan (keep it gitignored)
+STATE="${OVERNIGHT_STATE:-$HOME/.local/state/archive-overnight}"  # runtime state (logs, lock, resume prompt)
+CLAUDE="${OVERNIGHT_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
+# =======================================================================================================
+LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
+JOB="com.${LABEL}.overnight"    # launchd label (matches the .plist)
 
 INTERVAL="${OVERNIGHT_INTERVAL:-1200}"   # seconds between cycles (20 min)
 STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
@@ -45,7 +49,7 @@ tick() {
   # 1. Done? unload + stop.
   if grep -q '^RUN STATUS: COMPLETE' "$PLAN" 2>/dev/null; then
     log "plan RUN STATUS: COMPLETE — daemon stopping."
-    launchctl bootout "gui/$(id -u)/com.archivesuite.overnight" 2>/dev/null || true
+    launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
     return 9
   fi
   # 2. No plan? don't run blind.
@@ -63,8 +67,9 @@ tick() {
   ( while kill -0 "$ppid" 2>/dev/null; do touch "$LOCK" 2>/dev/null; sleep 60; done ) &
   local hb=$!
 
-  # 5. OCR key (for the E2E item) into the child env, without ever printing it.
-  set -a; [ -f "$STATE/ocr-key.env" ] && . "$STATE/ocr-key.env"; set +a
+  # 5. Optional per-project env hook (e.g. a test API key) into the child env, without ever printing it.
+  #    Archive Suite: $STATE/ocr-key.env holds `OCR_KEY=…` for the E2E (absent by default -> Keychain fallback).
+  set -a; [ -f "$STATE/env" ] && . "$STATE/env"; [ -f "$STATE/ocr-key.env" ] && . "$STATE/ocr-key.env"; set +a
 
   log "launching fresh resume session (timeout ${MAXRUN}s, budget \$$BUDGET)…"
   ( cd "$REPO" && timeout "$MAXRUN" "$CLAUDE" -p "$(cat "$PROMPT")" \
