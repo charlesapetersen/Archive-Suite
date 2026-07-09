@@ -33,6 +33,7 @@ INTERVAL="${OVERNIGHT_INTERVAL:-1200}"   # seconds between cycles (20 min)
 STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
 MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min
 BUDGET="${OVERNIGHT_BUDGET:-30}"         # --max-budget-usd per resume session
+EFFORT="${OVERNIGHT_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
 
 # Tools a work session legitimately needs. deny wins over allow. ARRAYS (not strings): patterns contain
 # spaces (e.g. "Bash(rm -rf:*)"), so they MUST each be one argv element — passed as "${DENY[@]}", never
@@ -95,6 +96,7 @@ tick() {
   "$CLAUDE" -p "$(cat "$PROMPT")" \
       --permission-mode default \
       --model opus --fallback-model sonnet \
+      --effort "$EFFORT" \
       --max-budget-usd "$BUDGET" \
       --allowedTools "${ALLOW[@]}" \
       --disallowedTools "${DENY[@]}" \

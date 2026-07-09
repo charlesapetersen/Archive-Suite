@@ -75,8 +75,11 @@ overnight run for a different repo:
 3. **Write the L2 resume prompt** (`$STATE/resume-prompt.txt`) — recover state → pick first `[ ]` → own
    worktree → verify → commit+push+tick → stop. Reuse this repo's `resume-prompt.txt` as the skeleton;
    adjust the repo path + any per-item notes.
-4. **Tune** `OVERNIGHT_INTERVAL` / `STALE` / `MAXRUN` / `BUDGET` and the `ALLOW`/`DENY` tool lists for the
-   project's risk surface (keep the destructive denylist; deny always wins over allow).
+4. **Tune** `OVERNIGHT_INTERVAL` / `STALE` / `MAXRUN` / `BUDGET` / `EFFORT` and the `ALLOW`/`DENY` tool lists
+   for the project's risk surface (keep the destructive denylist; deny always wins over allow). `EFFORT`
+   defaults to **`max`** — every resume session runs Opus at max reasoning effort (highest quality; higher
+   token burn, so it reaches usage caps sooner and rides them out by retrying). Lower it (`high`/`medium`) if
+   you want cheaper, faster cycles.
 5. **Start** it detached (primary) or arm the per-project `.plist` (`Label` = `com.<LABEL>.overnight`).
 
 ## Lessons learned (gotchas that cost real time — read before reusing)
