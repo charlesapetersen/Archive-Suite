@@ -4,16 +4,23 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
-## B9 (LOW) — resolved tag cards re-surface after a mid-session Mac restart; re-entered tags on an already-staged segment are dropped
+## ✅ FIXED (2026-07-08): resolved tag cards re-surfaced after a mid-session Mac restart (B9) [LOW]
 
-Found by the B4/B5 review (2026-07-08). `CaptureSession` persists `completedDocGroups` (B5-ii) but NOT
-`resolvedGroupIds`, so after a mid-session Mac restart a group already resolved+finalized re-shows its tag
-card (`pendingTagGroup`); re-tagging it no-ops on the already-baked staging output (the new tags never reach
-it). **Pre-existing root cause** — the same fires at Finish via `completeAllOpenDocGroups` post-restart; B5-ii
-merely triggers it mid-session too. **NO data loss / NO double-file** (guarded by `finalizedGroups.contains`
-in `segmentResolved`). Fix: persist `resolvedGroupIds` (+ `macTags`) in the manifest, OR intersect the restored
-`completedDocGroups` against the processor's persisted `finalizedGroups` on restore so a resolved group doesn't
-re-surface. `Capture/CaptureSession.swift`, `Capture/LiveCaptureProcessor.swift`.
+**FIXED:** `SessionManifest` now also persists `resolvedGroupIds` + `macTags` (both optional → pre-B9
+manifests still decode, to empty); `applyMacTags`/`skipMacTags` write the manifest on resolve, and
+crash-recovery restore repopulates both — so a mid-session Mac restart no longer re-surfaces an
+already-resolved tag card (nor drops its Mac-entered tags), and a resolve interrupted *before* staging now
+recovers with its tags instead of being lost. `clear()`/`clearFiled()` keep the three co-dependent sets
+(`completedDocGroups`/`resolvedGroupIds`/`macTags`) in sync. Verified: headless `ManifestPersistenceTestDriver`
+round-trip + pre-B9 back-compat (13/13 PASS), Tier-2 adversarial review (APPROVE, 0 findings), build clean,
+smoke PASS. `Capture/CaptureSession.swift`, `Capture/CaptureModels.swift`. Original report below.
+
+Found by the B4/B5 review (2026-07-08). `CaptureSession` persisted `completedDocGroups` (B5-ii) but NOT
+`resolvedGroupIds`, so after a mid-session Mac restart a group already resolved+finalized re-showed its tag
+card (`pendingTagGroup`); re-tagging it no-oped on the already-baked staging output (the new tags never
+reached it). **Pre-existing root cause** — the same fires at Finish via `completeAllOpenDocGroups`
+post-restart; B5-ii merely triggered it mid-session too. **NO data loss / NO double-file** (guarded by
+`finalizedGroups.contains` in `segmentResolved`).
 
 ---
 

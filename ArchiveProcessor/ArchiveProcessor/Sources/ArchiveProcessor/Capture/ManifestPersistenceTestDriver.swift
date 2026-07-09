@@ -74,6 +74,26 @@ enum ManifestPersistenceTestDriver {
         check("corrupt (non-JSON) manifest bytes decode to nil (ignored)",
               CaptureSession.decodeManifest(Data("not json {".utf8)) == nil)
 
+        // --- B9: resolvedGroupIds + macTags round-trip so a mid-session Mac restart does NOT re-surface an
+        //         already-resolved tag card (nor drop its Mac-entered tags). Optional keys => pre-B9
+        //         manifests still decode, to empty (back-compat). ---
+        let b9File = tmp.appendingPathComponent("b9.json")
+        let macTags: [String: MacSegmentTags] = [
+            "gDoc": MacSegmentTags(subjects: ["elections", "1968 campaign"], priority: "P8", year: 1968, month: 3)
+        ]
+        let b9Manifest = CaptureSession.SessionManifest(photos: entries, completedDocGroups: Array(completed),
+                                                        resolvedGroupIds: ["gDoc"], macTags: macTags)
+        let b9Wrote = (try? JSONEncoder().encode(b9Manifest)).map { (try? $0.write(to: b9File, options: .atomic)) != nil } ?? false
+        let b9 = (try? Data(contentsOf: b9File)).flatMap { CaptureSession.decodeManifest($0) }
+        check("B9: manifest with resolved/macTags written + decodes", b9Wrote && b9 != nil)
+        check("B9: resolvedGroupIds survives the round-trip", b9?.resolved == ["gDoc"])
+        check("B9: macTags survives the round-trip (subjects + date + priority)",
+              b9?.macTags["gDoc"]?.subjects == ["elections", "1968 campaign"]
+              && b9?.macTags["gDoc"]?.year == 1968 && b9?.macTags["gDoc"]?.priority == "P8")
+        check("B9 back-compat: pre-B9 manifest (no resolved/macTags keys) decodes to empty",
+              legacy?.resolved.isEmpty == true && legacy?.macTags.isEmpty == true
+              && emptyDecoded?.resolved.isEmpty == true && emptyDecoded?.macTags.isEmpty == true)
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_MANIFESTTEST_OUT"]

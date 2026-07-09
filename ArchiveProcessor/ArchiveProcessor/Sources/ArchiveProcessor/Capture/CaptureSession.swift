@@ -386,6 +386,8 @@ final class CaptureSession: ObservableObject {
             // segment-complete signal for a group it already got acked. A legacy (pre-B5) manifest has no
             // persisted set, so this is empty and behaves exactly as before for those sessions.
             completedDocGroups = restored.completed
+            resolvedGroupIds = restored.resolved     // B9: don't re-surface an already-resolved tag card
+            macTags = restored.macTags               // B9: keep the Mac-entered tags across the restart
         } else {
             sessionId = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
@@ -547,6 +549,7 @@ final class CaptureSession: ObservableObject {
         for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
         completedDocGroups.removeAll()
+        resolvedGroupIds.removeAll(); macTags.removeAll()   // B9: keep the persisted resolve state in sync
         writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
     }
@@ -560,7 +563,7 @@ final class CaptureSession: ObservableObject {
         let removed = photos.filter { filed.contains($0.url) }
         for p in removed { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = photos.filter { !filed.contains($0.url) }
-        if photos.isEmpty { completedDocGroups.removeAll() }
+        if photos.isEmpty { completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll() }
         writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
     }
@@ -645,11 +648,13 @@ final class CaptureSession: ObservableObject {
         macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
         resolvedGroupIds.insert(groupId)
         if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
+        _ = writeManifest()   // B9: persist resolve state + Mac tags so a mid-session restart doesn't re-ask
     }
 
     func skipMacTags(groupId: String) {
         resolvedGroupIds.insert(groupId)
         if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
+        _ = writeManifest()   // B9: persist that this card was resolved (skipped)
     }
 
     /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.
@@ -697,6 +702,11 @@ final class CaptureSession: ObservableObject {
     struct SessionManifest: Codable {
         let photos: [ManifestEntry]
         let completedDocGroups: [String]
+        // B9: also persist which completed segments were RESOLVED (tagged/skipped) + the Mac-entered tags,
+        // so a mid-session Mac restart doesn't re-surface an already-resolved card (and drop a re-tag on
+        // already-staged output). Optional so pre-B9 manifests ({photos, completedDocGroups}) still decode.
+        var resolvedGroupIds: [String]? = nil
+        var macTags: [String: MacSegmentTags]? = nil
     }
 
     private var manifestURL: URL { incomingFolder.appendingPathComponent("manifest.json") }
@@ -710,7 +720,8 @@ final class CaptureSession: ObservableObject {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
                           type: $0.type.rawValue, priority: $0.priority, year: $0.year, month: $0.month)
         }
-        let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups))
+        let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups),
+                                       resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
         do { try data.write(to: manifestURL, options: .atomic); return true }
         catch { return false }
@@ -719,15 +730,18 @@ final class CaptureSession: ObservableObject {
     /// Decode a session manifest, accepting BOTH the current object form ({photos, completedDocGroups})
     /// and the legacy bare-array form (pre-B5 builds wrote just `[ManifestEntry]`). A legacy manifest has
     /// no persisted completion set → empty (its tag cards still surface at Finish, exactly as before).
-    static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>)? {
+    static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
+                                                 resolved: Set<String>, macTags: [String: MacSegmentTags])? {
         let d = JSONDecoder()
-        if let m = try? d.decode(SessionManifest.self, from: data) { return (m.photos, Set(m.completedDocGroups)) }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, []) }
+        if let m = try? d.decode(SessionManifest.self, from: data) {
+            return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:])
+        }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:]) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>)? {
+    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags])? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
@@ -750,7 +764,7 @@ final class CaptureSession: ObservableObject {
             }
             if !restored.isEmpty {
                 restored.sort { $0.seq < $1.seq }
-                return (folder, restored, decoded.completed)
+                return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags)
             }
         }
         return nil
