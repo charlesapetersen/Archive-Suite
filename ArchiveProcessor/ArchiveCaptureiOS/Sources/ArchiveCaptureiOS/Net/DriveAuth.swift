@@ -197,6 +197,8 @@ final class DriveAuth: ObservableObject {
     /// `DriveClient`'s synchronous token provider — MUST be called off the main thread.
     /// `nonisolated` so it can be captured in a `@Sendable` closure without crossing `@MainActor`.
     nonisolated func accessTokenBlocking() throws -> String {
+        dispatchPrecondition(condition: .notOnQueue(.main))
+
         if let at = tokens.accessToken, let exp = tokens.expiry, Date() < exp { return at }
         guard tokens.refreshToken != nil else { throw DriveError.notSignedIn }
 
@@ -209,7 +211,9 @@ final class DriveAuth: ObservableObject {
             else { err = DriveError.notSignedIn }
             sem.signal()
         }
-        sem.wait()
+        if sem.wait(timeout: .now() + 65) == .timedOut {
+            throw DriveError.tokenRefreshTimedOut
+        }
         if let r = result { return r }
         throw err ?? DriveError.notSignedIn
     }

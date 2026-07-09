@@ -46,7 +46,7 @@ private final class HTTPResultBox: @unchecked Sendable {
 }
 
 enum DriveError: Error, CustomStringConvertible {
-    case badURL(String), noResponse, http(status: Int, body: String), decode(String), notSignedIn
+    case badURL(String), noResponse, http(status: Int, body: String), decode(String), notSignedIn, tokenRefreshTimedOut
     var description: String {
         switch self {
         case .badURL(let u): return "bad URL \(u)"
@@ -54,6 +54,7 @@ enum DriveError: Error, CustomStringConvertible {
         case .http(let s, let b): return "HTTP \(s): \(b.prefix(200))"
         case .decode(let m): return "decode: \(m)"
         case .notSignedIn: return "not signed in to Google Drive"
+        case .tokenRefreshTimedOut: return "Google token refresh timed out (65s)"
         }
     }
 }

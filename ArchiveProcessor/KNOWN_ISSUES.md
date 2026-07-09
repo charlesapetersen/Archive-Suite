@@ -412,6 +412,24 @@ failure — triggering the caller's 3-attempt retry. `postPhoto` callers use `tr
 
 ---
 
+## ✅ FIXED (2026-07-09): iOS `accessTokenBlocking()` deadlock risk + unbounded semaphore wait  [HIGH — concurrency]
+
+**Status:** FIXED. `DriveAuth.accessTokenBlocking()` used `DispatchSemaphore.wait()` with no timeout,
+bridging to a `Task { @MainActor in }` for token refresh. Two bugs: (1) if called from the main thread
+(e.g., a future call-site mistake), the semaphore blocks the main thread while the `@MainActor` Task
+needs the main thread to run — instant deadlock; (2) if the Google token endpoint is unreachable or
+stalls, the semaphore waits forever, hanging the upload thread permanently.
+
+Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
+
+**Fix:** added `dispatchPrecondition(condition: .notOnQueue(.main))` to trap immediately if called from
+the main thread (instead of silently deadlocking), and changed `sem.wait()` to
+`sem.wait(timeout: .now() + 65)` with a `DriveError.tokenRefreshTimedOut` throw on timeout — matching
+the Android `CountDownLatch.await(30, SECONDS)` pattern and the macOS `DriveClient` semaphore timeout
+(W3.n4). (`Net/DriveAuth.swift`, `Net/DriveClient.swift`.)
+
+---
+
 ## ✅ FIXED (2026-07-09): iOS deleteItem has no upload-state guard — un-uploaded photos irrecoverably lost  [HIGH — data loss]
 
 **Status:** FIXED. `CaptureViewModel.deleteItem()` unconditionally deleted the local JPEG and removed the
