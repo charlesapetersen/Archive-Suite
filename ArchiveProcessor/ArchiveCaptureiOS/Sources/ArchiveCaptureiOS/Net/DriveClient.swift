@@ -29,7 +29,9 @@ struct URLSessionHTTP: HTTPExecuting {
             }
             sem.signal()
         }.resume()
-        sem.wait()
+        if sem.wait(timeout: .now() + 65) == .timedOut {
+            throw URLError(.timedOut)
+        }
         if let e = box.error { throw e }
         guard let r = box.result else { throw DriveError.noResponse }
         return r

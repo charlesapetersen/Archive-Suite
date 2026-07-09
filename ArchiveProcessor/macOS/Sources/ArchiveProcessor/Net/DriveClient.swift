@@ -33,7 +33,9 @@ struct URLSessionHTTP: HTTPExecuting {
             }
             sem.signal()
         }.resume()
-        sem.wait()
+        if sem.wait(timeout: .now() + 65) == .timedOut {
+            throw DriveError.transport("request timed out (semaphore wait exceeded 65s)")
+        }
         if let e = box.error { throw e }
         guard let r = box.result else { throw DriveError.transport("no HTTPURLResponse — \(box.diag ?? "resp=nil, err=nil")") }
         return r
