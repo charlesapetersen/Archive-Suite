@@ -25,9 +25,9 @@ struct DriveRelayTransport: SegmentTransport {
     private func fileId(_ folder: String, _ name: String) -> String? {
         (try? client.listFiles(query: "'\(esc(folder))' in parents and appProperties has { key='relayName' and value='\(esc(name))' } and trashed = false"))?.first?.id
     }
-    private func upsert(_ folder: String, _ name: String, _ data: Data, _ mime: String) {
-        if let id = fileId(folder, name) { try? client.updateMedia(fileId: id, media: data, mimeType: mime) }
-        else { _ = try? client.createFile(name: name, parents: [folder], appProperties: ["relayName": name, "relayToken": token], media: data, mimeType: mime) }
+    private func upsert(_ folder: String, _ name: String, _ data: Data, _ mime: String) throws {
+        if let id = fileId(folder, name) { try client.updateMedia(fileId: id, media: data, mimeType: mime) }
+        else { _ = try client.createFile(name: name, parents: [folder], appProperties: ["relayName": name, "relayToken": token], media: data, mimeType: mime) }
     }
     private func read(_ folder: String, _ name: String) -> Data? {
         guard let id = fileId(folder, name) else { return nil }
@@ -57,8 +57,8 @@ struct DriveRelayTransport: SegmentTransport {
             guard let e = ep else { try? await Task.sleep(nanoseconds: 1_000_000_000); continue }       // no epoch yet
             if validReceipt(f, group: group, seq: seq, epoch: e, fp: fp) { return true }                // receipt-first
             if !wrote {                                                     // write-once: jpeg then sidecar (query-or-update)
-                upsert(f, RelayObjectFormat.jpegName(group: group, seq: seq), jpeg, "image/jpeg")
-                upsert(f, RelayObjectFormat.sidecarName(group: group, seq: seq),
+                try? upsert(f, RelayObjectFormat.jpegName(group: group, seq: seq), jpeg, "image/jpeg")
+                try? upsert(f, RelayObjectFormat.sidecarName(group: group, seq: seq),
                        RelayObjectFormat.encodeSidecar(token: token, epoch: e, group: group, seq: seq, type: type,
                            priority: priority, year: yearS, month: monthS, replaces: repl, device: device), "application/json")
                 wrote = true
@@ -70,15 +70,19 @@ struct DriveRelayTransport: SegmentTransport {
 
     func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool {
         guard let f = folderId(), let e = epoch(f) else { return false }
-        upsert(f, RelayObjectFormat.segmentName(group: group),
-               RelayObjectFormat.encodeSegment(token: token, epoch: e, group: group,
-                   priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil), "application/json")
-        return true
+        do {
+            try upsert(f, RelayObjectFormat.segmentName(group: group),
+                   RelayObjectFormat.encodeSegment(token: token, epoch: e, group: group,
+                       priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil), "application/json")
+            return true
+        } catch { return false }
     }
     func sessionComplete() async -> Bool {
         guard let f = folderId(), let e = epoch(f) else { return false }
-        upsert(f, RelayObjectFormat.sessionCompleteName, RelayObjectFormat.encodeSessionComplete(token: token, epoch: e), "application/json")
-        return true
+        do {
+            try upsert(f, RelayObjectFormat.sessionCompleteName, RelayObjectFormat.encodeSessionComplete(token: token, epoch: e), "application/json")
+            return true
+        } catch { return false }
     }
     func sessionDisconnect() async -> Bool { true }
 }

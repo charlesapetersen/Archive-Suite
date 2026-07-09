@@ -391,3 +391,21 @@ read/write on the same mutable property.
 comment true — all `listener` reads and writes serialize on the single serial queue. Both methods are
 fire-and-forget from the caller's perspective (no return value, no completion), so the async dispatch is
 transparent. (`Net/CaptureServer.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): iOS/file relay segmentComplete/sessionComplete return true without confirming write  [HIGH — silent tag loss]
+
+**Status:** FIXED. Both `DriveRelayTransport` and `FileRelayTransport` returned `true` from
+`segmentComplete()` and `sessionComplete()` immediately after writing, without checking whether the
+write succeeded. The underlying `upsert` (Drive) and `writeAtomic` (file) swallowed all errors via
+`try?`. The caller (`CaptureViewModel.trySendSegmentComplete`) removes the group from `endedSegments`
+on `true`, stopping all retries — so a silently-failed write meant the Mac never received the
+segment-complete signal, and the document's tags were permanently lost.
+
+Contrast with `postPhoto`, which correctly gates `true` on a Mac-written receipt (receipt-wait loop).
+
+**Fix:** `writeAtomic` and `upsert` now `throw` instead of silently swallowing errors.
+`segmentComplete` and `sessionComplete` wrap the write in `do/try/catch` and return `false` on
+failure — triggering the caller's 3-attempt retry. `postPhoto` callers use `try?` on the write
+(receipt-wait is the true confirmation). (`Net/FileRelayTransport.swift`, `Net/DriveRelayTransport.swift`.)

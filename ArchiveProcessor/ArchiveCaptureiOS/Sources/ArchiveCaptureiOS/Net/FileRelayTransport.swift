@@ -19,14 +19,17 @@ struct FileRelayTransport: SegmentTransport {
         return e
     }
 
-    private func writeAtomic(_ name: String, _ data: Data) {
+    private func writeAtomic(_ name: String, _ data: Data) throws {
         let final = sessionDir.appendingPathComponent(name)
         let tmp = sessionDir.appendingPathComponent("." + name + ".\(UUID().uuidString).part")
         do {
             try data.write(to: tmp, options: .atomic)
             try? FileManager.default.removeItem(at: final)
             try FileManager.default.moveItem(at: tmp, to: final)
-        } catch { try? FileManager.default.removeItem(at: tmp) }
+        } catch {
+            try? FileManager.default.removeItem(at: tmp)
+            throw error
+        }
     }
 
     private func validReceipt(group: String, seq: Int, epoch: String, fp: String) -> Bool {
@@ -52,8 +55,8 @@ struct FileRelayTransport: SegmentTransport {
             }
             if validReceipt(group: group, seq: seq, epoch: epoch, fp: fp) { return true }   // (a) receipt-first
             if wroteForEpoch != epoch {                                                     // (b) write-once per epoch
-                writeAtomic(RelayObjectFormat.jpegName(group: group, seq: seq), jpeg)       // jpeg FIRST
-                writeAtomic(RelayObjectFormat.sidecarName(group: group, seq: seq),          // sidecar LAST = commit marker
+                try? writeAtomic(RelayObjectFormat.jpegName(group: group, seq: seq), jpeg)  // jpeg FIRST
+                try? writeAtomic(RelayObjectFormat.sidecarName(group: group, seq: seq),     // sidecar LAST = commit marker
                             RelayObjectFormat.encodeSidecar(token: token, epoch: epoch, group: group, seq: seq,
                                 type: type, priority: priority, year: yearS, month: monthS, replaces: repl, device: device))
                 wroteForEpoch = epoch
@@ -65,16 +68,20 @@ struct FileRelayTransport: SegmentTransport {
 
     func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool {
         guard let epoch = currentEpoch() else { return false }
-        writeAtomic(RelayObjectFormat.segmentName(group: group),
-                    RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: group,
-                        priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil))
-        return true
+        do {
+            try writeAtomic(RelayObjectFormat.segmentName(group: group),
+                        RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: group,
+                            priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil))
+            return true
+        } catch { return false }
     }
 
     func sessionComplete() async -> Bool {
         guard let epoch = currentEpoch() else { return false }
-        writeAtomic(RelayObjectFormat.sessionCompleteName, RelayObjectFormat.encodeSessionComplete(token: token, epoch: epoch))
-        return true
+        do {
+            try writeAtomic(RelayObjectFormat.sessionCompleteName, RelayObjectFormat.encodeSessionComplete(token: token, epoch: epoch))
+            return true
+        } catch { return false }
     }
 
     func sessionDisconnect() async -> Bool { true }   // no persistent connection to drop
