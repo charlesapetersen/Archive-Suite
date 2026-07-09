@@ -32,16 +32,16 @@ Highest-risk first. Paths are repo-root-relative.
 
 | # | Unit | Paths | Prime focus |
 |---|------|-------|-------------|
-| 1 | Processor/Capture | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Capture/` | finalize/move, session state, actor isolation |
-| 2 | Processor/Net | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Net/` | relay object format, Drive auth, transport, protocol |
-| 3 | Processor/OCR | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/OCR/` | segmentation, PDF render/merge, file-safety, SPEC |
-| 4 | Processor/Tagging+Models | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Tagging/ ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Models/` | tag/PDF SPEC, Keychain, settings |
-| 5 | Processor/Views | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Views/` | resource/perf, main-thread work, state desync |
+| 1 | Processor/Capture | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/` | finalize/move, session state, actor isolation |
+| 2 | Processor/Net | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/` | relay object format, Drive auth, transport, protocol |
+| 3 | Processor/OCR | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/` | segmentation, PDF render/merge, file-safety, SPEC |
+| 4 | Processor/Tagging+Models | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/ ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/` | tag/PDF SPEC, Keychain, settings |
+| 5 | Processor/Views | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/` | resource/perf, main-thread work, state desync |
 | 6 | Android companion | `ArchiveProcessor/ArchiveCapture/` | capture path, wire protocol, lifecycle |
 | 7 | iOS companion | `ArchiveProcessor/ArchiveCaptureiOS/` | capture path, wire protocol, OAuth token exchange |
-| 8 | Reader/Core | `ArchiveReader/ArchiveReader/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
-| 9 | Reader/Search | `ArchiveReader/ArchiveReader/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
-| 10 | Reader/Views | `ArchiveReader/ArchiveReader/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety |
+| 8 | Reader/Core | `ArchiveReader/macOS/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
+| 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
+| 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety |
 
 ## How to run one unit
 
@@ -51,7 +51,7 @@ root:
 ```
 Workflow({ name: 'lean-review', args: {
   unit:  'Processor/Capture',
-  paths: 'ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Capture/',
+  paths: 'ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/',
   focusNote: 'finalize/move + drain-gate are the no-undo hotspots'   // optional
   // dimensions: [...]  // optional override; default = 6 dimensions in the script
 }})

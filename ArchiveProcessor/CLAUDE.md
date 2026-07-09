@@ -345,7 +345,7 @@ The `.dmg` is a build artifact — never commit it (build under gitignored `buil
 ```
 Archive Processor/
 ├── CLAUDE.md, README.md, AGENTS.md, prompts.md, POTENTIAL_FEATURES.md, KNOWN_ISSUES.md
-├── ArchiveProcessor/                  # macOS app (XcodeGen: project.yml)
+├── macOS/                             # macOS app (XcodeGen: project.yml)
 │   └── Sources/ArchiveProcessor/{Models, OCR, Tagging, Capture, Net, Views}/
 ├── ArchiveCapture/                    # Android companion app (Gradle)
 ├── ArchiveCaptureiOS/                 # iPhone companion app (XcodeGen: project.yml)
@@ -368,7 +368,7 @@ See the README's "Project Structure" for the full annotated file tree, and the *
 Per-file index (one line each); the folder tree + god-file-split rationale are under "Project Structure"
 above, ownership lanes + shared hotspots under "Concurrent / multi-agent development."
 
-`ArchiveProcessor/Sources/ArchiveProcessor/`
+`macOS/Sources/ArchiveProcessor/`
 ```
 ArchiveProcessorApp.swift      @main App; main window + ⌘, Settings scene.
 ContentView.swift              Top-level tab host (Process Files · Live Capture · Tools).

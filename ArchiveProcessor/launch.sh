@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-APPDIR="ArchiveProcessor"
+APPDIR="macOS"
 APP="$APPDIR/build/DD/Build/Products/Debug/ArchiveProcessor.app"
 EXE="$APP/Contents/MacOS/ArchiveProcessor"
 BUILD_LOG="/tmp/ap-launch-build.log"

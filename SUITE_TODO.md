@@ -5,16 +5,14 @@ ideas live in each app's `POTENTIAL_FEATURES.md`; detailed in-flight plans live 
 (indexed below, deleted when shipped). Full-codebase review: the paced method in `REVIEW.md`. Unattended /
 overnight runs: `ops/overnight/README.md` (durable plan → self-resume daemon), which drains this queue one
 bounded item per fresh session.
-Paths repo-root-relative; Reader source = `ArchiveReader/ArchiveReader/Sources/ArchiveReader/`,
-Processor source = `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
+Paths repo-root-relative; Reader source = `ArchiveReader/macOS/Sources/ArchiveReader/`,
+Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
 ## Active execution plans (`execution-plans/`)
-- **`structural-refactor.md`** — de-nest the `App/App` folders (cosmetic, lowest value; P3.1 Implementation
-  Maps shipped 2026-07-07). *(The `ArchiveCore` shared-package extraction moved to
-  `ArchiveProcessor/POTENTIAL_FEATURES.md` — deferred, not near-term.)*
+*(None — `structural-refactor.md` shipped and deleted.)*
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -83,9 +81,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] **Owner-gated: live Google Drive end-to-end test — DONE 2026-07-07.** Android phone→Drive→Mac verified end-to-end (sign-in, single photo, multi-page segment + Mac tag card, Box/Folder markers, Finish; photo durable in the Mac session + backup folder). Fixes landed: `DriveError` legibility + `DriveAuth.init` whitespace-trim; console setup (Desktop client for Mac, Android client + SHA-1 + **Custom URI scheme enabled** for the phone) captured in the Processor CLAUDE.md Live Capture section. ✅
 - [x] **iOS Drive-relay on-device OAuth — implemented.** `DriveAuth.swift` (`ASWebAuthenticationSession` + PKCE, `drive.file` scope, thread-safe `TokenStore` for `DriveClient`'s blocking token provider); `CaptureViewModel` gains `TransportMode` (.lan/.drive) + auto-selects Drive when QR has a relay token and user is signed in (falls back on LAN-unreachable too); `ConnectScreen` gains a "Sign in to Google Drive" section. `project.yml` registers the reversed-client-ID URL scheme. **Placeholder client ID** — needs a real iOS OAuth client in GCP project YOUR_GCP_PROJECT (bundle ID `com.archiveprocessor.capture.ios`, "Custom URI scheme" enabled). iOS build clean, no new warnings. On-device testing deferred → `ArchiveProcessor/POTENTIAL_FEATURES.md`. | ArchiveCaptureiOS | M
 
-## P3 — Suite structural  → detailed plan in `execution-plans/structural-refactor.md`
+## P3 — Suite structural
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
-- [ ] De-nest the `App/App` folders (cosmetic; lowest value). | files: ArchiveReader/, ArchiveProcessor/ | M | med
+- [x] De-nest the `App/App` folders → `App/macOS/`. Both apps build (0 warnings), 161 Reader tests green, DMG verified. ✅
   - *(`ArchiveCore` shared-package extraction moved to `ArchiveProcessor/POTENTIAL_FEATURES.md` — deferred, 2026-07-08.)*
 
 ## Flagged — need the owner present / GUI / a scratch-corpus write

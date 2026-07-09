@@ -21,8 +21,8 @@ VOL="Archive Suite ${VER}"
 
 # app-key : project-dir : scheme : built-app-name
 APPS=(
-  "ArchiveProcessor/ArchiveProcessor:ArchiveProcessor:ArchiveProcessor.app"
-  "ArchiveReader/ArchiveReader:ArchiveReader:ArchiveReader.app"
+  "ArchiveProcessor/macOS:ArchiveProcessor:ArchiveProcessor.app"
+  "ArchiveReader/macOS:ArchiveReader:ArchiveReader.app"
 )
 
 build_one() {  # $1 = "projDir:scheme:appName"

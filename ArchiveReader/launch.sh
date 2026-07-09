@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-APPDIR="ArchiveReader"
+APPDIR="macOS"
 APP="$APPDIR/build/DD/Build/Products/Debug/ArchiveReader.app"
 EXE="$APP/Contents/MacOS/ArchiveReader"
 BUILD_LOG="/tmp/ar-launch-build.log"

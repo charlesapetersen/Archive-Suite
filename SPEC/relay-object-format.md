@@ -238,10 +238,10 @@ contract. Severity in brackets.
 
 | Piece | Path |
 |---|---|
-| **Mac** format module (names, `classify`, `identityFromName`, `canonicalJSON`, `fingerprint`, encode sidecar/receipt/segment/session/**epoch**, lenient `parse`) | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Net/RelayObjectFormat.swift` |
-| **Mac** receiver (poll, `scanOnce`, ingest-then-ack, tombstones, sweep, epoch-scoped `relay-processed.json`) | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift` |
-| **Mac** group-id traversal guard (shared with `CaptureServer`) | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Net/CaptureValidation.swift` |
-| **Mac** Drive backend (same object shapes over `appProperties`) | `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/Net/DriveObjectStore.swift` |
+| **Mac** format module (names, `classify`, `identityFromName`, `canonicalJSON`, `fingerprint`, encode sidecar/receipt/segment/session/**epoch**, lenient `parse`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/RelayObjectFormat.swift` |
+| **Mac** receiver (poll, `scanOnce`, ingest-then-ack, tombstones, sweep, epoch-scoped `relay-processed.json`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift` |
+| **Mac** group-id traversal guard (shared with `CaptureServer`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureValidation.swift` |
+| **Mac** Drive backend (same object shapes over `appProperties`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift` |
 | **iOS** format module (names, `canonicalJSON`, `fingerprint`, encode sidecar/segment/session, lenient `parse` for receipt+epoch) | `ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/RelayObjectFormat.swift` |
 | **Android** format module (pure Kotlin — names, `canonicalJson`, `fingerprint`, encode sidecar/segment/session) | `ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/net/RelayObjectFormat.kt` |
 | **Golden fixtures** (`input.jpg` + expected canonical bytes for fixed inputs; `nasty` unicode fixture) | `ArchiveProcessor/SPEC/relay-golden/*.json`, `.../input.jpg` |

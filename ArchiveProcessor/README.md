@@ -236,7 +236,7 @@ The `.xcodeproj` is **generated and not committed** (`project.yml` is authoritat
 **macOS app:**
 
 ```bash
-cd ArchiveProcessor
+cd macOS
 xcodegen generate                 # required after clone, and whenever files are added
 open ArchiveProcessor.xcodeproj   # build & run in Xcode (macOS target)
 ```
@@ -244,7 +244,7 @@ open ArchiveProcessor.xcodeproj   # build & run in Xcode (macOS target)
 Headless build (CI / quick check):
 
 ```bash
-cd ArchiveProcessor && xcodegen generate && \
+cd macOS && xcodegen generate && \
   xcodebuild -scheme ArchiveProcessor -configuration Debug build
 ```
 

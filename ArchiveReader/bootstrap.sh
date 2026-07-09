@@ -38,10 +38,10 @@ if [ "$found" -eq 0 ]; then err "No project.yml found — are you in the repo ro
 
 say "Done."
 echo "  Open the project to build & run (macOS 14+):"
-echo "    open ArchiveReader/ArchiveReader.xcodeproj"
+echo "    open macOS/ArchiveReader.xcodeproj"
 
 # 3) Optional convenience: open the project.
 if [ "${1:-}" = "--open" ]; then
   say "Opening the project…"
-  open ArchiveReader/ArchiveReader.xcodeproj
+  open macOS/ArchiveReader.xcodeproj
 fi

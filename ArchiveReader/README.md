@@ -45,13 +45,13 @@ committed — run bootstrap first:
 
 ```bash
 ./bootstrap.sh            # installs XcodeGen if needed, generates the project
-open ArchiveReader/ArchiveReader.xcodeproj
+open macOS/ArchiveReader.xcodeproj
 ```
 
 Headless build / CI check:
 
 ```bash
-cd ArchiveReader && xcodegen generate && \
+cd macOS && xcodegen generate && \
   xcodebuild -scheme ArchiveReader -configuration Debug build
 ```
 

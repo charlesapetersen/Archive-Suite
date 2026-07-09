@@ -75,19 +75,17 @@ Archive-Suite/
 ├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for both apps
 ├── release/                # suite-level release tooling (combined DMG)
 ├── launch.sh               # dispatcher → ./launch.sh reader|processor
-├── ArchiveProcessor/       # outer = relocated app repo;  inner ArchiveProcessor/ = its XcodeGen project dir
-│   ├── ArchiveProcessor/   #   project.yml (authoritative), Sources/, generated .xcodeproj (gitignored)
+├── ArchiveProcessor/       # outer = relocated app repo
+│   ├── macOS/              #   XcodeGen project dir: project.yml (authoritative), Sources/, generated .xcodeproj (gitignored)
 │   ├── ArchiveCapture/     #   Android capture companion
 │   └── ArchiveCaptureiOS/  #   iOS capture companion
-└── ArchiveReader/          # outer = relocated app repo;  inner ArchiveReader/ = its XcodeGen project dir
-    └── ArchiveReader/      #   project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+└── ArchiveReader/          # outer = relocated app repo
+    └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
 ```
 
-**The double‑naming** (`ArchiveReader/ArchiveReader/`, `ArchiveProcessor/ArchiveProcessor/`) is a
-harmless byproduct of the merge — outer = the app's dir, inner = that app's XcodeGen project dir. Each
-app's `launch.sh`/`bootstrap.sh` use paths relative to themselves, so it's cosmetic only. It can be
-flattened later as a separate, per‑app, build‑verified cleanup (see `execution-plans/structural-refactor.md`);
-not worth touching now.
+The inner XcodeGen project dirs are named `macOS/` (de-nested from the old `App/App/` layout that
+was a byproduct of the repo merge). Each app's `launch.sh`/`bootstrap.sh` use paths relative to
+themselves.
 
 ## The shared contract is the risk
 

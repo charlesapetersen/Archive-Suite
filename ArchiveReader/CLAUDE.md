@@ -291,7 +291,7 @@ writes against the real corpus — always a copy.
 
 ## Implementation map (shipped — v1 + P2 complete, 135 tests, 2026-07-07)
 
-`ArchiveReader/Sources/ArchiveReader/`
+`macOS/Sources/ArchiveReader/`
 ```
 ArchiveReaderApp.swift        @main; two scenes (nav Window + document WindowGroup) + Settings (⌘,).
 ArchiveReaderCommands.swift   Menu bar (File · Selection · Tags · Sort & Filter · Document). Menus are

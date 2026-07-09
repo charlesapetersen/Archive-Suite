@@ -28,7 +28,7 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 | Lane | Territory |
 |------|-----------|
 | **reader** | `ArchiveReader/` — views, navigation, tag editing (via `TagWriter`), content index |
-| **processor-macOS** | `ArchiveProcessor/ArchiveProcessor/` — OCR pipeline, tagging, review flows, capture server |
+| **processor-macOS** | `ArchiveProcessor/macOS/` — OCR pipeline, tagging, review flows, capture server |
 | **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion |
 | **processor-android** | `ArchiveProcessor/ArchiveCapture/` — Android capture companion |
 | **suite** | root docs, `SPEC/`, `release/`, `launch.sh` dispatcher |
@@ -45,7 +45,7 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 ## Verification
 
 Build‑verify the app(s) you touched before merging to `main`:
-`cd <app>/<App> && xcodegen generate && xcodebuild -scheme <App> -configuration Debug -derivedDataPath ./build/DD build`.
+`cd <app>/macOS && xcodegen generate && xcodebuild -scheme <App> -configuration Debug -derivedDataPath ./build/DD build`.
 Run the app's tests where present (Reader has an XCTest bundle + `scripts/lint-write-surface.sh`;
 Processor has `scripts/test-smoke.sh` / `test-tier2.sh`, plus `scripts/e2e-phone-mac.sh` — the full
 phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`Net/` changes). Tag‑write

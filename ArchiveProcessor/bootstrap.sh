@@ -40,12 +40,12 @@ if [ "$found" -eq 0 ]; then err "No project.yml found — are you in the repo ro
 
 say "Done."
 echo "  Open a project to build & run:"
-echo "    open ArchiveProcessor/ArchiveProcessor.xcodeproj       # macOS app"
+echo "    open macOS/ArchiveProcessor.xcodeproj       # macOS app"
 echo "    open ArchiveCaptureiOS/ArchiveCaptureiOS.xcodeproj     # iPhone companion (iOS 17+; camera needs a physical device)"
 echo "  Android companion uses Gradle (no bootstrap needed):  (cd ArchiveCapture && ./gradlew assembleDebug)"
 
 # 3) Optional convenience: open the macOS project.
 if [ "${1:-}" = "--open" ]; then
   say "Opening the macOS project…"
-  open ArchiveProcessor/ArchiveProcessor.xcodeproj
+  open macOS/ArchiveProcessor.xcodeproj
 fi
