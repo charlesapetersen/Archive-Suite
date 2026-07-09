@@ -337,8 +337,9 @@ Views/
   InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
                               (menu), DateCell / TagsCell (popovers). Multi-file edits use the ⌘I editor.
   SubjectTokenField.swift     Inline NSTokenField subject editor per row: autocomplete from the corpus;
-                              edit-start-base diff → ONE TagWriter delta; drops half-typed fragments on
-                              incidental blur (controlled-vocabulary + no-lost-tag safety).
+                              edit-start-base diff → ONE TagWriter delta; commits the field's tokens on
+                              blur — WYSIWYG, so a typed-but-not-Return'd word sticks (owner 2026-07-08;
+                              GUI-verified). Adds only route through TagWriter, so existing tags never lost.
   TagFilterField.swift        NSComboBox-backed tag filter with autocomplete (+focus token for ⌘L).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
