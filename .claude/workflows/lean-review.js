@@ -18,9 +18,16 @@ export const meta = {
 // it as `args`; this keeps orchestration resumable and the token cost bounded.
 // ---------------------------------------------------------------------------
 
-const unit = (args && args.unit) || 'UNSPECIFIED'
-const paths = (args && args.paths) || ''
-const focusNote = (args && args.focusNote) || ''
+// Robustness: the harness may deliver `args` as an already-parsed object OR as a JSON-encoded STRING
+// (observed 2026-07-08 — the first run got a string and silently fell back to UNSPECIFIED/empty scope).
+// Normalize both so the unit is always scoped correctly.
+let A = args
+if (typeof A === 'string') { try { A = JSON.parse(A) } catch (e) { A = {} } }
+A = A || {}
+
+const unit = A.unit || 'UNSPECIFIED'
+const paths = A.paths || ''
+const focusNote = A.focusNote || ''
 
 // Default review dimensions. Override per unit via args.dimensions (array of {key,prompt}).
 const DEFAULT_DIMENSIONS = [
@@ -31,7 +38,7 @@ const DEFAULT_DIMENSIONS = [
   { key: 'resource-perf', prompt: 'leaks, retain cycles, unbounded growth, main-thread blocking work, O(n^2)/whole-collection re-computation on hot paths (e.g. per-keystroke), file handles / tasks not released' },
   { key: 'robustness', prompt: 'API misuse and fragile assumptions: force-try, unhandled throws, URL/regex/date/JSON misuse, assumptions about ordering/presence, missing timeouts/cancellation, silent catch-all' },
 ]
-const dimensions = (args && args.dimensions) || DEFAULT_DIMENSIONS
+const dimensions = A.dimensions || DEFAULT_DIMENSIONS
 
 const FINDINGS_SCHEMA = {
   type: 'object',
