@@ -112,9 +112,27 @@ enum LibrarySort {
     /// sort LAST regardless of direction; a final filename/path tiebreak makes the order stable.
     static func sorted(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {
         guard !descriptors.isEmpty else { return files }
+
+        // Schwartzian: pre-compute expensive subjects sort keys once, not per-comparison.
+        var subjectsCache = [URL: String]()
+        if descriptors.contains(where: { $0.field == .subjects }) {
+            subjectsCache.reserveCapacity(files.count)
+            for f in files {
+                if let key = subjectsKey(f) { subjectsCache[f.url] = key }
+            }
+        }
+
         return files.sorted { a, b in
             for d in descriptors {
-                switch rank(a, b, d) {
+                let r: ComparisonResult
+                if d.field == .subjects {
+                    r = nilLast(subjectsCache[a.url], subjectsCache[b.url]) {
+                        dir($0.localizedStandardCompare($1), d.ascending)
+                    }
+                } else {
+                    r = rank(a, b, d)
+                }
+                switch r {
                 case .orderedAscending: return true
                 case .orderedDescending: return false
                 case .orderedSame: continue
