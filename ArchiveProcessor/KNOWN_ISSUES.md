@@ -314,3 +314,20 @@ applied in copy-source mode).
 **Fix:** replaced the bare `nonisolated(unsafe) static var` with an `OSAllocatedUnfairLock`-backed computed
 property — same `Bool` get/set interface, zero call-site changes. The lock guarantees the MainActor write is
 visible to any detached-task reader. (`Tagging/MacOSTagger.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): idle-connection leak in `CaptureServer`  [MEDIUM — resource leak]
+
+**Status:** FIXED. `CaptureServer.handle(_:)` started an `NWConnection` and entered the `readRequest` loop,
+but if the remote peer never sent data (or sent only partial data and stalled), the connection was never
+cancelled — leaking its file descriptor, receive buffers, and associated Network.framework state for the
+process lifetime. Over a long Live Capture session with network churn (port scans, half-open TCP connects,
+or a phone that opens a connection then loses Wi-Fi), this could accumulate leaked FDs and memory.
+
+**Fix:** added a 30-second idle timeout (`DispatchWorkItem` on the serial `queue`). If no complete HTTP
+request arrives within the deadline, the connection is cancelled. The timeout is cancelled on every terminal
+path (successful parse, error, too-large, bad request) so well-behaved clients are unaffected. The timeout
+work item captures the connection weakly to avoid preventing deallocation. All dispatch happens on the same
+serial queue, so there is no race between the timeout and the receive callback.
+(`Net/CaptureServer.swift`.)

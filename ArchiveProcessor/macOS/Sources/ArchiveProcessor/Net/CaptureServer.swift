@@ -93,9 +93,19 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
 
     // MARK: - Connection handling
 
+    /// How long a connection may remain idle (no complete request received) before we cancel it.
+    /// 30 s is generous for a single-request-per-connection protocol over LAN/USB.
+    private static let connectionTimeoutSeconds: Int = 30
+
     private func handle(_ conn: NWConnection) {
         conn.start(queue: queue)
-        readRequest(conn, buffer: Data())
+
+        // Schedule an idle timeout — if no complete request arrives within the deadline,
+        // cancel the connection so it doesn't leak an FD + buffers for the process lifetime.
+        let timeout = DispatchWorkItem { [weak conn] in conn?.cancel() }
+        queue.asyncAfter(deadline: .now() + .seconds(Self.connectionTimeoutSeconds), execute: timeout)
+
+        readRequest(conn, buffer: Data(), timeout: timeout)
     }
 
     /// Max bytes we will buffer for a single request — a hard cap so a rogue/oversized upload
@@ -103,29 +113,34 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private static let maxRequestBytes = 64 * 1024 * 1024   // 64 MB
 
     /// Accumulate bytes until the full request (headers + Content-Length body) is available.
-    private func readRequest(_ conn: NWConnection, buffer: Data) {
+    private func readRequest(_ conn: NWConnection, buffer: Data, timeout: DispatchWorkItem) {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
-            guard let self else { conn.cancel(); return }
+            guard let self else { timeout.cancel(); conn.cancel(); return }
             var buffer = buffer
             if let data { buffer.append(data) }
 
             if buffer.count > Self.maxRequestBytes {
+                timeout.cancel()
                 self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
                 return
             }
 
             switch Self.tryParse(buffer) {
             case .parsed(let parsed):
+                timeout.cancel()
                 self.process(parsed, on: conn)
             case .tooLarge:
+                timeout.cancel()
                 self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
             case .bad:
+                timeout.cancel()
                 self.respond(conn, status: "400 Bad Request", json: ["error": "malformed request"])
             case .need:
                 if error != nil || isComplete {
+                    timeout.cancel()
                     self.respond(conn, status: "400 Bad Request", json: ["error": "incomplete request"])
                 } else {
-                    self.readRequest(conn, buffer: buffer)   // need more bytes
+                    self.readRequest(conn, buffer: buffer, timeout: timeout)   // need more bytes
                 }
             }
         }
