@@ -81,6 +81,18 @@ real corpus).
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 
 ## Docs & backlog convention
+
+**Definition of done — the docs move with the code, in the *same commit* (never a follow-up).** A change is
+not done until the trackers match reality:
+- flip the shipped item's `SUITE_TODO.md` checkbox to `[x]` (cite the commit) and add/close any
+  `KNOWN_ISSUES.md` entry — **in the same commit as the code**, not "later";
+- delete a shipped `execution-plans/` plan.
+
+`SUITE_TODO.md` is the **tracker of record.** An unattended/overnight run must **reconcile it before it
+ends**; a private plan/progress file (e.g. an overnight plan) never stands in for it — sync the real
+tracker, not just your scratch notes. **The owner should never have to catch a stale checkbox** — doc-sync
+is part of the change, full stop.
+
 Three tiers, so nothing sprawls or goes stale:
 - **Near-term work → `SUITE_TODO.md`** (root) — the single live to-do queue; it also **indexes the active execution plans** (below).
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.

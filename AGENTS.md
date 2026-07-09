@@ -17,6 +17,11 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
   almost always unnecessary (see the token‑efficiency directive in [`CLAUDE.md`](CLAUDE.md)).
 - **Never** write to a real corpus during dev/test (copy to scratchpad); **never** add a tag‑write call
   outside Reader's audited `TagWriter`, or any move/rename/delete/content‑write call anywhere.
+- **Done = code + docs in the *same commit*.** Ship a `SUITE_TODO.md` item → flip its checkbox (cite the
+  commit); fix/find a bug → update `KNOWN_ISSUES.md`; ship an `execution-plans/` plan → delete it.
+  `SUITE_TODO.md` is the tracker of record — an unattended run reconciles it *before ending*, never leaning
+  on a private plan file. The owner shouldn't have to catch a stale tracker. (Full rule:
+  [`CLAUDE.md`](CLAUDE.md) → "Docs & backlog convention.")
 
 ## Ownership lanes (safe to run in parallel)
 

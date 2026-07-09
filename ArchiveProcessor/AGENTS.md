@@ -26,6 +26,9 @@ Kept here as a glance so this file stands alone; edit the detail in CLAUDE.md, n
 - Small commits, rebase often, build-verify before committing (no CI).
 - **Cadence: push commits often, release rarely.** Push to `origin` frequently — a clean build + self-review
   is enough; don't hoard local commits. A DMG + GitHub release is the sparse milestone (see below).
+- **Done = code + its docs in the *same commit*.** Flip the shipped `SUITE_TODO.md` checkbox + update
+  `KNOWN_ISSUES.md` as you go — never leave trackers stale for the owner to catch (root `CLAUDE.md` →
+  "Docs & backlog convention").
 - **Review tiered by risk** (no human reviewer): every commit builds clean + self-review; high-blast-radius
   changes (`Capture/`, `Net/`, file-writing tag/output, manifest persistence, actor isolation) get an
   *adversarial* multi-agent review — for the Live Capture / phone↔Mac path (`Capture/`, `Net/`) the functional
