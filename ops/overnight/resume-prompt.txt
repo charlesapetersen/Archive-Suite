@@ -1,0 +1,55 @@
+You are a fresh, autonomous maintenance session for the Archive Suite monorepo at
+"/Users/<user>/Desktop/Claude/Archive Suite". The owner authorized an unattended overnight run and is asleep —
+do NOT wait for input; if something genuinely needs a human, append it to the Morning Review list and move
+on. Work resiliently: do ONE bounded item, verify it, commit+push, then STOP so the next fresh session
+continues. Fresh resumes are intentional — never try to do everything in one session.
+
+STEP 1 — RECOVER STATE (always, first):
+  cd "/Users/<user>/Desktop/Claude/Archive Suite"
+  git fetch origin && git pull --rebase origin main
+  Read, in full, ".maintenance/OVERNIGHT_PLAN.md". It is the single source of truth: PRIME DIRECTIVES,
+  RESUME PROTOCOL, and the WORK QUEUE. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
+  If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
+
+STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
+  loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
+
+STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (also in the plan):
+  * NEVER write to a real corpus — scratch/TESTOUT/mktemp output only. File safety beats getting it done.
+  * Work in your OWN fresh git worktree, never the primary checkout:
+        stamp="$(date +%Y%m%d-%H%M%S)-$$"
+        git worktree add "../suite-wt-$stamp" -b "wt/overnight-$stamp"
+        cd "../suite-wt-$stamp" && xcodegen ... (per the app) before building.
+    Use per-worktree DerivedData (./build/DD). Confirm you are in your OWN worktree before editing.
+  * NEVER --force past a git/tool refusal (worktree remove, reset --hard, clean, branch -D). A refusal =
+    STOP + investigate + log to Morning Review. Dirty files may be a parallel session's work — do not destroy.
+  * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
+    adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
+  * Build must be clean with NO new warnings; run the touched app's smoke test.
+
+STEP 4 — SHIP: in your worktree, `git pull --rebase origin main`, then commit + push. The commit MUST also
+  flip the shipped SUITE_TODO.md checkbox (cite the sha) and/or update the relevant KNOWN_ISSUES.md IN THE
+  SAME COMMIT (a Stop hook blocks the turn otherwise). If the change ships no tracked item (infra/mid-feature),
+  run `touch .claude/.docsync-ok` before finishing. End the commit message with:
+      Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+  Push commits freely; do NOT cut a DMG/GitHub release (that's owner-gated).
+
+STEP 5 — RECORD + CLEAN UP: tick the item in .maintenance/OVERNIGHT_PLAN.md ([x] + sha + one-line result),
+  append to its Session Log, and append anything owner-needed to Morning Review. Remove your worktree only if
+  it is clean (`git worktree remove "../suite-wt-$stamp"`); if git refuses, leave it and log to Morning Review.
+  If you just finished the LAST "[ ]" item in the whole queue, set the plan's "RUN STATUS:" line to COMPLETE.
+
+STEP 6 — STOP. Do not pick up a second item.
+
+ITEM-SPECIFIC NOTES:
+  * Wave 1 E2E: run `caffeinate -di "/Users/<user>/Desktop/Claude/Archive Suite/ArchiveProcessor/scripts/e2e-phone-mac.sh"`.
+    The OCR key is exported as $OCR_KEY (from ~/.local/state/archive-overnight/ocr-key.env); if that's empty,
+    the harness falls back to the Keychain. Artifacts land in /tmp/ap-e2e-*. Copy REPORT.txt + the tail of
+    mac.log into the plan's "E2E findings" section and turn each failure into a W1.x fix item. Fixing E2E bugs
+    in Capture/·Net/ is Tier-2.
+  * Wave 3 review: run the paced method in REVIEW.md — ONE unit via
+    Workflow({name:'lean-review', args:{unit, paths}}), write .maintenance/review/<unit>.md, triage confirmed
+    findings, mark the unit done in .maintenance/REVIEW_PROGRESS.md. Never run the retired 15-finder monolith.
+
+Efficiency: right-size subagents, read narrowly, keep this session lean — the goal is one solid committed
+increment, not maximal output.

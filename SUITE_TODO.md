@@ -2,7 +2,9 @@
 
 The **near-term** to-do queue for both apps (see root `CLAUDE.md` §Docs & backlog convention). Long-term
 ideas live in each app's `POTENTIAL_FEATURES.md`; detailed in-flight plans live in `execution-plans/`
-(indexed below, deleted when shipped). Heavy overnight audit: `.maintenance/OVERNIGHT_QUEUE.md`.
+(indexed below, deleted when shipped). Full-codebase review: the paced method in `REVIEW.md`. Unattended /
+overnight runs: `ops/overnight/README.md` (durable plan → self-resume daemon), which drains this queue one
+bounded item per fresh session.
 Paths repo-root-relative; Reader source = `ArchiveReader/ArchiveReader/Sources/ArchiveReader/`,
 Processor source = `ArchiveProcessor/ArchiveProcessor/Sources/ArchiveProcessor/`.
 

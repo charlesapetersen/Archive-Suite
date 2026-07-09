@@ -16,7 +16,10 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
 2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test.
 3. **Review by risk** — Tier-2 (adversarial review + a functional test) for anything with **no undo**:
    `Capture/`·`Net/`, file-writing tag/output, manifest/finalize, actor isolation, or the tag/PDF SPEC.
-   Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*.
+   Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*. For a
+   **full-codebase review**, use the paced method in [`REVIEW.md`](REVIEW.md) — one subsystem per session,
+   lean fan-out, refute-verify; **never** one giant fan-out (it blows a usage window). Use the `/code-review`
+   skill for the working diff.
 4. **Docs move with the code — in the SAME commit** (→ *Docs & backlog convention*, below): flip the
    shipped `SUITE_TODO.md` checkbox, update `KNOWN_ISSUES.md`, delete a shipped `execution-plans/` plan.
    `SUITE_TODO.md` is the tracker of record; an unattended run reconciles it **before it ends**.
@@ -26,6 +29,11 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
 
 The sections below are the depth behind these steps. **The owner should never have to catch a skipped one**
 (a doc-sync backstop hook enforces step 4 — see `.claude/hooks/`).
+
+**Unattended / overnight runs** follow the same loop, one bounded item per fresh session, off a durable plan
+that survives usage cutoffs — see [`ops/overnight/README.md`](ops/overnight/README.md) (L0 durable plan → L1
+self-resume daemon → L2 resume prompt), with the paced review in [`REVIEW.md`](REVIEW.md). Never run such a
+session with `--dangerously-skip-permissions`; use `--permission-mode default` + a scoped allow/deny list.
 
 ## Worktree-first — mandatory before any edit (every agent & instance)
 
