@@ -11,6 +11,8 @@ struct ConnectScreen: View {
     @State private var port = ""
     @State private var token = ""
     @State private var manualError: String?
+    @State private var driveSignInError: String?
+    @State private var signingIn = false
 
     private var isConnecting: Bool {
         if case .connecting = vm.connectPhase { return true }
@@ -50,6 +52,9 @@ struct ConnectScreen: View {
                 .padding(.top, 6)
             }
             .padding(.horizontal)
+
+            driveSection
+
             Spacer()
         }
         .sheet(isPresented: $showScanner) {
@@ -118,6 +123,44 @@ struct ConnectScreen: View {
         Task {
             await vm.connect(host: host.trimmingCharacters(in: .whitespaces), port: p,
                              token: token.trimmingCharacters(in: .whitespaces))
+        }
+    }
+
+    // MARK: - Google Drive cloud relay
+
+    /// Sign-in / status section for the Google Drive cloud relay. When signed in, the phone can reach
+    /// the Mac through Drive even when LAN is blocked (public/guest Wi-Fi). The QR must carry a `relay`
+    /// token (Mac signed into Drive + session active) for it to activate.
+    @ViewBuilder private var driveSection: some View {
+        VStack(spacing: 8) {
+            Divider().padding(.horizontal)
+            if vm.driveAuth.isSignedIn {
+                Label("Google Drive relay ready", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green).font(.callout)
+                Button("Sign out of Google Drive", role: .destructive) { vm.driveAuth.signOut() }
+                    .font(.caption)
+            } else {
+                Text("On a network that blocks device-to-device? Sign in to Google Drive to relay through the cloud.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                Button {
+                    signingIn = true
+                    driveSignInError = nil
+                    Task {
+                        let result = await vm.driveAuth.signIn()
+                        signingIn = false
+                        if !result.success { driveSignInError = result.error }
+                    }
+                } label: {
+                    Label("Sign in to Google Drive", systemImage: "cloud").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered).padding(.horizontal)
+                .disabled(signingIn)
+                if signingIn { ProgressView().controlSize(.small) }
+                if let driveSignInError {
+                    Text(driveSignInError).foregroundStyle(.red).font(.caption).padding(.horizontal)
+                }
+            }
         }
     }
 }

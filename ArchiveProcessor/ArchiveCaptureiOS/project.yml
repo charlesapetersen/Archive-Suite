@@ -36,3 +36,8 @@ targets:
         NSLocalNetworkUsageDescription: "Used to connect to the Archive Processor Mac app on your local network to send captured photos."
         NSBonjourServices: ["_archivecap._tcp"]   # must match the Mac's advertised type (CaptureServer.swift)
         ITSAppUsesNonExemptEncryption: false
+        # Google OAuth redirect — reversed client-ID scheme. Replace the placeholder when the real
+        # iOS OAuth client is created in GCP project YOUR_GCP_PROJECT.
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: ["com.googleusercontent.apps.YOUR_GCP_PROJECT-REPLACE_WITH_IOS_CLIENT_ID"]
+            CFBundleURLName: "Google OAuth Redirect"

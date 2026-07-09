@@ -55,17 +55,42 @@ final class CaptureViewModel: ObservableObject {
     private let store = SessionStore()
     private let sessionDir: URL
     let deviceName = UIDevice.current.name
+    let driveAuth = DriveAuth()
+
+    /// Which transport the phone is using to reach the Mac.
+    enum TransportMode: String { case lan, drive }
+    @Published private(set) var transportMode: TransportMode = .lan
 
     private static let endpointKey = "macEndpoint"
+    private static let transportModeKey = "transportMode"
 
     init() {
         sessionDir = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
                       ?? FileManager.default.temporaryDirectory).appendingPathComponent("capture", isDirectory: true)
         try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         endpoint = Self.loadEndpoint()
-        client = endpoint.map { MacClient(endpoint: $0) }
+        transportMode = TransportMode(rawValue: UserDefaults.standard.string(forKey: Self.transportModeKey) ?? "") ?? .lan
+        client = endpoint.map { Self.makeTransport(endpoint: $0, mode: transportMode, driveAuth: driveAuth) }
         restore()
         startAutoRetry()
+    }
+
+    /// Build the appropriate transport for the current mode.
+    private static func makeTransport(endpoint: MacEndpoint, mode: TransportMode, driveAuth: DriveAuth) -> any SegmentTransport {
+        if mode == .drive, let relay = endpoint.relay {
+            return DriveRelayTransport(client: DriveClient(token: { try driveAuth.accessTokenBlocking() }), token: relay)
+        }
+        return MacClient(endpoint: endpoint)
+    }
+
+    /// Switch transport mode (LAN vs Drive). Persists the choice and re-creates the client.
+    func setTransportMode(_ mode: TransportMode) {
+        transportMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.transportModeKey)
+        if let ep = endpoint {
+            client = Self.makeTransport(endpoint: ep, mode: mode, driveAuth: driveAuth)
+            resumeUploads()
+        }
     }
 
     private static func newGroupId() -> String { "g" + UUID().uuidString.prefix(8) }
@@ -91,12 +116,29 @@ final class CaptureViewModel: ObservableObject {
         switch await MacClient(endpoint: ep).reachability() {
         case .ok:
             endpoint = ep
-            client = MacClient(endpoint: ep)
+            // Auto-select Drive transport when the QR carries a relay token and the user is signed in.
+            if ep.relay != nil && driveAuth.isSignedIn { transportMode = .drive }
+            else { transportMode = .lan }
+            UserDefaults.standard.set(transportMode.rawValue, forKey: Self.transportModeKey)
+            client = Self.makeTransport(endpoint: ep, mode: transportMode, driveAuth: driveAuth)
             Self.saveEndpoint(ep)
-            statusMessage = ""   // connection status is owned by the endpoint-bound header; don't duplicate it here
+            statusMessage = ""
             connectPhase = .idle
             resumeUploads()
-        case .unreachable:  connectPhase = .unreachable(host: ep.host, port: ep.port)
+        case .unreachable:
+            // LAN unreachable but the QR has a relay token + user signed in → try Drive directly.
+            if ep.relay != nil && driveAuth.isSignedIn {
+                endpoint = ep
+                transportMode = .drive
+                UserDefaults.standard.set(transportMode.rawValue, forKey: Self.transportModeKey)
+                client = Self.makeTransport(endpoint: ep, mode: .drive, driveAuth: driveAuth)
+                Self.saveEndpoint(ep)
+                statusMessage = "Using Google Drive relay (LAN unreachable)"
+                connectPhase = .idle
+                resumeUploads()
+            } else {
+                connectPhase = .unreachable(host: ep.host, port: ep.port)
+            }
         case .refused:      connectPhase = .refused(host: ep.host, port: ep.port)
         case .unauthorized: connectPhase = .unauthorized(host: ep.host, port: ep.port)
         }
