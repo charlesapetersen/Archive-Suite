@@ -31,8 +31,10 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private static let preferredPort: UInt16 = 48627
 
     func start() {
-        guard listener == nil else { return }   // already listening/starting — don't leak a second NWListener
-        startListening(on: Self.preferredPort)
+        queue.async { [self] in
+            guard self.listener == nil else { return }   // already listening/starting — don't leak a second NWListener
+            self.startListening(on: Self.preferredPort)
+        }
     }
 
     private func startListening(on port: UInt16?) {
@@ -87,8 +89,10 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        queue.async { [self] in
+            self.listener?.cancel()
+            self.listener = nil
+        }
     }
 
     // MARK: - Connection handling

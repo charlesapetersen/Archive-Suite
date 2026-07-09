@@ -331,3 +331,18 @@ path (successful parse, error, too-large, bad request) so well-behaved clients a
 work item captures the connection weakly to avoid preventing deallocation. All dispatch happens on the same
 serial queue, so there is no race between the timeout and the receive callback.
 (`Net/CaptureServer.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): data race on `CaptureServer.listener` between `stop()` and `retryWithSystemPort()`  [HIGH — concurrency]
+
+**Status:** FIXED. The class comment claimed `listener` is "only touched on the serial `queue`," but
+`start()` and `stop()` accessed it directly from whatever thread called them (typically `@MainActor` via
+`CaptureSession`), while `retryWithSystemPort()` ran on `self.queue` from the NWListener state callback.
+A MainActor call to `stop()` concurrent with a queue-dispatched `retryWithSystemPort()` was an unsynchronized
+read/write on the same mutable property.
+
+**Fix:** `start()` and `stop()` now dispatch their `listener` access onto `self.queue`, making the class
+comment true — all `listener` reads and writes serialize on the single serial queue. Both methods are
+fire-and-forget from the caller's perspective (no return value, no completion), so the async dispatch is
+transparent. (`Net/CaptureServer.swift`.)
