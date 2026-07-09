@@ -244,9 +244,14 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             let year = (req.headers["x-year"]).flatMap { Int($0) }
             let month = (req.headers["x-month"]).flatMap { Int($0) }
             // Optional: the reclassify chain (SPEC A3) — comma-joined prior group ids whose (group, seq)
-            // copies the Mac should tombstone. Each id is validated individually.
-            let replacesChain: [String] = (req.headers["x-replaces"])
-                .map { $0.split(separator: ",").map(String.init).filter { CaptureValidation.isSafeGroupId($0) } } ?? []
+            // copies the Mac should tombstone. Reject if any id is unsafe (matches FileRelayReceiver).
+            let rawReplaces: [String] = (req.headers["x-replaces"])
+                .map { $0.split(separator: ",").map(String.init).filter { !$0.isEmpty } } ?? []
+            guard rawReplaces.allSatisfy({ CaptureValidation.isSafeGroupId($0) }) else {
+                respond(conn, status: "400 Bad Request", json: ["error": "unsafe id in X-Replaces chain"])
+                return
+            }
+            let replacesChain = rawReplaces
             let jpeg = req.body
             Task { @MainActor [weak self] in
                 let url = self?.session?.ingest(jpeg: jpeg, groupId: groupId, seq: seq, type: type,
