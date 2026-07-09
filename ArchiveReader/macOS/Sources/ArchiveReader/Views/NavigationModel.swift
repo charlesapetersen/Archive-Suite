@@ -400,14 +400,15 @@ final class NavigationModel: ObservableObject {
     private func libraryDidChange() {
         let files = library.files
         let ps = LibraryChangeSignature.paths(files)
-        if ps != pathsSig { pathsSig = ps; folderTree = buildFolderTree() }         // paths → folder tree
+        let pathsChanged = ps != pathsSig
+        if pathsChanged { pathsSig = ps; folderTree = buildFolderTree() }            // paths → folder tree
         let ss = LibraryChangeSignature.subjects(files)
         if ss != subjectsSig { subjectsSig = ss; refreshSubjectsCache() }            // subjects → autocomplete
         let ms = LibraryChangeSignature.matchFacets(files)
         if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
         recompute()                                     // always — a row's read-state/tags may have moved it
         indexer.startIndexing(files)                    // incremental; no-op if running
-        refreshFormatStatuses()                         // fold in already-known detection flags for the new set
+        if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
     }
 
