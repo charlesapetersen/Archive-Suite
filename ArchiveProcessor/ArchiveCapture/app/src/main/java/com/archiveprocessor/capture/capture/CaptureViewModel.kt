@@ -373,10 +373,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val i = items.indexOfFirst { it.id == id }
         if (i >= 0) {
             val oldGroupId = items[i].groupId
-            // Persist the drop-old-copy target on the item so retry / resume / autoRetry all keep sending
-            // X-Replaces until the reclassify lands (not just the first attempt).
+            // Build the full reclassify chain (SPEC A3): G→H→I carries "G,H" so the Mac tombstones
+            // every prior group, not just the immediate predecessor. Append the old group to any
+            // existing chain. Persisted on the item so retry/resume/autoRetry keep sending it.
+            val chain = items[i].replacesGroupId?.let { "$it,$oldGroupId" } ?: oldGroupId
             val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null,
-                state = UploadState.PENDING, replacesGroupId = oldGroupId)
+                state = UploadState.PENDING, replacesGroupId = chain)
             items[i] = updated
             clearSelection()
             persist()

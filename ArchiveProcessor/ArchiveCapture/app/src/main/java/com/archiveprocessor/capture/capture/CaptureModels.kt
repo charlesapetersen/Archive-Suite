@@ -19,9 +19,9 @@ data class CapturedItem(
     val year: Int? = null,
     val month: Int? = null,
     val state: UploadState = UploadState.PENDING,
-    // When this photo was reclassified into a new group, the old group whose (oldGroup, seq) copy the
-    // Mac should drop (X-Replaces). Stored on the item so EVERY retry/resume re-sends it until it lands —
-    // not just the first attempt — otherwise a failed first upload leaves a stray old copy. Mirrors iOS.
+    // The full comma-joined reclassify chain (SPEC A3): if a page goes G→H→I, this is "G,H" so the
+    // Mac tombstones every prior group. Stored on the item so EVERY retry/resume re-sends it until it
+    // lands — not just the first attempt — otherwise a failed first upload leaves a stray old copy.
     val replacesGroupId: String? = null,
     // A field changed (per-page P10 toggle, or a reclassify) WHILE this item's upload was in flight, so the
     // bytes/headers already sent are stale. The upload-completion handler honors this by re-sending with the

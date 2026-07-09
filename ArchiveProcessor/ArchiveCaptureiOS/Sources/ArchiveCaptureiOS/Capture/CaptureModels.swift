@@ -16,9 +16,9 @@ struct CapturedItem: Identifiable, Codable, Equatable {
     var year: Int? = nil
     var month: Int? = nil
     var state: UploadState = .pending
-    // When this photo was reclassified into a new group, the group whose (oldGroup, seq) copy the Mac
-    // should drop (X-Replaces). Stored on the item so EVERY retry/resume re-sends it until it lands —
-    // not just the first attempt — otherwise a failed first upload leaves a stray copy on the Mac.
+    // The full comma-joined reclassify chain (SPEC A3): if a page goes G→H→I, this is "G,H" so the
+    // Mac tombstones every prior group. Stored on the item so EVERY retry/resume re-sends it until it
+    // lands — not just the first attempt — otherwise a failed first upload leaves a stray copy on the Mac.
     var replacesGroupId: String? = nil
     // A field changed (per-page P10 toggle, or a reclassify) WHILE this item's upload was in flight, so the
     // bytes/headers already sent are stale. The upload-completion handler honors this by re-sending with the

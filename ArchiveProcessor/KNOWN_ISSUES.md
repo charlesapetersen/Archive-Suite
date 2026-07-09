@@ -263,8 +263,14 @@ un-filed (straggler) page** in the backup folder + Captured pane. No page is eve
 
 ## Cloud/relay: reclassify a page whose original document group already finalized → duplicate output  [MEDIUM — relay-amplified]
 
-**Status:** deferred (2026-07-06), from the FileRelay design adversarial review (hole H10, see
-`../SPEC/relay-object-format.md` A11). Fix scoped to the Drive milestone.
+**Status:** partially mitigated (2026-07-09); post-finalize race remains deferred to Drive milestone.
+
+**Partial fix (2026-07-09):** the `replaces` reclassify chain divergence is fixed — both iOS and Android
+now **append** the old group to the existing chain (SPEC A3: `"G,H"` not just `"H"`), and the Mac's HTTP
+receiver (`CaptureServer`) now splits the comma-joined chain and tombstones each prior group individually
+(matching `FileRelayReceiver`). A chained reclassify G→H→I no longer strands G. The **post-finalize race**
+(A11: reclassify after the original group is already staged/finalized → `removePhotoIfSafe` no-ops) remains
+deferred — see below.
 
 `removePhotoIfSafe` no-ops when the old group `isFinalized` (`CaptureSession.swift:231`). Over HTTP this is
 nearly unreachable (uploads are consumed immediately). With a **relay** (objects persist until the Mac drains

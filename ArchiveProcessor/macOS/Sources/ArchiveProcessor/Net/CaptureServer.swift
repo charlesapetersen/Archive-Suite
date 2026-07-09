@@ -6,7 +6,8 @@ import Network
 /// `POST /session/complete`. All requests must carry `Authorization: Bearer <session token>`.
 /// `POST /photo` header contract (body = raw JPEG): REQUIRED `X-Group` (must pass `isSafeGroupId`) and
 /// `X-Seq` (Int ≥ 0); OPTIONAL `X-Type` (CaptureGroupType rawValue, default `document`), `X-Device`,
-/// `X-Priority`, `X-Year`/`X-Month` (Int), and `X-Replaces` (a prior group id to drop; `isSafeGroupId`-checked).
+/// `X-Priority`, `X-Year`/`X-Month` (Int), and `X-Replaces` (comma-joined reclassify chain of prior group ids
+/// to tombstone, per SPEC A3; each id `isSafeGroupId`-checked individually).
 /// Same (group, seq) replaces idempotently. This contract is a shared hotspot — keep it in sync with the
 /// phones' `MacClient` (iOS `ArchiveCaptureiOS` + Android `ArchiveCapture`).
 /// One request per connection (responses set `Connection: close`); the phone opens a fresh
@@ -223,17 +224,18 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             let priority = (req.headers["x-priority"]).flatMap { $0.isEmpty ? nil : $0 }
             let year = (req.headers["x-year"]).flatMap { Int($0) }
             let month = (req.headers["x-month"]).flatMap { Int($0) }
-            // Optional: the group this upload replaces (phone reclassified an already-sent photo into a
-            // new group). After the new copy lands, drop the old (replacesGroup, seq) so it isn't orphaned.
-            let replacesGroup = (req.headers["x-replaces"]).flatMap {
-                $0.isEmpty || !CaptureValidation.isSafeGroupId($0) ? nil : $0
-            }
+            // Optional: the reclassify chain (SPEC A3) — comma-joined prior group ids whose (group, seq)
+            // copies the Mac should tombstone. Each id is validated individually.
+            let replacesChain: [String] = (req.headers["x-replaces"])
+                .map { $0.split(separator: ",").map(String.init).filter { CaptureValidation.isSafeGroupId($0) } } ?? []
             let jpeg = req.body
             Task { @MainActor [weak self] in
                 let url = self?.session?.ingest(jpeg: jpeg, groupId: groupId, seq: seq, type: type,
                                                 priority: priority, year: year, month: month, deviceName: device)
-                if url != nil, let replacesGroup, replacesGroup != groupId {
-                    self?.session?.removePhotoIfSafe(groupId: replacesGroup, seq: seq)
+                if url != nil {
+                    for rg in replacesChain where rg != groupId {
+                        self?.session?.removePhotoIfSafe(groupId: rg, seq: seq)
+                    }
                 }
                 self?.respond(conn, status: url != nil ? "200 OK" : "500 Internal Server Error",
                               json: ["ok": url != nil, "seq": seq])

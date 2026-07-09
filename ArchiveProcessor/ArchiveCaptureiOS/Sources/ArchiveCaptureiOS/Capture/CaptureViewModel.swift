@@ -269,8 +269,13 @@ final class CaptureViewModel: ObservableObject {
         items[i].groupId = Self.newGroupId()
         items[i].priority = nil
         items[i].state = .pending
-        // Persist the drop-old-copy target on the item so retry/resume/autoRetry all keep sending it.
-        items[i].replacesGroupId = oldGroupId
+        // Build the full reclassify chain (SPEC A3): G→H→I carries "G,H" so the Mac tombstones every
+        // prior group, not just the immediate predecessor. Append the old group to any existing chain.
+        if let existing = items[i].replacesGroupId {
+            items[i].replacesGroupId = "\(existing),\(oldGroupId)"
+        } else {
+            items[i].replacesGroupId = oldGroupId
+        }
         let updated = items[i]
         clearSelection()
         persist()
