@@ -409,3 +409,19 @@ Contrast with `postPhoto`, which correctly gates `true` on a Mac-written receipt
 `segmentComplete` and `sessionComplete` wrap the write in `do/try/catch` and return `false` on
 failure — triggering the caller's 3-attempt retry. `postPhoto` callers use `try?` on the write
 (receipt-wait is the true confirmation). (`Net/FileRelayTransport.swift`, `Net/DriveRelayTransport.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): iOS deleteItem has no upload-state guard — un-uploaded photos irrecoverably lost  [HIGH — data loss]
+
+**Status:** FIXED. `CaptureViewModel.deleteItem()` unconditionally deleted the local JPEG and removed the
+item from the model, regardless of upload state. If a photo was `.pending`, `.uploading`, or `.failed`
+(never confirmed on the Mac), the tap-to-delete cycle (select → arm → delete) permanently destroyed it
+with no confirmation and no recovery path.
+
+Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
+
+**Fix:** `deleteItem` now checks `items[i].state`: if `.uploaded`, delete immediately (the Mac has it);
+otherwise, set `pendingDeleteId` to trigger a destructive confirmation dialog ("This photo hasn't reached
+the Mac yet. Deleting it here loses it forever."). The user must explicitly confirm before an un-uploaded
+photo is removed. (`Capture/CaptureViewModel.swift`, `UI/CaptureScreen.swift`.)

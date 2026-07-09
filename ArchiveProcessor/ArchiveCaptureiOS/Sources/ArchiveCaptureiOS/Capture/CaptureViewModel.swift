@@ -34,6 +34,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var sentCount = 0
     @Published private(set) var transferFlash: String?
     @Published var captureError: String?   // set when a capture couldn't be written to disk (blocking alert)
+    @Published var pendingDeleteId: Int64? // set when deleting an un-uploaded item (confirmation dialog)
     @Published private(set) var connectPhase: ConnectPhase = .idle   // drives the pairing screen (P1)
 
     private var seqCounter = 0
@@ -253,10 +254,28 @@ final class CaptureViewModel: ObservableObject {
     }
 
     func deleteItem(_ id: Int64) {
-        if let i = items.firstIndex(where: { $0.id == id }) {
-            try? FileManager.default.removeItem(at: items[i].fileURL)
-            items.remove(at: i)
+        guard let i = items.firstIndex(where: { $0.id == id }) else { clearSelection(); return }
+        // If the photo hasn't been confirmed on the Mac, deleting it locally is irrecoverable.
+        // Show a destructive confirmation instead of silently discarding.
+        if items[i].state != .uploaded {
+            pendingDeleteId = id
+            return
         }
+        removeItem(at: i)
+    }
+
+    /// Actually remove an item (file + model). Called after confirmation for un-uploaded items.
+    func confirmDelete() {
+        guard let id = pendingDeleteId else { return }
+        pendingDeleteId = nil
+        if let i = items.firstIndex(where: { $0.id == id }) {
+            removeItem(at: i)
+        }
+    }
+
+    private func removeItem(at i: Int) {
+        try? FileManager.default.removeItem(at: items[i].fileURL)
+        items.remove(at: i)
         clearSelection()
         persist()
     }
