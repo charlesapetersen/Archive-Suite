@@ -79,7 +79,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 > on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
 
 - [x] **Owner-gated: live Google Drive end-to-end test — DONE 2026-07-07.** Android phone→Drive→Mac verified end-to-end (sign-in, single photo, multi-page segment + Mac tag card, Box/Folder markers, Finish; photo durable in the Mac session + backup folder). Fixes landed: `DriveError` legibility + `DriveAuth.init` whitespace-trim; console setup (Desktop client for Mac, Android client + SHA-1 + **Custom URI scheme enabled** for the phone) captured in the Processor CLAUDE.md Live Capture section. ✅
-- [ ] **iOS phone Drive relay: on-device OAuth + live E2E** (Android is done; the iOS `DriveRelayTransport` is built + mock-tested but has no on-device Google sign-in yet — mirror the Android AppAuth flow with `ASWebAuthenticationSession`, then verify on a device). | ArchiveCaptureiOS | needs: owner + iPhone | M
+- [ ] **iOS Drive-relay on-device OAuth — implement** (dev, near-term): mirror the Android AppAuth flow with `ASWebAuthenticationSession`; build + mock-test. iOS **development** continues here as normal. **On-device *testing* (the live phone→Drive→Mac E2E on a real iPhone) is deferred → `ArchiveProcessor/POTENTIAL_FEATURES.md`** per the policy "keep developing iOS, postpone iOS on-device testing" (owner 2026-07-08). | ArchiveCaptureiOS | M
 
 ## P3 — Suite structural  → detailed plan in `execution-plans/structural-refactor.md`
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅

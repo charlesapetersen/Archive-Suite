@@ -72,6 +72,19 @@ The v3.2.0 Live Capture wired mode uses `adb reverse`, which requires **USB debu
 
 ---
 
+## iOS on-device testing (deferred — long-term; needs an iPhone)
+**Policy (owner 2026-07-08): iOS *development* continues near-term as normal, but all iOS *on-device
+testing* is postponed to this long-term list** until an iPhone is available. Code + mock-test iOS freely;
+just don't gate near-term work on device verification. Deferred device checks:
+- **Drive-relay live E2E** — phone→Drive→Mac on a real iPhone (sign-in, single photo, multi-page segment +
+  Mac tag card, Box/Folder markers, Finish), mirroring the verified Android run. (The OAuth *implementation*
+  — `ASWebAuthenticationSession` — is tracked as near-term dev in `SUITE_TODO.md`; only its on-device
+  verification lives here.)
+- **Camera capture + full connect/capture UX** — the simulator has no camera, so real capture, pairing,
+  and the LAN / USB / cloud transports can only be verified on a physical device.
+
+---
+
 ## App-Store Distribution — Phase 4 (deferred)
 
 The distribution initiative is complete through **Phase 3**: guided
