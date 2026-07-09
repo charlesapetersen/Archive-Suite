@@ -75,7 +75,8 @@ struct DateCell: View {
             HStack {
                 Text("Year").frame(width: 44, alignment: .leading)
                 TextField("e.g. 1980", text: $yearText).frame(width: 90)
-                Button("Set") { model.applyEdit(.setYear(Int(yearText)), to: file) }
+                Button("Set") { if let y = Int(yearText), y > 0 { model.applyEdit(.setYear(y), to: file) } }
+                    .disabled(Int(yearText).map { $0 <= 0 } ?? true)
                 Button("Clear") { model.applyEdit(.setYear(nil), to: file); yearText = "" }
             }
             HStack {
@@ -88,7 +89,8 @@ struct DateCell: View {
             HStack {
                 Text("Day").frame(width: 44, alignment: .leading)
                 TextField("1–31", text: $dayText).frame(width: 60)
-                Button("Set") { model.applyEdit(.setDay(Int(dayText)), to: file) }
+                Button("Set") { if let d = Int(dayText), (1...31).contains(d) { model.applyEdit(.setDay(d), to: file) } }
+                    .disabled(Int(dayText).map { !(1...31).contains($0) } ?? true)
                 Button("Clear") { model.applyEdit(.setDay(nil), to: file); dayText = "" }
             }
             Toggle("Date uncertain (show year in italics)", isOn: uncertainBinding)
