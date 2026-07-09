@@ -14,7 +14,8 @@
 #   * script + CLAUDE live OUTSIDE ~/Desktop (TCC-protected) — a prior launchd attempt died with
 #     "Operation not permitted" exec'ing a script under Desktop.
 #
-# Runs as a detached loop (primary; start with: setsid nohup … & ) OR under launchd with KeepAlive.
+# Runs as a detached loop (primary; start with: ( nohup … >log 2>&1 & )  — macOS has no setsid) OR under
+# launchd with KeepAlive.
 # Self-terminates when the plan's "RUN STATUS:" line reads COMPLETE (a plain greppable line — no markdown).
 set -uo pipefail
 
@@ -39,6 +40,12 @@ DENY="Bash(sudo:*) Bash(launchctl:*) Bash(rm -rf:*) Bash(rm -fr:*) Bash(rm -r:*)
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# Children must be INDEPENDENT claude sessions, not NESTED. When this daemon is armed from an interactive
+# Claude session it inherits CLAUDECODE / CLAUDE_CODE_* / CLAUDE_EFFORT etc., and a child `claude -p` would
+# refuse to launch ("cannot be launched inside another Claude Code session"). The daemon needs none of them,
+# so scrub every CLAUDE* var from this process; children then inherit a clean env. (Keeps OCR_KEY etc.)
+for _v in $(env | sed -n 's/^\(CLAUDE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$_v"; done
 
 # Keep the machine awake for the daemon's whole lifetime (idle-sleep only; display may sleep).
 caffeinate -i -w "$$" &
@@ -72,14 +79,21 @@ tick() {
   set -a; [ -f "$STATE/env" ] && . "$STATE/env"; [ -f "$STATE/ocr-key.env" ] && . "$STATE/ocr-key.env"; set +a
 
   log "launching fresh resume session (timeout ${MAXRUN}s, budget \$$BUDGET)…"
-  ( cd "$REPO" && timeout "$MAXRUN" "$CLAUDE" -p "$(cat "$PROMPT")" \
+  cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
+  # Portable wall-clock timeout (macOS has no `timeout`/`gtimeout`): run claude in the background, and a
+  # watchdog TERM/KILLs it after MAXRUN. $cpid is claude's own pid (backgrounded directly, no subshell).
+  "$CLAUDE" -p "$(cat "$PROMPT")" \
       --permission-mode default \
       --model opus --fallback-model sonnet \
       --max-budget-usd "$BUDGET" \
       --allowedTools $ALLOW \
       --disallowedTools $DENY \
-      >> "$STATE/last-session.log" 2>&1 )
-  local rc=$?
+      >> "$STATE/last-session.log" 2>&1 &
+  local cpid=$!
+  ( sleep "$MAXRUN"; kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null ) &
+  local wpid=$!
+  wait "$cpid"; local rc=$?
+  kill "$wpid" 2>/dev/null; wait "$wpid" 2>/dev/null
   log "resume session exited rc=$rc"
 
   kill "$hb" 2>/dev/null || true

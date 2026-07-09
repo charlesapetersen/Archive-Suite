@@ -28,9 +28,10 @@ cp ops/overnight/archive-suite-overnight.sh ~/.local/bin/ && chmod +x ~/.local/b
 cp ops/overnight/resume-prompt.txt ~/.local/state/archive-overnight/
 ```
 
-**Primary (no launchctl, no owner needed) — a detached loop that inherits the current TCC context:**
+**Primary (no launchctl, no owner needed) — a detached loop that inherits the current TCC context.**
+macOS has **no `setsid`** — use a subshell + `nohup` to detach so it survives the parent shell:
 ```bash
-setsid nohup ~/.local/bin/archive-suite-overnight.sh >/dev/null 2>&1 &
+( nohup ~/.local/bin/archive-suite-overnight.sh >~/.local/state/archive-overnight/nohup.out 2>&1 & )
 ```
 
 **Reboot-durable option (owner-armed, once):** the detached daemon may lose `~/Desktop` access when its
