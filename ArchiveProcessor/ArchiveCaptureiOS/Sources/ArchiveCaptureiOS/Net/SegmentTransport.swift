@@ -19,7 +19,8 @@ protocol SegmentTransport {
                    replaces: String?) async -> Bool
 
     /// Signal that a document segment is complete and carry its tags (no image bytes). Idempotent.
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool
+    /// `seqs` = comma-joined page sequence numbers snapshotted at End-segment (SPEC A5).
+    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool
 
     /// Signal the capture session is finished (flush any still-open segment on the Mac).
     func sessionComplete() async -> Bool

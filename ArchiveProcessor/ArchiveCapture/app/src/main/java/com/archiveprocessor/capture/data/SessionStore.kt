@@ -15,7 +15,8 @@ class SessionStore(context: Context) {
 
     /** A document segment the operator has ended whose segment-complete signal the Mac hasn't acked yet.
      *  Persisted so an app-kill between End segment and the ack can't strand the document. */
-    data class EndedSeg(val group: String, val priority: String?, val year: Int?, val month: Int?)
+    data class EndedSeg(val group: String, val priority: String?, val year: Int?, val month: Int?,
+                        val seqs: String? = null)
 
     data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?,
                         val pendingTagGroupId: String?, val endedSegments: List<EndedSeg>)
@@ -47,6 +48,7 @@ class SessionStore(context: Context) {
                     e.priority?.let { v -> put("priority", v) }
                     e.year?.let { v -> put("year", v) }
                     e.month?.let { v -> put("month", v) }
+                    e.seqs?.let { v -> put("seqs", v) }
                 })
             }
             val root = JSONObject().apply {
@@ -109,7 +111,8 @@ class SessionStore(context: Context) {
                         group = o.getString("group"),
                         priority = if (o.has("priority")) o.getString("priority") else null,
                         year = if (o.has("year")) o.getInt("year") else null,
-                        month = if (o.has("month")) o.getInt("month") else null))
+                        month = if (o.has("month")) o.getInt("month") else null,
+                        seqs = if (o.has("seqs")) o.getString("seqs") else null))
                 }
             }
             Restored(items, root.optInt("seq", items.size), nextId,

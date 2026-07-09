@@ -10,6 +10,8 @@ struct SessionStore {
         var priority: String?
         var year: Int?
         var month: Int?
+        /// Comma-joined page seqs snapshotted at End-segment (SPEC A5). Optional for backward compat.
+        var seqs: String?
     }
 
     struct Snapshot: Codable {

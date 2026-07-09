@@ -68,12 +68,12 @@ struct DriveRelayTransport: SegmentTransport {
         return false   // timeout → .failed → auto-retry re-enters (re-resolves epoch); local copy retained
     }
 
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool {
+    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard let f = folderId(), let e = epoch(f) else { return false }
         do {
             try upsert(f, RelayObjectFormat.segmentName(group: group),
                    RelayObjectFormat.encodeSegment(token: token, epoch: e, group: group,
-                       priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil), "application/json")
+                       priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: seqs), "application/json")
             return true
         } catch { return false }
     }

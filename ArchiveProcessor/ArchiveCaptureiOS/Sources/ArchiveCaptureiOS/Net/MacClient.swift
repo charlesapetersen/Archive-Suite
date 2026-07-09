@@ -82,7 +82,7 @@ struct MacClient {
 
     /// End of a document segment: its pages already streamed in via `postPhoto`; this tells the Mac the
     /// group is complete (so its tag card can appear) and carries the segment's tags. No image bytes.
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool {
+    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard var req = makeRequest("/segment/complete", method: "POST") else { return false }
         req.setValue(group, forHTTPHeaderField: "X-Group")
         if let p = priority, !p.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -90,6 +90,7 @@ struct MacClient {
         }
         if let y = year { req.setValue(String(y), forHTTPHeaderField: "X-Year") }
         if let m = month { req.setValue(String(m), forHTTPHeaderField: "X-Month") }
+        if let s = seqs, !s.isEmpty { req.setValue(s, forHTTPHeaderField: "X-Seqs") }
         do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }

@@ -73,10 +73,10 @@ class FileRelayTransport(
         return false   // timeout → item stays FAILED → auto-retry re-enters at (a); local copy retained
     }
 
-    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean {
+    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?): Boolean {
         val epoch = currentEpoch() ?: return false
         writeAtomic(RelayObjectFormat.segmentName(group),
-            RelayObjectFormat.encodeSegment(token, epoch, group, priority, year?.toString(), month?.toString(), null))
+            RelayObjectFormat.encodeSegment(token, epoch, group, priority, year?.toString(), month?.toString(), seqs))
         return true
     }
 

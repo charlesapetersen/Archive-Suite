@@ -86,10 +86,10 @@ class DriveRelayTransport(
         return false   // timeout → item stays FAILED → auto-retry re-enters (re-resolves epoch); local copy retained
     }
 
-    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean {
+    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?): Boolean {
         val f = folderId() ?: return false; val e = epoch(f) ?: return false
         upsert(f, RelayObjectFormat.segmentName(group),
-            RelayObjectFormat.encodeSegment(token, e, group, priority, year?.toString(), month?.toString(), null), "application/json")
+            RelayObjectFormat.encodeSegment(token, e, group, priority, year?.toString(), month?.toString(), seqs), "application/json")
         return true
     }
 

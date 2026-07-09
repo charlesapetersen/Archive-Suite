@@ -45,7 +45,7 @@ final class CaptureViewModel: ObservableObject {
     /// force-completes any still-open group). A group's signal is emitted only once ALL its pages are
     /// confirmed uploaded (see `trySendSegmentComplete`) so the Mac can never complete a partial segment,
     /// and is retried until acked. Mirrors Android.
-    private struct SegTags { let priority: String?; let year: Int?; let month: Int? }
+    private struct SegTags { let priority: String?; let year: Int?; let month: Int?; let seqs: String? }
     private var endedSegments: [String: SegTags] = [:]
     /// Group ids whose completion signal is being sent right now, so the auto-retry loop, the
     /// upload-success hook, and resume can't fire the same one concurrently.
@@ -327,7 +327,10 @@ final class CaptureViewModel: ObservableObject {
             if items[i].state != .uploaded { enqueueUpload(items[i]) }
         }
         startNewGroup()                                    // gid is now finalized (differs from currentGroupId)
-        endedSegments[gid] = SegTags(priority: priority, year: year, month: month)
+        // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
+        let seqs = items.filter { $0.groupId == gid && $0.type == .document }
+            .map { String($0.seq) }.joined(separator: ",")
+        endedSegments[gid] = SegTags(priority: priority, year: year, month: month, seqs: seqs.isEmpty ? nil : seqs)
         persist()
         // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
         for item in items.filter({ $0.groupId == gid && $0.type == .document && $0.state == .uploaded }) {
@@ -350,7 +353,7 @@ final class CaptureViewModel: ObservableObject {
             defer { inFlightSegments.remove(group) }
             var ok = false, attempt = 0
             while !ok && attempt < 3 {
-                ok = await c.segmentComplete(group: group, priority: tags.priority, year: tags.year, month: tags.month)
+                ok = await c.segmentComplete(group: group, priority: tags.priority, year: tags.year, month: tags.month, seqs: tags.seqs)
                 attempt += 1
             }
             if ok { endedSegments[group] = nil; persist() }
@@ -550,7 +553,7 @@ final class CaptureViewModel: ObservableObject {
         if let g = snap.groupId { currentGroupId = g }
         // Restore segments ended-but-not-yet-acked so their completion signal is re-sent below (each still
         // gated on all its pages being uploaded), even across an app kill.
-        for e in snap.endedSegments ?? [] { endedSegments[e.group] = SegTags(priority: e.priority, year: e.year, month: e.month) }
+        for e in snap.endedSegments ?? [] { endedSegments[e.group] = SegTags(priority: e.priority, year: e.year, month: e.month, seqs: e.seqs) }
         // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone shows
         // only what still needs sending. EXCEPT document pages still in the current (un-ended) segment:
         // those streamed as shot but aren't tagged yet (tags apply at End segment), so keep them so the
@@ -574,7 +577,7 @@ final class CaptureViewModel: ObservableObject {
 
     private func persist() {
         let ended = endedSegments.map { SessionStore.EndedSeg(group: $0.key, priority: $0.value.priority,
-                                                              year: $0.value.year, month: $0.value.month) }
+                                                              year: $0.value.year, month: $0.value.month, seqs: $0.value.seqs) }
         store.save(.init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId,
                          pendingTagGroupId: pendingTagGroupId, endedSegments: ended))
     }

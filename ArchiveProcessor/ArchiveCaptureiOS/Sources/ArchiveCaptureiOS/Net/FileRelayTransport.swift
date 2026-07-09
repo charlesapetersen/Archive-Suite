@@ -66,12 +66,12 @@ struct FileRelayTransport: SegmentTransport {
         return false   // timeout → item stays .failed → auto-retry re-enters at (a); local copy retained
     }
 
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool {
+    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard let epoch = currentEpoch() else { return false }
         do {
             try writeAtomic(RelayObjectFormat.segmentName(group: group),
                         RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: group,
-                            priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: nil))
+                            priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: seqs))
             return true
         } catch { return false }
     }

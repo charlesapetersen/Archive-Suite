@@ -89,13 +89,14 @@ class MacClient(private val endpoint: MacEndpoint) : SegmentTransport {
 
     /** End of a document segment: pages already streamed in via postPhoto; this tells the Mac the group
      *  is complete (so its tag card can appear) and carries the segment's tags. No image bytes. */
-    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean = try {
+    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?): Boolean = try {
         val b = Request.Builder().url("${endpoint.baseUrl}/segment/complete")
             .header("Authorization", auth())
             .header("X-Group", group)
         if (!priority.isNullOrBlank()) b.header("X-Priority", priority)
         if (year != null) b.header("X-Year", year.toString())
         if (month != null) b.header("X-Month", month.toString())
+        if (!seqs.isNullOrEmpty()) b.header("X-Seqs", seqs)
         client.newCall(b.post(ByteArray(0).toRequestBody(null)).build()).execute().use { it.isSuccessful }
     } catch (e: Exception) {
         false

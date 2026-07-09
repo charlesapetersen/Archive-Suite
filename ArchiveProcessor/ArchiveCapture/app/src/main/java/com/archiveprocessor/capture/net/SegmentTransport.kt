@@ -22,8 +22,9 @@ interface SegmentTransport {
         replaces: String? = null
     ): Boolean
 
-    /** Signal that a document segment is complete and carry its tags (no image bytes). Idempotent. */
-    fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?): Boolean
+    /** Signal that a document segment is complete and carry its tags (no image bytes). Idempotent.
+     *  [seqs] = comma-joined page sequence numbers snapshotted at End-segment (SPEC A5). */
+    fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String? = null): Boolean
 
     /** Report how many photos are still un-sent on the phone (a heartbeat), so the Mac can tell the
      *  operator "the phone still has N photos to send" at Finish. Best-effort; the default is a no-op for

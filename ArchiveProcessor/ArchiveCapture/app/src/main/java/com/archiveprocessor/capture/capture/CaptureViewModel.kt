@@ -74,7 +74,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  force-completes any still-open group). A group's signal is emitted only once ALL its pages are
      *  confirmed uploaded (see [trySendSegmentComplete]) so the Mac can never complete a partial segment,
      *  and is retried until acked. Insertion-ordered so completions send in the order segments ended. */
-    private data class SegTags(val priority: String?, val year: Int?, val month: Int?)
+    private data class SegTags(val priority: String?, val year: Int?, val month: Int?, val seqs: String? = null)
     private val endedSegments = LinkedHashMap<String, SegTags>()
     /** Group ids whose completion signal is being sent right now, so the auto-retry loop, the
      *  upload-success hook, and resume can't fire the same one concurrently. */
@@ -103,7 +103,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             r.groupId?.let { currentGroupId = it }
             // Restore segments ended-but-not-yet-acked so their completion signal is re-sent below (each
             // still gated on all its pages being uploaded), even across an app kill.
-            r.endedSegments.forEach { endedSegments[it.group] = SegTags(it.priority, it.year, it.month) }
+            r.endedSegments.forEach { endedSegments[it.group] = SegTags(it.priority, it.year, it.month, it.seqs) }
             // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone
             // shows only what still needs sending. EXCEPT document pages still in the current (un-ended)
             // segment: those streamed as shot but aren't tagged yet (tags apply at End segment), so keep
@@ -145,7 +145,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private fun persist() {
         // trySend on a CONFLATED channel never blocks and always keeps the latest snapshot; the IO
         // consumer writes it near-immediately, preserving crash durability without main-thread disk I/O.
-        val ended = endedSegments.map { (g, t) -> SessionStore.EndedSeg(g, t.priority, t.year, t.month) }
+        val ended = endedSegments.map { (g, t) -> SessionStore.EndedSeg(g, t.priority, t.year, t.month, t.seqs) }
         saveChannel.trySend(SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId, ended))
     }
 
@@ -444,7 +444,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         startNewGroup()                     // gid is now finalized (differs from the new currentGroupId)
-        endedSegments[gid] = SegTags(priority, year, month)
+        // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
+        val seqs = items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT }
+            .joinToString(",") { it.seq.toString() }.ifEmpty { null }
+        endedSegments[gid] = SegTags(priority, year, month, seqs)
         persist()
         // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
         items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.UPLOADED }
@@ -471,7 +474,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 var ok = false; var attempt = 0
                 while (!ok && attempt < 3) {
-                    ok = withContext(Dispatchers.IO) { c.segmentComplete(group, tags.priority, tags.year, tags.month) }
+                    ok = withContext(Dispatchers.IO) { c.segmentComplete(group, tags.priority, tags.year, tags.month, tags.seqs) }
                     attempt++
                 }
                 if (ok) { endedSegments.remove(group); persist() }
