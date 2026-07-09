@@ -14,16 +14,11 @@ struct MacOSTagger {
         set { _stampUnread.withLock { $0 = newValue } }
     }
 
-    // Read macOS Finder tags from a file
-    static func readTags(from url: URL) -> [String] {
-        var tags: [String] = []
-        do {
-            let resourceValues = try url.resourceValues(forKeys: [.tagNamesKey])
-            tags = resourceValues.tagNames ?? []
-        } catch {
-            // Silently return empty if tags can't be read
-        }
-        return tags
+    // Read macOS Finder tags from a file. Throws on read failure so callers in the
+    // read→append→rewrite pattern bail instead of silently wiping existing tags with [].
+    static func readTags(from url: URL) throws -> [String] {
+        let resourceValues = try url.resourceValues(forKeys: [.tagNamesKey])
+        return resourceValues.tagNames ?? []
     }
 
     /// Apply macOS Finder tags to a file.

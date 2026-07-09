@@ -518,8 +518,7 @@ extension OCRProcessor {
                 if r.result.text == nil { failedFiles.append(r.sourceURL.lastPathComponent) }
                 outputURLMap[r.sourceURL] = r.outputURL
                 if passSourceTags {
-                    let sourceTags = MacOSTagger.readTags(from: r.sourceURL)
-                    if !sourceTags.isEmpty {
+                    if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
                         try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
                         jobs[r.index].appliedTags = sourceTags
                     }

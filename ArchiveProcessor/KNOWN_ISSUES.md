@@ -349,6 +349,36 @@ serial queue, so there is no race between the timeout and the receive callback.
 
 ---
 
+## ✅ FIXED (2026-07-09): review-sweep Tier-A batch — 7 file-safety / data-loss / SPEC fixes  [MED–HIGH]
+
+**Status:** FIXED. Found by the parallel review sweep (`.maintenance/review/sweep-raw-2026-07-09.md`),
+each verified against the actual code before fixing. All Tier-2 (adversarial review + build clean).
+
+1. **Merged-PDF overwrite-by-basename** (`OCRProcessor+Tagging.swift:785`): two multi-page segments sharing
+   a first-page source basename would overwrite each other's merged PDF (sources already deleted). Fix: name
+   the merged PDF after the dedup'd OUTPUT URL, not the raw source.
+2. **`try?`-swallowed PDF write error** (`OCRProcessor+OCR.swift:787`): `handleOCRResult` marked a job
+   `.succeeded` based on OCR text alone; a failed `PDFGenerator.generate` was invisible. Fix: `do/try/catch`;
+   on write failure mark `.failed` + log.
+3. **JSON-sidecar wrong-file rename** (`OCRProcessor+Tagging.swift:804`): the merge renamed JSON by the raw
+   source basename, not the dedup'd output name — moving the wrong file when output URLs were dedup'd. Fix:
+   derive the JSON path from the first output PDF.
+4. **`readTags` coerced read-failure → `[]`** (`MacOSTagger.swift:23`): the read→append→rewrite callers
+   (priority tags, image tag mirroring) would WIPE existing tags on a read failure. Fix: `readTags` now
+   `throws`; callers bail on error instead of writing empty tags.
+5. **Raw `applyTags` promoted subject "Red"/"Purple" to Finder color** (`MacOSTagger.swift:64`): the merge
+   path called the `[String]` overload without `colorIsAuthoritative`, so a subject tag "Red" was promoted to
+   a color label. Fix: derive the authoritative color from the job's classification.
+6. **Numeric month/day coercion** (`TagGenerator.swift:263`): `stringField` turned a JSON number `3` into
+   the bare string `"3"` — a SPEC-nonconforming month tag. Fix: normalize to "MM Month" / "Day N" format.
+7. **Free-text manual date tags** (`ManualTaggingSheet.swift:164`): user-typed bare month/day values were
+   written verbatim as Finder tags. Fix: normalize through the same `monthTag`/`dayNumber` helpers.
+
+Files: `OCRProcessor+OCR.swift`, `OCRProcessor+Pipeline.swift`, `OCRProcessor+Tagging.swift`,
+`MacOSTagger.swift`, `TagGenerator.swift`.
+
+---
+
 ## ✅ FIXED (2026-07-09): data race on `CaptureServer.listener` between `stop()` and `retryWithSystemPort()`  [HIGH — concurrency]
 
 **Status:** FIXED. The class comment claimed `listener` is "only touched on the serial `queue`," but

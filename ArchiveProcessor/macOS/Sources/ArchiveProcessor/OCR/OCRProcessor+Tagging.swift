@@ -43,7 +43,7 @@ extension OCRProcessor {
         for i in jobs.indices where i < preGroupedPriorities.count {
             guard let raw = preGroupedPriorities[i]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty,
                   let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
-            var tags = MacOSTagger.readTags(from: outputPDF)
+            guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
             if !tags.contains(raw) {
                 tags.append(raw)
                 try? MacOSTagger.applyTags(tags, to: outputPDF)
@@ -90,7 +90,7 @@ extension OCRProcessor {
                 guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB, rotationDegrees: w.rot) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
-                let tags = MacOSTagger.readTags(from: w.pdf)
+                guard let tags = try? MacOSTagger.readTags(from: w.pdf) else { continue }
                 try? MacOSTagger.applyTags(tags, to: w.img)
             }
         }.value
@@ -219,8 +219,8 @@ extension OCRProcessor {
             let seg = segments[m.segmentIndex]
             var tags = GeneratedTags()
             tags.year = m.year.isEmpty ? nil : m.year
-            tags.month = m.month.isEmpty ? nil : m.month
-            tags.day = m.day.isEmpty ? nil : m.day
+            tags.month = Self.normalizeMonth(m.month)
+            tags.day = Self.normalizeDay(m.day)
             tags.dateUncertain = m.dateUncertain
             tags.subjectTags = m.subjectTags
 
@@ -463,8 +463,8 @@ extension OCRProcessor {
             let data = tagsByFirstURL[firstURL] ?? SegmentTagData()
             var gtags = GeneratedTags()
             gtags.year = data.year.isEmpty ? nil : data.year
-            gtags.month = data.month.isEmpty ? nil : data.month
-            gtags.day = data.day.isEmpty ? nil : data.day
+            gtags.month = Self.normalizeMonth(data.month)
+            gtags.day = Self.normalizeDay(data.day)
             gtags.dateUncertain = data.dateUncertain
             gtags.subjectTags = data.subjectTags
 
@@ -779,9 +779,10 @@ extension OCRProcessor {
             let sourcePDFs = segment.pdfURLs.compactMap { outputURLMap[$0] }
             guard sourcePDFs.count > 1 else { continue }
 
-            // Name the merged PDF after the first page
-            let firstSource = segment.pdfURLs[0]
-            let baseName = firstSource.deletingPathExtension().lastPathComponent
+            // Name the merged PDF after the first page's OUTPUT (dedup'd) name, not the raw
+            // source — two segments sharing a source basename would otherwise overwrite each other.
+            let firstOutputPDF = sourcePDFs[0]
+            let baseName = firstOutputPDF.deletingPathExtension().lastPathComponent
             let mergedURL = outputDirectory.appendingPathComponent(baseName + "_merged.pdf")
 
             do {
@@ -792,7 +793,12 @@ extension OCRProcessor {
                 // untagged when only a later page carried tags.
                 let segmentJobs = segment.pdfURLs.compactMap { src in jobs.first(where: { $0.sourceURL == src }) }
                 if let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty }) {
-                    try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL)
+                    // Derive the authoritative color from the classification so a subject
+                    // tag "Red"/"Purple" isn't promoted to a Finder color label.
+                    let color: String? = tagged.classification == .boxLabel ? "Red" :
+                                         tagged.classification == .folderLabel ? "Purple" : nil
+                    try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
+                                               appColor: color, colorIsAuthoritative: true)
                 }
 
                 // Delete the individual PDFs that were merged
@@ -800,8 +806,8 @@ extension OCRProcessor {
                     try? FileManager.default.removeItem(at: pdfURL)
                 }
 
-                // Rename the JSON file to match the merged PDF name
-                let originalJSONURL = outputDirectory.appendingPathComponent(baseName + ".json")
+                // Rename the JSON sidecar (named after the first page's output PDF) to match the merged name
+                let originalJSONURL = firstOutputPDF.deletingPathExtension().appendingPathExtension("json")
                 let mergedJSONURL = outputDirectory.appendingPathComponent(baseName + "_merged.json")
                 if FileManager.default.fileExists(atPath: originalJSONURL.path) {
                     try? FileManager.default.moveItem(at: originalJSONURL, to: mergedJSONURL)
@@ -817,5 +823,25 @@ extension OCRProcessor {
                 statusMessage = "Failed to merge \(baseName): \(error.localizedDescription)"
             }
         }
+    }
+    /// Normalize a free-text month to SPEC "MM Month" format (e.g. "3" → "03 March").
+    /// Returns nil for empty/blank input; passes through unrecognized values unchanged.
+    private static func normalizeMonth(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        if let n = GeneratedTags.monthNumber(from: trimmed) {
+            return GeneratedTags.monthTag(n)
+        }
+        return trimmed
+    }
+    /// Normalize a free-text day to SPEC "Day N" format (e.g. "15" → "Day 15").
+    /// Returns nil for empty/blank input; passes through unrecognized values unchanged.
+    private static func normalizeDay(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        if let n = GeneratedTags.dayNumber(from: trimmed) {
+            return "Day \(n)"
+        }
+        return trimmed
     }
 }

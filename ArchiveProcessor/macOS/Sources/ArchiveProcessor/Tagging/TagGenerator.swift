@@ -259,9 +259,23 @@ class TagGenerator: ObservableObject {
 
         var tags = GeneratedTags()
         // Coerce year/month/day: models frequently return these as JSON numbers, not strings.
+        // Normalize bare-number months/days to SPEC format ("MM Month" / "Day N").
         tags.year = GeneratedTags.stringField(json["year"])
-        tags.month = GeneratedTags.stringField(json["month"])
-        tags.day = GeneratedTags.stringField(json["day"])
+        if let rawMonth = GeneratedTags.stringField(json["month"]) {
+            if let n = GeneratedTags.monthNumber(from: rawMonth), GeneratedTags.monthTag(n) != nil {
+                // Already SPEC-conforming ("03 March") or a bare number/name → normalize
+                tags.month = GeneratedTags.monthTag(n)
+            } else {
+                tags.month = rawMonth
+            }
+        }
+        if let rawDay = GeneratedTags.stringField(json["day"]) {
+            if let n = GeneratedTags.dayNumber(from: rawDay) {
+                tags.day = "Day \(n)"
+            } else {
+                tags.day = rawDay
+            }
+        }
         tags.dateUncertain = json["date_uncertain"] as? Bool ?? false
         // Enforce the 2–6 subject-tag contract's upper bound (models sometimes return many more).
         tags.subjectTags = Array((json["subject_tags"] as? [String] ?? []).prefix(6))

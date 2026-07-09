@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import os
 
 extension OCRProcessor {
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -162,11 +163,10 @@ extension OCRProcessor {
         } else if passSourceTags {
             // For pre-OCRed input, source tags are on the input PDFs themselves
             for (index, url) in files.enumerated() {
-                let sourceTags = MacOSTagger.readTags(from: url)
-                if !sourceTags.isEmpty, let outputURL = outputURLMap[url] {
-                    try? MacOSTagger.applyTags(sourceTags, to: outputURL)
-                    jobs[index].appliedTags = sourceTags
-                }
+                guard let sourceTags = try? MacOSTagger.readTags(from: url), !sourceTags.isEmpty,
+                      let outputURL = outputURLMap[url] else { continue }
+                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                jobs[index].appliedTags = sourceTags
             }
         }
 
@@ -783,14 +783,22 @@ extension OCRProcessor {
         // Use original source name for output PDF naming
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: sourceURL)
-        // Use the provided url (may be temp JPEG) for the image page
-        try? pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
+        // Use the provided url (may be temp JPEG) for the image page. If the PDF write fails, mark the
+        // job as failed so it appears in the failure log — a swallowed `try?` previously reported success
+        // even when no output PDF was written.
+        do {
+            try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
+        } catch {
+            jobs[index].status = .failed
+            let name = sourceURL.lastPathComponent
+            if !failedFiles.contains(name) { failedFiles.append(name) }
+            os_log(.error, "PDF write failed for %{public}@: %{public}@", name, error.localizedDescription)
+        }
         // Map by original source URL so tagging/collection segmentation can find it
         outputURLMap[sourceURL] = outputURL
         // Copy source tags to output PDF if pass-through mode is enabled
         if passSourceTags {
-            let sourceTags = MacOSTagger.readTags(from: sourceURL)
-            if !sourceTags.isEmpty {
+            if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
                 try? MacOSTagger.applyTags(sourceTags, to: outputURL)
                 jobs[index].appliedTags = sourceTags
             }
