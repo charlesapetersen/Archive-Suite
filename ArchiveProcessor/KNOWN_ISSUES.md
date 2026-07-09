@@ -443,3 +443,17 @@ Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
 otherwise, set `pendingDeleteId` to trigger a destructive confirmation dialog ("This photo hasn't reached
 the Mac yet. Deleting it here loses it forever."). The user must explicitly confirm before an un-uploaded
 photo is removed. (`Capture/CaptureViewModel.swift`, `UI/CaptureScreen.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): iOS clearSession confirmation doesn't distinguish uploaded from un-uploaded photos  [MED — data loss risk]
+
+**Status:** FIXED. The "Clear all photos?" confirmation dialog showed a generic message regardless of
+whether any photos had NOT been uploaded to the Mac. A user could tap Clear thinking everything was
+safely on the Mac when `.pending`/`.failed` items still existed only on the phone.
+
+Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
+
+**Fix:** The confirmation message now branches: if all items are `.uploaded`, it says "All photos have
+been uploaded to the Mac"; otherwise it warns with the exact count of un-uploaded photos that will be
+permanently lost. (`UI/CaptureScreen.swift`.)

@@ -136,7 +136,12 @@ struct CaptureScreen: View {
             Button("Clear (\(vm.items.count))", role: .destructive) { vm.clearSession() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently deletes captured photos still on this phone and can't be undone.")
+            let unUploaded = vm.items.filter { $0.state != .uploaded }
+            if unUploaded.isEmpty {
+                Text("All photos have been uploaded to the Mac. This clears the list and can't be undone.")
+            } else {
+                Text("\(unUploaded.count) photo(s) have NOT been uploaded to the Mac and will be permanently lost. This can't be undone.")
+            }
         }
         .confirmationDialog("Re-pair with a Mac?", isPresented: $showRepairConfirm, titleVisibility: .visible) {
             Button("Re-pair") { vm.disconnect() }
