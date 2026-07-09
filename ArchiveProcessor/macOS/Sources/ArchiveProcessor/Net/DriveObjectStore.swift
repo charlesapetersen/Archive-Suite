@@ -8,7 +8,8 @@ import Foundation
 /// Blocking (the receiver runs it off the main actor); `drive.file`-scoped, per-project (spike PASSED).
 /// Live use is owner-gated (OAuth); unit-tested via a mock `HTTPExecuting` behind `DriveClient`.
 /// `@unchecked Sendable`: the name→file cache is guarded by a lock (methods are also only ever called from
-/// the receiver's single-flight `scanOnce`).
+/// the receiver's single-flight `scanOnce`). Network calls are made OUTSIDE the lock to avoid blocking
+/// other accessors during slow HTTP round-trips.
 final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
     private let client: DriveClient
     private let token: String
@@ -25,45 +26,62 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
 
     // MARK: RelayObjectStore
 
-    func ensureSessionFolder() throws { lock.lock(); defer { lock.unlock() }; _ = try _ensureFolder() }
+    func ensureSessionFolder() throws {
+        // Check cache under lock first.
+        lock.lock()
+        if folderId != nil { lock.unlock(); return }
+        lock.unlock()
+        // Network call (unlocked) + cache update.
+        let id = try _ensureFolderUnlocked()
+        lock.lock(); folderId = id; lock.unlock()
+    }
 
     func publishEpoch(_ data: Data) { writeAtomic(RelayObjectFormat.epochMarkerName, data) }
 
     func listNames() -> [String] {
+        do { try _refreshCacheUnlocked() } catch { return [] }
         lock.lock(); defer { lock.unlock() }
-        do { try _refreshCache() } catch { return [] }
         return Array(cache.keys)
     }
 
     func readData(_ name: String) -> Data? {
-        lock.lock(); defer { lock.unlock() }
-        guard let id = try? _resolve(name) else { return nil }
+        // Resolve the file ID under lock, then download without the lock held.
+        guard let id = _resolveLocked(name) else { return nil }
         return try? client.getMedia(fileId: id)
     }
 
     func exists(_ name: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return (try? _resolve(name)) != nil
+        return _resolveLocked(name) != nil
     }
 
     func modificationDate(_ name: String) -> Date? {
-        lock.lock(); defer { lock.unlock() }
-        if cache[name] == nil { try? _refreshCache() }
-        return cache[name]?.modified
+        lock.lock()
+        if cache[name] == nil {
+            lock.unlock()
+            try? _refreshCacheUnlocked()
+            lock.lock()
+        }
+        let result = cache[name]?.modified
+        lock.unlock()
+        return result
     }
 
     func writeAtomic(_ name: String, _ data: Data) {
-        lock.lock(); defer { lock.unlock() }
         do {
-            let fid = try _ensureFolder()
+            let fid = try _ensureFolderUnlocked()
+            lock.lock(); folderId = fid; lock.unlock()
+
             let mime = name.hasSuffix(".jpg") ? "image/jpeg" : "application/json"
-            if let existing = try _resolve(name) {                       // idempotent overwrite (re-send)
+            let existing = _resolveLocked(name)
+
+            // Network call (unlocked).
+            if let existing {
                 try client.updateMedia(fileId: existing, media: data, mimeType: mime)
             } else {
                 let id = try client.createFile(name: name, parents: [fid],
                                                appProperties: ["relayName": name, "relayToken": token],
                                                media: data, mimeType: mime)
-                cache[name] = (id, nil)
+                lock.lock(); cache[name] = (id, nil); lock.unlock()
             }
         } catch {
             // Best-effort: a failed write leaves no receipt, so the phone's receipt-wait times out and
@@ -72,36 +90,59 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
     }
 
     func delete(_ name: String) {
-        lock.lock(); defer { lock.unlock() }
-        if let id = try? _resolve(name) { try? client.delete(fileId: id); cache[name] = nil }
+        guard let id = _resolveLocked(name) else { return }
+        try? client.delete(fileId: id)
+        lock.lock(); cache[name] = nil; lock.unlock()
     }
 
     func quarantine(_ name: String) {
         // Drive has no folders-as-move here; flag it out of listing instead (kept for debugging, excluded
         // from processing by _refreshCache's relayRejected filter).
-        lock.lock(); defer { lock.unlock() }
-        if let id = try? _resolve(name) {
-            try? client.updateAppProperties(fileId: id, appProperties: ["relayName": name, "relayToken": token, "relayRejected": "1"])
-            cache[name] = nil
-        }
+        guard let id = _resolveLocked(name) else { return }
+        try? client.updateAppProperties(fileId: id, appProperties: ["relayName": name, "relayToken": token, "relayRejected": "1"])
+        lock.lock(); cache[name] = nil; lock.unlock()
     }
 
-    // MARK: Unlocked cores (callers hold `lock`)
+    // MARK: Lock-aware helpers
 
-    private func _ensureFolder() throws -> String {
-        if let f = folderId { return f }
+    /// Resolve a relay name → fileId. Acquires/releases the lock internally; network calls (cache refresh)
+    /// happen outside the lock.
+    private func _resolveLocked(_ name: String) -> String? {
+        lock.lock()
+        if let e = cache[name] { lock.unlock(); return e.id }
+        lock.unlock()
+        // Cache miss — refresh (unlocked network) then re-check.
+        try? _refreshCacheUnlocked()
+        lock.lock()
+        let result = cache[name]?.id
+        lock.unlock()
+        return result
+    }
+
+    /// Ensure the session folder exists on Drive. Does NOT hold the lock during network calls.
+    /// Returns the folder ID; caller should store it under lock.
+    private func _ensureFolderUnlocked() throws -> String {
+        lock.lock()
+        if let f = folderId { lock.unlock(); return f }
+        lock.unlock()
+
         let existing = try client.listFiles(
             query: "mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='relayToken' and value='\(esc(token))' } and trashed = false")
-        if let f = existing.first { folderId = f.id; return f.id }
+        if let f = existing.first {
+            lock.lock(); folderId = f.id; lock.unlock()
+            return f.id
+        }
         let id = try client.createMetadata(name: folderName, parents: [],
                                            appProperties: ["relayToken": token, "relayFolder": "1"],
                                            mimeType: "application/vnd.google-apps.folder")
-        folderId = id
+        lock.lock(); folderId = id; lock.unlock()
         return id
     }
 
-    private func _refreshCache() throws {
-        let fid = try _ensureFolder()
+    /// Refresh the name→fileId cache from Drive. Network calls happen outside the lock; the cache is
+    /// replaced atomically under lock once the listing completes.
+    private func _refreshCacheUnlocked() throws {
+        let fid = try _ensureFolderUnlocked()
         let files = try client.listFiles(query: "'\(esc(fid))' in parents and trashed = false")
         // Drive has NO name uniqueness: a fileId-loss re-create (phone recovery path) can leave two files
         // with the same relayName. Keep only the NEWEST per name (by monotone `rev`, then modifiedTime, then
@@ -118,15 +159,11 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
                 } else { reap.append(f.id) }
             } else { best[name] = cand }
         }
+        lock.lock()
         cache = best.mapValues { (id: $0.id, modified: $0.mod) }
+        lock.unlock()
+        // Reap duplicates (unlocked — these are fire-and-forget deletes).
         for id in reap { try? client.delete(fileId: id) }
-    }
-
-    /// Resolve a relay name → fileId, refreshing the cache once on a miss.
-    private func _resolve(_ name: String) throws -> String? {
-        if let e = cache[name] { return e.id }
-        try _refreshCache()
-        return cache[name]?.id
     }
 
     private func esc(_ s: String) -> String { s.replacingOccurrences(of: "'", with: "\\'") }
