@@ -16,6 +16,11 @@ Review **one subsystem UNIT per session** with a **lean ~6-finder fan-out** (one
 **each finding is refuted-by-default verified once** (not a multi-lens panel), then persist the unit's report
 and mark it done — so a fresh session always resumes at the next unfinished unit.
 
+The finder + verifier agents are pinned to **Opus at max effort** (`model:'opus', effort:'max'` on the
+`agent()` calls) — reviewing/judging is the hardest stage, where max effort pays off, and it shouldn't depend
+on the launching session's effort. This raises per-agent token cost, so keep parallel sweeps ≤2–3 units (see
+Batch sizing).
+
 ## The three levers that keep it inside a window
 
 1. **One unit per session.** ~90 Processor + ~38 Reader Swift files + companions → **10 units** (below). A

@@ -87,7 +87,7 @@ const results = await pipeline(
     `Rules: (1) Only report a defect you can tie to a CONCRETE failing input/state and a wrong result — no style nits, no "consider". ` +
     `(2) Cite file + line. (3) Prefer few real bugs over many speculative ones. ` +
     `(4) Use Read/Grep/Bash to actually inspect the code; do not guess. Return findings (empty array if none).`,
-    { label: `find:${unit}:${d.key}`, phase: 'Find', schema: FINDINGS_SCHEMA }
+    { label: `find:${unit}:${d.key}`, phase: 'Find', schema: FINDINGS_SCHEMA, model: 'opus', effort: 'max' }
   ).then((r) => ({ dim: d.key, findings: (r && r.findings) || [] })),
 
   // Verify EACH finding of this dimension as soon as the dimension's find completes (no barrier).
@@ -99,7 +99,7 @@ const results = await pipeline(
         `Your job is to REFUTE it. Read the actual code and surrounding context. Set refuted=true unless you can ` +
         `state a concrete, realistic input/state that reaches this code and produces the wrong result. ` +
         `Default to refuted=true when uncertain, when the bad path is unreachable, or when existing guards prevent it.`,
-        { label: `verify:${unit}:${f.file.split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA }
+        { label: `verify:${unit}:${f.file.split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'max' }
       ).then((v) => ({ ...f, dim: found.dim, verdict: v }))
     )
   )

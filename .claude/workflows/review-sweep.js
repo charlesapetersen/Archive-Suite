@@ -61,7 +61,7 @@ function reviewUnit(u) {
       `Rules: (1) Only report a defect you can tie to a CONCRETE failing input/state and a wrong result — no ` +
       `style nits. (2) Cite file + line. (3) Prefer few real bugs over many speculative ones. (4) Use ` +
       `Read/Grep/Bash to inspect the code; do not guess. Return findings (empty array if none).`,
-      { label: `find:${u.unit}:${d.key}`, phase: 'Find', schema: FINDINGS_SCHEMA }
+      { label: `find:${u.unit}:${d.key}`, phase: 'Find', schema: FINDINGS_SCHEMA, model: 'opus', effort: 'max' }
     ).then((r) => ({ dim: d.key, findings: (r && r.findings) || [] })),
 
     (found) => parallel(
@@ -72,7 +72,7 @@ function reviewUnit(u) {
           `Your job is to REFUTE it. Read the actual code + surrounding context. Set refuted=true unless you ` +
           `can state a concrete, realistic input/state that reaches this code and produces the wrong result. ` +
           `Default refuted=true when uncertain, when the path is unreachable, or when existing guards prevent it.`,
-          { label: `verify:${u.unit}:${(f.file || '').split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA }
+          { label: `verify:${u.unit}:${(f.file || '').split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'max' }
         ).then((v) => ({ ...f, dim: found.dim, verdict: v }))
       )
     )
