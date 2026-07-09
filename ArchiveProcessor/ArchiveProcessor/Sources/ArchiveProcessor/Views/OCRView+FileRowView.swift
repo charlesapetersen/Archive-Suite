@@ -98,3 +98,42 @@ struct FileItem: ProcessableItem {
     }
 }
 
+// MARK: - Per-item text viewer (Files pane inline disclosure)
+
+struct FileTextViewerSheet: View {
+    let text: String?
+    let errorMessage: String?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("OCR Text").font(.title2).fontWeight(.semibold)
+            if let text, !text.isEmpty {
+                ScrollView {
+                    Text(text)
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+            } else {
+                Text("No OCR text was returned for this file.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let errorMessage, !errorMessage.isEmpty {
+                GroupBox("Error") {
+                    Text(errorMessage).font(.caption).foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 520, height: 480)
+    }
+}

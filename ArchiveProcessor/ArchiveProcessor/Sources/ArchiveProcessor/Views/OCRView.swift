@@ -68,6 +68,21 @@ struct OCRView: View {
     @State private var editingFileIndex: Int? = nil
     @State private var reviewFocusedIndex: Int = 0
 
+    // Per-item inline-disclosure (Files pane): which row is expanded + action sheet targets.
+    @State private var expandedFileID: String?
+    @State private var fileModelChoiceTarget: FileModelChoiceTarget?
+    @State private var fileTextViewerTarget: FileTextViewerTarget?
+
+    struct FileModelChoiceTarget: Identifiable {
+        let jobIndex: Int
+        let includeRotation: Bool
+        var id: String { "\(jobIndex)-\(includeRotation ? "rot" : "mdl")" }
+    }
+    struct FileTextViewerTarget: Identifiable {
+        let jobIndex: Int
+        var id: Int { jobIndex }
+    }
+
     @ObservedObject private var customModelStore = CustomModelStore.shared
 
     init(processor: OCRProcessor) {
@@ -211,6 +226,36 @@ struct OCRView: View {
         }
         .sheet(isPresented: $processor.awaitingRetryDecision) {
             OCRRetrySheet(processor: processor)
+        }
+        // Per-item "retry with model" / "rotate & re-run" from the Files pane inline disclosure.
+        .sheet(item: $fileModelChoiceTarget) { target in
+            ModelChoiceSheet(
+                title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
+                subtitle: "Re-run OCR for this file; the old output is replaced.",
+                includeRotation: target.includeRotation,
+                fileCountForEstimate: 1,
+                initialProvider: selectedProvider,
+                initialRotation: processor.jobs.indices.contains(target.jobIndex)
+                    ? (processor.jobs[target.jobIndex].result?.rotationDegrees ?? 0) : 0,
+                onApply: { provider, model, thinking, key, rotation in
+                    Task {
+                        guard let outDir = outputDirectory else { return }
+                        await processor.retryOne(
+                            index: target.jobIndex, provider: provider, model: model,
+                            thinkingLevel: thinking, apiKey: key, outputDirectory: outDir,
+                            rotation: rotation)
+                    }
+                    fileModelChoiceTarget = nil
+                },
+                onCancel: { fileModelChoiceTarget = nil })
+        }
+        // Per-item "view text" from the Files pane inline disclosure.
+        .sheet(item: $fileTextViewerTarget) { target in
+            let job = processor.jobs.indices.contains(target.jobIndex) ? processor.jobs[target.jobIndex] : nil
+            FileTextViewerSheet(
+                text: job?.result?.text,
+                errorMessage: job?.result?.errorMessage,
+                onDismiss: { fileTextViewerTarget = nil })
         }
         // Rotation/segmentation review + Segment & Tag open as real, movable, resizable windows filling
         // the screen (not sheets — sheets are anchored/centered and can't be moved).
@@ -573,11 +618,15 @@ struct OCRView: View {
             ScrollViewReader { scrollProxy in
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
+                        let job = processor.jobs.first { $0.sourceURL == url }
+                        let itemID = job?.id.uuidString ?? url.path
                         FileRowView(
                             url: url,
-                            job: processor.jobs.first { $0.sourceURL == url },
+                            job: job,
                             showTags: processor.awaitingFinalReview,
                             isFocused: isInReviewMode && index == reviewFocusedIndex,
+                            actions: ItemActionHandler { action, id in performFileAction(action, on: id) },
+                            isExpanded: expandedFileID == itemID,
                             presetClassification: capturePreGroupedClassification(at: index)
                         )
                         .contentShape(Rectangle())
@@ -588,7 +637,11 @@ struct OCRView: View {
                             }
                         }
                         .onTapGesture(count: 1) {
-                            if isInReviewMode { reviewFocusedIndex = index }
+                            if isInReviewMode {
+                                reviewFocusedIndex = index
+                            } else {
+                                expandedFileID = (expandedFileID == itemID) ? nil : itemID
+                            }
                         }
                     }
                 }
@@ -646,6 +699,32 @@ struct OCRView: View {
             guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
             processor.updateClassification(at: reviewFocusedIndex, to: .folderLabel)
             return .handled
+        }
+    }
+
+    // MARK: - Per-item actions (Files pane inline disclosure)
+
+    private func performFileAction(_ action: ItemAction, on itemID: String) {
+        guard let jobIndex = processor.jobs.firstIndex(where: { $0.id.uuidString == itemID }) else { return }
+        switch action {
+        case .retry:
+            guard let outDir = outputDirectory else { return }
+            Task {
+                await processor.retryOne(
+                    index: jobIndex, provider: selectedProvider, model: selectedModel,
+                    thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
+                    apiKey: apiKey, outputDirectory: outDir)
+            }
+        case .retryWithModel:
+            fileModelChoiceTarget = FileModelChoiceTarget(jobIndex: jobIndex, includeRotation: false)
+        case .changeRotation:
+            fileModelChoiceTarget = FileModelChoiceTarget(jobIndex: jobIndex, includeRotation: true)
+        case .viewText:
+            fileTextViewerTarget = FileTextViewerTarget(jobIndex: jobIndex)
+        case .reclassify:
+            editingFileIndex = jobIndex
+        case .revealFiles, .fileAsImageOnly:
+            break
         }
     }
 
