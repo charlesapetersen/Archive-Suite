@@ -191,8 +191,11 @@ writes against the real corpus — always a copy.
   optional provenance display, not for grouping.
 - **Two windows** (SwiftUI scenes): a single **navigation window** (Finder-Smart-Folder-like table)
   and a **document view window** opened with a selection payload.
-- **Navigation table:** SwiftUI `Table` (NSTableView-backed on macOS 14+), data layer abstracted so
-  an AppKit `NSTableView` swap is possible if `Table` janks at 150k (test early). Columns: Document
+- **Navigation table:** SwiftUI `Table` (NSTableView-backed on macOS 14+), data layer abstracted so an
+  AppKit `NSTableView` swap is possible. **Perf-checked 2026-07-08 at 40k (synthetic scratch corpus): it
+  JANKS** — scroll stutter, filter-field keystroke lag/beachball (whole-collection main-thread re-diff per
+  keystroke), slow sort; discovery/load itself was fine. **The AppKit `NSTableView` + diffable-data-source
+  swap is CONFIRMED warranted** (tracked in `SUITE_TODO.md`). Columns: Document
   date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
   draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
