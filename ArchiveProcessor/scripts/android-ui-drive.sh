@@ -71,9 +71,10 @@ tap_text(){ local xy; xy=$(center_of "$1") || die "element not found: $1"; log "
 tap_text_opt(){ local xy; xy=$(center_of "$1") && { log "tap '$1' @ $xy"; "$ADB" shell input tap $xy; sleep 1; } || log "skip '$1' (not shown — nothing pending)"; }
 type_into(){ local xy; xy=$(center_of "$1") || die "field not found: $1"; "$ADB" shell input tap $xy; sleep 0.5; "$ADB" shell input text "$2"; sleep 0.3; }
 # Dismiss the soft IME IF one is showing. On API 34 the hw-keyboard config suppresses it (no-op here), but on
-# API 36 Gboard shows anyway and covers on-screen buttons (e.g. Connect). BACK only when the IME is actually
-# up keeps this safe — it never navigates when no keyboard is shown.
-hide_ime(){ "$ADB" shell dumpsys input_method 2>/dev/null | grep -qiE "mInputShown ?= ?true" && { "$ADB" shell input keyevent 4 >/dev/null 2>&1; sleep 0.5; }; }
+# API 36 Gboard shows anyway and covers on-screen buttons (e.g. Connect). We use KEYCODE_ESCAPE (111) to
+# dismiss the IME without navigating — BACK (4) is unreliable because mInputShown can report true even when
+# hw.keyboard=yes suppresses the visual keyboard, causing BACK to navigate away from the app entirely.
+hide_ime(){ "$ADB" shell dumpsys input_method 2>/dev/null | grep -qiE "mInputShown ?= ?true" && { "$ADB" shell input keyevent 111 >/dev/null 2>&1; sleep 0.5; }; }
 shot(){ local n="${1:-shot}"; "$ADB" exec-out screencap -p > "$OUT/$n.png" 2>/dev/null && log "screenshot → $OUT/$n.png"; }
 
 # Tap the (unlabeled) shutter: the middle of the Box…Folder row.
@@ -90,7 +91,13 @@ ensure_avd(){ [ -x "$EMULATOR" ] || die "emulator not installed — run: sdkmana
     log "set hw.keyboard=yes in $cfg"
   fi; }
 boot(){ ensure_avd; log "booting headless emulator $AVD"; "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
-  "$ADB" wait-for-device; require_emulator   # emulator now exists → pin ANDROID_SERIAL for the calls below
+  # Wait for an emulator-* serial specifically (adb wait-for-device returns immediately if a physical
+  # device is already connected, causing require_emulator to fail before the emulator registers).
+  log "waiting for emulator to register with adb…"
+  for _ in $(seq 1 120); do
+    "$ADB" devices 2>/dev/null | grep -q '^emulator-' && break; sleep 1
+  done
+  require_emulator   # emulator now exists → pin ANDROID_SERIAL for the calls below
   log "waiting for boot…"; until [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do sleep 2; done
   "$ADB" shell input keyevent 82 >/dev/null 2>&1                    # dismiss the keyguard
   "$ADB" shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1  # never pop the soft IME (would cover buttons)
