@@ -42,8 +42,7 @@ final class CameraController: NSObject, ObservableObject {
         shouldBeRunning = true
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            authorized = true
-            accessDenied = false
+            DispatchQueue.main.async { self.authorized = true; self.accessDenied = false }
             queue.async { self.configureIfNeeded(); self.startRunning() }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
