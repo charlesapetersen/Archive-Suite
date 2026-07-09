@@ -66,20 +66,19 @@ class DriveRelayTransport(
         val repl = if (!replaces.isNullOrEmpty()) replaces else null
         val fp = RelayObjectFormat.fingerprint(type, priority, yearS, monthS, repl)
         val deadline = System.currentTimeMillis() + receiptWaitTimeoutMs
-        var folder: String? = null; var ep: String? = null; var wrote = false
+        var folder: String? = null; var wroteForEpoch: String? = null
         do {
             if (folder == null) folder = folderId()
             if (folder == null) { Thread.sleep(1000); continue }          // Mac relay not up yet
             val f = folder!!
-            if (ep == null) ep = epoch(f)
-            if (ep == null) { Thread.sleep(1000); continue }              // no epoch yet
-            val e = ep!!
+            val e = epoch(f)                                              // re-read each iteration (epoch may change on Mac restart)
+            if (e == null) { Thread.sleep(1000); continue }               // no epoch yet
             if (validReceipt(f, group, seq, e, fp)) return true           // receipt-first
-            if (!wrote) {                                                 // write-once: jpeg then sidecar (query-or-update)
+            if (wroteForEpoch != e) {                                     // write-once per epoch (re-write if epoch changes)
                 upsert(f, RelayObjectFormat.jpegName(group, seq), jpeg, "image/jpeg")
                 upsert(f, RelayObjectFormat.sidecarName(group, seq),
                     RelayObjectFormat.encodeSidecar(token, e, group, seq, type, priority, yearS, monthS, repl, device), "application/json")
-                wrote = true
+                wroteForEpoch = e
             }
             Thread.sleep(receiptPollMs)
         } while (System.currentTimeMillis() < deadline)

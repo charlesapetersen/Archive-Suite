@@ -457,3 +457,26 @@ Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
 **Fix:** The confirmation message now branches: if all items are `.uploaded`, it says "All photos have
 been uploaded to the Mac"; otherwise it warns with the exact count of un-uploaded photos that will be
 permanently lost. (`UI/CaptureScreen.swift`.)
+
+---
+
+## ✅ FIXED (2026-07-09): DriveRelayTransport epoch cached, not re-read per iteration  [MED — correctness]
+
+**Status:** FIXED. `DriveRelayTransport.postPhoto` resolved the Mac-published epoch once
+(`if ep == nil { ep = epoch(f) }`) and cached it for the entire receipt-wait loop. If the Mac
+restarted mid-transfer with a new epoch, the phone kept using the stale value — receipts (which carry
+the new epoch) would never match, and sidecars were written with the wrong epoch. The photo would time
+out and retry, but the retry re-entered the same `postPhoto` call with a fresh `ep = nil`, so it
+would eventually recover — but only after a full 20s timeout per photo per Mac restart.
+
+By contrast, `FileRelayTransport` correctly calls `currentEpoch()` every iteration and tracks
+`wroteForEpoch` to re-write the sidecar if the epoch changes mid-loop.
+
+Same bug existed in the Android Kotlin mirror.
+
+Found by the iOS companion lean-review (`.maintenance/review/iOS-companion.md`).
+
+**Fix:** Both iOS and Android `DriveRelayTransport.postPhoto` now re-read `epoch(f)` every iteration
+(matching `FileRelayTransport`), and use `wroteForEpoch` (string, not bool) so the sidecar is
+re-written with the correct epoch if it changes mid-loop.
+(`Net/DriveRelayTransport.swift`, `net/DriveRelayTransport.kt`.)

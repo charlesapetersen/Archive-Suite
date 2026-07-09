@@ -49,19 +49,18 @@ struct DriveRelayTransport: SegmentTransport {
         let repl = (replaces?.isEmpty == false) ? replaces : nil
         let fp = RelayObjectFormat.fingerprint(type: type, priority: priority, year: yearS, month: monthS, replaces: repl)
         let deadline = Date().addingTimeInterval(receiptWaitTimeout)
-        var folder: String?, ep: String?, wrote = false
+        var folder: String?, wroteForEpoch: String?
         repeat {
             if folder == nil { folder = folderId() }                       // resolve once (Mac's folder)
             guard let f = folder else { try? await Task.sleep(nanoseconds: 1_000_000_000); continue }  // Mac relay not up
-            if ep == nil { ep = epoch(f) }
-            guard let e = ep else { try? await Task.sleep(nanoseconds: 1_000_000_000); continue }       // no epoch yet
+            guard let e = epoch(f) else { try? await Task.sleep(nanoseconds: 1_000_000_000); continue } // re-read each iteration (epoch may change on Mac restart)
             if validReceipt(f, group: group, seq: seq, epoch: e, fp: fp) { return true }                // receipt-first
-            if !wrote {                                                     // write-once: jpeg then sidecar (query-or-update)
+            if wroteForEpoch != e {                                         // write-once per epoch (re-write if epoch changes)
                 try? upsert(f, RelayObjectFormat.jpegName(group: group, seq: seq), jpeg, "image/jpeg")
                 try? upsert(f, RelayObjectFormat.sidecarName(group: group, seq: seq),
                        RelayObjectFormat.encodeSidecar(token: token, epoch: e, group: group, seq: seq, type: type,
                            priority: priority, year: yearS, month: monthS, replaces: repl, device: device), "application/json")
-                wrote = true
+                wroteForEpoch = e
             }
             try? await Task.sleep(nanoseconds: UInt64(receiptPollInterval * 1_000_000_000))
         } while Date() < deadline
