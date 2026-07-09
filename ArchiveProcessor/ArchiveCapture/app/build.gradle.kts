@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.archiveprocessor.capture"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.archiveprocessor.capture"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1"
 
