@@ -123,7 +123,7 @@ final class DriveAuth: ObservableObject {
                     if let url { cont.resume(returning: url) }
                     else { cont.resume(throwing: error ?? DriveAuthError.cancelled) }
                 }
-                session.prefersEphemeralWebBrowserSession = false
+                session.prefersEphemeralWebBrowserSession = true
                 session.start()
             }
 
