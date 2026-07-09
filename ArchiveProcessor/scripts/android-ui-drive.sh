@@ -69,7 +69,11 @@ tap_text(){ local xy; xy=$(center_of "$1") || die "element not found: $1"; log "
 # Tap if present; skip (don't fail) if absent — for conditional controls (e.g. "Save to phone" only shows
 # while items are still un-sent on the phone).
 tap_text_opt(){ local xy; xy=$(center_of "$1") && { log "tap '$1' @ $xy"; "$ADB" shell input tap $xy; sleep 1; } || log "skip '$1' (not shown — nothing pending)"; }
-type_into(){ local xy; xy=$(center_of "$1") || die "field not found: $1"; "$ADB" shell input tap $xy; sleep 0.5; "$ADB" shell input text "$2"; sleep 0.3; }  # soft IME is disabled at boot, so no dismissal needed
+type_into(){ local xy; xy=$(center_of "$1") || die "field not found: $1"; "$ADB" shell input tap $xy; sleep 0.5; "$ADB" shell input text "$2"; sleep 0.3; }
+# Dismiss the soft IME IF one is showing. On API 34 the hw-keyboard config suppresses it (no-op here), but on
+# API 36 Gboard shows anyway and covers on-screen buttons (e.g. Connect). BACK only when the IME is actually
+# up keeps this safe — it never navigates when no keyboard is shown.
+hide_ime(){ "$ADB" shell dumpsys input_method 2>/dev/null | grep -qiE "mInputShown ?= ?true" && { "$ADB" shell input keyevent 4 >/dev/null 2>&1; sleep 0.5; }; }
 shot(){ local n="${1:-shot}"; "$ADB" exec-out screencap -p > "$OUT/$n.png" 2>/dev/null && log "screenshot → $OUT/$n.png"; }
 
 # Tap the (unlabeled) shutter: the middle of the Box…Folder row.
@@ -111,6 +115,7 @@ pair(){ local port="$1" token="$2"
   tap_text "Wi-Fi (same network)"; shot 02-mode
   tap_text "Enter manually instead"; shot 03-manual
   type_into "Host" "$MACHOST"; type_into "Port" "$port"; type_into "Token" "$token"; shot 04-filled
+  hide_ime                                    # API 36: Gboard covers the Connect button — dismiss it first
   tap_text "Connect"; sleep 3; shot 05-connected; }
 
 # A throwaway "fake Mac receiver": returns 200 to every route so the app pairs + thinks uploads succeed,
@@ -119,7 +124,7 @@ pair(){ local port="$1" token="$2"
 # then:  pair 48628 <anytoken>.  (For real end-to-end verification, pair to the real Mac instead and check
 # its backup/manifest files.)
 stub(){ local port="${1:-48628}"; log "stub (fake Mac receiver) on 127.0.0.1:$port — emulator reaches it at 10.0.2.2:$port"
-  python3 - "$port" <<'PY'
+  exec python3 - "$port" <<'PY'
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 class H(BaseHTTPRequestHandler):
