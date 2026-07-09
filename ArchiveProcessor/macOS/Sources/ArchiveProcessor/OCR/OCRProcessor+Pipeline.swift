@@ -257,6 +257,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        _takenOutputPaths = []
         exportedImageMap = [:]
         currentModel = pending.model
         taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
@@ -437,6 +438,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        _takenOutputPaths = []
         exportedImageMap = [:]
         pdfToImageMap = [:]
         currentModel = pending.model
@@ -913,6 +915,7 @@ extension OCRProcessor {
         segments = []
         collectionSegments = []
         outputURLMap = [:]
+        _takenOutputPaths = []
         exportedImageMap = [:]
         pdfToImageMap = [:]
         removedSourceURLs = []

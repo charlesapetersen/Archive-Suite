@@ -189,6 +189,9 @@ class OCRProcessor: ObservableObject {
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
     var outputURLMap: [URL: URL] = [:]
+    /// Cached lowercased paths of all values in `outputURLMap`, maintained by `uniqueOutputURL`
+    /// and cleared alongside `outputURLMap = [:]` resets. Avoids O(n) set-rebuild per call.
+    var _takenOutputPaths = Set<String>()
     /// Maps source image URL → its per-page EXPORTED original image URL (dual output), captured by
     /// `exportOriginalImages` BEFORE document merging repoints `outputURLMap` to a single merged PDF.
     /// Threaded into `CollectionSegmenter.organizeOutput` so a merged doc's per-page images get filed

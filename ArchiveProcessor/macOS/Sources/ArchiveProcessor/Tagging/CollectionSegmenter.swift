@@ -313,6 +313,13 @@ class CollectionSegmenter {
             // output folder APPENDS instead of restarting at 00001 and deleting/overwriting the earlier run.
             var movedCount = CollectionNumbering.highestLeadingNumber(in: folderURL, fm: fm)
             var movedOutputs = Set<URL>()
+            // Pre-build reverse map (output PDF → source URLs) to avoid O(n²) filter per merged doc.
+            var pdfToSources = [URL: [URL]]()
+            if moveSiblingImages {
+                for src in collection.fileURLs {
+                    if let pdf = outputURLMap[src] { pdfToSources[pdf, default: []].append(src) }
+                }
+            }
             for sourceURL in collection.fileURLs {
                 guard let pdfURL = outputURLMap[sourceURL],
                       !movedOutputs.contains(pdfURL),
@@ -327,7 +334,7 @@ class CollectionSegmenter {
                 // image's number. Threaded in via `exportedImageMap` because organizeOutput can't recover
                 // the per-page names from the merged PDF alone. Moves only — never overwrites/deletes.
                 if moveSiblingImages {
-                    let pageSources = collection.fileURLs.filter { outputURLMap[$0] == pdfURL }
+                    let pageSources = pdfToSources[pdfURL] ?? []
                     let pageImages = pageSources.compactMap { exportedImageMap[$0] }
                         .filter { fm.fileExists(atPath: $0.path) }
                     if pageSources.count > 1 && !pageImages.isEmpty {

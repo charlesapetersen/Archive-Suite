@@ -213,13 +213,17 @@ extension OCRProcessor {
     /// read-then-reserve needs no locking.
     func uniqueOutputURL(baseName: String, ext: String, in dir: URL, for sourceURL: URL) -> URL {
         if let existing = outputURLMap[sourceURL] { return existing }
-        let taken = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+        // Lazy rebuild after a reset (outputURLMap populated by resume-restore but cache was cleared).
+        if _takenOutputPaths.isEmpty && !outputURLMap.isEmpty {
+            _takenOutputPaths = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+        }
         var candidate = dir.appendingPathComponent(baseName + "." + ext)
         var n = 2
-        while taken.contains(candidate.standardizedFileURL.path.lowercased()) {
+        while _takenOutputPaths.contains(candidate.standardizedFileURL.path.lowercased()) {
             candidate = dir.appendingPathComponent("\(baseName) (\(n)).\(ext)")
             n += 1
         }
+        _takenOutputPaths.insert(candidate.standardizedFileURL.path.lowercased())
         return candidate
     }
 

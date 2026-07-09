@@ -614,11 +614,12 @@ struct OCRView: View {
     }
 
     private var fileList: some View {
-        ZStack {
+        let jobsBySource = Dictionary(processor.jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { _, last in last })
+        return ZStack {
             ScrollViewReader { scrollProxy in
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(zip(droppedFiles.indices, droppedFiles)), id: \.0) { index, url in
-                        let job = processor.jobs.first { $0.sourceURL == url }
+                        let job = jobsBySource[url]
                         let itemID = job?.id.uuidString ?? url.path
                         FileRowView(
                             url: url,
