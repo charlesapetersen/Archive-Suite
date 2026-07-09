@@ -307,6 +307,10 @@ key (`LIVECAPTURE_OCRKEY`), auto-skips tag cards (`LIVECAPTURE_AUTOSKIPTAGS`), a
 and drops `DONE.txt`; then `assert_mac.py` checks each fixture's unique OCR token + year survived the whole
 pipeline, and per-doc phone screencaps are checked. Deterministic + unattended (emulator only). Run:
 `OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh` (falls back to the Keychain key).
+**Needs:** the Mac free + awake (headless, but a live app session — don't drive its GUI meanwhile), the
+`ap_test` emulator + android-34 image installed, `xcodegen` on PATH, and a Gemini key (env or Keychain);
+spends ~a few cents. It's the Tier-2 functional gate for `Capture/`/`Net/` — **not** a per-commit/CI check
+(use `test-smoke.sh` for that).
 
 **Cadence:** **push commits to `origin` frequently** — a clean build + Tier-1 self-review (and Tier-2 for
 high-blast-radius diffs) is enough to push; don't hoard local commits. **Releases are the sparse milestone:**

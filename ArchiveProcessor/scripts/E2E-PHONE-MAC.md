@@ -39,6 +39,11 @@ pixel source. This is the sole fully-deterministic, unattended route.
 The companion has **no session-finish UI** (it finishes per-segment; whole-session finalize is a Mac
 action), so the harness itself sends `POST /session/complete` over the documented Bearer route.
 
+## When to run
+The **Tier-2 functional gate** for `Capture/`/`Net/` and the phone↔Mac protocol — run it after changes
+there, and before a release that touches Live Capture. **Not** a per-commit or CI check: it needs a live,
+awake Mac + the emulator and spends a little on OCR. For a cheap every-commit gate use `test-smoke.sh`.
+
 ## Run
 ```bash
 export OCR_KEY="<gemini-key>"       # optional; falls back to the Keychain Gemini key
