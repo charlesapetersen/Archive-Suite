@@ -10,7 +10,6 @@ struct NavigationWindowView: View {
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @State private var newSearchName = ""
     @State private var renameText = ""
-    @State private var columnCustomization = TableColumnCustomization<ArchiveFile>()   // C1: show/hide/reorder/resize
     @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
     @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
 
@@ -82,102 +81,18 @@ struct NavigationWindowView: View {
         .focusedSceneValue(\.openSelection) { openSelection() }
     }
 
-    // MARK: Table
+    // MARK: Table (AppKit NSTableView for virtualized, high-performance scrolling at scale)
 
     private var table: some View {
-        ScrollViewReader { proxy in
-        Table(model.displayed, selection: $model.selection,
-              sortOrder: Binding(get: { model.sortComparators }, set: { model.applyTableSort($0) }),
-              columnCustomization: $columnCustomization) {
-            TableColumn("⚑") { file in
-                Button {
-                    model.notes.setFlag(!model.notes.isFlagged(file.url.path), for: file.url.path)
-                } label: {
-                    Image(systemName: model.notes.isFlagged(file.url.path) ? "flag.fill" : "flag")
-                        .foregroundStyle(model.notes.isFlagged(file.url.path) ? Color.orange : Color.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Flag (app-only; never written to the file)")
-            }
-            .width(26)
-            .customizationID("flag")
-
-            TableColumn("⚠︎") { file in
-                WarningBadgeCell(model: model, file: file)   // non-standard PDF: unreadable / no text layer
-            }
-            .width(24)
-            .customizationID("warning")
-
-            TableColumn("Document date", sortUsing: ArchiveFileComparator(field: .date)) { file in
-                DateCell(model: model, file: file)   // click to edit year/month/day/uncertain
-            }
-            .width(min: 110, ideal: 140)
-            .customizationID("date")
-
-            TableColumn("File name", sortUsing: ArchiveFileComparator(field: .name)) { file in
-                HStack(spacing: 6) {
-                    if let color = file.color {
-                        Image(systemName: "circle.fill")
-                            .foregroundStyle(color == .box ? .red : .purple)
-                            .font(.system(size: 8))
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(file.name).lineLimit(1).truncationMode(.middle)
-                        // When another displayed row shares this filename, surface the containing folder
-                        // so the colliding rows can be told apart (read-only display aid; DuplicateNames).
-                        if model.isDuplicatedName(file.name) {
-                            Label(DuplicateNames.disambiguator(for: file.url), systemImage: "folder")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                    }
-                }
-            }
-            .width(min: 200, ideal: 320)
-            .customizationID("name")
-
-            TableColumn("Type", sortUsing: ArchiveFileComparator(field: .fileType)) { file in
-                Text(file.fileType).foregroundStyle(.secondary)
-            }
-            .width(min: 44, ideal: 56)
-            .customizationID("type")
-
-            TableColumn("File tags", sortUsing: ArchiveFileComparator(field: .subjects)) { file in
-                TagsCell(model: model, file: file)   // click to add/remove this file's tags
-            }
-            .width(min: 160, ideal: 300)
-            .customizationID("tags")
-
-            TableColumn("Priority", sortUsing: ArchiveFileComparator(field: .priority)) { file in
-                PriorityCell(model: model, file: file)
-            }
-            .width(min: 60, ideal: 72)
-            .customizationID("priority")
-
-            TableColumn("Read", sortUsing: ArchiveFileComparator(field: .readState)) { file in
-                ReadStateCell(model: model, file: file)
-            }
-            .width(min: 70, ideal: 84)
-            .customizationID("read")
-        }
-        .contextMenu(forSelectionType: ArchiveFile.ID.self) { _ in
-            Button("Open in Document View") { openSelection() }
-            Button("Preview") { model.showingPreview = true }
-            Button("Reveal in Finder") { model.revealInFinder() }
-            Button("Open in Default App") { model.openInDefaultApp() }
-            Button("Copy Link(s)") { model.copyLinks() }
-            Divider()
-            Button("Mark Read") { model.mark(.read) }
-            Button("Mark Unread") { model.mark(.unread) }
-            Button("Toggle Flag") { model.toggleFlagSelection() }
-            Button("Edit Tags…") { model.showingEditor = true }
-            Divider()
-            Button("Select Document Run") { model.extendSelectionToDocumentRun() }
-        } primaryAction: { _ in
-            openSelection()   // double-click opens
-        }
+        AppKitTableView(
+            model: model,
+            selection: $model.selection,
+            fontSize: listFontSize,
+            scrollRequest: model.scrollRequest,
+            scrollTargetID: model.scrollTargetID,
+            onDoubleClick: { openSelection() },
+            buildContextMenu: { _ in buildNSContextMenu() }
+        )
         .overlay { tableOverlay }
         // Focus-scoped Space → preview (fires only when the list has key focus, so Space still types
         // into the filter text fields).
@@ -189,7 +104,7 @@ struct NavigationWindowView: View {
         // G4 keyboard triage — a focus-scoped key cluster (fires only when the list has key focus, so it
         // never triggers while typing in the filter / search fields, and bare keys don't shadow the ⌘
         // menu accelerators). Physical cluster on a US layout: [ = previous unread, ] = next unread,
-        // \ = mark read & advance. Modifier-carrying presses (e.g. ⌘]) are ignored so the menu owns them.
+        // \ = mark read & advance.
         .onKeyPress(characters: CharacterSet(charactersIn: "[]\\"), phases: .down) { press in
             guard press.modifiers.isEmpty else { return .ignored }
             switch press.characters {
@@ -199,21 +114,32 @@ struct NavigationWindowView: View {
             default:   return .ignored
             }
         }
-        // Reveal the row a triage action just selected (next/previous-unread, mark-read-and-advance).
-        .onChange(of: model.scrollRequest) {
-            if let id = model.scrollTargetID { withAnimation { proxy.scrollTo(id) } }
+    }
+
+    /// Build an NSMenu for the table's right-click context menu (bridges SwiftUI actions to AppKit).
+    private func buildNSContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open in Document View", action: #selector(ContextMenuActions.openInDocView), keyEquivalent: "")
+        menu.addItem(withTitle: "Preview", action: #selector(ContextMenuActions.preview), keyEquivalent: "")
+        menu.addItem(withTitle: "Reveal in Finder", action: #selector(ContextMenuActions.revealInFinder), keyEquivalent: "")
+        menu.addItem(withTitle: "Open in Default App", action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
+        menu.addItem(withTitle: "Copy Link(s)", action: #selector(ContextMenuActions.copyLinks), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
+        menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
+        menu.addItem(withTitle: "Toggle Flag", action: #selector(ContextMenuActions.toggleFlag), keyEquivalent: "")
+        menu.addItem(withTitle: "Edit Tags…", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Select Document Run", action: #selector(ContextMenuActions.selectDocRun), keyEquivalent: "")
+
+        // Wire each item's target to a trampoline that captures the model.
+        let trampoline = ContextMenuActions(model: model, openSelection: { openSelection() })
+        // Prevent deallocation during menu tracking by retaining via objc association.
+        objc_setAssociatedObject(menu, "trampoline", trampoline, .OBJC_ASSOCIATION_RETAIN)
+        for item in menu.items where !item.isSeparatorItem {
+            item.target = trampoline
         }
-        .font(.system(size: listFontSize))   // C3: list density / readability (persisted)
-        .onChange(of: columnCustomization) { _, c in
-            if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: "ar.columnCustomization") }
-        }
-        .onAppear {
-            if let d = UserDefaults.standard.data(forKey: "ar.columnCustomization"),
-               let c = try? JSONDecoder().decode(TableColumnCustomization<ArchiveFile>.self, from: d) {
-                columnCustomization = c
-            }
-        }
-        }   // ScrollViewReader
+        return menu
     }
 
     /// Status overlay on the results area so the user always knows what's happening — most importantly
@@ -334,7 +260,7 @@ struct NavigationWindowView: View {
 
             subjectFilterField
 
-            TextField("Filter file name…", text: $model.filter.searchText)
+            TextField("Filter file name…", text: $model.filterSearchText)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)
                 .help("Filter the list by file name")
@@ -367,11 +293,12 @@ struct NavigationWindowView: View {
 
             Spacer()
 
-            if model.filter.isActive || model.ftsPaths != nil {
+            if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
                 Button("Save as Smart Folder") { model.showingSaveDialog = true }
                     .help("Save these filters as a smart folder in the sidebar")
                 Button("Clear") {
                     model.filter = LibraryFilter()
+                    model.filterSearchText = ""
                     model.fullTextQuery = ""
                     model.runFullTextSearch()
                 }
@@ -610,4 +537,25 @@ struct FlowLayout: Layout {
             rowH = max(rowH, s.height)
         }
     }
+}
+
+/// NSObject trampoline for the AppKit context menu — routes `NSMenuItem` actions to
+/// `NavigationModel` methods. Retained by the `NSMenu` via `objc_setAssociatedObject`.
+@MainActor
+final class ContextMenuActions: NSObject {
+    let model: NavigationModel
+    let openSelection: () -> Void
+    init(model: NavigationModel, openSelection: @escaping () -> Void) {
+        self.model = model; self.openSelection = openSelection
+    }
+    @objc func openInDocView()    { openSelection() }
+    @objc func preview()          { model.showingPreview = true }
+    @objc func revealInFinder()   { model.revealInFinder() }
+    @objc func openInDefaultApp() { model.openInDefaultApp() }
+    @objc func copyLinks()        { model.copyLinks() }
+    @objc func markRead()         { model.mark(.read) }
+    @objc func markUnread()       { model.mark(.unread) }
+    @objc func toggleFlag()       { model.toggleFlagSelection() }
+    @objc func editTags()         { model.showingEditor = true }
+    @objc func selectDocRun()     { model.extendSelectionToDocumentRun() }
 }

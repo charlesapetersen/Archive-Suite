@@ -25,6 +25,9 @@ final class NavigationModel: ObservableObject {
     let savedSearches = SavedSearchStore()
 
     @Published var filter = LibraryFilter()
+    /// The text field binds to this; a debounce pipeline copies it into `filter.searchText` after
+    /// a 150 ms pause so recompute doesn't fire on every keystroke at 40k+ rows.
+    @Published var filterSearchText = ""
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection(); refreshSelectionCache() } }
     @Published var fullTextQuery = ""
@@ -62,6 +65,7 @@ final class NavigationModel: ObservableObject {
         filter.read = AppSettings.defaultReadFilter
         filter.subjectCombine = AppSettings.defaultSubjectCombine
         restoreViewState()   // last session's filter + sort override the defaults (C2)
+        filterSearchText = filter.searchText   // seed from restored state
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
         library.$files
@@ -70,6 +74,15 @@ final class NavigationModel: ObservableObject {
             // — which made the list show 0 of N. receive(on:) defers until after the value commits.
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.libraryDidChange() } }
+            .store(in: &cancellables)
+        // Debounce the filename search text — 150 ms pause before recomputing (fixes the typing
+        // beachball at 40k+ rows by keeping recompute off the per-keystroke path).
+        $filterSearchText
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
+            .sink { [weak self] text in MainActor.assumeIsolated {
+                guard let self, self.filter.searchText != text else { return }
+                self.filter.searchText = text
+            } }
             .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated {
@@ -155,6 +168,7 @@ final class NavigationModel: ObservableObject {
             statusMessage = "Saved search’s folder scope isn’t under the current archive root — showing the whole root."
         }
         filter = f
+        filterSearchText = f.searchText   // keep the debounced text field in sync
         fullTextQuery = search.fullTextQuery
         runFullTextSearch()   // updates ftsPaths + recompute; filter change also recomputes
     }
@@ -461,6 +475,7 @@ final class NavigationModel: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url {
             rootStore.setRoot(url)
             filter.pathPrefix = nil   // a folder scope from the old root can't apply to a new one
+            filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong
             // results while the search box + FTS indicator stay lit. Clear the full-text search so the
