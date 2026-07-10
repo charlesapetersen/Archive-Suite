@@ -102,15 +102,26 @@ final class DocumentViewerModel: ObservableObject {
         leftController.findAndSelect(query)
     }
 
+    private static let imageExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "tiff", "tif", "heic", "heif", "bmp", "gif"
+    ]
+
     private func loadCurrent() {
         guard urls.indices.contains(index) else { current = nil; loadError = nil; return }
         let url = urls[index]
         if let doc = PDFDocument(url: url) {
             current = doc
             loadError = doc.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
+        } else if Self.imageExtensions.contains(url.pathExtension.lowercased()),
+                  let image = NSImage(contentsOf: url),
+                  let page = PDFPage(image: image) {
+            let doc = PDFDocument()
+            doc.insert(page, at: 0)
+            current = doc
+            loadError = nil
         } else {
             current = nil
-            loadError = "Could not open “\(url.lastPathComponent)” (missing, corrupt, or not a PDF)."
+            loadError = "Could not open “\(url.lastPathComponent)” (missing, corrupt, or unsupported format)."
         }
     }
 }

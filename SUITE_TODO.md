@@ -162,9 +162,9 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   publishes the viewer model so the existing Document menu ⌘0 (Fit Page) + zoom shortcuts reach the
   preview. Build clean, 191 tests green. GUI-verify: Document menu confirmed; preview-specific test
   deferred (scratch corpus not Spotlight-indexed). | done
-- [ ] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images currently degrade; add an image
-  view path so they open in the viewer + preview. | files: Views/PDFPaneView.swift (or a new image pane),
-  Views/DocumentWindowView.swift, Views/PreviewSheet.swift | M | low
+- [x] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF)
+  now open in viewer + preview via PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent().
+  Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
