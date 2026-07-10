@@ -315,7 +315,7 @@ struct NavigationWindowView: View {
     /// Existing tags offered for autocomplete — the library's distinct topical tags, minus any already
     /// chosen. (`allSubjects` is the deduped topical-tag set the model already maintains.)
     private var tagSuggestions: [String] {
-        model.allSubjects.filter { !model.filter.subjects.contains($0) }
+        model.allSubjects.filter { !model.filter.subjects.contains($0) && !DocumentTags.isDateFacetLike($0) }
     }
     private var subjectFilterField: some View {
         HStack(spacing: 4) {
