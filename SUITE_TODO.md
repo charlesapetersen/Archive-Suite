@@ -133,13 +133,13 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `TagWriter`). | files: Views/AppKitTableView.swift, Views/SubjectTokenField.swift, Views/InlineEditCells.swift | M | med
 
 ### Archive Reader — tag cloud & filters
-- [ ] **No dates in the tag cloud** — exclude Year/Month/Day **and decade** facets; show subjects only
+- [x] **No dates in the tag cloud** — exclude Year/Month/Day **and decade** facets; show subjects only
   (facet classification already exists in `DocumentTags`). | files: Views/NavigationWindowView.swift
-  (tag-cloud panel), Core/DocumentTags.swift | S | low
+  (tag-cloud panel), Core/DocumentTags.swift | S | low | done
 - [ ] **Remove date tags from the tag filter search** — months/years/decades must not appear as
   suggestions/targets in the tag filter field. | files: Views/TagFilterField.swift, Core/DocumentTags.swift | S | low
-- [ ] **Logarithmic tag-cloud sizing** — size by `log(count)` (or similar) so a 1000-count outlier doesn't
-  crush the 2/10/20/100/1000 gradient into uniformly tiny text. | files: Views/NavigationWindowView.swift | S | low
+- [x] **Logarithmic tag-cloud sizing** — size by `log(count)` (or similar) so a 1000-count outlier doesn't
+  crush the 2/10/20/100/1000 gradient into uniformly tiny text. | files: Views/NavigationWindowView.swift | S | low | done
 - [ ] **Wrap (not clip) file tags in the list** — assess feasibility in the AppKit cell; **if hard → move to
   `ArchiveReader/POTENTIAL_FEATURES.md`** (owner). | files: Views/AppKitTableView.swift | S | low
 

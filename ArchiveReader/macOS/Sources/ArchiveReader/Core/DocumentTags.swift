@@ -220,4 +220,24 @@ extension DocumentTags {
         guard (3...4).contains(s.count), s.allSatisfy(\.isNumber), let y = Int(s) else { return nil }
         return y
     }
+
+    /// "1970s"-style decade token (4-digit number + trailing "s").
+    static func parseDecade(_ s: String) -> Int? {
+        guard s.count == 5, s.hasSuffix("s"), let y = Int(s.dropLast()), y % 10 == 0 else { return nil }
+        return y
+    }
+
+    /// True if the trimmed token looks like ANY date facet (year, month, day, decade, "Date Uncertain").
+    /// Used to keep date-like tokens out of display surfaces (tag cloud, tag filter suggestions) even
+    /// when they were demoted to `subjects` during a facet collision.
+    static func isDateFacetLike(_ tag: String) -> Bool {
+        let s = tag.trimmingCharacters(in: .whitespaces)
+        if s.isEmpty { return false }
+        if s.caseInsensitiveCompare("Date Uncertain") == .orderedSame { return true }
+        if parseYear(s) != nil { return true }
+        if parseMonth(s) != nil { return true }
+        if parseDay(s) != nil { return true }
+        if parseDecade(s) != nil { return true }
+        return false
+    }
 }

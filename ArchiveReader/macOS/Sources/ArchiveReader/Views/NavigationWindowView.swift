@@ -226,9 +226,13 @@ struct NavigationWindowView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
-    /// Map a tag's file-count to a font size (11…26 pt) relative to the most common visible tag.
+    /// Map a tag's file-count to a font size (11…26 pt) using **logarithmic** scaling so high-count
+    /// outliers don't crush mid-range tags into uniformly tiny text.
+    /// Gradient at maxCount=1000: count 1→11pt, 10→16pt, 100→21pt, 1000→26pt.
     private func tagCloudFontSize(_ count: Int, max maxCount: Int) -> CGFloat {
-        11 + (CGFloat(count) / CGFloat(maxCount)) * 15
+        guard maxCount > 1 else { return 14 }
+        let ratio = log(Double(max(1, count))) / log(Double(maxCount))
+        return 11 + CGFloat(ratio) * 15
     }
 
     // MARK: Filter bar

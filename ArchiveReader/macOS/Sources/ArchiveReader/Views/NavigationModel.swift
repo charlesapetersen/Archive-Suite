@@ -375,14 +375,17 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Tag cloud over the *currently displayed* rows: each **subject** tag with the number of visible
-    /// files carrying it, alphabetical (the view scales font size by count). Counts each tag once per
-    /// file. Built from `subjects` (not `topicalTags`) so clicking a chip is always a valid subject
-    /// filter — priority (P7–P10) and marker-color have their own dedicated controls, and including
-    /// them here would filter to an empty list (they never appear in `file.subjects`).
+    /// files carrying it, alphabetical (the view scales font size by count via log). Counts each tag
+    /// once per file. Built from `subjects` (not `topicalTags`) so clicking a chip is always a valid
+    /// subject filter — priority (P7–P10) and marker-color have their own dedicated controls.
+    /// Date-facet-like tokens (year/month/day/decade) are excluded even if they were demoted to
+    /// `subjects` during a facet collision — they clutter the cloud and have their own column.
     var tagCloud: [(tag: String, count: Int)] {
         var counts: [String: Int] = [:]
         for f in displayed {
-            for t in Set(f.subjects) { counts[t, default: 0] += 1 }
+            for t in Set(f.subjects) where !DocumentTags.isDateFacetLike(t) {
+                counts[t, default: 0] += 1
+            }
         }
         return counts.map { (tag: $0.key, count: $0.value) }
             .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
