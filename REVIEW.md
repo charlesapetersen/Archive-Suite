@@ -43,10 +43,16 @@ Highest-risk first. Paths are repo-root-relative.
 | 4 | Processor/Tagging+Models | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/ ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/` | tag/PDF SPEC, Keychain, settings |
 | 5 | Processor/Views | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/` | resource/perf, main-thread work, state desync |
 | 6 | Android companion | `ArchiveProcessor/ArchiveCapture/` | capture path, wire protocol, lifecycle |
-| 7 | iOS companion | `ArchiveProcessor/ArchiveCaptureiOS/` | capture path, wire protocol, OAuth token exchange |
+| ~~7~~ | ~~iOS companion~~ | **ON HOLD — skip** (maintain-only; see SUITE_TODO "Project focus") | — |
 | 8 | Reader/Core | `ArchiveReader/macOS/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
 | 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
 | 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety |
+
+**Scope (owner, 2026-07-09 — see SUITE_TODO "Project focus & ON-HOLD"):** the **iOS companion (unit 7) is
+ON HOLD — skip it.** For **Processor/Net (unit 2)**, review the **LAN/USB** transmission surface
+(`CaptureServer`, `CaptureReceiver`, `CaptureValidation`, `USBBridge`, `RelayObjectFormat` as a contract) but
+**skip the cloud/Drive relay** (`DriveObjectStore`, `DriveClient`, `DriveAuth`, `FileRelayReceiver` cloud
+path) — it's maintain-only. Everything else (Capture, OCR, Tagging, Views, **Android**, Reader) reviews as normal.
 
 ## How to run one unit
 

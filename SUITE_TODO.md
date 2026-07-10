@@ -11,11 +11,29 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
+
+**Focus now:** the **wired (USB) + wireless (LAN/Wi-Fi) phone↔Mac transmission** path and the **Android**
+companion — plus the core Mac pipeline (OCR/tag/PDF/finalize) and the Reader, which continue as normal.
+
+**ON HOLD — maintain-only** (keep them compiling / mirror shared-contract changes so they don't rot, but
+**no new feature development, and NOT a code-review or bug-fix target**):
+- **iOS companion** — `ArchiveProcessor/ArchiveCaptureiOS/`.
+- **Cloud (Google Drive) relay transport** — Mac `Net/{DriveObjectStore,DriveClient,DriveAuth}.swift` + the
+  `FileRelayReceiver`/`RelayObjectStore` cloud path (incl. the offline `FileRelay` stand-in); both companions'
+  `DriveRelayTransport`/`DriveAuth`/`DriveClient`. The `RelayObjectFormat` wire contract stays frozen — only
+  mirror it if a focused change forces it.
+
+*Maintain-only* means: if a protocol/SPEC change on the focus path (LAN/USB, Android) requires it, mirror the
+minimum into iOS/cloud so they still build — but don't invest effort or reviews there. **Code reviews + fixes
+concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, non-Drive `Net/`), USB
+(`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
+
 ## Active execution plans (`execution-plans/`)
 - **`index-parallelization.md`** — parallelize + batch the Reader content-index build (Reader/Core review
   finding, 2026-07-09; Tier-2, read-only, no SPEC/TagWriter change; est. ~4–8× on first-run/re-index over
-  ~150k PDFs). **Design only — not started.** Owner to decide: implement (near-term Reader perf) or move to
-  `ArchiveReader/POTENTIAL_FEATURES.md`.
+  ~150k PDFs). **Approved to implement (owner, 2026-07-09)** — tracked as the checkbox item under
+  *P2 — Reader performance* below. Proposed defaults: `workers = cores − 2`, `synchronous = NORMAL`.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -47,6 +65,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - ~~Side-by-side compare of two selected documents~~ — **dropped (owner: not doing this), 2026-07-06.**
 
 **→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
+
+## P2 — Reader performance
+- [ ] **Parallelize + batch the content-index build** — see `execution-plans/index-parallelization.md`.
+  Replace the serial one-file-at-a-time indexer with a bounded parallel `withTaskGroup` (extraction fans
+  out across cores; DB writes stay serialized through the `ContentIndex` actor), batch upserts into
+  transactions (`upsertBatch`), add WAL + `synchronous=NORMAL`, and a one-query `existingMTimes()` skip-map
+  (also speeds the warm-reopen scan). UI-responsiveness guard: `workers = cores − 2` + `.utility` QoS so a
+  full-core parse storm can't starve the main thread; WAL lets search run during a pass. Est. ~4–8× on
+  first-run/re-index over ~150k PDFs. **Tier-2** (actor isolation) — worktree + adversarial review + a
+  concurrent-extraction test on scratch PDFs (never the corpus); no SPEC/`TagWriter` change, no new write
+  surface. | files: Search/ContentIndex.swift, Search/ContentIndexer.swift (+tests) | M | med · needs: none
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
