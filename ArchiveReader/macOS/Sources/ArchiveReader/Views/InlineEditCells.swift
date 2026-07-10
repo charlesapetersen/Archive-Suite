@@ -75,8 +75,8 @@ struct DateCell: View {
             HStack {
                 Text("Year").frame(width: 44, alignment: .leading)
                 TextField("e.g. 1980", text: $yearText).frame(width: 90)
-                Button("Set") { if let y = Int(yearText), y > 0 { model.applyEdit(.setYear(y), to: file) } }
-                    .disabled(Int(yearText).map { $0 <= 0 } ?? true)
+                Button("Set") { if let y = Int(yearText), (100...9999).contains(y) { model.applyEdit(.setYear(y), to: file) } }
+                    .disabled(Int(yearText).map { !(100...9999).contains($0) } ?? true)
                 Button("Clear") { model.applyEdit(.setYear(nil), to: file); yearText = "" }
             }
             HStack {

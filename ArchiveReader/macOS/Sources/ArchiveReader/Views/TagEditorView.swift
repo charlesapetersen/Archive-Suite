@@ -99,8 +99,8 @@ struct TagEditorView: View {
             HStack {
                 Text("Year").frame(width: 52, alignment: .leading)
                 TextField(yearPlaceholder(s), text: $yearDraft).textFieldStyle(.roundedBorder).frame(width: 90)
-                Button("Set") { if let y = Int(yearDraft) { model.applyEdit(.setYear(y)) } }
-                    .disabled(Int(yearDraft) == nil)
+                Button("Set") { if let y = Int(yearDraft), (100...9999).contains(y) { model.applyEdit(.setYear(y)) } }
+                    .disabled(Int(yearDraft).map { !(100...9999).contains($0) } ?? true)
                 Button("Clear") { model.applyEdit(.setYear(nil)); yearDraft = "" }
             }
             HStack {

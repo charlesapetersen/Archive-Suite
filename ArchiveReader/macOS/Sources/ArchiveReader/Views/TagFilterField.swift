@@ -41,7 +41,7 @@ struct TagFilterField: NSViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, NSComboBoxDelegate {
+    @MainActor final class Coordinator: NSObject, NSComboBoxDelegate {
         var onAdd: (String) -> Void
         var items: [String] = []
         var lastFocusToken = 0
