@@ -79,20 +79,18 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 **→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
 
 ## P2 — Reader performance
-- [ ] **Parallelize + batch the content-index build (+ bm25 ranked search)** — see
-  `execution-plans/index-parallelization.md` (design verified against the code). *Part A (build speed):*
-  bounded parallel `withTaskGroup` extraction (DB writes stay serialized through the `ContentIndex`
-  actor) + batched `upsertBatch` transactions + WAL/`synchronous=NORMAL` + one-query `existingMTimes()`
-  skip-map (also speeds warm reopen) + actor-isolated end-of-pass maintenance (incremental `merge` each
-  pass, full `optimize` only on bulk build, then `wal_checkpoint(TRUNCATE)`). UI guard: `workers =
-  cores − 2` + `.utility` QoS. *Part B:* auto-refresh the active FTS query on pass completion (mid-pass
-  results under-report today). *Part C (bm25):* relevance-ranked search — a 5-point change (SQL `ORDER BY
-  bm25` **+** drop the `Set` wrap in `ContentIndexer.search` **+** widen `ftsPaths` to carry rank **+**
-  order `base` by rank in `recompute()` **+** a `.relevance` `LibrarySort` auto-selected while a query is
-  active); **no** snippet previews (→ `POTENTIAL_FEATURES.md`). Est. ~4–8× build. **Tier-2** (actor
-  isolation) — worktree + adversarial review + concurrent-extraction test on scratch PDFs (never the
-  corpus). | files: Search/ContentIndex.swift, Search/ContentIndexer.swift, Views/NavigationModel.swift,
-  Core/LibraryFilter.swift (+tests) | L | med · needs: none (GUI-verify relevance sort)
+- [x] **Parallelize + batch the content-index build** *(Part A — build speed)* — bounded parallel
+  `withTaskGroup` extraction + `upsertBatch` + WAL/`synchronous=NORMAL` + `existingMTimes()` +
+  `performMaintenance`. 185 tests green. Tier-2 APPROVE. | done
+- [ ] **Ranked (bm25) search + search-during-index refresh** *(Parts B+C)* — see
+  `execution-plans/index-parallelization.md`. *Part B:* auto-refresh the active FTS query on pass
+  completion (mid-pass results under-report today). *Part C (bm25):* relevance-ranked search — a
+  5-point change (SQL `ORDER BY bm25` **+** drop the `Set` wrap in `ContentIndexer.search` **+**
+  widen `ftsPaths` to carry rank **+** order `base` by rank in `recompute()` **+** a `.relevance`
+  `LibrarySort` auto-selected while a query is active); **no** snippet previews (→
+  `POTENTIAL_FEATURES.md`). **Tier-2** (actor isolation). | files: Search/ContentIndex.swift,
+  Search/ContentIndexer.swift, Views/NavigationModel.swift, Core/LibraryFilter.swift (+tests) | M |
+  med · needs: none (GUI-verify relevance sort)
 - [ ] **Prune the content index** — see `execution-plans/index-pruning.md`. Gated cache eviction of rows
   for files no longer under the current root (bounds DB growth; corrects corpus-wide counts at source).
   **Do after the parallelization item** (reuses `existingMTimes`/batch patterns). Ship ONLY behind the

@@ -30,7 +30,7 @@ final class ContentIndexer: ObservableObject {
         index = ContentIndex(url: dir.appendingPathComponent("content-index-v2.sqlite3"))
     }
 
-    /// Incrementally index the given files (skips unchanged content via `needsIndex`).
+    /// Incrementally index the given files (skips unchanged content via `existingMTimes`).
     ///
     /// - An **empty** set means the library was cleared (a scope change, or no tagged files): cancel any
     ///   in-flight pass and drop queued work so a stale-scope pass can't starve the new scope. The next
@@ -53,31 +53,111 @@ final class ContentIndexer: ObservableObject {
         generation += 1
         let gen = generation
         let idx = index
+        // Reserve cores for the main thread + system: at least 1 worker, leave 2 cores free.
+        let workers = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         task = Task.detached(priority: .utility) { [weak self] in
             try? await idx.open()
-            let total = files.count
-            await self?.report((0, total), gen)
-            var done = 0
-            for f in files {
-                if Task.isCancelled { break }
-                let path = f.url.path
+            // Pull all stored mtimes in one query to partition work without per-file actor round-trips.
+            let existing = await idx.existingMTimes()
+            let work = files.filter { f in
                 let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
-                if await idx.needsIndex(path: path, mtime: mtime) {
-                    if let content = PDFTextExtractor.extract(f.url) {
-                        try? await idx.upsert(path: path, mtime: mtime, name: f.name,
-                                              classification: content.classification, body: content.body,
-                                              pageCount: content.pageCount, hasText: !content.body.isEmpty, readable: true)
-                    } else {
-                        // Unreadable (corrupt / encrypted / non-PDF): still record it so it's surfaced as
-                        // needing attention, and so we don't retry the failed extraction every pass.
-                        try? await idx.upsert(path: path, mtime: mtime, name: f.name,
-                                              classification: nil, body: "",
-                                              pageCount: 0, hasText: false, readable: false)
+                guard let stored = existing[f.url.path] else { return true }
+                return stored != mtime
+            }
+            let total = files.count
+            let skipped = total - work.count
+            await self?.report((skipped, total), gen)
+            if work.isEmpty {
+                await self?.finish(gen)
+                return
+            }
+
+            // Parallel extraction: bounded task group (width = workers). Each child captures
+            // primitives only, runs PDFTextExtractor off-actor, returns a Sendable IndexRow.
+            // DB writes stay serialized through the ContentIndex actor via batched upserts.
+            let batchSize = 500
+            var batch: [IndexRow] = []
+            batch.reserveCapacity(batchSize)
+            var done = skipped
+            var rowsIndexed = 0
+
+            await withTaskGroup(of: IndexRow?.self) { group in
+                var queued = 0
+                var workIter = work.makeIterator()
+
+                // Seed the group with `workers` tasks.
+                while queued < workers, let f = workIter.next() {
+                    let url = f.url
+                    let path = f.url.path
+                    let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
+                    let name = f.name
+                    group.addTask(priority: .utility) {
+                        guard !Task.isCancelled else { return nil }
+                        if let content = PDFTextExtractor.extract(url) {
+                            return IndexRow(path: path, mtime: mtime, name: name,
+                                            classification: content.classification, body: content.body,
+                                            pageCount: content.pageCount,
+                                            hasText: !content.body.isEmpty, readable: true)
+                        } else {
+                            return IndexRow(path: path, mtime: mtime, name: name,
+                                            classification: nil, body: "",
+                                            pageCount: 0, hasText: false, readable: false)
+                        }
+                    }
+                    queued += 1
+                }
+
+                // As each child completes, enqueue the next file and collect rows for batching.
+                for await row in group {
+                    if Task.isCancelled { group.cancelAll(); break }
+                    if let row {
+                        batch.append(row)
+                        rowsIndexed += 1
+                    }
+                    done += 1
+
+                    // Flush the batch when full.
+                    if batch.count >= batchSize {
+                        try? await idx.upsertBatch(batch)
+                        batch.removeAll(keepingCapacity: true)
+                    }
+
+                    // Progress reporting (every 100 files or at the end).
+                    if done % 100 == 0 || done == total {
+                        await self?.report((done, total), gen)
+                    }
+
+                    // Feed the next file into the group.
+                    if let f = workIter.next() {
+                        let url = f.url
+                        let path = f.url.path
+                        let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
+                        let name = f.name
+                        group.addTask(priority: .utility) {
+                            guard !Task.isCancelled else { return nil }
+                            if let content = PDFTextExtractor.extract(url) {
+                                return IndexRow(path: path, mtime: mtime, name: name,
+                                                classification: content.classification, body: content.body,
+                                                pageCount: content.pageCount,
+                                                hasText: !content.body.isEmpty, readable: true)
+                            } else {
+                                return IndexRow(path: path, mtime: mtime, name: name,
+                                                classification: nil, body: "",
+                                                pageCount: 0, hasText: false, readable: false)
+                            }
+                        }
                     }
                 }
-                done += 1
-                if done % 100 == 0 || done == total { await self?.report((done, total), gen) }
             }
+
+            // Flush any remaining rows.
+            if !batch.isEmpty {
+                try? await idx.upsertBatch(batch)
+            }
+
+            // Post-pass maintenance (actor-isolated): merge FTS segments + truncate WAL.
+            await idx.performMaintenance(rowsIndexed: rowsIndexed)
+
             await self?.finish(gen)
         }
     }

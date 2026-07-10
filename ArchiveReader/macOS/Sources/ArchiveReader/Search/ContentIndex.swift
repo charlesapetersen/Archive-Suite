@@ -1,6 +1,19 @@
 import Foundation
 import SQLite3
 
+/// A row of extracted content ready for batch insertion. `Sendable` so task-group children
+/// can return it safely.
+struct IndexRow: Sendable {
+    let path: String
+    let mtime: Double
+    let name: String
+    let classification: String?
+    let body: String
+    let pageCount: Int
+    let hasText: Bool
+    let readable: Bool
+}
+
 /// A disposable, rebuildable full-text index over the OCR body text of the corpus, backed by the
 /// **system SQLite** FTS5 engine (`import SQLite3` — no third-party dependency). The filesystem +
 /// tags remain the source of truth; deleting this DB loses nothing (it re-indexes on next launch).
@@ -28,6 +41,11 @@ actor ContentIndex {
             throw IndexError.open(message)
         }
         sqlite3_busy_timeout(db, 3000)
+        // WAL + relaxed sync: cheaper batched writes, fewer fsyncs. Safe because the DB is a
+        // disposable cache — a crash just means re-indexing. performMaintenance truncates the
+        // -wal/-shm sidecars after each pass.
+        try exec("PRAGMA journal_mode = WAL;")
+        try exec("PRAGMA synchronous = NORMAL;")
         // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.
         // `page_count`/`has_text`/`readable` carry the non-standard-PDF detection (display + triage);
         // a fresh v2 DB filename (see ContentIndexer) means every row is written with these columns.
@@ -50,42 +68,83 @@ actor ContentIndex {
         return true
     }
 
+    /// All stored (path, mtime) pairs in one query — the indexer pulls this once to partition
+    /// files into work (mtime differs) vs skipped, instead of a serialized `needsIndex` per file.
+    func existingMTimes() -> [String: Double] {
+        guard let stmt = prepare("SELECT path, mtime FROM files;") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var map: [String: Double] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 0) {
+                map[String(cString: c)] = sqlite3_column_double(stmt, 1)
+            }
+        }
+        return map
+    }
+
     /// Insert or replace the indexed text + format-detection flags for one file. `readable=false`
     /// records an unreadable/non-PDF file (empty body) so it can still be surfaced as needing attention.
     func upsert(path: String, mtime: Double, name: String, classification: String?, body: String,
                 pageCount: Int = 0, hasText: Bool = true, readable: Bool = true) throws {
-        try exec("BEGIN;")
+        try exec("BEGIN IMMEDIATE;")
         do {
-            var rowid: Int64? = nil
-            if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
-                bindText(sel, 1, path)
-                if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
-                sqlite3_finalize(sel)
-            }
-            if let rowid {
-                try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-                try run("UPDATE files SET mtime = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
-                    sqlite3_bind_double($0, 1, mtime)
-                    sqlite3_bind_int($0, 2, Int32(pageCount))
-                    sqlite3_bind_int($0, 3, hasText ? 1 : 0)
-                    sqlite3_bind_int($0, 4, readable ? 1 : 0)
-                    sqlite3_bind_int64($0, 5, rowid)
-                }
-                try insertFTS(rowid: rowid, body: body, classification: classification, name: name, path: path)
-            } else {
-                try run("INSERT INTO files(path, mtime, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?);") {
-                    self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
-                    sqlite3_bind_int($0, 3, Int32(pageCount))
-                    sqlite3_bind_int($0, 4, hasText ? 1 : 0)
-                    sqlite3_bind_int($0, 5, readable ? 1 : 0)
-                }
-                let newRow = sqlite3_last_insert_rowid(db)
-                try insertFTS(rowid: newRow, body: body, classification: classification, name: name, path: path)
+            try upsertRow(path: path, mtime: mtime, name: name, classification: classification,
+                          body: body, pageCount: pageCount, hasText: hasText, readable: readable)
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Batch-insert multiple rows in one transaction. All extraction must be done BEFORE calling
+    /// this — no `await`/suspension between BEGIN and COMMIT (actor-reentrancy invariant: the
+    /// synchronous exec/prepare/run/insertFTS calls must not be interleaved by another actor call).
+    func upsertBatch(_ rows: [IndexRow]) throws {
+        guard !rows.isEmpty else { return }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            for row in rows {
+                try upsertRow(path: row.path, mtime: row.mtime, name: row.name,
+                              classification: row.classification, body: row.body,
+                              pageCount: row.pageCount, hasText: row.hasText, readable: row.readable)
             }
             try exec("COMMIT;")
         } catch {
             try? exec("ROLLBACK;")
             throw error
+        }
+    }
+
+    /// The body of a single-file upsert. Called inside an already-open transaction — no
+    /// BEGIN/COMMIT here. Fully synchronous (no await) to preserve the actor-reentrancy invariant.
+    private func upsertRow(path: String, mtime: Double, name: String, classification: String?,
+                           body: String, pageCount: Int, hasText: Bool, readable: Bool) throws {
+        var rowid: Int64? = nil
+        if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
+            bindText(sel, 1, path)
+            if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
+            sqlite3_finalize(sel)
+        }
+        if let rowid {
+            try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
+            try run("UPDATE files SET mtime = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
+                sqlite3_bind_double($0, 1, mtime)
+                sqlite3_bind_int($0, 2, Int32(pageCount))
+                sqlite3_bind_int($0, 3, hasText ? 1 : 0)
+                sqlite3_bind_int($0, 4, readable ? 1 : 0)
+                sqlite3_bind_int64($0, 5, rowid)
+            }
+            try insertFTS(rowid: rowid, body: body, classification: classification, name: name, path: path)
+        } else {
+            try run("INSERT INTO files(path, mtime, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?);") {
+                self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
+                sqlite3_bind_int($0, 3, Int32(pageCount))
+                sqlite3_bind_int($0, 4, hasText ? 1 : 0)
+                sqlite3_bind_int($0, 5, readable ? 1 : 0)
+            }
+            let newRow = sqlite3_last_insert_rowid(db)
+            try insertFTS(rowid: newRow, body: body, classification: classification, name: name, path: path)
         }
     }
 
@@ -190,6 +249,22 @@ actor ContentIndex {
         guard let stmt = prepare("SELECT count(*) FROM files;") else { return 0 }
         defer { sqlite3_finalize(stmt) }
         return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
+    }
+
+    /// Post-pass maintenance: merge FTS segments and truncate the WAL. Actor-isolated so the
+    /// sqlite3 handle is never touched off-actor. Skips on zero-row passes. Prefers incremental
+    /// merge on small passes; full optimize only on bulk builds (rewrites the entire index —
+    /// multi-second on 150k, blocks search for its duration, so it must not fire each pass).
+    func performMaintenance(rowsIndexed: Int) {
+        guard rowsIndexed > 0 else { return }
+        if rowsIndexed > 5000 {
+            try? exec("INSERT INTO fts(fts) VALUES('optimize');")
+        } else {
+            try? exec("INSERT INTO fts(fts, rank) VALUES('merge', 500);")
+        }
+        // Checkpoint: reclaim WAL space. TRUNCATE shrinks the -wal file; single-connection
+        // design means no concurrent reader can leave it partial. Busy result is non-fatal.
+        try? exec("PRAGMA wal_checkpoint(TRUNCATE);")
     }
 
     /// Build a safe FTS5 MATCH expression: `"term1" "term2"` (implicit AND), doubling embedded quotes.

@@ -157,6 +157,67 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    // --- upsertBatch parity: batch insert is searchable, count correct, reindex within batch replaces.
+    func testUpsertBatchParity() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        let rows: [IndexRow] = [
+            IndexRow(path: "/a.pdf", mtime: 1, name: "a", classification: "Document Start",
+                     body: "Senator Cold War budget", pageCount: 2, hasText: true, readable: true),
+            IndexRow(path: "/b.pdf", mtime: 1, name: "b", classification: nil,
+                     body: "Economic policy taxes", pageCount: 2, hasText: true, readable: true),
+        ]
+        try await idx.upsertBatch(rows)
+        let cold = await idx.search("Cold War")
+        XCTAssertEqual(cold, ["/a.pdf"])
+        let taxes = await idx.search("taxes")
+        XCTAssertEqual(taxes, ["/b.pdf"])
+        let count = await idx.indexedCount()
+        XCTAssertEqual(count, 2)
+        // Reindex within a second batch replaces old body.
+        let updated = [IndexRow(path: "/a.pdf", mtime: 2, name: "a", classification: nil,
+                                body: "oranges", pageCount: 1, hasText: true, readable: true)]
+        try await idx.upsertBatch(updated)
+        let coldGone = await idx.search("Cold War")
+        XCTAssertTrue(coldGone.isEmpty)
+        let oranges = await idx.search("oranges")
+        XCTAssertEqual(oranges, ["/a.pdf"])
+        let finalCount = await idx.indexedCount()
+        XCTAssertEqual(finalCount, 2) // still 2 files
+        await idx.close()
+    }
+
+    func testExistingMTimes() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        let empty = await idx.existingMTimes()
+        XCTAssertTrue(empty.isEmpty)
+        try await idx.upsert(path: "/a.pdf", mtime: 100, name: "a", classification: nil, body: "hello")
+        try await idx.upsert(path: "/b.pdf", mtime: 200, name: "b", classification: nil, body: "world")
+        let mtimes = await idx.existingMTimes()
+        XCTAssertEqual(mtimes.count, 2)
+        XCTAssertEqual(mtimes["/a.pdf"], 100)
+        XCTAssertEqual(mtimes["/b.pdf"], 200)
+        await idx.close()
+    }
+
+    func testPerformMaintenanceSearchable() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        let rows = (0..<10).map { i in
+            IndexRow(path: "/f\(i).pdf", mtime: 1, name: "f\(i)", classification: nil,
+                     body: "maintenance test body \(i)", pageCount: 1, hasText: true, readable: true)
+        }
+        try await idx.upsertBatch(rows)
+        await idx.performMaintenance(rowsIndexed: 10)  // incremental merge path
+        // Index must still be fully searchable after maintenance.
+        let hits = await idx.search("maintenance")
+        XCTAssertEqual(hits.count, 10)
+        // Zero-row pass should be a no-op (no crash).
+        await idx.performMaintenance(rowsIndexed: 0)
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFTextExtractor.parseClassification(from: page2), "Document Start")

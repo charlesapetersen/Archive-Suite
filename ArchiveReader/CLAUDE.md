@@ -188,6 +188,11 @@ writes against the real corpus — always a copy.
   Incremental (only new/changed files). It is a **disposable, rebuildable cache** — deleting it loses
   nothing; the corpus + tags remain authoritative. This powers v1 full-text search and segment-aware
   reading without relying on Spotlight content indexing (which was absent on the test copy).
+  **Parallel + batched build:** extraction runs in a bounded `withTaskGroup` (`cores − 2` workers,
+  `.utility` QoS) while DB writes stay serialized through the `ContentIndex` actor via `upsertBatch`
+  (~500-row transactions). WAL journal mode + `synchronous=NORMAL` for cheaper writes; `existingMTimes()`
+  one-query skip-map replaces per-file actor round-trips; actor-isolated `performMaintenance` (incremental
+  merge / full optimize + WAL checkpoint) compacts the FTS index after each pass.
 - **Reading model — the user decides which files open together.** Manual multi-selection in the nav
   window is the *definitive* grouping mechanism; **the app never auto-groups**. Segment/classification
   awareness is at most an *optional, opt-in convenience* (e.g. an "extend selection to the next
