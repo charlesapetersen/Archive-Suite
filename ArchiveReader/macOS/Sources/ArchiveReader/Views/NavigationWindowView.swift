@@ -300,13 +300,8 @@ struct NavigationWindowView: View {
             if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
                 Button("Save as Smart Folder") { model.showingSaveDialog = true }
                     .help("Save these filters as a smart folder in the sidebar")
-                Button("Clear") {
-                    model.filter = LibraryFilter()
-                    model.filterSearchText = ""
-                    model.fullTextQuery = ""
-                    model.runFullTextSearch()
-                }
-                .help("Clear all filters and searches")
+                Button("Clear") { model.clearUserFilters() }
+                    .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
             }
         }
         .padding(8)
@@ -379,7 +374,7 @@ struct NavigationWindowView: View {
                     Text("No saved searches")
                 } else {
                     ForEach(model.savedSearches.searches) { s in
-                        Button(s.name) { model.applySaved(s) }
+                        Button(s.name) { model.applyScope(s) }
                     }
                     Divider()
                     Menu("Delete") {

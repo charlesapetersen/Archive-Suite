@@ -50,9 +50,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   "1970s" in the manual-tag **Year** field (already written verbatim → SPEC/help/tests only). **Tier-2**
   (shared SPEC + tag write path). Covers the *dates & decades* item. Owner decisions pending (italic for
   decade? Reader display-only? case strictness) — see the plan's Open questions.
-- **`reader-smart-folders-scoped.md`** — smart folders as a **scoped root**: a base-scope (a held
-  `SavedSearch`) distinct from user filters — selecting one shows exactly its set, **no filters render as
-  "set"**, and *Clear filters* returns to the base set (not the whole root). Covers the smart-folder item.
+- ~~`reader-smart-folders-scoped.md`~~ — **SHIPPED** (smart folders as scoped root). Plan deleted.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -163,10 +161,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 - [ ] **Drop the top-bar Sort button; sort via column headers** — remove the sort control; click a header to
   sort; **right-click a header to set a secondary sort**. | files: Views/NavigationWindowView.swift,
   Views/AppKitTableView.swift, Core/LibraryFilter.swift | M | low
-- [ ] **Smart folders behave like a scoped root** _(plan: `execution-plans/reader-smart-folders-scoped.md`)_ — selecting a saved search shows exactly its filtered set;
-  **no filters render as "set"**, and *Clear filters* returns to the smart folder's base set (not the whole
-  root). | files: Search/SavedSearch.swift, Views/NavigationModel.swift, Views/SidebarView.swift,
-  Core/LibraryFilter.swift | M | med
+- [x] **Smart folders behave like a scoped root** — selecting a saved search enters a base scope; user
+  filters layer on top; Clear returns to the base set, not the whole root. Sidebar shows a durable
+  highlight. Scope persists across relaunch. `LibraryFilter.effective` merge for Save/summary. 170 tests
+  green. Tier-2 APPROVE. | done
 
 ### Archive Reader — viewer & preview
 - [ ] **Single-page PDF with an embedded text layer → show its text as plain text (right pane)** — in both

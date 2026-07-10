@@ -31,6 +31,13 @@ final class NavigationModel: ObservableObject {
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection(); refreshSelectionCache() } }
     @Published var fullTextQuery = ""
+    /// The active smart folder's base scope — the visible universe. `nil` = whole root. User
+    /// `filter` narrows *within* this. Selecting a folder / All Files exits the scope.
+    @Published private(set) var scope: SavedSearch?
+    /// Paths matching the base scope's own OCR query. `nil` = scope has no query (or no scope).
+    /// Separate from `ftsPaths` so a scoped OCR query never lights the user filter indicators.
+    @Published private(set) var baseFtsPaths: Set<String>?
+    private var baseFtsGeneration = 0
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
     @Published var showingEditor = false
     @Published var showingPreview = false
@@ -100,77 +107,137 @@ final class NavigationModel: ObservableObject {
             .store(in: &cancellables)
         savedSearches.objectWillChange
             .receive(on: DispatchQueue.main)   // run after the change commits, so counts see the new set
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send(); self?.refreshSmartFolderCounts() } }
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                guard let self else { return }
+                self.objectWillChange.send()
+                self.refreshSmartFolderCounts()
+                self.reconcileScopeWithStore()
+            } }
             .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
     }
 
-    // MARK: Saved searches
+    // MARK: Saved searches / scope
 
     func saveCurrentSearch(name: String) {
-        savedSearches.add(name: name, filter: filter, fullTextQuery: fullTextQuery)
+        let ef = effectiveFilter
+        let eq = effectiveFullTextQuery
+        savedSearches.add(name: name, filter: ef, fullTextQuery: eq)
+    }
+
+    /// The merged filter for Save/summary: when a scope is active, fold user facets onto the base.
+    private var effectiveFilter: LibraryFilter {
+        guard let scope else { return filter }
+        return LibraryFilter.effective(base: scope.filter, user: filter)
+    }
+    /// The merged OCR query for Save/summary: user query wins if set, else the scope's.
+    private var effectiveFullTextQuery: String {
+        let uq = fullTextQuery.trimmingCharacters(in: .whitespaces)
+        if !uq.isEmpty { return fullTextQuery }
+        return scope?.fullTextQuery ?? ""
     }
 
     /// A human-readable default name for "save current filters as a smart folder", built from the
     /// active filter facets (e.g. "Unread · P8 · Jerry Brown · Batch-A").
     var suggestedSmartFolderName: String {
+        let f = effectiveFilter
         var parts: [String] = []
-        switch filter.read {
+        switch f.read {
         case .all: break
         case .read: parts.append("Read")
         case .unread: parts.append("Unread")
         case .noReadState: parts.append("No read-state")
         }
-        if !filter.priorities.isEmpty {
-            parts.append(filter.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        if !f.priorities.isEmpty {
+            parts.append(f.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
         }
-        if !filter.subjects.isEmpty {
-            parts.append(filter.subjects.sorted().joined(separator: filter.subjectCombine == .all ? " + " : " / "))
+        if !f.subjects.isEmpty {
+            parts.append(f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
         }
-        if let p = filter.pathPrefix, !p.isEmpty { parts.append(URL(fileURLWithPath: p).lastPathComponent) }
-        let fn = filter.searchText.trimmingCharacters(in: .whitespaces)
+        if let p = f.pathPrefix, !p.isEmpty { parts.append(URL(fileURLWithPath: p).lastPathComponent) }
+        let fn = f.searchText.trimmingCharacters(in: .whitespaces)
         if !fn.isEmpty { parts.append("name:\(fn)") }
-        let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty { parts.append("“\(q)”") }
-        return parts.isEmpty ? "Smart Folder" : parts.joined(separator: " · ")
+        let q = effectiveFullTextQuery.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { parts.append("\u{201c}\(q)\u{201d}") }
+        return parts.isEmpty ? "Smart Folder" : parts.joined(separator: " \u{b7} ")
     }
 
     /// A human-readable summary of the active filter for the status bar (nil when nothing is filtered).
     var activeFilterSummary: String? {
+        let f = effectiveFilter
         var parts: [String] = []
-        switch filter.read {
+        if let scope { parts.append("[\(scope.name)]") }
+        switch f.read {
         case .all: break
         case .read: parts.append("Read")
         case .unread: parts.append("Unread")
         case .noReadState: parts.append("No read-state")
         }
-        if !filter.priorities.isEmpty {
-            parts.append(filter.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        if !f.priorities.isEmpty {
+            parts.append(f.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
         }
-        if !filter.subjects.isEmpty {
-            parts.append("tags: " + filter.subjects.sorted().joined(separator: filter.subjectCombine == .all ? " + " : " / "))
+        if !f.subjects.isEmpty {
+            parts.append("tags: " + f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
         }
-        if let p = filter.pathPrefix, !p.isEmpty { parts.append("folder: " + URL(fileURLWithPath: p).lastPathComponent) }
-        let fn = filter.searchText.trimmingCharacters(in: .whitespaces)
+        if let p = f.pathPrefix, !p.isEmpty { parts.append("folder: " + URL(fileURLWithPath: p).lastPathComponent) }
+        let fn = f.searchText.trimmingCharacters(in: .whitespaces)
         if !fn.isEmpty { parts.append("name: \(fn)") }
-        let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty { parts.append("text: “\(q)”") }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        let q = effectiveFullTextQuery.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { parts.append("text: \u{201c}\(q)\u{201d}") }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{b7} ")
     }
-    func applySaved(_ search: SavedSearch) {
+
+    /// Enter a smart-folder scope: the saved search becomes the visible universe; user filters reset.
+    func applyScope(_ search: SavedSearch) {
         var f = search.filter
-        // Sanitize a folder scope that isn't under the CURRENT root (a saved search may carry a
-        // pathPrefix from a different/older root; restoring it verbatim would make recompute reject
-        // every file → empty list). Same guard restoreViewState() applies on relaunch.
         let sanitized = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
         if sanitized != f.pathPrefix {
             f.pathPrefix = sanitized
-            statusMessage = "Saved search’s folder scope isn’t under the current archive root — showing the whole root."
+            statusMessage = "Smart folder's folder scope isn't under the current archive root — showing the whole root."
         }
-        filter = f
-        filterSearchText = f.searchText   // keep the debounced text field in sync
-        fullTextQuery = search.fullTextQuery
-        runFullTextSearch()   // updates ftsPaths + recompute; filter change also recomputes
+        var s = search; s.filter = f
+        scope = s
+        clearUserFilters(recompute: false)
+        runBaseFullTextSearch()
+        recompute()
+    }
+
+    /// Reset user-applied filters to neutral (preserving the base scope). Both Clear sites call this.
+    func clearUserFilters(recompute doRecompute: Bool = true) {
+        filter = LibraryFilter()
+        filter.read = AppSettings.defaultReadFilter
+        filter.subjectCombine = AppSettings.defaultSubjectCombine
+        filterSearchText = ""
+        fullTextQuery = ""
+        ftsGeneration += 1
+        ftsPaths = nil
+        if doRecompute { recompute() }
+    }
+
+    /// Run (or clear) the base scope's full-text search. Mirrors `runFullTextSearch` but uses
+    /// `scope?.fullTextQuery` and writes `baseFtsPaths`/`baseFtsGeneration`.
+    private func runBaseFullTextSearch() {
+        let q = scope?.fullTextQuery.trimmingCharacters(in: .whitespaces) ?? ""
+        baseFtsGeneration += 1
+        let generation = baseFtsGeneration
+        Task { [weak self] in
+            guard let self else { return }
+            let result: Set<String>? = q.isEmpty ? nil : await self.indexer.search(q)
+            guard generation == self.baseFtsGeneration else { return }
+            self.baseFtsPaths = result
+            self.recompute()
+        }
+    }
+
+    /// Keep the active scope in sync with the saved-search store (delete → exit, rename → refresh).
+    private func reconcileScopeWithStore() {
+        guard let scope else { return }
+        if let current = savedSearches.searches.first(where: { $0.id == scope.id }) {
+            if current != scope { self.scope = current; runBaseFullTextSearch(); recompute() }
+        } else {
+            // The active scope's saved search was deleted — exit the scope.
+            self.scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil; recompute()
+        }
     }
 
     // MARK: Document-run convenience (opt-in; degrades when classification is absent)
@@ -243,10 +310,17 @@ final class NavigationModel: ObservableObject {
     // MARK: Derived
 
     func recompute() {
-        var base = library.files.filter(filter.matches)
+        var base = library.files
+        // Base scope = the visible universe (smart folder). User filter layers on top.
+        if let scope {
+            base = base.filter(scope.filter.matches)
+            if let baseFtsPaths { base = base.filter { baseFtsPaths.contains($0.url.path) } }
+            if scope.filter.needsAttentionOnly {
+                base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
+            }
+        }
+        base = base.filter(filter.matches)
         if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
-        // Non-standard-PDF filter (like FTS, applied here because the status lives in the async index):
-        // keep only files known to need attention. Files not yet indexed lack a status and are excluded.
         if filter.needsAttentionOnly {
             base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
         }
@@ -284,11 +358,11 @@ final class NavigationModel: ObservableObject {
 
     // MARK: View-state persistence (C2) — filter + sort survive relaunch (selection is persisted separately)
 
-    private struct ViewState: Codable { var filter: LibraryFilter; var sort: [ARSortDescriptor] }
+    private struct ViewState: Codable { var filter: LibraryFilter; var sort: [ARSortDescriptor]; var scopeID: UUID? }
     private let viewStateKey = "ar.viewState"
 
     private func persistViewState() {
-        if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: sort)) {
+        if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: sort, scopeID: scope?.id)) {
             UserDefaults.standard.set(d, forKey: viewStateKey)
         }
     }
@@ -299,6 +373,15 @@ final class NavigationModel: ObservableObject {
         f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
         filter = f
         if !s.sort.isEmpty { sort = s.sort }
+        // Restore the active scope (if its saved search still exists).
+        if let sid = s.scopeID, let search = savedSearches.searches.first(where: { $0.id == sid }) {
+            var sf = search.filter
+            sf.pathPrefix = Self.sanitizedPathPrefix(sf.pathPrefix, against: rootStore.root?.path)
+            var restored = search; restored.filter = sf
+            scope = restored
+            clearUserFilters(recompute: false)
+            runBaseFullTextSearch()
+        }
     }
 
     /// Drop a folder scope (`pathPrefix`) that isn't under `rootPath` — returns nil for a stale prefix,
@@ -424,7 +507,9 @@ final class NavigationModel: ObservableObject {
     /// the clicked row while the list + status bar stayed on the old scope. Recompute here is the
     /// deterministic path; the `.onChange` still covers filter-bar edits made from their own closures.
     func setFolderScope(_ path: String?) {
-        guard filter.pathPrefix != path else { return }
+        let scopeWasActive = scope != nil
+        if scopeWasActive { scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil }
+        guard scopeWasActive || filter.pathPrefix != path else { return }
         filter.pathPrefix = path
         recompute()
     }
@@ -478,7 +563,9 @@ final class NavigationModel: ObservableObject {
         panel.message = "Choose the folder that contains your tagged archive PDFs."
         if panel.runModal() == .OK, let url = panel.url {
             rootStore.setRoot(url)
-            filter.pathPrefix = nil   // a folder scope from the old root can't apply to a new one
+            // A scope from the old root can't apply to a new one.
+            scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil
+            filter.pathPrefix = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong

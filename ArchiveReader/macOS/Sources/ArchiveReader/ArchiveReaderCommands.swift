@@ -87,11 +87,7 @@ struct ArchiveReaderCommands: Commands {
             Button("Sort by Priority") { nav?.sort = sortBy(.priority) }.disabled(nav == nil)
             Button("Sort by Read State") { nav?.sort = sortBy(.readState) }.disabled(nav == nil)
             Divider()
-            Button("Clear Filters & Search") {
-                nav?.filter = LibraryFilter()
-                nav?.fullTextQuery = ""
-                nav?.runFullTextSearch()
-            }
+            Button("Clear Filters & Search") { nav?.clearUserFilters() }
             .keyboardShortcut("k", modifiers: [.command, .shift])
             .disabled(nav == nil)
             Divider()

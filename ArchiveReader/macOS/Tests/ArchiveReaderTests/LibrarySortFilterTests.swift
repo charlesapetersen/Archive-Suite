@@ -119,4 +119,65 @@ final class LibrarySortFilterTests: XCTestCase {
         let sorted = LibrarySort.sorted(files, by: [ARSortDescriptor(field: .priority, ascending: true)]).map(\.name)
         XCTAssertEqual(sorted, ["p9", "p10", "none"])  // 9<10 ascending; unprioritized last
     }
+
+    // MARK: - LibraryFilter.effective (base-scope merge)
+
+    func testEffectiveUserWinsRead() {
+        let base = LibraryFilter(read: .unread)
+        let user = LibraryFilter(read: .read)
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).read, .read)
+    }
+
+    func testEffectiveInheritsBaseWhenUserNeutral() {
+        let base = LibraryFilter(priorities: [10], read: .unread, searchText: "memo")
+        let user = LibraryFilter()   // neutral
+        let eff = LibraryFilter.effective(base: base, user: user)
+        XCTAssertEqual(eff.read, .unread)
+        XCTAssertEqual(eff.priorities, [10])
+        XCTAssertEqual(eff.searchText, "memo")
+    }
+
+    func testEffectiveSubjectsUnion() {
+        let base = LibraryFilter(subjects: ["A", "B"])
+        let user = LibraryFilter(subjects: ["B", "C"])
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjects, ["A", "B", "C"])
+    }
+
+    func testEffectiveSubjectCombineUserWins() {
+        let base = LibraryFilter(subjects: ["A"], subjectCombine: .all)
+        let user = LibraryFilter(subjects: ["B"], subjectCombine: .any)
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjectCombine, .any)
+    }
+
+    func testEffectiveSubjectCombineInheritsBaseWhenUserEmpty() {
+        let base = LibraryFilter(subjects: ["A"], subjectCombine: .any)
+        let user = LibraryFilter()
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjectCombine, .any)
+    }
+
+    func testEffectivePathPrefixUserWins() {
+        let base = LibraryFilter(pathPrefix: "/corpus/Brown")
+        let user = LibraryFilter(pathPrefix: "/corpus/Smith")
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).pathPrefix, "/corpus/Smith")
+    }
+
+    func testEffectivePathPrefixInheritsBase() {
+        let base = LibraryFilter(pathPrefix: "/corpus/Brown")
+        let user = LibraryFilter()
+        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).pathPrefix, "/corpus/Brown")
+    }
+
+    func testEffectiveNeedsAttentionOR() {
+        let base = LibraryFilter(needsAttentionOnly: true)
+        let user = LibraryFilter()
+        XCTAssertTrue(LibraryFilter.effective(base: base, user: user).needsAttentionOnly)
+        let user2 = LibraryFilter(needsAttentionOnly: true)
+        let base2 = LibraryFilter()
+        XCTAssertTrue(LibraryFilter.effective(base: base2, user: user2).needsAttentionOnly)
+    }
+
+    func testEffectiveNeutralBothReturnsNeutral() {
+        let eff = LibraryFilter.effective(base: LibraryFilter(), user: LibraryFilter())
+        XCTAssertFalse(eff.isActive)
+    }
 }

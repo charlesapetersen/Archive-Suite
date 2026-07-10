@@ -7,7 +7,7 @@ filter by subject / priority / read-state, read them two-up (image + OCR text), 
 file links, and mark them Read as you go.
 
 > **Status:** Shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate tag
-> finder, document-viewer refinements, duplicate-filename disambiguation); 161 tests green. **This
+> finder, document-viewer refinements, duplicate-filename disambiguation); 170 tests green. **This
 > file is the durable record** for the Reader. **Core Directive**, **Verified Facts**, and **Safety
 > Protocol** below are settled and non-negotiable; the keyboard map, options, edge-case rules, and
 > decisions are folded into the sections below.
@@ -286,9 +286,13 @@ writes against the real corpus — always a copy.
 - **Reading/grouping is user-driven manual multi-selection** — the app never auto-groups; segment
   awareness is opt-in convenience that degrades silently when the classification is absent.
 - **Full-text OCR search is in v1** via the app's content index (not Spotlight content indexing) + in-doc `⌘F`.
+- **Smart folders are a scoped root** — selecting a saved search enters a base scope (the visible
+  universe); user filters layer on top (AND); Clear resets the user layer to neutral (back to the base
+  set, not the whole root); selecting a folder / All Files exits the scope. Scope persists across
+  relaunch. `LibraryFilter.effective(base:user:)` merges for Save/summary.
 - **v1 sandboxed** to a granted root; non-sandboxed whole-Mac search is long-term (behind a `FileAccessProvider` abstraction).
 
-## Implementation map (shipped — v1 + P2 complete, 161 tests, 2026-07-09)
+## Implementation map (shipped — v1 + P2 complete, 170 tests, 2026-07-10)
 
 `macOS/Sources/ArchiveReader/`
 ```
@@ -332,13 +336,15 @@ Search/                       Discovery + disposable caches (never the corpus):
 Views/
   NavigationModel.swift       Nav view model: filter/sort/selection, folder tree, smart-folder counts,
                               view-state persistence, inline + corpus-wide edits — all via TagWriter.
+                              Smart-folder scope: `scope`/`baseFtsPaths`/`applyScope`/`clearUserFilters`.
   NavigationWindowView.swift  Results Table (customizable columns), filter bar, sidebar+tag-cloud panels,
                               toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
   AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
                               virtualized rows, incremental snapshot apply, 150ms-debounced filter;
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel.
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
-                              (List(selection:)+OutlineGroup) that scopes the list via filter.pathPrefix.
+                              (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
+                              selection exits the scope.
   InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
                               (menu), DateCell / TagsCell (popovers). Multi-file edits use the ⌘I editor.
   SubjectTokenField.swift     Inline NSTokenField subject editor per row: autocomplete from the corpus;
@@ -359,7 +365,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 ```
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
-`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (161 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (170 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
 ## Stack & Build

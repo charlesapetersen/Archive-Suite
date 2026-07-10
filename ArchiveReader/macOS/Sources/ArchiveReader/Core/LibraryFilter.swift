@@ -90,6 +90,25 @@ extension LibraryFilter {
     }
 }
 
+extension LibraryFilter {
+    /// Fold a user filter onto a base scope for "Save Current Search" / the status summary.
+    /// Per-facet: user wins when set, else inherit the base; subjects = union;
+    /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly = OR.
+    static func effective(base: LibraryFilter, user: LibraryFilter) -> LibraryFilter {
+        var r = LibraryFilter()
+        r.read = user.read != .all ? user.read : base.read
+        r.priorities = user.priorities.isEmpty ? base.priorities : user.priorities
+        r.subjects = base.subjects.union(user.subjects)
+        r.subjectCombine = user.subjects.isEmpty ? base.subjectCombine : user.subjectCombine
+        let us = user.searchText.trimmingCharacters(in: .whitespaces)
+        r.searchText = us.isEmpty ? base.searchText : user.searchText
+        let up = user.pathPrefix
+        r.pathPrefix = (up == nil || up?.isEmpty == true) ? base.pathPrefix : up
+        r.needsAttentionOnly = base.needsAttentionOnly || user.needsAttentionOnly
+        return r
+    }
+}
+
 // MARK: - Sorting
 
 enum SortField: String, Sendable, CaseIterable, Codable {
