@@ -419,7 +419,7 @@ extension OCRProcessor {
                         imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                         originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
                         gatewayDisplayName: currentGateway?.displayName,
-                        pdfImageMB: Self.pdfImageMB
+                        pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns
                     )
                 }
             }

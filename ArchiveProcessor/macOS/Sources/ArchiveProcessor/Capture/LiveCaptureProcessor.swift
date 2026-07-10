@@ -437,7 +437,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let model = config.model, gatewayName = config.gateway?.displayName
         let writeJSON = config.enableSegmentJSON && gType == .document
         let jsonTags = tags
-        let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB
+        let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
 
         // B8: `computeTags` above may have suspended on an LLM tagging call. Re-check BEFORE writing the
         // output PDF, so a Clear during OCR/tagging bails here and never leaves an orphan PDF in the cleared
@@ -450,7 +450,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                    gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
                                    jsonTags: jsonTags, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
-                                   outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
+                                   outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB, textColumns: textColumns)
         }.value
 
         // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
@@ -466,7 +466,7 @@ final class LiveCaptureProcessor: ObservableObject {
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
-            outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB)
+            outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB, textColumns: textColumns)
         persistManifest()
         for p in group.photos { pageTasks[p.id] = nil }   // free memory
         // A1 — discriminated failure taxonomy (labeling ONLY; the data-safety gate is unchanged). The
@@ -546,13 +546,48 @@ final class LiveCaptureProcessor: ObservableObject {
         let outputImageFile: Bool
         let pdfImageMB: Double
         let exportedImageMB: Double
+        let textColumns: Int
+
+        // Custom decoder: decodeIfPresent for textColumns so old manifests (pre-multicol) decode safely.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            groupId = try c.decode(String.self, forKey: .groupId)
+            type = try c.decode(CaptureGroupType.self, forKey: .type)
+            collectionKey = try c.decode(String.self, forKey: .collectionKey)
+            order = try c.decode(Int.self, forKey: .order)
+            pages = try c.decode([PageWork].self, forKey: .pages)
+            baseTags = try c.decode([String].self, forKey: .baseTags)
+            doMerge = try c.decode(Bool.self, forKey: .doMerge)
+            model = try c.decode(LLMModel.self, forKey: .model)
+            gatewayName = try c.decodeIfPresent(String.self, forKey: .gatewayName)
+            writeJSON = try c.decode(Bool.self, forKey: .writeJSON)
+            jsonTags = try c.decode(GeneratedTags.self, forKey: .jsonTags)
+            texts = try c.decode([String].self, forKey: .texts)
+            boxLabelText = try c.decodeIfPresent(String.self, forKey: .boxLabelText)
+            outputImageFile = try c.decode(Bool.self, forKey: .outputImageFile)
+            pdfImageMB = try c.decode(Double.self, forKey: .pdfImageMB)
+            exportedImageMB = try c.decode(Double.self, forKey: .exportedImageMB)
+            textColumns = try c.decodeIfPresent(Int.self, forKey: .textColumns) ?? 1
+        }
+
+        // Memberwise init (matches the synthesized one the callers already use).
+        init(groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
+             pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
+             writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
+             outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int) {
+            self.groupId = groupId; self.type = type; self.collectionKey = collectionKey; self.order = order
+            self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
+            self.gatewayName = gatewayName; self.writeJSON = writeJSON; self.jsonTags = jsonTags
+            self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
+            self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
+        }
     }
 
     nonisolated private static func writeSegmentFiles(
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
-        outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double
+        outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int
     ) -> StagedSegment {
         let fm = FileManager.default
         let pdfGen = PDFGenerator()
@@ -564,7 +599,7 @@ final class LiveCaptureProcessor: ObservableObject {
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
                                  outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB)
+                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
@@ -839,7 +874,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
-                                           exportedImageMB: seg.exportedImageMB)
+                                           exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns)
                 }
             }.value
             guard let self else { return }

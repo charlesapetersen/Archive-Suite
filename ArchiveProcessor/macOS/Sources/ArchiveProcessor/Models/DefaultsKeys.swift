@@ -35,6 +35,7 @@ enum DefaultsKeys {
     static let imageResolutionPercent = "imageResolutionPercent"
     static let standardImageSizeMB = "standardImageSizeMB"
     static let pdfImageSizeMB = "pdfImageSizeMB"
+    static let textColumns = "textColumns"
     static let exportedImageSizeMB = "exportedImageSizeMB"
     static let outputImageFile = "outputImageFile"
     static let contextCharCount = "contextCharCount"

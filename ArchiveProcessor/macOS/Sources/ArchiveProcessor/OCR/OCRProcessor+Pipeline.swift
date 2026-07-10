@@ -502,13 +502,14 @@ extension OCRProcessor {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
                 let pdfMB = Self.pdfImageMB
+                let txtCols = Self.textColumns
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
                 await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
                     for g in toGenerate {
                         try? gen.generate(imageURL: g.imageURL, result: g.result, model: model,
                                           outputURL: g.outputURL, originalFileName: g.fileName,
-                                          gatewayDisplayName: gatewayName, pdfImageMB: pdfMB)
+                                          gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
                     }
                 }.value
             }

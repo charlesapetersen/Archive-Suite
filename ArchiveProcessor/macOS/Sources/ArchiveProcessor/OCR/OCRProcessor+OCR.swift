@@ -791,7 +791,7 @@ extension OCRProcessor {
         // job as failed so it appears in the failure log — a swallowed `try?` previously reported success
         // even when no output PDF was written.
         do {
-            try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB)
+            try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns)
         } catch {
             jobs[index].status = .failed
             let name = sourceURL.lastPathComponent

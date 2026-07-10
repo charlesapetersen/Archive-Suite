@@ -6,7 +6,7 @@ import ImageIO
 
 struct PDFGenerator {
 
-    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0) throws {
+    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0, textColumns: Int = 1) throws {
         let pdfDocument = PDFDocument()
 
         if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB) {
@@ -18,7 +18,7 @@ struct PDFGenerator {
             pdfDocument.insert(makePlaceholderImagePage(note: "Original image could not be embedded (\(imageURL.lastPathComponent))."), at: 0)
         }
 
-        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName)
+        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName, textColumns: textColumns)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
         guard pdfDocument.write(to: outputURL) else {
@@ -204,7 +204,7 @@ struct PDFGenerator {
 
     // MARK: - Text Page
 
-    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil, gatewayDisplayName: String? = nil) -> PDFPage {
+    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil, gatewayDisplayName: String? = nil, textColumns: Int = 1) -> PDFPage {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
@@ -234,20 +234,14 @@ struct PDFGenerator {
             bodyText = msg
         }
 
-        let fullString = NSMutableAttributedString()
-
         let headerParaStyle = NSMutableParagraphStyle()
         headerParaStyle.lineSpacing = 4
         headerParaStyle.paragraphSpacing = 2
-        // Char-wrap so a single token wider than the text column (long filename/URL) wraps
-        // within the margin instead of clipping past the right edge.
         headerParaStyle.lineBreakMode = .byCharWrapping
 
         let bodyParaStyle = NSMutableParagraphStyle()
         bodyParaStyle.lineSpacing = 4
         bodyParaStyle.paragraphSpacing = 6
-        // Char-wrap so long unbreakable tokens (URLs, base64/hex blobs, whitespace-free CJK,
-        // dense table rows) wrap instead of overflowing the right margin and being clipped.
         bodyParaStyle.lineBreakMode = .byCharWrapping
 
         let headerFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
@@ -264,33 +258,75 @@ struct PDFGenerator {
             .paragraphStyle: bodyParaStyle
         ]
 
-        fullString.append(NSAttributedString(string: headerLine, attributes: headerAttr))
-        fullString.append(NSAttributedString(string: bodyText, attributes: bodyAttr))
+        let headerString = NSAttributedString(string: headerLine, attributes: headerAttr)
+        let bodyString = NSAttributedString(string: bodyText, attributes: bodyAttr)
 
         let pageWidth: CGFloat = 612
         let margin: CGFloat = 54
-        let textWidth = pageWidth - 2 * margin
+        let fullTextWidth = pageWidth - 2 * margin
+        let cols = max(1, min(textColumns, 4))
 
-        let framesetter = CTFramesetterCreateWithAttributedString(fullString as CFAttributedString)
-        let constraintSize = CGSize(width: textWidth, height: CGFloat.greatestFiniteMagnitude)
-        let fullRange = CFRangeMake(0, fullString.length)
-        let measured = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, fullRange, nil, constraintSize, nil)
-
-        // CTFramesetterSuggestFrameSizeWithConstraints can fractionally under-report the height
-        // CTFrameDraw actually needs (line-origin rounding, trailing paragraph spacing), which
-        // silently drops the last line. Grow the text height until the WHOLE string is verified
-        // visible, so archival OCR text is never clipped. The page grows arbitrarily tall — the
-        // extra whitespace at the bottom is invisible.
-        var textHeight = ceil(measured.height) + 4
-        for _ in 0..<200 {
-            let probeRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
-            let probeFrame = CTFramesetterCreateFrame(framesetter, fullRange, CGPath(rect: probeRect, transform: nil), nil)
-            let visible = CTFrameGetVisibleStringRange(probeFrame)
-            if visible.location + visible.length >= fullString.length { break }
-            textHeight += 24   // grow ~2 lines and re-verify
+        // --- Measure the header (always single-column, full width) ---
+        let headerFS = CTFramesetterCreateWithAttributedString(headerString as CFAttributedString)
+        let headerRange = CFRangeMake(0, headerString.length)
+        let headerMeasured = CTFramesetterSuggestFrameSizeWithConstraints(
+            headerFS, headerRange, nil, CGSize(width: fullTextWidth, height: .greatestFiniteMagnitude), nil)
+        var headerHeight = ceil(headerMeasured.height) + 4
+        for _ in 0..<50 {
+            let r = CGRect(x: 0, y: 0, width: fullTextWidth, height: headerHeight)
+            let f = CTFramesetterCreateFrame(headerFS, headerRange, CGPath(rect: r, transform: nil), nil)
+            let v = CTFrameGetVisibleStringRange(f)
+            if v.location + v.length >= headerString.length { break }
+            headerHeight += 24
         }
 
-        let pageHeight = max(792, textHeight + 2 * margin)
+        // --- Measure + lay out the body in N columns ---
+        let columnGap: CGFloat = cols > 1 ? 18 : 0
+        let columnWidth = (fullTextWidth - columnGap * CGFloat(cols - 1)) / CGFloat(cols)
+
+        let bodyFS = CTFramesetterCreateWithAttributedString(bodyString as CFAttributedString)
+        let bodyFullRange = CFRangeMake(0, bodyString.length)
+
+        // For single-column, measure the same way as before (one frame, grow until all visible).
+        // For multi-column, flow text through column frames of a fixed height, adding rows of
+        // columns until all text is placed. Use letter-page-body-height as the column height.
+        let bodyHeight: CGFloat
+        if cols == 1 {
+            let bodyMeasured = CTFramesetterSuggestFrameSizeWithConstraints(
+                bodyFS, bodyFullRange, nil, CGSize(width: columnWidth, height: .greatestFiniteMagnitude), nil)
+            var h = ceil(bodyMeasured.height) + 4
+            for _ in 0..<200 {
+                let r = CGRect(x: 0, y: 0, width: columnWidth, height: h)
+                let f = CTFramesetterCreateFrame(bodyFS, bodyFullRange, CGPath(rect: r, transform: nil), nil)
+                let v = CTFrameGetVisibleStringRange(f)
+                if v.location + v.length >= bodyString.length { break }
+                h += 24
+            }
+            bodyHeight = h
+        } else {
+            // Multi-column: flow through fixed-height column frames.
+            // Each "row" of columns is one letter-page-body-height tall.
+            let rowHeight: CGFloat = 792 - 2 * margin - headerHeight
+            let maxRowHeight = max(rowHeight, 200)
+            var charIndex = 0
+            var totalRows = 0
+            while charIndex < bodyString.length {
+                totalRows += 1
+                for _ in 0..<cols {
+                    if charIndex >= bodyString.length { break }
+                    let remaining = CFRangeMake(charIndex, bodyString.length - charIndex)
+                    let colRect = CGRect(x: 0, y: 0, width: columnWidth, height: maxRowHeight)
+                    let colFrame = CTFramesetterCreateFrame(bodyFS, remaining, CGPath(rect: colRect, transform: nil), nil)
+                    let visible = CTFrameGetVisibleStringRange(colFrame)
+                    if visible.length == 0 { charIndex = bodyString.length; break }
+                    charIndex += visible.length
+                }
+            }
+            bodyHeight = maxRowHeight * CGFloat(totalRows)
+        }
+
+        let totalTextHeight = headerHeight + bodyHeight
+        let pageHeight = max(792, totalTextHeight + 2 * margin)
         let pageSize = CGSize(width: pageWidth, height: pageHeight)
 
         let pdfData = NSMutableData()
@@ -304,11 +340,39 @@ struct PDFGenerator {
         context.setFillColor(CGColor.white)
         context.fill(CGRect(origin: .zero, size: pageSize))
 
-        let textOriginY = pageHeight - margin - textHeight
-        let textRect = CGRect(x: margin, y: textOriginY, width: textWidth, height: textHeight)
-        let path = CGPath(rect: textRect, transform: nil)
-        let frame = CTFramesetterCreateFrame(framesetter, fullRange, path, nil)
-        CTFrameDraw(frame, context)
+        // --- Draw the header (single-column, full width, at the top) ---
+        let headerOriginY = pageHeight - margin - headerHeight
+        let headerRect = CGRect(x: margin, y: headerOriginY, width: fullTextWidth, height: headerHeight)
+        let headerFrame = CTFramesetterCreateFrame(headerFS, headerRange, CGPath(rect: headerRect, transform: nil), nil)
+        CTFrameDraw(headerFrame, context)
+
+        // --- Draw the body columns ---
+        if cols == 1 {
+            let bodyOriginY = headerOriginY - bodyHeight
+            let bodyRect = CGRect(x: margin, y: bodyOriginY, width: columnWidth, height: bodyHeight)
+            let bodyFrame = CTFramesetterCreateFrame(bodyFS, bodyFullRange, CGPath(rect: bodyRect, transform: nil), nil)
+            CTFrameDraw(bodyFrame, context)
+        } else {
+            let rowHeight: CGFloat = 792 - 2 * margin - headerHeight
+            let maxRowHeight = max(rowHeight, 200)
+            var charIndex = 0
+            var currentRow = 0
+            while charIndex < bodyString.length {
+                let rowTopY = headerOriginY - CGFloat(currentRow) * maxRowHeight
+                for col in 0..<cols {
+                    if charIndex >= bodyString.length { break }
+                    let remaining = CFRangeMake(charIndex, bodyString.length - charIndex)
+                    let colX = margin + CGFloat(col) * (columnWidth + columnGap)
+                    let colRect = CGRect(x: colX, y: rowTopY - maxRowHeight, width: columnWidth, height: maxRowHeight)
+                    let colFrame = CTFramesetterCreateFrame(bodyFS, remaining, CGPath(rect: colRect, transform: nil), nil)
+                    CTFrameDraw(colFrame, context)
+                    let visible = CTFrameGetVisibleStringRange(colFrame)
+                    if visible.length == 0 { charIndex = bodyString.length; break }
+                    charIndex += visible.length
+                }
+                currentRow += 1
+            }
+        }
 
         context.endPDFPage()
         context.closePDF()

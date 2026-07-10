@@ -94,10 +94,11 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 (cross-app + SPEC). Legend as above (S/M/L · risk · needs).
 
 ### Archive Processor
-- [ ] **Multi-column OCR output layout** — render the output PDF's text page in **multi-column** layout for
-  newspapers / multi-column books (single-column today). Detect columns or let the user set the count;
-  preserve cross-column reading order. **Tier-2** if it touches the PDF/finalize write path. | files: OCR/
-  layout + PDF output/finalize | L | med · needs: gui (verify on a real multi-column source)
+- [x] **Multi-column OCR output layout** — `textColumns` setting (1/2/3, default 1) in Settings +
+  ProcessingProfiles; body text on page 2 flows into N CoreText columns (header stays single-column,
+  full-width). Threaded through OCRProcessor, SessionProcessingConfig, LiveCaptureProcessor (Codable-safe
+  with `decodeIfPresent` fallback). Build clean 0 new warnings. Tier-2 APPROVE (7/7 vectors). 7 synthetic
+  tests green. GUI-verify deferred: verify on a real multi-column newspaper scan → Morning Review. | done
 
 ### Archive Reader — layout & panels
 - [x] **Adjustable + collapsible side panels** — `PanelDivider` (drag-to-resize, 140–350 / 160–400

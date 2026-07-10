@@ -68,6 +68,9 @@ class OCRProcessor: ObservableObject {
     /// Independent of the LLM/OCR image size. Set once per run from Settings.
     nonisolated(unsafe) static var pdfImageMB: Double = 0
 
+    /// Number of text columns on the OCR text page (1 = single-column default, 2–4 for multi-column).
+    nonisolated(unsafe) static var textColumns: Int = 1
+
     /// Target size (MB) for the separately-exported image file in two-file output (0 = full resolution).
     /// Independent of the camera/source size. Set once per run from Settings.
     nonisolated(unsafe) static var exportedImageMB: Double = 0
@@ -83,6 +86,8 @@ class OCRProcessor: ObservableObject {
         pdfImageMB = p > 0 ? p : 2.0
         let e = UserDefaults.standard.double(forKey: DefaultsKeys.exportedImageSizeMB)
         exportedImageMB = e > 0 ? e : 3.0
+        let tc = UserDefaults.standard.integer(forKey: DefaultsKeys.textColumns)
+        textColumns = tc > 1 ? min(4, tc) : 1
     }
 
     /// Cosmetic status suffix shown while a (typically free-tier) key is being rate-limited (429), so a

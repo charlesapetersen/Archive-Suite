@@ -382,7 +382,8 @@ extension OCRProcessor {
                     outputURL: outputURL,
                     originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
                     gatewayDisplayName: currentGateway?.displayName,
-                    pdfImageMB: Self.pdfImageMB
+                    pdfImageMB: Self.pdfImageMB,
+                    textColumns: Self.textColumns
                 )
                 // Regenerating rewrites the file, dropping its Finder tags. In copy-source mode the
                 // tags were applied during OCR and nothing re-applies them later, so restore them now.

@@ -85,6 +85,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.imageResolutionPercent, def: .double(100)),
         .init(key: DefaultsKeys.standardImageSizeMB, def: .double(3.0)),
         .init(key: DefaultsKeys.pdfImageSizeMB, def: .double(2.0)),
+        .init(key: DefaultsKeys.textColumns, def: .int(1)),
         .init(key: DefaultsKeys.exportedImageSizeMB, def: .double(3.0)),
         .init(key: DefaultsKeys.outputImageFile, def: .bool(true)),
         .init(key: DefaultsKeys.contextCharCount, def: .double(0)),

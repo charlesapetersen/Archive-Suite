@@ -25,6 +25,7 @@ struct SessionProcessingConfig {
     var outputImageFile: Bool         // two files (PDF + separate image) vs one file (PDF only)
     var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
     var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
+    var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
 
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults() -> SessionProcessingConfig {
@@ -82,7 +83,8 @@ struct SessionProcessingConfig {
             gateway: gateway,
             outputImageFile: (d.object(forKey: DefaultsKeys.outputImageFile) as? Bool) ?? true,
             pdfImageMB: { let p = d.double(forKey: DefaultsKeys.pdfImageSizeMB); return p > 0 ? p : 2.0 }(),
-            exportedImageMB: { let e = d.double(forKey: DefaultsKeys.exportedImageSizeMB); return e > 0 ? e : 3.0 }()
+            exportedImageMB: { let e = d.double(forKey: DefaultsKeys.exportedImageSizeMB); return e > 0 ? e : 3.0 }(),
+            textColumns: { let tc = d.integer(forKey: DefaultsKeys.textColumns); return tc > 1 ? min(4, tc) : 1 }()
         )
     }
 

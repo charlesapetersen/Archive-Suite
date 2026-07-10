@@ -53,6 +53,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.outputImageFile) private var outputImageFile: Bool = true
     @AppStorage(DefaultsKeys.pdfImageSizeMB) private var pdfImageSizeMB: Double = 2.0
     @AppStorage(DefaultsKeys.exportedImageSizeMB) private var exportedImageSizeMB: Double = 3.0
+    @AppStorage(DefaultsKeys.textColumns) private var textColumns: Int = 1
     @AppStorage(DefaultsKeys.writeLogFile) private var writeLogEnabled: Bool = false
     @AppStorage(DefaultsKeys.ocrWorkerCount) private var ocrWorkerCount: Int = 4
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
@@ -451,6 +452,19 @@ struct SettingsView: View {
                     .frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.secondary)
                 Stepper("", value: $pdfImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+            }
+            .disabled(preOCRedInput)
+            HStack {
+                Text("Text columns")
+                HelpButton(text: "Number of columns for the OCR text page (page 2) of each output PDF. Use 2 or 3 for multi-column sources like newspapers. Default: 1 (single-column).")
+                Spacer()
+                Picker("", selection: $textColumns) {
+                    Text("1").tag(1)
+                    Text("2").tag(2)
+                    Text("3").tag(3)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
             }
             .disabled(preOCRedInput)
             HStack {
