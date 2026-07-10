@@ -30,6 +30,11 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `local-agent-cli-provider.md` — **PROPOSED** (Processor): drive OCR/tagging through a locally installed,
+  subscription-authenticated CLI — **Claude Code + Gemini CLI + OpenAI Codex CLI**, all first-class — for
+  enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. No key stored; auth lives in each
+  CLI's login. Additive `localAgent` config sibling to the gateway (append-only, keeps resume-critical
+  snapshots unchanged). Tier-2. Claude path validated on-machine 2026-07-10.
 - ~~`index-parallelization.md`~~ — **SHIPPED** (parallel+batched index build + bm25 ranked search +
   search-during-index refresh). Plan deleted.
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
