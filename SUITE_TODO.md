@@ -96,9 +96,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 - [ ] **Adjustable + collapsible side panels** — left folder-nav column (`SidebarView`) and right tag-cloud
   column get draggable width **and** collapse/expand, each with a **keyboard shortcut** to toggle. | files:
   Views/NavigationWindowView.swift, Views/SidebarView.swift, ArchiveReaderCommands.swift | M | low
-- [ ] **Add/remove columns in the file list** — user-toggled show/hide of nav-table columns (the map calls
-  the table "customizable columns" — confirm what survived the AppKit swap, then wire a column picker). |
-  files: Views/AppKitTableView.swift, Views/NavigationWindowView.swift | M | low
+- [x] **Add/remove columns in the file list** — right-click the column header → checkmark menu to
+  show/hide any column (except File name); visibility persisted via UserDefaults. `ColumnPickerHeaderView`
+  subclass + `AppSettings.hiddenColumns`. |
+  files: Views/AppKitTableView.swift, Core/AppSettings.swift | done
 - [x] **Make tags editable in the file list _again_** — `TagTokenCellView` (NSTokenField in NSTableCellView)
   replaces the plain-text tags cell; edit-start base snapshot + freeze-during-edit + WYSIWYG commit on blur,
   all routing through `commitSubjectEdit` → `TagWriter`. Tier-2 APPROVE (6/6 vectors). 191 tests green,

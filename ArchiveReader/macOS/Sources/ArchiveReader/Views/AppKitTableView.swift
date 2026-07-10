@@ -37,7 +37,7 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         tableView.rowHeight = max(20, fontSize * 1.8)
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
-        tableView.headerView = NSTableHeaderView()
+        tableView.headerView = ColumnPickerHeaderView()
         tableView.target = coordinator
         tableView.doubleAction = #selector(Coordinator.tableViewDoubleClicked(_:))
         tableView.contextMenuProvider = { [weak coordinator] selIDs in
@@ -65,6 +65,11 @@ struct AppKitTableView: NSViewRepresentable {
                 tc.sortDescriptorPrototype = NSSortDescriptor(key: sf.rawValue, ascending: true)
             }
             tableView.addTableColumn(tc)
+        }
+
+        let hidden = AppSettings.hiddenColumns
+        for col in tableView.tableColumns where hidden.contains(col.identifier.rawValue) {
+            col.isHidden = true
         }
 
         scrollView.documentView = tableView
@@ -443,6 +448,38 @@ final class TagTokenCellView: NSTableCellView {
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+// MARK: - Column-picker header view
+
+/// Right-click the table header → a menu with checkmark toggles for each column.
+/// "File name" is always visible (disabled toggle); all others can be hidden.
+@MainActor
+final class ColumnPickerHeaderView: NSTableHeaderView {
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let tv = tableView else { return nil }
+        let menu = NSMenu(title: "Columns")
+        for col in tv.tableColumns {
+            let id = col.identifier.rawValue
+            let item = NSMenuItem(title: col.title, action: #selector(toggleColumn(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = id
+            item.state = col.isHidden ? .off : .on
+            if id == "name" { item.isEnabled = false }
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    @objc private func toggleColumn(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let tv = tableView,
+              let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
+        col.isHidden.toggle()
+        var hidden = AppSettings.hiddenColumns
+        if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
+        AppSettings.setHiddenColumns(hidden)
+    }
 }
 
 // MARK: - Context-menu NSTableView subclass
