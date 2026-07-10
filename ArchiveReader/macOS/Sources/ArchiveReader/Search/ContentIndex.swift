@@ -304,14 +304,14 @@ actor ContentIndex {
     /// merge on small passes; full optimize only on bulk builds (rewrites the entire index —
     /// multi-second on 150k, blocks search for its duration, so it must not fire each pass).
     func performMaintenance(rowsIndexed: Int) {
-        guard rowsIndexed > 0 else { return }
         if rowsIndexed > 5000 {
             try? exec("INSERT INTO fts(fts) VALUES('optimize');")
-        } else {
+        } else if rowsIndexed > 0 {
             try? exec("INSERT INTO fts(fts, rank) VALUES('merge', 500);")
         }
         // Checkpoint: reclaim WAL space. TRUNCATE shrinks the -wal file; single-connection
         // design means no concurrent reader can leave it partial. Busy result is non-fatal.
+        // Always runs (even after prune-only deletes with rowsIndexed == 0).
         try? exec("PRAGMA wal_checkpoint(TRUNCATE);")
     }
 

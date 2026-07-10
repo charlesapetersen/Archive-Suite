@@ -196,6 +196,10 @@ final class ContentIndexer: ObservableObject {
     /// `NSMetadataQueryDidUpdate` after a tag write and reappear on the next update).
     private var pendingPrune: Set<String>?
 
+    /// The in-flight prune task. Serialized: a new call cancels any prior in-flight task so two
+    /// overlapping detached tasks cannot race on `pendingPrune` and defeat the two-emission gate.
+    private var pruneTask: Task<Void, Never>?
+
     /// Evict index rows for files no longer under `rootPrefix` — but ONLY when the snapshot is
     /// settled and confirmed across two emissions:
     ///   Gate 1: `isGathering == false && !currentPaths.isEmpty`  (caller ensures)
@@ -205,10 +209,13 @@ final class ContentIndexer: ObservableObject {
     /// This is a separate call from `startIndexing` — a destructive delete must never ride the
     /// harmless-on-empty indexing emission.
     func pruneIfSettled(currentPaths: Set<String>, rootPrefix: String) {
+        pruneTask?.cancel()
         let idx = index
-        Task.detached(priority: .utility) { [weak self] in
+        pruneTask = Task.detached(priority: .utility) { [weak self] in
+            guard !Task.isCancelled else { return }
             try? await idx.open()
             let indexed = await idx.allPaths()
+            guard !Task.isCancelled else { return }
 
             // Scope to the current root using a component-boundary test (not substring LIKE).
             // A root "/Archive" must not match "/ArchiveBox/file.pdf".
@@ -247,7 +254,7 @@ final class ContentIndexer: ObservableObject {
     }
 
     /// Reset the pending-prune state (e.g. on a scope/root change that invalidates the snapshot).
-    func resetPruneState() { pendingPrune = nil }
+    func resetPruneState() { pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil }
 
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).
     private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return } ; progress = p }
