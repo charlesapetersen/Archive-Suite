@@ -211,16 +211,3 @@ enum LibrarySort {
     }
 }
 
-/// A `SortComparator` over a single `SortField`, used as the SwiftUI `Table` column sort key so that
-/// clicking a header sorts by that column (and toggles direction / builds multi-level order). It shares
-/// `LibrarySort`'s exact semantics (nil-last, medieval-safe, `localizedStandard`), so header-click and
-/// the Sort menu stay consistent. `order` is applied inside `rank`; nil-last is direction-independent.
-struct ArchiveFileComparator: SortComparator, Identifiable, Hashable {
-    var field: SortField
-    var order: SortOrder = .forward
-    var id: SortField { field }
-
-    func compare(_ a: ArchiveFile, _ b: ArchiveFile) -> ComparisonResult {
-        LibrarySort.rank(a, b, ARSortDescriptor(field: field, ascending: order == .forward))
-    }
-}

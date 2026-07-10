@@ -37,7 +37,26 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         tableView.rowHeight = max(20, fontSize * 1.8)
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
-        tableView.headerView = ColumnPickerHeaderView()
+        let headerView = ColumnPickerHeaderView()
+        headerView.currentSort = { [weak coordinator] in coordinator?.parent.model.sort ?? LibrarySort.default }
+        headerView.onSetSecondarySort = { [weak coordinator] field, ascending in
+            guard let c = coordinator else { return }
+            var sort = c.parent.model.sort
+            // Keep the primary, replace/add the secondary
+            sort = [sort.first ?? ARSortDescriptor(field: .date, ascending: true),
+                    ARSortDescriptor(field: field, ascending: ascending)]
+            c.parent.model.sort = sort
+        }
+        headerView.onRemoveSecondarySort = { [weak coordinator] in
+            guard let c = coordinator else { return }
+            if let primary = c.parent.model.sort.first {
+                c.parent.model.sort = [primary]
+            }
+        }
+        headerView.onResetSort = { [weak coordinator] in
+            coordinator?.parent.model.sort = LibrarySort.default
+        }
+        tableView.headerView = headerView
         tableView.target = coordinator
         tableView.doubleAction = #selector(Coordinator.tableViewDoubleClicked(_:))
         tableView.contextMenuProvider = { [weak coordinator] selIDs in
@@ -452,13 +471,25 @@ final class TagTokenCellView: NSTableCellView {
 
 // MARK: - Column-picker header view
 
-/// Right-click the table header → a menu with checkmark toggles for each column.
-/// "File name" is always visible (disabled toggle); all others can be hidden.
+/// Right-click the table header → a menu with checkmark toggles for each column plus sort options.
+/// "File name" is always visible (disabled toggle); all others can be hidden. If the clicked
+/// column is sortable, a secondary-sort section lets the user set it without Option-clicking.
 @MainActor
 final class ColumnPickerHeaderView: NSTableHeaderView {
+    /// Callback to set a secondary sort field. Parameters: (field, ascending).
+    var onSetSecondarySort: ((SortField, Bool) -> Void)?
+    /// Callback to remove the secondary sort (collapse to primary only).
+    var onRemoveSecondarySort: (() -> Void)?
+    /// Callback to reset sort to the default (date, then name).
+    var onResetSort: (() -> Void)?
+    /// Returns the current sort descriptors so the menu can reflect active state.
+    var currentSort: (() -> [ARSortDescriptor])?
+
     override func menu(for event: NSEvent) -> NSMenu? {
         guard let tv = tableView else { return nil }
         let menu = NSMenu(title: "Columns")
+
+        // Column visibility toggles
         for col in tv.tableColumns {
             let id = col.identifier.rawValue
             let item = NSMenuItem(title: col.title, action: #selector(toggleColumn(_:)), keyEquivalent: "")
@@ -468,6 +499,48 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
             if id == "name" { item.isEnabled = false }
             menu.addItem(item)
         }
+
+        // Detect which column was right-clicked and offer secondary-sort options
+        let point = convert(event.locationInWindow, from: nil)
+        let colIndex = column(at: point)
+        if colIndex >= 0 {
+            let col = tv.tableColumns[colIndex]
+            if let sd = col.sortDescriptorPrototype, let key = sd.key, let field = SortField(rawValue: key) {
+                let sort = currentSort?() ?? []
+                let isPrimary = sort.first?.field == field
+                let isSecondary = sort.count > 1 && sort[1].field == field
+
+                menu.addItem(.separator())
+                let header = NSMenuItem(title: "Sort — \(col.title)", action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                menu.addItem(header)
+
+                if !isPrimary {
+                    let ascItem = NSMenuItem(title: "Set as Secondary Sort (A→Z)", action: #selector(setSecondaryAsc(_:)), keyEquivalent: "")
+                    ascItem.target = self
+                    ascItem.representedObject = field.rawValue
+                    if isSecondary && sort[1].ascending { ascItem.state = .on }
+                    menu.addItem(ascItem)
+
+                    let descItem = NSMenuItem(title: "Set as Secondary Sort (Z→A)", action: #selector(setSecondaryDesc(_:)), keyEquivalent: "")
+                    descItem.target = self
+                    descItem.representedObject = field.rawValue
+                    if isSecondary && !sort[1].ascending { descItem.state = .on }
+                    menu.addItem(descItem)
+                }
+
+                if sort.count > 1 {
+                    let removeItem = NSMenuItem(title: "Remove Secondary Sort", action: #selector(removeSecondary(_:)), keyEquivalent: "")
+                    removeItem.target = self
+                    menu.addItem(removeItem)
+                }
+
+                let resetItem = NSMenuItem(title: "Default Sort (date, then name)", action: #selector(resetSort(_:)), keyEquivalent: "")
+                resetItem.target = self
+                menu.addItem(resetItem)
+            }
+        }
+
         return menu
     }
 
@@ -479,6 +552,21 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
         var hidden = AppSettings.hiddenColumns
         if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
         AppSettings.setHiddenColumns(hidden)
+    }
+
+    @objc private func setSecondaryAsc(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String, let field = SortField(rawValue: key) else { return }
+        onSetSecondarySort?(field, true)
+    }
+    @objc private func setSecondaryDesc(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String, let field = SortField(rawValue: key) else { return }
+        onSetSecondarySort?(field, false)
+    }
+    @objc private func removeSecondary(_ sender: NSMenuItem) {
+        onRemoveSecondarySort?()
+    }
+    @objc private func resetSort(_ sender: NSMenuItem) {
+        onResetSort?()
     }
 }
 

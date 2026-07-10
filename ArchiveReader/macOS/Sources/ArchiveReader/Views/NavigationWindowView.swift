@@ -355,20 +355,6 @@ struct NavigationWindowView: View {
                 .help("Choose which archive folder to browse")
 
             Menu {
-                sortButton("Document date", .date)
-                sortButton("File name", .name)
-                sortButton("Type", .fileType)
-                sortButton("File tags", .subjects)
-                sortButton("Priority", .priority)
-                sortButton("Read state", .readState)
-                Divider()
-                Button("Default (date, then name)") { model.sort = LibrarySort.default }
-                Text("Tip: click a column header to sort; click again to reverse.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
-                .help("Choose how the document list is sorted")
-
-            Menu {
                 if model.savedSearches.searches.isEmpty {
                     Text("No saved searches")
                 } else {
@@ -423,21 +409,6 @@ struct NavigationWindowView: View {
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .disabled(model.undoDepth == 0)
                 .help("Undo the last tag change (⌘Z)")
-        }
-    }
-
-    private func sortButton(_ title: String, _ field: SortField) -> some View {
-        Button {
-            // Toggle direction if already the primary field; else make it primary, name as tiebreak.
-            if model.sort.first?.field == field {
-                model.sort[0].ascending.toggle()
-            } else {
-                model.sort = [ARSortDescriptor(field: field, ascending: true),
-                              ARSortDescriptor(field: .name, ascending: true)]
-            }
-        } label: {
-            let arrow = model.sort.first?.field == field ? (model.sort.first!.ascending ? " ↑" : " ↓") : ""
-            Text(title + arrow)
         }
     }
 

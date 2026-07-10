@@ -131,9 +131,11 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | done
 
 ### Archive Reader — sort & smart folders
-- [ ] **Drop the top-bar Sort button; sort via column headers** — remove the sort control; click a header to
-  sort; **right-click a header to set a secondary sort**. | files: Views/NavigationWindowView.swift,
-  Views/AppKitTableView.swift, Core/LibraryFilter.swift | M | low
+- [x] **Drop the top-bar Sort button; sort via column headers** — removed the toolbar Sort menu; primary
+  sort via native column-header click (already wired via `sortDescriptorPrototype`); right-click header →
+  secondary sort (asc/desc) + remove-secondary + reset-to-default via `ColumnPickerHeaderView`. Dead
+  SwiftUI-Table sort code removed (`ArchiveFileComparator`, `sortComparators`, `applyTableSort`). 191 tests
+  green, 0 warnings. | done
 - [x] **Smart folders behave like a scoped root** — selecting a saved search enters a base scope; user
   filters layer on top; Clear returns to the base set, not the whole root. Sidebar shows a durable
   highlight. Scope persists across relaunch. `LibraryFilter.effective` merge for Save/summary. 170 tests
