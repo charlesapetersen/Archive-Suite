@@ -99,10 +99,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 - [ ] **Add/remove columns in the file list** — user-toggled show/hide of nav-table columns (the map calls
   the table "customizable columns" — confirm what survived the AppKit swap, then wire a column picker). |
   files: Views/AppKitTableView.swift, Views/NavigationWindowView.swift | M | low
-- [ ] **Make tags editable in the file list _again_** — inline tag editing (`SubjectTokenField` /
-  `InlineEditCells`) **likely regressed** with the SwiftUI `Table`→AppKit `NSTableView` swap (`435b8c4`);
-  those were SwiftUI cells. Re-host the inline editors in the NSTableView cell path. **Tier-2** (writes via
-  `TagWriter`). | files: Views/AppKitTableView.swift, Views/SubjectTokenField.swift, Views/InlineEditCells.swift | M | med
+- [x] **Make tags editable in the file list _again_** — `TagTokenCellView` (NSTokenField in NSTableCellView)
+  replaces the plain-text tags cell; edit-start base snapshot + freeze-during-edit + WYSIWYG commit on blur,
+  all routing through `commitSubjectEdit` → `TagWriter`. Tier-2 APPROVE (6/6 vectors). 191 tests green,
+  0 warnings. GUI write-verify deferred (screen locked). | done
 
 ### Archive Reader — tag cloud & filters
 - [x] **No dates in the tag cloud** — exclude Year/Month/Day **and decade** facets; show subjects only

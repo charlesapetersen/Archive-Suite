@@ -113,11 +113,19 @@ struct AppKitTableView: NSViewRepresentable {
             coordinator.applySnapshot(newIDs, animated: false)
         } else {
             // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
+            // Exclude the row with an active tag edit to prevent editor dismissal.
             let visRange = tableView.rows(in: tableView.visibleRect)
             if visRange.length > 0 {
-                tableView.reloadData(
-                    forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
-                    columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                var rowSet = IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length))
+                if let editID = coordinator.editingItemID,
+                   let editIdx = coordinator.currentSnapshotIDs.firstIndex(of: editID) {
+                    rowSet.remove(editIdx)
+                }
+                if !rowSet.isEmpty {
+                    tableView.reloadData(
+                        forRowIndexes: rowSet,
+                        columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                }
             }
         }
 
@@ -150,7 +158,7 @@ struct AppKitTableView: NSViewRepresentable {
     // MARK: - Coordinator
 
     @MainActor
-    final class Coordinator: NSObject, NSTableViewDelegate {
+    final class Coordinator: NSObject, NSTableViewDelegate, NSTokenFieldDelegate {
         var parent: AppKitTableView
         weak var tableView: NSTableView?
         var dataSource: NSTableViewDiffableDataSource<Int, ArchiveFile.ID>?
@@ -161,6 +169,7 @@ struct AppKitTableView: NSViewRepresentable {
         var lastScrollRequest = 0
         var displayedByID: [ArchiveFile.ID: ArchiveFile] = [:]
         var currentSnapshotIDs: [ArchiveFile.ID] = []
+        var editingItemID: ArchiveFile.ID?
 
         init(_ parent: AppKitTableView) {
             self.parent = parent
@@ -191,9 +200,14 @@ struct AppKitTableView: NSViewRepresentable {
 
         func makeCell(tableView: NSTableView, column: NSTableColumn, row: Int, itemID: ArchiveFile.ID) -> NSView {
             let colID = column.identifier.rawValue
-            let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
             let file = displayedByID[itemID]
 
+            // Tags column: inline-editable NSTokenField cell
+            if colID == "tags" {
+                return makeTagTokenCell(tableView: tableView, itemID: itemID, file: file)
+            }
+
+            let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
             let cell: NSTableCellView
             if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
                 cell = reused
@@ -287,9 +301,6 @@ struct AppKitTableView: NSViewRepresentable {
                 tf.stringValue = file.fileType
                 tf.textColor = .secondaryLabelColor
 
-            case "tags":
-                tf.stringValue = file.subjects.joined(separator: ", ")
-
             case "priority":
                 tf.stringValue = file.priority.map { "P\($0)" } ?? "—"
                 tf.textColor = .secondaryLabelColor
@@ -336,7 +347,102 @@ struct AppKitTableView: NSViewRepresentable {
             guard let tableView, tableView.clickedRow >= 0 else { return }
             parent.onDoubleClick()
         }
+
+        // MARK: Inline tag editing (NSTokenFieldDelegate)
+
+        private func makeTagTokenCell(tableView: NSTableView, itemID: ArchiveFile.ID, file: ArchiveFile?) -> NSView {
+            let cellID = NSUserInterfaceItemIdentifier("cell.tags.token")
+            let tagCell: TagTokenCellView
+            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? TagTokenCellView {
+                tagCell = reused
+            } else {
+                tagCell = TagTokenCellView()
+                tagCell.identifier = cellID
+                tagCell.tokenField.delegate = self
+            }
+            // Freeze during edit: don't clobber the in-progress token field or its target file.
+            // Mirrors SubjectTokenField.updateNSView's currentEditor() guard.
+            if tagCell.tokenField.currentEditor() == nil {
+                tagCell.tokenField.objectValue = file?.subjects ?? []
+                tagCell.itemID = itemID
+                tagCell.editBase = nil
+            }
+            tagCell.tokenField.font = .systemFont(ofSize: currentFontSize)
+            return tagCell
+        }
+
+        func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
+                        indexOfToken tokenIndex: Int,
+                        indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
+            let s = substring.trimmingCharacters(in: .whitespaces)
+            guard !s.isEmpty else { return [] }
+            let suggestions = parent.model.allSubjects
+            return Array(suggestions.filter {
+                $0.caseInsensitiveCompare(s) != .orderedSame &&
+                $0.range(of: s, options: [.caseInsensitive, .anchored]) != nil
+            }.prefix(20))
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            guard let tf = obj.object as? NSTokenField,
+                  let tagCell = tf.superview as? TagTokenCellView else { return }
+            tagCell.editBase = (tf.objectValue as? [String]) ?? []
+            editingItemID = tagCell.itemID
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let tf = obj.object as? NSTokenField,
+                  let tagCell = tf.superview as? TagTokenCellView,
+                  let base = tagCell.editBase,
+                  let fileID = tagCell.itemID,
+                  let file = displayedByID[fileID] else {
+                editingItemID = nil
+                return
+            }
+            tagCell.editBase = nil
+            editingItemID = nil
+            let edited = (tf.objectValue as? [String]) ?? []
+            parent.model.commitSubjectEdit(from: base, to: edited, for: file)
+        }
     }
+}
+
+// MARK: - Tag token cell view for inline tag editing
+
+/// Custom cell for the "File tags" column: an `NSTokenField` that renders subject tags as removable
+/// chips and supports inline add/remove with autocomplete. The cell stores the file ID and edit-start
+/// base so the coordinator's delegate methods can commit through `TagWriter`.
+@MainActor
+final class TagTokenCellView: NSTableCellView {
+    let tokenField: NSTokenField = {
+        let tf = NSTokenField()
+        tf.translatesAutoresizingMaskIntoConstraints = false
+        tf.tokenStyle = .rounded
+        tf.isBordered = false
+        tf.drawsBackground = false
+        tf.focusRingType = .none
+        tf.placeholderString = "Add tags\u{2026}"
+        tf.tokenizingCharacterSet = CharacterSet(charactersIn: ",")
+        tf.lineBreakMode = .byTruncatingTail
+        tf.usesSingleLineMode = true
+        if let cell = tf.cell as? NSTokenFieldCell { cell.wraps = false; cell.isScrollable = true }
+        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return tf
+    }()
+    var itemID: ArchiveFile.ID?
+    var editBase: [String]?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        addSubview(tokenField)
+        NSLayoutConstraint.activate([
+            tokenField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            tokenField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            tokenField.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 // MARK: - Context-menu NSTableView subclass
