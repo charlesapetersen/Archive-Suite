@@ -13,13 +13,17 @@ import PDFKit
 final class PDFPaneController {
     weak var pdfView: PDFView?
     let key: String                    // "left" / "right" — persistence + default carry-over
+    private let persists: Bool         // false → fit-to-pane default, no UserDefaults writes (preview mode)
     private var savedScale: CGFloat?   // nil = fit-to-pane; else an explicit scale factor
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
 
-    init(key: String) {
+    init(key: String, persists: Bool = true) {
         self.key = key
-        let saved = AppSettings.viewerZoom(key)
-        savedScale = saved > 0 ? CGFloat(saved) : nil
+        self.persists = persists
+        if persists {
+            let saved = AppSettings.viewerZoom(key)
+            savedScale = saved > 0 ? CGFloat(saved) : nil
+        }
     }
 
     func zoomIn()  { setScale(currentScale * 1.25) }
@@ -27,7 +31,7 @@ final class PDFPaneController {
     func fit() {
         guard let v = pdfView else { return }
         savedScale = nil
-        AppSettings.setViewerZoom(key, 0)
+        if persists { AppSettings.setViewerZoom(key, 0) }
         isApplying = true; v.autoScales = true; isApplying = false
         scrollToTop()
     }
@@ -46,7 +50,7 @@ final class PDFPaneController {
     func recordScale() {
         guard let v = pdfView, !isApplying, v.autoScales == false else { return }
         savedScale = v.scaleFactor
-        AppSettings.setViewerZoom(key, Double(v.scaleFactor))
+        if persists { AppSettings.setViewerZoom(key, Double(v.scaleFactor)) }
         scrollToTop()
     }
 

@@ -147,9 +147,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   the document viewer and the navigator Preview, when a PDF has selectable text but no OCR page-2, extract
   the text layer via `embeddedText` and render it as selectable plain text in the right pane. Build clean,
   191 tests green. GUI-verify deferred (screen locked). | done
-- [ ] **Preview gets its own default zoom** — independent of the document viewer's persisted zoom; default
+- [x] **Preview gets its own default zoom** — independent of the document viewer's persisted zoom; default
   to **full page** until the user changes it; on open, **focus the image pane** so keyboard zoom works
-  immediately. | files: Views/PreviewSheet.swift, Core/AppSettings.swift | S | low
+  immediately. `PDFPaneController(persists: false)` in preview mode; focus via async dispatch on appear.
+  Build clean, 191 tests green. GUI-verify deferred (screen locked). | done
 - [ ] **⌘0 = "fit full page" everywhere zoom applies** — viewer panes **and** preview. | files:
   ArchiveReaderCommands.swift, Views/PDFPaneView.swift, Views/PreviewSheet.swift | S | low
 - [ ] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images currently degrade; add an image

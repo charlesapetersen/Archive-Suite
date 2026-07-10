@@ -9,7 +9,7 @@ struct PreviewSheet: View {
     var onOpenFull: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var model = DocumentViewerModel()
+    @StateObject private var model = DocumentViewerModel(persists: false)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +18,10 @@ struct PreviewSheet: View {
             content
         }
         .frame(width: 940, height: 700)
-        .onAppear { model.load(selection) }
+        .onAppear {
+            model.load(selection)
+            DispatchQueue.main.async { model.leftController.focus() }
+        }
         // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match.
         .onChange(of: nav.selection) { model.load(nav.documentSelection()) }
         // Space toggles the preview closed (Finder-style); Esc also closes via the Done button.

@@ -11,8 +11,14 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var loadError: String?
     @Published var showingFind = false   // driven by the toolbar and the Document menu
 
-    let leftController = PDFPaneController(key: "left")    // image page (page 0)
-    let rightController = PDFPaneController(key: "right")  // OCR text page (page 1)
+    let leftController: PDFPaneController     // image page (page 0)
+    let rightController: PDFPaneController   // OCR text page (page 1)
+
+    /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
+    init(persists: Bool = true) {
+        leftController = PDFPaneController(key: "left", persists: persists)
+        rightController = PDFPaneController(key: "right", persists: persists)
+    }
 
     /// Which pane keyboard focus / zoom acts on. ⌘↑/⌘↓ zoom this pane; ⌘⌥←/→ switch it.
     enum Pane: Sendable { case left, right }
