@@ -27,6 +27,16 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
     adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
   * Build must be clean with NO new warnings; run the touched app's smoke test.
 
+STEP 3.5 — GUI-VERIFY (authorized this run — "GUI verify things that you can"): if the item has a visible UI
+  effect, after the clean build launch the app in your worktree (`./launch.sh reader|processor`), drive it as
+  far as automation allows (menu items + keystrokes via `osascript`; `cliclick` if present), then
+  `screencapture -x /tmp/verify-<item>.png` and READ the shot to confirm the change looks right; record the
+  path in the Session Log. QUIT the app when done (`osascript -e 'quit app "ArchiveReader"'`). Point the app at
+  a SCRATCH copy, NEVER the real corpus. Whatever you can't automate (fine drag, right-click menus, exact
+  zoom): verify what you can and append the specific remaining check to Morning Review. If the GUI can't be
+  driven (no window server / screen locked), fall back to build+unit and flag the GUI check. Full protocol:
+  the "GUI VERIFICATION" block in .maintenance/OVERNIGHT_PLAN.md.
+
 STEP 4 — SHIP: in your worktree, `git pull --rebase origin main`, then commit + push. The commit MUST also
   flip the shipped SUITE_TODO.md checkbox (cite the sha) and/or update the relevant KNOWN_ISSUES.md IN THE
   SAME COMMIT (a Stop hook blocks the turn otherwise). If the change ships no tracked item (infra/mid-feature),
