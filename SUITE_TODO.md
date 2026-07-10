@@ -123,10 +123,11 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   exclusion structural). Plan deleted. | done
 
 ### Archive Reader — search
-- [ ] **Incremental (as-you-type) OCR search** — update results while typing, **debounced** (mirror the
-  150 ms filter debounce) so it can't stall the UI at ~150k files; note bm25 scores the whole match set, so
-  keep the per-keystroke path cheap. **If it can't be made cheap enough → `POTENTIAL_FEATURES.md`** (owner).
-  | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | M | med
+- [x] **Incremental (as-you-type) OCR search** — debounced 150ms Combine pipeline on `$fullTextQuery`
+  triggers `runFullTextSearch()` as-you-type; FTS5 MATCH + bm25 is indexed and fast at scale; existing
+  `ftsGeneration` token handles superseded queries. `.onSubmit` removed (debounce handles it); clear
+  button still calls explicitly for instant feedback. 191 tests green, 0 new warnings.
+  | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | done
 
 ### Archive Reader — sort & smart folders
 - [ ] **Drop the top-bar Sort button; sort via column headers** — remove the sort control; click a header to

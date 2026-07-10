@@ -92,6 +92,15 @@ final class NavigationModel: ObservableObject {
                 self.filter.searchText = text
             } }
             .store(in: &cancellables)
+        // Debounce the OCR full-text search — 150 ms pause before running the FTS5 query, so
+        // results update as-you-type without firing a search on every keystroke. The generation
+        // token inside runFullTextSearch() already handles superseded queries.
+        $fullTextQuery
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                self?.runFullTextSearch()
+            } }
+            .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated {
                 self?.indexingProgress = p

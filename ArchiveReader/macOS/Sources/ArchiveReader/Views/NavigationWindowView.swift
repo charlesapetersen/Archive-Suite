@@ -275,8 +275,7 @@ struct NavigationWindowView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
                     .focused($searchFocused)
-                    .onSubmit { model.runFullTextSearch() }
-                    .help("Search the full OCR text of documents (press Return)")
+                    .help("Search the full OCR text of documents")
                 if model.ftsPaths != nil {
                     Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
                         Image(systemName: "xmark.circle.fill")
