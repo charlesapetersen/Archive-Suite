@@ -35,6 +35,13 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
 - ~~`decades-date-facet.md`~~ — **SHIPPED** (decade date facet). Plan deleted.
 - ~~`reader-smart-folders-scoped.md`~~ — **SHIPPED** (smart folders as scoped root). Plan deleted.
+- [ ] **`reader-gui-test-harness.md`** — reliable/repeatable **XCUITest** harness for the 5 GUI items that
+  couldn't be driven via System Events (UI-test target + `accessibilityIdentifier`s + a DEBUG-gated
+  fixture-root override that never touches the real bookmark + `scripts/make-gui-fixture.sh` + the cliclick
+  `scripts/gui-drive.sh` helper + initial tests). Code-grounded + adversarially reviewed (needs-change fixes
+  folded in: Route-B read-**write** entitlement, per-row cell IDs, poll the async TagWriter write, deterministic
+  index-ready signals). **Queued as the FINAL wave (Wave 7) of the current overnight run** — see
+  `.maintenance/OVERNIGHT_PLAN.md`. 5 bounded sub-tasks, one per session. Tier-1 (no production behavior change).
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
