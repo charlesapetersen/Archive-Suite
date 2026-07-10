@@ -35,6 +35,11 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. No key stored; auth lives in each
   CLI's login. Additive `localAgent` config sibling to the gateway (append-only, keeps resume-critical
   snapshots unchanged). Tier-2. Claude path validated on-machine 2026-07-10.
+- `openai-chatgpt-provider.md` — **PROPOSED** (Processor): add OpenAI/ChatGPT as a first-class provider via
+  (1) the **standard API** (native `LLMProvider.openai`, BYO OpenAI API key) and (2) an **OpenAI gateway
+  preset** (turnkey config over the existing OpenAI-compatible gateway). Reuses `OpenAICompatibleClient`
+  (already speaks OpenAI's format). The **API-key** counterpart to the CLI plan's subscription path. Tier-1
+  + live OCR test.
 - ~~`index-parallelization.md`~~ — **SHIPPED** (parallel+batched index build + bm25 ranked search +
   search-during-index refresh). Plan deleted.
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
