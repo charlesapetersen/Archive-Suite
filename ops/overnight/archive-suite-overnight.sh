@@ -15,7 +15,9 @@
 #     "Operation not permitted" exec'ing a script under Desktop.
 #
 # Runs as a detached loop (primary; start with: ( nohup … >log 2>&1 & )  — macOS has no setsid) OR under
-# launchd with KeepAlive.
+# launchd with KeepAlive. The detached, session-scoped run is the NORMAL, accepted setup: it uses the
+# launching session's TCC/screen grant, and if that session closes the daemon just stops — restart it next
+# session (durable plan ⇒ no loss). Reboot-durability (launchd) is OPTIONAL, not needed for normal use.
 # Self-terminates when the plan's "RUN STATUS:" line reads COMPLETE (a plain greppable line — no markdown).
 set -uo pipefail
 

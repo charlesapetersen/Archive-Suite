@@ -28,15 +28,21 @@ cp ops/overnight/archive-suite-overnight.sh ~/.local/bin/ && chmod +x ~/.local/b
 cp ops/overnight/resume-prompt.txt ~/.local/state/archive-overnight/
 ```
 
-**Primary (no launchctl, no owner needed) — a detached loop that inherits the current TCC context.**
-macOS has **no `setsid`** — use a subshell + `nohup` to detach so it survives the parent shell:
+**How we run it — the standard, accepted setup: a detached loop under the launching session's TCC/screen
+grant.** macOS has **no `setsid`**, so use a subshell + `nohup` to detach it so it survives the launching
+command returning:
 ```bash
 ( nohup ~/.local/bin/archive-suite-overnight.sh >~/.local/state/archive-overnight/nohup.out 2>&1 & )
 ```
+It runs while this login session is alive and inherits its `~/Desktop`/screen (TCC) grant — which is all we
+need. **If the terminal/session that launched it closes, the daemon stops — and that is fine, by design:**
+just start it again from your next session. All state is durable in the plan + `git`, so a stop loses nothing
+and the next start continues the queue. **We deliberately do NOT chase reboot/close durability** — the
+detached, session-scoped run is the normal behavior, not a stopgap.
 
-**Reboot-durable option (owner-armed, once):** the detached daemon may lose `~/Desktop` access when its
-parent terminal exits (macOS TCC). To survive a reboot / terminal close, arm the LaunchAgent — and if it
-logs `Operation not permitted`, grant **Full Disk Access** to `/bin/bash` (System Settings → Privacy):
+**Optional — reboot-durable (rarely needed, NOT the default).** Only if you specifically want the run to
+survive a reboot or the launching session closing, arm the LaunchAgent (may log `Operation not permitted`
+until you grant **Full Disk Access** to `/bin/bash` in System Settings → Privacy). Normal use does not need it:
 ```bash
 cp ops/overnight/com.archivesuite.overnight.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.archivesuite.overnight.plist
@@ -80,16 +86,18 @@ overnight run for a different repo:
    defaults to **`max`** — every resume session runs Opus at max reasoning effort (highest quality; higher
    token burn, so it reaches usage caps sooner and rides them out by retrying). Lower it (`high`/`medium`) if
    you want cheaper, faster cycles.
-5. **Start** it detached (primary) or arm the per-project `.plist` (`Label` = `com.<LABEL>.overnight`).
+5. **Start** it detached (the standard way — `( nohup … & )`, under the launching session's grant); the
+   per-project `.plist` (`Label` = `com.<LABEL>.overnight`) is an optional reboot-durable extra, not required.
 
 ## Lessons learned (gotchas that cost real time — read before reusing)
 
 - **TCC / protected dirs.** A launchd-context bash **cannot exec a script under `~/Desktop`** — it dies with
   `Operation not permitted` and silently no-ops every cycle. Put the script + `claude` in `~/.local/bin`. The
-  script may still need to *read/write* the repo under `~/Desktop`: a **detached daemon** started from an
-  interactive session inherits that session's TCC grant (works while the parent lives, may lapse after it
-  exits); a **launchd** job may need **Full Disk Access granted to `/bin/bash`** (System Settings → Privacy).
-  Detached-from-a-live-session is the low-friction primary; launchd is the reboot-durable upgrade.
+  script reads/writes the repo under `~/Desktop`: a **detached daemon started from an interactive session
+  inherits that session's TCC grant, and that is the standard, accepted way to run it.** If that session
+  closes, the run simply stops until you restart it next session (durable state ⇒ no loss) — we accept this
+  and do **not** need more durability. launchd reboot-durability is an optional extra (and may need **Full
+  Disk Access granted to `/bin/bash`**), not something normal use requires.
 - **Never bypass permissions.** `--permission-mode default` + a scoped `--allowedTools` and a destructive
   `--disallowedTools` denylist is the approved posture; `--dangerously-skip-permissions` is refused by the
   owner and blocked by the auto-mode classifier. **Deny wins over allow**, and Bash pattern matching is
