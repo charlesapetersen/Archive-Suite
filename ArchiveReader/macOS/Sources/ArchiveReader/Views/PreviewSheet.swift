@@ -26,6 +26,7 @@ struct PreviewSheet: View {
         .onChange(of: nav.selection) { model.load(nav.documentSelection()) }
         // Space toggles the preview closed (Finder-style); Esc also closes via the Done button.
         .onKeyPress(.space) { dismiss(); return .handled }
+        .focusedObject(model)   // expose to the Document menu so ⌘0 (Fit Page) + zoom shortcuts work
     }
 
     private var header: some View {

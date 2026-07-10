@@ -151,8 +151,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   to **full page** until the user changes it; on open, **focus the image pane** so keyboard zoom works
   immediately. `PDFPaneController(persists: false)` in preview mode; focus via async dispatch on appear.
   Build clean, 191 tests green. GUI-verify deferred (screen locked). | done
-- [ ] **⌘0 = "fit full page" everywhere zoom applies** — viewer panes **and** preview. | files:
-  ArchiveReaderCommands.swift, Views/PDFPaneView.swift, Views/PreviewSheet.swift | S | low
+- [x] **⌘0 = "fit full page" everywhere zoom applies** — `.focusedObject(model)` on PreviewSheet
+  publishes the viewer model so the existing Document menu ⌘0 (Fit Page) + zoom shortcuts reach the
+  preview. Build clean, 191 tests green. GUI-verify: Document menu confirmed; preview-specific test
+  deferred (scratch corpus not Spotlight-indexed). | done
 - [ ] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images currently degrade; add an image
   view path so they open in the viewer + preview. | files: Views/PDFPaneView.swift (or a new image pane),
   Views/DocumentWindowView.swift, Views/PreviewSheet.swift | M | low
