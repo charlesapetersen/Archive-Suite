@@ -33,6 +33,15 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
 ## Medium priority
 - **Controlled subject vocabulary (optional)** — restrict subject tags to an allowed list (near-duplicate
   detection via `TagSimilarity` and corpus-wide bulk rename already shipped).
+- **Full-text search snippet previews** — show a `snippet()`-style keyword-in-context excerpt for each
+  hit (the matched OCR text with the query term highlighted), so results are scannable without opening
+  each doc. Deferred out of the `index-parallelization` plan, which ships bm25 *relevance ranking* but
+  **not** previews (owner, 2026-07-09). Depends on the content index already storing the OCR `body`
+  (it does), so this is a search-UI addition, not an indexing change.
+- **Fuzzy OCR text search** — tolerate typos / near-matches in full-text search (FTS5 prefix/`NEAR`,
+  a trigram tokenizer, or an edit-distance layer over candidates), so a misspelled query still finds
+  the document. Deferred by owner (2026-07-09); would coordinate with the bm25 ranking in the
+  `index-parallelization` plan. | Search/ContentIndex.swift, Views/NavigationModel.swift.
 
 ## Lower priority / long-term
 - **Cloud-drive support** (Google Drive / File Provider): conflict-copy handling, materialization

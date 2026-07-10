@@ -30,10 +30,29 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- **`index-parallelization.md`** — parallelize + batch the Reader content-index build (Reader/Core review
-  finding, 2026-07-09; Tier-2, read-only, no SPEC/TagWriter change; est. ~4–8× on first-run/re-index over
-  ~150k PDFs). **Approved to implement (owner, 2026-07-09)** — tracked as the checkbox item under
-  *P2 — Reader performance* below. Proposed defaults: `workers = cores − 2`, `synchronous = NORMAL`.
+- **`index-parallelization.md`** — parallelize + batch the Reader content-index build, **+ bm25
+  relevance-ranked search + search-during-index refresh** (Reader/Core, 2026-07-09; design **verified &
+  hardened** against the code by the `index-plan-verify` workflow — 4 readers + 3 adversarial reviewers;
+  Tier-2, no SPEC/TagWriter change; est. ~4–8× on first-run/re-index over ~150k PDFs). **Approved
+  (owner, 2026-07-09)** — checkbox under *P2 — Reader performance*. Defaults: `workers = cores − 2`,
+  `synchronous = NORMAL`, WAL. *Verified gotchas folded in:* bm25 ranking is a 5-point change (SQL alone
+  is a no-op — order is discarded at `ContentIndexer.search`'s `Set` wrap + `ftsPaths: Set`), full
+  `optimize` must not run every pass (blocks the shared actor), and maintenance must be actor-isolated.
+- **`index-pruning.md`** — prune the never-pruned content index (bound DB growth; make corpus-wide counts
+  correct at source). **Approved (owner, 2026-07-09)**; do **after** `index-parallelization` (reuses its
+  `existingMTimes`/batch patterns). Naive "delete paths not in `library.files`" is UNSAFE (wipes the
+  index on every launch/root switch — `files=[]` fires mid-gather); ships only behind a settled +
+  non-empty + two-emission-confirmed + root-scoped gate. Owner assumption: root rarely changes (so no
+  per-root DB). Checkbox under *P2 — Reader performance*.
+- **`decades-date-facet.md`** — NEW **decade** date facet (`1970s`) across both apps + the shared SPEC:
+  Reader parses `NNNNs` → sortDate = decade start (interleaves with dated files) but the Date column still
+  displays "1970s"; decades stay out of the tag cloud + tag filter. Processor authors one by typing
+  "1970s" in the manual-tag **Year** field (already written verbatim → SPEC/help/tests only). **Tier-2**
+  (shared SPEC + tag write path). Covers the *dates & decades* item. Owner decisions pending (italic for
+  decade? Reader display-only? case strictness) — see the plan's Open questions.
+- **`reader-smart-folders-scoped.md`** — smart folders as a **scoped root**: a base-scope (a held
+  `SavedSearch`) distinct from user filters — selecting one shows exactly its set, **no filters render as
+  "set"**, and *Clear filters* returns to the base set (not the whole root). Covers the smart-folder item.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -67,15 +86,101 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 **→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
 
 ## P2 — Reader performance
-- [ ] **Parallelize + batch the content-index build** — see `execution-plans/index-parallelization.md`.
-  Replace the serial one-file-at-a-time indexer with a bounded parallel `withTaskGroup` (extraction fans
-  out across cores; DB writes stay serialized through the `ContentIndex` actor), batch upserts into
-  transactions (`upsertBatch`), add WAL + `synchronous=NORMAL`, and a one-query `existingMTimes()` skip-map
-  (also speeds the warm-reopen scan). UI-responsiveness guard: `workers = cores − 2` + `.utility` QoS so a
-  full-core parse storm can't starve the main thread; WAL lets search run during a pass. Est. ~4–8× on
-  first-run/re-index over ~150k PDFs. **Tier-2** (actor isolation) — worktree + adversarial review + a
-  concurrent-extraction test on scratch PDFs (never the corpus); no SPEC/`TagWriter` change, no new write
-  surface. | files: Search/ContentIndex.swift, Search/ContentIndexer.swift (+tests) | M | med · needs: none
+- [ ] **Parallelize + batch the content-index build (+ bm25 ranked search)** — see
+  `execution-plans/index-parallelization.md` (design verified against the code). *Part A (build speed):*
+  bounded parallel `withTaskGroup` extraction (DB writes stay serialized through the `ContentIndex`
+  actor) + batched `upsertBatch` transactions + WAL/`synchronous=NORMAL` + one-query `existingMTimes()`
+  skip-map (also speeds warm reopen) + actor-isolated end-of-pass maintenance (incremental `merge` each
+  pass, full `optimize` only on bulk build, then `wal_checkpoint(TRUNCATE)`). UI guard: `workers =
+  cores − 2` + `.utility` QoS. *Part B:* auto-refresh the active FTS query on pass completion (mid-pass
+  results under-report today). *Part C (bm25):* relevance-ranked search — a 5-point change (SQL `ORDER BY
+  bm25` **+** drop the `Set` wrap in `ContentIndexer.search` **+** widen `ftsPaths` to carry rank **+**
+  order `base` by rank in `recompute()` **+** a `.relevance` `LibrarySort` auto-selected while a query is
+  active); **no** snippet previews (→ `POTENTIAL_FEATURES.md`). Est. ~4–8× build. **Tier-2** (actor
+  isolation) — worktree + adversarial review + concurrent-extraction test on scratch PDFs (never the
+  corpus). | files: Search/ContentIndex.swift, Search/ContentIndexer.swift, Views/NavigationModel.swift,
+  Core/LibraryFilter.swift (+tests) | L | med · needs: none (GUI-verify relevance sort)
+- [ ] **Prune the content index** — see `execution-plans/index-pruning.md`. Gated cache eviction of rows
+  for files no longer under the current root (bounds DB growth; corrects corpus-wide counts at source).
+  **Do after the parallelization item** (reuses `existingMTimes`/batch patterns). Ship ONLY behind the
+  gate: `isGathering == false && !files.isEmpty` + absence confirmed across two post-gather emissions +
+  scoped to `rootStore.root` (component-boundary, not `LIKE`) + batched deletes — a naive prune wipes the
+  index on every launch/root switch. Its own gated pass, not folded into `startIndexing`. **Tier-2**
+  (destructive cache op on live-query state). | files: Search/ContentIndex.swift, Search/ContentIndexer.swift,
+  Views/NavigationModel.swift (+tests) | M | med · needs: none
+
+## Owner-requested batch (2026-07-09) — Processor output + Reader UX/viewer
+Captured verbatim from the owner; file hints are from the Reader/Processor Implementation Maps (verify
+at implementation). Not yet scoped into execution plans — the **decades** item likely warrants one
+(cross-app + SPEC). Legend as above (S/M/L · risk · needs).
+
+### Archive Processor
+- [ ] **Multi-column OCR output layout** — render the output PDF's text page in **multi-column** layout for
+  newspapers / multi-column books (single-column today). Detect columns or let the user set the count;
+  preserve cross-column reading order. **Tier-2** if it touches the PDF/finalize write path. | files: OCR/
+  layout + PDF output/finalize | L | med · needs: gui (verify on a real multi-column source)
+
+### Archive Reader — layout & panels
+- [ ] **Adjustable + collapsible side panels** — left folder-nav column (`SidebarView`) and right tag-cloud
+  column get draggable width **and** collapse/expand, each with a **keyboard shortcut** to toggle. | files:
+  Views/NavigationWindowView.swift, Views/SidebarView.swift, ArchiveReaderCommands.swift | M | low
+- [ ] **Add/remove columns in the file list** — user-toggled show/hide of nav-table columns (the map calls
+  the table "customizable columns" — confirm what survived the AppKit swap, then wire a column picker). |
+  files: Views/AppKitTableView.swift, Views/NavigationWindowView.swift | M | low
+- [ ] **Make tags editable in the file list _again_** — inline tag editing (`SubjectTokenField` /
+  `InlineEditCells`) **likely regressed** with the SwiftUI `Table`→AppKit `NSTableView` swap (`435b8c4`);
+  those were SwiftUI cells. Re-host the inline editors in the NSTableView cell path. **Tier-2** (writes via
+  `TagWriter`). | files: Views/AppKitTableView.swift, Views/SubjectTokenField.swift, Views/InlineEditCells.swift | M | med
+
+### Archive Reader — tag cloud & filters
+- [ ] **No dates in the tag cloud** — exclude Year/Month/Day **and decade** facets; show subjects only
+  (facet classification already exists in `DocumentTags`). | files: Views/NavigationWindowView.swift
+  (tag-cloud panel), Core/DocumentTags.swift | S | low
+- [ ] **Remove date tags from the tag filter search** — months/years/decades must not appear as
+  suggestions/targets in the tag filter field. | files: Views/TagFilterField.swift, Core/DocumentTags.swift | S | low
+- [ ] **Logarithmic tag-cloud sizing** — size by `log(count)` (or similar) so a 1000-count outlier doesn't
+  crush the 2/10/20/100/1000 gradient into uniformly tiny text. | files: Views/NavigationWindowView.swift | S | low
+- [ ] **Wrap (not clip) file tags in the list** — assess feasibility in the AppKit cell; **if hard → move to
+  `ArchiveReader/POTENTIAL_FEATURES.md`** (owner). | files: Views/AppKitTableView.swift | S | low
+
+### Archive Reader — dates & decades (CROSS-APP + shared SPEC)
+- [ ] **Decade tags ("1970s", "1980s")** _(plan: `execution-plans/decades-date-facet.md`)_ — a NEW date facet spanning BOTH apps and the shared tag contract:
+  - **SPEC first:** add the decade facet to `SPEC/tag-format.md` (both apps parse/write identically). **Tier-2.**
+  - **Reader:** parse a decade tag → **sort** key = start of decade ("1970s" sorts as 1970-01-01, i.e. in
+    sequence with dated files) but the **date column still displays "1970s"**, not a concrete date. | files:
+    Core/DocumentTags.swift (parse / sortDate / displayDate)
+  - **Processor:** let the user tag a decade by typing e.g. "1970s" into the **date field** of the tagging
+    dialog. | files: Processor tagging dialog + `MacOSTagger`
+  - Likely its own `execution-plans/` plan. | L | med · needs: none
+
+### Archive Reader — search
+- [ ] **Incremental (as-you-type) OCR search** — update results while typing, **debounced** (mirror the
+  150 ms filter debounce) so it can't stall the UI at ~150k files; note bm25 scores the whole match set, so
+  keep the per-keystroke path cheap. **If it can't be made cheap enough → `POTENTIAL_FEATURES.md`** (owner).
+  | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | M | med
+
+### Archive Reader — sort & smart folders
+- [ ] **Drop the top-bar Sort button; sort via column headers** — remove the sort control; click a header to
+  sort; **right-click a header to set a secondary sort**. | files: Views/NavigationWindowView.swift,
+  Views/AppKitTableView.swift, Core/LibraryFilter.swift | M | low
+- [ ] **Smart folders behave like a scoped root** _(plan: `execution-plans/reader-smart-folders-scoped.md`)_ — selecting a saved search shows exactly its filtered set;
+  **no filters render as "set"**, and *Clear filters* returns to the smart folder's base set (not the whole
+  root). | files: Search/SavedSearch.swift, Views/NavigationModel.swift, Views/SidebarView.swift,
+  Core/LibraryFilter.swift | M | med
+
+### Archive Reader — viewer & preview
+- [ ] **Single-page PDF with an embedded text layer → show its text as plain text (right pane)** — in both
+  the document viewer and the navigator Preview, when a PDF has selectable text but no OCR page-2, render
+  that text on the right. | files: Views/DocumentViewerModel.swift, Views/DocumentWindowView.swift,
+  Views/PreviewSheet.swift | M | low
+- [ ] **Preview gets its own default zoom** — independent of the document viewer's persisted zoom; default
+  to **full page** until the user changes it; on open, **focus the image pane** so keyboard zoom works
+  immediately. | files: Views/PreviewSheet.swift, Core/AppSettings.swift | S | low
+- [ ] **⌘0 = "fit full page" everywhere zoom applies** — viewer panes **and** preview. | files:
+  ArchiveReaderCommands.swift, Views/PDFPaneView.swift, Views/PreviewSheet.swift | S | low
+- [ ] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images currently degrade; add an image
+  view path so they open in the viewer + preview. | files: Views/PDFPaneView.swift (or a new image pane),
+  Views/DocumentWindowView.swift, Views/PreviewSheet.swift | M | low
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
