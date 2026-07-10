@@ -54,7 +54,7 @@ struct DateCell: View {
 
     var body: some View {
         Button {
-            yearText = file.tags.year.map(String.init) ?? ""
+            yearText = file.tags.year.map(String.init) ?? file.tags.decadeToken ?? ""
             dayText  = file.tags.day.map(String.init) ?? ""
             showing = true
         } label: {

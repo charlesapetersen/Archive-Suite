@@ -25,7 +25,9 @@ enum TagEditing {
         case .removeSubject(let s):
             return TagDelta(remove: [s])
         case .setYear(let y):
-            return TagDelta(add: y.map { [String($0)] } ?? [], remove: tags.yearToken.map { [$0] } ?? [])
+            // Year supersedes Decade: remove both yearToken and decadeToken (prevents orphaned hidden decade).
+            let remove = (tags.yearToken.map { [$0] } ?? []) + (tags.decadeToken.map { [$0] } ?? [])
+            return TagDelta(add: y.map { [String($0)] } ?? [], remove: remove)
         case .setMonth(let m):
             return TagDelta(add: m.map { [monthToken($0)] } ?? [], remove: tags.monthToken.map { [$0] } ?? [])
         case .setDay(let d):

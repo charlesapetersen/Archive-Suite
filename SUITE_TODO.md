@@ -44,12 +44,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   index on every launch/root switch — `files=[]` fires mid-gather); ships only behind a settled +
   non-empty + two-emission-confirmed + root-scoped gate. Owner assumption: root rarely changes (so no
   per-root DB). Checkbox under *P2 — Reader performance*.
-- **`decades-date-facet.md`** — NEW **decade** date facet (`1970s`) across both apps + the shared SPEC:
-  Reader parses `NNNNs` → sortDate = decade start (interleaves with dated files) but the Date column still
-  displays "1970s"; decades stay out of the tag cloud + tag filter. Processor authors one by typing
-  "1970s" in the manual-tag **Year** field (already written verbatim → SPEC/help/tests only). **Tier-2**
-  (shared SPEC + tag write path). Covers the *dates & decades* item. Owner decisions pending (italic for
-  decade? Reader display-only? case strictness) — see the plan's Open questions.
+- ~~`decades-date-facet.md`~~ — **SHIPPED** (decade date facet). Plan deleted.
 - ~~`reader-smart-folders-scoped.md`~~ — **SHIPPED** (smart folders as scoped root). Plan deleted.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
@@ -142,14 +137,11 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `ArchiveReader/POTENTIAL_FEATURES.md`** (owner). | files: Views/AppKitTableView.swift | S | low
 
 ### Archive Reader — dates & decades (CROSS-APP + shared SPEC)
-- [ ] **Decade tags ("1970s", "1980s")** _(plan: `execution-plans/decades-date-facet.md`)_ — a NEW date facet spanning BOTH apps and the shared tag contract:
-  - **SPEC first:** add the decade facet to `SPEC/tag-format.md` (both apps parse/write identically). **Tier-2.**
-  - **Reader:** parse a decade tag → **sort** key = start of decade ("1970s" sorts as 1970-01-01, i.e. in
-    sequence with dated files) but the **date column still displays "1970s"**, not a concrete date. | files:
-    Core/DocumentTags.swift (parse / sortDate / displayDate)
-  - **Processor:** let the user tag a decade by typing e.g. "1970s" into the **date field** of the tagging
-    dialog. | files: Processor tagging dialog + `MacOSTagger`
-  - Likely its own `execution-plans/` plan. | L | med · needs: none
+- [x] **Decade tags ("1970s", "1980s")** _(plan: `execution-plans/decades-date-facet.md`)_ — SHIPPED.
+  SPEC + Reader parse/sort/display/topicalTags + write-path safety (year supersedes decade) +
+  Processor Year-field help text. 12 new unit tests (182 total green). Tier-2 APPROVE. Defaults
+  applied for the 4 open questions (italic=yes, no Reader decade editor, no hard validator, cloud/filter
+  exclusion structural). Plan deleted. | done
 
 ### Archive Reader — search
 - [ ] **Incremental (as-you-type) OCR search** — update results while typing, **debounced** (mirror the

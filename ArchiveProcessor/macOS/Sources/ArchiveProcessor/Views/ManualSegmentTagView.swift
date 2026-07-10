@@ -354,8 +354,8 @@ private struct ManualSegTagCard: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Year").font(.caption2).foregroundStyle(.secondary)
-                    TextField("", text: $processor.manualSegDraftTags.year)
-                        .textFieldStyle(.roundedBorder).frame(width: 66)
+                    TextField("1968 or 1970s", text: $processor.manualSegDraftTags.year)
+                        .textFieldStyle(.roundedBorder).frame(width: 90)
                         .focused($yearFocused)
                 }
                 MonthField(month: $processor.manualSegDraftTags.month)

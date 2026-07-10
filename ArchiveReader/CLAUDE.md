@@ -59,6 +59,11 @@ paths also contain **non-breaking spaces** U+00A0).
   `parseYear` accepts **3–4** (medieval-friendly), so don't assume exactly 4.
 - **Month:** `MM Month`, e.g. `03 March`.
 - **Day:** `Day N` (unpadded), e.g. `Day 25`, `Day 1`. Often absent.
+- **Decade:** `NNNNs`, e.g. `1970s` (3–4 digit run ending in `0`, then lowercase `s`; medieval `970s`).
+  An approximate date; **mutually exclusive with Year** (Year supersedes). Sorts at decade start
+  (`1970s` → `19_700_000`, same as year-only `1970`), displays `"1970s"` italic (speculative). Reader
+  never authors a decade — Processor-only (manual Year field). A year edit supersedes a decade
+  (TagEditing removes both `yearToken` + `decadeToken`). Parser: `DocumentTags.parseDecade`.
 - **Date Uncertain:** flags that the date is **speculative** — the file *usually still has a Year
   tag*. So these files sort by their (speculative) year like any dated file; the nav window renders
   the derived date in **italics** to signal speculation (never dumped to the end).

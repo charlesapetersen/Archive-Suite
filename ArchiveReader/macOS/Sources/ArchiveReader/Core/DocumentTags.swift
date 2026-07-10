@@ -48,6 +48,7 @@ struct DocumentTags: Sendable, Equatable {
     var month: Month?
     var day: Int?
     var dateUncertain: Bool
+    var decade: Int?           // decade START year, e.g. 1970 (from "1970s"); nil when absent
     var priority: Int?         // 7...10 (P10 highest)
     var readState: ReadState?
     var color: ArchiveColor?
@@ -60,19 +61,21 @@ struct DocumentTags: Sendable, Equatable {
     var yearToken: String?
     var monthToken: String?
     var dayToken: String?
+    var decadeToken: String?   // the verbatim raw token consumed for the decade facet ("1970s")
     var priorityToken: String?
 
     /// Chronological sort key derived from the date tags. **No epoch limit** (medieval-safe).
     /// `nil` when there is no year → the caller sorts undated rows to the end.
     /// Month/day absent count as 0, so a year-only doc sorts just before its January.
     var sortDate: Int? {
-        guard let year else { return nil }
-        return year * 10_000 + (month?.number ?? 0) * 100 + (day ?? 0)
+        if let year { return year * 10_000 + (month?.number ?? 0) * 100 + (day ?? 0) }
+        if let decade { return decade * 10_000 }
+        return nil
     }
 
     /// When true, the derived date is speculative and should be shown in italics.
     /// (`Date Uncertain` flags a speculative year; the file usually still carries a Year tag.)
-    var dateIsSpeculative: Bool { dateUncertain }
+    var dateIsSpeculative: Bool { dateUncertain || (year == nil && decade != nil) }
 
     /// Tokens for the "File tags" column and the tag cloud: the raw tags minus the WINNING date facets
     /// (yearToken / monthToken / dayToken / `Date Uncertain`) and read-state (`Read`/`Unread`), since
@@ -83,6 +86,7 @@ struct DocumentTags: Sendable, Equatable {
             if let t = yearToken { s.insert(t) }
             if let t = monthToken { s.insert(t) }
             if let t = dayToken { s.insert(t) }
+            if let t = decadeToken { s.insert(t) }
             return s
         }()
         return raw.filter { token in
@@ -98,7 +102,7 @@ struct DocumentTags: Sendable, Equatable {
     /// Human-readable date for the "Document date" column. `nil` when undated.
     /// Year only → "1980"; +month → "Mar 1980"; +day → "Mar 25, 1980".
     var displayDate: String? {
-        guard let year else { return nil }
+        guard let year else { return decadeToken }
         guard let month else { return String(year) }
         let mon = DocumentTags.monthNames[month.number - 1].prefix(3)
         if let day { return "\(mon) \(day), \(year)" }
@@ -117,6 +121,7 @@ extension DocumentTags {
         var month: Month?
         var day: Int?
         var dateUncertain = false
+        var decade: Int?
         var priority: Int?
         var readState: ReadState?
         var subjects: [String] = []
@@ -127,6 +132,7 @@ extension DocumentTags {
         var yearToken: String?
         var monthToken: String?
         var dayToken: String?
+        var decadeToken: String?
         var priorityToken: String?
 
         let color = labelNumber.flatMap(ArchiveColor.init(labelNumber:))
@@ -163,6 +169,13 @@ extension DocumentTags {
                 day = d; dayToken = token
                 continue
             }
+            // Decade — "NNNNs" (checked before the bare-number Year test; the trailing 's'
+            // means it can't collide with parseYear, so relative order is immaterial).
+            if let dec = parseDecade(s) {
+                if let prev = decadeToken { subjects.append(prev) }
+                decade = dec; decadeToken = token
+                continue
+            }
             // Year — bare 3–4 digit number (medieval-friendly: 800, 1215, 1980).
             if let y = parseYear(s) {
                 if let prev = yearToken { subjects.append(prev) }
@@ -180,9 +193,9 @@ extension DocumentTags {
 
         return DocumentTags(
             raw: raw, labelNumber: labelNumber,
-            year: year, month: month, day: day, dateUncertain: dateUncertain,
+            year: year, month: month, day: day, dateUncertain: dateUncertain, decade: decade,
             priority: priority, readState: readState, color: color, subjects: subjects,
-            yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, priorityToken: priorityToken
+            yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken, priorityToken: priorityToken
         )
     }
 
@@ -222,8 +235,11 @@ extension DocumentTags {
     }
 
     /// "1970s"-style decade token (4-digit number + trailing "s").
+    /// A decade token "NNNNs": 3–4 digits whose last digit is 0, then a lowercase 's'
+    /// (e.g. "1970s", medieval-friendly "970s"). Returns the decade START year (1970).
     static func parseDecade(_ s: String) -> Int? {
-        guard s.count == 5, s.hasSuffix("s"), let y = Int(s.dropLast()), y % 10 == 0 else { return nil }
+        guard (4...5).contains(s.count), s.hasSuffix("s"),
+              let y = Int(s.dropLast()), y % 10 == 0 else { return nil }
         return y
     }
 

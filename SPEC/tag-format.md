@@ -62,6 +62,7 @@ year test, so `P7` or `Day 25` is never taken for a year).
 | **Year** | bare digits, e.g. `1980` | 0–1 | Processor's LLM prompt forces a **4-digit** year and never null for a dated doc. Reader's `parseYear` accepts **3–4 digits** (medieval-friendly: `800`, `1215`). See discrepancy #1. |
 | **Month** | `MM Month`, e.g. `03 March` | 0–1 | `MM` = 1–12, name must match that month (case-insensitive). Processor applies `capitalizeFirstLetters`, so it is emitted title-cased. Month is written **only when explicit in the doc**, never inferred. |
 | **Day** | `Day N` (unpadded), e.g. `Day 25`, `Day 1` | 0–1 | N = 1–31. Often absent. |
+| **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 digit run whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor **only** when the user types it into the manual tag dialog's Year field; the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
 | **Date Uncertain** | literal `Date Uncertain` | 0–1 | Flags a **speculative year** — the file _usually still carries a Year tag_. Not "no date." |
 | **Priority** | exactly one of `P7` `P8` `P9` `P10` | 0–1 | **P10 highest.** Comes **only from Live Capture phone input** — the LLM tagger never emits priority. Box/folder pages and most batch docs have none. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
@@ -81,7 +82,13 @@ the file's actual `labelNumber`).
 Derived from Year/Month/Day into one sortable integer (Reader `DocumentTags.sortDate`):
 
 ```
-sortDate = year * 10_000 + (month ?? 0) * 100 + (day ?? 0)     // nil when no year
+sortDate = year * 10_000 + (month ?? 0) * 100 + (day ?? 0)     // nil when no year (and no decade)
+// A Decade tag with no Year sorts as the decade's first year, Jan 1:
+// sortDate = decadeStart * 10_000   (e.g. "1970s" → 19_700_000)
+// so it interleaves with dated files exactly where a year-only "1970" doc sorts.
+// If a concrete Year is also present it takes precedence (Year supersedes Decade).
+// The Date column displays the verbatim decade token ("1970s"), never a synthesized
+// concrete date, and renders it italic (speculative), like Date Uncertain.
 ```
 
 - **No epoch limit** (unlike the deferred creation-date mirroring, which is ~1678–2262). Medieval and
@@ -175,6 +182,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 |---|---|---|
 | Tag read/write primitives | `ArchiveProcessor/.../Tagging/MacOSTagger.swift` | `ArchiveReader/.../Core/TagWriter.swift`, `Core/TagReading.swift` |
 | Year / Month / Day / Date Uncertain | `Tagging/TagGenerator.swift` (`GeneratedTags`, prompt) | `Core/DocumentTags.swift` (`parseYear`/`parseMonth`/`parseDay`) |
+| Decade `NNNNs` | `Views/ManualTaggingSheet.swift` + `Views/ManualSegmentTagView.swift` (Year date field → verbatim via `GeneratedTags.allTags`/`MacOSTagger`) | `Core/DocumentTags.swift` (`parseDecade`/`sortDate`/`displayDate`) |
 | Priority `P7`–`P10` | `Capture/LiveCaptureProcessor.swift`, `OCR/OCRProcessor+Tagging.swift` (`applyCapturePriorityTags`) | `Core/DocumentTags.swift` (`parsePriority`) |
 | Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `Core/DocumentTags.swift` (`ReadState`), `Core/TagWriter.swift` (`setReadState`) |
 | Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |

@@ -75,6 +75,79 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(t.raw, raw)  // never reordered or mutated
     }
 
+    // MARK: Decade facet
+
+    func testParseDecadeValidTokens() {
+        XCTAssertEqual(DocumentTags.parseDecade("1970s"), 1970)
+        XCTAssertEqual(DocumentTags.parseDecade("1980s"), 1980)
+        XCTAssertEqual(DocumentTags.parseDecade("970s"), 970)      // medieval-friendly 3-digit
+        XCTAssertEqual(DocumentTags.parseDecade("800s"), 800)
+    }
+
+    func testParseDecadeRejectsInvalid() {
+        XCTAssertNil(DocumentTags.parseDecade("1975s"))   // last digit not 0
+        XCTAssertNil(DocumentTags.parseDecade("1970S"))   // uppercase S
+        XCTAssertNil(DocumentTags.parseDecade("1970"))    // no trailing s
+        XCTAssertNil(DocumentTags.parseDecade("19700s"))  // 5-digit run
+        XCTAssertNil(DocumentTags.parseDecade("s"))       // no digits
+        XCTAssertNil(DocumentTags.parseDecade(""))        // empty
+    }
+
+    func testDecadeParseIntegration() {
+        let raw = ["1970s", "Economics", "Unread"]
+        let t = DocumentTags.parse(raw: raw, labelNumber: nil)
+        XCTAssertEqual(t.decade, 1970)
+        XCTAssertEqual(t.decadeToken, "1970s")
+        XCTAssertNil(t.year)
+        XCTAssertEqual(t.subjects, ["Economics"])               // decade NOT in subjects
+        XCTAssertFalse(t.topicalTags.contains("1970s"))         // excluded from topicalTags
+    }
+
+    func testDecadeSortDate() {
+        let t = DocumentTags.parse(raw: ["1970s"], labelNumber: nil)
+        XCTAssertEqual(t.sortDate, 19_700_000)
+        // Equals a year-only 1970
+        let yearOnly = DocumentTags.parse(raw: ["1970"], labelNumber: nil)
+        XCTAssertEqual(t.sortDate, yearOnly.sortDate)
+    }
+
+    func testDecadeDisplayDate() {
+        let t = DocumentTags.parse(raw: ["1970s", "Economics"], labelNumber: nil)
+        XCTAssertEqual(t.displayDate, "1970s")
+        XCTAssertTrue(t.dateIsSpeculative)                      // decade-only is speculative
+    }
+
+    func testYearSupersedesDecadeInSortAndDisplay() {
+        // Both year and decade on one file — year wins sortDate/displayDate; decade is hidden.
+        let t = DocumentTags.parse(raw: ["1970s", "1975", "Economics"], labelNumber: nil)
+        XCTAssertEqual(t.year, 1975)
+        XCTAssertEqual(t.decade, 1970)
+        XCTAssertEqual(t.sortDate, 19_750_000)                  // year wins
+        XCTAssertEqual(t.displayDate, "1975")                   // year wins
+        XCTAssertFalse(t.dateIsSpeculative)                     // concrete year, not speculative
+    }
+
+    func testTwoDecadesLastWinsPreviousDemoted() {
+        let t = DocumentTags.parse(raw: ["1960s", "1970s", "Economics"], labelNumber: nil)
+        XCTAssertEqual(t.decade, 1970)
+        XCTAssertEqual(t.decadeToken, "1970s")
+        XCTAssertTrue(t.subjects.contains("1960s"))             // first decade demoted to subject
+    }
+
+    func testDecadeNotInTagCloudOrFilter() {
+        // Decade token is consumed (continue), so it never lands in subjects —
+        // tag cloud and filter autocomplete derive from subjects, so decade is excluded for free.
+        let t = DocumentTags.parse(raw: ["1970s", "Economics"], labelNumber: nil)
+        XCTAssertFalse(t.subjects.contains("1970s"))
+    }
+
+    func testMedievalDecade() {
+        let t = DocumentTags.parse(raw: ["970s", "Manuscripts"], labelNumber: nil)
+        XCTAssertEqual(t.decade, 970)
+        XCTAssertEqual(t.sortDate, 9_700_000)
+        XCTAssertEqual(t.displayDate, "970s")
+    }
+
     // SPEC/tag-format.md discrepancy #3: Archive Processor emits literal `Box`/`Folder` (on marker
     // pages, alongside the color) and `OCR Failed` (on OCR failures) as ordinary subject tokens. They
     // must classify as plain SUBJECTS — never a facet, never the color token — so they can't drive a

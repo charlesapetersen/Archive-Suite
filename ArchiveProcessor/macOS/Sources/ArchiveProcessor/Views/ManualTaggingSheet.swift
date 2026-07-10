@@ -160,7 +160,7 @@ struct ManualTagSegmentView: View {
                 // Date
                 GroupBox("Date") {
                     HStack(alignment: .bottom, spacing: 12) {
-                        dateField("Year", text: $segment.year, width: 70, prompt: "1968")
+                        dateField("Year", text: $segment.year, width: 70, prompt: "1968 or 1970s")
                         dateField("Month", text: $segment.month, width: 130, prompt: "03 March")
                         dateField("Day", text: $segment.day, width: 90, prompt: "Day 15")
                         Toggle("Date uncertain", isOn: $segment.dateUncertain)

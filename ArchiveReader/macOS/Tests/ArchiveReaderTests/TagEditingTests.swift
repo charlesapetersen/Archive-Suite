@@ -104,6 +104,36 @@ final class TagEditingTests: XCTestCase {
         XCTAssertTrue(TagEditing.delta(for: .setYear(nil), given: tags(["Jerry Brown", "Unread"])).remove.isEmpty)  // no year to clear
     }
 
+    // MARK: Decade reconcile — year supersedes decade (no orphaned hidden decade)
+
+    func testSetYearRemovesDecade() {
+        // Setting a concrete year on a decade-only file removes the decade token.
+        let t = tags(["1970s", "Economics", "Unread"])
+        XCTAssertEqual(t.decade, 1970)
+        XCTAssertEqual(t.decadeToken, "1970s")
+        let d = TagEditing.delta(for: .setYear(1975), given: t)
+        XCTAssertEqual(d.add, ["1975"])
+        XCTAssertEqual(d.remove, ["1970s"])                      // decade removed, no orphan
+    }
+
+    func testClearYearAlsoRemovesDecade() {
+        // "Clear" (setYear nil) on a decade file removes the decade too.
+        let t = tags(["1970s", "Economics"])
+        let d = TagEditing.delta(for: .setYear(nil), given: t)
+        XCTAssertTrue(d.add.isEmpty)
+        XCTAssertEqual(d.remove, ["1970s"])
+    }
+
+    func testSetYearOnFileWithBothYearAndDecade() {
+        // A legacy file with both "1970s" and "1975" — setYear removes both tokens.
+        let t = tags(["1970s", "1975", "Economics"])
+        XCTAssertEqual(t.yearToken, "1975")
+        XCTAssertEqual(t.decadeToken, "1970s")
+        let d = TagEditing.delta(for: .setYear(1982), given: t)
+        XCTAssertEqual(d.add, ["1982"])
+        XCTAssertEqual(Set(d.remove), ["1975", "1970s"])         // both removed
+    }
+
     func testAddAndRemoveSubject() {
         XCTAssertEqual(TagEditing.delta(for: .addSubject("Taxes"), given: tags(["1980"])).add, ["Taxes"])
         XCTAssertTrue(TagEditing.delta(for: .addSubject("   "), given: tags(["1980"])).isEmpty)
