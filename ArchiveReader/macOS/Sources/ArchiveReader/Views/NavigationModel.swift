@@ -539,6 +539,11 @@ final class NavigationModel: ObservableObject {
         indexer.startIndexing(files)                    // incremental; no-op if running
         if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
+        // Prune stale index rows — separate from startIndexing (a destructive delete must never ride
+        // a harmless-on-empty indexing emission). Gated: settled (not gathering) + non-empty + root known.
+        if !library.isGathering, !files.isEmpty, let rootPath = rootStore.root?.path {
+            indexer.pruneIfSettled(currentPaths: Set(files.map(\.url.path)), rootPrefix: rootPath)
+        }
     }
 
     /// Scope the list to a folder subtree (nil = whole root), then recompute.
@@ -608,6 +613,7 @@ final class NavigationModel: ObservableObject {
             rootStore.setRoot(url)
             // A scope from the old root can't apply to a new one.
             scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil
+            indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
             filter.pathPrefix = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once

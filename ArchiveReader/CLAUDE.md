@@ -193,6 +193,9 @@ writes against the real corpus — always a copy.
   (~500-row transactions). WAL journal mode + `synchronous=NORMAL` for cheaper writes; `existingMTimes()`
   one-query skip-map replaces per-file actor round-trips; actor-isolated `performMaintenance` (incremental
   merge / full optimize + WAL checkpoint) compacts the FTS index after each pass.
+  **Pruned (gated):** stale rows (files removed or under a previous root) are evicted by a separate
+  `pruneIfSettled` pass — gated on settled + non-empty + two-emission absence confirmation +
+  component-boundary root scope; batched deletes; never folded into the indexing emission.
   **Relevance-ranked search (bm25):** search results are ordered by FTS5 `bm25` score (column weights:
   name=10, classification=5, body=1 — filename/classification hits outrank body-only hits). The nav list
   auto-switches to a `.relevance` sort while a query is active (falls back to the default sort on clear).

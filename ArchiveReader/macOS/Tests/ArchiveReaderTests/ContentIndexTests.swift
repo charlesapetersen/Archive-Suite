@@ -245,4 +245,72 @@ final class ContentIndexTests: XCTestCase {
         XCTAssertEqual(PDFTextExtractor.parseClassification(from: "Classification: Box"), "Box")
         XCTAssertNil(PDFTextExtractor.parseClassification(from: "no classification line here"))
     }
+
+    // MARK: - Pruning (deletePaths + allPaths)
+
+    /// deletePaths removes the target rows and leaves others intact; counts + search reflect it.
+    func testDeletePathsRemovesTargetOnly() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/root/a.pdf", mtime: 1, name: "a", classification: nil, body: "alpha text")
+        try await idx.upsert(path: "/root/b.pdf", mtime: 1, name: "b", classification: nil, body: "bravo text")
+        try await idx.upsert(path: "/root/c.pdf", mtime: 1, name: "c", classification: nil, body: "charlie text")
+        try await idx.deletePaths(["/root/c.pdf"])
+        let count = await idx.indexedCount()
+        XCTAssertEqual(count, 2)
+        let alpha = await idx.search("alpha")
+        XCTAssertEqual(alpha, ["/root/a.pdf"])
+        let charlie = await idx.search("charlie")
+        XCTAssertTrue(charlie.isEmpty, "deleted path must not appear in search")
+        await idx.close()
+    }
+
+    /// deletePaths with an empty array is a no-op (no crash, no deletion).
+    func testDeletePathsEmptyIsNoop() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil, body: "hello")
+        try await idx.deletePaths([])
+        let count = await idx.indexedCount()
+        XCTAssertEqual(count, 1)
+        await idx.close()
+    }
+
+    /// allPaths returns the full set of indexed paths.
+    func testAllPaths() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil, body: "hello")
+        try await idx.upsert(path: "/b.pdf", mtime: 1, name: "b", classification: nil, body: "world")
+        let paths = await idx.allPaths()
+        XCTAssertEqual(paths, ["/a.pdf", "/b.pdf"])
+        await idx.close()
+    }
+
+    /// deletePaths on a nonexistent path is a silent no-op (no crash, count unchanged).
+    func testDeletePathsNonexistentIsSilent() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil, body: "hello")
+        try await idx.deletePaths(["/nonexistent.pdf"])
+        let count = await idx.indexedCount()
+        XCTAssertEqual(count, 1)
+        await idx.close()
+    }
+
+    /// After pruning, needsAttentionCount drops to the live set (stale rows gone).
+    func testPruneDropsCorpusWideCount() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/root/good.pdf", mtime: 1, name: "good", classification: nil,
+                             body: "ok", pageCount: 2, hasText: true, readable: true)
+        try await idx.upsert(path: "/root/stale.pdf", mtime: 1, name: "stale", classification: nil,
+                             body: "", pageCount: 0, hasText: false, readable: false)
+        let before = await idx.needsAttentionCount()
+        XCTAssertEqual(before, 1)
+        try await idx.deletePaths(["/root/stale.pdf"])
+        let after = await idx.needsAttentionCount()
+        XCTAssertEqual(after, 0, "corpus-wide count should drop after pruning the stale row")
+        await idx.close()
+    }
 }

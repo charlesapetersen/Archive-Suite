@@ -32,12 +32,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 ## Active execution plans (`execution-plans/`)
 - ~~`index-parallelization.md`~~ — **SHIPPED** (parallel+batched index build + bm25 ranked search +
   search-during-index refresh). Plan deleted.
-- **`index-pruning.md`** — prune the never-pruned content index (bound DB growth; make corpus-wide counts
-  correct at source). **Approved (owner, 2026-07-09)**; do **after** `index-parallelization` (reuses its
-  `existingMTimes`/batch patterns). Naive "delete paths not in `library.files`" is UNSAFE (wipes the
-  index on every launch/root switch — `files=[]` fires mid-gather); ships only behind a settled +
-  non-empty + two-emission-confirmed + root-scoped gate. Owner assumption: root rarely changes (so no
-  per-root DB). Checkbox under *P2 — Reader performance*.
+- ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
 - ~~`decades-date-facet.md`~~ — **SHIPPED** (decade date facet). Plan deleted.
 - ~~`reader-smart-folders-scoped.md`~~ — **SHIPPED** (smart folders as scoped root). Plan deleted.
 
@@ -80,14 +75,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   search (SQL `ORDER BY bm25`, column weights name=10/class=5/body=1, ordered `[String]` return,
   `ftsRank` map, `.relevance` auto-sort, lifecycle + persistence coercion) + auto-refresh active FTS
   query on index pass completion. 186 tests green. Tier-2 APPROVE. | done
-- [ ] **Prune the content index** — see `execution-plans/index-pruning.md`. Gated cache eviction of rows
-  for files no longer under the current root (bounds DB growth; corrects corpus-wide counts at source).
-  **Do after the parallelization item** (reuses `existingMTimes`/batch patterns). Ship ONLY behind the
-  gate: `isGathering == false && !files.isEmpty` + absence confirmed across two post-gather emissions +
-  scoped to `rootStore.root` (component-boundary, not `LIKE`) + batched deletes — a naive prune wipes the
-  index on every launch/root switch. Its own gated pass, not folded into `startIndexing`. **Tier-2**
-  (destructive cache op on live-query state). | files: Search/ContentIndex.swift, Search/ContentIndexer.swift,
-  Views/NavigationModel.swift (+tests) | M | med · needs: none
+- [x] **Prune the content index** — gated cache eviction: `!isGathering && !files.isEmpty` +
+  two-emission absence confirmation + component-boundary root scope + batched deletes. Its own pass
+  (`pruneIfSettled`), not folded into `startIndexing`. Root-switch resets pending-prune state.
+  Corpus-wide counts now correct at source (the `among:`-scoped workaround stays as defense-in-depth).
+  191 tests green (5 new). Tier-2 APPROVE (7/7 vectors). | done
 
 ## Owner-requested batch (2026-07-09) — Processor output + Reader UX/viewer
 Captured verbatim from the owner; file hints are from the Reader/Processor Implementation Maps (verify

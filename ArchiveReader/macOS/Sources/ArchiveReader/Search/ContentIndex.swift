@@ -254,6 +254,51 @@ actor ContentIndex {
         return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
     }
 
+    /// All stored paths as a set — one query, used by the pruner to diff against the live library.
+    func allPaths() -> Set<String> {
+        guard let stmt = prepare("SELECT path FROM files;") else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var set = Set<String>()
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 0) { set.insert(String(cString: c)) }
+        }
+        return set
+    }
+
+    /// Delete a batch of paths from both the bookkeeping and FTS tables. Batches of ~500 rows per
+    /// transaction (mirrors `upsertBatch`'s discipline). Fully synchronous within each transaction
+    /// (no await between BEGIN and COMMIT) to preserve the actor-reentrancy invariant.
+    func deletePaths(_ paths: [String]) throws {
+        guard !paths.isEmpty else { return }
+        let batchSize = 500
+        for start in stride(from: 0, to: paths.count, by: batchSize) {
+            let end = min(start + batchSize, paths.count)
+            let batch = paths[start..<end]
+            try exec("BEGIN IMMEDIATE;")
+            do {
+                for path in batch {
+                    // Look up the rowid so we can delete the matching FTS row (FTS5 content tables
+                    // are keyed by rowid, not by a column value).
+                    if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
+                        bindText(sel, 1, path)
+                        if sqlite3_step(sel) == SQLITE_ROW {
+                            let rowid = sqlite3_column_int64(sel, 0)
+                            sqlite3_finalize(sel)
+                            try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
+                            try run("DELETE FROM files WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
+                        } else {
+                            sqlite3_finalize(sel)
+                        }
+                    }
+                }
+                try exec("COMMIT;")
+            } catch {
+                try? exec("ROLLBACK;")
+                throw error
+            }
+        }
+    }
+
     /// Post-pass maintenance: merge FTS segments and truncate the WAL. Actor-isolated so the
     /// sqlite3 handle is never touched off-actor. Skips on zero-row passes. Prefers incremental
     /// merge on small passes; full optimize only on bulk builds (rewrites the entire index —

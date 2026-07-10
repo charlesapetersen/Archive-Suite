@@ -188,6 +188,67 @@ final class ContentIndexer: ObservableObject {
         return await index.needsAttentionCount(among: paths)
     }
 
+    // MARK: - Pruning (gated cache eviction)
+
+    /// Paths that were absent in the *previous* settled emission. A path is only eligible for
+    /// deletion after it has been confirmed absent across **two consecutive** post-gather snapshots
+    /// — this closes Spotlight's transient-drop window (a file can momentarily vanish from
+    /// `NSMetadataQueryDidUpdate` after a tag write and reappear on the next update).
+    private var pendingPrune: Set<String>?
+
+    /// Evict index rows for files no longer under `rootPrefix` — but ONLY when the snapshot is
+    /// settled and confirmed across two emissions:
+    ///   Gate 1: `isGathering == false && !currentPaths.isEmpty`  (caller ensures)
+    ///   Gate 2: a path must be absent in two consecutive calls (transient-drop guard)
+    ///   Gate 3: only paths under `rootPrefix` (component-boundary) are candidates
+    ///
+    /// This is a separate call from `startIndexing` — a destructive delete must never ride the
+    /// harmless-on-empty indexing emission.
+    func pruneIfSettled(currentPaths: Set<String>, rootPrefix: String) {
+        let idx = index
+        Task.detached(priority: .utility) { [weak self] in
+            try? await idx.open()
+            let indexed = await idx.allPaths()
+
+            // Scope to the current root using a component-boundary test (not substring LIKE).
+            // A root "/Archive" must not match "/ArchiveBox/file.pdf".
+            let normalizedRoot = rootPrefix.hasSuffix("/") ? String(rootPrefix.dropLast()) : rootPrefix
+            let indexedUnderRoot = indexed.filter { path in
+                path == normalizedRoot || path.hasPrefix(normalizedRoot + "/")
+            }
+
+            // Diff: indexed-under-root paths NOT in the current library set.
+            let absent = indexedUnderRoot.subtracting(currentPaths)
+            guard !absent.isEmpty else {
+                await MainActor.run { [weak self] in self?.pendingPrune = nil }
+                return
+            }
+
+            // Gate 2: confirm across two emissions.
+            let previousPending: Set<String>? = await MainActor.run { [weak self] in self?.pendingPrune }
+            if let prev = previousPending {
+                // Only delete paths that were absent in BOTH this and the previous snapshot.
+                let confirmed = absent.intersection(prev)
+                if !confirmed.isEmpty {
+                    try? await idx.deletePaths(Array(confirmed))
+                    await idx.performMaintenance(rowsIndexed: 0) // checkpoint only
+                    try? await idx.open() // ensure WAL checkpoint worked; harmless if already open
+                }
+                await MainActor.run { [weak self] in
+                    // If there are still-pending paths (absent this time but not last time), keep them.
+                    let remaining = absent.subtracting(confirmed)
+                    self?.pendingPrune = remaining.isEmpty ? nil : remaining
+                }
+            } else {
+                // First sighting — stash for confirmation on the next emission.
+                await MainActor.run { [weak self] in self?.pendingPrune = absent }
+            }
+        }
+    }
+
+    /// Reset the pending-prune state (e.g. on a scope/root change that invalidates the snapshot).
+    func resetPruneState() { pendingPrune = nil }
+
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).
     private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return } ; progress = p }
 
