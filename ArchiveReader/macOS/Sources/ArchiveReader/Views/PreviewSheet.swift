@@ -77,6 +77,15 @@ struct PreviewSheet: View {
                 if model.hasTextPage {
                     PDFPaneView(page: model.textPage, controller: model.rightController)
                         .frame(maxWidth: .infinity)
+                } else if let text = model.embeddedText {
+                    ScrollView {
+                        Text(text)
+                            .textSelection(.enabled)
+                            .font(.body)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxWidth: .infinity)
                 } else {
                     ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                            description: Text("This document has a single page."))

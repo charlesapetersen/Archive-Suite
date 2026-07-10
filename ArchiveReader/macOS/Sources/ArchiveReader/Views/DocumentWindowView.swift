@@ -61,6 +61,16 @@ struct DocumentWindowView: View {
                             .id(model.index)
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
+                    } else if let text = model.embeddedText {
+                        ScrollView {
+                            Text(text)
+                                .textSelection(.enabled)
+                                .font(.body)
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .overlay(focusBorder(.right))
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                                description: Text("This document has a single page."))

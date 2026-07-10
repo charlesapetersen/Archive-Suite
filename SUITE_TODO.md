@@ -143,10 +143,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   green. Tier-2 APPROVE. | done
 
 ### Archive Reader — viewer & preview
-- [ ] **Single-page PDF with an embedded text layer → show its text as plain text (right pane)** — in both
-  the document viewer and the navigator Preview, when a PDF has selectable text but no OCR page-2, render
-  that text on the right. | files: Views/DocumentViewerModel.swift, Views/DocumentWindowView.swift,
-  Views/PreviewSheet.swift | M | low
+- [x] **Single-page PDF with an embedded text layer → show its text as plain text (right pane)** — in both
+  the document viewer and the navigator Preview, when a PDF has selectable text but no OCR page-2, extract
+  the text layer via `embeddedText` and render it as selectable plain text in the right pane. Build clean,
+  191 tests green. GUI-verify deferred (screen locked). | done
 - [ ] **Preview gets its own default zoom** — independent of the document viewer's persisted zoom; default
   to **full page** until the user changes it; on open, **focus the image pane** so keyboard zoom works
   immediately. | files: Views/PreviewSheet.swift, Core/AppSettings.swift | S | low

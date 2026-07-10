@@ -51,6 +51,16 @@ final class DocumentViewerModel: ObservableObject {
     }
     var hasTextPage: Bool { textPage != nil }
 
+    /// The text extracted from the first page's embedded text layer, when the document is a
+    /// single-page PDF with selectable text but no OCR page-2. `nil` for multi-page (processed)
+    /// PDFs or image-only documents.
+    var embeddedText: String? {
+        guard textPage == nil,
+              let page = current?.page(at: 0),
+              let text = page.string, !text.isEmpty else { return nil }
+        return text
+    }
+
     /// A one-line warning when the current document is non-standard — image-only with no selectable
     /// OCR text anywhere. `nil` for a standard document. (Open failures / empty PDFs are already
     /// surfaced via `loadError`, so this focuses on the no-text-layer case.) Derived from the loaded
