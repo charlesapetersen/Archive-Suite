@@ -162,10 +162,10 @@ final class ContentIndexer: ObservableObject {
         }
     }
 
-    /// Full-text search → set of matching file paths.
-    func search(_ query: String) async -> Set<String> {
+    /// Full-text search → matching file paths in **bm25 relevance order** (best match first).
+    func search(_ query: String) async -> [String] {
         try? await index.open()
-        return Set(await index.search(query))
+        return await index.search(query)
     }
 
     /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.

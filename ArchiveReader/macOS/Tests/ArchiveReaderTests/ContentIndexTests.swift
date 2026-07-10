@@ -218,6 +218,27 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    // bm25 relevance ranking: a term in name (weight 10) outranks classification (5) outranks body (1).
+    func testBm25RankedSearch() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        // "budget" in body only (weight 1.0 → ranks last)
+        try await idx.upsert(path: "/body.pdf", mtime: 1, name: "report",
+                             classification: nil, body: "budget allocation for defense spending")
+        // "budget" in classification (weight 5.0 → ranks middle)
+        try await idx.upsert(path: "/class.pdf", mtime: 1, name: "memo",
+                             classification: "Budget Review", body: "a routine document")
+        // "budget" in name (weight 10.0 → ranks first)
+        try await idx.upsert(path: "/name.pdf", mtime: 1, name: "budget",
+                             classification: nil, body: "a routine document")
+        let results = await idx.search("budget")
+        XCTAssertEqual(results.count, 3)
+        // bm25 with weights (body=1, class=5, name=10): name hit first, body-only hit last.
+        XCTAssertEqual(results.first, "/name.pdf", "name hit (weight 10) should rank first")
+        XCTAssertEqual(results.last, "/body.pdf", "body-only hit (weight 1) should rank last")
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFTextExtractor.parseClassification(from: page2), "Document Start")

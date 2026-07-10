@@ -54,6 +54,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
     @Published private(set) var smartFolderCounts: [UUID: Int] = [:]   // D2: files matching each saved search
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
+    private var ftsRank: [String: Int]?    // bm25 position map (0 = best); nil = no ranked query
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
@@ -94,7 +95,10 @@ final class NavigationModel: ObservableObject {
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated {
                 self?.indexingProgress = p
-                if p == nil { self?.refreshFormatStatuses() }   // a pass just finished → fold in new detection flags
+                if p == nil {
+                    self?.refreshFormatStatuses()           // a pass just finished → fold in new detection flags
+                    self?.refreshFullTextSearchIfActive()   // Part B: newly indexed files may now match the active query
+                }
             } }
             .store(in: &cancellables)
         // Republish when notes/flags change so the table's flag column refreshes.
@@ -211,6 +215,8 @@ final class NavigationModel: ObservableObject {
         fullTextQuery = ""
         ftsGeneration += 1
         ftsPaths = nil
+        ftsRank = nil
+        if sort.first?.field == .relevance { sort = LibrarySort.default }
         if doRecompute { recompute() }
     }
 
@@ -222,7 +228,7 @@ final class NavigationModel: ObservableObject {
         let generation = baseFtsGeneration
         Task { [weak self] in
             guard let self else { return }
-            let result: Set<String>? = q.isEmpty ? nil : await self.indexer.search(q)
+            let result: Set<String>? = q.isEmpty ? nil : Set(await self.indexer.search(q))
             guard generation == self.baseFtsGeneration else { return }
             self.baseFtsPaths = result
             self.recompute()
@@ -324,7 +330,12 @@ final class NavigationModel: ObservableObject {
         if filter.needsAttentionOnly {
             base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
         }
-        displayed = LibrarySort.sorted(base, by: sort)
+        if let ftsRank, sort.first?.field == .relevance {
+            // bm25 relevance ordering: sort by the rank map (0 = best match).
+            displayed = base.sorted { (ftsRank[$0.url.path] ?? Int.max) < (ftsRank[$1.url.path] ?? Int.max) }
+        } else {
+            displayed = LibrarySort.sorted(base, by: sort)
+        }
         duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
@@ -362,7 +373,9 @@ final class NavigationModel: ObservableObject {
     private let viewStateKey = "ar.viewState"
 
     private func persistViewState() {
-        if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: sort, scopeID: scope?.id)) {
+        // Never persist .relevance — it's transient (active only while a query is live).
+        let persistedSort = sort.first?.field == .relevance ? LibrarySort.default : sort
+        if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: persistedSort, scopeID: scope?.id)) {
             UserDefaults.standard.set(d, forKey: viewStateKey)
         }
     }
@@ -372,7 +385,8 @@ final class NavigationModel: ObservableObject {
         var f = s.filter
         f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
         filter = f
-        if !s.sort.isEmpty { sort = s.sort }
+        // Coerce a persisted .relevance (stale from an older build) to the default sort.
+        if !s.sort.isEmpty { sort = s.sort.first?.field == .relevance ? LibrarySort.default : s.sort }
         // Restore the active scope (if its saved search still exists).
         if let sid = s.scopeID, let search = savedSearches.searches.first(where: { $0.id == sid }) {
             var sf = search.filter
@@ -408,24 +422,53 @@ final class NavigationModel: ObservableObject {
 
     /// Apply a header-click sort order back into `sort` (preserving first/second-level order). The
     /// final filename/path tiebreak lives in `LibrarySort.sorted`, so no tiebreak is appended here.
+    /// `.relevance` is excluded — it has no backing column and is auto-managed by the FTS lifecycle.
     func applyTableSort(_ comparators: [ArchiveFileComparator]) {
-        let d = comparators.map { ARSortDescriptor(field: $0.field, ascending: $0.order == .forward) }
+        let d = comparators
+            .filter { $0.field != .relevance }
+            .map { ARSortDescriptor(field: $0.field, ascending: $0.order == .forward) }
         if !d.isEmpty { sort = d }   // ignore an empty order (keep the current sort)
     }
 
     private var ftsGeneration = 0
     /// Run (or clear) the corpus full-text search, then re-filter. AND-combined with the tag facets.
     /// A generation token ensures a slower older search can't overwrite a newer one's result.
+    /// Results are returned in **bm25 relevance order** and fed into `ftsRank` so `recompute()` can
+    /// sort by relevance when `.relevance` is the active sort.
     func runFullTextSearch() {
         let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
         ftsGeneration += 1
         let generation = ftsGeneration
+        // Auto-select relevance sort while a query is active; fall back when cleared.
+        if !q.isEmpty && sort.first?.field != .relevance {
+            sort = [ARSortDescriptor(field: .relevance)]
+        } else if q.isEmpty && sort.first?.field == .relevance {
+            sort = LibrarySort.default
+        }
         Task { [weak self] in
             guard let self else { return }
-            let result: Set<String>? = q.isEmpty ? nil : await self.indexer.search(q)
+            let ranked: [String]? = q.isEmpty ? nil : await self.indexer.search(q)
             guard generation == self.ftsGeneration else { return }   // superseded by a newer search
-            self.ftsPaths = result
+            if let ranked {
+                self.ftsPaths = Set(ranked)
+                self.ftsRank = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($1, $0) })
+            } else {
+                self.ftsPaths = nil
+                self.ftsRank = nil
+            }
             self.recompute()
+        }
+    }
+
+    /// Re-run any active full-text search after an index pass completes (Part B: search-during-index
+    /// refresh). The pass may have indexed files that now match the query but were upserted after the
+    /// original search ran — re-querying folds them in. Also refreshes the base scope's OCR query.
+    private func refreshFullTextSearchIfActive() {
+        if !fullTextQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            runFullTextSearch()
+        }
+        if let scope, !scope.fullTextQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            runBaseFullTextSearch()
         }
     }
 
@@ -574,6 +617,8 @@ final class NavigationModel: ObservableObject {
             // runFullTextSearch a no-op reset anyway.)
             fullTextQuery = ""
             ftsPaths = nil
+            ftsRank = nil
+            if sort.first?.field == .relevance { sort = LibrarySort.default }
             ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
                                  // (which passes the `generation == ftsGeneration` guard) can't repopulate
                                  // ftsPaths with stale old-root paths after the new library loads.

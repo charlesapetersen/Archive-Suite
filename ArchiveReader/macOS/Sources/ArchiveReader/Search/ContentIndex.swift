@@ -151,16 +151,19 @@ actor ContentIndex {
     /// Full-text search → matching file paths. Input is tokenized and quoted so arbitrary user text
     /// can never be an FTS5 syntax error; terms are AND-combined.
     ///
-    /// Returns **all** matching paths by default (`limit == nil`). The sole caller uses the result only
-    /// for set-membership AND-ing (`ftsPaths.contains`), so an arbitrary row cap would silently drop
-    /// matches past the cap (by rowid, not relevance) on a large corpus — e.g. a common term over
-    /// ~150k PDFs. `limit` remains available for callers/tests that deliberately want a bounded result.
+    /// Returns **all** matching paths by default (`limit == nil`), ordered by **bm25 relevance**
+    /// (best match first). Column weights: name=10, classification=5, body=1 — so a filename or
+    /// classification hit outranks a body-only hit, and the order is explainable from what the user
+    /// can see. `limit` remains available for callers/tests that deliberately want a bounded result.
     func search(_ query: String, limit: Int? = nil) -> [String] {
         let match = ftsMatchExpression(query)
         guard !match.isEmpty else { return [] }
+        // bm25 weights in FTS5 column order (body, classification, name): name hits rank
+        // highest (10), then classification (5), then body (1). bm25 returns negative scores
+        // (more negative = more relevant); ORDER BY ascending puts the best matches first.
         let sql = limit == nil
-            ? "SELECT path FROM fts WHERE fts MATCH ?;"
-            : "SELECT path FROM fts WHERE fts MATCH ? LIMIT ?;"
+            ? "SELECT path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0);"
+            : "SELECT path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0) LIMIT ?;"
         guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)

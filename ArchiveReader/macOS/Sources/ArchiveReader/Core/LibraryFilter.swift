@@ -112,7 +112,7 @@ extension LibraryFilter {
 // MARK: - Sorting
 
 enum SortField: String, Sendable, CaseIterable, Codable {
-    case date, name, priority, readState, fileType, subjects
+    case date, name, priority, readState, fileType, subjects, relevance
 }
 
 struct ARSortDescriptor: Sendable, Equatable, Codable {
@@ -179,6 +179,8 @@ enum LibrarySort {
             return nilLast(subjectsKey(a), subjectsKey(b)) {
                 dir($0.localizedStandardCompare($1), d.ascending)
             }
+        case .relevance:
+            return .orderedSame   // rank ordering is injected at recompute(), not via the comparator
         }
     }
 
