@@ -113,8 +113,9 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   suggestions/targets in the tag filter field. | files: Views/TagFilterField.swift, Core/DocumentTags.swift | S | low | done
 - [x] **Logarithmic tag-cloud sizing** — size by `log(count)` (or similar) so a 1000-count outlier doesn't
   crush the 2/10/20/100/1000 gradient into uniformly tiny text. | files: Views/NavigationWindowView.swift | S | low | done
-- [ ] **Wrap (not clip) file tags in the list** — assess feasibility in the AppKit cell; **if hard → move to
-  `ArchiveReader/POTENTIAL_FEATURES.md`** (owner). | files: Views/AppKitTableView.swift | S | low
+- [x] **Wrap (not clip) file tags in the list** — `usesAutomaticRowHeights` + multi-line `NSTokenField`
+  (`wraps = true`, top/bottom constraints). Build clean, 191 tests green. GUI-verify deferred (screen
+  locked). | files: Views/AppKitTableView.swift | S | low | done
 
 ### Archive Reader — dates & decades (CROSS-APP + shared SPEC)
 - [x] **Decade tags ("1970s", "1980s")** _(plan: `execution-plans/decades-date-facet.md`)_ — SHIPPED.

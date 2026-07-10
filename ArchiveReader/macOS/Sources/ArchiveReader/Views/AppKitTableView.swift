@@ -36,6 +36,7 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.allowsColumnResizing = true
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         tableView.rowHeight = max(20, fontSize * 1.8)
+        tableView.usesAutomaticRowHeights = true
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
         let headerView = ColumnPickerHeaderView()
         headerView.currentSort = { [weak coordinator] in coordinator?.parent.model.sort ?? LibrarySort.default }
@@ -247,6 +248,8 @@ struct AppKitTableView: NSViewRepresentable {
                 NSLayoutConstraint.activate([
                     tf.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
                     tf.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                    tf.topAnchor.constraint(greaterThanOrEqualTo: cell.topAnchor, constant: 2),
+                    tf.bottomAnchor.constraint(lessThanOrEqualTo: cell.bottomAnchor, constant: -2),
                     tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 ])
             }
@@ -447,11 +450,12 @@ final class TagTokenCellView: NSTableCellView {
         tf.focusRingType = .none
         tf.placeholderString = "Add tags\u{2026}"
         tf.tokenizingCharacterSet = CharacterSet(charactersIn: ",")
-        tf.lineBreakMode = .byTruncatingTail
-        tf.usesSingleLineMode = true
-        if let cell = tf.cell as? NSTokenFieldCell { cell.wraps = false; cell.isScrollable = true }
+        tf.lineBreakMode = .byWordWrapping
+        tf.usesSingleLineMode = false
+        if let cell = tf.cell as? NSTokenFieldCell { cell.wraps = true; cell.isScrollable = false }
         tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        tf.setContentCompressionResistancePriority(.required, for: .vertical)
         return tf
     }()
     var itemID: ArchiveFile.ID?
@@ -463,7 +467,8 @@ final class TagTokenCellView: NSTableCellView {
         NSLayoutConstraint.activate([
             tokenField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
             tokenField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
-            tokenField.centerYAnchor.constraint(equalTo: centerYAnchor),
+            tokenField.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            tokenField.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
