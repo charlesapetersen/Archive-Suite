@@ -7,6 +7,8 @@ struct NavigationWindowView: View {
     @State private var showingHealth = false
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
+    @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
+    @AppStorage("ar.tagCloudWidth") private var tagCloudWidth = 240.0
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @State private var newSearchName = ""
     @State private var renameText = ""
@@ -17,9 +19,9 @@ struct NavigationWindowView: View {
         HStack(spacing: 0) {
             if showingSidebar {
                 SidebarView(model: model)
-                    .frame(width: 210)
-                    .transition(.move(edge: .leading))   // expands in from the left margin
-                Divider()
+                    .frame(width: sidebarWidth)
+                    .transition(.move(edge: .leading))
+                PanelDivider(width: $sidebarWidth, panelOnLeft: true, range: 140...350)
             }
             VStack(spacing: 0) {
                 filterBar
@@ -27,9 +29,9 @@ struct NavigationWindowView: View {
                 HStack(spacing: 0) {
                     table
                     if showingTagCloud {
-                        Divider()
+                        PanelDivider(width: $tagCloudWidth, panelOnLeft: false, range: 160...400)
                         tagCloudPanel
-                            .transition(.move(edge: .trailing))   // expands in from the right margin
+                            .transition(.move(edge: .trailing))
                     }
                 }
                 Divider()
@@ -37,6 +39,8 @@ struct NavigationWindowView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+        .animation(.easeInOut(duration: 0.2), value: showingSidebar)
+        .animation(.easeInOut(duration: 0.2), value: showingTagCloud)
         .toolbar { toolbarContent }
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
@@ -222,7 +226,7 @@ struct NavigationWindowView: View {
                 }
             }
         }
-        .frame(width: 240)
+        .frame(width: tagCloudWidth)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
@@ -344,7 +348,7 @@ struct NavigationWindowView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup {
-            Button { withAnimation(.easeInOut(duration: 0.2)) { showingSidebar.toggle() } } label: {
+            Button { showingSidebar.toggle() } label: {
                 Label("Sidebar", systemImage: "sidebar.left")
             }
             .help("Show or hide the folder sidebar")
@@ -373,7 +377,7 @@ struct NavigationWindowView: View {
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")
 
-            Button { withAnimation(.easeInOut(duration: 0.2)) { showingTagCloud.toggle() } } label: {
+            Button { showingTagCloud.toggle() } label: {
                 Label("Tag Cloud", systemImage: "tag.square")
             }
             .help("Show a tag cloud of the visible files — larger tags appear on more files (click to filter)")
@@ -449,6 +453,40 @@ struct NavigationWindowView: View {
         let sel = model.documentSelection()
         guard !sel.filePaths.isEmpty else { return }
         openWindow(id: WindowID.document, value: sel)
+    }
+}
+
+/// A thin divider that can be dragged to resize an adjacent panel.
+private struct PanelDivider: View {
+    @Binding var width: Double
+    /// `true` when the resizable panel is to the left of this divider (sidebar).
+    let panelOnLeft: Bool
+    let range: ClosedRange<CGFloat>
+
+    @State private var startWidth: CGFloat?
+
+    var body: some View {
+        Color(nsColor: .separatorColor)
+            .frame(width: 1)
+            .padding(.horizontal, 3)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() }
+                else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if startWidth == nil { startWidth = CGFloat(width) }
+                        let delta = panelOnLeft
+                            ? value.translation.width
+                            : -value.translation.width
+                        let clamped = min(range.upperBound, max(range.lowerBound,
+                                          (startWidth ?? CGFloat(width)) + delta))
+                        width = Double(clamped)
+                    }
+                    .onEnded { _ in startWidth = nil }
+            )
     }
 }
 

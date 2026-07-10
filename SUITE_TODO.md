@@ -93,9 +93,9 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   layout + PDF output/finalize | L | med · needs: gui (verify on a real multi-column source)
 
 ### Archive Reader — layout & panels
-- [ ] **Adjustable + collapsible side panels** — left folder-nav column (`SidebarView`) and right tag-cloud
-  column get draggable width **and** collapse/expand, each with a **keyboard shortcut** to toggle. | files:
-  Views/NavigationWindowView.swift, Views/SidebarView.swift, ArchiveReaderCommands.swift | M | low
+- [x] **Adjustable + collapsible side panels** — `PanelDivider` (drag-to-resize, 140–350 / 160–400
+  clamped, `@AppStorage`-persisted widths); sidebar + tag cloud toggle via toolbar buttons + View menu
+  shortcuts ⌥⌘S / ⌥⌘T; animated expand/collapse. 191 tests green, 0 warnings. | done
 - [x] **Add/remove columns in the file list** — right-click the column header → checkmark menu to
   show/hide any column (except File name); visibility persisted via UserDefaults. `ColumnPickerHeaderView`
   subclass + `AppSettings.hiddenColumns`. |

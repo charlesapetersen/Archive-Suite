@@ -17,10 +17,24 @@ struct ArchiveReaderCommands: Commands {
     @FocusedObject private var nav: NavigationModel?
     @FocusedObject private var doc: DocumentViewerModel?
     @FocusedValue(\.openSelection) private var openSelection: (() -> Void)?
+    @AppStorage("ar.showSidebar") private var showingSidebar = true
+    @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
     private var noSelection: Bool { nav?.selection.isEmpty ?? true }
 
     var body: some Commands {
+        // View — panel toggles (placed in the system View menu)
+        CommandGroup(before: .sidebar) {
+            Button(showingSidebar ? "Hide Sidebar" : "Show Sidebar") {
+                showingSidebar.toggle()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option])
+            Button(showingTagCloud ? "Hide Tag Cloud" : "Show Tag Cloud") {
+                showingTagCloud.toggle()
+            }
+            .keyboardShortcut("t", modifiers: [.command, .option])
+        }
+
         // File
         CommandGroup(replacing: .newItem) {
             Button("Choose Archive Folder…") { nav?.chooseRoot() }
