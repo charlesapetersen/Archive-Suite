@@ -792,24 +792,25 @@ extension OCRProcessor {
         // even when no output PDF was written.
         do {
             try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns)
+            // Map by original source URL so tagging/collection segmentation can find it.
+            // Only set when the PDF was actually written — a failed write must not leave a
+            // phantom entry pointing downstream consumers at a nonexistent file (M1 fix).
+            outputURLMap[sourceURL] = outputURL
+            // Copy source tags to output PDF if pass-through mode is enabled
+            if passSourceTags {
+                if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
+                    try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                    jobs[index].appliedTags = sourceTags
+                }
+            }
         } catch {
             jobs[index].status = .failed
             let name = sourceURL.lastPathComponent
             if !failedFiles.contains(name) { failedFiles.append(name) }
             os_log(.error, "PDF write failed for %{public}@: %{public}@", name, error.localizedDescription)
         }
-        // Map by original source URL so tagging/collection segmentation can find it
-        outputURLMap[sourceURL] = outputURL
-        // Copy source tags to output PDF if pass-through mode is enabled
-        if passSourceTags {
-            if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
-                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
-                jobs[index].appliedTags = sourceTags
-            }
-        }
-        // Persist result AND its assigned output path for resume-after-restart. Recording the exact
-        // outputURL (the value uniqueOutputURL just returned for this index) lets resume reuse the same
-        // source→output mapping verbatim, so a duplicate-base-name collision can't be swapped on resume (B7).
+        // Persist result AND its assigned output path for resume-after-restart. Records the intended
+        // output path even on failure so resume can attempt to regenerate the PDF (B7).
         saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     static func isTimeoutError(_ result: OCRResult) -> Bool {

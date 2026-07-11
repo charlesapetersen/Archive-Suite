@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import os
 
 extension OCRProcessor {
     /// Rebuild `segments` from current job classifications, excluding user-removed files.
@@ -375,16 +376,21 @@ extension OCRProcessor {
                 let pdfGen = PDFGenerator()
                 // Use the temp JPEG if this was a PDF input, otherwise the original file.
                 let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
-                try? pdfGen.generate(
-                    imageURL: imageURL,
-                    result: result,
-                    model: model,
-                    outputURL: outputURL,
-                    originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
-                    gatewayDisplayName: currentGateway?.displayName,
-                    pdfImageMB: Self.pdfImageMB,
-                    textColumns: Self.textColumns
-                )
+                do {
+                    try pdfGen.generate(
+                        imageURL: imageURL,
+                        result: result,
+                        model: model,
+                        outputURL: outputURL,
+                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
+                        gatewayDisplayName: currentGateway?.displayName,
+                        pdfImageMB: Self.pdfImageMB,
+                        textColumns: Self.textColumns
+                    )
+                } catch {
+                    os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
+                           jobs[item.fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
+                }
                 // Regenerating rewrites the file, dropping its Finder tags. In copy-source mode the
                 // tags were applied during OCR and nothing re-applies them later, so restore them now.
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)

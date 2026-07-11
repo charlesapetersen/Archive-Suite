@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import os
 
 extension OCRProcessor {
     /// Applies Red/Purple color tags to box/folder label PDFs when full LLM tagging
@@ -415,12 +416,17 @@ extension OCRProcessor {
                 jobs[fileIndex].result = updated
                 if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
-                    try? PDFGenerator().generate(
-                        imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
-                        originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
-                        gatewayDisplayName: currentGateway?.displayName,
-                        pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns
-                    )
+                    do {
+                        try PDFGenerator().generate(
+                            imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
+                            originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
+                            gatewayDisplayName: currentGateway?.displayName,
+                            pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns
+                        )
+                    } catch {
+                        os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
+                               jobs[fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
+                    }
                 }
             }
         }
@@ -783,7 +789,16 @@ extension OCRProcessor {
             // source — two segments sharing a source basename would otherwise overwrite each other.
             let firstOutputPDF = sourcePDFs[0]
             let baseName = firstOutputPDF.deletingPathExtension().lastPathComponent
-            let mergedURL = outputDirectory.appendingPathComponent(baseName + "_merged.pdf")
+            // Ensure the merged URL doesn't collide with an existing file from a prior run
+            // or another segment with the same base name (H1 fix).
+            var mergedURL = outputDirectory.appendingPathComponent(baseName + "_merged.pdf")
+            var mergeN = 2
+            while _takenOutputPaths.contains(mergedURL.standardizedFileURL.path.lowercased())
+                  || FileManager.default.fileExists(atPath: mergedURL.path) {
+                mergedURL = outputDirectory.appendingPathComponent("\(baseName)_merged (\(mergeN)).pdf")
+                mergeN += 1
+            }
+            _takenOutputPaths.insert(mergedURL.standardizedFileURL.path.lowercased())
 
             do {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)

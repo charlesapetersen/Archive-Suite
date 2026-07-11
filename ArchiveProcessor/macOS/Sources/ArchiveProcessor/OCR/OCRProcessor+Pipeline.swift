@@ -497,20 +497,28 @@ extension OCRProcessor {
                     toGenerate.append((imageURLs[index], outputURL, sourceURL.lastPathComponent, result))
                 }
             }
-            // Regenerate only missing PDFs, off the main thread.
+            // Regenerate only missing PDFs, off the main thread. Track failures so we don't
+            // populate outputURLMap with phantom entries pointing at nonexistent files (M2 fix).
+            var failedRegenURLs = Set<URL>()
             if !toGenerate.isEmpty {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
                 let pdfMB = Self.pdfImageMB
                 let txtCols = Self.textColumns
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
-                await Task.detached(priority: .utility) {
+                failedRegenURLs = await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
+                    var failed = Set<URL>()
                     for g in toGenerate {
-                        try? gen.generate(imageURL: g.imageURL, result: g.result, model: model,
-                                          outputURL: g.outputURL, originalFileName: g.fileName,
-                                          gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                        do {
+                            try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
+                                              outputURL: g.outputURL, originalFileName: g.fileName,
+                                              gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                        } catch {
+                            failed.insert(g.outputURL)
+                        }
                     }
+                    return failed
                 }.value
             }
             // Apply the (cheap) state updates back on the main actor.
@@ -519,11 +527,15 @@ extension OCRProcessor {
                 jobs[r.index].classification = r.result.classification
                 jobs[r.index].status = r.result.text != nil ? .succeeded : .failed
                 if r.result.text == nil { failedFiles.append(r.sourceURL.lastPathComponent) }
-                outputURLMap[r.sourceURL] = r.outputURL
-                if passSourceTags {
-                    if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
-                        try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
-                        jobs[r.index].appliedTags = sourceTags
+                // Only populate outputURLMap when the PDF actually exists on disk (already
+                // present or successfully regenerated). Skipping prevents phantom entries.
+                if !failedRegenURLs.contains(r.outputURL) {
+                    outputURLMap[r.sourceURL] = r.outputURL
+                    if passSourceTags {
+                        if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
+                            try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
+                            jobs[r.index].appliedTags = sourceTags
+                        }
                     }
                 }
             }
