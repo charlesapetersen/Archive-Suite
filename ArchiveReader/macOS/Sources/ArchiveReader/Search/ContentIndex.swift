@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ArchiveCore
 
 /// A row of extracted content ready for batch insertion. `Sendable` so task-group children
 /// can return it safely.

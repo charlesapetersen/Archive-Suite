@@ -1,5 +1,5 @@
 import XCTest
-@testable import ArchiveReader
+@testable import ArchiveCore
 
 final class PDFFormatStatusTests: XCTestCase {
 
@@ -26,11 +26,13 @@ final class PDFFormatStatusTests: XCTestCase {
     func testClassifyFromExtractedContent() {
         // nil content → couldn't open → unreadable.
         XCTAssertEqual(PDFFormatStatus.classify(nil), .unreadable)
-        // Non-empty body → has selectable text → standard.
-        let withText = ExtractedContent(body: "Senator Chafee on the budget.", classification: "Document Start", pageCount: 2)
+        // Non-empty fullBody → has selectable text → standard.
+        let withText = ExtractedContent(fullBody: "Senator Chafee on the budget.",
+                                        strippedBody: "Senator Chafee on the budget.",
+                                        classification: "Document Start", pageCount: 2)
         XCTAssertEqual(PDFFormatStatus.classify(withText), .standard)
-        // Empty body but opened → no text layer (page count is NOT a defect signal).
-        let noText = ExtractedContent(body: "", classification: nil, pageCount: 5)
+        // Empty fullBody but opened → no text layer (page count is NOT a defect signal).
+        let noText = ExtractedContent(fullBody: "", strippedBody: "", classification: nil, pageCount: 5)
         XCTAssertEqual(PDFFormatStatus.classify(noText), .noTextLayer)
     }
 

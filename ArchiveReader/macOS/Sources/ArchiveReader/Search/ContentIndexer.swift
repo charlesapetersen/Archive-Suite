@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import ArchiveCore
 
 /// Drives the background content-indexing of the library into `ContentIndex`, and answers full-text
 /// queries. Indexing runs off the main actor (detached); @Published progress drives the UI.
@@ -95,9 +96,9 @@ final class ContentIndexer: ObservableObject {
                         guard !Task.isCancelled else { return nil }
                         if let content = PDFTextExtractor.extract(url) {
                             return IndexRow(path: path, mtime: mtime, name: name,
-                                            classification: content.classification, body: content.body,
+                                            classification: content.classification, body: content.fullBody,
                                             pageCount: content.pageCount,
-                                            hasText: !content.body.isEmpty, readable: true)
+                                            hasText: !content.fullBody.isEmpty, readable: true)
                         } else {
                             return IndexRow(path: path, mtime: mtime, name: name,
                                             classification: nil, body: "",
@@ -137,9 +138,9 @@ final class ContentIndexer: ObservableObject {
                             guard !Task.isCancelled else { return nil }
                             if let content = PDFTextExtractor.extract(url) {
                                 return IndexRow(path: path, mtime: mtime, name: name,
-                                                classification: content.classification, body: content.body,
+                                                classification: content.classification, body: content.fullBody,
                                                 pageCount: content.pageCount,
-                                                hasText: !content.body.isEmpty, readable: true)
+                                                hasText: !content.fullBody.isEmpty, readable: true)
                             } else {
                                 return IndexRow(path: path, mtime: mtime, name: name,
                                                 classification: nil, body: "",

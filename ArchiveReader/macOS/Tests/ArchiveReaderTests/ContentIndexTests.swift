@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+@testable import ArchiveCore
 
 final class ContentIndexTests: XCTestCase {
 
@@ -289,9 +290,9 @@ final class ContentIndexTests: XCTestCase {
 
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
-        XCTAssertEqual(PDFTextExtractor.parseClassification(from: page2), "Document Start")
-        XCTAssertEqual(PDFTextExtractor.parseClassification(from: "Classification: Box"), "Box")
-        XCTAssertNil(PDFTextExtractor.parseClassification(from: "no classification line here"))
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Box"), "Box")
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: "no classification line here"))
     }
 
     // MARK: - Pruning (deletePaths + allPaths)

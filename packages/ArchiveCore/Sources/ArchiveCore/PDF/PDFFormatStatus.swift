@@ -11,29 +11,29 @@ import Foundation
 // Page count is recorded for display, never for "needs attention".
 
 /// The readability/format status of a tagged PDF, derived from a single content-extraction attempt.
-enum PDFFormatStatus: Sendable, Equatable {
+public enum PDFFormatStatus: Sendable, Equatable {
     case standard          // opened, has selectable OCR text
     case unreadable        // couldn't open: corrupt / encrypted / non-PDF
     case noTextLayer       // opened but zero selectable text (can't read/search as text)
 
     /// Classify from the two orthogonal facts the extractor establishes.
-    static func classify(readable: Bool, hasText: Bool) -> PDFFormatStatus {
+    public static func classify(readable: Bool, hasText: Bool) -> PDFFormatStatus {
         guard readable else { return .unreadable }
         return hasText ? .standard : .noTextLayer
     }
 
     /// Convenience over an extraction result: `nil` (open failed) → `.unreadable`; otherwise text
-    /// presence is decided by a non-empty body.
-    static func classify(_ content: ExtractedContent?) -> PDFFormatStatus {
+    /// presence is decided by a non-empty fullBody.
+    public static func classify(_ content: ExtractedContent?) -> PDFFormatStatus {
         guard let content else { return .unreadable }
-        return classify(readable: true, hasText: !content.body.isEmpty)
+        return classify(readable: true, hasText: !content.fullBody.isEmpty)
     }
 
     /// True for anything a human should look at (unreadable or text-less); `.standard` is fine.
-    var needsAttention: Bool { self != .standard }
+    public var needsAttention: Bool { self != .standard }
 
     /// Short, human-readable label for a badge tooltip / health readout.
-    var label: String {
+    public var label: String {
         switch self {
         case .standard:    return "Standard"
         case .unreadable:  return "Unreadable"

@@ -188,8 +188,8 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |
 | Color label (Red=6/Purple=3) | `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `Core/DocumentTags.swift` (`ArchiveColor`), `Core/TagWriter.swift` |
 | Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`) |
-| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | `Search/PDFTextExtractor.swift`, `Views/PDFPaneView.swift` |
-| Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` | `Search/PDFTextExtractor.swift`, `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
+| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
+| Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` (shim maps string→enum) | `ArchiveCore` `PDFHeaderParser` returns raw `String?`; `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
 
 ---
 
