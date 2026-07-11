@@ -6,7 +6,7 @@
 // arrow drawn here.
 import AppKit
 
-let W: CGFloat = 640, H: CGFloat = 400   // matches the Finder window content size in build-suite-dmg.sh
+let W: CGFloat = 760, H: CGFloat = 400   // matches the Finder window content size in build-suite-dmg.sh
 let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "dmg-background.png"
 
 let img = NSImage(size: NSSize(width: W, height: H))
@@ -31,11 +31,11 @@ func draw(_ s: String, cx: CGFloat, yTop: CGFloat, size: CGFloat, weight: NSFont
 
 // Title + subtitle near the top.
 draw("Archive Suite", cx: W/2, yTop: 40, size: 34, weight: .bold, white: 0.13)
-draw("Drag both apps into the Applications folder", cx: W/2, yTop: 86, size: 15, weight: .regular, white: 0.30)
+draw("Drag all three apps into the Applications folder", cx: W/2, yTop: 86, size: 15, weight: .regular, white: 0.30)
 
 // A right-pointing arrow across the middle (from behind the apps toward Applications).
 let midY = H/2 - 6          // AppKit y of the arrow center (icons are vertically centered)
-let x0: CGFloat = 300, x1: CGFloat = 396, headW: CGFloat = 22, shaftH: CGFloat = 10
+let x0: CGFloat = 500, x1: CGFloat = 596, headW: CGFloat = 22, shaftH: CGFloat = 10
 NSColor(calibratedRed: 0.30, green: 0.46, blue: 0.78, alpha: 0.85).setFill()
 let arrow = NSBezierPath()
 arrow.move(to: NSPoint(x: x0, y: midY - shaftH/2))

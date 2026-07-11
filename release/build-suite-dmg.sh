@@ -23,6 +23,7 @@ VOL="Archive Suite ${VER}"
 APPS=(
   "ArchiveProcessor/macOS:ArchiveProcessor:ArchiveProcessor.app"
   "ArchiveReader/macOS:ArchiveReader:ArchiveReader.app"
+  "ArchiveNotes/macOS:ArchiveNotes:ArchiveNotes.app"
 )
 
 build_one() {  # $1 = "projDir:scheme:appName"
@@ -42,7 +43,7 @@ build_one() {  # $1 = "projDir:scheme:appName"
   echo "  ✓ $appname built"
 }
 
-echo "▸ Archive Suite $VER — building both apps"
+echo "▸ Archive Suite $VER — building all apps"
 for a in "${APPS[@]}"; do build_one "$a" || exit 1; done
 
 # ---- stage ---------------------------------------------------------------
@@ -74,21 +75,22 @@ tell application "Finder"
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
-    set the bounds of container window to {200, 120, 840, 520}
+    set the bounds of container window to {200, 120, 960, 520}
     set opts to the icon view options of container window
     set arrangement of opts to not arranged
     set icon size of opts to 96
     set background picture of opts to file ".background:dmg-background.png"
-    set position of item "ArchiveProcessor.app" of container window to {150, 200}
-    set position of item "ArchiveReader.app" of container window to {300, 200}
-    set position of item "Applications" of container window to {500, 200}
+    set position of item "ArchiveProcessor.app" of container window to {150, 230}
+    set position of item "ArchiveReader.app" of container window to {300, 230}
+    set position of item "ArchiveNotes.app" of container window to {450, 230}
+    set position of item "Applications" of container window to {640, 230}
     update without registering applications
     delay 1
     close
   end tell
 end tell
 EOF
-[ "$style_ok" = 1 ] && echo "  ✓ window styled" || echo "  ⚠ Finder styling skipped (headless?) — DMG is still functional (both apps + Applications)."
+[ "$style_ok" = 1 ] && echo "  ✓ window styled" || echo "  ⚠ Finder styling skipped (headless?) — DMG is still functional (all apps + Applications)."
 
 sync; sleep 1
 hdiutil detach "$DEV" >/dev/null 2>&1 || hdiutil detach "$MNT" -force >/dev/null 2>&1
