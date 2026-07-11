@@ -12,7 +12,19 @@ final class RootFolderStore: ObservableObject {
     private var accessing: URL?
     private let key = "archiveRootBookmark"
 
-    init() { resolveSaved() }
+    init() {
+#if DEBUG
+        // XCUITest sets -ARUITestRootPath <path> via launchArguments. The argument domain is
+        // volatile (never written to disk), so this can never shadow a normal launch. We set
+        // `root` directly without persisting a bookmark and without reading/writing
+        // `archiveRootBookmark` — the real root is never touched.
+        if let path = UserDefaults.standard.string(forKey: "ARUITestRootPath"), !path.isEmpty {
+            adoptTestRoot(URL(fileURLWithPath: path, isDirectory: true))
+            return
+        }
+#endif
+        resolveSaved()
+    }
 
     /// Set the archive root from a user-selected folder (via an open panel).
     func setRoot(_ url: URL) {
@@ -65,4 +77,15 @@ final class RootFolderStore: ObservableObject {
     private func stopAccessing() {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }
     }
+
+#if DEBUG
+    /// Set root for UI testing without persisting a bookmark or starting a security scope.
+    /// The fixture path is accessible via the UITest-only temporary-exception entitlement,
+    /// so no security-scoped resource dance is needed. This method does NOT read or write
+    /// `archiveRootBookmark` in UserDefaults — the real root bookmark is never touched.
+    private func adoptTestRoot(_ url: URL) {
+        root = url
+        // `accessing` stays nil — no scope to release. No bookmark persisted.
+    }
+#endif
 }

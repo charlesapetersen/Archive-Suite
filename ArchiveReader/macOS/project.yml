@@ -26,14 +26,15 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         SWIFT_VERSION: "6.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    entitlements:
-      path: Sources/ArchiveReader/ArchiveReader.entitlements
-      properties:
-        # v1 sandboxed for OS-enforced containment of irreplaceable files; non-sandboxed
-        # whole-Mac search is planned long-term (see CLAUDE.md §Stack & Build).
-        com.apple.security.app-sandbox: true
-        com.apple.security.files.user-selected.read-write: true
-        com.apple.security.files.bookmarks.app-scope: true
+      configs:
+        # Debug uses the UITest entitlements (superset: adds a temporary-exception for the
+        # fixture path so XCUITests can read/write tags in the sandbox). The override code
+        # path is #if DEBUG + launch-arg gated — inactive in normal Debug runs.
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.uitest.entitlements
+        # Release uses the production entitlements (byte-identical to the original).
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.entitlements
 
   ArchiveReaderTests:
     type: bundle.unit-test
