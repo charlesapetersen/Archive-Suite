@@ -40,6 +40,13 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   preset** (turnkey config over the existing OpenAI-compatible gateway). Reuses `OpenAICompatibleClient`
   (already speaks OpenAI's format). The **API-key** counterpart to the CLI plan's subscription path. Tier-1
   + live OCR test.
+- **`archive-notes/`** — **PROPOSED** (NEW APP): a third native macOS app, **Archive Notes** —
+  provenance-first note-taking from archival PDFs (via Reader) + Zotero, at 100k-note / 2M-word scale.
+  Markdown+assets files (title=filename, UUID-folder identity), YAML front-matter metadata (no tag
+  pollution), purely-virtual folders + replication, WYSIWYG-over-Markdown editor, durable cross-app links
+  (root-marker + relative path; `archivereader://reveal` + `archivenotes://open`), extracts, templates.
+  Master plan + 8 wave plans live in `execution-plans/archive-notes/` (`00-overview.md` §16 = the
+  **authoritative interface contract**). Built over a long unattended run. See the **Archive Notes** queue below.
 - ~~`index-parallelization.md`~~ — **SHIPPED** (parallel+batched index build + bm25 ranked search +
   search-during-index refresh). Plan deleted.
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
@@ -52,6 +59,23 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   folded in: Route-B read-**write** entitlement, per-row cell IDs, poll the async TagWriter write, deterministic
   index-ready signals). **Queued as the FINAL wave (Wave 7) of the current overnight run** — see
   `.maintenance/OVERNIGHT_PLAN.md`. 5 bounded sub-tasks, one per session. Tier-1 (no production behavior change).
+
+## Archive Notes — NEW APP (planned 2026-07-10; `execution-plans/archive-notes/`)
+Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). Each wave maps to
+one or more bounded overnight sessions (sub-tasks listed inside each wave file). DevonThink informs **only**
+the 3-pane browsing shell — everything else (note appearance, link/provenance UI, replication semantics) is
+purpose-built for the historian's provenance-first workflow. **Owner decision points (early):** (a) **R13d** —
+the `ArchiveSuite` *exclusion* effect is deferred to the convergence wave (see `00 §2` call-out); (b) **ArchiveCore
+scoping** — Notes depends on a read-side ArchiveCore now; Reader/Processor converge later (`00 §10`).
+- [ ] **W1** scaffold + ArchiveCore (read-side) + app skeleton — `01-scaffolding-and-core.md` — Tier-2 (SPEC/scaffold)
+- [ ] **W2** store + front-matter I/O + virtual folders/replication + FTS5 index — `02-storage-model-and-index.md` — Tier-2 (writers)
+- [ ] **W3** rich-text/Markdown editor (WYSIWYG + raw toggle, inline images) — `03-rich-text-markdown-editor.md` — Tier-1
+- [ ] **W4** source blocks + page thumbnails + Reader URL scheme/reveal + durable links — `04-sources-and-cross-app-linking.md` — Tier-2 (Reader deep-link)
+- [ ] **W5** Zotero metadata / citations / chips — `05-zotero-integration.md` — Tier-1
+- [ ] **W6** viewers + search/filter/sort + replication UI + templates + dates/quality — `06-viewers-search-replication.md` — Tier-2 (delete path)
+- [ ] **W7** extracts (snapshot + provenance, blocks→notes, jump-to-source) — `07-extracts.md` — Tier-1
+- [ ] **W8** tests + XCUITest/cliclick GUI harness (scratch corpus) — `08-testing-and-gui-verification.md` — Tier-1
+- [ ] **(later)** convergence: Reader/Processor onto ArchiveCore; Reader parses/hides `ArchiveSuite`; corpus back-fill + Processor stamping; unified storage path — Tier-2, separately gated
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
