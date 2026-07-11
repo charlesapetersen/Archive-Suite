@@ -42,7 +42,12 @@ struct AnthropicBatchClient: Sendable {
 
     /// Submit a batch of OCR requests. Returns the batch ID.
     func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
-        var requests: [[String: Any]] = []
+        // M5 perf fix: serialize each request to JSON Data immediately and append to the
+        // body buffer, so only ONE image's base64 lives in the dict tree at a time. The old
+        // approach held ALL base64 strings in the `requests` array simultaneously, then
+        // serialized the whole tree — roughly 2× peak memory (all dicts + final Data).
+        var bodyData = Data("{\"requests\":[".utf8)
+        var count = 0
 
         for (index, url) in fileURLs.enumerated() {
             guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
@@ -91,17 +96,22 @@ struct AnthropicBatchClient: Sendable {
                 params["max_tokens"] = 8192 + budget
             }
 
-            requests.append([
+            let requestObj: [String: Any] = [
                 "custom_id": "file-\(index)",
                 "params": params
-            ])
+            ]
+
+            if count > 0 { bodyData.append(Data(",".utf8)) }
+            bodyData.append(try JSONSerialization.data(withJSONObject: requestObj))
+            count += 1
+            // base64, content, params, requestObj released here — only bodyData grows
         }
 
-        guard !requests.isEmpty else {
+        bodyData.append(Data("]}".utf8))
+
+        guard count > 0 else {
             throw OCRError.networkError("No valid images to process")
         }
-
-        let body: [String: Any] = ["requests": requests]
 
         let reqURL = try makeBatchURL(baseURL)
         var request = URLRequest(url: reqURL, timeoutInterval: 300)
@@ -112,7 +122,7 @@ struct AnthropicBatchClient: Sendable {
         if thinkingLevel != nil {
             request.setValue("interleaved-thinking-2025-05-14", forHTTPHeaderField: "anthropic-beta")
         }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = bodyData
 
         let (data, response) = try await NetworkSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {

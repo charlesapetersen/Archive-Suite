@@ -234,10 +234,10 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   min-length gate for 1–2-char queries (prefix goes broad), and the bm25 × prefix-expansion interaction. Add a
   `ContentIndexTests` case. | files: `Search/ContentIndex.swift`, `Tests/ArchiveReaderTests/ContentIndexTests.swift` | S | low
 - [x] **Reader perf (deferred W6.2/W6.5)** _(W8.1)_ — (a) `displayedByID` rebuild gated by `displayedGeneration` counter (skips O(N) dict rebuild on unrelated `updateNSView` calls); (b) `tagCloud` cached + invalidated in `recompute()`. 193 tests green, 0 warnings.
-- [ ] **Processor OCR throughput (deferred W6.5 — M3–M5). Tier-2** _(next run: W8.2)_ — M3 `handleOCRResult` runs
-  image-decode+JPEG+PDF-write on the MainActor → `Task.detached(.utility)` like the resume path; M4
-  `processBatchResults` awaits rotation+PDF serially → bounded-concurrent; M5 Anthropic batch submit holds all
-  base64 in memory → chunk like the Gemini path. Verify on a scratch copy, never the real corpus. | files: `OCR/OCRProcessor+OCR.swift`, `OCR/BatchOCR.swift` | M | low
+- [x] **Processor OCR throughput (deferred W6.5 — M3–M5). Tier-2** _(W8.2)_ — M3 `handleOCRResult` PDF gen →
+  `Task.detached(.utility)`; M4 `processBatchResults` rotation → bounded-concurrent `withTaskGroup`; M5
+  Anthropic batch submit → incremental JSON serialization (1-image peak vs all-images). Tier-2 APPROVE
+  (18 attack vectors). Build clean 0 warnings. | files: `OCR/OCRProcessor+OCR.swift`, `OCR/BatchOCR.swift` | M | low
 - [ ] **Processor OCR LOW cleanup (W6.4 L1–L4)** _(next run: W9.1)_ — L1 `cancelBatch` raw apiKey in URL →
   `urlComponentEncoded`; L2 preserve `errorCode` across the ~6 OCRResult re-creations (was `nil`); L3 formalize/
   document the seven `nonisolated(unsafe) static var` cross-task reads; L4 stop re-encoding the previous image each

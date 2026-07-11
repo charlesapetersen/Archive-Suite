@@ -771,7 +771,7 @@ extension OCRProcessor {
 
                 for await (index, result) in group {
                     guard !Task.isCancelled else { group.cancelAll(); return }
-                    handleOCRResult(result, index: index, url: fileURLs[index], model: model, outputDirectory: outputDirectory)
+                    await handleOCRResult(result, index: index, url: fileURLs[index], model: model, outputDirectory: outputDirectory)
                     completed += 1
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
@@ -833,7 +833,7 @@ extension OCRProcessor {
                     )
                 }
 
-                handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
                 progress = Double(alreadyCompleted + attempt + 1) / Double(totalFiles) * 0.7
                 statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles) complete"
             }
@@ -1254,7 +1254,7 @@ extension OCRProcessor {
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
-        handleOCRResult(result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
+        await handleOCRResult(result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
         return result.text != nil
     }
     /// Request notification permission (call once at app launch).

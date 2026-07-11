@@ -567,7 +567,7 @@ extension OCRProcessor {
                                        : "Could not read the source image (unsupported or corrupt file).",
                 errorCode: readable ? "no_result" : "image_unreadable"
             )
-            handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
+            await handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
         }
     }
     private func processBatchResults(
@@ -577,18 +577,41 @@ extension OCRProcessor {
         apiKey: String,
         outputDirectory: URL
     ) async {
-        for (customId, result) in results {
+        // Parse valid entries upfront so the task group doesn't need to touch fileURLs.
+        let entries: [(index: Int, url: URL, result: OCRResult)] = results.compactMap { (customId, result) in
             let indexStr = customId.replacingOccurrences(of: "file-", with: "")
-            guard let index = Int(indexStr), index < fileURLs.count else { continue }
-            let url = fileURLs[index]
-            // The batch path has no live network call to overlap with, but rotation is still
-            // detected per the run's mode and merged before applying.
-            let correction = await Self.detectRotation(
-                imageURL: url, provider: model.provider, apiKey: apiKey,
-                mode: Self.rotationModeForRun, gatewayConfig: currentGateway
-            )
-            let resolved = Self.mergeRotation(into: result, correction: correction)
-            handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            guard let index = Int(indexStr), index < fileURLs.count else { return nil }
+            return (index, fileURLs[index], result)
+        }
+        guard !entries.isEmpty else { return }
+
+        // M4 perf fix: detect rotation concurrently (bounded) instead of serially.
+        // handleOCRResult runs back on MainActor (serialized) for state updates;
+        // its PDF gen is off-MainActor via M3.
+        let rotationMode = Self.rotationModeForRun
+        let gateway = currentGateway
+        let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
+        await withTaskGroup(of: (Int, URL, OCRResult).self) { group in
+            var iter = entries.makeIterator()
+
+            func addNext() -> Bool {
+                guard let entry = iter.next() else { return false }
+                group.addTask {
+                    let correction = await Self.detectRotation(
+                        imageURL: entry.url, provider: model.provider, apiKey: apiKey,
+                        mode: rotationMode, gatewayConfig: gateway
+                    )
+                    return (entry.index, entry.url, Self.mergeRotation(into: entry.result, correction: correction))
+                }
+                return true
+            }
+
+            for _ in 0..<min(maxConcurrent, entries.count) { _ = addNext() }
+
+            for await (index, url, resolved) in group {
+                await handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                _ = addNext()
+            }
         }
         // NOTE: do NOT sweep remaining `.processing` jobs to `.failed` here. For multi-chunk Gemini
         // batches this runs while OTHER chunks are still processing, so it would falsely fail files
@@ -689,7 +712,7 @@ extension OCRProcessor {
                 )
             }
 
-            handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
             previousText = result.text
             previousImageURL = url
 
@@ -742,7 +765,7 @@ extension OCRProcessor {
             for await (index, result) in group {
                 guard !Task.isCancelled else { group.cancelAll(); return }
                 let url = fileURLs[index]
-                handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
 
                 completed += 1
                 progress = Double(completed) / Double(total) * 0.7
@@ -768,7 +791,7 @@ extension OCRProcessor {
             }
         }
     }
-    func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) {
+    func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) async {
         guard index >= 0 && index < jobs.count else { return }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
@@ -783,31 +806,48 @@ extension OCRProcessor {
             // Succeeded (possibly on retry): make sure a prior failure entry is cleared.
             failedFiles.removeAll { $0 == sourceURL.lastPathComponent }
         }
-        let pdfGen = PDFGenerator()
         // Use original source name for output PDF naming
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: sourceURL)
-        // Use the provided url (may be temp JPEG) for the image page. If the PDF write fails, mark the
-        // job as failed so it appears in the failure log — a swallowed `try?` previously reported success
-        // even when no output PDF was written.
-        do {
-            try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL, originalFileName: sourceURL.lastPathComponent, gatewayDisplayName: currentGateway?.displayName, pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns)
+        // Move heavy PDF generation + tag I/O off the main actor (M3 perf fix). The MainActor
+        // suspends at the await but is free to service UI events while the work runs on .utility.
+        let originalFileName = sourceURL.lastPathComponent
+        let gatewayName = currentGateway?.displayName
+        let pdfMB = Self.pdfImageMB
+        let txtCols = Self.textColumns
+        let shouldPassTags = passSourceTags
+        let pdfResult: (success: Bool, tags: [String]?) = await Task.detached(priority: .utility) {
+            let pdfGen = PDFGenerator()
+            do {
+                try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL,
+                                    originalFileName: originalFileName, gatewayDisplayName: gatewayName,
+                                    pdfImageMB: pdfMB, textColumns: txtCols)
+                var appliedTags: [String]? = nil
+                if shouldPassTags {
+                    if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
+                        try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                        appliedTags = sourceTags
+                    }
+                }
+                return (true, appliedTags)
+            } catch {
+                os_log(.error, "PDF write failed for %{public}@: %{public}@",
+                       originalFileName, error.localizedDescription)
+                return (false, nil)
+            }
+        }.value
+        if pdfResult.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
             // phantom entry pointing downstream consumers at a nonexistent file (M1 fix).
             outputURLMap[sourceURL] = outputURL
-            // Copy source tags to output PDF if pass-through mode is enabled
-            if passSourceTags {
-                if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
-                    try? MacOSTagger.applyTags(sourceTags, to: outputURL)
-                    jobs[index].appliedTags = sourceTags
-                }
+            if let tags = pdfResult.tags {
+                jobs[index].appliedTags = tags
             }
-        } catch {
+        } else {
             jobs[index].status = .failed
             let name = sourceURL.lastPathComponent
             if !failedFiles.contains(name) { failedFiles.append(name) }
-            os_log(.error, "PDF write failed for %{public}@: %{public}@", name, error.localizedDescription)
         }
         // Persist result AND its assigned output path for resume-after-restart. Records the intended
         // output path even on failure so resume can attempt to regenerate the PDF (B7).
@@ -959,7 +999,7 @@ extension OCRProcessor {
                 let sourceFileName = jobs[index].sourceURL.lastPathComponent
                 failedFiles.removeAll { $0 == sourceFileName }
             }
-            handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
         }
     }
     /// Run a single OCR call at a given image scale for resolution testing. Public so the UI can call it.
