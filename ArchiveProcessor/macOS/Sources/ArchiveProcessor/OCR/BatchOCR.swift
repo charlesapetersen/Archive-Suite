@@ -48,6 +48,9 @@ struct AnthropicBatchClient: Sendable {
         // serialized the whole tree — roughly 2× peak memory (all dicts + final Data).
         var bodyData = Data("{\"requests\":[".utf8)
         var count = 0
+        // L4 perf: cache the previous iteration's JPEG so sendPreviousImage reuses it
+        // instead of re-loading + re-encoding from disk each iteration.
+        var previousJPEG: Data?
 
         for (index, url) in fileURLs.enumerated() {
             guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
@@ -60,8 +63,7 @@ struct AnthropicBatchClient: Sendable {
 
             var content: [[String: Any]] = []
 
-            if sendPreviousImage && index > 0,
-               let prevData = ImageEncoding.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
+            if sendPreviousImage && index > 0, let prevData = previousJPEG {
                 content.append([
                     "type": "image",
                     "source": [
@@ -104,6 +106,7 @@ struct AnthropicBatchClient: Sendable {
             if count > 0 { bodyData.append(Data(",".utf8)) }
             bodyData.append(try JSONSerialization.data(withJSONObject: requestObj))
             count += 1
+            previousJPEG = sendPreviousImage ? jpegData : nil
             // base64, content, params, requestObj released here — only bodyData grows
         }
 
@@ -257,6 +260,9 @@ struct GeminiBatchClient: Sendable {
     func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
         // Build JSONL lines for each file, tracking sizes for chunking
         var jsonlLines: [String] = []
+        // L4 perf: cache the previous iteration's JPEG so sendPreviousImage reuses it
+        // instead of re-loading + re-encoding from disk each iteration.
+        var previousJPEG: Data?
 
         for (index, url) in fileURLs.enumerated() {
             guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
@@ -269,8 +275,7 @@ struct GeminiBatchClient: Sendable {
 
             var parts: [[String: Any]] = []
 
-            if sendPreviousImage && index > 0,
-               let prevData = ImageEncoding.loadImageAsJPEG(url: fileURLs[index - 1], scale: imageScale) {
+            if sendPreviousImage && index > 0, let prevData = previousJPEG {
                 parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
             }
 
@@ -295,6 +300,7 @@ struct GeminiBatchClient: Sendable {
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 jsonlLines.append(jsonString)
             }
+            previousJPEG = sendPreviousImage ? jpegData : nil
         }
 
         guard !jsonlLines.isEmpty else {
@@ -627,7 +633,7 @@ struct GeminiBatchClient: Sendable {
 
     /// Cancel a running batch.
     func cancelBatch(batchName: String) async {
-        guard let url = URL(string: "\(baseURL)/\(batchName):cancel?key=\(apiKey)") else { return }
+        guard let url = URL(string: "\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         _ = try? await NetworkSession.data(for: request)

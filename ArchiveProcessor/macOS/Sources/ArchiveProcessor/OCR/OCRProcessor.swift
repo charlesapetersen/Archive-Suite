@@ -54,29 +54,38 @@ class OCRProcessor: ObservableObject {
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
     /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
     var reviewRotation = false
-    /// The active run's rotation mode, readable from the nonisolated OCR call. Only one run
-    /// executes at a time, so a static is safe here.
+    // MARK: - Per-run configuration statics
+    //
+    // Concurrency contract: these statics are WRITE-ONCE-per-run on the MainActor (via
+    // `loadStandardImageMB()` or direct assignment in `startProcessing`) BEFORE any child
+    // Task or `withTaskGroup` reads them. Because the writes happen on the @MainActor class
+    // and child tasks are spawned strictly after, Swift's structured-concurrency model
+    // guarantees a happens-before edge — the child task observes the written value. Only one
+    // processing run executes at a time (`isProcessing` gate), so no concurrent write is
+    // possible. `nonisolated(unsafe)` is intentional: the values must be readable from
+    // nonisolated `Task.detached` / `withTaskGroup` closures that perform OCR and PDF
+    // generation off the MainActor.
+
+    /// The active run's rotation mode, readable from the nonisolated OCR call.
     nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
 
-    /// The "standard" image size (MB) the resolution slider targets. Set once per run from Settings.
+    /// The "standard" image size (MB) the resolution slider targets.
     nonisolated(unsafe) static var standardImageMB: Double = 3.0
 
-    /// Parallel OCR workers for the batch run (user-configurable in Settings, 1–12). Set once per run.
+    /// Parallel OCR workers for the batch run (user-configurable in Settings, 1–12).
     nonisolated(unsafe) static var ocrWorkerCount: Int = 4
 
     /// Target size (MB) for the image embedded in each output PDF (0 = full source resolution).
-    /// Independent of the LLM/OCR image size. Set once per run from Settings.
     nonisolated(unsafe) static var pdfImageMB: Double = 0
 
     /// Number of text columns on the OCR text page (1 = single-column default, 2–4 for multi-column).
     nonisolated(unsafe) static var textColumns: Int = 1
 
     /// Target size (MB) for the separately-exported image file in two-file output (0 = full resolution).
-    /// Independent of the camera/source size. Set once per run from Settings.
     nonisolated(unsafe) static var exportedImageMB: Double = 0
 
     /// Load run-time knobs from UserDefaults (standard size 3 MB, OCR workers 4, PDF-image 2 MB,
-    /// exported-image 3 MB) — call at run start.
+    /// exported-image 3 MB) — call at run start, on @MainActor, before spawning any child task.
     static func loadStandardImageMB() {
         let v = UserDefaults.standard.double(forKey: DefaultsKeys.standardImageSizeMB)
         standardImageMB = v > 0 ? v : 3.0

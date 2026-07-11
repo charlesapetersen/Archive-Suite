@@ -34,7 +34,7 @@ extension OCRProcessor {
             if let r = jobs[i].result {
                 jobs[i].result = OCRResult(text: r.text, classification: cls,
                                            rotationDegrees: r.rotationDegrees,
-                                           errorMessage: r.errorMessage, errorCode: nil)
+                                           errorMessage: r.errorMessage, errorCode: r.errorCode)
             }
         }
     }
@@ -155,7 +155,7 @@ extension OCRProcessor {
                         classification: newClassification,
                         rotationDegrees: existingResult.rotationDegrees,
                         errorMessage: existingResult.errorMessage,
-                        errorCode: nil
+                        errorCode: existingResult.errorCode
                     )
                 }
 
@@ -303,7 +303,7 @@ extension OCRProcessor {
                 classification: newClassification,
                 rotationDegrees: existingResult.rotationDegrees,
                 errorMessage: existingResult.errorMessage,
-                errorCode: nil
+                errorCode: existingResult.errorCode
             )
         }
         // Update tags on the output file
@@ -580,7 +580,7 @@ extension OCRProcessor {
                     classification: newClassification,
                     rotationDegrees: item.rotationDegrees,
                     errorMessage: existingResult.errorMessage,
-                    errorCode: nil
+                    errorCode: existingResult.errorCode
                 )
             }
 

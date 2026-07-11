@@ -238,10 +238,11 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   `Task.detached(.utility)`; M4 `processBatchResults` rotation → bounded-concurrent `withTaskGroup`; M5
   Anthropic batch submit → incremental JSON serialization (1-image peak vs all-images). Tier-2 APPROVE
   (18 attack vectors). Build clean 0 warnings. | files: `OCR/OCRProcessor+OCR.swift`, `OCR/BatchOCR.swift` | M | low
-- [ ] **Processor OCR LOW cleanup (W6.4 L1–L4)** _(next run: W9.1)_ — L1 `cancelBatch` raw apiKey in URL →
-  `urlComponentEncoded`; L2 preserve `errorCode` across the ~6 OCRResult re-creations (was `nil`); L3 formalize/
-  document the seven `nonisolated(unsafe) static var` cross-task reads; L4 stop re-encoding the previous image each
-  batch iteration. | files: `OCR/BatchOCR.swift`, `OCR/OCRProcessor+ReviewFlows.swift`, `OCR/OCRProcessor.swift` | S | low
+- [x] **Processor OCR LOW cleanup (W6.4 L1–L4)** — L1 Gemini `cancelBatch` apiKey → `urlComponentEncoded`; L2
+  preserve `errorCode` across 4 OCRResult re-creations; L3 documented `nonisolated(unsafe) static var` concurrency
+  contract (write-once-per-run on MainActor, happens-before child tasks); L4 cache previous JPEG in Anthropic +
+  Gemini batch loops. Build clean 0 warnings. | files: `OCR/BatchOCR.swift`, `OCR/OCRProcessor+ReviewFlows.swift`,
+  `OCR/OCRProcessor.swift` | S | low
 - [x] **Reader GUI test harness (XCUITest)** — W7.1–W7.5 shipped. XCUITest target + accessibilityIdentifiers + fixture-root override + make-gui-fixture.sh + initial test suite (12 tests: table, tag cloud, sort, filter, preview, viewer, degrade). | L | med
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
