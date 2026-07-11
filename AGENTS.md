@@ -2,7 +2,7 @@
 
 Umbrella conventions for working in this monorepo (solo or with multiple agents in parallel). Each app
 also has its own `AGENTS.md` with app‑specific lanes — read it before working inside a subdir:
-[`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md).
+[`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/CLAUDE.md`](ArchiveNotes/CLAUDE.md).
 
 ## Ground rules
 
@@ -31,12 +31,15 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 | **processor-macOS** | `ArchiveProcessor/macOS/` — OCR pipeline, tagging, review flows, capture server |
 | **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion |
 | **processor-android** | `ArchiveProcessor/ArchiveCapture/` — Android capture companion |
+| **notes** | `ArchiveNotes/` — note/extract store, editor, index, cross-app linking, Zotero |
 | **suite** | root docs, `SPEC/`, `release/`, `launch.sh` dispatcher |
 
 ## Shared hotspots — coordinate before editing
 
 - **`SPEC/tag-format.md`** — the tag/PDF contract. A change here means the Processor *writer* and Reader
   *reader/editor* both change, together, in one reviewed unit. Highest‑risk shared surface.
+- **`packages/ArchiveCore/`** — the shared read-side contract (tags, PDF, durable links, suite marker).
+  Cross-app surface: changes here affect Reader, Processor, and Notes.
 - **Each app's `project.yml`** — the XcodeGen source of truth (schemes, targets, entitlements).
 - **`release/build-suite-dmg.sh`** — the single build/packaging path.
 - **Processor's phone↔Mac Live‑Capture protocol** and its append‑only `ProviderModels` enums — see

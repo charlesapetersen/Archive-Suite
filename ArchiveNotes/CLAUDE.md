@@ -1,0 +1,54 @@
+# Archive Notes — App Guide
+
+Provenance‑first note‑taking from archival PDFs (via Reader) and Zotero references, at
+100k‑note / 2M‑word scale. Third app in the Archive Suite monorepo. Umbrella conventions,
+the shared contract, and the release process live in the root [`CLAUDE.md`](../CLAUDE.md);
+this file is authoritative for Notes‑specific work.
+
+## Core Directive — file safety
+
+- Notes writes **only its own store** (UUID‑folder Markdown+assets under
+  `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
+  resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
+- The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors front‑matter onto the
+  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
+- Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
+
+## Stack & build
+
+- **XcodeGen** — `macOS/project.yml` is authoritative; the `.xcodeproj` is generated and gitignored.
+  `brew install xcodegen`, Xcode 16, macOS 14+, Swift 6.
+- **ArchiveCore dependency** — `packages/ArchiveCore` (local Swift package). Shared tags, PDF parsing,
+  durable links, suite marker.
+- **Build:** `cd ArchiveNotes/macOS && xcodegen generate && xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`
+- **Run:** `./launch.sh notes` from the repo root, or `cd ArchiveNotes && ./launch.sh`.
+- **Test:** `./test-smoke.sh notes` from the repo root, or `cd ArchiveNotes && ./test-smoke.sh`.
+- **Bundle ID:** `com.archivenotes.app`. Ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
+
+## Implementation Map
+
+```
+macOS/Sources/ArchiveNotes/
+  ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings
+  Models/
+    NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
+  Views/
+    NotesShellView.swift           Empty 3-pane shell (HStack + PanelDivider)
+    PanelDivider.swift             Draggable divider (copied from Reader)
+    NotesSettingsView.swift        Settings form (placeholder)
+
+macOS/Tests/ArchiveNotesTests/
+  SmokePlaceholderTests.swift      Trivial test for the smoke gate
+  ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
+  NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable
+
+packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
+  Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
+  PDF/                             ExtractedContent (PDFHeaderParser), PDFFormatStatus
+  DurableLink.swift                Cross-app link URLs (archivereader:// / archivenotes://)
+  RootMarker.swift                 .archive-suite-root.json identity + Codable
+  ArchiveSuiteMarker.swift         Suite membership tag recognition + filter
+```
+
+The map grows with each wave (W2 storage, W3 editor, W4 linking, W5 Zotero, W6 viewers,
+W7 extracts, W8 tests). Master plan: `execution-plans/archive-notes/00-overview.md`.

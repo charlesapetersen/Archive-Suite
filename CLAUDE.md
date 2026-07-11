@@ -1,12 +1,14 @@
 # Archive Suite — Umbrella Project Guide
 
-Two native macOS apps in one monorepo: **Archive Processor** (capture · OCR · tag) and
-**Archive Reader** (find · read · triage). This file is the *umbrella* guide — repo‑wide conventions,
-the shared contract, and the release process. **Each app's own `CLAUDE.md` stays authoritative for
-that app**; read it before working inside a subdirectory:
+Three native macOS apps in one monorepo: **Archive Processor** (capture · OCR · tag),
+**Archive Reader** (find · read · triage), and **Archive Notes** (provenance‑first note‑taking from
+archival sources). This file is the *umbrella* guide — repo‑wide conventions, the shared contract, and
+the release process. **Each app's own `CLAUDE.md` stays authoritative for that app**; read it before
+working inside a subdirectory:
 
 - [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) — the Processor + its iOS/Android capture companions.
 - [`ArchiveReader/CLAUDE.md`](ArchiveReader/CLAUDE.md) — the Reader (incl. its bulletproof file‑safety Core Directive).
+- [`ArchiveNotes/CLAUDE.md`](ArchiveNotes/CLAUDE.md) — Notes (provenance‑first notes + extracts from archival PDFs).
 
 ## How we work — the loop for every change
 
@@ -72,14 +74,17 @@ Ownership lanes, per-app build commands, and shared hotspots: [`AGENTS.md`](AGEN
 
 ```
 Archive-Suite/
-├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for both apps
+├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for all apps
+├── packages/ArchiveCore/   # shared Swift package (tags, PDF, durable links, suite marker)
 ├── release/                # suite-level release tooling (combined DMG)
-├── launch.sh               # dispatcher → ./launch.sh reader|processor
+├── launch.sh               # dispatcher → ./launch.sh reader|processor|notes
 ├── ArchiveProcessor/       # outer = relocated app repo
 │   ├── macOS/              #   XcodeGen project dir: project.yml (authoritative), Sources/, generated .xcodeproj (gitignored)
 │   ├── ArchiveCapture/     #   Android capture companion
 │   └── ArchiveCaptureiOS/  #   iOS capture companion
-└── ArchiveReader/          # outer = relocated app repo
+├── ArchiveReader/          # outer = relocated app repo
+│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+└── ArchiveNotes/           # provenance-first note-taking app
     └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
 ```
 
@@ -102,7 +107,7 @@ real corpus).
   — always `xcodegen generate` (or run the app's `bootstrap.sh`) after cloning/pulling. `brew install xcodegen`, Xcode 16, macOS 14+, Swift 6.
 - **Run:** `./launch.sh reader|processor` from the root (build‑if‑stale, then launch), or `cd <app> && ./launch.sh`.
 - **Per‑worktree DerivedData** (`-derivedDataPath ./build/DD`) so concurrent agents/worktrees don't collide. `build/` is gitignored.
-- **Two apps, two bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`) — never merged. Both are ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
+- **Three apps, three bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`, `com.archivenotes.app`) — never merged. All are ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 
 ## Docs & backlog convention
@@ -152,13 +157,13 @@ this repo:
   (starting `suite-v1.0.0`). Each app keeps its own independent internal version. *Note:* the bare
   `vX.Y.Z` tags in this repo are **Archive Processor's historical app tags** (v1.0.0–v3.8.2), carried
   in with its history — that's why Suite releases are `suite-`‑prefixed (a bare `v1.0.0` already exists).
-- **Build + DMG:** `release/build-suite-dmg.sh <ver>` — Release‑builds both macOS apps, stages both
-  `.app`s + one `Applications` symlink + the "drag both here" background, and produces
+- **Build + DMG:** `release/build-suite-dmg.sh <ver>` — Release‑builds all three macOS apps, stages
+  all `.app`s + one `Applications` symlink + the "drag here" background, and produces
   `/tmp/ArchiveSuite-<ver>.dmg`. The `.dmg` is a build artifact — **never commit it**.
 - **Publish:** `/opt/homebrew/bin/gh release create suite-v<ver> /tmp/ArchiveSuite-<ver>.dmg --repo charlesapetersen/Archive-Suite --title "Archive Suite <ver>" --notes "…"`.
   ⚠️ Use the **full path** `/opt/homebrew/bin/gh` — a shadowing Python tool named `gh` is first on PATH and fails.
 - Cut DMG/GitHub releases sparingly; push commits frequently.
 
 The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
-record). De‑nesting shipped (`7706368`); the remaining structural follow‑up — a shared `ArchiveCore`
-package — is deferred in `ArchiveProcessor/POTENTIAL_FEATURES.md`.
+record). De‑nesting shipped (`7706368`); `packages/ArchiveCore` shipped in the W0 refactor
+(`49c0162`–`b90800f`); Archive Notes scaffolding is in progress.
