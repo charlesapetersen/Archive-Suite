@@ -33,7 +33,8 @@ JOB="com.${LABEL}.overnight"    # launchd label (matches the .plist)
 
 INTERVAL="${OVERNIGHT_INTERVAL:-1200}"   # seconds between cycles (20 min)
 STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
-MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min
+MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min (HARD cap)
+IDLE_MAX="${OVERNIGHT_IDLE_MAX:-1200}"   # ALSO kill a session emitting NO new output for 20 min (fast hang detection)
 BUDGET="${OVERNIGHT_BUDGET:-30}"         # --max-budget-usd per resume session
 EFFORT="${OVERNIGHT_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
 
@@ -53,6 +54,22 @@ DENY=(
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# SECURITY REMINDER (owner: TOP PRIORITY) — on ANY daemon exit, if the taskport debugger authorization is
+# still password-free ('allow'), loudly remind the owner to REVERT it: daemon.log + a visible Desktop file +
+# a macOS notification (best-effort). Fires once; no-op once taskport is back to authenticate-user.
+_reminded=0
+remind_revert_taskport() {
+  [ "$_reminded" = 1 ] && return; _reminded=1
+  security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>' || return
+  local bk="$STATE/taskport-rule.backup.plist"
+  local m="Overnight run has EXITED but taskport debugger auth is STILL 'allow' (password-free). REVERT it:  sudo security authorizationdb write system.privilege.taskport < $bk"
+  log "!!!!!!!!!!!! SECURITY REMINDER: $m"
+  { echo "[$(date '+%F %T')] Archive Suite overnight run exited."; echo; echo "$m"; } > "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" 2>/dev/null || true
+  osascript -e 'display notification "taskport auth is still password-free — REVERT it (see REVERT-TASKPORT-SECURITY.txt on your Desktop)." with title "Archive Suite: revert security setting" sound name "Basso"' >/dev/null 2>&1 || true
+}
+trap remind_revert_taskport EXIT
+trap 'exit 0' TERM INT
 
 # Children must be INDEPENDENT claude sessions, not NESTED. When this daemon is armed from an interactive
 # Claude session it inherits CLAUDECODE / CLAUDE_CODE_* / CLAUDE_EFFORT etc., and a child `claude -p` would
@@ -104,7 +121,26 @@ tick() {
       --disallowedTools "${DENY[@]}" \
       >> "$STATE/last-session.log" 2>&1 &
   local cpid=$!
-  ( sleep "$MAXRUN"; kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null ) &
+  # Watchdog: kill on IDLE (no new session-log output for IDLE_MAX = fast hang detection, e.g. stuck on a
+  # native prompt) OR on the MAXRUN hard cap. A busy session appends output regularly, so idle-kill spares
+  # legitimately long work while catching hangs ~4x faster than the hard cap alone.
+  local sesslog="$STATE/last-session.log"
+  (
+    wd_start=$(date +%s); wd_last=$(wc -c < "$sesslog" 2>/dev/null || echo 0); wd_idle=$wd_start
+    while kill -0 "$cpid" 2>/dev/null; do
+      sleep 30
+      wd_now=$(date +%s); wd_sz=$(wc -c < "$sesslog" 2>/dev/null || echo 0)
+      [ "$wd_sz" != "$wd_last" ] && { wd_last=$wd_sz; wd_idle=$wd_now; }
+      if [ $(( wd_now - wd_idle )) -ge "$IDLE_MAX" ]; then
+        log "watchdog: no new output for ${IDLE_MAX}s — killing stuck session (pid $cpid)"
+        kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null; break
+      fi
+      if [ $(( wd_now - wd_start )) -ge "$MAXRUN" ]; then
+        log "watchdog: hit ${MAXRUN}s hard cap — killing session (pid $cpid)"
+        kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null; break
+      fi
+    done
+  ) &
   local wpid=$!
   wait "$cpid"; local rc=$?
   kill "$wpid" 2>/dev/null; wait "$wpid" 2>/dev/null
