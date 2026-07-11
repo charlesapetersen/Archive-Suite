@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+import ArchiveCore
 
 /// Tests for the G4 keyboard-triage feature:
 ///  1. `TriageNavigation` — pure next/previous-unread selection math (skips read rows; wraps / stops).

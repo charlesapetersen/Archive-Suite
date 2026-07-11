@@ -11,6 +11,8 @@ DerivedData/
 *.xcodeproj/
 **/xcuserdata/
 *.xcuserstate
+# SwiftPM build dir (ArchiveCore package).
+.build/
 
 # Release artifacts — the combined DMG is a build output; NEVER commit it.
 release/*.dmg

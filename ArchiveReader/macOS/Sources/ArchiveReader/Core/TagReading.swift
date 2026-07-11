@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// Result of reading a file's Finder tags.
 ///

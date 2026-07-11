@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AppKit
+import ArchiveCore
 
 /// A node in the sidebar folder tree, derived from discovered file paths. `path` is the absolute
 /// directory path (identity); `fileCount` is the recursive number of files in the subtree.

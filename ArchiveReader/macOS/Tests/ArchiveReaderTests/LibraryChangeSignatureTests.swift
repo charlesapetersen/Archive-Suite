@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+import ArchiveCore
 
 /// Guards the library change-signatures used by `NavigationModel.libraryDidChange` to gate cache
 /// rebuilds. The subjects signature had a parity bug (a raw-multiset XOR self-cancels for any subject

@@ -12,12 +12,18 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
 
+packages:
+  ArchiveCore:
+    path: ../../packages/ArchiveCore
+
 targets:
   ArchiveReader:
     type: application
     platform: macOS
     sources:
       - Sources/ArchiveReader
+    dependencies:
+      - package: ArchiveCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.app

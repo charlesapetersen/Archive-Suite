@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// A single user-intended tag edit. `TagEditing.delta(for:given:)` turns it into a per-file
 /// `TagDelta` that `TagWriter` applies safely. Facet-replacing ops (year/month/day/priority) remove

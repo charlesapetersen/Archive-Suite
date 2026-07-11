@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 /// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
 struct NavigationWindowView: View {

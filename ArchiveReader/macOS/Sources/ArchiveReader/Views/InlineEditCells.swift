@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 // Inline, single-file tag editors that live in the navigation-list cells. Editing MULTIPLE selected
 // files at once uses the ⌘I group editor; these cells act on exactly one file. Every change routes

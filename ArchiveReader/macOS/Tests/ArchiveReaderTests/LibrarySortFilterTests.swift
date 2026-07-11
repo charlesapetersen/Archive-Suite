@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+import ArchiveCore
 
 final class LibrarySortFilterTests: XCTestCase {
 

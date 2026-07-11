@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCore
 
 /// The Options panel (⌘,). Settings persist via `@AppStorage`; the models read them through
 /// `AppSettings` at point of use, so changes take effect on the next action.

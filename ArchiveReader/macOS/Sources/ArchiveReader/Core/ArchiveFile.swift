@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// One row in the navigation window: a tagged file discovered by the library.
 ///

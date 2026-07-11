@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 // ============================================================================================
 //  TagWriter — THE SINGLE AUDITED WRITE CHOKE-POINT.

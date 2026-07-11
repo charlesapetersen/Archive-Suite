@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import ArchiveCore
 
 /// Discovers the tagged-PDF universe via Spotlight (`NSMetadataQuery`) and keeps it live-updated.
 ///

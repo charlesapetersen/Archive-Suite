@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// Detects when displayed rows share a base filename — common at corpus scale (e.g. `00001 IMG —
 /// Brown.pdf` recurring across boxes/folders) — so the nav list can surface each colliding row's

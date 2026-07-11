@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+import ArchiveCore
 
 /// Integration tests for the safety-critical `TagWriter`. These operate ONLY on throwaway temp files
 /// created per-test — NEVER the corpus. They exercise the Safety Protocol guarantees directly.

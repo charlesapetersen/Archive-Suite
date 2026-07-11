@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveReader
+import ArchiveCore
 
 /// The inline subject-token editor (SubjectTokenField → NavigationModel.commitSubjectEdit) turns an
 /// edited token set into a single `TagDelta` via `TagEditing.subjectDelta` and writes it through the
