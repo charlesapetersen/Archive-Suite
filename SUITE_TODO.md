@@ -197,6 +197,31 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   new `Search/ExcludedFoldersStore.swift` (or `Core/AppSettings.swift`), `Views/NavigationModel.swift`,
   `Search/ContentIndexer.swift`, `Search/ArchiveLibrary.swift` | M | low
 
+## Deferred from the 2026-07-09/10 overnight run → queued for next overnight run
+Correctness bugs from that run's review shipped (`848c9d2`, `f866a0f`, `14118c0`); the items below were
+consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/OVERNIGHT_PLAN.md`
+as **Waves 7–10** for the next daemon run (relaunch the daemon to start it — `ops/overnight/README.md`).
+- [ ] **Prefix-match as-you-type OCR search** _(next run: W10.1)_ — append a `*` wildcard to the LAST token in
+  `ContentIndex.ftsMatchExpression` so partial words match while typing ("news" → "newspaper"); FTS5 does prefix
+  queries via its term B-tree. Salvaged from orphaned WIP (worktree `suite-wt-20260710-030636`; the debounce half
+  already shipped as `7aa673f` — take only the `ftsMatchExpression` change + its test). Needs its own review:
+  min-length gate for 1–2-char queries (prefix goes broad), and the bm25 × prefix-expansion interaction. Add a
+  `ContentIndexTests` case. | files: `Search/ContentIndex.swift`, `Tests/ArchiveReaderTests/ContentIndexTests.swift` | S | low
+- [ ] **Reader perf (deferred W6.2/W6.5)** _(next run: W8.1)_ — (a) `AppKitTableView.displayedByID` rebuilds fully
+  O(N) on every `updateNSView` → make incremental/diff-guarded; (b) `NavigationModel.tagCloud` uncached computed
+  property → cache + invalidate on library/filter change. Perf-only, no data risk. | files: `Views/AppKitTableView.swift`, `Views/NavigationModel.swift` | M | low
+- [ ] **Processor OCR throughput (deferred W6.5 — M3–M5). Tier-2** _(next run: W8.2)_ — M3 `handleOCRResult` runs
+  image-decode+JPEG+PDF-write on the MainActor → `Task.detached(.utility)` like the resume path; M4
+  `processBatchResults` awaits rotation+PDF serially → bounded-concurrent; M5 Anthropic batch submit holds all
+  base64 in memory → chunk like the Gemini path. Verify on a scratch copy, never the real corpus. | files: `OCR/OCRProcessor+OCR.swift`, `OCR/BatchOCR.swift` | M | low
+- [ ] **Processor OCR LOW cleanup (W6.4 L1–L4)** _(next run: W9.1)_ — L1 `cancelBatch` raw apiKey in URL →
+  `urlComponentEncoded`; L2 preserve `errorCode` across the ~6 OCRResult re-creations (was `nil`); L3 formalize/
+  document the seven `nonisolated(unsafe) static var` cross-task reads; L4 stop re-encoding the previous image each
+  batch iteration. | files: `OCR/BatchOCR.swift`, `OCR/OCRProcessor+ReviewFlows.swift`, `OCR/OCRProcessor.swift` | S | low
+- [ ] **Reader GUI test harness (XCUITest)** _(next run: W7.1–W7.5)_ — see the `reader-gui-test-harness.md` plan
+  indexed under **Active execution plans** above; deferred from the last run at the owner's request, now the first
+  wave of the next run. Also GUI-verifies the W5 items the daemon couldn't confirm headlessly. | files: per the plan | L | med
+
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
 - [x] KNOWN_ISSUES #3: zoomed-image scroll monitor no longer swallows scroll app-wide — scoped to the image via a hit-test-transparent probe (`ZoomableImageView.swift`); SwiftUI drag/pinch intact, no OCR/output logic touched. Build clean. ✅  ← GUI-verify (zoom a page >100%, confirm the filmstrip scrolls).
