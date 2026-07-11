@@ -315,10 +315,21 @@ actor ContentIndex {
         try? exec("PRAGMA wal_checkpoint(TRUNCATE);")
     }
 
-    /// Build a safe FTS5 MATCH expression: `"term1" "term2"` (implicit AND), doubling embedded quotes.
+    /// Build a safe FTS5 MATCH expression: `"term1" "term2"*` (implicit AND), doubling embedded
+    /// quotes. The LAST token gets a `*` prefix-wildcard so partial words match while typing
+    /// (e.g. "news" → matches "newspaper"). Short tokens (≤2 chars) skip the wildcard because
+    /// prefix expansion on 1–2-char terms is too broad (performance + relevance).
     nonisolated func ftsMatchExpression(_ query: String) -> String {
-        query.split(whereSeparator: { $0.isWhitespace })
-            .map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
+        let tokens = query.split(whereSeparator: { $0.isWhitespace })
+        guard !tokens.isEmpty else { return "" }
+        return tokens.enumerated()
+            .map { (i, tok) in
+                let quoted = "\"" + tok.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+                if i == tokens.count - 1 && tok.count > 2 {
+                    return quoted + "*"
+                }
+                return quoted
+            }
             .joined(separator: " ")
     }
 

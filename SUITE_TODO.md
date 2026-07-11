@@ -227,12 +227,9 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 Correctness bugs from that run's review shipped (`848c9d2`, `f866a0f`, `14118c0`); the items below were
 consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/OVERNIGHT_PLAN.md`
 as **Waves 7–10** for the next daemon run (relaunch the daemon to start it — `ops/overnight/README.md`).
-- [ ] **Prefix-match as-you-type OCR search** _(next run: W10.1)_ — append a `*` wildcard to the LAST token in
-  `ContentIndex.ftsMatchExpression` so partial words match while typing ("news" → "newspaper"); FTS5 does prefix
-  queries via its term B-tree. Salvaged from orphaned WIP (worktree `suite-wt-20260710-030636`; the debounce half
-  already shipped as `7aa673f` — take only the `ftsMatchExpression` change + its test). Needs its own review:
-  min-length gate for 1–2-char queries (prefix goes broad), and the bm25 × prefix-expansion interaction. Add a
-  `ContentIndexTests` case. | files: `Search/ContentIndex.swift`, `Tests/ArchiveReaderTests/ContentIndexTests.swift` | S | low
+- [x] **Prefix-match as-you-type OCR search** _(W10.1)_ — `ftsMatchExpression` appends `*` to the last token
+  (>2 chars) for FTS5 prefix queries ("news" → "newspaper"). Min-length gate skips wildcard for ≤2-char tokens.
+  3 new tests (196 total green), 0 warnings.
 - [x] **Reader perf (deferred W6.2/W6.5)** _(W8.1)_ — (a) `displayedByID` rebuild gated by `displayedGeneration` counter (skips O(N) dict rebuild on unrelated `updateNSView` calls); (b) `tagCloud` cached + invalidated in `recompute()`. 193 tests green, 0 warnings.
 - [x] **Processor OCR throughput (deferred W6.5 — M3–M5). Tier-2** _(W8.2)_ — M3 `handleOCRResult` PDF gen →
   `Task.detached(.utility)`; M4 `processBatchResults` rotation → bounded-concurrent `withTaskGroup`; M5

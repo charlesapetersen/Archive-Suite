@@ -239,6 +239,54 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    // MARK: - Prefix matching
+
+    func testFtsMatchExpressionPrefixWildcard() {
+        let idx = ContentIndex(url: URL(fileURLWithPath: "/dev/null"))
+        // Multi-word: last token gets wildcard (>2 chars)
+        XCTAssertEqual(idx.ftsMatchExpression("cold war bud"), "\"cold\" \"war\" \"bud\"*")
+        // Single long token: gets wildcard
+        XCTAssertEqual(idx.ftsMatchExpression("news"), "\"news\"*")
+        // Short last token (≤2 chars): no wildcard
+        XCTAssertEqual(idx.ftsMatchExpression("cold an"), "\"cold\" \"an\"")
+        // Single short token: no wildcard
+        XCTAssertEqual(idx.ftsMatchExpression("ab"), "\"ab\"")
+        // Empty: empty
+        XCTAssertEqual(idx.ftsMatchExpression(""), "")
+    }
+
+    func testPrefixMatchSearch() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil,
+                             body: "the newspaper reported on the budget")
+        try await idx.upsert(path: "/b.pdf", mtime: 1, name: "b", classification: nil,
+                             body: "a newsletter was distributed")
+        try await idx.upsert(path: "/c.pdf", mtime: 1, name: "c", classification: nil,
+                             body: "unrelated document about taxes")
+        // "news" (>2 chars) prefix-matches "newspaper" and "newsletter"
+        let hits = await idx.search("news")
+        XCTAssertEqual(Set(hits), ["/a.pdf", "/b.pdf"], "prefix should find both")
+        // Full word still works
+        let exact = await idx.search("newspaper")
+        XCTAssertEqual(exact, ["/a.pdf"])
+        await idx.close()
+    }
+
+    func testPrefixMatchShortTokenSkipsWildcard() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        // "an" is only in doc A as a standalone token; doc B has "analysis" but NOT "an"
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil,
+                             body: "an idea was proposed")
+        try await idx.upsert(path: "/b.pdf", mtime: 1, name: "b", classification: nil,
+                             body: "analysis of the data")
+        // Short token (≤2 chars): no wildcard, so "an" matches only exact token
+        let hits = await idx.search("an")
+        XCTAssertEqual(hits, ["/a.pdf"], "short token should not prefix-expand to 'analysis'")
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFTextExtractor.parseClassification(from: page2), "Document Start")
