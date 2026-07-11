@@ -69,7 +69,7 @@ before any Notes-specific work.
   vocabulary/formatting + `PDFTextExtractor`/`PDFFormatStatus` + new `RootMarker`/`DurableLink` + `ArchiveSuite`
   recognition) out of both shipping apps and migrate them onto it; behavior-preserving, parity-gated, one audited
   write seam; adds the SPEC delta — `00a-archivecore-refactor.md` — **Tier-2** (TagWriter + both apps + SPEC)
-  (S0 `f050d88` → S5 `cd7ff4f` → S6 `pending-commit`)
+  (S0 `f050d88` → S5 `cd7ff4f` → S6 `b90800f`)
 - [ ] **W1** scaffold + app skeleton **depending on the W0 ArchiveCore** — `01-scaffolding-and-core.md` — Tier-2 (scaffold)
 - [ ] **W2** store + front-matter I/O + virtual folders/replication + FTS5 index — `02-storage-model-and-index.md` — Tier-2 (writers)
 - [ ] **W3** rich-text/Markdown editor (WYSIWYG + raw toggle, inline images) — `03-rich-text-markdown-editor.md` — Tier-1
