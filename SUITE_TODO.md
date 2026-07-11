@@ -177,6 +177,26 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   now open in viewer + preview via PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent().
   Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done
 
+## Owner-requested (2026-07-10) — Reader
+- [ ] **Exclude a subfolder (inside the root) from indexing _and_ display** — a Settings control to
+  name one or more folders under the current root that the Reader should treat as out of scope: their
+  files are neither shown in the library nor added to the content index. UI lives in the Reader's
+  **Settings** scene (`ArchiveReaderApp.swift:30` — add an "Excluded folders" section / list; a folder
+  picker scoped under root that appends rows, each removable). Persist the exclusions (path prefixes,
+  and/or security-scoped bookmarks like `RootFolderStore`) via `AppSettings`/a small store. **Apply at
+  BOTH gates so "not indexed" and "not shown" actually hold:** (1) _display_ — filter files whose path is
+  under an excluded prefix in `NavigationModel.libraryDidChange`/`recompute` (discovery is Spotlight-wide
+  by tag in `ArchiveLibrary`, so match on path prefix, not search scope); (2) _index_ — skip excluded
+  paths in `ContentIndexer.startIndexing`, **and prune already-indexed rows** under a newly-excluded
+  folder (reuse the gated-prune path so search stops matching them; growth stays bounded). Reversible:
+  un-excluding re-includes + re-indexes on the next library change. Edge cases: exclusion must be a
+  descendant of root; overlapping/nested exclusions dedupe to the outermost; an excluded folder that
+  later disappears is a no-op. Mostly build+unit verifiable (path-prefix filter, prune-on-exclude);
+  GUI-verify the Settings list + that excluded rows vanish from the list and OCR search. **Not Tier-2**
+  (no tag/corpus writes — read/index-side only). | files: `ArchiveReaderApp.swift` (Settings scene),
+  new `Search/ExcludedFoldersStore.swift` (or `Core/AppSettings.swift`), `Views/NavigationModel.swift`,
+  `Search/ContentIndexer.swift`, `Search/ArchiveLibrary.swift` | M | low
+
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
 - [x] KNOWN_ISSUES #3: zoomed-image scroll monitor no longer swallows scroll app-wide — scoped to the image via a hit-test-transparent probe (`ZoomableImageView.swift`); SwiftUI drag/pinch intact, no OCR/output logic touched. Build clean. ✅  ← GUI-verify (zoom a page >100%, confirm the filmstrip scrolls).
