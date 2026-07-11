@@ -42,7 +42,14 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 case "${1:-arm}" in
   status) status; exit 0 ;;
   stop)
-    if pkill -f archive-suite-autonomous.sh; then echo "daemon stopped."; else echo "daemon was not running."; fi
+    # Kill the daemon loop AND any resume session it spawned. A bare `claude -p` child is NOT matched by the
+    # script-name pgrep (its cmdline is the prompt text), so killing only the loop orphans it — reparented to
+    # init, still running off possibly-stale state (the repeated-orphan bug). Match sessions by the resume
+    # prompt's distinctive phrase. Neither pattern matches arm.sh itself or an interactive Claude session.
+    k=0
+    pkill -f 'archive-suite-autonomous\.sh' && k=1
+    pkill -f 'autonomous maintenance session for the Archive Suite' && k=1
+    [ "$k" = 1 ] && echo "daemon + any resume session stopped." || echo "daemon was not running."
     exit 0 ;;
   arm) : ;;
   *) fail "unknown command '${1}'. Use: arm | status | stop" ;;
