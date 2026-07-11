@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// The Options panel (⌘,). Settings persist via `@AppStorage`; the models read them through
 /// `AppSettings` at point of use, so changes take effect on the next action.
@@ -13,6 +14,7 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
     @AppStorage(SettingsKey.warnNearDuplicate) private var warnNearDuplicate: Bool = true
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
+    @ObservedObject private var excludedFolders = ExcludedFoldersStore.shared
 
     var body: some View {
         Form {
@@ -53,8 +55,59 @@ struct OptionsView: View {
             Section("Tag editing") {
                 Toggle("Warn when a new subject differs only by case from an existing one", isOn: $warnNearDuplicate)
             }
+            Section("Excluded folders") {
+                Text("Files in these folders are hidden from the library and not indexed for search.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if excludedFolders.excludedRelativePaths.isEmpty {
+                    Text("No folders excluded.")
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ForEach(excludedFolders.excludedRelativePaths, id: \.self) { rel in
+                        HStack {
+                            Image(systemName: "folder.badge.minus")
+                                .foregroundStyle(.secondary)
+                            Text(rel)
+                            Spacer()
+                            Button(role: .destructive) {
+                                excludedFolders.remove(rel)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                Button("Add Folder\u{2026}") { addExcludedFolder() }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 520)
+        .frame(width: 500, height: 620)
+    }
+
+    private func addExcludedFolder() {
+        guard let rootURL = resolveArchiveRoot() else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = rootURL
+        panel.prompt = "Exclude"
+        panel.message = "Choose a subfolder to exclude from the library."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let rootPath = rootURL.path.hasSuffix("/") ? String(rootURL.path.dropLast()) : rootURL.path
+        let chosen = url.path
+        // Must be a descendant of root.
+        guard chosen.hasPrefix(rootPath + "/") else { return }
+        let relative = String(chosen.dropFirst(rootPath.count + 1))
+        excludedFolders.add(relative)
+    }
+
+    /// Resolve the archive root from the persisted bookmark (same key as RootFolderStore).
+    private func resolveArchiveRoot() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: "archiveRootBookmark") else { return nil }
+        var stale = false
+        return try? URL(resolvingBookmarkData: data, options: .withSecurityScope,
+                        relativeTo: nil, bookmarkDataIsStale: &stale)
     }
 }

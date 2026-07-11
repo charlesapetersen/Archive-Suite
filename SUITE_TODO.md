@@ -204,7 +204,7 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done
 
 ## Owner-requested (2026-07-10) — Reader
-- [ ] **Exclude a subfolder (inside the root) from indexing _and_ display** — a Settings control to
+- [x] **Exclude a subfolder (inside the root) from indexing _and_ display** — a Settings control to
   name one or more folders under the current root that the Reader should treat as out of scope: their
   files are neither shown in the library nor added to the content index. UI lives in the Reader's
   **Settings** scene (`ArchiveReaderApp.swift:30` — add an "Excluded folders" section / list; a folder

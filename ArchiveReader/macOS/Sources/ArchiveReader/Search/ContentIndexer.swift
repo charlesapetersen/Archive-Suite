@@ -253,6 +253,27 @@ final class ContentIndexer: ObservableObject {
         }
     }
 
+    /// Immediately prune index rows whose path falls under any of the given absolute prefixes.
+    /// Called when the user excludes a folder, so search results stop matching immediately
+    /// (not gated by the two-emission window).
+    func pruneExcluded(prefixes: [String]) {
+        guard !prefixes.isEmpty else { return }
+        let idx = index
+        Task.detached(priority: .utility) {
+            try? await idx.open()
+            let all = await idx.allPaths()
+            let toDelete = all.filter { path in
+                prefixes.contains { prefix in
+                    path == prefix || path.hasPrefix(prefix + "/")
+                }
+            }
+            if !toDelete.isEmpty {
+                try? await idx.deletePaths(Array(toDelete))
+                await idx.performMaintenance(rowsIndexed: 0)
+            }
+        }
+    }
+
     /// Reset the pending-prune state (e.g. on a scope/root change that invalidates the snapshot).
     func resetPruneState() { pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil }
 

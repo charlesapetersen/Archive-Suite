@@ -23,6 +23,7 @@ final class NavigationModel: ObservableObject {
     let indexer = ContentIndexer()
     let notes = NotesStore()
     let savedSearches = SavedSearchStore()
+    let excludedFolders = ExcludedFoldersStore.shared
 
     @Published var filter = LibraryFilter()
     /// The text field binds to this; a debounce pipeline copies it into `filter.searchText` after
@@ -129,6 +130,15 @@ final class NavigationModel: ObservableObject {
                 self.objectWillChange.send()
                 self.refreshSmartFolderCounts()
                 self.reconcileScopeWithStore()
+            } }
+            .store(in: &cancellables)
+        excludedFolders.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                guard let self else { return }
+                self.folderTree = self.buildFolderTree()
+                self.recompute()
+                self.pruneExcludedFromIndex()
             } }
             .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
@@ -330,6 +340,10 @@ final class NavigationModel: ObservableObject {
 
     func recompute() {
         var base = library.files
+        // Exclude user-designated folders before any other filtering.
+        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+            base = base.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+        }
         // Base scope = the visible universe (smart folder). User filter layers on top.
         if let scope {
             base = base.filter(scope.filter.matches)
@@ -539,13 +553,21 @@ final class NavigationModel: ObservableObject {
         let ms = LibraryChangeSignature.matchFacets(files)
         if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
         recompute()                                     // always — a row's read-state/tags may have moved it
-        indexer.startIndexing(files)                    // incremental; no-op if running
+        // Filter excluded folders before indexing so excluded files are never added to the content index.
+        let filesToIndex: [ArchiveFile]
+        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+            filesToIndex = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+        } else {
+            filesToIndex = files
+        }
+        indexer.startIndexing(filesToIndex)             // incremental; no-op if running
         if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
         // Prune stale index rows — separate from startIndexing (a destructive delete must never ride
         // a harmless-on-empty indexing emission). Gated: settled (not gathering) + non-empty + root known.
-        if !library.isGathering, !files.isEmpty, let rootPath = rootStore.root?.path {
-            indexer.pruneIfSettled(currentPaths: Set(files.map(\.url.path)), rootPrefix: rootPath)
+        // Uses filesToIndex (excludes user-excluded folders) so excluded paths are eligible for pruning.
+        if !library.isGathering, !filesToIndex.isEmpty, let rootPath = rootStore.root?.path {
+            indexer.pruneIfSettled(currentPaths: Set(filesToIndex.map(\.url.path)), rootPrefix: rootPath)
         }
     }
 
@@ -568,8 +590,12 @@ final class NavigationModel: ObservableObject {
     /// D2: recompute each smart folder's matching-file count over the whole library (cached; refreshed
     /// on library or saved-search changes, so the sidebar isn't O(searches·N) per render).
     private func refreshSmartFolderCounts() {
+        var files = library.files
+        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+            files = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+        }
         var counts: [UUID: Int] = [:]
-        for s in savedSearches.searches { counts[s.id] = library.files.filter(s.filter.matches).count }
+        for s in savedSearches.searches { counts[s.id] = files.filter(s.filter.matches).count }
         smartFolderCounts = counts
     }
 
@@ -580,9 +606,11 @@ final class NavigationModel: ObservableObject {
         let root = rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath
         final class Mut { var count = 0; var children: [String: Mut] = [:] }
         let top = Mut()
+        let hasExclusions = !excludedFolders.excludedRelativePaths.isEmpty
         for f in library.files {
-            top.count += 1                                  // recursive total at the root
             let path = f.url.path
+            if hasExclusions, excludedFolders.isExcludedAbsolute(path, rootPath: rootPath) { continue }
+            top.count += 1                                  // recursive total at the root
             guard path.hasPrefix(root + "/") else { continue }
             var comps = String(path.dropFirst(root.count + 1)).split(separator: "/").map(String.init)
             guard comps.count >= 1 else { continue }
@@ -633,6 +661,14 @@ final class NavigationModel: ObservableObject {
                                  // ftsPaths with stale old-root paths after the new library loads.
             library.start(scope: url)
         }
+    }
+
+    /// Immediately prune content-index rows under any excluded folder prefix.
+    /// Called when the exclusion list changes so search results don't lag the display filter.
+    private func pruneExcludedFromIndex() {
+        guard let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty else { return }
+        let prefixes = excludedFolders.absolutePrefixes(rootPath: rootPath)
+        indexer.pruneExcluded(prefixes: prefixes)
     }
 
     // MARK: Tag actions (all via TagWriter)
