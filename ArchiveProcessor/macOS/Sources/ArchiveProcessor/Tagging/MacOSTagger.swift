@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ArchiveCore
 import os
 
 struct MacOSTagger {

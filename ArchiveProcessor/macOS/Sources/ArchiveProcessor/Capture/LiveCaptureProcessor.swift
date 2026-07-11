@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ArchiveCore
 
 /// Streams processing during Live Capture: OCRs each page **as it arrives**, and finalizes each
 /// segment (tagging + PDF + dual-output + optional merge) into a durable staging area as the operator
