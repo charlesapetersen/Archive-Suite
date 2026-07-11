@@ -48,15 +48,34 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.tests
 
+  ArchiveReaderUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - Tests/ArchiveReaderUITests
+    dependencies:
+      - target: ArchiveReader
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.uitests
+        TEST_TARGET_NAME: ArchiveReader
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        ENABLE_HARDENED_RUNTIME: NO
+
 schemes:
   ArchiveReader:
     build:
       targets:
         ArchiveReader: all
         ArchiveReaderTests: [test]
+        ArchiveReaderUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - ArchiveReaderTests
+        - ArchiveReaderUITests
