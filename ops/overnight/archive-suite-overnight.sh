@@ -33,8 +33,7 @@ JOB="com.${LABEL}.overnight"    # launchd label (matches the .plist)
 
 INTERVAL="${OVERNIGHT_INTERVAL:-1200}"   # seconds between cycles (20 min)
 STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
-MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min (HARD cap)
-IDLE_MAX="${OVERNIGHT_IDLE_MAX:-1200}"   # ALSO kill a session emitting NO new output for 20 min (fast hang detection)
+MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min (wall-clock hard cap)
 BUDGET="${OVERNIGHT_BUDGET:-30}"         # --max-budget-usd per resume session
 EFFORT="${OVERNIGHT_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
 
@@ -121,26 +120,13 @@ tick() {
       --disallowedTools "${DENY[@]}" \
       >> "$STATE/last-session.log" 2>&1 &
   local cpid=$!
-  # Watchdog: kill on IDLE (no new session-log output for IDLE_MAX = fast hang detection, e.g. stuck on a
-  # native prompt) OR on the MAXRUN hard cap. A busy session appends output regularly, so idle-kill spares
-  # legitimately long work while catching hangs ~4x faster than the hard cap alone.
-  local sesslog="$STATE/last-session.log"
-  (
-    wd_start=$(date +%s); wd_last=$(wc -c < "$sesslog" 2>/dev/null || echo 0); wd_idle=$wd_start
-    while kill -0 "$cpid" 2>/dev/null; do
-      sleep 30
-      wd_now=$(date +%s); wd_sz=$(wc -c < "$sesslog" 2>/dev/null || echo 0)
-      [ "$wd_sz" != "$wd_last" ] && { wd_last=$wd_sz; wd_idle=$wd_now; }
-      if [ $(( wd_now - wd_idle )) -ge "$IDLE_MAX" ]; then
-        log "watchdog: no new output for ${IDLE_MAX}s — killing stuck session (pid $cpid)"
-        kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null; break
-      fi
-      if [ $(( wd_now - wd_start )) -ge "$MAXRUN" ]; then
-        log "watchdog: hit ${MAXRUN}s hard cap — killing session (pid $cpid)"
-        kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null; break
-      fi
-    done
-  ) &
+  # Wall-clock hard cap only. (An idle-output watchdog was REMOVED 2026-07-11: it monitored
+  # last-session.log, but `claude -p` writes output only at the END of a run, so the log never grows
+  # mid-session — the watchdog false-killed EVERY session that ran longer than IDLE_MAX even while it was
+  # working productively (it executed two healthy W0-S3 sessions). A correct fast-hang detector would watch
+  # the session TRANSCRIPT (~/.claude/projects/<proj>/*.jsonl, appended per event) instead — deferred.
+  # Genuine hangs are now rare: the taskport password-prompt cause is fixed and GUI is paused.)
+  ( sleep "$MAXRUN"; kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null ) &
   local wpid=$!
   wait "$cpid"; local rc=$?
   kill "$wpid" 2>/dev/null; wait "$wpid" 2>/dev/null
