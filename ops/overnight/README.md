@@ -21,6 +21,12 @@ context compaction, and session restarts. Standing principles: memory `autonomou
 
 ## Install / run
 
+**One command (preferred): `./ops/overnight/arm.sh`** — checks every prerequisite (claude CLI outside
+`~/Desktop`, daemon + resume prompt present, an L0 plan whose `RUN STATUS` is `IN_PROGRESS` with unchecked
+`[ ]` items), installs the latest committed copies to the runtime location, refuses to double-launch, warns
+with the exact fix if the plan is stale-`COMPLETE`, launches detached, and confirms the first cycle started.
+Also `arm.sh status` (read-only) and `arm.sh stop`. The manual steps below are what it automates.
+
 The committed copies here are the source of truth; install to the runtime location:
 
 ```bash
