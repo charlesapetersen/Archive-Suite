@@ -18,7 +18,7 @@ set -uo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"          # .../ArchiveProcessor  (outer app dir)
-PROJ="$ROOT/ArchiveProcessor"                  # inner XcodeGen project dir
+PROJ="$ROOT/macOS"                             # inner XcodeGen project dir
 APP="$PROJ/build/DD/Build/Products/Debug/ArchiveProcessor.app"
 BIN="$APP/Contents/MacOS/ArchiveProcessor"
 KC_SERVICE="com.archiveprocessor.app"

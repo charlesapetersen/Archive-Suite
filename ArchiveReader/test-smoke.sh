@@ -13,7 +13,7 @@ set -uo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"          # .../ArchiveReader (outer app dir)
-PROJ="$ROOT/ArchiveReader"                     # inner XcodeGen project dir
+PROJ="$ROOT/macOS"                              # inner XcodeGen project dir
 LOGDIR="$ROOT/.maintenance/test-results"; mkdir -p "$LOGDIR"
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="$LOGDIR/smoke-reader-$TS.log"

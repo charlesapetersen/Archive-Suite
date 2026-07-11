@@ -7,7 +7,7 @@
 # Run before every commit (also invoked by the autonomous build). Exit non-zero on violation.
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="ArchiveReader/Sources/ArchiveReader"
+SRC="macOS/Sources/ArchiveReader"
 fail=0
 
 # 1) tag-write APIs must appear only in TagWriter.swift.
