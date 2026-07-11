@@ -32,6 +32,13 @@ macOS/Sources/ArchiveNotes/
   ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings
   Models/
     NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
+  Store/
+    Item.swift                     Item/ZoteroRef/UnknownKey domain models
+    FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
+    BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
+    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets
+    RootFolderStore.swift          Security-scoped bookmark to the Notes store root
+    RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
   Views/
     NotesShellView.swift           Empty 3-pane shell (HStack + PanelDivider)
     PanelDivider.swift             Draggable divider (copied from Reader)
@@ -41,6 +48,8 @@ macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
   ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
   NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable
+  NoteStoreTests.swift             13 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL
+  RootMarkerStoreTests.swift       5 tests: fresh/idempotent/corrupt-guard/empty/JSON-round-trip
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
