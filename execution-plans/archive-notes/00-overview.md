@@ -1,7 +1,7 @@
 # Archive Notes — Master Plan & Architecture (00 / overview)
 
 > **Status: PROPOSED** (planning, 2026-07-10). A third native macOS app for Archive Suite, to be built
-> carefully over a long unattended/overnight run. This file is the **spine**: vision, locked design
+> carefully over a long unattended/autonomous run. This file is the **spine**: vision, locked design
 > decisions, the complete data model + on-disk format + front-matter schema, the shared-contract (SPEC)
 > delta, the durable-link/URL-scheme spec, the ArchiveCore decision, risk/tier policy, and the **wave
 > index** that the per-wave plan files (`01`–`08`) expand. Read this before any wave.
@@ -61,7 +61,7 @@ every other surface is designed from the historian's workflow up, not copied fro
 | D1 | On-disk note/extract format | **Markdown + assets**, one **UUID-named folder** per item: `<store>/<uuid>/<Title>.md` + `<uuid>/assets/` | Durable, greppable, tool-agnostic; title=filename with no collisions; UUID = stable link identity |
 | D2 | Metadata store | **YAML front-matter is authoritative** for *all* metadata; **mirror only subject tags + `ArchiveSuite`** into macOS Finder tags (regenerable projection, not source of truth) | No author/date/quality pollution of the global tag namespace; front-matter is the standard durable answer |
 | D3 | Organization / replication | **Purely virtual** — flat pile of UUID folders on disk; the folder tree, "home", working-folders, and replication are **many-to-many records in the index DB** | Replication is trivial (a membership row); moving computers = move one folder; disk is not the tree |
-| D4 | Shared-tag SPEC change | **Additive + read-aware, NO corpus back-fill** this run | SPEC gains only the `ArchiveSuite` membership marker; **no `Author:` facet**; existing corpus untouched (lowest overnight risk) |
+| D4 | Shared-tag SPEC change | **Additive + read-aware, NO corpus back-fill** this run | SPEC gains only the `ArchiveSuite` membership marker; **no `Author:` facet**; existing corpus untouched (lowest risk) |
 | D5 | Durable link identity | **Root-marker file (GUID+name) + root-relative path**, carried in custom URL schemes | Survives moving the whole install to a new computer after a one-time root re-grant |
 | D6 | Editor | **Rich-text WYSIWYG + formatting toolbar**, Markdown as the saved format, with a **per-note raw-Markdown toggle** | `NSTextView`/TextKit + attributed↔Markdown bridge; user never sees syntax unless they ask |
 | D7 | Extract semantics | **Snapshot + provenance link** (extract owns editable text; link back to source note+passage; jump-to-source; note edits don't change the extract) | Extract has its own title/date/author/tags; can be segmented with blocks linking to *different* notes |
@@ -395,13 +395,13 @@ Differences for Notes (`02`):
   work with no irreplaceable-data surface, but always: clean build, **no new warnings**, unit tests, and GUI
   verification where feasible.
 - **Shared-contract change** (`SPEC/tag-format.md` + ArchiveCore) is the coordinated, atomic risk — see `01`.
-- **Bounded chunk per session**, verified + committed + pushed + checkbox flipped, then stop (overnight loop).
+- **Bounded chunk per session**, verified + committed + pushed + checkbox flipped, then stop (autonomous loop).
 
 ---
 
-## 13. Wave index (→ bounded overnight sessions)
+## 13. Wave index (→ bounded autonomous sessions)
 
-Each wave is one plan file and decomposes into bounded sub-tasks (one per fresh overnight session). Ordering
+Each wave is one plan file and decomposes into bounded sub-tasks (one per fresh autonomous session). Ordering
 respects dependencies. "GUI" = drive the app to verify; "Tier" per §12.
 
 | Wave | Plan | Goal | Depends on | Tier |

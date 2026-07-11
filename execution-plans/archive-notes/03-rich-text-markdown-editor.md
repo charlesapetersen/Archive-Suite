@@ -167,7 +167,7 @@ One `NSTextView`, two presentation modes over **one** underlying Markdown string
 - **NET-NEW (nothing in the repo does this today):** any `NSTextView`/TextKit-2 rich text, attributed-string *persistence*, `NSTextAttachment`/`NSTextAttachmentViewProvider`, `NSAttributedString(markdown:)`, and the attributed→Markdown serializer. All existing `NSTextView` use is plain single-line token entry or read-only diff display — call this out so no one assumes an editor exists to extend.
 
 ## Bounded sub-tasks
-Each is one fresh overnight session: worktree → build clean/no new warnings → unit tests + GUI via `./launch.sh notes` → docs-in-same-commit → push → remove worktree (00-overview §14). All **Tier-1** (00-overview §12).
+Each is one fresh autonomous session: worktree → build clean/no new warnings → unit tests + GUI via `./launch.sh notes` → docs-in-same-commit → push → remove worktree (00-overview §14). All **Tier-1** (00-overview §12).
 
 - **S1 — Editor shell, plain-Markdown editing, two-way binding, undo/find, raw-toggle mechanism.**
   Files: `Editor/MarkdownEditorView.swift`, `Editor/EditorTextView.swift`, `Views/NoteEditorPane.swift`; wire into the W1 center pane. No rich rendering yet — both styled and raw modes show the plain Markdown string (establishes the swap + no-loss plumbing + debounced write-back). TextKit 2 enforced; `scripts/lint-editor.sh` added (fails on `\.layoutManager`).

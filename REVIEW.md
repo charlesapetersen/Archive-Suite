@@ -79,7 +79,7 @@ It fans out 6 dimension finders → refute-verifies each finding → returns
 3. Write the report to `.maintenance/review/<unit>.md` (confirmed findings + the refuted list for audit).
 4. **Triage confirmed findings:** fix small/clear ones now (own worktree, build-verify, Tier-2 where the
    change is no-undo — see root `CLAUDE.md` §"How we work"); append larger ones as fix items to the active
-   backlog (`SUITE_TODO.md` or the overnight `.maintenance/OVERNIGHT_PLAN.md`).
+   backlog (`SUITE_TODO.md` or the `.maintenance/AUTONOMOUS_PLAN.md`).
 5. Mark the unit **done** in `REVIEW_PROGRESS.md` (with the confirmed count) + commit. Exit.
 
 Because the unit list is durable (this file) and progress is persisted, the review survives usage cutoffs,

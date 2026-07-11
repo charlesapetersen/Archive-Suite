@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.archivesuite.overnight</string>
+  <string>com.archivesuite.autonomous</string>
 
   <!-- Runs the SAME daemon script (a long-lived loop). Script lives OUTSIDE ~/Desktop so launchd's
        TCC context can exec it (the prior under-Desktop attempt died: "Operation not permitted"). -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/<user>/.local/bin/archive-suite-overnight.sh</string>
+    <string>/Users/<user>/.local/bin/archive-suite-autonomous.sh</string>
   </array>
 
   <key>RunAtLoad</key>
@@ -23,9 +23,9 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/<user>/.local/state/archive-overnight/launchd.out.log</string>
+  <string>/Users/<user>/.local/state/archive-autonomous/launchd.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/<user>/.local/state/archive-overnight/launchd.err.log</string>
+  <string>/Users/<user>/.local/state/archive-autonomous/launchd.err.log</string>
 
   <key>ProcessType</key>
   <string>Background</string>

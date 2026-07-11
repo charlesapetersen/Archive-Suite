@@ -187,7 +187,7 @@ It carries, unchanged, every guarantee already proven in Reader's `mutate`: `NSF
 
 ## Migration order — bounded sub-tasks
 
-Each Sn = **one fresh overnight session**, each leaves **all apps building + green**, each states its own verify + rollback. **S0 is a hard prerequisite** — it repairs the parity gate itself before any code moves. Then: pure read-side first; write path in the middle (Reader, its origin, first); Processor write convergence last.
+Each Sn = **one fresh autonomous session**, each leaves **all apps building + green**, each states its own verify + rollback. **S0 is a hard prerequisite** — it repairs the parity gate itself before any code moves. Then: pure read-side first; write path in the middle (Reader, its origin, first); Processor write convergence last.
 
 ### S0 — Repair the de-nested helper scripts + delete stale trees (PREREQUISITE — must run first)
 - **Why:** the acceptance bar (lint clean + both smokes green) is currently enforced against **stale, pre-de-nest paths** — see §XcodeGen wiring landmines. No W0 verify means anything until this is fixed. This sub-task moves **no product code**.
@@ -195,7 +195,7 @@ Each Sn = **one fresh overnight session**, each leaves **all apps building + gre
   1. `ArchiveReader/scripts/lint-write-surface.sh:11` — `SRC="ArchiveReader/macOS/Sources/ArchiveReader"`.
   2. `ArchiveReader/test-smoke.sh:16` — `PROJ="$ROOT/macOS"`.
   3. `ArchiveProcessor/test-smoke.sh:21` — `PROJ="$ROOT/macOS"`.
-  4. Delete the stale `ArchiveReader/ArchiveReader/` and `ArchiveProcessor/ArchiveProcessor/` trees (confirmed on disk: each is a gitignored stale `.xcodeproj` + `Sources/` + `build/`, 0 git-tracked files) so an overnight session can never build the wrong copy.
+  4. Delete the stale `ArchiveReader/ArchiveReader/` and `ArchiveProcessor/ArchiveProcessor/` trees (confirmed on disk: each is a gitignored stale `.xcodeproj` + `Sources/` + `build/`, 0 git-tracked files) so an autonomous session can never build the wrong copy.
 - **Verify (proves the gate now works):**
   - Run the repaired lint and confirm it now **FAILS**, listing the 3 real `setResourceValue` calls under `macOS/Sources/.../Core/TagWriter.swift` — i.e. it catches what it silently missed. (After S3/S5 relocate the writes it will pass again.) Baseline this "expected fail on current tree" so S3's "now clean" is meaningful.
   - Run both repaired smokes against current `macOS/Sources` → green (this is the true pre-migration baseline; record the Reader test count).
@@ -307,7 +307,7 @@ Each Sn = **one fresh overnight session**, each leaves **all apps building + gre
 - **Both apps' `CLAUDE.md` Implementation Maps:** note the `Core/` tag/PDF/date types (Reader) and `Tagging/GeneratedTags` + `MacOSTagger` (adapter) + PDF extractor (Processor) now live in / delegate to `ArchiveCore`; Reader's Safety Protocol notes `TagWriter` delegates to `ArchiveCore.CoordinatedTagWriter` (the single choke-point is now the package's primitive).
 - **`AGENTS.md`:** add an **ownership lane** for `packages/ArchiveCore` (the shared contract — coordinated, Tier-2) and add it to **shared hotspots** alongside the `project.yml` files (now **three** build surfaces) and `SPEC/tag-format.md`. Also record the de-nested smoke/lint paths from S0.
 - **`ArchiveProcessor/CLAUDE.md` shared-hotspots list** currently ends at "the two `project.yml` files" — update to **three build surfaces plus the new `packages/ArchiveCore` lane**, and reflect the `MacOSTagger`/`GeneratedTags` adapter split (not a wholesale move).
-- **Doc-sync backstop:** `.claude/.docsync-ok` shows as **deleted** in git status — confirm the doc-sync hook (`.claude/hooks/`) still fires for a package that lives **outside** both app dirs (`packages/`), so an overnight run's S1–S6 checkbox flips are enforced; fix the hook's scope if it only watches the two app trees.
+- **Doc-sync backstop:** `.claude/.docsync-ok` shows as **deleted** in git status — confirm the doc-sync hook (`.claude/hooks/`) still fires for a package that lives **outside** both app dirs (`packages/`), so an autonomous run's S1–S6 checkbox flips are enforced; fix the hook's scope if it only watches the two app trees.
 - **`SPEC/tag-format.md`:** update the closing note (`:208-209`) from "When Archive Suite extracts…" (future) to "**Implemented in `ArchiveCore`** — `MacOSTagger` and `TagWriter` reconcile into one audited primitive (`CoordinatedTagWriter`); this file is that package's contract doc"; update "Where each side lives" (`:181-192`) to point at ArchiveCore for the shared rows — verifying the Processor rows (`GeneratedTags`, `MacOSTagger`) reflect the **adapter split**, not a wholesale move, and that the parser row notes the full-body/stripped-body split.
 - **`SUITE_TODO.md`** (tracker of record): replace the deferred line at `:219` ("`ArchiveCore` shared-package extraction moved to POTENTIAL_FEATURES — deferred") with the live W0 item + **S0..S6** checkboxes; flip each in the **same commit** as its code; delete this plan file only when W0 fully ships (git keeps history), per `00-overview.md` §14.
 - **`ArchiveProcessor/POTENTIAL_FEATURES.md`:** remove the deferred ArchiveCore wish (now realized); leave the shared-storage-path item.
@@ -316,7 +316,7 @@ Each Sn = **one fresh overnight session**, each leaves **all apps building + gre
 
 ## Open questions (non-blocking)
 
-1. **Package tests vs app scheme.** W0 runs moved tests via `swift test` (package) + a new dispatcher step, leaving the app schemes running only app-resident tests. Acceptable, or does the owner want the package tests also surfaced under a single `xcodebuild test` (would require an aggregate test target)? Recommend the `swift test` split — simpler, faster, and it is what CI-less overnight runs already do per subsystem.
+1. **Package tests vs app scheme.** W0 runs moved tests via `swift test` (package) + a new dispatcher step, leaving the app schemes running only app-resident tests. Acceptable, or does the owner want the package tests also surfaced under a single `xcodebuild test` (would require an aggregate test target)? Recommend the `swift test` split — simpler, faster, and it is what CI-less autonomous runs already do per subsystem.
 2. **Page-2 header builder unification.** W0 unifies only the *parser*; `PDFGenerator.makeTextPage` (`OCR/PDFGenerator.swift:207-225`) keeps composing the header. A follow-on could extract a shared `PageTwoHeader.build/parse` pair so compose and parse can never drift — deferred to avoid touching the CoreText writer in a parity wave. Promote if the owner wants the builder shared now.
 3. **Reader `FileLink` vs net-new `DurableLink`.** Confirmed as separate concerns (Reader clipboard formatter vs the `archivereader://` scheme). Recommendation: `FileLink` stays Reader (a Reader feature, not the shared contract) even though it is UI-free. Confirm.
 4. **Processor write-surface lint (S5).** Confirm `PDFDocument.write` should be allow-listed only in `PDFGenerator.swift`/`mergeDocumentPDFs` (legitimate content writers) and banned elsewhere.

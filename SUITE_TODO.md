@@ -3,7 +3,7 @@
 The **near-term** to-do queue for both apps (see root `CLAUDE.md` §Docs & backlog convention). Long-term
 ideas live in each app's `POTENTIAL_FEATURES.md`; detailed in-flight plans live in `execution-plans/`
 (indexed below, deleted when shipped). Full-codebase review: the paced method in `REVIEW.md`. Unattended /
-overnight runs: `ops/overnight/README.md` (durable plan → self-resume daemon), which drains this queue one
+autonomous runs: `ops/autonomous/README.md` (durable plan → self-resume daemon), which drains this queue one
 bounded item per fresh session.
 Paths repo-root-relative; Reader source = `ArchiveReader/macOS/Sources/ArchiveReader/`,
 Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
@@ -58,7 +58,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 
 ## Archive Notes — NEW APP (planned 2026-07-10; `execution-plans/archive-notes/`)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). Each wave maps to
-one or more bounded overnight sessions (sub-tasks listed inside each wave file). DevonThink informs **only**
+one or more bounded autonomous sessions (sub-tasks listed inside each wave file). DevonThink informs **only**
 the 3-pane browsing shell — everything else (note appearance, link/provenance UI, replication semantics) is
 purpose-built for the historian's provenance-first workflow. **Owner decision points (early):** (a) **R13d** —
 the `ArchiveSuite` *exclusion* effect is deferred to the later behavior/data follow-on (see `00 §2` call-out).
@@ -223,10 +223,10 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   new `Search/ExcludedFoldersStore.swift` (or `Core/AppSettings.swift`), `Views/NavigationModel.swift`,
   `Search/ContentIndexer.swift`, `Search/ArchiveLibrary.swift` | M | low
 
-## Deferred from the 2026-07-09/10 overnight run → queued for next overnight run
+## Deferred from the 2026-07-09/10 autonomous run → queued for next autonomous run
 Correctness bugs from that run's review shipped (`848c9d2`, `f866a0f`, `14118c0`); the items below were
-consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/OVERNIGHT_PLAN.md`
-as **Waves 7–10** for the next daemon run (relaunch the daemon to start it — `ops/overnight/README.md`).
+consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/AUTONOMOUS_PLAN.md`
+as **Waves 7–10** for the next daemon run (relaunch the daemon to start it — `ops/autonomous/README.md`).
 - [x] **Prefix-match as-you-type OCR search** _(W10.1)_ — `ftsMatchExpression` appends `*` to the last token
   (>2 chars) for FTS5 prefix queries ("news" → "newspaper"). Min-length gate skips wildcard for ≤2-char tokens.
   3 new tests (196 total green), 0 warnings.

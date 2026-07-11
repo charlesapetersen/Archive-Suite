@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Autonomous overnight self-resume daemon (L1) — REUSABLE TEMPLATE.
+# Autonomous autonomous self-resume daemon (L1) — REUSABLE TEMPLATE.
 # Current instance: Archive Suite. To reuse for another repo, copy this file, edit the PROJECT CONFIG
-# block below (or set the OVERNIGHT_* env vars), and write that repo's L0 plan + L2 resume prompt.
+# block below (or set the AUTONOMOUS_* env vars), and write that repo's L0 plan + L2 resume prompt.
 #
 # Fires a FRESH headless `claude -p` every cycle to advance a durable plan, one bounded item per session.
 # Resilient to usage cutoffs: an exhausted window just fails fast and the next cycle retries when the cap
@@ -21,21 +21,21 @@
 # Self-terminates when the plan's "RUN STATUS:" line reads COMPLETE (a plain greppable line — no markdown).
 set -uo pipefail
 
-# ===== PROJECT CONFIG — to reuse elsewhere, edit these 5 (or set the matching OVERNIGHT_* env vars) =====
-LABEL="${OVERNIGHT_LABEL:-archivesuite}"                            # unique slug: names the state dir + launchd job
-REPO="${OVERNIGHT_REPO:-/Users/<user>/Desktop/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
-PLAN="${OVERNIGHT_PLAN:-$REPO/.maintenance/OVERNIGHT_PLAN.md}"     # L0 durable plan (keep it gitignored)
-STATE="${OVERNIGHT_STATE:-$HOME/.local/state/archive-overnight}"  # runtime state (logs, lock, resume prompt)
-CLAUDE="${OVERNIGHT_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
+# ===== PROJECT CONFIG — to reuse elsewhere, edit these 5 (or set the matching AUTONOMOUS_* env vars) =====
+LABEL="${AUTONOMOUS_LABEL:-archivesuite}"                            # unique slug: names the state dir + launchd job
+REPO="${AUTONOMOUS_REPO:-/Users/<user>/Desktop/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
+PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durable plan (keep it gitignored)
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"  # runtime state (logs, lock, resume prompt)
+CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
-JOB="com.${LABEL}.overnight"    # launchd label (matches the .plist)
+JOB="com.${LABEL}.autonomous"    # launchd label (matches the .plist)
 
-INTERVAL="${OVERNIGHT_INTERVAL:-1200}"   # seconds between cycles (20 min)
-STALE="${OVERNIGHT_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
-MAXRUN="${OVERNIGHT_MAXRUN:-4500}"       # kill a single resume after 75 min (wall-clock hard cap)
-BUDGET="${OVERNIGHT_BUDGET:-30}"         # --max-budget-usd per resume session
-EFFORT="${OVERNIGHT_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
+INTERVAL="${AUTONOMOUS_INTERVAL:-1200}"   # seconds between cycles (20 min)
+STALE="${AUTONOMOUS_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
+MAXRUN="${AUTONOMOUS_MAXRUN:-4500}"       # kill a single resume after 75 min (wall-clock hard cap)
+BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
+EFFORT="${AUTONOMOUS_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
 
 # Tools a work session legitimately needs. deny wins over allow. ARRAYS (not strings): patterns contain
 # spaces (e.g. "Bash(rm -rf:*)"), so they MUST each be one argv element — passed as "${DENY[@]}", never
@@ -62,9 +62,9 @@ remind_revert_taskport() {
   [ "$_reminded" = 1 ] && return; _reminded=1
   security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>' || return
   local bk="$STATE/taskport-rule.backup.plist"
-  local m="Overnight run has EXITED but taskport debugger auth is STILL 'allow' (password-free). REVERT it:  sudo security authorizationdb write system.privilege.taskport < $bk"
+  local m="Autonomous run has EXITED but taskport debugger auth is STILL 'allow' (password-free). REVERT it:  sudo security authorizationdb write system.privilege.taskport < $bk"
   log "!!!!!!!!!!!! SECURITY REMINDER: $m"
-  { echo "[$(date '+%F %T')] Archive Suite overnight run exited."; echo; echo "$m"; } > "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" 2>/dev/null || true
+  { echo "[$(date '+%F %T')] Archive Suite autonomous run exited."; echo; echo "$m"; } > "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" 2>/dev/null || true
   osascript -e 'display notification "taskport auth is still password-free — REVERT it (see REVERT-TASKPORT-SECURITY.txt on your Desktop)." with title "Archive Suite: revert security setting" sound name "Basso"' >/dev/null 2>&1 || true
 }
 trap remind_revert_taskport EXIT

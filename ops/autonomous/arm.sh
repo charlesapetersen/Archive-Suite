@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ops/overnight/arm.sh — ONE-COMMAND prep + launch + verify for the overnight run.
+# ops/autonomous/arm.sh — ONE-COMMAND prep + launch + verify for the autonomous run.
 #
 # Collapses the whole "arm the daemon" dance (install runtime copies, check every
 # prerequisite, guard the stale-COMPLETE + double-launch footguns, launch detached,
@@ -7,9 +7,9 @@
 # re-derived from README.md again.
 #
 # Run from the PRIMARY checkout:
-#   ./ops/overnight/arm.sh            # install + verify prereqs + launch + confirm first cycle
-#   ./ops/overnight/arm.sh status     # show daemon state + RUN STATUS + recent log (read-only)
-#   ./ops/overnight/arm.sh stop       # stop the detached daemon
+#   ./ops/autonomous/arm.sh            # install + verify prereqs + launch + confirm first cycle
+#   ./ops/autonomous/arm.sh status     # show daemon state + RUN STATUS + recent log (read-only)
+#   ./ops/autonomous/arm.sh stop       # stop the detached daemon
 #
 # Prereqs it enforces (and explains if missing): claude CLI outside ~/Desktop (launchd/TCC),
 # the daemon script + resume prompt present, an L0 plan whose RUN STATUS is IN_PROGRESS with
@@ -17,20 +17,20 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"          # this script's checkout = where the daemon works
-STATE="$HOME/.local/state/archive-overnight"
+STATE="$HOME/.local/state/archive-autonomous"
 BIN="$HOME/.local/bin"
 CLAUDE="$BIN/claude"
-DAEMON_SRC="$REPO/ops/overnight/archive-suite-overnight.sh"
-DAEMON_DST="$BIN/archive-suite-overnight.sh"
-PROMPT_SRC="$REPO/ops/overnight/resume-prompt.txt"
-PLAN="$REPO/.maintenance/OVERNIGHT_PLAN.md"
+DAEMON_SRC="$REPO/ops/autonomous/archive-suite-autonomous.sh"
+DAEMON_DST="$BIN/archive-suite-autonomous.sh"
+PROMPT_SRC="$REPO/ops/autonomous/resume-prompt.txt"
+PLAN="$REPO/.maintenance/AUTONOMOUS_PLAN.md"
 LOG="$STATE/daemon.log"
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
 
 status() {
   echo "== daemon process =="
-  pgrep -fl archive-suite-overnight.sh || echo "  (not running)"
+  pgrep -fl archive-suite-autonomous.sh || echo "  (not running)"
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
   echo "== recent daemon.log =="
@@ -42,7 +42,7 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 case "${1:-arm}" in
   status) status; exit 0 ;;
   stop)
-    if pkill -f archive-suite-overnight.sh; then echo "daemon stopped."; else echo "daemon was not running."; fi
+    if pkill -f archive-suite-autonomous.sh; then echo "daemon stopped."; else echo "daemon was not running."; fi
     exit 0 ;;
   arm) : ;;
   *) fail "unknown command '${1}'. Use: arm | status | stop" ;;
@@ -62,9 +62,9 @@ cp "$PROMPT_SRC" "$STATE/resume-prompt.txt"
 echo "installed: daemon -> $DAEMON_DST ; resume prompt -> $STATE/"
 
 # 3. don't double-launch
-if pgrep -f archive-suite-overnight.sh >/dev/null; then
+if pgrep -f archive-suite-autonomous.sh >/dev/null; then
   echo "daemon ALREADY running — not launching a second one:"
-  pgrep -fl archive-suite-overnight.sh
+  pgrep -fl archive-suite-autonomous.sh
   echo; status; exit 0
 fi
 
@@ -91,7 +91,7 @@ echo "launched (detached)."
 # 6. verify the first cycle actually started (bounded poll — no unbounded wait)
 ok=""
 for _ in $(seq 1 20); do
-  if pgrep -f archive-suite-overnight.sh >/dev/null && tail -n 4 "$LOG" 2>/dev/null | grep -q 'daemon up'; then
+  if pgrep -f archive-suite-autonomous.sh >/dev/null && tail -n 4 "$LOG" 2>/dev/null | grep -q 'daemon up'; then
     ok=1; break
   fi
   sleep 0.5

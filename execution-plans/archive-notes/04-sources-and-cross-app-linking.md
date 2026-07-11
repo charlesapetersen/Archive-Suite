@@ -276,7 +276,7 @@ Swift 6 / Sendable notes: `SourceBlockPaster`, `SourceBlockView`, `ReaderPreview
 - **DurableLink/RootMarker/PDFThumbnailer/payload** — **net-new** in ArchiveCore; nothing comparable exists in the repo.
 
 ## Bounded sub-tasks
-Each sized to one fresh overnight session (own worktree → clean build, no new warnings → tests → GUI check → commit with docs → push → remove worktree). Tier per 00-overview §12.
+Each sized to one fresh autonomous session (own worktree → clean build, no new warnings → tests → GUI check → commit with docs → push → remove worktree). Tier per 00-overview §12.
 
 **S1 — ArchiveCore: `DurableLink` + `RootMarker` + `ArchiveLinkPayload`.** *(Tier-2: shared-contract type + a benign root write.)*
 - Files: `ArchiveCore/Sources/ArchiveCore/Links/{DurableLink,RootMarker,ArchiveLinkPayload}.swift` (NEW) + tests.

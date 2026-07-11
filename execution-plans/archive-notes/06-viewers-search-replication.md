@@ -319,7 +319,7 @@ Quality is Reader's priority pattern re-skinned to a 1..5 front-matter field (00
 
 ## Bounded sub-tasks
 
-Each sub-task = one fresh overnight session: own worktree → clean build (`xcodegen generate` in `ArchiveNotes/macOS`, then `xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`), **no new warnings**, named unit tests, GUI check via `./launch.sh notes`, docs move in the same commit. Tier per 00-overview §12.
+Each sub-task = one fresh autonomous session: own worktree → clean build (`xcodegen generate` in `ArchiveNotes/macOS`, then `xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`), **no new warnings**, named unit tests, GUI check via `./launch.sh notes`, docs move in the same commit. Tier per 00-overview §12.
 
 **S1 — 3-pane shell + two windows + persistence.** *(Tier-1)*
 Scope: `NotesBrowserView`, `NotesPanelDivider` (copied), the two `WindowGroup` scenes in `ArchiveNotesApp.swift`, `NotesAppSettings` (window size + panel-width keys), placeholder tree/list/detail panes.

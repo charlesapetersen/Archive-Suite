@@ -30,8 +30,8 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
 The sections below are the depth behind these steps. **The owner should never have to catch a skipped one**
 (a doc-sync backstop hook enforces step 4 — see `.claude/hooks/`).
 
-**Unattended / overnight runs** follow the same loop, one bounded item per fresh session, off a durable plan
-that survives usage cutoffs — see [`ops/overnight/README.md`](ops/overnight/README.md) (L0 durable plan → L1
+**Unattended / autonomous runs** follow the same loop, one bounded item per fresh session, off a durable plan
+that survives usage cutoffs — see [`ops/autonomous/README.md`](ops/autonomous/README.md) (L0 durable plan → L1
 self-resume daemon → L2 resume prompt), with the paced review in [`REVIEW.md`](REVIEW.md). Never run such a
 session with `--dangerously-skip-permissions`; use `--permission-mode default` + a scoped allow/deny list.
 
@@ -113,7 +113,7 @@ not done until the trackers match reality:
   `KNOWN_ISSUES.md` entry — **in the same commit as the code**, not "later";
 - delete a shipped `execution-plans/` plan.
 
-`SUITE_TODO.md` is the **tracker of record.** An unattended/overnight run must **reconcile it before it
+`SUITE_TODO.md` is the **tracker of record.** An unattended/autonomous run must **reconcile it before it
 ends**; a private plan/progress file (e.g. an overnight plan) never stands in for it — sync the real
 tracker, not just your scratch notes. **The owner should never have to catch a stale checkbox** — doc-sync
 is part of the change, full stop.
@@ -134,7 +134,7 @@ this repo:
   subagents so the main thread keeps the *conclusion*, not file dumps. Don't spawn an agent (or re‑run
   a search you already delegated) for a single known‑location lookup. **Big `Workflow` fan‑outs are the
   biggest token sink** — scope them tightly, size the fleet to the remaining budget, and prefer
-  accumulating heavy multi‑agent jobs (adversarial reviews, wide audits) to run **overnight/unattended**
+  accumulating heavy multi‑agent jobs (adversarial reviews, wide audits) to run **autonomous/unattended**
   rather than firing them inline while interactive.
 - **Read narrowly.** Scoped reads, `grep`/Explore to locate, `git log -- <path>` scoped to a subdir.
   Don't load whole files, or the *other* app, when a change touches one.

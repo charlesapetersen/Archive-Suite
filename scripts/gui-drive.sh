@@ -17,7 +17,7 @@
 #
 # PERMISSIONS
 #   cliclick posts real CGEvents, so the CONTROLLING PROCESS (Terminal / the
-#   overnight daemon / whatever is running this script) MUST hold macOS
+#   autonomous daemon / whatever is running this script) MUST hold macOS
 #   Accessibility permission (System Settings > Privacy & Security >
 #   Accessibility). Without it clicks silently no-op. Screen Recording
 #   permission is required for window-scoped `screencapture -l`.
