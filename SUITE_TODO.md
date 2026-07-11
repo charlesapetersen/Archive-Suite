@@ -52,13 +52,9 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
 - ~~`decades-date-facet.md`~~ — **SHIPPED** (decade date facet). Plan deleted.
 - ~~`reader-smart-folders-scoped.md`~~ — **SHIPPED** (smart folders as scoped root). Plan deleted.
-- [ ] **`reader-gui-test-harness.md`** — reliable/repeatable **XCUITest** harness for the 5 GUI items that
-  couldn't be driven via System Events (UI-test target + `accessibilityIdentifier`s + a DEBUG-gated
-  fixture-root override that never touches the real bookmark + `scripts/make-gui-fixture.sh` + the cliclick
-  `scripts/gui-drive.sh` helper + initial tests). Code-grounded + adversarially reviewed (needs-change fixes
-  folded in: Route-B read-**write** entitlement, per-row cell IDs, poll the async TagWriter write, deterministic
-  index-ready signals). **Queued as the FINAL wave (Wave 7) of the current overnight run** — see
-  `.maintenance/OVERNIGHT_PLAN.md`. 5 bounded sub-tasks, one per session. Tier-1 (no production behavior change).
+- ~~`reader-gui-test-harness.md`~~ — **SHIPPED** (W7.1–W7.5). XCUITest target, accessibilityIdentifiers,
+  DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
+  viewer, preview, filter, sort, degrade). Plan deleted.
 
 ## Archive Notes — NEW APP (planned 2026-07-10; `execution-plans/archive-notes/`)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). Each wave maps to
@@ -248,9 +244,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   `urlComponentEncoded`; L2 preserve `errorCode` across the ~6 OCRResult re-creations (was `nil`); L3 formalize/
   document the seven `nonisolated(unsafe) static var` cross-task reads; L4 stop re-encoding the previous image each
   batch iteration. | files: `OCR/BatchOCR.swift`, `OCR/OCRProcessor+ReviewFlows.swift`, `OCR/OCRProcessor.swift` | S | low
-- [ ] **Reader GUI test harness (XCUITest)** _(next run: W7.1–W7.5)_ — see the `reader-gui-test-harness.md` plan
-  indexed under **Active execution plans** above; deferred from the last run at the owner's request, now the first
-  wave of the next run. Also GUI-verifies the W5 items the daemon couldn't confirm headlessly. | files: per the plan | L | med
+- [x] **Reader GUI test harness (XCUITest)** — W7.1–W7.5 shipped. XCUITest target + accessibilityIdentifiers + fixture-root override + make-gui-fixture.sh + initial test suite (12 tests: table, tag cloud, sort, filter, preview, viewer, degrade). | L | med
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**
