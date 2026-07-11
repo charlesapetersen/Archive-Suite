@@ -29,6 +29,7 @@ struct AppKitTableView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         let tableView = ContextMenuTableView()
+        tableView.setAccessibilityIdentifier("ar.table")
         tableView.style = .plain
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.allowsMultipleSelection = true
@@ -39,6 +40,7 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.usesAutomaticRowHeights = true
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
         let headerView = ColumnPickerHeaderView()
+        headerView.setAccessibilityIdentifier("ar.table.header")
         headerView.currentSort = { [weak coordinator] in coordinator?.parent.model.sort ?? LibrarySort.default }
         headerView.onSetSecondarySort = { [weak coordinator] field, ascending in
             guard let c = coordinator else { return }
@@ -395,6 +397,8 @@ struct AppKitTableView: NSViewRepresentable {
                 tagCell.editBase = nil
             }
             tagCell.tokenField.font = .systemFont(ofSize: currentFontSize)
+            // Per-row accessibility id so XCUITest can target a specific row's tag cell
+            tagCell.tokenField.setAccessibilityIdentifier("ar.cell.tags.\(file?.name ?? "")")
             return tagCell
         }
 

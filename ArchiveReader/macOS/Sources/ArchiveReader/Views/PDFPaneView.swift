@@ -51,6 +51,9 @@ final class PDFPaneController {
         guard let v = pdfView, !isApplying, v.autoScales == false else { return }
         savedScale = v.scaleFactor
         if persists { AppSettings.setViewerZoom(key, Double(v.scaleFactor)) }
+        #if DEBUG
+        v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
+        #endif
         scrollToTop()
     }
 
@@ -61,6 +64,9 @@ final class PDFPaneController {
         isApplying = true
         if let s = savedScale { v.autoScales = false; v.scaleFactor = s } else { v.autoScales = true }
         isApplying = false
+        #if DEBUG
+        v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
+        #endif
         scrollToTop()
     }
 
@@ -108,6 +114,7 @@ final class PDFPaneController {
 struct PDFPaneView: NSViewRepresentable {
     let page: PDFPage?
     let controller: PDFPaneController
+    var id: String = ""
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
@@ -124,10 +131,14 @@ struct PDFPaneView: NSViewRepresentable {
         view.autoScales = true
         view.backgroundColor = .windowBackgroundColor
         controller.pdfView = view
+        if !id.isEmpty { view.setAccessibilityIdentifier(id) }
         NotificationCenter.default.addObserver(context.coordinator,
                                                selector: #selector(Coordinator.scaleChanged(_:)),
                                                name: .PDFViewScaleChanged, object: view)
         loadPage(into: view)
+        #if DEBUG
+        view.setAccessibilityValue(String(format: "%.4f", view.scaleFactor))
+        #endif
         return view
     }
 

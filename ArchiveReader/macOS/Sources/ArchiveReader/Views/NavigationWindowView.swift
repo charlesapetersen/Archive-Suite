@@ -21,7 +21,7 @@ struct NavigationWindowView: View {
                 SidebarView(model: model)
                     .frame(width: sidebarWidth)
                     .transition(.move(edge: .leading))
-                PanelDivider(width: $sidebarWidth, panelOnLeft: true, range: 140...350)
+                PanelDivider(width: $sidebarWidth, panelOnLeft: true, range: 140...350, id: "ar.divider.sidebar")
             }
             VStack(spacing: 0) {
                 filterBar
@@ -29,7 +29,7 @@ struct NavigationWindowView: View {
                 HStack(spacing: 0) {
                     table
                     if showingTagCloud {
-                        PanelDivider(width: $tagCloudWidth, panelOnLeft: false, range: 160...400)
+                        PanelDivider(width: $tagCloudWidth, panelOnLeft: false, range: 160...400, id: "ar.divider.tagCloud")
                         tagCloudPanel
                             .transition(.move(edge: .trailing))
                     }
@@ -202,6 +202,7 @@ struct NavigationWindowView: View {
                             }
                             .buttonStyle(.plain)
                             .help("\(item.count) file\(item.count == 1 ? "" : "s") · click to \(active ? "remove" : "add") as a tag filter")
+                            .accessibilityIdentifier("ar.tagCloud.tag")
                             .contextMenu {
                                 Button(active ? "Remove from tag filter" : "Add to tag filter") {
                                     if active { model.filter.subjects.remove(item.tag) }
@@ -228,6 +229,7 @@ struct NavigationWindowView: View {
         }
         .frame(width: tagCloudWidth)
         .background(Color(nsColor: .controlBackgroundColor))
+        .accessibilityIdentifier("ar.tagCloud")
     }
 
     /// Map a tag's file-count to a font size (11…26 pt) using **logarithmic** scaling so high-count
@@ -252,6 +254,7 @@ struct NavigationWindowView: View {
             .fixedSize()
             .labelsHidden()
             .help("Filter the list by read state")
+            .accessibilityIdentifier("ar.filter.readState")
 
             HStack(spacing: 4) {
                 ForEach([10, 9, 8, 7], id: \.self) { p in
@@ -263,6 +266,7 @@ struct NavigationWindowView: View {
                     .toggleStyle(.button)
                     .controlSize(.small)
                     .help("Show only documents at priority P\(p)")
+                    .accessibilityIdentifier("ar.filter.priority.P\(p)")
                 }
             }
 
@@ -272,6 +276,7 @@ struct NavigationWindowView: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)
                 .help("Filter the list by file name")
+                .accessibilityIdentifier("ar.filter.name")
 
             HStack(spacing: 3) {
                 Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
@@ -280,12 +285,14 @@ struct NavigationWindowView: View {
                     .frame(maxWidth: 180)
                     .focused($searchFocused)
                     .help("Search the full OCR text of documents")
+                    .accessibilityIdentifier("ar.filter.ocr")
                 if model.ftsPaths != nil {
                     Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
                         Image(systemName: "xmark.circle.fill")
                     }
                     .buttonStyle(.borderless)
                     .help("Clear full-text search")
+                    .accessibilityIdentifier("ar.filter.ocrClear")
                 }
             }
 
@@ -296,6 +303,7 @@ struct NavigationWindowView: View {
                 .toggleStyle(.button)
                 .controlSize(.small)
                 .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
+                .accessibilityIdentifier("ar.filter.needsAttention")
             }
 
             Spacer()
@@ -303,8 +311,10 @@ struct NavigationWindowView: View {
             if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
                 Button("Save as Smart Folder") { model.showingSaveDialog = true }
                     .help("Save these filters as a smart folder in the sidebar")
+                    .accessibilityIdentifier("ar.filter.saveSmartFolder")
                 Button("Clear") { model.clearUserFilters() }
                     .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
+                    .accessibilityIdentifier("ar.filter.clear")
             }
         }
         .padding(8)
@@ -339,6 +349,7 @@ struct NavigationWindowView: View {
                 }
                 .pickerStyle(.segmented).fixedSize().labelsHidden()
                 .help("Match documents having all, or any, of the chosen tags")
+                .accessibilityIdentifier("ar.filter.subjectCombine")
             }
         }
     }
@@ -352,11 +363,13 @@ struct NavigationWindowView: View {
                 Label("Sidebar", systemImage: "sidebar.left")
             }
             .help("Show or hide the folder sidebar")
+            .accessibilityIdentifier("ar.toolbar.sidebar")
 
             Button {
                 model.chooseRoot()
             } label: { Label(rootLabel, systemImage: "folder") }
                 .help("Choose which archive folder to browse")
+                .accessibilityIdentifier("ar.toolbar.chooseFolder")
 
             Menu {
                 if model.savedSearches.searches.isEmpty {
@@ -376,43 +389,53 @@ struct NavigationWindowView: View {
                 Button("Save Current Search…") { newSearchName = ""; model.showingSaveDialog = true }
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")
+                .accessibilityIdentifier("ar.toolbar.saved")
 
             Button { showingTagCloud.toggle() } label: {
                 Label("Tag Cloud", systemImage: "tag.square")
             }
             .help("Show a tag cloud of the visible files — larger tags appear on more files (click to filter)")
+            .accessibilityIdentifier("ar.toolbar.tagCloud")
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .disabled(model.selection.isEmpty)
                 .help("Open the selected documents for reading (⌘O)")
+                .accessibilityIdentifier("ar.toolbar.open")
 
             Button { model.showingPreview = true } label: { Label("Preview", systemImage: "eye") }
                 .disabled(model.selection.isEmpty)
                 .help("Preview the selection 2-up without opening it (Space or ⌘Y)")
+                .accessibilityIdentifier("ar.toolbar.preview")
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
                 .disabled(model.selection.isEmpty)
                 .help("Copy links to the selected files (⌘⇧C)")
+                .accessibilityIdentifier("ar.toolbar.copyLinks")
 
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
                 .disabled(model.selection.isEmpty)
                 .help("Mark the selected documents as read (⌘R)")
+                .accessibilityIdentifier("ar.toolbar.markRead")
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
                 .disabled(model.selection.isEmpty)
                 .help("Mark the selected documents as unread (⌘U)")
+                .accessibilityIdentifier("ar.toolbar.markUnread")
 
             Button { model.showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
                 .disabled(model.selection.isEmpty)
                 .help("Edit tags for the selected documents (⌘I)")
+                .accessibilityIdentifier("ar.toolbar.editTags")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
                 .disabled(model.selection.isEmpty)
                 .help("Flag or unflag the selection — app-only, never written to the file (⌘⇧F)")
+                .accessibilityIdentifier("ar.toolbar.flag")
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .disabled(model.undoDepth == 0)
                 .help("Undo the last tag change (⌘Z)")
+                .accessibilityIdentifier("ar.toolbar.undo")
         }
     }
 
@@ -436,6 +459,7 @@ struct NavigationWindowView: View {
             Button { showingHealth = true } label: { Image(systemName: "stethoscope") }
                 .buttonStyle(.borderless)
                 .help("Library health")
+                .accessibilityIdentifier("ar.status.health")
                 .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount) }
             Spacer()
             if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
@@ -462,6 +486,7 @@ private struct PanelDivider: View {
     /// `true` when the resizable panel is to the left of this divider (sidebar).
     let panelOnLeft: Bool
     let range: ClosedRange<CGFloat>
+    var id: String = ""
 
     @State private var startWidth: CGFloat?
 
@@ -487,6 +512,7 @@ private struct PanelDivider: View {
                     }
                     .onEnded { _ in startWidth = nil }
             )
+            .accessibilityIdentifier(id)
     }
 }
 

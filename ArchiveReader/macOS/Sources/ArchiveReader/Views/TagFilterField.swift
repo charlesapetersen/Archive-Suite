@@ -24,6 +24,7 @@ struct TagFilterField: NSViewRepresentable {
         cb.action = #selector(Coordinator.commit(_:))   // fires on Return
         cb.font = .systemFont(ofSize: NSFont.systemFontSize(for: .small))
         cb.controlSize = .regular
+        cb.setAccessibilityIdentifier("ar.filter.tagField")
         return cb
     }
 

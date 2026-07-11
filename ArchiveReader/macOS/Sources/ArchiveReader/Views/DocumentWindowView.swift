@@ -51,13 +51,13 @@ struct DocumentWindowView: View {
                 HStack(spacing: 0) {
                     // `.id(index)` gives each page a fresh PDFView (DV-3: a reused view loses text
                     // selection after the document is swapped). Zoom persists via the controller.
-                    PDFPaneView(page: model.imagePage, controller: model.leftController)
+                    PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.doc.imagePane")
                         .id(model.index)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
-                        PDFPaneView(page: model.textPage, controller: model.rightController)
+                        PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.doc.textPane")
                             .id(model.index)
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
@@ -71,10 +71,12 @@ struct DocumentWindowView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .overlay(focusBorder(.right))
+                        .accessibilityIdentifier("ar.doc.textPane")
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                                description: Text("This document has a single page."))
                             .frame(maxWidth: .infinity)
+                            .accessibilityIdentifier("ar.doc.noText")
                     }
                 }
                 .coordinateSpace(name: "split")
@@ -119,6 +121,7 @@ struct DocumentWindowView: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(Color.orange.opacity(0.12))
+        .accessibilityIdentifier("ar.doc.formatBanner")
     }
 
     private var findBar: some View {
@@ -129,6 +132,7 @@ struct DocumentWindowView: View {
                 .frame(maxWidth: 260)
                 .focused($findFocused)
                 .onSubmit { model.find(findText) }
+                .accessibilityIdentifier("ar.doc.findField")
             Button("Find") { model.find(findText) }
             Button("Done") { model.showingFind = false; findText = "" }
             Spacer()

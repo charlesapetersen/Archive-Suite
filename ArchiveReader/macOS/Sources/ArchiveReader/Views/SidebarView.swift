@@ -31,6 +31,7 @@ struct SidebarView: View {
                     row(name: s.name, systemImage: "folder.badge.gearshape",
                         count: s.fullTextQuery.isEmpty ? model.smartFolderCounts[s.id] : nil)
                         .tag(SidebarView.smartPrefix + s.id.uuidString)
+                        .accessibilityIdentifier("ar.sidebar.smart")
                         .contextMenu {
                             Button("Rename…") { model.renamingSearch = s }
                             Button("Delete", role: .destructive) { model.savedSearches.delete(s.id) }
@@ -50,11 +51,13 @@ struct SidebarView: View {
             Section("Folders") {
                 row(name: "All Files", systemImage: "tray.full", count: model.folderTree?.fileCount)
                     .tag(SidebarView.allFilesTag)
+                    .accessibilityIdentifier("ar.sidebar.allFiles")
                 if let root = model.folderTree {
                     OutlineGroup(root.children, children: \.childrenOrNil) { node in
                         row(name: node.name, systemImage: "folder", count: node.fileCount)
                             .tag(node.path)
                             .help(node.path)
+                            .accessibilityIdentifier("ar.sidebar.folder")
                     }
                 }
             }

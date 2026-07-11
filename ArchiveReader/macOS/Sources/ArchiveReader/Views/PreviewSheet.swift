@@ -62,9 +62,11 @@ struct PreviewSheet: View {
             Button("Open") { onOpenFull() }
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Open in the full document window (⌘O)")
+                .accessibilityIdentifier("ar.preview.open")
             Button("Done") { dismiss() }
                 .keyboardShortcut(.cancelAction)   // Esc
                 .help("Close preview (Esc or Space)")
+                .accessibilityIdentifier("ar.preview.done")
         }
         .padding(10)
     }
@@ -75,11 +77,11 @@ struct PreviewSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             HStack(spacing: 0) {
-                PDFPaneView(page: model.imagePage, controller: model.leftController)
+                PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane")
                     .frame(maxWidth: .infinity)
                 Divider()
                 if model.hasTextPage {
-                    PDFPaneView(page: model.textPage, controller: model.rightController)
+                    PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.preview.textPane")
                         .frame(maxWidth: .infinity)
                 } else if let text = model.embeddedText {
                     ScrollView {
@@ -90,10 +92,12 @@ struct PreviewSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("ar.preview.textPane")
                 } else {
                     ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                            description: Text("This document has a single page."))
                         .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("ar.preview.noText")
                 }
             }
         }
