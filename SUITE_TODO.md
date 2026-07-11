@@ -65,9 +65,15 @@ Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-over
 one or more bounded overnight sessions (sub-tasks listed inside each wave file). DevonThink informs **only**
 the 3-pane browsing shell — everything else (note appearance, link/provenance UI, replication semantics) is
 purpose-built for the historian's provenance-first workflow. **Owner decision points (early):** (a) **R13d** —
-the `ArchiveSuite` *exclusion* effect is deferred to the convergence wave (see `00 §2` call-out); (b) **ArchiveCore
-scoping** — Notes depends on a read-side ArchiveCore now; Reader/Processor converge later (`00 §10`).
-- [ ] **W1** scaffold + ArchiveCore (read-side) + app skeleton — `01-scaffolding-and-core.md` — Tier-2 (SPEC/scaffold)
+the `ArchiveSuite` *exclusion* effect is deferred to the later behavior/data follow-on (see `00 §2` call-out).
+**Confirmed (owner):** the FULL **ArchiveCore extraction + Reader/Processor migration is W0 — done FIRST** (`00a`),
+before any Notes-specific work.
+- [ ] **W0** **ArchiveCore extraction + Reader/Processor migration (FIRST)** — create `packages/ArchiveCore`, move
+  the shared tag/PDF/date contract (facet parser + `sortDate` + read + the audited **write** path + Processor
+  vocabulary/formatting + `PDFTextExtractor`/`PDFFormatStatus` + new `RootMarker`/`DurableLink` + `ArchiveSuite`
+  recognition) out of both shipping apps and migrate them onto it; behavior-preserving, parity-gated, one audited
+  write seam; adds the SPEC delta — `00a-archivecore-refactor.md` — **Tier-2** (TagWriter + both apps + SPEC)
+- [ ] **W1** scaffold + app skeleton **depending on the W0 ArchiveCore** — `01-scaffolding-and-core.md` — Tier-2 (scaffold)
 - [ ] **W2** store + front-matter I/O + virtual folders/replication + FTS5 index — `02-storage-model-and-index.md` — Tier-2 (writers)
 - [ ] **W3** rich-text/Markdown editor (WYSIWYG + raw toggle, inline images) — `03-rich-text-markdown-editor.md` — Tier-1
 - [ ] **W4** source blocks + page thumbnails + Reader URL scheme/reveal + durable links — `04-sources-and-cross-app-linking.md` — Tier-2 (Reader deep-link)
@@ -75,7 +81,7 @@ scoping** — Notes depends on a read-side ArchiveCore now; Reader/Processor con
 - [ ] **W6** viewers + search/filter/sort + replication UI + templates + dates/quality — `06-viewers-search-replication.md` — Tier-2 (delete path)
 - [ ] **W7** extracts (snapshot + provenance, blocks→notes, jump-to-source) — `07-extracts.md` — Tier-1
 - [ ] **W8** tests + XCUITest/cliclick GUI harness (scratch corpus) — `08-testing-and-gui-verification.md` — Tier-1
-- [ ] **(later)** convergence: Reader/Processor onto ArchiveCore; Reader parses/hides `ArchiveSuite`; corpus back-fill + Processor stamping; unified storage path — Tier-2, separately gated
+- [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**; unified suite storage path — Tier-2, separately gated
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no

@@ -4,6 +4,14 @@
 > ⚠️ **Canonical shared types & cross-wave APIs are defined in `00-overview.md` §16 (Interface Contract).** Where a sketch in this file differs — store type/name (`actor NoteStore` + `@MainActor NotesModel`/`OrganizationStore`), `DurableLink`/`RootMarker`, the single `NotesFilter` type, template-assignments-only, the index `items` projection, the `archivenotes://open?id=` grammar — **the overview is authoritative.**
 
 
+> 🔄 **SUPERSEDED IN PART BY W0 (`00a-archivecore-refactor.md`).** The owner moved the **full ArchiveCore
+> extraction + Reader/Processor migration** into **W0, done FIRST**. So `packages/ArchiveCore/` **already exists
+> and is battle-tested** before W1 starts, and the `ArchiveSuite` marker recognition + the `SPEC/tag-format.md`
+> delta land in **W0**, not here. W1 therefore reduces to: add the `ArchiveNotes/` app + scaffold + 3-pane
+> skeleton that **depends on the existing ArchiveCore**, plus the root-dispatcher/DMG/docs wiring for the new
+> app. Wherever this file below describes *creating/seeding* ArchiveCore or *editing the SPEC*, that is **W0's
+> job** — kept here as reference for what the Notes app consumes. **W1 now depends on W0.**
+
 ## Goal
 Stand up `ArchiveNotes/` as a clean third macOS app in the monorepo — mirroring the Reader's structure, XcodeGen conventions, launch/bootstrap/test-smoke scripts, root dispatcher arms, and combined-DMG packaging — and create the repo's first Swift package, `packages/ArchiveCore/` (read-side only, per 00-overview §10), seeded byte-for-byte from Reader's tested `DocumentTags`/`PDFTextExtractor` plus net-new `RootMarker`/`DurableLink`/`SuiteMarker` types. The deliverable is a buildable, launchable app skeleton: an empty 3-pane shell (Notes window + Extracts window + Settings) that links against `ArchiveCore`, builds with no new warnings, and opens via `./launch.sh notes`. No storage, editor, index, linking, or Zotero yet — those are W2–W7. This wave also lands the additive `ArchiveSuite` membership marker into `SPEC/tag-format.md` (Tier-2 coordinated change, no corpus back-fill per D4).
 

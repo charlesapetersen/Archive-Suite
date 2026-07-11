@@ -333,26 +333,35 @@ literally named `ArchiveSuite`).
 
 Adding a *third* consumer of the tag/PDF/date contract is exactly the forcing function the Suite has been
 deferring (`SPEC/tag-format.md` L208-209; `ArchiveProcessor/POTENTIAL_FEATURES.md`). A third hand-rolled
-parser is the specific silent-divergence risk the SPEC warns about. **Decision for run 1 (conservative):**
+parser is the specific silent-divergence risk the SPEC warns about. **Decision (owner-confirmed 2026-07-10):
+do the FULL ArchiveCore extraction and migrate all three apps — and do it FIRST, as Wave 0, before any
+Notes-specific work.** Detailed in `00a-archivecore-refactor.md`.
 
-- Introduce a **`ArchiveCore` Swift package** (in the repo, `packages/ArchiveCore/` or `ArchiveCore/`) seeded
-  **from Reader's existing, tested** code, containing only the **pure, UI-free, read-side** contract:
-  the tag vocabulary constants + facet model + parser (`DocumentTags`), `sortDate`, `PDFTextExtractor`, the
-  new `RootMarker`/durable-link types, and the `ArchiveSuite` marker recognition. Ships with the current
-  Reader tests moved/copied in.
-- **Archive Notes depends on ArchiveCore** for parsing/sorting/extraction/link-resolution.
-- **Reader & Processor are NOT migrated onto ArchiveCore in run 1** (that refactor touches the two shipping
-  apps' build + is higher risk than an overnight run should absorb). ArchiveCore is *the* single source; the
-  two apps keep their current copies until a **separately-gated convergence wave** adopts the package. Until
-  then, drift is bounded by (a) ArchiveCore being a byte-for-byte seed of Reader's parser, (b) shared tests,
-  (c) the SPEC as contract.
-- **`TagWriter` (the write path) is NOT shared or refactored in run 1.** It is the crown-jewel safety code;
-  Notes gets its own narrow, independently-audited `NotesTagProjector` (§9). Unifying the writer into
-  ArchiveCore is a later, adversarially-reviewed item.
+- Introduce a **`ArchiveCore` Swift package** (`packages/ArchiveCore/`) seeded **from Reader's & Processor's
+  existing, tested** code, containing the **UI-free** shared contract: the tag vocabulary + facet model +
+  parser (`DocumentTags`, `sortDate`, `isDateFacetLike`, `ArchiveColor`), the tag **read + write** path
+  (`TagReading`, `TagWriter`, `TagEditing` — the audited choke-point with all seven invariants),
+  `PDFTextExtractor` + `PDFFormatStatus`, the Processor's tag **vocabulary/formatting** (title-casing, month/
+  day/decade token builders, `GeneratedTags` emit order), and the new `RootMarker`/`DurableLink` types +
+  `ArchiveSuite` marker recognition.
+- **Reader and Processor migrate ONTO ArchiveCore in W0**, deleting their now-duplicated copies. This is a
+  **behavior-preserving refactor** — parity (identical build + green tests + green smokes) is the acceptance
+  bar, not new behavior. Staged so every sub-task leaves *all* apps building + green.
+- **Both apps write tags through ONE audited seam.** ArchiveCore owns the coordinated metadata-only write
+  primitive (NSFileCoordinator + trustworthy-read guard + lossless delta + verify-by-re-read); Reader's
+  delta-mutate and Processor's fresh-write are thin adapters over it. Archive Notes' `NotesTagProjector` (§9)
+  is a third thin adapter over the same primitive — so there is exactly one place that can ever touch
+  irreplaceable tag metadata.
+- **Archive Notes (W1+) then depends on the already-built, battle-tested ArchiveCore** — no third parser,
+  no third writer.
+- **Tier-2 throughout** (touches `TagWriter` + both shipping apps + the shared SPEC). W0's write-path moves
+  (S3/S4 in `00a`) get adversarial review + scratch-corpus functional tests. See `00a` for the full staging,
+  rollback, and parity strategy.
 
-> **Owner decision point:** accept this conservative scoping (Notes-on-ArchiveCore, Reader/Processor
-> converge later) vs. a bigger "extract ArchiveCore and migrate all three now" refactor. The plan assumes
-> the conservative path; the convergence wave is pre-written in §13 so it can be promoted whenever desired.
+> Still deferred to the *later* convergence follow-on (NOT part of W0): teaching Reader to parse/**hide** the
+> `ArchiveSuite` marker in its UI, the corpus **back-fill**, Processor **stamping** `ArchiveSuite` on new
+> output, and the unified suite-wide storage path (§2, §15). W0 unifies the *code*; those items change
+> *behavior/data* and stay their own gated steps.
 
 ---
 
@@ -397,7 +406,8 @@ respects dependencies. "GUI" = drive the app to verify; "Tier" per §12.
 
 | Wave | Plan | Goal | Depends on | Tier |
 |------|------|------|-----------|------|
-| **W1** | `01` | Third-app scaffold (`ArchiveNotes/`, project.yml, entitlements, launch/bootstrap/test-smoke, root dispatcher, DMG entry, AGENTS/CLAUDE), **ArchiveCore** package seeded from Reader (read-side), app skeleton + empty 3-pane shell that builds & launches | — | Tier-2 (SPEC/scaffold) |
+| **W0** | `00a` | **ArchiveCore extraction + suite-wide migration — DONE FIRST.** Create `packages/ArchiveCore`; move the shared tag/PDF/date contract (facet parser + `sortDate` + read + the audited **write** path + Processor vocabulary/formatting + `PDFTextExtractor`/`PDFFormatStatus` + new `RootMarker`/`DurableLink` + `ArchiveSuite` recognition) out of Reader & Processor; migrate **both shipping apps** onto it. Behavior-preserving, parity-gated, one audited write seam. | — | **Tier-2** (TagWriter + both shipping apps + SPEC) |
+| **W1** | `01` | Third-app scaffold (`ArchiveNotes/`, project.yml, entitlements, launch/bootstrap/test-smoke, root dispatcher, DMG entry, AGENTS/CLAUDE), app skeleton + empty 3-pane shell that builds & launches, **depending on the W0 ArchiveCore** | W0 | Tier-2 (scaffold) |
 | **W2** | `02` | Note/extract **store** (UUID folders, front-matter I/O, atomic saves, `NotesTagProjector`), **virtual folders + replication** model + `organization.json`, **SQLite FTS5 index** + incremental build | W1 | Tier-2 (writers) |
 | **W3** | `03` | **Rich-text/Markdown editor** (NSTextView/TextKit, attributed↔Markdown bridge, formatting toolbar, inline images + paste, raw-Markdown toggle, block rendering) | W1 (W2 for persistence) | Tier-1 |
 | **W4** | `04` | **Source blocks + cross-app linking**: page-thumbnail render+cache; Reader URL scheme + router + `revealAndSelect`; **Copy Archive Link(s)** + pasteboard payload; Notes paste-to-blocks; `archivenotes://` scheme; durable-link resolution | W1, W2 | Tier-2 (Reader deep-link) |
@@ -405,7 +415,7 @@ respects dependencies. "GUI" = drive the app to verify; "Tier" per §12.
 | **W6** | `06` | **Viewers**: note & extract 3-pane windows, folder-tree sidebar (mutable), item list, search+filter(kind/tag/keyword)+date-sort, replication UI + delete-last-instance guard, templates (folder-assigned), dates & quality UI | W2, W3 | Tier-2 (delete path) |
 | **W7** | `07` | **Extracts**: Create-Extract (snapshot+provenance), extract blocks→notes, jump-to-source, extract-viewer featuring | W2, W3, W6 | Tier-1 |
 | **W8** | `08` | **Tests & GUI verification**: unit suites (front-matter, md-bridge, projector safety, index, folders/replication, links), XCUITest+cliclick GUI harness, smoke gate, end-to-end scratch-corpus run | W1–W7 | Tier-1 |
-| **(later)** | — | **Convergence**: migrate Reader/Processor onto ArchiveCore; teach Reader to parse/hide `ArchiveSuite`; corpus back-fill + Processor stamping; unified storage path | W1–W8 | Tier-2, separately gated |
+| **(later)** | — | **Behavior/data follow-ons** (NOT W0, which unifies only the *code*): teach Reader to parse/**hide** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**; unified suite storage path | W0–W8 | Tier-2, separately gated |
 
 Estimated bounded sub-tasks per wave are enumerated in each plan file; expect ~3–6 sessions per wave.
 
@@ -425,7 +435,9 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
 
 1. **Unified storage path** for Processor+Reader+Notes (the owner's "move to a new computer easily" goal) —
    design a suite-level default root + a migration that re-keys Reader's path-keyed index/NotesStore.
-2. **ArchiveCore convergence** timing (Reader/Processor adoption; `TagWriter` unification).
+2. **ArchiveCore write-path shape** — W0 (`00a`) puts one audited coordinated-write primitive in ArchiveCore
+   with thin per-app adapters (Reader delta-mutate, Processor fresh-write, Notes projector); revisit only if
+   a fuller single unified-writer API is later wanted.
 3. Whether Notes and Reader should ever share **one window / unified view** (currently separate apps).
 4. Mirroring **date/quality** into Finder tags if cross-app chronological filtering of notes is wanted.
 5. Zotero: write-back (creating Zotero items from Notes) — read-only for now.
