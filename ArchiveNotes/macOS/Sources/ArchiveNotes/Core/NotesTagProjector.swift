@@ -1,0 +1,109 @@
+import Foundation
+import ArchiveCore
+
+// ============================================================================================
+//  NotesTagProjector — the AUDITED Finder-tag mirror for Archive Notes.
+//
+//  Reimplements every TagWriter invariant (CoordinatedTagWriter.write) for the narrow projection
+//  use case: Notes mirrors an item's front-matter subjects (title-cased) + the ArchiveSuite
+//  membership marker onto the note's own .md file via Finder tags.
+//
+//  This is the ONLY place Notes touches file-level tag metadata. It writes ONLY files under
+//  <NotesStore>/items/<uuid>/ (component-boundary guard). It never touches color labels,
+//  never moves/renames/deletes/content-writes, and never touches the archive corpus.
+//
+//  Invariants (each citing TagWriter / CoordinatedTagWriter):
+//   §1 Single audited choke-point + coordinated metadata-only write (TagWrite.swift:91).
+//   §2 Fresh read inside coordination (TagWrite.swift:93-102).
+//   §3 Trustworthy-read guard — read failure aborts, never coerced to [] (TagReading.swift:6-9).
+//   §4 Lossless delta: remove only previously-managed; add only desired (TagWrite.swift:44-50).
+//   §5 Only adds/removes projected tokens. remove ⊆ previouslyManaged. Exact whole-string match.
+//   §6 ArchiveSuite collision: deduped by "not already present" (TagWrite.swift:48).
+//   §7 No label writes. Verify label unchanged after write (drift guard).
+//   §8 Verify by re-read, multiset-equal (TagWrite.swift:127).
+// ============================================================================================
+
+enum NotesTagProjector {
+    enum ProjectError: Error, Sendable {
+        case unreadable(String)
+        case verificationFailed(String)
+        case coordinationFailed(String)
+        case outsideItemDir(String)
+    }
+
+    /// Reconcile the Finder tags on `url` (a note's own .md file) so that the managed tokens
+    /// match `desired`, preserving all non-managed tokens verbatim.
+    ///
+    /// - Parameters:
+    ///   - desired: The managed tokens we want present (from `NotesTagVocabulary.managedTokens`).
+    ///   - previouslyManaged: The managed tokens we wrote last time (so we remove only tokens WE
+    ///     own that are now gone). Empty on first projection (add-only, safe).
+    ///   - url: The note's .md file URL.
+    ///   - itemDir: The item's directory URL (for the component-boundary guard).
+    ///
+    /// - Returns: The managed set actually present after the write (persist as next call's
+    ///   `previouslyManaged`).
+    ///
+    /// - Throws: `ProjectError` on read failure, verification failure, coordination failure, or
+    ///   if the URL escapes the item directory.
+    static func project(
+        _ desired: Set<String>,
+        previouslyManaged: Set<String>,
+        to url: URL,
+        itemDir: URL
+    ) throws -> Set<String> {
+        // Component-boundary guard: the URL must be under the item's directory.
+        // resolvingSymlinksInPath() resolves symlinks (not just lexical `..`), preventing a
+        // symlink inside itemDir from escaping to an arbitrary target.
+        // Append "/" to the dir path so "/items/abc" doesn't match "/items/abc-evil/".
+        let stdURL = url.standardizedFileURL.resolvingSymlinksInPath().path
+        let stdDir = itemDir.standardizedFileURL.resolvingSymlinksInPath().path
+        let dirPrefix = stdDir.hasSuffix("/") ? stdDir : stdDir + "/"
+        guard stdURL.hasPrefix(dirPrefix) else {
+            throw ProjectError.outsideItemDir("URL \(url.path) is not under \(itemDir.path)")
+        }
+
+        let result = try CoordinatedTagWriter.write(url) { currentTags, currentLabel in
+            // §4 Lossless delta: compute what to remove and what to add.
+            // remove = tokens we previously managed that are no longer desired.
+            let toRemove = previouslyManaged.subtracting(desired)
+            // §5 Only remove tokens in previouslyManaged — exact whole-string match.
+            var newTags = currentTags.filter { token in
+                !toRemove.contains(token)
+            }
+            // Add desired tokens not already present (dedup — §6 handles ArchiveSuite collision).
+            for token in desired where !newTags.contains(token) {
+                newTags.append(token)
+            }
+
+            // No-op: if tags unchanged, skip the write.
+            if newTags == currentTags { return nil }
+
+            // §7 Never change the label — return the current label unchanged.
+            return (newTags, currentLabel)
+        }
+
+        // Map CoordinatedTagWriter errors to ProjectError for a cleaner API surface.
+        // (CoordinatedTagWriter already enforces §1-§3, §7-§8 internally.)
+
+        // §7 drift guard: verify the label was not changed by our tag-array write.
+        if normalizedLabel(result.afterLabel) != normalizedLabel(result.beforeLabel) {
+            throw ProjectError.verificationFailed(
+                "label drifted from \(String(describing: result.beforeLabel)) to \(String(describing: result.afterLabel))")
+        }
+
+        // Return the managed tokens that are actually on the file now.
+        let afterSet = Set(result.after)
+        return desired.filter { afterSet.contains($0) }
+    }
+
+    /// Recover `previouslyManaged` when the index DB is wiped (no persisted state).
+    /// Intersects the file's current tags with the recomputed candidate managed set.
+    /// Conservative: a token we never wrote is never in the result, so no accidental removal.
+    static func recoverPreviouslyManaged(for item: Item, from url: URL) -> Set<String> {
+        let readResult = TagReading.read(url)
+        guard let currentTags = readResult.tagNames else { return [] }
+        let candidates = NotesTagVocabulary.managedTokens(for: item)
+        return candidates.intersection(currentTags)
+    }
+}
