@@ -233,9 +233,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   already shipped as `7aa673f` — take only the `ftsMatchExpression` change + its test). Needs its own review:
   min-length gate for 1–2-char queries (prefix goes broad), and the bm25 × prefix-expansion interaction. Add a
   `ContentIndexTests` case. | files: `Search/ContentIndex.swift`, `Tests/ArchiveReaderTests/ContentIndexTests.swift` | S | low
-- [ ] **Reader perf (deferred W6.2/W6.5)** _(next run: W8.1)_ — (a) `AppKitTableView.displayedByID` rebuilds fully
-  O(N) on every `updateNSView` → make incremental/diff-guarded; (b) `NavigationModel.tagCloud` uncached computed
-  property → cache + invalidate on library/filter change. Perf-only, no data risk. | files: `Views/AppKitTableView.swift`, `Views/NavigationModel.swift` | M | low
+- [x] **Reader perf (deferred W6.2/W6.5)** _(W8.1)_ — (a) `displayedByID` rebuild gated by `displayedGeneration` counter (skips O(N) dict rebuild on unrelated `updateNSView` calls); (b) `tagCloud` cached + invalidated in `recompute()`. 193 tests green, 0 warnings.
 - [ ] **Processor OCR throughput (deferred W6.5 — M3–M5). Tier-2** _(next run: W8.2)_ — M3 `handleOCRResult` runs
   image-decode+JPEG+PDF-write on the MainActor → `Task.detached(.utility)` like the resume path; M4
   `processBatchResults` awaits rotation+PDF serially → bounded-concurrent; M5 Anthropic batch submit holds all

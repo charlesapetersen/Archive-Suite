@@ -49,6 +49,10 @@ final class NavigationModel: ObservableObject {
     func requestFocusTagFilter() { focusTagFilterRequest &+= 1 }
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var duplicatedNames: Set<String> = []   // base names shared by ≥2 displayed rows
+    /// Monotonic counter incremented each time `displayed` is set (in `recompute()`). Lets the
+    /// AppKit table bridge skip its O(N) `displayedByID` dictionary rebuild when `updateNSView`
+    /// fires for unrelated state changes (selection, scroll, font size).
+    private(set) var displayedGeneration: Int = 0
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
@@ -345,6 +349,8 @@ final class NavigationModel: ObservableObject {
         } else {
             displayed = LibrarySort.sorted(base, by: sort)
         }
+        displayedGeneration += 1
+        _tagCloudCache = nil
         duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
@@ -499,15 +505,19 @@ final class NavigationModel: ObservableObject {
     /// subject filter — priority (P7–P10) and marker-color have their own dedicated controls.
     /// Date-facet-like tokens (year/month/day/decade) are excluded even if they were demoted to
     /// `subjects` during a facet collision — they clutter the cloud and have their own column.
+    private var _tagCloudCache: [(tag: String, count: Int)]?
     var tagCloud: [(tag: String, count: Int)] {
+        if let cached = _tagCloudCache { return cached }
         var counts: [String: Int] = [:]
         for f in displayed {
             for t in Set(f.subjects) where !DocumentTags.isDateFacetLike(t) {
                 counts[t, default: 0] += 1
             }
         }
-        return counts.map { (tag: $0.key, count: $0.value) }
+        let result = counts.map { (tag: $0.key, count: $0.value) }
             .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
+        _tagCloudCache = result
+        return result
     }
 
     // MARK: Folder tree (sidebar)

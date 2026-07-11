@@ -131,27 +131,31 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
-        coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
+        // Only rebuild the O(N) lookup dictionary + diff the snapshot when `displayed` actually changed.
+        let gen = model.displayedGeneration
+        if coordinator.lastDisplayedGeneration != gen {
+            coordinator.lastDisplayedGeneration = gen
+            coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
-        // Snapshot (incremental diff)
-        let newIDs = model.displayed.map(\.id)
-        let idsChanged = newIDs != coordinator.currentSnapshotIDs
-        if idsChanged {
-            coordinator.applySnapshot(newIDs, animated: false)
-        } else {
-            // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
-            // Exclude the row with an active tag edit to prevent editor dismissal.
-            let visRange = tableView.rows(in: tableView.visibleRect)
-            if visRange.length > 0 {
-                var rowSet = IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length))
-                if let editID = coordinator.editingItemID,
-                   let editIdx = coordinator.currentSnapshotIDs.firstIndex(of: editID) {
-                    rowSet.remove(editIdx)
-                }
-                if !rowSet.isEmpty {
-                    tableView.reloadData(
-                        forRowIndexes: rowSet,
-                        columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+            let newIDs = model.displayed.map(\.id)
+            let idsChanged = newIDs != coordinator.currentSnapshotIDs
+            if idsChanged {
+                coordinator.applySnapshot(newIDs, animated: false)
+            } else {
+                // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
+                // Exclude the row with an active tag edit to prevent editor dismissal.
+                let visRange = tableView.rows(in: tableView.visibleRect)
+                if visRange.length > 0 {
+                    var rowSet = IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length))
+                    if let editID = coordinator.editingItemID,
+                       let editIdx = coordinator.currentSnapshotIDs.firstIndex(of: editID) {
+                        rowSet.remove(editIdx)
+                    }
+                    if !rowSet.isEmpty {
+                        tableView.reloadData(
+                            forRowIndexes: rowSet,
+                            columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                    }
                 }
             }
         }
@@ -195,6 +199,7 @@ struct AppKitTableView: NSViewRepresentable {
         var isSortingFromModel = false
         var lastScrollRequest = 0
         var displayedByID: [ArchiveFile.ID: ArchiveFile] = [:]
+        var lastDisplayedGeneration: Int = -1
         var currentSnapshotIDs: [ArchiveFile.ID] = []
         var editingItemID: ArchiveFile.ID?
 
