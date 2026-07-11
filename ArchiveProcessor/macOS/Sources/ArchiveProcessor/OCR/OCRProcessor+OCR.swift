@@ -165,7 +165,7 @@ extension OCRProcessor {
             for (index, url) in files.enumerated() {
                 guard let sourceTags = try? MacOSTagger.readTags(from: url), !sourceTags.isEmpty,
                       let outputURL = outputURLMap[url] else { continue }
-                try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL)
                 jobs[index].appliedTags = sourceTags
             }
         }
@@ -825,7 +825,7 @@ extension OCRProcessor {
                 var appliedTags: [String]? = nil
                 if shouldPassTags {
                     if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
-                        try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                        _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL)
                         appliedTags = sourceTags
                     }
                 }

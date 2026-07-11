@@ -23,7 +23,7 @@ extension OCRProcessor {
             default: continue
             }
             if let outputPDF = outputURLMap[job.sourceURL] {
-                try? MacOSTagger.applyTags(tags, to: outputPDF)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
             }
         }
     }
@@ -48,7 +48,7 @@ extension OCRProcessor {
             guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
             if !tags.contains(raw) {
                 tags.append(raw)
-                try? MacOSTagger.applyTags(tags, to: outputPDF)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
             }
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
@@ -93,7 +93,7 @@ extension OCRProcessor {
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
                 guard let tags = try? MacOSTagger.readTags(from: w.pdf) else { continue }
-                try? MacOSTagger.applyTags(tags, to: w.img)
+                _ = try? MacOSTagger.applyTags(tags, to: w.img)
             }
         }.value
     }
@@ -228,7 +228,7 @@ extension OCRProcessor {
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
-                    try? MacOSTagger.applyTags(tags, to: outputPDF)
+                    _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = tags.allTags
@@ -477,7 +477,7 @@ extension OCRProcessor {
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
-                    try? MacOSTagger.applyTags(gtags, to: outputPDF)
+                    _ = try? MacOSTagger.applyTags(gtags, to: outputPDF)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = gtags.allTags
@@ -705,7 +705,7 @@ extension OCRProcessor {
         }
         for sourceURL in segment.pdfURLs {
             if let outputPDF = outputURLMap[sourceURL] {
-                try? MacOSTagger.applyTags(tags, to: outputPDF)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
             }
             if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                 jobs[jobIndex].appliedTags = tags.allTags
@@ -813,7 +813,7 @@ extension OCRProcessor {
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
                     let color: String? = tagged.classification == .boxLabel ? "Red" :
                                          tagged.classification == .folderLabel ? "Purple" : nil
-                    try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
+                    _ = try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
                                                appColor: color, colorIsAuthoritative: true)
                 }
 

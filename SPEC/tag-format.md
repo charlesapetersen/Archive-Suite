@@ -205,5 +205,8 @@ The shared contract is the single biggest risk in the Suite. Therefore:
 - **Treat as Tier-2 (adversarial review + tests on scratch copies).** Both apps class tag/PDF write
   code as high-blast-radius: multi-agent adversarial review plus targeted tests. **Never test tag
   writes against the real corpus — always a scratch copy.**
-- When Archive Suite extracts the shared `ArchiveCore` package, Processor's `MacOSTagger` and Reader's
-  `TagWriter` reconcile into one audited writer and this file becomes that package's contract doc.
+- **Shared write primitive (DONE).** Both apps now write tags through
+  `ArchiveCore.CoordinatedTagWriter.write` — a single audited choke-point with coordinated access,
+  trustworthy-read guard, verify-by-re-read, and inverse-delta derivation. Processor's `MacOSTagger`
+  and Reader's `TagWriter` are thin adapters that translate app-specific semantics (fresh-write vs
+  delta-apply) into transform closures over the shared primitive. This spec is that package's contract.

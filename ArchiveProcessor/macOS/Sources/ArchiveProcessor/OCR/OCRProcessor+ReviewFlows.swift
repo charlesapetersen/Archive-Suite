@@ -180,7 +180,7 @@ extension OCRProcessor {
                     } else if newClassification == .folderLabel {
                         if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
                     }
-                    try? MacOSTagger.applyTags(existingTags, to: outputURL)
+                    _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
                     jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
@@ -324,7 +324,7 @@ extension OCRProcessor {
             } else if newClassification == .folderLabel {
                 if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
             }
-            try? MacOSTagger.applyTags(existingTags, to: outputURL)
+            _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
             jobs[index].appliedTags = existingTags
         }
     }
@@ -395,7 +395,7 @@ extension OCRProcessor {
                 // tags were applied during OCR and nothing re-applies them later, so restore them now.
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
                 if passSourceTags {
-                    try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL)
+                    _ = try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL)
                 }
             }
         }
@@ -600,7 +600,7 @@ extension OCRProcessor {
                 default:
                     break
                 }
-                try? MacOSTagger.applyTags(existingTags, to: outputURL)
+                _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
                 jobs[item.fileIndex].appliedTags = existingTags
             }
 

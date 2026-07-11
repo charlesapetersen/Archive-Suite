@@ -610,14 +610,14 @@ final class LiveCaptureProcessor: ObservableObject {
             guard fm.fileExists(atPath: stagedPDF.path) else { continue }
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
-            try? MacOSTagger.applyTags(tagList, to: stagedPDF)
+            _ = try? MacOSTagger.applyTags(tagList, to: stagedPDF)
             pdfURLs.append(stagedPDF)
 
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
-                    try? MacOSTagger.applyTags(tagList, to: stagedImg)
+                    _ = try? MacOSTagger.applyTags(tagList, to: stagedImg)
                     imageURLs.append(stagedImg)
                 }
             }
@@ -643,7 +643,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
                 var tagList = baseTags
                 if let pr = pages.first?.priority, !tagList.contains(pr) { tagList.append(pr) }
-                try? MacOSTagger.applyTags(tagList, to: mergedURL)
+                _ = try? MacOSTagger.applyTags(tagList, to: mergedURL)
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
             } catch { /* keep the individual PDFs if merge fails */ }

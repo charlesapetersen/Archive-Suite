@@ -533,7 +533,7 @@ extension OCRProcessor {
                     outputURLMap[r.sourceURL] = r.outputURL
                     if passSourceTags {
                         if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
-                            try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
+                            _ = try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
                             jobs[r.index].appliedTags = sourceTags
                         }
                     }
