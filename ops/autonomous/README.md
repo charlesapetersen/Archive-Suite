@@ -141,3 +141,33 @@ blast radius. Treat every change to them like a Tier-2 code change:
 - **Parity for renames/moves:** re-grep for stragglers AND confirm the daemon still arms, finds its plan, and
   launches a session.
 - Never install a daemon change straight onto a running run without the above.
+
+## Housekeeping — automatic worktree/branch GC (added 2026-07-11)
+
+Each session mints a `wt/autonomous-<stamp>` worktree + branch. Clean ones the session self-removes (resume
+prompt STEP 5), but dirty/interrupted ones — and **all** the merged branch refs — used to pile up (91 stray
+`wt/*` branches accrued before the first sweep). The daemon now GCs its own leftovers itself: `housekeeping()`
+runs in the loop **between sessions** and, for the `wt/autonomous*` namespace only:
+
+- removes a worktree whose branch is an **ancestor of `origin/main`** (work provably pushed) — with a **plain
+  `git worktree remove`, never `--force`**;
+- deletes merged `wt/autonomous*` branches (safe: `-D` is gated by the ancestor check, and git refuses to
+  delete a branch still checked out).
+
+**Why no `--force` (Tier-2 adversarial review, 2026-07-11).** A 3-lens review of the first draft (which *did*
+use `--force`) found a **high-severity** hole: the `wt/autonomous*` glob also matches a *maintainer's* worktree
+if they slug daemon-maintenance work `autonomous-…`, and `--force` would then delete their **uncommitted** work
+(the ancestor gate is satisfied by any freshly-branched worktree). Same class of bug for a watchdog-killed
+session's unpushed edits, and for a live build/bg grandchild still writing a merged worktree (`merged ≠ idle`).
+Dropping `--force` makes git itself refuse any dirty/in-use worktree, so housekeeping is **structurally unable
+to destroy unpushed or in-progress work** — it skips those and logs `left N merged-but-dirty/in-use
+worktree(s) for manual review`. Proven on a 13-assertion scratch matrix (incl. a dirty `wt/autonomous-hkfix`
+human worktree → kept, work intact). Purely local (no `git fetch`; the session's push already advanced the
+shared `origin/main` ref) so it can't hang the loop; never touches the primary checkout.
+
+- **Reserved namespace:** `wt/autonomous*` belongs to the daemon. When *you* work on the daemon, slug the
+  worktree something else (e.g. `wt/daemon-fix-…`, `wt/hk-…`) so a clean one can't be GC'd out from under you.
+- **Known follow-ups (pre-existing, not this change):** the parent's `trap 'exit 0' TERM INT` doesn't kill the
+  backgrounded child, and the watchdog kills only claude's pid (not its process group), so a killed session can
+  orphan grandchildren. Harmless to housekeeping now (it won't remove their dirty/in-use worktree), but worth a
+  process-group fix later.

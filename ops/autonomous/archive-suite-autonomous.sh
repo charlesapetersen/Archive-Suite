@@ -54,6 +54,53 @@ DENY=(
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
 
+# Housekeeping — GC the daemon's OWN spent worktrees + branches so they don't pile up for the owner.
+# Runs in the daemon loop BETWEEN sessions. SAFETY is structural, in layers (this survived an adversarial
+# Tier-2 review — see ops/autonomous/README.md "housekeeping"):
+#   * NO --force, EVER. Plain `git worktree remove` makes git itself REFUSE any worktree with uncommitted or
+#     untracked content. So housekeeping CANNOT destroy unpushed/in-progress work — not a maintainer's, not a
+#     watchdog-killed session's, not a live build's. A dirty/in-use worktree is SKIPPED and logged; it does
+#     NOT treat "merged" as "safe to blow away". (This is why the review's data-loss + race findings don't
+#     bite: the dangerous cases are all dirty or in-use, and git refuses to remove those.)
+#   * MERGED-ONLY: only touch a wt/ ref whose tip is an ANCESTOR of origin/main — its commits are provably
+#     pushed, so branch -D drops nothing reachable and worktree removal loses no committed work.
+#   * SCOPE: only the "wt/autonomous*" namespace the daemon's sessions use (resume prompt STEP 3). A human's
+#     differently-slugged worktree is never even considered.
+#   * PURELY LOCAL: no `git fetch` (the session's `push … HEAD:main` already advanced the shared
+#     refs/remotes/origin/main the primary checkout sees) — so this can never hang the loop on a dead network.
+#   * NEVER the primary checkout ($REPO); every step best-effort (|| true / 2>/dev/null) — no `set -e`, so a
+#     failing git call can't abort the daemon loop.
+housekeeping() {
+  cd "$REPO" 2>/dev/null || return 0
+  git rev-parse --verify --quiet origin/main >/dev/null 2>&1 || return 0   # no ref yet -> nothing to compare
+  git worktree prune 2>/dev/null || true                                   # drop admin entries for gone dirs
+  local dir ref br removed=0 skipped=0 delbr=0
+  # Phase 1: remove SPENT worktrees with a PLAIN remove (never --force) — git refuses if there is any
+  # uncommitted/untracked content, which is exactly the safety we want. Must precede branch deletion (git
+  # won't delete a branch still checked out in a worktree).
+  while IFS=$'\t' read -r dir ref; do
+    [ -n "$dir" ] || continue
+    [ "$dir" = "$REPO" ] && continue                                       # never the primary checkout
+    case "$ref" in refs/heads/wt/autonomous*) ;; *) continue ;; esac       # only the daemon's own namespace
+    git merge-base --is-ancestor "$ref" origin/main 2>/dev/null || continue # only provably-pushed work
+    if git worktree remove "$dir" 2>/dev/null; then removed=$((removed+1)); else skipped=$((skipped+1)); fi
+  done < <(git worktree list --porcelain \
+             | awk '/^worktree /{w=substr($0,10)} /^branch /{print w"\t"substr($0,8)}')
+  git worktree prune 2>/dev/null || true
+  # Phase 2: delete merged wt/autonomous branches. Safe: no working tree involved, git refuses to delete a
+  # branch still checked out anywhere (so a dirty worktree skipped above keeps its branch), and the ancestor
+  # gate means -D drops no unpushed commit (plain -d would refuse these because local main lags origin/main).
+  while read -r br; do
+    [ -n "$br" ] || continue
+    case "$br" in wt/autonomous*) ;; *) continue ;; esac
+    git merge-base --is-ancestor "$br" origin/main 2>/dev/null || continue
+    git branch -D "$br" 2>/dev/null && delbr=$((delbr+1))
+  done < <(git for-each-ref --format='%(refname:short)' refs/heads/wt/ 2>/dev/null)
+  [ $((removed + delbr)) -gt 0 ] && log "housekeeping: GC'd $removed spent worktree(s), $delbr merged branch(es)"
+  [ "$skipped" -gt 0 ] && log "housekeeping: left $skipped merged-but-dirty/in-use worktree(s) for manual review"
+  return 0
+}
+
 # SECURITY REMINDER (owner: TOP PRIORITY) — on ANY daemon exit, if the taskport debugger authorization is
 # still password-free ('allow'), loudly remind the owner to REVERT it: daemon.log + a visible Desktop file +
 # a macOS notification (best-effort). Fires once; no-op once taskport is back to authenticate-user.
@@ -134,6 +181,7 @@ tick() {
 
   kill "$hb" 2>/dev/null || true
   rm -f "$LOCK" 2>/dev/null || true
+  housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
   return 0
 }
 
