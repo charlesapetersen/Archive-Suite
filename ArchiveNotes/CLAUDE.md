@@ -39,6 +39,10 @@ macOS/Sources/ArchiveNotes/
     NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
+  Index/
+    NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection)
+    NotesIndex.swift               actor — FTS5 + items table + org tables (folders/memberships/templates)
+    NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
   Core/
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
@@ -56,6 +60,9 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed
+  NotesIndexTests.swift            10 tests: bm25 title>tags>authors>body ordering, sanitizer safety,
+                                   incremental mtime-skip, prune deleteItems, WAL checkpoint,
+                                   searchReturnsItemIDs, summaryRoundTrip, org tables exist
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
