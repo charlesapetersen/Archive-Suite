@@ -17,6 +17,8 @@ import com.archiveprocessor.capture.net.MacClient
 import com.archiveprocessor.capture.net.SegmentTransport
 import com.archiveprocessor.capture.net.MacEndpoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,6 +48,8 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var statusMessage by mutableStateOf("")
         private set
+    var isClearing by mutableStateOf(false)
+        private set
 
     /** The just-finished document segment awaiting the tag sheet (null = no sheet). */
     var pendingTagGroupId by mutableStateOf<String?>(null)
@@ -67,6 +71,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     private var seqCounter = 0
     private var nextId = 1L
+    private var sessionGeneration = 0L
+
+    /** CaptureScreen snapshots this before asking CameraX to write. Clear invalidates all prior tokens. */
+    fun beginCaptureToken(): Long? = captureStartToken(sessionGeneration, isClearing)
+    fun isCaptureTokenCurrent(token: Long): Boolean =
+        captureTokenIsCurrent(token, sessionGeneration, isClearing)
 
     /** Document segments the operator has ended (End segment → Apply/Skip) whose segment-complete signal
      *  the Mac hasn't acked yet, with the tags to send. PERSISTED so an app-kill between End segment and
@@ -79,6 +89,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Group ids whose completion signal is being sent right now, so the auto-retry loop, the
      *  upload-success hook, and resume can't fire the same one concurrently. */
     private val inFlightSegments = mutableSetOf<String>()
+    private val segmentJobs = mutableMapOf<String, Job>()
 
     private fun newGroupId() = "g" + UUID.randomUUID().toString().take(8)
 
@@ -88,7 +99,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  serialize + write on IO so the UI never blocks on disk during capture/upload bursts. */
     private data class SaveSnapshot(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val group: String,
                                     val pendingTag: String?, val ended: List<SessionStore.EndedSeg>)
-    private val saveChannel = Channel<SaveSnapshot>(Channel.CONFLATED)
+    private sealed interface StoreOperation {
+        data class Save(val snapshot: SaveSnapshot) : StoreOperation
+        data class Clear(val files: List<File>, val sessionJobs: List<Job>) : StoreOperation
+    }
+    private val storeChannel = Channel<StoreOperation>(Channel.CONFLATED)
     /** One ordered heartbeat writer. Independent launch-per-report coroutines could reach the Mac out of
      *  order, allowing an older zero to overwrite a newer nonzero. Conflation keeps the newest queued state. */
     private data class StatusSnapshot(val client: SegmentTransport, val pending: Int)
@@ -97,7 +112,29 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Start the off-main session writer first, so any persist() during restore is handled off the UI thread.
         viewModelScope.launch(Dispatchers.IO) {
-            for (snap in saveChannel) store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag, snap.ended)
+            for (operation in storeChannel) {
+                when (operation) {
+                    is StoreOperation.Save -> operation.snapshot.let { snap ->
+                        store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag, snap.ended)
+                    }
+                    is StoreOperation.Clear -> {
+                        // Clear is ordered after any save already in progress. Wait for every cancelled
+                        // upload before deleting its source, then remove the manifest. Captures/persists stay
+                        // gated until this barrier completes, so no older save can resurrect the session.
+                        operation.sessionJobs.forEach { it.cancelAndJoin() }
+                        operation.files.forEach { runCatching { it.delete() } }
+                        store.clear()
+                        withContext(Dispatchers.Main) {
+                            inFlightUploads.clear()
+                            uploadJobs.clear()
+                            segmentJobs.clear()
+                            isClearing = false
+                            statusMessage = ""
+                            sendStatusReport()   // ordered zero after any pre-Clear heartbeat
+                        }
+                    }
+                }
+            }
         }
         viewModelScope.launch(Dispatchers.IO) {
             for (snap in statusChannel) runCatching { snap.client.reportStatus(snap.pending) }
@@ -153,10 +190,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun persist() {
+        if (isClearing) return
         // trySend on a CONFLATED channel never blocks and always keeps the latest snapshot; the IO
         // consumer writes it near-immediately, preserving crash durability without main-thread disk I/O.
         val ended = endedSegments.map { (g, t) -> SessionStore.EndedSeg(g, t.priority, t.year, t.month, t.seqs) }
-        saveChannel.trySend(SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId, ended))
+        storeChannel.trySend(StoreOperation.Save(
+            SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId, ended)))
     }
 
     /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
@@ -270,6 +309,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Main shutter: add a page to the current document segment and stream it to the Mac immediately. */
     fun addDocumentPhoto(file: File) {
+        if (isClearing) {
+            runCatching { file.delete() }
+            statusMessage = "Still clearing the previous session — try the photo again."
+            return
+        }
         clearSelection()
         seqCounter += 1
         val item = CapturedItem(id = nextId++, file = file, groupId = currentGroupId, seq = seqCounter, type = GroupType.DOCUMENT)
@@ -286,6 +330,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Box/Folder: a single-image marker (never a multi-page segment) — its own group; uploads now. */
     fun captureMarker(file: File, type: GroupType) {
+        if (isClearing) {
+            runCatching { file.delete() }
+            statusMessage = "Still clearing the previous session — try the photo again."
+            return
+        }
         clearSelection()
         seqCounter += 1
         val item = CapturedItem(id = nextId++, file = file, groupId = newGroupId(), seq = seqCounter, type = type)
@@ -477,7 +526,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Gate: any page of this group not yet UPLOADED (PENDING/UPLOADING/FAILED) → wait for it.
         if (items.any { it.groupId == group && it.state != UploadState.UPLOADED }) return
         if (!inFlightSegments.add(group)) return   // a send for this group is already running
-        viewModelScope.launch {
+        val segmentJob = viewModelScope.launch {
             try {
                 var ok = false; var attempt = 0
                 while (!ok && attempt < 3) {
@@ -487,8 +536,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 if (ok) { endedSegments.remove(group); persist() }
             } finally {
                 inFlightSegments.remove(group)
+                segmentJobs.remove(group)
             }
         }
+        segmentJobs[group] = segmentJob
     }
 
     /** Retry every ended-but-unacked segment (each still gated on all its pages being uploaded). */
@@ -518,6 +569,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Ids currently being uploaded, so the auto-retry loop and a manual Retry can't both fire the same
      *  item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). */
     private val inFlightUploads = mutableSetOf<Long>()
+    private val uploadJobs = mutableMapOf<Long, Job>()
 
     private fun enqueueUpload(item: CapturedItem) {
         val c = client ?: return
@@ -526,7 +578,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val replaces = item.replacesGroupId
         setState(item.id, UploadState.UPLOADING)
         sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
-        viewModelScope.launch {
+        val uploadJob = viewModelScope.launch {
             var resendItem: CapturedItem? = null
             try {
                 val bytes = withContext(Dispatchers.IO) { runCatching { item.file.readBytes() }.getOrNull() }
@@ -574,9 +626,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 sendStatusReport()   // reflect the new un-sent count promptly (this upload just settled)
             } finally {
                 inFlightUploads.remove(item.id)
+                uploadJobs.remove(item.id)
             }
             resendItem?.let { enqueueUpload(it) }
         }
+        uploadJobs[item.id] = uploadJob
     }
 
     fun retryFailed() {
@@ -615,20 +669,28 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Delete every captured photo (files + persisted session) and start a clean session. */
     fun clearSession() {
-        for (item in items) { runCatching { item.file.delete() } }
+        if (isClearing) return
+        sessionGeneration += 1
+        isClearing = true
+        val filesToDelete = items.map { it.file }
+        val sessionJobsToJoin = (uploadJobs.values + segmentJobs.values).distinct()
+        sessionJobsToJoin.forEach { it.cancel() }
         items.clear()
         endedSegments.clear()
         inFlightSegments.clear()
         inFlightUploads.clear()
         seqCounter = 0
-        nextId = 1L
+        // Never reuse an id within this ViewModel lifetime: delayed removal/status callbacks from the old
+        // session can then never match a new photo, even if they outlive cancellation.
         currentGroupId = newGroupId()
         pendingTagGroupId = null
         clearSelection()
         sentCount = 0
         transferFlash = null
-        statusMessage = ""
-        viewModelScope.launch(Dispatchers.IO) { store.clear() }
+        statusMessage = "Clearing previous session…"
+        // The conflated writer cannot lose this barrier: persist() is gated by isClearing until Clear
+        // completes, and old upload callbacks are cancelled/joined inside the same ordered operation.
+        storeChannel.trySend(StoreOperation.Clear(filesToDelete, sessionJobsToJoin))
     }
 
     private fun setState(id: Long, state: UploadState) {

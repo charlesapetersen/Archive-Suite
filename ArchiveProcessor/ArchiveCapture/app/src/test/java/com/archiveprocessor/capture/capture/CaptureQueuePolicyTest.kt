@@ -54,4 +54,15 @@ class CaptureQueuePolicyTest {
         assertEquals(false, restored.needsResend)
         assertEquals(1, pendingReportCount(listOf(restored)))
     }
+
+    @Test
+    fun `camera callback from before clear is rejected by new generation`() {
+        val token = captureStartToken(generation = 7, isClearing = false)
+        assertEquals(7L, token)
+
+        assertEquals(false, captureTokenIsCurrent(token!!, generation = 8, isClearing = false))
+        assertEquals(false, captureTokenIsCurrent(8, generation = 8, isClearing = true))
+        assertEquals(null, captureStartToken(generation = 8, isClearing = true))
+        assertEquals(true, captureTokenIsCurrent(8, generation = 8, isClearing = false))
+    }
 }

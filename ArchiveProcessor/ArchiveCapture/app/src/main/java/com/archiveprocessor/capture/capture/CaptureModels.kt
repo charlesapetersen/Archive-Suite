@@ -20,6 +20,13 @@ internal fun CapturedItem.prepareDeferredResend(): CapturedItem =
 internal fun CapturedItem.normalizeForRestore(): CapturedItem =
     if (needsResend) prepareDeferredResend() else this
 
+/** Camera callbacks are asynchronous. A token captured at shutter time is valid only for that session. */
+internal fun captureStartToken(generation: Long, isClearing: Boolean): Long? =
+    generation.takeUnless { isClearing }
+
+internal fun captureTokenIsCurrent(token: Long, generation: Long, isClearing: Boolean): Boolean =
+    !isClearing && token == generation
+
 /** One captured photo: its group, sequence, minimal tags, and upload status. Immutable — replace
  *  the element in the state list to update (so Compose recomposes). */
 data class CapturedItem(

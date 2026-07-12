@@ -4,6 +4,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): Android Clear raced uploads and manifest saves, then reused item IDs [CRITICAL]
+
+**FIXED:** Clear now gates new captures/persistence, cancels and joins every tracked upload and segment
+signal, deletes source files only after those jobs stop, and clears the manifest through the same ordered
+persistence worker so a queued old save cannot resurrect it. Item IDs remain monotonic for the ViewModel lifetime, preventing stale
+delayed callbacks from matching a new photo. Camera callbacks carry a session-generation token, so a shutter
+started before/during Clear cannot populate the new session afterward. Android JVM tests cover that delayed
+callback policy in addition to building the lifecycle changes. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): Android manifest fallback deleted the last good session before replacement [CRITICAL]
 
 **FIXED:** session saves now write and `fsync` a unique temporary sibling, then publish it with replace

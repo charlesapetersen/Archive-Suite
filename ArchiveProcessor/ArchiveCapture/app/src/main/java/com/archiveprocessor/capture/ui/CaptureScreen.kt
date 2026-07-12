@@ -311,7 +311,16 @@ private fun takePicture(
     vm: CaptureViewModel,
     onSaved: (File) -> Unit
 ) {
+    val captureToken = vm.beginCaptureToken()
+    if (captureToken == null) {
+        vm.reportCaptureError("Still clearing the previous session — try the photo again.")
+        return
+    }
     val file = vm.newCaptureFile()
+    fun deliverIfCurrent() {
+        if (vm.isCaptureTokenCurrent(captureToken)) onSaved(file)
+        else { runCatching { file.delete() } }
+    }
     // TEST SEAM (DEBUG-ONLY — stripped from release by the BuildConfig.DEBUG guard). For a deterministic,
     // headless phone↔Mac E2E: if the harness has pushed an inject image to files/test_inject.jpg
     // (adb shell run-as … cp … files/test_inject.jpg), use ITS pixels instead of the camera — copied into
@@ -328,7 +337,7 @@ private fun takePicture(
             }.isSuccess
             runCatching { inject.delete() }   // consume: each shutter tap needs a fresh push
             if (copied) {
-                onSaved(file)
+                deliverIfCurrent()
             } else {
                 runCatching { file.delete() }
                 vm.reportCaptureError("Test inject failed — please retake.")
@@ -341,12 +350,14 @@ private fun takePicture(
         opts,
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
-            override fun onImageSaved(results: ImageCapture.OutputFileResults) { onSaved(file) }
+            override fun onImageSaved(results: ImageCapture.OutputFileResults) { deliverIfCurrent() }
             override fun onError(exception: ImageCaptureException) {
                 // A failed capture must NOT be silent — an archival page can't be re-taken. Remove any
                 // partial file and surface the failure so the operator re-shoots.
                 runCatching { file.delete() }
-                vm.reportCaptureError("Capture failed — please retake. (${exception.message ?: "camera error"})")
+                if (vm.isCaptureTokenCurrent(captureToken)) {
+                    vm.reportCaptureError("Capture failed — please retake. (${exception.message ?: "camera error"})")
+                }
             }
         }
     )
