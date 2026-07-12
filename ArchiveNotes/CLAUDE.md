@@ -41,8 +41,10 @@ macOS/Sources/ArchiveNotes/
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
   Index/
     NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection)
-    NotesIndex.swift               actor — FTS5 + items table + org tables (folders/memberships/templates)
+    NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
+    OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json
+    OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
@@ -60,9 +62,12 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed
-  NotesIndexTests.swift            10 tests: bm25 title>tags>authors>body ordering, sanitizer safety,
-                                   incremental mtime-skip, prune deleteItems, WAL checkpoint,
-                                   searchReturnsItemIDs, summaryRoundTrip, org tables exist
+  NotesIndexTests.swift            10 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
+                                   search, summaryRoundTrip, org tables exist
+  OrganizationStoreTests.swift     13 tests: system-folder seeding, create/rename/move(cycle-guard)/
+                                   delete(reparent+orphans), replication add/remove/wasLastInstance/
+                                   forceRemove, template assignment+inheritance, JSON+DB round-trip
+  OrganizationFileTests.swift      3 tests: round-trip, loadMissing, atomicWrite
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
