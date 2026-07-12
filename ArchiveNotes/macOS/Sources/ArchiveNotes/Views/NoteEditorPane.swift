@@ -1,20 +1,26 @@
 import SwiftUI
 
-/// Center pane of the 3-pane shell: hosts the Markdown editor with a raw-toggle toolbar button.
+/// Center pane of the 3-pane shell: hosts the Markdown editor with formatting toolbar.
 struct NoteEditorPane: View {
     @State private var markdown = ""
     @State private var isRaw = false
+    @StateObject private var formatting = FormattingContext()
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
+            if !isRaw {
+                FormattingToolbar(context: formatting)
+                Divider()
+            }
+            rawToggleBar
             Divider()
-            MarkdownEditorView(markdown: $markdown, isRaw: $isRaw)
+            MarkdownEditorView(markdown: $markdown, isRaw: $isRaw, formatting: formatting)
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .focusedSceneValue(\.formattingContext, formatting)
     }
 
-    private var toolbar: some View {
+    private var rawToggleBar: some View {
         HStack {
             Spacer()
             Button {

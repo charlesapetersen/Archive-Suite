@@ -7,6 +7,7 @@ struct ArchiveNotesApp: App {
         Window("Archive Notes", id: NotesWindowID.notes) {
             NotesShellView(kind: .note)
         }
+        .commands { FormatCommands() }
         Window("Extracts", id: NotesWindowID.extracts) {
             NotesShellView(kind: .extract)
         }

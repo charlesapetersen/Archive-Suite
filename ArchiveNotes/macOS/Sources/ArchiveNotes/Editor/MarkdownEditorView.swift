@@ -8,6 +8,7 @@ struct MarkdownEditorView: NSViewRepresentable {
     @Binding var markdown: String
     @Binding var isRaw: Bool
     var fontSize: CGFloat = 14
+    var formatting: FormattingContext?
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -16,7 +17,15 @@ struct MarkdownEditorView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let textView = EditorTextView()
         textView.delegate = context.coordinator
+        textView.configuredFontSize = fontSize
         textView.applyRawMode(isRaw, fontSize: fontSize)
+
+        // Wire formatting context
+        if let fmt = formatting {
+            fmt.textView = textView
+            fmt.fontSize = fontSize
+            context.coordinator.formattingContext = fmt
+        }
         if isRaw {
             textView.string = markdown
         } else {
@@ -51,7 +60,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         if coordinator.currentFontSize != fontSize {
             coordinator.currentFontSize = fontSize
+            textView.configuredFontSize = fontSize
             textView.applyRawMode(wantRaw, fontSize: fontSize)
+            coordinator.formattingContext?.fontSize = fontSize
         }
 
         // Freeze-during-edit: don't clobber the text storage while the user is typing.
@@ -77,6 +88,7 @@ struct MarkdownEditorView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownEditorView
         weak var textView: EditorTextView?
+        var formattingContext: FormattingContext?
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
@@ -100,6 +112,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         nonisolated func textDidEndEditing(_ notification: Notification) {
             MainActor.assumeIsolated {
                 flushWriteBack()
+            }
+        }
+
+        nonisolated func textViewDidChangeSelection(_ notification: Notification) {
+            MainActor.assumeIsolated {
+                formattingContext?.updateState()
             }
         }
 

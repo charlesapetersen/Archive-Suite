@@ -29,7 +29,8 @@ this file is authoritative for Notes‑specific work.
 
 ```
 macOS/Sources/ArchiveNotes/
-  ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings
+  ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands
+  ArchiveNotesCommands.swift       Format menu (⌘B/I/K, ⌘⌥0-6/C/Q/K, ⌘⇧U/O) via FocusedValue
   Models/
     NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
   Store/
@@ -49,7 +50,9 @@ macOS/Sources/ArchiveNotes/
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
   Editor/
-    EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text)
+    EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
+                                   list keyboard behavior: Tab/Shift-Tab indent, Return continue,
+                                   Backspace-at-start outdent)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
@@ -57,9 +60,14 @@ macOS/Sources/ArchiveNotes/
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
+    EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject) +
+                                   EditorFormatting actions (bold/italic/code/link/heading/list/
+                                   blockquote/code-block/indent/outdent) + FocusedValue key
+    FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
   Views/
     NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
-    NoteEditorPane.swift           Center pane: toolbar (raw toggle) + MarkdownEditorView
+    NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
+                                   publishes FormattingContext via focusedSceneValue
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        Settings form (placeholder)
 
@@ -86,6 +94,10 @@ macOS/Tests/ArchiveNotesTests/
                                    code block+lang), mixed doc, second-round-trip no-op,
                                    unknown-styling-drops-text-preserved, Apple-parser semantic
                                    snapshots, block-kind stamping, text-never-dropped
+  FormattingActionTests.swift      22 tests: per-action apply-then-serialize (bold, italic,
+                                   inline code, bold+italic, link apply/remove, h1/h2/heading→plain,
+                                   ul/ol/blockquote/code-block toggle + toggle-twice-no-op), state
+                                   query (bold/heading/list reflected correctly)
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
