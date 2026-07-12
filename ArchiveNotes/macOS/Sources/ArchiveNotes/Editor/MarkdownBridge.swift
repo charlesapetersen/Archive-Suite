@@ -222,7 +222,9 @@ enum MarkdownBridge {
 
             let thumbnail: NSImage?
             if let store = assetStore, let url = store.resolveAsset(ref.path) {
-                thumbnail = InlineImageAttachment.loadThumbnail(from: url)
+                thumbnail = InlineImageAttachment.loadThumbnail(
+                    from: url, cacheKey: ref.path
+                )
             } else {
                 thumbnail = nil
             }

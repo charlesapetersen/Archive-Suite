@@ -75,9 +75,21 @@ final class InlineImageAttachment: NSTextAttachment {
     }()
 }
 
-// MARK: - Thumbnail generation
+// MARK: - Thumbnail generation + cache
 
 extension InlineImageAttachment {
+
+    /// Bounded cache of decoded thumbnails keyed by asset relative path.
+    /// Evictable by the system; re-decoded on demand. Full-resolution PNGs are never
+    /// loaded into the editor — only downsampled thumbnails.
+    /// `nonisolated(unsafe)` — NSCache is thread-safe by design; the static let is
+    /// initialized once and the cache handles its own synchronization.
+    nonisolated(unsafe) static let thumbnailCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 200
+        cache.totalCostLimit = 50 * 1024 * 1024  // ~50 MB
+        return cache
+    }()
 
     /// Create a downsampled thumbnail from raw image data.
     /// Returns nil if the data isn't a recognized image format.
@@ -93,10 +105,23 @@ extension InlineImageAttachment {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    /// Load a thumbnail from a file URL (used when parsing existing `![](assets/…)` references).
-    static func loadThumbnail(from url: URL, maxPixels: Int = 800) -> NSImage? {
+    /// Load a thumbnail from a file URL, using the cache keyed by `cacheKey`.
+    /// If `cacheKey` is provided and a cached thumbnail exists, returns it without disk I/O.
+    static func loadThumbnail(from url: URL, maxPixels: Int = 800,
+                              cacheKey: String? = nil) -> NSImage? {
+        if let key = cacheKey {
+            let nsKey = key as NSString
+            if let cached = thumbnailCache.object(forKey: nsKey) {
+                return cached
+            }
+        }
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return downsampledThumbnail(from: data, maxPixels: maxPixels)
+        guard let thumb = downsampledThumbnail(from: data, maxPixels: maxPixels) else { return nil }
+        if let key = cacheKey {
+            let cost = Int(thumb.size.width * thumb.size.height * 4)
+            thumbnailCache.setObject(thumb, forKey: key as NSString, cost: cost)
+        }
+        return thumb
     }
 }
 

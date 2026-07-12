@@ -237,8 +237,16 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// Threshold (in characters) above which pasted text is parsed off-main.
+    static let largePasteThreshold = 10_000
+
     /// Insert plain text at the caret, stripping any rich formatting.
+    /// For large pastes in styled mode, parses off-main to avoid blocking the UI.
     private func insertPlainText(_ text: String) {
+        if isRichText, text.count > Self.largePasteThreshold {
+            insertLargeTextAsync(text)
+            return
+        }
         let font: NSFont = isRichText
             ? .systemFont(ofSize: configuredFontSize)
             : .monospacedSystemFont(ofSize: configuredFontSize, weight: .regular)
@@ -253,6 +261,24 @@ final class EditorTextView: NSTextView {
         undoManager?.beginUndoGrouping()
         insertText(str, replacementRange: selectedRange())
         undoManager?.endUndoGrouping()
+    }
+
+    /// Parse a large text paste off-main, then apply the result on @MainActor.
+    private func insertLargeTextAsync(_ text: String) {
+        let fontSize = configuredFontSize
+        let range = selectedRange()
+        Task.detached(priority: .userInitiated) {
+            // Pure parse on background — produces Sendable String→String mapping
+            let markdown = text
+            // Build attributed string on main (NSAttributedString is not Sendable)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                let parsed = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
+                self.undoManager?.beginUndoGrouping()
+                self.insertText(parsed, replacementRange: range)
+                self.undoManager?.endUndoGrouping()
+            }
+        }
     }
 
     // MARK: - Image helpers
