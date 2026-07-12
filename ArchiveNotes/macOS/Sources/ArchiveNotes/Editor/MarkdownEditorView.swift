@@ -9,6 +9,7 @@ struct MarkdownEditorView: NSViewRepresentable {
     @Binding var isRaw: Bool
     var fontSize: CGFloat = 14
     var formatting: FormattingContext?
+    var assetStore: EditorAssetStore?
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -20,16 +21,19 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.configuredFontSize = fontSize
         textView.applyRawMode(isRaw, fontSize: fontSize)
 
-        // Wire formatting context
+        // Wire formatting context + asset store
         if let fmt = formatting {
             fmt.textView = textView
             fmt.fontSize = fontSize
             context.coordinator.formattingContext = fmt
         }
+        textView.assetStore = assetStore
+        context.coordinator.assetStore = assetStore
         if isRaw {
             textView.string = markdown
         } else {
-            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
+            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
+                                               assetStore: assetStore)
             textView.textStorage?.setAttributedString(styled)
         }
 
@@ -74,7 +78,8 @@ struct MarkdownEditorView: NSViewRepresentable {
                 if wantRaw {
                     textView.string = markdown
                 } else {
-                    let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
+                    let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
+                                                       assetStore: coordinator.assetStore)
                     textView.textStorage?.setAttributedString(styled)
                 }
                 coordinator.isApplyingProgrammaticChange = false
@@ -89,6 +94,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         var parent: MarkdownEditorView
         weak var textView: EditorTextView?
         var formattingContext: FormattingContext?
+        weak var assetStore: EditorAssetStore?
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
@@ -170,7 +176,8 @@ struct MarkdownEditorView: NSViewRepresentable {
             } else {
                 // Leaving raw: parse and style the Markdown
                 let styled = MarkdownBridge.parse(markdown: parent.markdown,
-                                                   fontSize: currentFontSize)
+                                                   fontSize: currentFontSize,
+                                                   assetStore: assetStore)
                 textView.textStorage?.setAttributedString(styled)
             }
 

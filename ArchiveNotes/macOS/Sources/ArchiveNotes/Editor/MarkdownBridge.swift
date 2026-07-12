@@ -10,15 +10,38 @@ import AppKit
 /// Unsupported visual styling is dropped on serialize; **text is never dropped**.
 enum MarkdownBridge {
 
+    // MARK: - Image regex
+
+    /// Matches `![alt](path)` inline image references in Markdown text.
+    private static let imagePattern = try! NSRegularExpression(
+        pattern: #"!\[([^\]]*)\]\(([^)]+)\)"#
+    )
+
+    /// Placeholder prefix used to protect image refs from Apple's Markdown parser.
+    private static let imageTokenPrefix = "\u{FFFC}IMG:"
+
+    private struct ImageRef {
+        let alt: String
+        let path: String
+        let token: String
+    }
+
     // MARK: - Parse (Markdown → styled NSAttributedString)
 
     /// Parse a Markdown string into a styled `NSAttributedString` with our custom
-    /// `noteBlockKind` / `noteInlineCode` attributes stamped for the serializer.
+    /// `noteBlockKind` / `noteInlineCode` / `noteImageRelPath` attributes stamped
+    /// for the serializer. If `assetStore` is provided, inline images are loaded as
+    /// thumbnails; otherwise they get a missing-asset placeholder (rel-path is always
+    /// preserved).
     @MainActor
-    static func parse(markdown: String, fontSize: CGFloat = 14) -> NSAttributedString {
+    static func parse(markdown: String, fontSize: CGFloat = 14,
+                       assetStore: EditorAssetStore? = nil) -> NSAttributedString {
         if markdown.isEmpty {
             return NSAttributedString(string: "")
         }
+
+        // Pre-extract image references so Apple's parser doesn't strip them.
+        let (cleaned, imageRefs) = extractImageReferences(markdown)
 
         // Use Apple's CommonMark parser (AttributedString API) for semantic attributes
         let options = AttributedString.MarkdownParsingOptions(
@@ -28,7 +51,7 @@ enum MarkdownBridge {
         )
 
         let semantic: AttributedString
-        if let parsed = try? AttributedString(markdown: markdown, options: options) {
+        if let parsed = try? AttributedString(markdown: cleaned, options: options) {
             semantic = parsed
         } else {
             // Fallback: plain text with no styling
@@ -40,7 +63,84 @@ enum MarkdownBridge {
         }
 
         // Apply visual styling + stamp our custom keys
-        return MarkdownStyler.style(semantic, fontSize: fontSize)
+        let styled = MarkdownStyler.style(semantic, fontSize: fontSize)
+
+        // Restore inline images by replacing placeholder tokens with attachments
+        if !imageRefs.isEmpty {
+            restoreImageAttachments(in: styled, refs: imageRefs, assetStore: assetStore)
+        }
+
+        return styled
+    }
+
+    // MARK: - Image extraction (pre-parse)
+
+    /// Replace `![alt](path)` with unique placeholder tokens, returning the cleaned
+    /// text and an ordered list of image references.
+    private static func extractImageReferences(_ markdown: String) -> (String, [ImageRef]) {
+        let nsString = markdown as NSString
+        let matches = imagePattern.matches(in: markdown,
+                                           range: NSRange(location: 0, length: nsString.length))
+        if matches.isEmpty { return (markdown, []) }
+
+        var refs: [ImageRef] = []
+        var result = ""
+        var lastEnd = 0
+
+        for match in matches {
+            let fullRange = match.range
+            let alt = nsString.substring(with: match.range(at: 1))
+            let path = nsString.substring(with: match.range(at: 2))
+            let token = "\(imageTokenPrefix)\(refs.count)\u{FFFC}"
+            refs.append(ImageRef(alt: alt, path: path, token: token))
+
+            result += nsString.substring(with: NSRange(location: lastEnd,
+                                                        length: fullRange.location - lastEnd))
+            result += token
+            lastEnd = fullRange.location + fullRange.length
+        }
+
+        if lastEnd < nsString.length {
+            result += nsString.substring(from: lastEnd)
+        }
+
+        return (result, refs)
+    }
+
+    /// Replace placeholder tokens in the styled result with actual image attachments.
+    @MainActor
+    private static func restoreImageAttachments(in styled: NSMutableAttributedString,
+                                                 refs: [ImageRef],
+                                                 assetStore: EditorAssetStore?) {
+        // Process in reverse so ranges stay valid
+        for ref in refs.reversed() {
+            let tokenRange = (styled.string as NSString).range(of: ref.token)
+            guard tokenRange.location != NSNotFound else { continue }
+
+            let thumbnail: NSImage?
+            if let store = assetStore, let url = store.resolveAsset(ref.path) {
+                thumbnail = InlineImageAttachment.loadThumbnail(from: url)
+            } else {
+                thumbnail = nil
+            }
+
+            let attachment = InlineImageAttachment(
+                relativePath: ref.path, altText: ref.alt, thumbnail: thumbnail
+            )
+            let attachStr = NSMutableAttributedString(attachment: attachment)
+            attachStr.addAttribute(.noteImageRelPath, value: ref.path,
+                                   range: NSRange(location: 0, length: attachStr.length))
+
+            // Preserve block kind from surrounding context
+            if tokenRange.location > 0,
+               let kind = styled.attribute(.noteBlockKind, at: tokenRange.location - 1,
+                                           effectiveRange: nil) {
+                attachStr.addAttribute(.noteBlockKind, value: kind,
+                                       range: NSRange(location: 0, length: attachStr.length))
+            }
+
+            styled.replaceCharacters(in: tokenRange, with: attachStr)
+        }
     }
 
     // MARK: - Serialize (styled NSAttributedString → CommonMark)
@@ -146,6 +246,18 @@ enum MarkdownBridge {
         var result = ""
         storage.enumerateAttributes(in: range) { attrs, runRange, _ in
             let runText = (storage.string as NSString).substring(with: runRange)
+
+            // Check for inline image attachment — emit ![alt](path)
+            if let relPath = attrs[.noteImageRelPath] as? String {
+                let alt: String
+                if let attach = attrs[.attachment] as? InlineImageAttachment {
+                    alt = attach.altText
+                } else {
+                    alt = ""
+                }
+                result += "![\(alt)](\(relPath))"
+                return
+            }
 
             // Check for inline code (belt-and-suspenders: custom attr + mono font)
             let isCode = attrs[.noteInlineCode] as? Bool == true

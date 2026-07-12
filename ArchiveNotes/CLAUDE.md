@@ -51,14 +51,18 @@ macOS/Sources/ArchiveNotes/
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
-                                   list keyboard behavior: Tab/Shift-Tab indent, Return continue,
-                                   Backspace-at-start outdent)
+                                   list keyboard: Tab/Shift-Tab indent, Return continue,
+                                   Backspace-at-start outdent, paste/drag image + text)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
-                                   freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode
+                                   freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
+                                   EditorAssetStore plumbing for inline images
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
-                                   CommonMark); idempotent for the supported formatting subset
+                                   CommonMark); inline images (![alt](path)); idempotent for the
+                                   supported formatting subset
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
+    InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path),
+                                   EditorAssetStore protocol, ScratchAssetStore (test impl)
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
     EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject) +
                                    EditorFormatting actions (bold/italic/code/link/heading/list/
@@ -98,6 +102,10 @@ macOS/Tests/ArchiveNotesTests/
                                    inline code, bold+italic, link apply/remove, h1/h2/heading→plain,
                                    ul/ol/blockquote/code-block toggle + toggle-twice-no-op), state
                                    query (bold/heading/list reflected correctly)
+  ImageSerializationTests.swift    13 tests: attachment↔![alt](path) round-trip, missing-asset
+                                   preserves path, multiple/empty-alt/second-round-trip, image+bold,
+                                   scratch-store write+disambiguate+resolve, attachment metadata,
+                                   downsample, parse-with-asset-store
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
