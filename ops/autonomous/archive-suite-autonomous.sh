@@ -31,7 +31,9 @@ CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI 
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
 JOB="com.${LABEL}.autonomous"    # launchd label (matches the .plist)
 
-INTERVAL="${AUTONOMOUS_INTERVAL:-1200}"   # seconds between cycles (20 min)
+INTERVAL="${AUTONOMOUS_INTERVAL:-120}"    # idle gap between cycles (2 min — near back-to-back; sessions run
+                                          # ~10 min, so this is the effective cadence. Was 1200/20min; tightened
+                                          # 2026-07-11 for faster throughput. Override with AUTONOMOUS_INTERVAL.
 STALE="${AUTONOMOUS_STALE:-1500}"         # a lock older than this (25 min) is stale -> take over
 MAXRUN="${AUTONOMOUS_MAXRUN:-4500}"       # kill a single resume after 75 min (wall-clock hard cap)
 BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
