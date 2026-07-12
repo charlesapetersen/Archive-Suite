@@ -59,16 +59,7 @@ class SessionStore(context: Context) {
                 if (pendingTagGroupId != null) put("pendingTag", pendingTagGroupId)
                 if (ended.length() > 0) put("ended", ended)
             }
-            val tmp = File(file.parentFile, "session.json.tmp")
-            tmp.writeText(root.toString())
-            if (!tmp.renameTo(file)) {
-                // renameTo can return false (no throw) on some filesystems when the destination exists.
-                // Remove the destination and retry the atomic rename — never copyTo(overwrite), which
-                // writes in place and can leave a TRUNCATED session.json if the process is killed
-                // mid-write (that corrupt file then fails to load, orphaning queued photos). If the retry
-                // also fails, leave the previous good file intact (tmp still holds a full copy).
-                if (file.delete()) tmp.renameTo(file)
-            }
+            ManifestFileWriter.replace(file, root.toString().toByteArray(Charsets.UTF_8))
         } catch (e: Exception) {
             // Never crash the capture flow because of a persistence hiccup.
         }

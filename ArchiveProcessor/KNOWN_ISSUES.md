@@ -4,6 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): Android manifest fallback deleted the last good session before replacement [CRITICAL]
+
+**FIXED:** session saves now write and `fsync` a unique temporary sibling, then publish it with replace
+semantics (atomic when supported). The fallback never explicitly deletes `session.json`; if publishing fails,
+the previous durable manifest remains intact and only the operation-owned temporary file is cleaned up.
+Plain-JVM tests inject replacement failure and verify the good manifest survives byte-for-byte. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): Android reported zero pending while failed pages were auto-retrying [CRITICAL]
 
 **FIXED:** the phone's status heartbeat now counts every page not yet confirmed `UPLOADED`, including
