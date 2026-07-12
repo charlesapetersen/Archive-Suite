@@ -4,6 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): Android capture thumbnails decoded on the UI thread [MEDIUM]
+
+**FIXED:** each thumbnail now loads through a key-scoped Compose producer and performs file probing plus
+downsampled `BitmapFactory` decoding on `Dispatchers.IO`. Removing/replacing an item cancels its producer;
+composition only receives the finished `ImageBitmap`. The macOS collection and document review panes were
+already using asynchronous thumbnail loaders. Android debug compilation and JVM tests pass. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): Android Clear raced uploads and manifest saves, then reused item IDs [CRITICAL]
 
 **FIXED:** Clear now gates new captures/persistence, cancels and joins every tracked upload and segment

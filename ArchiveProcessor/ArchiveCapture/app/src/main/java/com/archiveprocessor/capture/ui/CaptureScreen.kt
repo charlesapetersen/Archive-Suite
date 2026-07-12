@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,6 +70,8 @@ import com.archiveprocessor.capture.capture.CaptureViewModel
 import com.archiveprocessor.capture.capture.CapturedItem
 import com.archiveprocessor.capture.capture.GroupType
 import com.archiveprocessor.capture.capture.UploadState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -372,7 +375,13 @@ private fun Thumb(
     onTap: () -> Unit,
     onLongPress: () -> Unit
 ) {
-    val bmp: ImageBitmap? = remember(item.file.path) { decodeThumb(item.file.path) }
+    // BitmapFactory performs disk I/O and decode work. Keep it off the composition/main thread; changing
+    // or removing this item cancels the old producer automatically.
+    val bmp: ImageBitmap? by produceState(initialValue = null, key1 = item.file.path) {
+        // `produceState` retains its holder across key changes; clear the prior path's bitmap immediately.
+        value = null
+        value = withContext(Dispatchers.IO) { decodeThumb(item.file.path) }
+    }
     // Once a photo is saved to the phone's gallery it is safe locally, so it must no longer READ as failed:
     // its status dot turns teal (with a saved-badge below) regardless of the upload/queue state, which is
     // unchanged underneath — this is display state only (the item can still be UPLOADING/FAILED for the Mac).
@@ -413,8 +422,9 @@ private fun Thumb(
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
             .semantics { contentDescription = a11yLabel }
     ) {
-        if (bmp != null) {
-            Image(bitmap = bmp, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        bmp?.let { thumbnail ->
+            Image(bitmap = thumbnail, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
         Box(Modifier.align(Alignment.BottomStart).padding(3.dp).size(10.dp).clip(CircleShape).background(stateColor))
         // "Saved to phone" affordance: a small check badge so a gallery-saved photo reads as safe, not failed.
