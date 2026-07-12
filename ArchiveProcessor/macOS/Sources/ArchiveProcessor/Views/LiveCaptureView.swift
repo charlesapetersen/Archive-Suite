@@ -66,14 +66,12 @@ struct LiveCaptureView: View {
         // then advances to the next (box/folder markers need no card).
         .sheet(item: Binding(
             get: { session.pendingTagGroup },
-            set: { newValue in
-                // A nil write means the sheet was dismissed without Save/Skip. Resolve the current
-                // segment (as a skip) so the card doesn't immediately re-present with fresh state and
-                // strand the operator's typed edits with no way to close it.
-                if newValue == nil, let g = session.pendingTagGroup { session.skipMacTags(groupId: g.id) }
-            }
+            // Dismissal is not a semantic action. Only the card's explicit Apply or Skip buttons may
+            // resolve the group; treating Escape/click-outside as Skip silently discards typed metadata.
+            set: { _ in }
         )) { group in
             SegmentTagCard(group: group, session: session)
+                .interactiveDismissDisabled(true)
         }
         .sheet(isPresented: $liveProc.showFinalizeSheet) {
             CollectionFinalizeSheet(liveProc: liveProc)
@@ -631,7 +629,7 @@ private struct LiveProcessingBox: View {
 /// Auto-advancing tag card for one completed document segment during Live Capture. Subjects are the
 /// piece the phone doesn't capture; year/month/priority default to the phone's values and are editable.
 /// Built for keyboard speed: type subjects, ↑/↓ to pick a suggestion, ⇥ to autocomplete, ⏎ to add
-/// (⏎ on an empty field saves), ⌫ on an empty field deletes the previous tag, esc skips.
+/// (⏎ on an empty field saves), ⌫ on an empty field deletes the previous tag, esc clears a draft.
 private struct SegmentTagCard: View {
     let group: CaptureGroup
     @ObservedObject var session: CaptureSession
@@ -691,7 +689,7 @@ private struct SegmentTagCard: View {
                 Spacer()
             }
 
-            Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc skip")
+            Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc clear draft")
                 .font(.caption2).foregroundStyle(.tertiary)
 
             HStack {
@@ -826,8 +824,10 @@ private struct SegmentTagCard: View {
     }
 
     private func onEscape() {
-        if input.isEmpty { session.skipMacTags(groupId: group.id) }
-        else { input = ""; suggestions = []; highlighted = -1 }
+        guard !input.isEmpty else { return }
+        input = ""
+        suggestions = []
+        highlighted = -1
     }
 
     private func save() {

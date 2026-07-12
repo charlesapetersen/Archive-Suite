@@ -4,6 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): dismissing the macOS live tag card silently acted as Skip [HIGH]
+
+**FIXED:** interactive dismissal is disabled and the sheet binding no longer translates a nil write into
+`skipMacTags`. A live segment is resolved only by the card's explicit Apply or Skip buttons, so Escape,
+click-outside, or other dismissal attempts cannot discard typed metadata. Android already used this explicit
+action policy; iOS already disabled interactive dismissal. macOS Debug build passes. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): controlled subject vocabulary was prompt-only and accepted invented tags [HIGH]
 
 **FIXED:** parsed model subjects now pass through a pure enforcement boundary. With a configured vocabulary,
