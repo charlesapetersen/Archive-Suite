@@ -75,6 +75,39 @@ enum CollectionOrganizeTestDriver {
         }
 
         // ============================================================================================
+        // Case 5 — safety: a JSON-only collision is invisible to highestLeadingNumber (which scans the
+        // collection root). It must advance the whole artifact set instead of deleting the existing JSON.
+        // The exported image uses a collision-renamed source path to prove exportedImageMap is authoritative.
+        // ============================================================================================
+        do {
+            let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-jsoncollision-\(UUID().uuidString)", isDirectory: true)
+            let folder = out.appendingPathComponent("JC")
+            let jsonFolder = folder.appendingPathComponent("JSON Output")
+            try? fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
+            let existingJSON = jsonFolder.appendingPathComponent("00001 JC.json")
+            writeFile(existingJSON, "KEEP")
+            let source = out.appendingPathComponent("source.jpg")
+            let pdf = out.appendingPathComponent("source.pdf")
+            let json = out.appendingPathComponent("source.json")
+            let collisionRenamedImage = out.appendingPathComponent("source (2).jpg")
+            writeFile(pdf, "PDF"); writeFile(json, "NEWJSON"); writeFile(collisionRenamedImage, "IMAGE")
+            let coll = CollectionSegment(collectionName: "JC", fileURLs: [source])
+            do {
+                try seg.organizeOutput(
+                    collections: [coll], outputDirectory: out,
+                    outputURLMap: [source: pdf], moveSiblingImages: true,
+                    exportedImageMap: [source: collisionRenamedImage])
+            } catch { check("JSON collision: organizeOutput threw \(error)", false) }
+            let preserved = (try? String(contentsOf: existingJSON, encoding: .utf8)) == "KEEP"
+            check("JSON collision: existing 00001 sidecar preserved", preserved)
+            check("JSON collision: new PDF/JSON/image advanced together to 00002",
+                  fm.fileExists(atPath: folder.appendingPathComponent("00002 JC.pdf").path)
+                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("00002 JC.json").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("00002 JC.jpg").path))
+            try? fm.removeItem(at: out)
+        }
+
+        // ============================================================================================
         // Case 2 — regression: NON-merged dual output (one PDF per page). Each page's image shares its
         // PDF's base name; organizeOutput pairs them by base name and numbers each page independently.
         // Must be unchanged by the fix (merged branch must NOT fire when each source has its own PDF).
@@ -144,6 +177,60 @@ enum CollectionOrganizeTestDriver {
             let newPdf = fm.fileExists(atPath: folder.appendingPathComponent("00002 OW.pdf").path)
             check("no-overwrite: existing 00001 file preserved (not overwritten/deleted)", preserved)
             check("no-overwrite: merged run continued numbering at 00002/00003", newImg && newPdf)
+            try? fm.removeItem(at: out)
+        }
+
+        // Merged JSON-only collision: reserve the entire image/PDF/JSON set at the next free range.
+        do {
+            let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-merged-jsoncollision-\(UUID().uuidString)", isDirectory: true)
+            let folder = out.appendingPathComponent("MJ")
+            let jsonFolder = folder.appendingPathComponent("JSON Output")
+            try? fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
+            let existingJSON = jsonFolder.appendingPathComponent("00001 MJ.json")
+            writeFile(existingJSON, "KEEP")
+            let s1 = out.appendingPathComponent("p1.src"); let s2 = out.appendingPathComponent("p2.src")
+            let i1 = out.appendingPathComponent("p1.jpg"); let i2 = out.appendingPathComponent("p2.jpg")
+            let merged = out.appendingPathComponent("p1_merged.pdf")
+            let mergedJSON = out.appendingPathComponent("p1_merged.json")
+            writeFile(i1, "I1"); writeFile(i2, "I2"); writeFile(merged, "PDF"); writeFile(mergedJSON, "JSON")
+            let coll = CollectionSegment(collectionName: "MJ", fileURLs: [s1, s2])
+            do {
+                try seg.organizeOutput(
+                    collections: [coll], outputDirectory: out,
+                    outputURLMap: [s1: merged, s2: merged], moveSiblingImages: true,
+                    exportedImageMap: [s1: i1, s2: i2])
+            } catch { check("merged JSON collision: organizeOutput threw \(error)", false) }
+            check("merged JSON collision: existing 00001 JSON preserved",
+                  (try? String(contentsOf: existingJSON, encoding: .utf8)) == "KEEP")
+            check("merged JSON collision: new set advanced together to 00002/00003",
+                  fm.fileExists(atPath: folder.appendingPathComponent("00002 MJ.jpg").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("00003 MJ.jpg").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("00002 MJ.pdf").path)
+                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("00002 MJ.json").path))
+            try? fm.removeItem(at: out)
+        }
+
+        // Failed collision-renamed export: never fall back to and move the unrelated preferred-name image.
+        do {
+            let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-missing-export-\(UUID().uuidString)", isDirectory: true)
+            try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+            let source = out.appendingPathComponent("page.src")
+            let pdf = out.appendingPathComponent("page.pdf")
+            let unrelatedPreferred = out.appendingPathComponent("page.jpg")
+            let missingTracked = out.appendingPathComponent("page (2).jpg")
+            writeFile(pdf, "PDF"); writeFile(unrelatedPreferred, "USER")
+            let coll = CollectionSegment(collectionName: "ME", fileURLs: [source])
+            var didThrow = false
+            do {
+                try seg.organizeOutput(
+                    collections: [coll], outputDirectory: out,
+                    outputURLMap: [source: pdf], moveSiblingImages: true,
+                    exportedImageMap: [source: missingTracked])
+            } catch { didThrow = true }
+            check("missing tracked export: organization stops safely", didThrow)
+            check("missing tracked export: unrelated preferred image remains untouched",
+                  (try? String(contentsOf: unrelatedPreferred, encoding: .utf8)) == "USER")
+            check("missing tracked export: PDF source remains retryable", fm.fileExists(atPath: pdf.path))
             try? fm.removeItem(at: out)
         }
 

@@ -4,6 +4,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): output generation and organization could overwrite prior files [HIGH]
+
+**FIXED:** normal OCR now reserves against both current-run paths and files already on disk; dual-image
+export chooses a distinct destination unless it intentionally reuses the pristine source; collection
+organization preflights PDF/JSON/image destinations as a set and advances numbering instead of deleting a
+collision. The actual exported-image path is carried through organization, including collision-renamed
+images. Standalone destination tests plus the synthetic collection-organization driver cover prior-run PDF,
+reserved-path, source-image reuse, JSON-only collision, and artifact alignment. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): pre-OCRed review removal deleted the original PDF [CRITICAL]
 
 **FIXED:** pre-OCRed inputs map their source PDF as the output. Both manual and document-segmentation
@@ -108,13 +119,14 @@ map (`OCRProcessor.exportedImageMap`) at export time — i.e. BEFORE merge repoi
 single merged PDF — and threads it into `CollectionSegmenter.organizeOutput`. For a merged multi-page
 document (several source pages → one PDF) with dual output on, `organizeOutput` now NUMBERS + MOVES each
 page image into the collection folder and gives the merged PDF the first image's number, mirroring
-`LiveCaptureProcessor.executePlans`'s merged branch. Moves only, never overwrites (skips a colliding
-destination rather than deleting). Non-merged / no-export / crash-resume paths are unchanged (the merged
-branch fires only when `moveSiblingImages` is on AND >1 source maps to the same PDF AND ≥1 exported image
-exists; the resume paths never populate `exportedImageMap`, so they pass the empty default). Proven by the
-`$0` `CollectionOrganizeTestDriver` (`COLLECTIONORGANIZE_TEST=1`): 10/10 PASS, including the repro
-(per-page images filed as `00001`/`00002` inside the collection folder, none left loose in the output
-root) plus the non-merged, no-export, and no-overwrite regressions.
+`LiveCaptureProcessor.executePlans`'s merged branch. The complete image/PDF/JSON set is now copied to
+transaction-owned staging files, byte-verified, and installed without replacement before its sources are
+removed; a collision advances the entire numbered set. Non-merged / no-export / crash-resume paths are
+unchanged (the merged image branch requires every source page's tracked export; resume paths do not populate
+`exportedImageMap`, so they use the empty default). Proven by the `$0` `CollectionOrganizeTestDriver`
+(`COLLECTIONORGANIZE_TEST=1`): 17/17 PASS, including the repro (per-page images filed as
+`00001`/`00002` inside the collection folder, none left loose in the output root), JSON-only collisions,
+missing tracked exports, and the non-merged, no-export, and no-overwrite regressions.
 
 **Repro:** enable *output image file* (`exportOriginals`) **and** *merge documents* **and** collection
 organization, then process a multi-page document.

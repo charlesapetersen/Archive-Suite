@@ -215,16 +215,13 @@ extension OCRProcessor {
         if let existing = outputURLMap[sourceURL] { return existing }
         // Lazy rebuild after a reset (outputURLMap populated by resume-restore but cache was cleared).
         if _takenOutputPaths.isEmpty && !outputURLMap.isEmpty {
-            _takenOutputPaths = Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() })
+            _takenOutputPaths = Set(outputURLMap.values.map(OutputFileSafety.pathKey))
         }
-        var candidate = dir.appendingPathComponent(baseName + "." + ext)
-        var n = 2
-        while _takenOutputPaths.contains(candidate.standardizedFileURL.path.lowercased()) {
-            candidate = dir.appendingPathComponent("\(baseName) (\(n)).\(ext)")
-            n += 1
-        }
-        _takenOutputPaths.insert(candidate.standardizedFileURL.path.lowercased())
-        return candidate
+        let preferred = dir.appendingPathComponent(baseName + "." + ext)
+        return OutputFileSafety.reserveUniqueDestination(
+            preferred: preferred,
+            reservedPaths: &_takenOutputPaths
+        )
     }
 
     /// Classify a document using a text-only LLM call (no image).

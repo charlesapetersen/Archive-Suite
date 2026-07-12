@@ -288,6 +288,9 @@ final class CaptureSession: ObservableObject {
     /// find and copy the raw photos in Finder — including if the app won't launch. Falls back to
     /// Application Support only if the Pictures directory is somehow unavailable.
     static var backupRoot: URL {
+        if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] {
+            return URL(fileURLWithPath: testRoot, isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return base.appendingPathComponent("Archive Processor Live Capture", isDirectory: true)
@@ -369,7 +372,9 @@ final class CaptureSession: ObservableObject {
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         // Move any in-flight session left by an older build into the VISIBLE root, so its photos are
         // Finder-discoverable and every further ingest for it lands there too (not the hidden container).
-        Self.migrateLegacySessions(into: root)
+        if ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] == nil {
+            Self.migrateLegacySessions(into: root)
+        }
         // Drop leftover empty session folders (their photos were already cleared at a successful finalize)
         // so the visible backup root doesn't accumulate clutter that buries the run that still has photos.
         // Runs before recovery, so it can never touch the active session (which has photos, or is fresh).

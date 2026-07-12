@@ -291,7 +291,7 @@ class CollectionSegmenter {
     /// JSON files are similarly renamed: "00001 Collection Name.json"
     /// - Parameter exportedImageMap: source-URL → its per-page exported original image URL, captured
     ///   BEFORE document merging (which repoints `outputURLMap` to a single merged PDF and so loses the
-    ///   per-page image names). Needed only for the merged + dual-output case; empty otherwise.
+    ///   per-page image names). Also carries collision-renamed images whose base no longer matches the PDF.
     func organizeOutput(
         collections: [CollectionSegment],
         outputDirectory: URL,
@@ -335,74 +335,116 @@ class CollectionSegmenter {
                 // the per-page names from the merged PDF alone. Moves only — never overwrites/deletes.
                 if moveSiblingImages {
                     let pageSources = pdfToSources[pdfURL] ?? []
-                    let pageImages = pageSources.compactMap { exportedImageMap[$0] }
-                        .filter { fm.fileExists(atPath: $0.path) }
-                    if pageSources.count > 1 && !pageImages.isEmpty {
-                        var firstNum: Int?
-                        for img in pageImages {
-                            movedCount += 1
-                            if firstNum == nil { firstNum = movedCount }
-                            let base = "\(String(format: "%05d", movedCount)) \(collection.collectionName)"
-                            let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                            let destImg = folderURL.appendingPathComponent(base + "." + ext)
-                            if !fm.fileExists(atPath: destImg.path) { try fm.moveItem(at: img, to: destImg) }
+                    if pageSources.count > 1 {
+                        let pageImages = try pageSources.map { source -> URL in
+                            guard let image = exportedImageMap[source], fm.fileExists(atPath: image.path) else {
+                                throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey:
+                                    exportedImageMap[source]?.path ?? source.path])
+                            }
+                            return image
                         }
-                        let pdfNum = firstNum!   // non-nil: pageImages was non-empty
-                        let mergedBaseName = "\(String(format: "%05d", pdfNum)) \(collection.collectionName)"
-                        let destMergedPDF = folderURL.appendingPathComponent(mergedBaseName + ".pdf")
-                        if !fm.fileExists(atPath: destMergedPDF.path) { try fm.moveItem(at: pdfURL, to: destMergedPDF) }
-                        // Matching JSON sidecar (same base name as the merged PDF).
                         let mergedJSONName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
                         let mergedJSONURL = outputDirectory.appendingPathComponent(mergedJSONName)
-                        if fm.fileExists(atPath: mergedJSONURL.path) {
-                            let jsonFolder = folderURL.appendingPathComponent("JSON Output")
-                            try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
-                            let destJSON = jsonFolder.appendingPathComponent(mergedBaseName + ".json")
-                            if !fm.fileExists(atPath: destJSON.path) { try fm.moveItem(at: mergedJSONURL, to: destJSON) }
+                        let hasMergedJSON = fm.fileExists(atPath: mergedJSONURL.path)
+
+                        // Reserve one contiguous range for every page image; the merged PDF/JSON share the
+                        // first page's number. Preflight the full set so no old sidecar can be falsely paired.
+                        var firstNumber = movedCount + 1
+                        while true {
+                            var occupied = false
+                            for (offset, image) in pageImages.enumerated() {
+                                let number = firstNumber + offset
+                                let base = "\(String(format: "%05d", number)) \(collection.collectionName)"
+                                let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
+                                if fm.fileExists(atPath: folderURL.appendingPathComponent(base + "." + ext).path) {
+                                    occupied = true; break
+                                }
+                            }
+                            let firstBase = "\(String(format: "%05d", firstNumber)) \(collection.collectionName)"
+                            occupied = occupied || fm.fileExists(atPath: folderURL.appendingPathComponent(firstBase + ".pdf").path)
+                            if hasMergedJSON {
+                                occupied = occupied || fm.fileExists(atPath:
+                                    folderURL.appendingPathComponent("JSON Output/" + firstBase + ".json").path)
+                            }
+                            if !occupied { break }
+                            firstNumber += 1
                         }
+
+                        var artifactMoves: [OutputFileSafety.ArtifactMove] = pageImages.enumerated().map { offset, image in
+                            let number = firstNumber + offset
+                            let base = "\(String(format: "%05d", number)) \(collection.collectionName)"
+                            let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
+                            return .init(source: image, destination: folderURL.appendingPathComponent(base + "." + ext))
+                        }
+                        let firstBase = "\(String(format: "%05d", firstNumber)) \(collection.collectionName)"
+                        artifactMoves.append(.init(source: pdfURL,
+                                                   destination: folderURL.appendingPathComponent(firstBase + ".pdf")))
+                        if hasMergedJSON {
+                            artifactMoves.append(.init(source: mergedJSONURL,
+                                destination: folderURL.appendingPathComponent("JSON Output/" + firstBase + ".json")))
+                        }
+                        try OutputFileSafety.relocateArtifactSet(artifactMoves)
+                        movedCount = firstNumber + pageImages.count - 1
                         continue
                     }
                 }
 
-                let seqNum = String(format: "%05d", movedCount + 1)
-                movedCount += 1
-                let newBaseName = "\(seqNum) \(collection.collectionName)"
-
-                let destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
-                if fm.fileExists(atPath: destPDF.path) {
-                    try fm.removeItem(at: destPDF)
-                }
-                try fm.moveItem(at: pdfURL, to: destPDF)
-
-                // Also check for a matching JSON file (same base name as original PDF)
+                // Locate the optional JSON and exported image BEFORE selecting a sequence number so every
+                // destination can be preflighted together. `exportedImageMap` is authoritative when present:
+                // collision-safe export may intentionally give the image a different base from the PDF.
                 let jsonName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
                 let jsonURL = outputDirectory.appendingPathComponent(jsonName)
-                if fm.fileExists(atPath: jsonURL.path) {
-                    let jsonFolder = folderURL.appendingPathComponent("JSON Output")
-                    try fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
-                    let destJSON = jsonFolder.appendingPathComponent(newBaseName + ".json")
-                    if fm.fileExists(atPath: destJSON.path) {
-                        try fm.removeItem(at: destJSON)
+                let hasJSON = fm.fileExists(atPath: jsonURL.path)
+                var imageURL: URL?
+                if moveSiblingImages {
+                    if let tracked = exportedImageMap[sourceURL] {
+                        guard fm.fileExists(atPath: tracked.path) else {
+                            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: tracked.path])
+                        }
+                        imageURL = tracked
+                    } else {
+                        let imgBase = pdfURL.deletingPathExtension().lastPathComponent
+                        imageURL = ImageEncoding.acceptedImageExtensions.lazy
+                            .map { pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + $0) }
+                            .first { fm.fileExists(atPath: $0.path) }
                     }
-                    try fm.moveItem(at: jsonURL, to: destJSON)
                 }
 
-                // Two-file (dual) output: move the app-EXPORTED sibling image (same base name as the PDF)
-                // alongside it, renamed to match. Gated on moveSiblingImages: when export is off we must not
-                // sweep up a source original that happens to share the base name (e.g. output dir == input
-                // dir) — with no export, the only same-base image there is the user's irreplaceable original.
-                if moveSiblingImages {
-                    let imgBase = pdfURL.deletingPathExtension().lastPathComponent
-                    for ext in ImageEncoding.acceptedImageExtensions {
-                        let imgURL = pdfURL.deletingLastPathComponent().appendingPathComponent(imgBase + "." + ext)
-                        if fm.fileExists(atPath: imgURL.path) {
-                            let destImg = folderURL.appendingPathComponent(newBaseName + "." + ext)
-                            if fm.fileExists(atPath: destImg.path) { try fm.removeItem(at: destImg) }
-                            try fm.moveItem(at: imgURL, to: destImg)
-                            break
-                        }
+                // Continue from the existing highest number, but also check every extension. A stale JSON
+                // sidecar can occupy a number that is absent from the top-level folder; skip it rather than
+                // deleting it. The same preflight closes races/partial-recovery collisions without overwrite.
+                var sequence = movedCount + 1
+                var newBaseName = ""
+                var destPDF: URL
+                var destJSON: URL?
+                var destImage: URL?
+                while true {
+                    let seqNum = String(format: "%05d", sequence)
+                    newBaseName = "\(seqNum) \(collection.collectionName)"
+                    destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
+                    destJSON = hasJSON
+                        ? folderURL.appendingPathComponent("JSON Output/" + newBaseName + ".json")
+                        : nil
+                    destImage = imageURL.map {
+                        let ext = $0.pathExtension.isEmpty ? "jpg" : $0.pathExtension
+                        return folderURL.appendingPathComponent(newBaseName + "." + ext)
                     }
+                    let occupied = fm.fileExists(atPath: destPDF.path)
+                        || destJSON.map { fm.fileExists(atPath: $0.path) } == true
+                        || destImage.map { fm.fileExists(atPath: $0.path) } == true
+                    if !occupied { break }
+                    sequence += 1
                 }
+                movedCount = sequence
+
+                var artifactMoves = [OutputFileSafety.ArtifactMove(source: pdfURL, destination: destPDF)]
+                if let destJSON {
+                    artifactMoves.append(.init(source: jsonURL, destination: destJSON))
+                }
+                if let imageURL, let destImage {
+                    artifactMoves.append(.init(source: imageURL, destination: destImage))
+                }
+                try OutputFileSafety.relocateArtifactSet(artifactMoves)
             }
         }
     }

@@ -82,6 +82,7 @@ extension OCRProcessor {
         // Snapshot the work on the main actor… The exported image is always a .jpg sized toward the
         // exported-image target (independent of the source/camera size).
         var imageMap: [URL: URL] = [:]
+        var reservedImagePaths = Set<String>()
         let work: [(src: URL, img: URL, pdf: URL, rot: Int)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
                   FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
@@ -91,7 +92,12 @@ extension OCRProcessor {
             // The exported image's name matches the PER-PAGE PDF (base + .jpg) at this point — i.e. BEFORE
             // merge repoints outputURLMap to a single merged PDF. Record it keyed by the original source so
             // organizeOutput can file a merged doc's per-page images into the collection folder.
-            let img = pdfURL.deletingPathExtension().appendingPathExtension("jpg")
+            let preferred = pdfURL.deletingPathExtension().appendingPathExtension("jpg")
+            let img = OutputFileSafety.reserveUniqueDestination(
+                preferred: preferred,
+                allowedExisting: src,
+                reservedPaths: &reservedImagePaths
+            )
             imageMap[job.sourceURL] = img
             // Snapshot the final (post-review) rotation so the exported .jpg matches the rotated PDF.
             return (src: src, img: img, pdf: pdfURL, rot: job.result?.rotationDegrees ?? 0)
@@ -106,9 +112,9 @@ extension OCRProcessor {
                 // is a same-base .jpg, the exported-image path equals the original photo, and writeSizedJPEG
                 // would delete/overwrite the irreplaceable original. Skip — the pristine original stays in
                 // place as the image half of the dual output, and organizeOutput's moveSiblingImages step
-                // relocates it non-destructively. Case-insensitive because APFS/HFS+ are case-insensitive by
-                // default (Photo.JPG and photo.jpg are the same file). Mirrors CollectionSegmenter's guard.
-                if w.img.standardizedFileURL.path.compare(w.src.standardizedFileURL.path, options: .caseInsensitive) == .orderedSame { continue }
+                // relocates it non-destructively. Prove filesystem identity rather than comparing path text:
+                // case-sensitive volumes may hold distinct `Photo.JPG` and `photo.jpg` files.
+                if OutputFileSafety.isSameFile(w.img, w.src) { continue }
                 guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB, rotationDegrees: w.rot) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").

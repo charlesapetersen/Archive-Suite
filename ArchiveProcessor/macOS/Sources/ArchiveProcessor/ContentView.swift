@@ -85,8 +85,7 @@ struct ContentView: View {
     /// always re-openable from Settings). Skipped in the headless test modes.
     private func maybePresentKeyOnboarding() {
         guard !hasSeenKeyOnboarding,
-              ProcessInfo.processInfo.environment["LIVECAPTURE_TESTMODE"] != "1",
-              ProcessInfo.processInfo.environment["PROCESSFILES_TESTMODE"] != "1" else { return }
+              !KeychainHelper.isHeadlessTestMode else { return }
         let hasAnyKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) != nil
             || KeychainHelper.load(account: LLMProvider.mistral.rawValue) != nil
             || KeychainHelper.load(account: LLMProvider.anthropic.rawValue) != nil
