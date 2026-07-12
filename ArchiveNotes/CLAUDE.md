@@ -83,6 +83,12 @@ macOS/Sources/ArchiveNotes/
     ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for
                                    needsRootGrant / renamedCandidate / notFound.
                                    SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject)
+  Zotero/
+    ZoteroRef.swift                ZoteroRef/ZoteroLibrary/ZoteroRefKind value types (§D.1)
+    ZoteroSelectLink.swift         Pure total parser for zotero://select/… links (§D.2)
+    ZoteroClient.swift             actor — probe cascade (BBT→localAPI→unavailable), CSL fetch,
+                                   citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4)
+    ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)
@@ -131,6 +137,10 @@ macOS/Tests/ArchiveNotesTests/
   SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller
                                    no-crash, chip Reveal+Preview buttons, MarkdownBridge onPreview
                                    threading, buildInsertableBlock preview, reveal URL validation
+  ZoteroClientTests.swift          23 tests: probe (BBT/localAPI/unavailable/cache-TTL/reset),
+                                   fetch CSL (BBT/localAPI/cache-hit/unavailable-throws/citation/group),
+                                   CSL mapping (year/month/day precision, literal/given-family author),
+                                   cache store (round-trip/loadMissing/cacheKey)
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
