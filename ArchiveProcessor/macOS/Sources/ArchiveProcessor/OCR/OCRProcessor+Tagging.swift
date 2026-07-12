@@ -53,6 +53,26 @@ extension OCRProcessor {
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
     }
+
+    /// Exclude one item from review and remove only output that the Processor itself generated.
+    /// Pre-OCRed inputs deliberately map `outputURLMap[source] = source`; detach that mapping without
+    /// deleting the user's original PDF or a same-basename source sidecar.
+    @discardableResult
+    func discardGeneratedOutput(for sourceURL: URL) -> Bool {
+        guard let outputURL = outputURLMap[sourceURL] else { return true }
+        if OutputFileSafety.isSameFile(outputURL, sourceURL) {
+            outputURLMap[sourceURL] = nil
+            return true
+        }
+        do {
+            try OutputFileSafety.removeGeneratedOutput(outputURL, for: sourceURL)
+            outputURLMap[sourceURL] = nil
+            return true
+        } catch {
+            statusMessage = "Could not remove generated output for \(sourceURL.lastPathComponent): \(error.localizedDescription)"
+            return false
+        }
+    }
     /// Live Capture dual output: write each page's original image next to its PDF (same base name),
     /// tagged identically, so the final folder holds BOTH the image and the PDF. Runs before merge/
     /// organization so `outputURLMap` is still per-page; `organizeOutput` moves the sibling image too.
@@ -391,14 +411,10 @@ extension OCRProcessor {
             let fileIndex = manualSegImages[idx].fileIndex
             guard fileIndex < jobs.count else { continue }
             let sourceURL = jobs[fileIndex].sourceURL
-            removedSourceURLs.insert(sourceURL)
-            if let outputURL = outputURLMap[sourceURL] {
-                try? FileManager.default.removeItem(at: outputURL)
-                let jsonURL = outputURL.deletingPathExtension().appendingPathExtension("json")
-                try? FileManager.default.removeItem(at: jsonURL)
-                outputURLMap[sourceURL] = nil
+            if discardGeneratedOutput(for: sourceURL) {
+                removedSourceURLs.insert(sourceURL)
+                jobs[fileIndex].status = .removed
             }
-            jobs[fileIndex].status = .removed
         }
 
         // (b) Rotation: bake any corrected rotation into the output PDF by regenerating it. Skipped

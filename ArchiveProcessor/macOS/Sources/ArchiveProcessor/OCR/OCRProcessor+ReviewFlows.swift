@@ -439,14 +439,11 @@ extension OCRProcessor {
 
             // Removal: drop this photo from output, tagging, and segments
             if item.markedForRemoval {
-                removedSourceURLs.insert(item.fileURL)
-                if let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL] {
-                    try? FileManager.default.removeItem(at: outputURL)
-                    let jsonURL = outputURL.deletingPathExtension().appendingPathExtension("json")
-                    try? FileManager.default.removeItem(at: jsonURL)
-                    outputURLMap[jobs[item.fileIndex].sourceURL] = nil
+                let sourceURL = jobs[item.fileIndex].sourceURL
+                if discardGeneratedOutput(for: sourceURL) {
+                    removedSourceURLs.insert(item.fileURL)
+                    jobs[item.fileIndex].status = .removed
                 }
-                jobs[item.fileIndex].status = .removed
                 continue
             }
 

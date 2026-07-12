@@ -4,6 +4,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): pre-OCRed review removal deleted the original PDF [CRITICAL]
+
+**FIXED:** pre-OCRed inputs map their source PDF as the output. Both manual and document-segmentation
+removal flows previously deleted that mapped URL and its same-basename JSON sidecar. Removal now detaches
+source-as-output mappings without deleting them, using a shared conservative file-identity guard with
+standalone regression coverage. Cleanup removes only the explicitly tracked output—never an inferred JSON
+sidecar—and retains failed cleanup mappings for retry. `OCR/OutputFileSafety.swift`, `OCRProcessor+Tagging.swift`,
+`OCRProcessor+ReviewFlows.swift`.
+
+---
+
 ## ✅ FIXED (2026-07-08): resolved tag cards re-surfaced after a mid-session Mac restart (B9) [LOW]
 
 **FIXED:** `SessionManifest` now also persists `resolvedGroupIds` + `macTags` (both optional → pre-B9
