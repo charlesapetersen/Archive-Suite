@@ -72,7 +72,7 @@ class TagGenerator: ObservableObject {
 
         do {
             let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
-            return parseTagResponse(rawResponse)
+            return parseTagResponse(rawResponse, vocabulary: vocabulary)
         } catch {
             return GeneratedTags(dateUncertain: true)
         }
@@ -144,7 +144,7 @@ class TagGenerator: ObservableObject {
                                          gatewayConfig: gatewayConfig, maxTokens: 512, timeout: 120)
     }
 
-    private func parseTagResponse(_ raw: String) -> GeneratedTags {
+    private func parseTagResponse(_ raw: String, vocabulary: [String] = []) -> GeneratedTags {
         // Extract JSON from the response (model may wrap in markdown code fences)
         var jsonStr = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if jsonStr.hasPrefix("```") {
@@ -181,8 +181,10 @@ class TagGenerator: ObservableObject {
             }
         }
         tags.dateUncertain = json["date_uncertain"] as? Bool ?? false
-        // Enforce the 2–6 subject-tag contract's upper bound (models sometimes return many more).
-        tags.subjectTags = Array((json["subject_tags"] as? [String] ?? []).prefix(6))
+        // Enforce both the upper bound and, when configured, the controlled vocabulary. The prompt is
+        // advisory; models can still invent values or alter case/spacing, so canonicalize at this boundary.
+        tags.subjectTags = ControlledVocabulary.enforce(
+            json["subject_tags"] as? [String] ?? [], vocabulary: vocabulary)
         tags.format = json["format"] as? String
         tags.authorName = json["author_name"] as? String
         tags.recipientName = json["recipient_name"] as? String

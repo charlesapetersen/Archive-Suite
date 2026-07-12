@@ -4,6 +4,16 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): controlled subject vocabulary was prompt-only and accepted invented tags [HIGH]
+
+**FIXED:** parsed model subjects now pass through a pure enforcement boundary. With a configured vocabulary,
+only case-insensitive, whitespace-trimmed matches survive; output uses the first configured canonical spelling,
+deduplicates matches, rejects inventions, and retains the six-tag cap. Empty vocabulary preserves existing
+free-form behavior. A standalone pure regression covers canonicalization, duplicates, inventions, blank
+vocabulary entries, and free-form compatibility. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): Android capture thumbnails decoded on the UI thread [MEDIUM]
 
 **FIXED:** each thumbnail now loads through a key-scoped Compose producer and performs file probing plus
