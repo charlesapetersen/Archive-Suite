@@ -49,9 +49,14 @@ macOS/Sources/ArchiveNotes/
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
   Editor/
-    EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find)
+    EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
-                                   freeze-during-edit, raw-toggle (⌘/)
+                                   freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode
+    MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
+                                   CommonMark); idempotent for the supported formatting subset
+    MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
+                                   noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
+    NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
   Views/
     NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
     NoteEditorPane.swift           Center pane: toolbar (raw toggle) + MarkdownEditorView
@@ -76,6 +81,11 @@ macOS/Tests/ArchiveNotesTests/
   EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
                                    flush, programmatic suppress, mode-switch undo-clear/text-preserve,
                                    lint (no .layoutManager in Editor/)
+  MarkdownBridgeTests.swift        28 tests: per-construct idempotency (h1–h6, bold, italic,
+                                   bold+italic, inline code, link, ul, ol, blockquote, code block,
+                                   code block+lang), mixed doc, second-round-trip no-op,
+                                   unknown-styling-drops-text-preserved, Apple-parser semantic
+                                   snapshots, block-kind stamping, text-never-dropped
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite

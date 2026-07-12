@@ -17,7 +17,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         let textView = EditorTextView()
         textView.delegate = context.coordinator
         textView.applyRawMode(isRaw, fontSize: fontSize)
-        textView.string = markdown
+        if isRaw {
+            textView.string = markdown
+        } else {
+            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
+            textView.textStorage?.setAttributedString(styled)
+        }
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -55,7 +60,12 @@ struct MarkdownEditorView: NSViewRepresentable {
             let current = textView.string
             if current != markdown {
                 coordinator.isApplyingProgrammaticChange = true
-                textView.string = markdown
+                if wantRaw {
+                    textView.string = markdown
+                } else {
+                    let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
+                    textView.textStorage?.setAttributedString(styled)
+                }
                 coordinator.isApplyingProgrammaticChange = false
             }
         }
@@ -112,7 +122,14 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         private func writeBack() {
             guard let textView else { return }
-            let current = textView.string
+            let current: String
+            if currentIsRaw {
+                current = textView.string
+            } else if let storage = textView.textStorage {
+                current = MarkdownBridge.serialize(storage)
+            } else {
+                current = textView.string
+            }
             if parent.markdown != current {
                 parent.markdown = current
             }
@@ -126,9 +143,18 @@ struct MarkdownEditorView: NSViewRepresentable {
             flushWriteBack()
 
             currentIsRaw = raw
-            // Swap visual presentation. In S1 both modes show plain text;
-            // S2 will add rich rendering in styled mode.
             textView.applyRawMode(raw, fontSize: currentFontSize)
+
+            // Swap the storage contents between raw Markdown and styled
+            if raw {
+                // Entering raw: show the plain Markdown string
+                textView.string = parent.markdown
+            } else {
+                // Leaving raw: parse and style the Markdown
+                let styled = MarkdownBridge.parse(markdown: parent.markdown,
+                                                   fontSize: currentFontSize)
+                textView.textStorage?.setAttributedString(styled)
+            }
 
             // Clear undo across the toggle — intentional design decision (plan §6).
             textView.undoManager?.removeAllActions()

@@ -21,7 +21,7 @@ final class EditorTextView: NSTextView {
     required init?(coder: NSCoder) { fatalError("Not supported") }
 
     private func commonInit() {
-        isRichText = false          // W3-S1: plain Markdown only; S2 enables rich
+        isRichText = true           // W3-S2: rich text for styled mode
         isAutomaticQuoteSubstitutionEnabled = false
         isAutomaticDashSubstitutionEnabled = false
         isAutomaticTextReplacementEnabled = false
@@ -44,12 +44,21 @@ final class EditorTextView: NSTextView {
         }
     }
 
-    /// Toggle between styled mode (future S2) and raw monospaced mode.
+    /// Toggle between styled mode and raw monospaced mode.
     func applyRawMode(_ isRaw: Bool, fontSize: CGFloat) {
-        let font: NSFont = isRaw
-            ? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-            : .systemFont(ofSize: fontSize)
-        self.font = font
-        typingAttributes = [.font: font, .foregroundColor: NSColor.textColor]
+        if isRaw {
+            isRichText = false
+            let font: NSFont = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+            self.font = font
+            typingAttributes = [.font: font, .foregroundColor: NSColor.textColor]
+        } else {
+            isRichText = true
+            let font: NSFont = .systemFont(ofSize: fontSize)
+            typingAttributes = [
+                .font: font,
+                .foregroundColor: NSColor.textColor,
+                .noteBlockKind: BlockKind.plain
+            ]
+        }
     }
 }
