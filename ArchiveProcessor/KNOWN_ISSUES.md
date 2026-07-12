@@ -4,6 +4,18 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): Android reported zero pending while failed pages were auto-retrying [CRITICAL]
+
+**FIXED:** the phone's status heartbeat now counts every page not yet confirmed `UPLOADED`, including
+`FAILED` pages. Those pages are automatically retried every eight seconds, so excluding them could let the
+Mac finish a session before the retry arrived. Deferred P10/reclassification resends transition atomically
+back to `PENDING`, and one serialized/conflated writer prevents older heartbeat coroutines from arriving
+after newer state. Crash restore normalizes a persisted resend marker to `PENDING` before uploaded-page
+pruning. Plain-JVM queue-policy tests cover all states, deferred-resend transitions, and the between-saves
+restore state, proving the count reaches zero only after required delivery is confirmed. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): failed merged-PDF tag transfer still deleted component PDFs [CRITICAL]
 
 **FIXED:** merging now treats a successful, verified tag write as a prerequisite for retiring the

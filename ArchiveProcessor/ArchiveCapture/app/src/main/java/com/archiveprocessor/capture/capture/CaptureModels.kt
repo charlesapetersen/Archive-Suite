@@ -7,6 +7,19 @@ enum class GroupType(val wire: String) { DOCUMENT("document"), BOX("box"), FOLDE
 
 enum class UploadState { PENDING, UPLOADING, UPLOADED, FAILED }
 
+/** Count pages the Mac must still expect. FAILED is included because the background retry loop sends it
+ * automatically; reporting zero while such a page exists can let the Mac finish a session too early. */
+internal fun pendingReportCount(items: Iterable<CapturedItem>): Int =
+    items.count { it.state != UploadState.UPLOADED || it.needsResend }
+
+/** Atomically expose a deferred metadata resend as pending before the next drain heartbeat is emitted. */
+internal fun CapturedItem.prepareDeferredResend(): CapturedItem =
+    copy(state = UploadState.PENDING, needsResend = false)
+
+/** A persisted resend marker is authoritative across a crash, even if an earlier save recorded UPLOADED. */
+internal fun CapturedItem.normalizeForRestore(): CapturedItem =
+    if (needsResend) prepareDeferredResend() else this
+
 /** One captured photo: its group, sequence, minimal tags, and upload status. Immutable — replace
  *  the element in the state list to update (so Compose recomposes). */
 data class CapturedItem(

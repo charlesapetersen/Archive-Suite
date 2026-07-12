@@ -89,15 +89,25 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private data class SaveSnapshot(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val group: String,
                                     val pendingTag: String?, val ended: List<SessionStore.EndedSeg>)
     private val saveChannel = Channel<SaveSnapshot>(Channel.CONFLATED)
+    /** One ordered heartbeat writer. Independent launch-per-report coroutines could reach the Mac out of
+     *  order, allowing an older zero to overwrite a newer nonzero. Conflation keeps the newest queued state. */
+    private data class StatusSnapshot(val client: SegmentTransport, val pending: Int)
+    private val statusChannel = Channel<StatusSnapshot>(Channel.CONFLATED)
 
     init {
         // Start the off-main session writer first, so any persist() during restore is handled off the UI thread.
         viewModelScope.launch(Dispatchers.IO) {
             for (snap in saveChannel) store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag, snap.ended)
         }
+        viewModelScope.launch(Dispatchers.IO) {
+            for (snap in statusChannel) runCatching { snap.client.reportStatus(snap.pending) }
+        }
         // Crash resilience: restore any prior session and re-send whatever wasn't confirmed uploaded.
         store.load()?.let { r ->
-            items.addAll(r.items)
+            // A crash can persist UPLOADED before the following deferred-resend transition reaches disk.
+            // Normalize resend intent first so pruning can never delete a page whose corrected metadata
+            // still needs delivery, and so resume/auto-retry have an explicitly sendable PENDING state.
+            items.addAll(r.items.map { it.normalizeForRestore() })
             seqCounter = r.seq
             nextId = r.nextId
             r.groupId?.let { currentGroupId = it }
@@ -108,7 +118,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             // shows only what still needs sending. EXCEPT document pages still in the current (un-ended)
             // segment: those streamed as shot but aren't tagged yet (tags apply at End segment), so keep
             // them so the operator can finish + tag the recovered segment.
-            items.filter { it.state == UploadState.UPLOADED &&
+            items.filter { it.state == UploadState.UPLOADED && !it.needsResend &&
                 !(it.type == GroupType.DOCUMENT && it.groupId == currentGroupId) }.toList().forEach { i ->
                 runCatching { i.file.delete() }; items.remove(i)
             }
@@ -154,7 +164,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (client == null) return
         // Re-send anything not confirmed on the Mac (in-flight/failed, or still-PENDING). Document pages
         // now stream as shot, so a PENDING doc is simply one captured while unpaired/offline — send it too.
-        items.filter { it.state != UploadState.UPLOADED }.forEach { enqueueUpload(it) }
+        items.filter { it.state != UploadState.UPLOADED || it.needsResend }.forEach { enqueueUpload(it) }
         // Re-drive any ended segment whose completion signal hasn't been acked (each still gated on all
         // its pages being uploaded), so a reconnect flushes them.
         resendEndedSegments()
@@ -170,7 +180,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 delay(8_000)
                 // Flush anything not confirmed on the Mac — failed uploads and any still-PENDING page
                 // (document pages now stream as shot, so a PENDING doc just hasn't reached the Mac yet).
-                val needsSend = items.filter { it.state == UploadState.FAILED || it.state == UploadState.PENDING }
+                val needsSend = items.filter {
+                    it.state == UploadState.FAILED || it.state == UploadState.PENDING || it.needsResend
+                }
                 if (client != null) {
                     if (needsSend.isNotEmpty()) needsSend.forEach { enqueueUpload(it) }
                     // Retry any ended segment whose completion signal hasn't been acked (gated on all its
@@ -315,11 +327,6 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private fun markNeedsResend(id: Long) {
         val i = items.indexOfFirst { it.id == id }
         if (i >= 0 && !items[i].needsResend) { items[i] = items[i].copy(needsResend = true); persist() }
-    }
-
-    private fun clearNeedsResend(id: Long) {
-        val i = items.indexOfFirst { it.id == id }
-        if (i >= 0 && items[i].needsResend) { items[i] = items[i].copy(needsResend = false); persist() }
     }
 
     private fun clearSelection() { selectedItemId = null; armed = false }
@@ -490,14 +497,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         endedSegments.keys.toList().forEach { trySendSegmentComplete(it) }
     }
 
-    /** Heartbeat the count of photos still IN FLIGHT to the Mac (PENDING/UPLOADING) so the Mac can surface
-     *  "phone still has N photos to send" and hold Finish until they arrive — reaching 0 once they settle.
-     *  FAILED pages are deliberately EXCLUDED: they need a manual Retry and won't arrive on their own, so
-     *  they must not block Finish forever (the operator sees + retries them in the phone's strip). */
+    /** Heartbeat every photo not yet confirmed on the Mac. FAILED pages are included because [startAutoRetry]
+     *  sends them again automatically; reporting zero while one exists can let the Mac finish a partial
+     *  session. The count reaches zero only when every retained page is confirmed UPLOADED. */
     private fun sendStatusReport() {
         val c = client ?: return
-        val pending = items.count { it.state == UploadState.PENDING || it.state == UploadState.UPLOADING }
-        viewModelScope.launch { withContext(Dispatchers.IO) { runCatching { c.reportStatus(pending) } } }
+        val pending = pendingReportCount(items)
+        statusChannel.trySend(StatusSnapshot(c, pending))
     }
 
     private fun startNewGroup() {
@@ -546,8 +552,15 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     // causing the re-enqueue to silently no-op).
                     val cur = items.firstOrNull { it.id == item.id }
                     if (cur != null && cur.needsResend) {
-                        clearNeedsResend(item.id)
-                        resendItem = items.firstOrNull { it.id == item.id }
+                        val i = items.indexOfFirst { it.id == item.id }
+                        if (i >= 0) {
+                            // Clear the marker AND return to PENDING in one list replacement before the
+                            // heartbeat below. There is never a visible UPLOADED/no-marker drained window.
+                            val pendingResend = items[i].prepareDeferredResend()
+                            items[i] = pendingResend
+                            persist()
+                            resendItem = pendingResend
+                        }
                     } else {
                         // Confirmed durably on the Mac → drop it from the phone shortly after (the brief delay
                         // lets the strip animate it out), so photos transfer in segments instead of piling up.
