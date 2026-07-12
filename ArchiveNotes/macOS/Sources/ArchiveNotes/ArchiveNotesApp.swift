@@ -1,11 +1,19 @@
 import SwiftUI
+import AppKit
 import ArchiveCore
 
 @main
 struct ArchiveNotesApp: App {
+    @StateObject private var deepLinkRouter = NotesDeepLinkRouter()
+
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
             NotesShellView(kind: .note)
+                .environmentObject(deepLinkRouter)
+                .onOpenURL { url in
+                    NSApp.activate(ignoringOtherApps: true)
+                    deepLinkRouter.handle(url)
+                }
         }
         .commands {
             FormatCommands()
