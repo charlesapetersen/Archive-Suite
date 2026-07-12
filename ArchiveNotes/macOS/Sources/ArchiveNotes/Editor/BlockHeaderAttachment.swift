@@ -1,5 +1,12 @@
 import AppKit
 
+/// Sendable wrapper for a non-Sendable preview callback so it can cross the
+/// MainActor.assumeIsolated boundary in `loadView()`. Safe: loadView always runs on main.
+final class PreviewCallbackBox: @unchecked Sendable {
+    let callback: ((SourceAnchor, NSView) -> Void)?
+    init(_ callback: ((SourceAnchor, NSView) -> Void)?) { self.callback = callback }
+}
+
 /// Reference wrapper so a `SourceAnchor` (value type) can ride on an `NSAttributedString.Key`.
 /// Immutable + `@unchecked Sendable` — all fields are `let`.
 final class SourceAnchorBox: @unchecked Sendable {
@@ -29,9 +36,12 @@ final class BlockHeaderAttachment: NSTextAttachment {
     let sourceBox: SourceAnchorBox
 
     /// Callback invoked when the user clicks "Reveal in Reader" on the chip.
-    /// Set by the coordinator; W4 wires the actual handler. Stub logs in W3.
     /// `nonisolated(unsafe)` — set once after init, read from nonisolated viewProvider.
     nonisolated(unsafe) var onReveal: (@Sendable (SourceAnchor) -> Void)?
+
+    /// Callback invoked when the user clicks "Preview" on the chip.
+    /// Receives the anchor and the view to anchor the popover to.
+    nonisolated(unsafe) var onPreview: ((SourceAnchor, NSView) -> Void)?
 
     init(sourceBox: SourceAnchorBox) {
         self.sourceBox = sourceBox
@@ -59,6 +69,7 @@ final class BlockHeaderAttachment: NSTextAttachment {
         )
         provider.chipBox = sourceBox
         provider.chipReveal = onReveal
+        provider.chipPreview = onPreview
         provider.tracksTextAttachmentViewBounds = true
         return provider
     }
@@ -83,15 +94,17 @@ final class BlockHeaderViewProvider: NSTextAttachmentViewProvider {
     /// inherited interfaces are nonisolated but `loadView` runs on main thread.
     nonisolated(unsafe) var chipBox: SourceAnchorBox?
     nonisolated(unsafe) var chipReveal: (@Sendable (SourceAnchor) -> Void)?
+    nonisolated(unsafe) var chipPreview: ((SourceAnchor, NSView) -> Void)?
 
     // loadView is always called on the main thread by TextKit 2.
     @preconcurrency override func loadView() {
         let box = chipBox
         let reveal = chipReveal
+        let previewBox = PreviewCallbackBox(chipPreview)
         // NSView.init is @MainActor — assumeIsolated is correct here (always main thread).
         let chipView: NSView = MainActor.assumeIsolated {
             if let box {
-                return BlockHeaderChipView(box: box, onReveal: reveal)
+                return BlockHeaderChipView(box: box, onReveal: reveal, onPreview: previewBox.callback)
             }
             return NSView()
         }
@@ -106,11 +119,14 @@ final class BlockHeaderChipView: NSView {
 
     private let box: SourceAnchorBox
     private var onReveal: (@Sendable (SourceAnchor) -> Void)?
+    private var onPreview: ((SourceAnchor, NSView) -> Void)?
 
     @preconcurrency
-    init(box: SourceAnchorBox, onReveal: (@Sendable (SourceAnchor) -> Void)?) {
+    init(box: SourceAnchorBox, onReveal: (@Sendable (SourceAnchor) -> Void)?,
+         onPreview: ((SourceAnchor, NSView) -> Void)? = nil) {
         self.box = box
         self.onReveal = onReveal
+        self.onPreview = onPreview
         super.init(frame: .zero)
         setupSubviews()
     }
@@ -141,7 +157,12 @@ final class BlockHeaderChipView: NSView {
         revealButton.controlSize = .small
         revealButton.font = .systemFont(ofSize: 10)
 
-        let stack = NSStackView(views: [label, revealButton])
+        let previewButton = NSButton(title: "Preview", target: self, action: #selector(previewClicked))
+        previewButton.bezelStyle = .inline
+        previewButton.controlSize = .small
+        previewButton.font = .systemFont(ofSize: 10)
+
+        let stack = NSStackView(views: [label, revealButton, previewButton])
         stack.orientation = .horizontal
         stack.spacing = 6
         stack.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
@@ -158,5 +179,9 @@ final class BlockHeaderChipView: NSView {
 
     @objc private func revealClicked() {
         onReveal?(box.anchor)
+    }
+
+    @objc private func previewClicked() {
+        onPreview?(box.anchor, self)
     }
 }

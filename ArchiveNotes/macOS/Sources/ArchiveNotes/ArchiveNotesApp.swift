@@ -5,11 +5,13 @@ import ArchiveCore
 @main
 struct ArchiveNotesApp: App {
     @StateObject private var deepLinkRouter = NotesDeepLinkRouter()
+    @StateObject private var previewState = SourceBlockPreviewState()
 
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
             NotesShellView(kind: .note)
                 .environmentObject(deepLinkRouter)
+                .environmentObject(previewState)
                 .onOpenURL { url in
                     NSApp.activate(ignoringOtherApps: true)
                     deepLinkRouter.handle(url)
@@ -24,6 +26,7 @@ struct ArchiveNotesApp: App {
         }
         Window("Extracts", id: NotesWindowID.extracts) {
             NotesShellView(kind: .extract)
+                .environmentObject(previewState)
         }
         Settings { NotesSettingsView() }
     }

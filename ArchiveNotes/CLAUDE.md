@@ -75,9 +75,14 @@ macOS/Sources/ArchiveNotes/
   Views/
     NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
-                                   publishes FormattingContext via focusedSceneValue
+                                   wires Reveal (NSWorkspace.open) + Preview (popover) callbacks
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        Settings form (placeholder)
+    ThumbnailImageCache.swift      @MainActor NSCache<NSString, NSImage> (300 count / 64 MB)
+    NotesPDFPaneView.swift         Notes-side PDFPaneController + PDFPaneView (read-only, no-persist)
+    ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for
+                                   needsRootGrant / renamedCandidate / notFound.
+                                   SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)
@@ -123,6 +128,9 @@ macOS/Tests/ArchiveNotesTests/
                                    readPasteboard (UTI/text/empty), block header §6 round-trip
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
+  SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller
+                                   no-crash, chip Reveal+Preview buttons, MarkdownBridge onPreview
+                                   threading, buildInsertableBlock preview, reveal URL validation
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite

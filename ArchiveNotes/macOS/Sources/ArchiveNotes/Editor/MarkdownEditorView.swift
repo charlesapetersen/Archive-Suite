@@ -10,8 +10,10 @@ struct MarkdownEditorView: NSViewRepresentable {
     var fontSize: CGFloat = 14
     var formatting: FormattingContext?
     var assetStore: EditorAssetStore?
-    /// W4 seam: called when "Reveal in Reader" is clicked on a block chip. Stub in W3.
+    /// Called when "Reveal in Reader" is clicked on a block chip.
     var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
+    /// Called when "Preview" is clicked on a block chip. Receives anchor + anchor view for popover.
+    var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -33,6 +35,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.assetStore = assetStore
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
+        context.coordinator.onPreviewBlock = onPreviewBlock
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
         }
@@ -41,7 +44,8 @@ struct MarkdownEditorView: NSViewRepresentable {
         } else {
             let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
                                                assetStore: assetStore,
-                                               onRevealBlock: onRevealBlock)
+                                               onRevealBlock: onRevealBlock,
+                                               onPreviewBlock: onPreviewBlock)
             textView.textStorage?.setAttributedString(styled)
         }
 
@@ -88,7 +92,8 @@ struct MarkdownEditorView: NSViewRepresentable {
                 } else {
                     let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
                                                        assetStore: coordinator.assetStore,
-                                                       onRevealBlock: coordinator.onRevealBlock)
+                                                       onRevealBlock: coordinator.onRevealBlock,
+                                                       onPreviewBlock: coordinator.onPreviewBlock)
                     textView.textStorage?.setAttributedString(styled)
                 }
                 coordinator.isApplyingProgrammaticChange = false
@@ -105,6 +110,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         var formattingContext: FormattingContext?
         weak var assetStore: EditorAssetStore?
         var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
+        var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
@@ -188,7 +194,8 @@ struct MarkdownEditorView: NSViewRepresentable {
                 let styled = MarkdownBridge.parse(markdown: parent.markdown,
                                                    fontSize: currentFontSize,
                                                    assetStore: assetStore,
-                                                   onRevealBlock: onRevealBlock)
+                                                   onRevealBlock: onRevealBlock,
+                                                   onPreviewBlock: onPreviewBlock)
                 textView.textStorage?.setAttributedString(styled)
             }
 
@@ -208,7 +215,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard let textView, !currentIsRaw else { return }
             let chipStr = MarkdownBridge.buildInsertableBlock(
                 kind: kind, anchor: anchor, fontSize: currentFontSize,
-                onReveal: onRevealBlock
+                onReveal: onRevealBlock, onPreview: onPreviewBlock
             )
             textView.undoManager?.beginUndoGrouping()
             textView.insertText(chipStr, replacementRange: textView.selectedRange())
@@ -233,7 +240,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                 }
                 let chipStr = MarkdownBridge.buildInsertableBlock(
                     kind: entry.kind, anchor: entry.anchor, fontSize: currentFontSize,
-                    onReveal: onRevealBlock
+                    onReveal: onRevealBlock, onPreview: onPreviewBlock
                 )
                 textView.insertText(chipStr, replacementRange: textView.selectedRange())
             }

@@ -41,7 +41,8 @@ enum MarkdownBridge {
     @MainActor
     static func parse(markdown: String, fontSize: CGFloat = 14,
                        assetStore: EditorAssetStore? = nil,
-                       onRevealBlock: (@Sendable (SourceAnchor) -> Void)? = nil) -> NSAttributedString {
+                       onRevealBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
+                       onPreviewBlock: ((SourceAnchor, NSView) -> Void)? = nil) -> NSAttributedString {
         if markdown.isEmpty {
             return NSAttributedString(string: "")
         }
@@ -65,7 +66,8 @@ enum MarkdownBridge {
         // Each block: chip attachment + body
         for block in blocks {
             let chipStr = buildChipAttributedString(
-                block: block, fontSize: fontSize, onReveal: onRevealBlock
+                block: block, fontSize: fontSize, onReveal: onRevealBlock,
+                onPreview: onPreviewBlock
             )
             result.append(chipStr)
 
@@ -86,7 +88,8 @@ enum MarkdownBridge {
     @MainActor
     private static func buildChipAttributedString(
         block: Block, fontSize: CGFloat,
-        onReveal: (@Sendable (SourceAnchor) -> Void)?
+        onReveal: (@Sendable (SourceAnchor) -> Void)?,
+        onPreview: ((SourceAnchor, NSView) -> Void)? = nil
     ) -> NSAttributedString {
         let anchor = block.source ?? SourceAnchor()
         let box = SourceAnchorBox(
@@ -97,6 +100,7 @@ enum MarkdownBridge {
         )
         let attachment = BlockHeaderAttachment(sourceBox: box)
         attachment.onReveal = onReveal
+        attachment.onPreview = onPreview
 
         let attachStr = NSMutableAttributedString(attachment: attachment)
         let range = NSRange(location: 0, length: attachStr.length)
@@ -165,14 +169,16 @@ enum MarkdownBridge {
         anchor: SourceAnchor,
         unknownHeaderFields: [(String, String)] = [],
         fontSize: CGFloat = 14,
-        onReveal: (@Sendable (SourceAnchor) -> Void)? = nil
+        onReveal: (@Sendable (SourceAnchor) -> Void)? = nil,
+        onPreview: ((SourceAnchor, NSView) -> Void)? = nil
     ) -> NSAttributedString {
         let block = Block(
             kind: kind, source: anchor, markdown: "",
             unknownHeaderFields: unknownHeaderFields
         )
         return buildChipAttributedString(
-            block: block, fontSize: fontSize, onReveal: onReveal
+            block: block, fontSize: fontSize, onReveal: onReveal,
+            onPreview: onPreview
         )
     }
 
