@@ -158,6 +158,10 @@ final class EditorTextView: NSTextView {
     /// Set by the coordinator when wiring the editor.
     weak var assetStore: EditorAssetStore?
 
+    /// Handler for pasting archive-link payloads as source blocks.
+    /// Set by the coordinator; returns true if handled.
+    var sourceBlockPasteHandler: (([SourceBlockPaster.PasteEntry]) -> Bool)?
+
     /// Image UTIs we accept on the pasteboard.
     private static let imageTypes: Set<NSPasteboard.PasteboardType> = [
         .png, .tiff,
@@ -168,12 +172,22 @@ final class EditorTextView: NSTextView {
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
         if tryPasteImage(from: pb) { return }
+        if tryPasteSourceBlocks(from: pb) { return }
         // For text: prefer plain string to avoid importing unmodeled rich styling
         if let str = pb.string(forType: .string), !str.isEmpty {
             insertPlainText(str)
             return
         }
         super.paste(sender)
+    }
+
+    /// Check the pasteboard for archive-link payloads and delegate to the source-block handler.
+    @discardableResult
+    private func tryPasteSourceBlocks(from pb: NSPasteboard) -> Bool {
+        guard let handler = sourceBlockPasteHandler else { return false }
+        let entries = SourceBlockPaster.readPasteboard(from: pb)
+        guard !entries.isEmpty else { return false }
+        return handler(entries)
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {

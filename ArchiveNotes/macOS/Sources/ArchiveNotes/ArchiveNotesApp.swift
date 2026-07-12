@@ -17,6 +17,7 @@ struct ArchiveNotesApp: App {
         }
         .commands {
             FormatCommands()
+            SourceBlockCommands()
             #if DEBUG
             DebugBlockCommands()
             #endif

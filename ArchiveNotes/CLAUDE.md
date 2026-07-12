@@ -30,7 +30,7 @@ this file is authoritative for Notes‑specific work.
 ```
 macOS/Sources/ArchiveNotes/
   ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands
-  ArchiveNotesCommands.swift       Format menu (⌘B/I/K, ⌘⌥0-6/C/Q/K, ⌘⇧U/O) via FocusedValue
+  ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), DebugBlockCommands
   Models/
     NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
   Store/
@@ -69,7 +69,8 @@ macOS/Sources/ArchiveNotes/
                                    TextKit 2 view provider); W4 seam: onRevealBlock callback
     EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject) +
                                    EditorFormatting actions (bold/italic/code/link/heading/list/
-                                   blockquote/code-block/indent/outdent) + insertTestBlock + FocusedValue key
+                                   blockquote/code-block/indent/outdent) + insertTestBlock +
+                                   pasteSourceBlocks + FocusedValue key
     FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
   Views/
     NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
@@ -77,6 +78,9 @@ macOS/Sources/ArchiveNotes/
                                    publishes FormattingContext via focusedSceneValue
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        Settings form (placeholder)
+  Sources/
+    SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
+                                   thumbnail asset import, entry-count cap (100)
 
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
@@ -113,12 +117,18 @@ macOS/Tests/ArchiveNotesTests/
                                    unknown-fields preserved, absent-header=freeform, malformed tolerated,
                                    chip-first-char, consecutive-chips, second-round-trip-no-op,
                                    thumb-line-consumed, insert-block-seam, leading-text-preserved
+  SourceBlockPasterTests.swift     21 tests: payload→entries (page/doc/invalid/oversized/multi),
+                                   scanURLs (page/doc/multi/non-archive/empty/non-PDF), thumbnail
+                                   import (page/doc/collision), pasteboardHasArchiveLinks (UTI/text/no),
+                                   readPasteboard (UTI/text/empty), block header §6 round-trip
+  ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
+                                   grant/wrong-guid/special-chars + router + root-store
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
   PDF/                             ExtractedContent (PDFHeaderParser), PDFFormatStatus
-  DurableLink.swift                Cross-app link URLs (archivereader:// / archivenotes://)
-  RootMarker.swift                 .archive-suite-root.json identity + Codable
+  Links/                           DurableLink, RootMarker, ArchiveLinkPayload + UTI
+  Thumbnails/                      PDFThumbnailer actor, ThumbnailCacheKey (disk LRU)
   ArchiveSuiteMarker.swift         Suite membership tag recognition + filter
 ```
 

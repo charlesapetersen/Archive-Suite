@@ -49,6 +49,21 @@ struct FormatCommands: Commands {
     }
 }
 
+/// Edit-menu additions: paste archive links as source blocks.
+struct SourceBlockCommands: Commands {
+    @FocusedValue(\.formattingContext) private var formatting
+
+    var body: some Commands {
+        CommandGroup(after: .pasteboard) {
+            Button("Paste as Source Block(s)") {
+                formatting?.pasteSourceBlocks()
+            }
+            .keyboardShortcut("v", modifiers: [.command, .shift])
+            .disabled(formatting == nil)
+        }
+    }
+}
+
 #if DEBUG
 /// Debug menu: insert a test source block to exercise the chip rendering + round-trip.
 struct DebugBlockCommands: Commands {

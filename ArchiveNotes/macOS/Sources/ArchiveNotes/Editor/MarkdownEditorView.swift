@@ -33,6 +33,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.assetStore = assetStore
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
+        textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
+            coordinator?.handleSourceBlockPaste(entries) ?? false
+        }
         if isRaw {
             textView.string = markdown
         } else {
@@ -211,6 +214,32 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.insertText(chipStr, replacementRange: textView.selectedRange())
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
+        }
+
+        // MARK: Source-block paste (W4-S6)
+
+        /// Handle a paste of archive-link entries as source blocks.
+        /// Imports thumbnails via assetStore and inserts each block at the caret.
+        func handleSourceBlockPaste(_ entries: [SourceBlockPaster.PasteEntry]) -> Bool {
+            guard let textView, !currentIsRaw, !entries.isEmpty else { return false }
+            textView.undoManager?.beginUndoGrouping()
+            for var entry in entries.prefix(100) {
+                if let thumbData = entry.thumbnailData, let store = assetStore {
+                    if let ref = SourceBlockPaster.importThumbnail(
+                        thumbData, page: entry.anchor.page, assetStore: store
+                    ) {
+                        entry.anchor.thumbRef = ref
+                    }
+                }
+                let chipStr = MarkdownBridge.buildInsertableBlock(
+                    kind: entry.kind, anchor: entry.anchor, fontSize: currentFontSize,
+                    onReveal: onRevealBlock
+                )
+                textView.insertText(chipStr, replacementRange: textView.selectedRange())
+            }
+            textView.undoManager?.endUndoGrouping()
+            scheduleWriteBack()
+            return true
         }
     }
 }

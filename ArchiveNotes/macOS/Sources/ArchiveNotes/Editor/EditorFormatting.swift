@@ -118,6 +118,13 @@ final class FormattingContext: ObservableObject {
         )
         coordinator?.insertBlock(kind: .readerPage, anchor: anchor)
     }
+
+    /// Paste archive links from the pasteboard as source blocks (Edit menu / ⌘⇧V).
+    func pasteSourceBlocks() {
+        let entries = SourceBlockPaster.readPasteboard()
+        guard !entries.isEmpty else { return }
+        _ = coordinator?.handleSourceBlockPaste(entries)
+    }
 }
 
 // MARK: - FocusedValue key
