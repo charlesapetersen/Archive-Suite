@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCore
 
 /// Archive Reader — a native macOS app for reading & triaging tagged historical-document PDFs.
 ///
@@ -16,9 +17,16 @@ struct ArchiveReaderApp: App {
     @AppStorage(SettingsKey.viewerWinW) private var viewerWinW = 0.0
     @AppStorage(SettingsKey.viewerWinH) private var viewerWinH = 0.0
 
+    @StateObject private var deepLinkRouter = DeepLinkRouter()
+
     var body: some Scene {
         Window("Archive Reader", id: WindowID.navigation) {
             NavigationWindowView()
+                .environmentObject(deepLinkRouter)
+                .onOpenURL { url in
+                    NSApp.activate(ignoringOtherApps: true)
+                    deepLinkRouter.handle(url)
+                }
         }
         .commands { ArchiveReaderCommands() }
 

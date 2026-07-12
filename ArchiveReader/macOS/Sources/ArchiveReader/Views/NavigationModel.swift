@@ -72,6 +72,11 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var scrollRequest = 0
     private(set) var scrollTargetID: ArchiveFile.ID?
 
+    // Deep-link reveal: stashed until the target is visible in library.files (gather deferral).
+    private var pendingReveal: String?
+    private var pendingRevealPage: Int?
+    private var pendingRevealSettledMisses = 0
+
     private var undoStack: [[TagWriteResult]] = []
     private var cancellables = Set<AnyCancellable>()
 
@@ -564,6 +569,7 @@ final class NavigationModel: ObservableObject {
         indexer.startIndexing(filesToIndex)             // incremental; no-op if running
         if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
+        applyPendingRevealIfPossible()                  // deep-link reveal deferral
         // Prune stale index rows — separate from startIndexing (a destructive delete must never ride
         // a harmless-on-empty indexing emission). Gated: settled (not gathering) + non-empty + root known.
         // Uses filesToIndex (excludes user-excluded folders) so excluded paths are eligible for pruning.
@@ -586,6 +592,57 @@ final class NavigationModel: ObservableObject {
         guard scopeWasActive || filter.pathPrefix != path else { return }
         filter.pathPrefix = path
         recompute()
+    }
+
+    // MARK: Deep-link reveal (archivereader://reveal)
+
+    /// Reveal and select a file identified by a deep link. Exits any active scope/filter so the
+    /// target is visible, then selects and scrolls to it. If the library is still gathering, the
+    /// reveal is deferred until the target appears (or settled-absence gives up).
+    func revealAndSelect(rootGUID: UUID, relativePath: String, page: Int?) {
+        guard let root = rootStore.root else {
+            statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"
+            return
+        }
+        guard rootStore.rootMarker?.guid == rootGUID else {
+            statusMessage = "This link points at a different archive. Choose it in File ▸ Choose Archive Folder…"
+            return
+        }
+        let targetPath = root.appendingPathComponent(relativePath).path
+        pendingReveal = targetPath
+        pendingRevealPage = page
+        pendingRevealSettledMisses = 0
+        // Exit any narrowing so the target is visible.
+        clearUserFilters(recompute: false)
+        if scope != nil { setFolderScope(nil) }
+        recompute()
+        applyPendingRevealIfPossible()
+    }
+
+    /// Try to select the pending reveal target. Called after recompute and after each
+    /// `libraryDidChange` emission. Gives up after 3 settled (non-gathering) misses.
+    func applyPendingRevealIfPossible() {
+        guard let targetPath = pendingReveal else { return }
+        // Check if the target is in the current library files.
+        if let file = library.files.first(where: { $0.url.path == targetPath }) {
+            selection = [file.id]
+            requestScroll(to: file.id)
+            statusMessage = ""
+            pendingReveal = nil
+            pendingRevealPage = nil
+            pendingRevealSettledMisses = 0
+            return
+        }
+        // Still gathering — wait for next emission.
+        if library.isGathering { return }
+        // Settled but target not found — increment miss counter.
+        pendingRevealSettledMisses += 1
+        if pendingRevealSettledMisses >= 3 {
+            statusMessage = "Document not found in the current archive."
+            pendingReveal = nil
+            pendingRevealPage = nil
+            pendingRevealSettledMisses = 0
+        }
     }
 
     /// D2: recompute each smart folder's matching-file count over the whole library (cached; refreshed

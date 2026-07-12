@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import ArchiveCore
 
 /// Persists (as a security-scoped bookmark) the archive root folder the user granted, so v1 can
 /// search + read within the sandbox across launches. The only access granted is to that folder;
@@ -8,6 +9,7 @@ import Combine
 @MainActor
 final class RootFolderStore: ObservableObject {
     @Published private(set) var root: URL?
+    @Published private(set) var rootMarker: RootMarker?
 
     private var accessing: URL?
     private let key = "archiveRootBookmark"
@@ -39,6 +41,7 @@ final class RootFolderStore: ObservableObject {
             accessing = url
             if let previous, previous != url { previous.stopAccessingSecurityScopedResource() }
             root = url
+            loadOrEnsureMarker(at: url)
         } catch {
             NSLog("RootFolderStore: could not bookmark \(url.path): \(error)")
         }
@@ -48,6 +51,7 @@ final class RootFolderStore: ObservableObject {
         stopAccessing()
         UserDefaults.standard.removeObject(forKey: key)
         root = nil
+        rootMarker = nil
     }
 
     private func resolveSaved() {
@@ -64,6 +68,7 @@ final class RootFolderStore: ObservableObject {
             }
             accessing = url
             root = url
+            loadOrEnsureMarker(at: url)
             // Refresh a stale bookmark WHILE access is still held — never drop the scope first. (Fix)
             if stale, let fresh = try? url.bookmarkData(options: .withSecurityScope,
                                                         includingResourceValuesForKeys: nil, relativeTo: nil) {
@@ -78,6 +83,18 @@ final class RootFolderStore: ObservableObject {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }
     }
 
+    /// Read or create the `.archive-suite-root.json` marker at the granted root.
+    /// On failure (read-only volume, malformed existing file), log and leave `rootMarker = nil`
+    /// — the app still reads normally; deep links degrade to path-only (no portable guid).
+    private func loadOrEnsureMarker(at url: URL) {
+        do {
+            rootMarker = try RootMarker.ensure(at: url, kind: .reader, name: url.lastPathComponent)
+        } catch {
+            NSLog("RootFolderStore: could not load/create root marker at \(url.path): \(error)")
+            rootMarker = nil
+        }
+    }
+
 #if DEBUG
     /// Set root for UI testing without persisting a bookmark or starting a security scope.
     /// The fixture path is accessible via the UITest-only temporary-exception entitlement,
@@ -86,6 +103,8 @@ final class RootFolderStore: ObservableObject {
     private func adoptTestRoot(_ url: URL) {
         root = url
         // `accessing` stays nil — no scope to release. No bookmark persisted.
+        // Read (but don't create) a marker if present — tests may provide one.
+        rootMarker = try? RootMarker.read(at: url)
     }
 #endif
 }

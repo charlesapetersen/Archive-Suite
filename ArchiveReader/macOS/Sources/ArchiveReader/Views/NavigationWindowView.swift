@@ -4,6 +4,7 @@ import ArchiveCore
 /// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
 struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
@@ -84,6 +85,7 @@ struct NavigationWindowView: View {
         .navigationTitle("Archive Reader")
         .focusedSceneObject(model)
         .focusedSceneValue(\.openSelection) { openSelection() }
+        .onAppear { deepLinkRouter.nav = model }
     }
 
     // MARK: Table (AppKit NSTableView for virtualized, high-performance scrolling at scale)

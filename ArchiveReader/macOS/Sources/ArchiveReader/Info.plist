@@ -22,5 +22,16 @@
     <string>public.app-category.productivity</string>
     <key>NSHumanReadableCopyright</key>
     <string></string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.archivereader.reveal</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>archivereader</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
