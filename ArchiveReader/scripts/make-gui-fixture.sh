@@ -17,7 +17,7 @@
 set -euo pipefail
 
 TAG=/opt/homebrew/bin/tag
-SRC="$HOME/Desktop/Claude/Archive Suite/Test files/Brown Gemini"
+SRC="$HOME/Claude/Archive Suite/Test files/Brown Gemini"
 DST="$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture"
 
 # --- preflight ---

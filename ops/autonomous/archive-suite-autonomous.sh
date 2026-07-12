@@ -23,7 +23,7 @@ set -uo pipefail
 
 # ===== PROJECT CONFIG — to reuse elsewhere, edit these 5 (or set the matching AUTONOMOUS_* env vars) =====
 LABEL="${AUTONOMOUS_LABEL:-archivesuite}"                            # unique slug: names the state dir + launchd job
-REPO="${AUTONOMOUS_REPO:-/Users/<user>/Desktop/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
+REPO="${AUTONOMOUS_REPO:-/Users/<user>/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durable plan (keep it gitignored)
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"  # runtime state (logs, lock, resume prompt)
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
