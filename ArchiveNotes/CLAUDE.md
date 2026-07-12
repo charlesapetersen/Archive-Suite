@@ -48,8 +48,13 @@ macOS/Sources/ArchiveNotes/
   Core/
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
+  Editor/
+    EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find)
+    MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
+                                   freeze-during-edit, raw-toggle (⌘/)
   Views/
-    NotesShellView.swift           Empty 3-pane shell (HStack + PanelDivider)
+    NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
+    NoteEditorPane.swift           Center pane: toolbar (raw toggle) + MarkdownEditorView
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        Settings form (placeholder)
 
@@ -68,6 +73,9 @@ macOS/Tests/ArchiveNotesTests/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip
   OrganizationFileTests.swift      3 tests: round-trip, loadMissing, atomicWrite
+  EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
+                                   flush, programmatic suppress, mode-switch undo-clear/text-preserve,
+                                   lint (no .layoutManager in Editor/)
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite

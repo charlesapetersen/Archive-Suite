@@ -31,12 +31,7 @@ private struct ItemListPane: View {
 private struct DetailPane: View {
     let kind: ItemKindShell
     var body: some View {
-        VStack {
-            placeholder(kind == .note ? "Note" : "Extract")
-            Text("Suite marker: \(ArchiveSuiteMarker.tagName)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
+        NoteEditorPane()
     }
 }
 
