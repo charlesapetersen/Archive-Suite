@@ -55,18 +55,21 @@ macOS/Sources/ArchiveNotes/
                                    Backspace-at-start outdent, paste/drag image + text)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
-                                   EditorAssetStore plumbing for inline images
+                                   EditorAssetStore plumbing, onRevealBlock seam, insertBlock method
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
-                                   CommonMark); inline images (![alt](path)); idempotent for the
-                                   supported formatting subset
+                                   CommonMark); block-header chips (<!-- block: --> → chip attachments);
+                                   inline images (![alt](path)); buildInsertableBlock seam; idempotent
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path),
                                    EditorAssetStore protocol, ScratchAssetStore (test impl)
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
+    BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
+                                   (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
+                                   TextKit 2 view provider); W4 seam: onRevealBlock callback
     EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject) +
                                    EditorFormatting actions (bold/italic/code/link/heading/list/
-                                   blockquote/code-block/indent/outdent) + FocusedValue key
+                                   blockquote/code-block/indent/outdent) + insertTestBlock + FocusedValue key
     FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
   Views/
     NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
@@ -106,6 +109,10 @@ macOS/Tests/ArchiveNotesTests/
                                    preserves path, multiple/empty-alt/second-round-trip, image+bold,
                                    scratch-store write+disambiguate+resolve, attachment metadata,
                                    downsample, parse-with-asset-store
+  BlockChipTests.swift             13 tests: multi-block round-trip, reader-page/zotero/note-passage,
+                                   unknown-fields preserved, absent-header=freeform, malformed tolerated,
+                                   chip-first-char, consecutive-chips, second-round-trip-no-op,
+                                   thumb-line-consumed, insert-block-seam, leading-text-preserved
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite

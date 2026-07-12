@@ -105,6 +105,19 @@ final class FormattingContext: ObservableObject {
         guard let tv = textView else { return }
         state = EditorFormatting.currentState(for: tv)
     }
+
+    /// W3-S5 seam: the coordinator that owns the editor, used for `insertBlock`.
+    weak var coordinator: MarkdownEditorView.Coordinator?
+
+    /// Insert a test source-block chip at the caret (Debug menu).
+    func insertTestBlock() {
+        let anchor = SourceAnchor(
+            link: "archivereader://reveal?root=TEST&rel=test.pdf&page=1",
+            display: "Test Document - p. 1",
+            page: 1
+        )
+        coordinator?.insertBlock(kind: .readerPage, anchor: anchor)
+    }
 }
 
 // MARK: - FocusedValue key

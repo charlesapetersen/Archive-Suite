@@ -48,3 +48,19 @@ struct FormatCommands: Commands {
         }
     }
 }
+
+#if DEBUG
+/// Debug menu: insert a test source block to exercise the chip rendering + round-trip.
+struct DebugBlockCommands: Commands {
+    @FocusedValue(\.formattingContext) private var formatting
+
+    var body: some Commands {
+        CommandMenu("Debug") {
+            Button("Insert Test Source Block") {
+                formatting?.insertTestBlock()
+            }
+            .disabled(formatting == nil)
+        }
+    }
+}
+#endif

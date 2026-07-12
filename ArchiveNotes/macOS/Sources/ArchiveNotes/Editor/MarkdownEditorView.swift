@@ -10,6 +10,8 @@ struct MarkdownEditorView: NSViewRepresentable {
     var fontSize: CGFloat = 14
     var formatting: FormattingContext?
     var assetStore: EditorAssetStore?
+    /// W4 seam: called when "Reveal in Reader" is clicked on a block chip. Stub in W3.
+    var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -25,15 +27,18 @@ struct MarkdownEditorView: NSViewRepresentable {
         if let fmt = formatting {
             fmt.textView = textView
             fmt.fontSize = fontSize
+            fmt.coordinator = context.coordinator
             context.coordinator.formattingContext = fmt
         }
         textView.assetStore = assetStore
         context.coordinator.assetStore = assetStore
+        context.coordinator.onRevealBlock = onRevealBlock
         if isRaw {
             textView.string = markdown
         } else {
             let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
-                                               assetStore: assetStore)
+                                               assetStore: assetStore,
+                                               onRevealBlock: onRevealBlock)
             textView.textStorage?.setAttributedString(styled)
         }
 
@@ -79,7 +84,8 @@ struct MarkdownEditorView: NSViewRepresentable {
                     textView.string = markdown
                 } else {
                     let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
-                                                       assetStore: coordinator.assetStore)
+                                                       assetStore: coordinator.assetStore,
+                                                       onRevealBlock: coordinator.onRevealBlock)
                     textView.textStorage?.setAttributedString(styled)
                 }
                 coordinator.isApplyingProgrammaticChange = false
@@ -95,6 +101,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         weak var textView: EditorTextView?
         var formattingContext: FormattingContext?
         weak var assetStore: EditorAssetStore?
+        var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
@@ -177,7 +184,8 @@ struct MarkdownEditorView: NSViewRepresentable {
                 // Leaving raw: parse and style the Markdown
                 let styled = MarkdownBridge.parse(markdown: parent.markdown,
                                                    fontSize: currentFontSize,
-                                                   assetStore: assetStore)
+                                                   assetStore: assetStore,
+                                                   onRevealBlock: onRevealBlock)
                 textView.textStorage?.setAttributedString(styled)
             }
 
@@ -188,6 +196,21 @@ struct MarkdownEditorView: NSViewRepresentable {
             if parent.isRaw != raw {
                 parent.isRaw = raw
             }
+        }
+
+        // MARK: Insert block (W4 seam)
+
+        /// Insert a source-block chip at the current caret position.
+        func insertBlock(kind: Block.Kind = .readerPage, anchor: SourceAnchor) {
+            guard let textView, !currentIsRaw else { return }
+            let chipStr = MarkdownBridge.buildInsertableBlock(
+                kind: kind, anchor: anchor, fontSize: currentFontSize,
+                onReveal: onRevealBlock
+            )
+            textView.undoManager?.beginUndoGrouping()
+            textView.insertText(chipStr, replacementRange: textView.selectedRange())
+            textView.undoManager?.endUndoGrouping()
+            scheduleWriteBack()
         }
     }
 }

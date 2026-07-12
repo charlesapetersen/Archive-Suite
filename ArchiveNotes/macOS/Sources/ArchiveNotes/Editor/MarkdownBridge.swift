@@ -8,6 +8,9 @@ import AppKit
 /// Round-trip policy (00-overview §6): the supported subset is idempotent —
 /// `serialize(parse(md))` == `normalize(md)`, and a second round-trip is a no-op.
 /// Unsupported visual styling is dropped on serialize; **text is never dropped**.
+///
+/// Block headers (`<!-- block: … -->`) are parsed into `BlockHeaderAttachment` chips
+/// in styled mode and serialized back verbatim. Raw mode shows them as plain text.
 enum MarkdownBridge {
 
     // MARK: - Image regex
@@ -29,13 +32,95 @@ enum MarkdownBridge {
     // MARK: - Parse (Markdown → styled NSAttributedString)
 
     /// Parse a Markdown string into a styled `NSAttributedString` with our custom
-    /// `noteBlockKind` / `noteInlineCode` / `noteImageRelPath` attributes stamped
-    /// for the serializer. If `assetStore` is provided, inline images are loaded as
-    /// thumbnails; otherwise they get a missing-asset placeholder (rel-path is always
-    /// preserved).
+    /// `noteBlockKind` / `noteInlineCode` / `noteImageRelPath` / `noteBlockSource`
+    /// attributes stamped for the serializer.
+    ///
+    /// Block headers (`<!-- block: … -->`) become non-editable chip attachments.
+    /// If `assetStore` is provided, inline images are loaded as thumbnails; otherwise
+    /// they get a missing-asset placeholder (rel-path is always preserved).
     @MainActor
     static func parse(markdown: String, fontSize: CGFloat = 14,
-                       assetStore: EditorAssetStore? = nil) -> NSAttributedString {
+                       assetStore: EditorAssetStore? = nil,
+                       onRevealBlock: (@Sendable (SourceAnchor) -> Void)? = nil) -> NSAttributedString {
+        if markdown.isEmpty {
+            return NSAttributedString(string: "")
+        }
+
+        // Split into blocks using the storage-layer BlockParser
+        let (leadingText, blocks) = BlockParser.parse(markdown)
+
+        // If no block headers, parse the whole thing as a single body
+        if blocks.isEmpty {
+            return parseSingleBody(markdown, fontSize: fontSize, assetStore: assetStore)
+        }
+
+        let result = NSMutableAttributedString()
+
+        // Leading text before the first block header
+        if let leading = leadingText, !leading.isEmpty {
+            let parsed = parseSingleBody(leading, fontSize: fontSize, assetStore: assetStore)
+            result.append(parsed)
+        }
+
+        // Each block: chip attachment + body
+        for block in blocks {
+            let chipStr = buildChipAttributedString(
+                block: block, fontSize: fontSize, onReveal: onRevealBlock
+            )
+            result.append(chipStr)
+
+            // Parse the block body (the markdown after the header)
+            if !block.markdown.isEmpty {
+                let bodyParsed = parseSingleBody(
+                    block.markdown, fontSize: fontSize, assetStore: assetStore
+                )
+                result.append(bodyParsed)
+            }
+        }
+
+        return result
+    }
+
+    /// Build an `NSAttributedString` containing a single chip attachment character
+    /// for a block header.
+    @MainActor
+    private static func buildChipAttributedString(
+        block: Block, fontSize: CGFloat,
+        onReveal: (@Sendable (SourceAnchor) -> Void)?
+    ) -> NSAttributedString {
+        let anchor = block.source ?? SourceAnchor()
+        let box = SourceAnchorBox(
+            anchor: anchor,
+            kind: block.kind,
+            unknownHeaderFields: block.unknownHeaderFields,
+            thumbRef: block.source?.thumbRef
+        )
+        let attachment = BlockHeaderAttachment(sourceBox: box)
+        attachment.onReveal = onReveal
+
+        let attachStr = NSMutableAttributedString(attachment: attachment)
+        let range = NSRange(location: 0, length: attachStr.length)
+        attachStr.addAttribute(.noteBlockSource, value: box, range: range)
+        // Stamp plain block kind so serializer doesn't try to interpret chip as formatted text
+        attachStr.addAttribute(.noteBlockKind, value: BlockKind.plain, range: range)
+        attachStr.addAttribute(.font, value: NSFont.systemFont(ofSize: fontSize), range: range)
+
+        // Add newline after chip so body text starts on the next line
+        let newline = NSAttributedString(string: "\n", attributes: [
+            .font: NSFont.systemFont(ofSize: fontSize),
+            .foregroundColor: NSColor.textColor,
+            .noteBlockKind: BlockKind.plain
+        ])
+        let combined = NSMutableAttributedString()
+        combined.append(attachStr)
+        combined.append(newline)
+        return combined
+    }
+
+    /// Parse a single body segment (no block headers) into styled attributed string.
+    @MainActor
+    private static func parseSingleBody(_ markdown: String, fontSize: CGFloat = 14,
+                                         assetStore: EditorAssetStore? = nil) -> NSAttributedString {
         if markdown.isEmpty {
             return NSAttributedString(string: "")
         }
@@ -54,7 +139,6 @@ enum MarkdownBridge {
         if let parsed = try? AttributedString(markdown: cleaned, options: options) {
             semantic = parsed
         } else {
-            // Fallback: plain text with no styling
             return NSAttributedString(string: markdown, attributes: [
                 .font: NSFont.systemFont(ofSize: fontSize),
                 .foregroundColor: NSColor.textColor,
@@ -62,15 +146,34 @@ enum MarkdownBridge {
             ])
         }
 
-        // Apply visual styling + stamp our custom keys
         let styled = MarkdownStyler.style(semantic, fontSize: fontSize)
 
-        // Restore inline images by replacing placeholder tokens with attachments
         if !imageRefs.isEmpty {
             restoreImageAttachments(in: styled, refs: imageRefs, assetStore: assetStore)
         }
 
         return styled
+    }
+
+    // MARK: - Insert block (seam for W4)
+
+    /// Insert a source block at the given location in the text storage.
+    /// Returns the attributed string to insert (chip + newline).
+    @MainActor
+    static func buildInsertableBlock(
+        kind: Block.Kind = .readerPage,
+        anchor: SourceAnchor,
+        unknownHeaderFields: [(String, String)] = [],
+        fontSize: CGFloat = 14,
+        onReveal: (@Sendable (SourceAnchor) -> Void)? = nil
+    ) -> NSAttributedString {
+        let block = Block(
+            kind: kind, source: anchor, markdown: "",
+            unknownHeaderFields: unknownHeaderFields
+        )
+        return buildChipAttributedString(
+            block: block, fontSize: fontSize, onReveal: onReveal
+        )
     }
 
     // MARK: - Image extraction (pre-parse)
@@ -147,36 +250,85 @@ enum MarkdownBridge {
 
     /// Serialize a styled `NSAttributedString` (with our custom attributes) back to CommonMark.
     /// Text is never dropped; only unmodeled visual styling is lost.
+    ///
+    /// Block-header chip characters (`noteBlockSource` attr) are serialized as
+    /// `<!-- block: kind ... -->` headers with optional `![display](thumb)` lines.
     @MainActor
     static func serialize(_ attributed: NSAttributedString) -> String {
         if attributed.length == 0 { return "" }
 
-        // Split into "paragraphs" by noteBlockKind attribute spans.
-        // Apple's parser may concatenate list items without newlines, so we
-        // can't rely on text lineRange — we split on attribute boundaries.
-        let paragraphs = collectParagraphs(attributed)
-        var lines: [String] = []
-        var prevWasCodeBlock = false
+        // Walk the attributed string, splitting on chip boundaries
+        var result = ""
+        var i = 0
+        let fullLen = attributed.length
 
-        for para in paragraphs {
-            let line = serializeParagraph(attributed, range: para.range, kind: para.kind)
+        while i < fullLen {
+            // Check for a block-header chip at this position
+            if let box = attributed.attribute(.noteBlockSource, at: i,
+                                              effectiveRange: nil) as? SourceAnchorBox {
+                // Emit the block header
+                result += serializeBlockHeader(box)
+                i += 1 // skip the chip attachment character
 
-            // Insert blank line between different block types for readability
-            // (except between consecutive list items of the same kind)
-            if !lines.isEmpty && !prevWasCodeBlock {
-                let isListItem: Bool
-                if case .listItem = para.kind { isListItem = true } else { isListItem = false }
-                let prevIsListItem: Bool
-                if case .listItem = paragraphs[lines.count - 1].kind { prevIsListItem = true }
-                else { prevIsListItem = false }
-                if !isListItem || !prevIsListItem {
-                    // Only add blank separator between different types
-                    // (paragraphs already get separated by \n from join)
+                // Skip the newline after chip if present
+                if i < fullLen, (attributed.string as NSString).character(at: i) == 0x0A { // '\n'
+                    i += 1
                 }
+                continue
             }
 
+            // Find the extent of non-chip content
+            var end = i + 1
+            while end < fullLen {
+                if attributed.attribute(.noteBlockSource, at: end,
+                                        effectiveRange: nil) is SourceAnchorBox {
+                    break
+                }
+                end += 1
+            }
+
+            // Serialize this body segment
+            let bodyRange = NSRange(location: i, length: end - i)
+            let bodyStr = serializeBodySegment(attributed, range: bodyRange)
+            result += bodyStr
+            i = end
+        }
+
+        return result
+    }
+
+    /// Serialize a `SourceAnchorBox` back to the `<!-- block: ... -->` header format.
+    private static func serializeBlockHeader(_ box: SourceAnchorBox) -> String {
+        let block = Block(
+            kind: box.kind,
+            source: box.anchor,
+            markdown: "",
+            unknownHeaderFields: box.unknownHeaderFields
+        )
+        // Reuse BlockParser.serialize for the header, then extract just the header
+        // (it appends the empty markdown, which is fine).
+        var header = BlockParser.serialize(leadingText: nil, blocks: [block])
+        // BlockParser.serialize emits the header only (markdown is ""), no trailing content.
+        // If there's a thumbRef, emit the thumb line after the header.
+        if let thumb = box.thumbRef {
+            let display = box.anchor.display ?? ""
+            header += "![\(display)](\(thumb))\n"
+        }
+        return header
+    }
+
+    /// Serialize a body segment (no chips) using the existing paragraph/inline logic.
+    private static func serializeBodySegment(_ attributed: NSAttributedString,
+                                              range: NSRange) -> String {
+        let sub = attributed.attributedSubstring(from: range)
+        if sub.length == 0 { return "" }
+
+        let paragraphs = collectParagraphs(sub)
+        var lines: [String] = []
+
+        for para in paragraphs {
+            let line = serializeParagraph(sub, range: para.range, kind: para.kind)
             lines.append(line)
-            if case .codeBlock = para.kind { prevWasCodeBlock = true } else { prevWasCodeBlock = false }
         }
 
         return lines.joined(separator: "\n")
@@ -223,8 +375,6 @@ enum MarkdownBridge {
             return "> \(trimmed)"
 
         case .codeBlock(let hint):
-            // Code blocks: the whole paragraph is the code content.
-            // We use fenced code blocks with ``` delimiters.
             let fence = "```"
             let lang = hint ?? ""
             return "\(fence)\(lang)\n\(trimmed)\n\(fence)"
@@ -246,6 +396,11 @@ enum MarkdownBridge {
         var result = ""
         storage.enumerateAttributes(in: range) { attrs, runRange, _ in
             let runText = (storage.string as NSString).substring(with: runRange)
+
+            // Skip block-header chip characters (already handled by the caller)
+            if attrs[.noteBlockSource] is SourceAnchorBox {
+                return
+            }
 
             // Check for inline image attachment — emit ![alt](path)
             if let relPath = attrs[.noteImageRelPath] as? String {
@@ -277,7 +432,6 @@ enum MarkdownBridge {
             if case .codeBlock = blockKind { inCodeBlock = true } else { inCodeBlock = false }
 
             if inCodeBlock {
-                // Inside a code block, emit verbatim (no inline formatting)
                 result += runText
                 return
             }
@@ -302,7 +456,6 @@ enum MarkdownBridge {
                     if isBold && isItalic {
                         inner = "***\(inner)***"
                     } else if isBold {
-                        // Don't wrap headings in ** (headings are already bold visually)
                         if case .heading = blockKind {
                             // heading text: no extra bold wrap
                         } else {
@@ -331,7 +484,6 @@ enum MarkdownBridge {
                 result.append("\\")
                 result.append(ch)
             case "#":
-                // Only escape # at line start
                 if i == 0 {
                     result.append("\\")
                 }
