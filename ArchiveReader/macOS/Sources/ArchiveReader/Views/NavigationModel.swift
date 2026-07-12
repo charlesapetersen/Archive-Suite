@@ -984,6 +984,22 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
     }
 
+    func copyArchiveLinks() {
+        let files = selectedFiles
+        guard !files.isEmpty, let root = rootStore.root, let marker = rootStore.rootMarker else {
+            statusMessage = "Choose an archive folder first."
+            return
+        }
+        Task {
+            let item = await ArchiveLinkWriter.pasteboardItem(
+                for: files, root: root, marker: marker, thumbnailer: nil
+            )
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects([item])
+            statusMessage = "Copied \(files.count) archive link\(files.count == 1 ? "" : "s")."
+        }
+    }
+
     // MARK: Open / reveal
 
     func documentSelection() -> DocumentSelection {

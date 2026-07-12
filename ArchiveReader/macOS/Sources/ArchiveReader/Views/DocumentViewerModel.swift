@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import ArchiveCore
 
 /// Drives the document window: the selected files, the current document, and page cycling.
 /// Loads one document at a time (never materializes the whole selection).
@@ -100,6 +101,24 @@ final class DocumentViewerModel: ObservableObject {
         // Search the text pane first (that is where OCR text lives), then the image pane.
         rightController.findAndSelect(query)
         leftController.findAndSelect(query)
+    }
+
+    /// Copy an archive link for the current page (1-based) to the pasteboard.
+    /// Needs the root + marker from the navigation model to build a durable link.
+    func copyArchivePageLink(root: URL, marker: RootMarker) {
+        guard urls.indices.contains(index) else { return }
+        let fileURL = urls[index]
+        // Page is 1-based in the link format; `index` here is the doc index (not the PDF page).
+        // For the document viewer, "this page" means the current document at page 1 (image page).
+        let page = 1
+        Task {
+            let item = await ArchiveLinkWriter.pageLink(
+                fileURL: fileURL, page: page,
+                root: root, marker: marker, thumbnailer: nil
+            )
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects([item])
+        }
     }
 
     private static let imageExtensions: Set<String> = [

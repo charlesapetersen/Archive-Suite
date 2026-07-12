@@ -58,6 +58,9 @@ struct ArchiveReaderCommands: Commands {
             Button("Copy Link(s)") { nav?.copyLinks() }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(noSelection)
+            Button("Copy Archive Link(s)") { nav?.copyArchiveLinks() }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+                .disabled(noSelection)
             Divider()
             Button("Select Document Run") { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)
@@ -131,6 +134,14 @@ struct ArchiveReaderCommands: Commands {
             Button("Fit Page") { doc?.fitFocused() }
                 .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
             Divider()
+            Button("Copy Archive Link to This Page") {
+                if let doc, let nav {
+                    if let root = nav.rootStore.root, let marker = nav.rootStore.rootMarker {
+                        doc.copyArchivePageLink(root: root, marker: marker)
+                    }
+                }
+            }
+            .disabled(doc == nil || nav == nil)
             Button("Copy") { doc?.copyPlainSelection() }
                 .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
             Button("Copy Cleaned for Prose") { doc?.copySelection() }

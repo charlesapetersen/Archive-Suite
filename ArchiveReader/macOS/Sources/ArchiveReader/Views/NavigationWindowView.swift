@@ -131,6 +131,7 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Reveal in Finder", action: #selector(ContextMenuActions.revealInFinder), keyEquivalent: "")
         menu.addItem(withTitle: "Open in Default App", action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Link(s)", action: #selector(ContextMenuActions.copyLinks), keyEquivalent: "")
+        menu.addItem(withTitle: "Copy Archive Link(s)", action: #selector(ContextMenuActions.copyArchiveLinks), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
@@ -415,6 +416,11 @@ struct NavigationWindowView: View {
                 .help("Copy links to the selected files (⌘⇧C)")
                 .accessibilityIdentifier("ar.toolbar.copyLinks")
 
+            Button { model.copyArchiveLinks() } label: { Label("Copy Archive Links", systemImage: "link.badge.plus") }
+                .disabled(model.selection.isEmpty)
+                .help("Copy durable archive links (⌘⇧L)")
+                .accessibilityIdentifier("ar.toolbar.copyArchiveLinks")
+
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
                 .disabled(model.selection.isEmpty)
                 .help("Mark the selected documents as read (⌘R)")
@@ -589,6 +595,7 @@ final class ContextMenuActions: NSObject {
     @objc func revealInFinder()   { model.revealInFinder() }
     @objc func openInDefaultApp() { model.openInDefaultApp() }
     @objc func copyLinks()        { model.copyLinks() }
+    @objc func copyArchiveLinks() { model.copyArchiveLinks() }
     @objc func markRead()         { model.mark(.read) }
     @objc func markUnread()       { model.mark(.unread) }
     @objc func toggleFlag()       { model.toggleFlagSelection() }
