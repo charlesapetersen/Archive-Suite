@@ -4,6 +4,19 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): failed merged-PDF tag transfer still deleted component PDFs [CRITICAL]
+
+**FIXED:** merging now treats a successful, verified tag write as a prerequisite for retiring the
+per-page PDFs. If tag reading, writing, coordination, or verification fails, the component PDFs remain,
+the source-to-output mappings remain unchanged, and the merged recovery copy is preserved for inspection.
+The implicit `Unread` tag is transferred even when generated tags are otherwise empty. Optional JSON is
+reserved under the same collision-safe basename and copy-verified before component cleanup. The headless
+merge-safety regression injects a tag-write failure and proves the sources remain retryable; its success,
+empty-tag, and JSON-only-collision cases prove cleanup occurs only after all required artifacts are durable.
+(2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): output generation and organization could overwrite prior files [HIGH]
 
 **FIXED:** normal OCR now reserves against both current-run paths and files already on disk; dual-image

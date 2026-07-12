@@ -785,7 +785,14 @@ extension OCRProcessor {
     }
     /// Merge multi-page document segments into single PDFs.
     /// Each segment with >1 page gets combined. Single-page segments are left as-is.
-    func performDocumentMerging(files: [URL], outputDirectory: URL) {
+    typealias MergedTagWriter = (_ tags: [String], _ url: URL,
+                                 _ appColor: String?, _ colorIsAuthoritative: Bool) throws -> Void
+
+    func performDocumentMerging(
+        files: [URL],
+        outputDirectory: URL,
+        tagWriter: MergedTagWriter? = nil
+    ) {
         // Build segments from current classifications if not already built
         let segs: [DocumentSegment]
         if segments.isEmpty {
@@ -812,16 +819,24 @@ extension OCRProcessor {
             // source — two segments sharing a source basename would otherwise overwrite each other.
             let firstOutputPDF = sourcePDFs[0]
             let baseName = firstOutputPDF.deletingPathExtension().lastPathComponent
-            // Ensure the merged URL doesn't collide with an existing file from a prior run
-            // or another segment with the same base name (H1 fix).
-            var mergedURL = outputDirectory.appendingPathComponent(baseName + "_merged.pdf")
+            let originalJSONURL = firstOutputPDF.deletingPathExtension().appendingPathExtension("json")
+            let hasJSON = FileManager.default.fileExists(atPath: originalJSONURL.path)
+
+            // Reserve the merged PDF and its optional JSON sidecar as one basename. A JSON-only prior-run
+            // collision must advance the PDF too, or downstream organization cannot keep the pair aligned.
+            var mergedBaseName = baseName + "_merged"
+            var mergedURL = outputDirectory.appendingPathComponent(mergedBaseName + ".pdf")
+            var mergedJSONURL = outputDirectory.appendingPathComponent(mergedBaseName + ".json")
             var mergeN = 2
-            while _takenOutputPaths.contains(mergedURL.standardizedFileURL.path.lowercased())
-                  || FileManager.default.fileExists(atPath: mergedURL.path) {
-                mergedURL = outputDirectory.appendingPathComponent("\(baseName)_merged (\(mergeN)).pdf")
+            while _takenOutputPaths.contains(OutputFileSafety.pathKey(mergedURL))
+                  || FileManager.default.fileExists(atPath: mergedURL.path)
+                  || (hasJSON && FileManager.default.fileExists(atPath: mergedJSONURL.path)) {
+                mergedBaseName = "\(baseName)_merged (\(mergeN))"
+                mergedURL = outputDirectory.appendingPathComponent(mergedBaseName + ".pdf")
+                mergedJSONURL = outputDirectory.appendingPathComponent(mergedBaseName + ".json")
                 mergeN += 1
             }
-            _takenOutputPaths.insert(mergedURL.standardizedFileURL.path.lowercased())
+            _takenOutputPaths.insert(OutputFileSafety.pathKey(mergedURL))
 
             do {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)
@@ -830,25 +845,37 @@ extension OCRProcessor {
                 // first page in the segment that actually has tags, so the merged PDF isn't left
                 // untagged when only a later page carried tags.
                 let segmentJobs = segment.pdfURLs.compactMap { src in jobs.first(where: { $0.sourceURL == src }) }
-                if let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty }) {
+                // Empty generated tags still mean `Unread` in real-tagging modes. Select a segment job
+                // even when its explicit array is empty whenever the adapter is stamping that implicit tag.
+                let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty })
+                    ?? (MacOSTagger.stampUnread ? segmentJobs.first : nil)
+                if let tagged {
                     // Derive the authoritative color from the classification so a subject
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
                     let color: String? = tagged.classification == .boxLabel ? "Red" :
                                          tagged.classification == .folderLabel ? "Purple" : nil
-                    _ = try? MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
-                                               appColor: color, colorIsAuthoritative: true)
+                    if let tagWriter {
+                        try tagWriter(tagged.appliedTags, mergedURL, color, true)
+                    } else {
+                        _ = try MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
+                                                     appColor: color, colorIsAuthoritative: true)
+                    }
                 }
 
-                // Delete the individual PDFs that were merged
+                // Relocate the sidecar before any component PDF is retired or mapping is advanced. The
+                // transaction copy-verifies and removes the source only after the destination is durable;
+                // any error falls into the recovery path with every component and mapping still intact.
+                if hasJSON {
+                    try OutputFileSafety.relocateArtifactSet([
+                        .init(source: originalJSONURL, destination: mergedJSONURL)
+                    ])
+                }
+
+                // Retire component PDFs ONLY after tag transfer returned successfully. A read/write/
+                // verification failure leaves both the components and merged recovery copy in place,
+                // and the unchanged outputURLMap keeps the run retryable instead of silently losing tags.
                 for pdfURL in sourcePDFs {
                     try? FileManager.default.removeItem(at: pdfURL)
-                }
-
-                // Rename the JSON sidecar (named after the first page's output PDF) to match the merged name
-                let originalJSONURL = firstOutputPDF.deletingPathExtension().appendingPathExtension("json")
-                let mergedJSONURL = outputDirectory.appendingPathComponent(baseName + "_merged.json")
-                if FileManager.default.fileExists(atPath: originalJSONURL.path) {
-                    try? FileManager.default.moveItem(at: originalJSONURL, to: mergedJSONURL)
                 }
 
                 // Update outputURLMap: point all source URLs in this segment to the merged PDF

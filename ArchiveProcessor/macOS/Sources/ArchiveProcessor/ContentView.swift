@@ -36,6 +36,7 @@ struct ContentView: View {
             LiveCaptureRecoveryTestDriver.runIfRequested()   // $0 data-safety self-test (env-gated)
             BatchResumeTestDriver.runIfRequested()           // $0 Process-Files crash-resume self-test (env-gated)
             CollectionOrganizeTestDriver.runIfRequested()    // $0 merged-doc image-filing self-test (env-gated)
+            MergeSafetyTestDriver.runIfRequested()           // $0 merged-doc tag-transfer safety test (env-gated)
             ManifestPersistenceTestDriver.runIfRequested()   // $0 completedDocGroups manifest round-trip (env-gated)
             maybePresentKeyOnboarding()
         }
