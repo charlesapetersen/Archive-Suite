@@ -129,8 +129,11 @@ trap 'exit 0' TERM INT
 # so scrub every CLAUDE* var from this process; children then inherit a clean env. (Keeps OCR_KEY etc.)
 for _v in $(env | sed -n 's/^\(CLAUDE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$_v"; done
 
-# Keep the machine awake for the daemon's whole lifetime (idle-sleep only; display may sleep).
-caffeinate -i -w "$$" &
+# Keep the machine awake for the daemon's whole lifetime. -d (prevent DISPLAY sleep) is essential, not just
+# -i: even on AC (where the system won't idle-sleep), once the display sleeps macOS drops its "prevent sleep
+# while display is on" assertion and the machine darkwakes/sleeps anyway — this cost a ~5h overnight stall
+# on 2026-07-12 (display slept 03:27 → 5h gap). -di holds the display on and keeps the whole machine up.
+caffeinate -di -w "$$" &
 
 log "=== daemon up (pid $$, interval ${INTERVAL}s, budget \$$BUDGET) ==="
 
@@ -173,16 +176,28 @@ tick() {
       --disallowedTools "${DENY[@]}" \
       >> "$STATE/last-session.log" 2>&1 &
   local cpid=$!
-  # Wall-clock hard cap only. (An idle-output watchdog was REMOVED 2026-07-11: it monitored
-  # last-session.log, but `claude -p` writes output only at the END of a run, so the log never grows
-  # mid-session — the watchdog false-killed EVERY session that ran longer than IDLE_MAX even while it was
-  # working productively (it executed two healthy W0-S3 sessions). A correct fast-hang detector would watch
-  # the session TRANSCRIPT (~/.claude/projects/<proj>/*.jsonl, appended per event) instead — deferred.
-  # Genuine hangs are now rare: the taskport password-prompt cause is fixed and GUI is paused.)
+  # Watchdog A — wall-clock hard cap: TERM then KILL claude after MAXRUN. $cpid is claude's own pid.
   ( sleep "$MAXRUN"; kill -TERM "$cpid" 2>/dev/null; sleep 15; kill -KILL "$cpid" 2>/dev/null ) &
   local wpid=$!
+  # Watchdog B — usage-limit fast-fail. When the account hits its cap, `claude -p` can SPIN printing
+  # "You've hit your limit · resets …" for the full MAXRUN instead of exiting (wasted a 75-min window twice
+  # on 2026-07-12, and squanders capacity that frees when the cap resets mid-hang). Watch only THIS session's
+  # NEW output (from the byte offset captured at launch) and kill once that string repeats ≥3× — then the
+  # next ~2-min cycle retries fresh. This is NOT the removed idle-watchdog: that keyed on ABSENCE of output
+  # (false-killing healthy long sessions because claude buffers normal output to the end); THIS keys on a
+  # SPECIFIC string that genuinely streams during the hang, and the ≥3 threshold ignores a one-off transient.
+  local off; off=$(wc -c < "$STATE/last-session.log" 2>/dev/null || echo 0)
+  ( while kill -0 "$cpid" 2>/dev/null; do
+      sleep 20
+      hits=$(tail -c "+$((off+1))" "$STATE/last-session.log" 2>/dev/null | grep -c "You've hit your limit")
+      if [ "${hits:-0}" -ge 3 ]; then
+        printf '%s  %s\n' "$(date '+%F %T')" "watchdog: usage-limit spam (${hits}x) — fast-failing session" >> "$LOG"
+        kill -TERM "$cpid" 2>/dev/null; sleep 5; kill -KILL "$cpid" 2>/dev/null; break
+      fi
+    done ) &
+  local lpid=$!
   wait "$cpid"; local rc=$?
-  kill "$wpid" 2>/dev/null; wait "$wpid" 2>/dev/null
+  kill "$wpid" "$lpid" 2>/dev/null; wait "$wpid" "$lpid" 2>/dev/null
   log "resume session exited rc=$rc"
 
   kill "$hb" 2>/dev/null || true
