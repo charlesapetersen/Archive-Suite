@@ -144,15 +144,19 @@ blast radius. Treat every change to them like a Tier-2 code change:
 
 ## Housekeeping — automatic worktree/branch GC (added 2026-07-11)
 
-Each session mints a `wt/autonomous-<stamp>` worktree + branch. Clean ones the session self-removes (resume
+Each session mints a `wt/<slug>-<stamp>` worktree + branch. Clean ones the session self-removes (resume
 prompt STEP 5), but dirty/interrupted ones — and **all** the merged branch refs — used to pile up (91 stray
 `wt/*` branches accrued before the first sweep). The daemon now GCs its own leftovers itself: `housekeeping()`
-runs in the loop **between sessions** and, for the `wt/autonomous*` namespace only:
+runs in the loop **between sessions**, with a deliberately **split scope** (because sessions don't reliably
+follow the `wt/autonomous-$stamp` template — they improvise slugs like `wt/notes-w3s1-…`):
 
-- removes a worktree whose branch is an **ancestor of `origin/main`** (work provably pushed) — with a **plain
-  `git worktree remove`, never `--force`**;
-- deletes merged `wt/autonomous*` branches (safe: `-D` is gated by the ancestor check, and git refuses to
-  delete a branch still checked out).
+- **Phase 1 — worktree removal, narrow (`wt/autonomous*`):** removes a worktree whose branch is an **ancestor
+  of `origin/main`** with a **plain `git worktree remove`, never `--force`**. Kept narrow so it can't reclaim
+  a clean *interactive* worktree out from under you.
+- **Phase 2 — branch deletion, broad (all merged `wt/*`):** deletes every `wt/*` branch that is an ancestor
+  of `origin/main`, whatever the slug. Safe regardless of scope: `git branch -D` **refuses a branch checked
+  out in any worktree** (an active worktree — yours, or the running session's — is protected), and the merged
+  gate means `-D` drops nothing reachable. This is what actually kills the pile-up (branches were 91 of it).
 
 **Why no `--force` (Tier-2 adversarial review, 2026-07-11).** A 3-lens review of the first draft (which *did*
 use `--force`) found a **high-severity** hole: the `wt/autonomous*` glob also matches a *maintainer's* worktree
@@ -165,8 +169,10 @@ worktree(s) for manual review`. Proven on a 13-assertion scratch matrix (incl. a
 human worktree → kept, work intact). Purely local (no `git fetch`; the session's push already advanced the
 shared `origin/main` ref) so it can't hang the loop; never touches the primary checkout.
 
-- **Reserved namespace:** `wt/autonomous*` belongs to the daemon. When *you* work on the daemon, slug the
-  worktree something else (e.g. `wt/daemon-fix-…`, `wt/hk-…`) so a clean one can't be GC'd out from under you.
+- **Interactive coexistence:** Phase 1 only removes *worktrees* on a `wt/autonomous*` branch, so a worktree
+  you slug anything else is never removed. Phase 2 may delete your merged `wt/*` *branch ref* once its worktree
+  is gone (no data loss — it's on `origin/main`), but never while you have it checked out. Net: your active
+  work is always safe; only fully-pushed leftovers get reclaimed.
 - **Known follow-ups (pre-existing, not this change):** the parent's `trap 'exit 0' TERM INT` doesn't kill the
   backgrounded child, and the watchdog kills only claude's pid (not its process group), so a killed session can
   orphan grandchildren. Harmless to housekeeping now (it won't remove their dirty/in-use worktree), but worth a

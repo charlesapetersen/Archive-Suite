@@ -64,8 +64,11 @@ log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
 #     bite: the dangerous cases are all dirty or in-use, and git refuses to remove those.)
 #   * MERGED-ONLY: only touch a wt/ ref whose tip is an ANCESTOR of origin/main — its commits are provably
 #     pushed, so branch -D drops nothing reachable and worktree removal loses no committed work.
-#   * SCOPE: only the "wt/autonomous*" namespace the daemon's sessions use (resume prompt STEP 3). A human's
-#     differently-slugged worktree is never even considered.
+#   * SCOPE (split, because sessions don't reliably follow the wt/autonomous-$stamp template — they improvise
+#     slugs like wt/notes-w3s1-…): WORKTREE removal (Phase 1) stays narrow to "wt/autonomous*" so it can never
+#     reclaim a clean *interactive* worktree out from under you. BRANCH deletion (Phase 2) covers ALL merged
+#     "wt/*" refs — safe regardless of slug because git refuses to delete a branch checked out in any worktree
+#     (an active worktree, yours or the daemon's, is protected) and the merged gate means zero data loss.
 #   * PURELY LOCAL: no `git fetch` (the session's `push … HEAD:main` already advanced the shared
 #     refs/remotes/origin/main the primary checkout sees) — so this can never hang the loop on a dead network.
 #   * NEVER the primary checkout ($REPO); every step best-effort (|| true / 2>/dev/null) — no `set -e`, so a
@@ -87,12 +90,13 @@ housekeeping() {
   done < <(git worktree list --porcelain \
              | awk '/^worktree /{w=substr($0,10)} /^branch /{print w"\t"substr($0,8)}')
   git worktree prune 2>/dev/null || true
-  # Phase 2: delete merged wt/autonomous branches. Safe: no working tree involved, git refuses to delete a
-  # branch still checked out anywhere (so a dirty worktree skipped above keeps its branch), and the ancestor
-  # gate means -D drops no unpushed commit (plain -d would refuse these because local main lags origin/main).
+  # Phase 2: delete ALL merged wt/* branches (any slug the sessions used). Safe: no working tree involved,
+  # git refuses to delete a branch still checked out anywhere (so an active worktree — a dirty one skipped
+  # above, YOUR interactive one, or the running session's — keeps its branch), and the ancestor gate means -D
+  # drops no unpushed commit (plain -d would refuse these because local main lags origin/main).
   while read -r br; do
     [ -n "$br" ] || continue
-    case "$br" in wt/autonomous*) ;; *) continue ;; esac
+    case "$br" in wt/*) ;; *) continue ;; esac
     git merge-base --is-ancestor "$br" origin/main 2>/dev/null || continue
     git branch -D "$br" 2>/dev/null && delbr=$((delbr+1))
   done < <(git for-each-ref --format='%(refname:short)' refs/heads/wt/ 2>/dev/null)
