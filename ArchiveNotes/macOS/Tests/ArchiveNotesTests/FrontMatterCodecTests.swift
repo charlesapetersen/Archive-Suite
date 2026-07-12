@@ -76,7 +76,7 @@ final class FrontMatterCodecTests: XCTestCase {
         let z = item.zotero[0]
         XCTAssertEqual(z.selectLink, "zotero://select/library/items/ABCD1234")
         XCTAssertEqual(z.itemKey, "ABCD1234")
-        XCTAssertEqual(z.library, "library")
+        XCTAssertEqual(z.library, .user)
         XCTAssertEqual(z.kind, .item)
         XCTAssertEqual(z.citation, "Moore, Gordon E. Oral History. Chemical Heritage Foundation, 2001.")
 
@@ -218,8 +218,8 @@ final class FrontMatterCodecTests: XCTestCase {
             dateUncertain: true,
             quality: 3,
             tags: ["History", "Silicon Valley"],
-            zotero: [ZoteroRef(selectLink: "zotero://select/items/XY", itemKey: "XY",
-                               library: "lib", kind: .item, citation: "Cite A")],
+            zotero: [ZoteroRef(selectLink: "zotero://select/library/items/ABCD1234",
+                               itemKey: "ABCD1234", library: .user, citation: "Cite A")],
             roundup: false,
             created: ref,
             modified: ref,
@@ -345,9 +345,9 @@ final class FrontMatterCodecTests: XCTestCase {
             title: Zotero Unknown
             roundup: false
             zotero:
-              - selectLink: zotero://select/items/X
-                itemKey: X
-                library: lib
+              - selectLink: zotero://select/library/items/ABCD1234
+                itemKey: ABCD1234
+                library: library
                 kind: item
                 future_zotero_key: surprise
             created: 2026-01-01T00:00:00Z
@@ -389,9 +389,9 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(reencoded, text)
     }
 
-    // MARK: - Date with fetched bool
+    // MARK: - Zotero fetchedAt date
 
-    func testZoteroFetchedBool() throws {
+    func testZoteroFetchedAt() throws {
         let text = """
             ---
             schema: 1
@@ -400,18 +400,18 @@ final class FrontMatterCodecTests: XCTestCase {
             title: Fetched
             roundup: false
             zotero:
-              - selectLink: zotero://select/items/Y
-                itemKey: Y
-                library: lib
+              - selectLink: zotero://select/library/items/ABCD1234
+                itemKey: ABCD1234
+                library: library
                 kind: attachment
-                fetched: true
+                fetchedAt: 2026-07-10T21:00:00Z
             created: 2026-01-01T00:00:00Z
             modified: 2026-01-01T00:00:00Z
             ---
 
             """
         let item = try FrontMatterCodec.decode(text)
-        XCTAssertEqual(item.zotero[0].fetched, true)
+        XCTAssertNotNil(item.zotero[0].fetchedAt)
         XCTAssertEqual(item.zotero[0].kind, .attachment)
     }
 
@@ -437,13 +437,13 @@ final class FrontMatterCodecTests: XCTestCase {
             title: Multi Zotero
             roundup: false
             zotero:
-              - selectLink: zotero://select/items/A
-                itemKey: A
-                library: lib
+              - selectLink: zotero://select/library/items/AAAAAAAA
+                itemKey: AAAAAAAA
+                library: library
                 kind: item
-              - selectLink: zotero://select/items/B
-                itemKey: B
-                library: lib
+              - selectLink: zotero://select/groups/42/items/BBBBBBBB
+                itemKey: BBBBBBBB
+                library: 42
                 kind: attachment
             created: 2026-01-01T00:00:00Z
             modified: 2026-01-01T00:00:00Z
@@ -452,8 +452,10 @@ final class FrontMatterCodecTests: XCTestCase {
             """
         let item = try FrontMatterCodec.decode(text)
         XCTAssertEqual(item.zotero.count, 2)
-        XCTAssertEqual(item.zotero[0].itemKey, "A")
-        XCTAssertEqual(item.zotero[1].itemKey, "B")
+        XCTAssertEqual(item.zotero[0].itemKey, "AAAAAAAA")
+        XCTAssertEqual(item.zotero[0].library, .user)
+        XCTAssertEqual(item.zotero[1].itemKey, "BBBBBBBB")
+        XCTAssertEqual(item.zotero[1].library, .group(42))
         XCTAssertEqual(item.zotero[1].kind, .attachment)
     }
 }

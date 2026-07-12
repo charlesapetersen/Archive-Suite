@@ -6,30 +6,6 @@ struct UnknownKey: Sendable, Equatable {
     let rawLines: [String]
 }
 
-/// A reference to a Zotero library item or attachment (00-overview §3.4).
-struct ZoteroRef: Sendable, Equatable {
-    var selectLink: String
-    var itemKey: String
-    var library: String
-
-    enum Kind: String, Sendable, Codable { case item, attachment }
-    var kind: Kind
-    var citation: String?
-    var fetched: Bool?
-    var unknown: [UnknownKey]
-
-    init(selectLink: String, itemKey: String, library: String, kind: Kind,
-         citation: String? = nil, fetched: Bool? = nil, unknown: [UnknownKey] = []) {
-        self.selectLink = selectLink
-        self.itemKey = itemKey
-        self.library = library
-        self.kind = kind
-        self.citation = citation
-        self.fetched = fetched
-        self.unknown = unknown
-    }
-}
-
 /// The domain model for a note or extract (00-overview §3.1, §5).
 /// Serialized to/from Markdown with YAML front-matter via `FrontMatterCodec`.
 struct Item: Sendable, Equatable, Identifiable {

@@ -103,10 +103,11 @@ enum FrontMatterCodec {
             for ref in item.zotero {
                 lines.append("  - selectLink: \(quoteScalar(ref.selectLink))")
                 lines.append("    itemKey: \(quoteScalar(ref.itemKey))")
-                lines.append("    library: \(quoteScalar(ref.library))")
+                lines.append("    library: \(quoteScalar(ref.library.frontMatterValue))")
                 lines.append("    kind: \(ref.kind.rawValue)")
-                if let c = ref.citation  { lines.append("    citation: \(quoteScalar(c))") }
-                if let f = ref.fetched   { lines.append("    fetched: \(f)") }
+                if let pk = ref.parentKey { lines.append("    parentKey: \(quoteScalar(pk))") }
+                if let c = ref.citation   { lines.append("    citation: \(quoteScalar(c))") }
+                if let fa = ref.fetchedAt { lines.append("    fetchedAt: \(formatISO(fa))") }
                 for u in ref.unknown {
                     for raw in u.rawLines { lines.append(raw) }
                 }
@@ -315,7 +316,7 @@ enum FrontMatterCodec {
     // MARK: - Zotero nested map parsing
 
     private static let knownZoteroKeys: Set<String> = [
-        "selectLink", "itemKey", "library", "kind", "citation", "fetched"
+        "selectLink", "itemKey", "library", "kind", "parentKey", "citation", "fetchedAt"
     ]
 
     private static func parseZoteroBlock(_ lines: [String], from start: Int) -> ([ZoteroRef], Int) {
@@ -328,11 +329,13 @@ enum FrontMatterCodec {
             guard let sl = current["selectLink"],
                   let ik = current["itemKey"],
                   let lib = current["library"] else { return }
-            let kind = ZoteroRef.Kind(rawValue: current["kind"] ?? "item") ?? .item
+            let kind = ZoteroRefKind(rawValue: current["kind"] ?? "item") ?? .item
             refs.append(ZoteroRef(
-                selectLink: sl, itemKey: ik, library: lib, kind: kind,
+                selectLink: sl, itemKey: ik,
+                library: ZoteroLibrary.from(frontMatter: lib), kind: kind,
+                parentKey: current["parentKey"],
                 citation: current["citation"],
-                fetched: current["fetched"].flatMap(parseBool),
+                fetchedAt: current["fetchedAt"].flatMap(parseISO),
                 unknown: currentUnknown
             ))
         }
