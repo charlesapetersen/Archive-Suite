@@ -58,6 +58,19 @@ final class NotesNavigationModel: ObservableObject {
     /// Rows selected in the table. A single-row selection loads that item into the detail pane.
     @Published var selection: Set<UUID> = []
 
+    /// A pending single-item **delete-last-instance** confirmation (§3.6, W6-S5). Non-nil ⟹ the view
+    /// MUST present the mandatory modal before anything is deleted; `nil` = nothing pending. (The
+    /// batched folder-delete variant lives on the shared tree, since folder structure is shared.)
+    @Published var pendingDeletion: PendingDeletion?
+
+    /// The item + folder whose removal would delete the item's sole remaining instance (§3.6).
+    struct PendingDeletion: Identifiable, Equatable {
+        let id = UUID()
+        let itemId: UUID
+        let folderId: UUID
+        let title: String
+    }
+
     // MARK: FTS state (keyword search)
 
     /// Item ids matching the active keyword query (bm25). `nil` = no active query (don't intersect).
@@ -150,6 +163,101 @@ final class NotesNavigationModel: ObservableObject {
     func saveAsSmartFolder(named name: String) async {
         let effective = NotesFilter.effective(base: scope ?? NotesFilter(), user: currentUserFilter)
         await model.createSmartFolder(name: name, query: effective)
+    }
+
+    // MARK: Replication + delete-last-instance guard (W6-S5, Tier-2 — 06-viewers §5)
+
+    /// The folders an item belongs to — the "Show all locations" inspector (§5). Only normal folders
+    /// hold memberships (smart folders are queries), sorted by localized name.
+    func locations(of itemId: UUID) -> [VFolder] {
+        let ids = Set(model.organization.foldersContaining(item: itemId))
+        return model.organization.folders
+            .filter { ids.contains($0.id) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Is `folderId` a normal (item-holding) folder? Smart folders + the All-Notes pseudo-root are
+    /// queries, not containers, so a drop / "Add to Folder" onto them is refused (§5).
+    func isNormalFolder(_ folderId: UUID) -> Bool {
+        model.organization.folders.first { $0.id == folderId }?.kind == .normal
+    }
+
+    /// Remove `itemId` from `folderId`, guarding the delete-last-instance case (§3.6). A replicant
+    /// (≥2 memberships) is removed quietly; the LAST membership sets `pendingDeletion` (**no mutation
+    /// yet**) so the view shows the mandatory confirmation. `OrganizationStore.removeMembership` reads
+    /// the count FRESH and returns `.wasLastInstance` without mutating, so a concurrent replicate in
+    /// the other window can't cause a false "last instance."
+    func removeMembership(_ itemId: UUID, from folderId: UUID) async {
+        do {
+            switch try await model.organization.removeMembership(item: itemId, folder: folderId) {
+            case .removed:
+                model.rebuild(); recompute()
+            case .wasLastInstance:
+                let title = model.allItems.first { $0.id == itemId }?.title ?? ""
+                pendingDeletion = PendingDeletion(itemId: itemId, folderId: folderId,
+                                                  title: title.isEmpty ? "Untitled" : title)
+            }
+        } catch { model.statusMessage = "Couldn't remove the note from the folder." }
+    }
+
+    /// Confirm the pending delete-last-instance. **Re-checks the membership count FRESH at confirm
+    /// time**, not just when the modal opened: if a replicate in the other window added another
+    /// instance in between, this is no longer the last one → we quietly unlink and KEEP the file
+    /// (trashing it would strand the new replicant on a trashed note). Only when it is *still* the last
+    /// instance do we force-remove the final membership and move the note to Trash (recoverable) + drop
+    /// its index row. Membership first, file second — a trash failure leaves a recoverable, still-
+    /// findable note (§5). No-op if nothing is pending.
+    func confirmPendingDeletion() async {
+        guard let pending = pendingDeletion else { return }
+        pendingDeletion = nil
+        do {
+            switch try await model.organization.removeMembership(item: pending.itemId, folder: pending.folderId) {
+            case .removed:
+                // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
+                model.rebuild(); recompute(); return
+            case .wasLastInstance:
+                try await model.organization.forceRemoveLastMembership(item: pending.itemId, folder: pending.folderId)
+            }
+        } catch { model.statusMessage = "Couldn't remove the note from the folder."; return }
+        await model.trashItems([pending.itemId])
+        recompute()
+    }
+
+    /// Dismiss the confirmation without deleting anything (the default / Cancel path).
+    func cancelPendingDeletion() { pendingDeletion = nil }
+
+    /// **Replicate** items into `target` (⌥-drag / "Add to Folder…"): add a membership, leaving every
+    /// existing membership intact — the DevonThink replicant (one file, K places). Refuses a non-normal
+    /// target. Never deletes.
+    func replicate(_ ids: [UUID], to target: UUID) async {
+        guard isNormalFolder(target) else {
+            model.statusMessage = "Smart folders can't hold items directly."; return
+        }
+        for id in ids {
+            do { try await model.organization.addMembership(item: id, folder: target) }
+            catch { model.statusMessage = "Couldn't add the note to the folder." }
+        }
+        model.rebuild(); recompute()
+    }
+
+    /// **Move** items into `target` (default drag / "Move to Folder…"), removing them from `source`.
+    /// The target add happens FIRST (idempotent) so the item is never transiently member-less and the
+    /// source-removal can never be the "last instance" — moving a note between folders must never trip
+    /// the delete guard. When `source` is nil (drag from All Notes / a search — no single source
+    /// folder) MOVE degrades to a pure add. Refuses a non-normal target.
+    func move(_ ids: [UUID], to target: UUID, from source: UUID?) async {
+        guard isNormalFolder(target) else {
+            model.statusMessage = "Smart folders can't hold items directly."; return
+        }
+        for id in ids {
+            do { try await model.organization.addMembership(item: id, folder: target) }
+            catch { model.statusMessage = "Couldn't move the note to the folder."; continue }
+            if let source, source != target {
+                // Safe: the add above guarantees ≥2 memberships, so this returns `.removed` (never last).
+                _ = try? await model.organization.removeMembership(item: id, folder: source)
+            }
+        }
+        model.rebuild(); recompute()
     }
 
     // MARK: Keyword search (FTS)

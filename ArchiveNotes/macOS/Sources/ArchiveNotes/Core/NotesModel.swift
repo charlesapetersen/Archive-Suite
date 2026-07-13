@@ -54,6 +54,9 @@ final class NotesModel: ObservableObject {
     private let ownsDataLayer: Bool
     private let index: NotesIndex?
     private let rootStore: RootFolderStore?
+    /// The only file-deleting layer (W2, §16.1). Built in `bootstrap()` on the app path; injectable for
+    /// tests. `delete(_:)` moves an item dir to the macOS Trash (recoverable) — never `removeItem`.
+    private var noteStore: NoteStore?
     private var didBootstrap = false
 
     // MARK: Init
@@ -67,14 +70,17 @@ final class NotesModel: ObservableObject {
         rebuild()
     }
 
-    /// Injection init with a live index — for tests that exercise FTS `search(_:)`. Like
-    /// `init(organization:)` but routes keyword search to a real `NotesIndex`; it still does **not**
-    /// own the data layer (`bootstrap()` stays a no-op), so callers seed items via `replaceItems`.
-    init(organization: OrganizationStore, index: NotesIndex) {
+    /// Injection init with a live index — for tests that exercise FTS `search(_:)` or the W6-S5 delete
+    /// path (`noteStore`). Like `init(organization:)` but routes keyword search to a real `NotesIndex`
+    /// and, when a `noteStore` is supplied, the delete-last-instance path to a real (scratch) store. It
+    /// still does **not** own the data layer (`bootstrap()` stays a no-op), so callers seed items via
+    /// `replaceItems`.
+    init(organization: OrganizationStore, index: NotesIndex, noteStore: NoteStore? = nil) {
         self.organization = organization
         self.ownsDataLayer = false
         self.index = index
         self.rootStore = nil
+        self.noteStore = noteStore
         rebuild()
     }
 
@@ -105,6 +111,7 @@ final class NotesModel: ObservableObject {
         guard ownsDataLayer, !didBootstrap else { return }
         didBootstrap = true
         guard let index, let rootStore, let root = rootStore.root else { rebuild(); return }
+        noteStore = NoteStore(root: root)
         do {
             try await index.open()
             try await organization.load(storeRoot: root)
@@ -267,6 +274,62 @@ final class NotesModel: ObservableObject {
             }
             return orphaned
         } catch { report(error, "delete the folder"); return [] }
+    }
+
+    // MARK: Delete-last-instance path (W6-S5, Tier-2 — §3.6, 06-viewers §5)
+
+    /// Items that would be **permanently deleted** (moved to Trash) by deleting `folderId`: those whose
+    /// *only* membership is this folder. Read FRESH from the org graph at call time (no cached count),
+    /// so a concurrent replicate in the other window can't cause a false positive (§5, analogous to
+    /// TagWriter's fresh-read-inside-the-write rule). Empty ⟹ deleting the folder loses no note (its
+    /// items live elsewhere too, and its subfolders are reparented, not deleted).
+    func strandedByDeletingFolder(_ folderId: UUID) -> [UUID] {
+        organization.items(in: folderId).filter { organization.membershipCount(item: $0) == 1 }
+    }
+
+    /// Titles for `ids` (from the shared item source), for the delete-confirmation copy. Missing items
+    /// fall back to "Untitled".
+    func titles(for ids: [UUID]) -> [String] {
+        let byID = Dictionary(allItems.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
+        return ids.map { byID[$0].map { $0.isEmpty ? "Untitled" : $0 } ?? "Untitled" }
+    }
+
+    /// Delete `folderId` and permanently delete (to Trash) the `stranded` sole-instance notes it held.
+    /// The caller has shown + confirmed the §3.6 batched modal. Order is deliberate: remove memberships
+    /// (the durable org graph) FIRST via `OrganizationStore.deleteFolder`, THEN trash the files — so if
+    /// a trash fails the note is still on disk *and* discoverable under All Notes (0 memberships),
+    /// never silently lost. Subfolders are reparented (never deleted) by `deleteFolder`.
+    func deleteFolderDeletingStranded(_ folderId: UUID, stranded: [UUID]) async {
+        let orphaned: [UUID]
+        do {
+            orphaned = try await organization.deleteFolder(folderId)   // removes memberships, reparents children
+        } catch { report(error, "delete the folder"); return }
+        if selectedFolderId == folderId { setAllNotesScope() }
+        // Trash ONLY items that (a) the user confirmed as stranded AND (b) are *actually* orphaned now
+        // (0 memberships) — `deleteFolder` returns the fresh orphan set, so a replicate between the
+        // modal and this confirm rescues its item from deletion (it keeps its other membership).
+        let confirmed = Set(stranded)
+        await trashItems(orphaned.filter { confirmed.contains($0) })   // trashes + drops rows + reloads
+        rebuild()                                                      // covers the empty case
+    }
+
+    /// Move the given items' folders to the macOS Trash (recoverable — `NoteStore.delete` never
+    /// `removeItem`s) and drop their index rows. The caller must have already removed the items'
+    /// memberships (0 remaining) — the §3.6 guard passed. A per-item trash failure is logged and the
+    /// rest proceed (best-effort; the org graph is already consistent). Reloads the shared item list +
+    /// rebuilds the tree. A no-op with no `noteStore` (injected test store without one) beyond the
+    /// index/reload bookkeeping.
+    func trashItems(_ ids: [UUID]) async {
+        guard !ids.isEmpty else { return }
+        if let noteStore {
+            for id in ids {
+                do { try await noteStore.delete(id) }
+                catch { NSLog("NotesModel: could not move note \(id) to Trash: \(error)") }
+            }
+        }
+        if let index { try? await index.deleteItems(ids) }
+        await reloadItems()
+        rebuild()
     }
 
     // MARK: Pure helpers (unit-tested)
