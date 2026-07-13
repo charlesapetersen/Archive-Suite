@@ -191,6 +191,26 @@ enum RemoveResult: Sendable { case removed; case wasLastInstance }
         memberships.filter { $0.folderId == folder }.map(\.itemId)
     }
 
+    /// Every item id that is a member of `folder` **or any of its descendant folders** (the subtree
+    /// union). Replicated items are counted once (a `Set`). Cycle-safe (a visited guard) and O(F + M).
+    /// This is the graph analog of Reader's path-prefix scope; W6-S4 uses it to scope the item list to
+    /// a selected folder (06-viewers §4, "Folder scope").
+    func subtreeItemIDs(of folder: UUID) -> Set<UUID> {
+        // Build the parent→children adjacency once, then walk the subtree from `folder`.
+        var childrenOf: [UUID: [UUID]] = [:]
+        for f in folders { if let p = f.parentId { childrenOf[p, default: []].append(f.id) } }
+        var subtree: Set<UUID> = [folder]
+        var stack = [folder]
+        while let cur = stack.popLast() {
+            for child in childrenOf[cur] ?? [] where subtree.insert(child).inserted {
+                stack.append(child)
+            }
+        }
+        var ids = Set<UUID>()
+        for m in memberships where subtree.contains(m.folderId) { ids.insert(m.itemId) }
+        return ids
+    }
+
     func membershipCount(item: UUID) -> Int {
         memberships.count(where: { $0.itemId == item })
     }

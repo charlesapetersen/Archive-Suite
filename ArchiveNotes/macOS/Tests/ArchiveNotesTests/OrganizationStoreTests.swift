@@ -280,4 +280,42 @@ struct OrganizationStoreTests {
 
         await index.close()
     }
+
+    // MARK: - subtreeItemIDs (W6-S4 folder scope)
+
+    @Test func subtreeItemIDsIncludesDescendantsAndDedupesReplicants() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        // parent ▸ child ▸ grandchild, plus a sibling outside the parent subtree.
+        let parent = try await store.createFolder(name: "Parent")
+        let child = try await store.createFolder(name: "Child", parent: parent.id)
+        let grandchild = try await store.createFolder(name: "Grandchild", parent: child.id)
+        let sibling = try await store.createFolder(name: "Sibling")
+
+        let inParent = UUID(), inChild = UUID(), inGrandchild = UUID(), inSibling = UUID()
+        let replicant = UUID()   // lives in both child and sibling
+        try await store.addMembership(item: inParent, folder: parent.id)
+        try await store.addMembership(item: inChild, folder: child.id)
+        try await store.addMembership(item: inGrandchild, folder: grandchild.id)
+        try await store.addMembership(item: inSibling, folder: sibling.id)
+        try await store.addMembership(item: replicant, folder: child.id)
+        try await store.addMembership(item: replicant, folder: sibling.id)
+
+        let subtree = store.subtreeItemIDs(of: parent.id)
+        #expect(subtree == [inParent, inChild, inGrandchild, replicant])   // replicant counted once
+        #expect(!subtree.contains(inSibling))
+
+        // A leaf folder returns only its direct members.
+        #expect(store.subtreeItemIDs(of: grandchild.id) == [inGrandchild])
+    }
+
+    @Test func subtreeItemIDsEmptyForUnknownOrEmptyFolder() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let empty = try await store.createFolder(name: "Empty")
+        #expect(store.subtreeItemIDs(of: empty.id).isEmpty)
+        #expect(store.subtreeItemIDs(of: UUID()).isEmpty)   // unknown folder id → empty, no crash
+    }
 }

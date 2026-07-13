@@ -67,6 +67,17 @@ final class NotesModel: ObservableObject {
         rebuild()
     }
 
+    /// Injection init with a live index — for tests that exercise FTS `search(_:)`. Like
+    /// `init(organization:)` but routes keyword search to a real `NotesIndex`; it still does **not**
+    /// own the data layer (`bootstrap()` stays a no-op), so callers seed items via `replaceItems`.
+    init(organization: OrganizationStore, index: NotesIndex) {
+        self.organization = organization
+        self.ownsDataLayer = false
+        self.index = index
+        self.rootStore = nil
+        rebuild()
+    }
+
     /// App init: build the real data layer (index + org store + store-root). The tree stays empty
     /// until `bootstrap()` runs (call it from a `.task` before first render) so no blocking I/O
     /// happens during `App` construction.
@@ -119,6 +130,16 @@ final class NotesModel: ObservableObject {
     /// navigation model recomputes its `displayed` list.
     func replaceItems(_ items: [ItemSummary]) {
         allItems = items
+    }
+
+    // MARK: Keyword search (W6-S4)
+
+    /// Full-text search over the disposable index, in bm25 relevance order (best match first). Returns
+    /// `[]` for a blank query or an injected (index-less) store. The per-window `NotesNavigationModel`
+    /// intersects this with its filtered set and orders by rank (06-viewers §4, §11).
+    func search(_ query: String) async -> [UUID] {
+        guard let index, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        return await index.search(query)
     }
 
     // MARK: Tree rebuild
@@ -186,6 +207,26 @@ final class NotesModel: ObservableObject {
             rebuild()
             return created.id
         } catch { report(error, "create the folder"); return nil }
+    }
+
+    /// Create a root-level **smart** folder whose saved `NotesFilter` is persisted as `queryJSON`
+    /// (§16.3) — the "Save as Smart Folder" action from the filter bar (W6-S4). Name trimmed, empty
+    /// rejected, sibling-deduped. Returns the new folder id.
+    @discardableResult
+    func createSmartFolder(name rawName: String, query: NotesFilter) async -> UUID? {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { statusMessage = "A smart folder needs a name."; return nil }
+        let unique = uniqueSiblingName(name, parent: nil, excluding: nil)
+        guard let data = try? JSONEncoder().encode(query),
+              let json = String(data: data, encoding: .utf8) else {
+            statusMessage = "Couldn't encode the smart folder's query."; return nil
+        }
+        do {
+            let created = try await organization.createFolder(
+                name: unique, parent: nil, kind: .smart, queryJSON: json)
+            rebuild()
+            return created.id
+        } catch { report(error, "create the smart folder"); return nil }
     }
 
     /// Rename a folder. Whitespace-trimmed; empty rejected; deduped against siblings (excluding self).
