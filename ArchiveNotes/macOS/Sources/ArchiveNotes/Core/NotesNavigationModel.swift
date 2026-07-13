@@ -138,6 +138,24 @@ final class NotesNavigationModel: ObservableObject {
         selection = id.map { [$0] } ?? []
     }
 
+    // MARK: Metadata edits (W6-S7 — dates & quality; front-matter only, never a Finder tag)
+
+    /// Set the date + precision for `id`, forwarding to the shared model (§16.1). The metadata inspector
+    /// composes the canonical string for the chosen precision; the model normalizes + persists + re-indexes.
+    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async {
+        await model.setDate(date, precision: precision, for: id)
+    }
+
+    /// Toggle the "date uncertain" flag for `id` (italic date; still sorts by its value).
+    func setDateUncertain(_ uncertain: Bool, for id: UUID) async {
+        await model.setDateUncertain(uncertain, for: id)
+    }
+
+    /// Set the quality (None + 1…5) for `id` — front-matter `quality`, never a Finder tag (D9).
+    func setQuality(_ quality: Int?, for id: UUID) async {
+        await model.setQuality(quality, for: id)
+    }
+
     // MARK: Sort control (from the table header)
 
     func setSort(_ descriptors: [NoteSortDescriptor]) {

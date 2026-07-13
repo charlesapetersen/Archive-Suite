@@ -174,37 +174,8 @@ final class NotesIndexer: ObservableObject {
         guard let data = try? Data(contentsOf: ref.url),
               let text = String(data: data, encoding: .utf8),
               let item = try? FrontMatterCodec.decode(text) else { return nil }
-
-        let bodyText = item.blocks.map(\.markdown).joined(separator: "\n")
-        let fullBody: String
-        if let leading = item.trailingBodyRaw {
-            fullBody = leading + "\n" + bodyText
-        } else {
-            fullBody = bodyText
-        }
-
-        let encoder = JSONEncoder()
-        let tagsJSON = (try? encoder.encode(item.tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-        let authorsJSON = (try? encoder.encode(item.authors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-
-        return NoteIndexRow(
-            id: ref.id,
-            mtime: ref.mtime,
-            title: item.title,
-            kind: item.kind,
-            tags: item.tags.joined(separator: " "),
-            authors: item.authors.joined(separator: " "),
-            authorsJSON: authorsJSON,
-            body: fullBody,
-            date: item.date,
-            datePrecision: item.datePrecision,
-            dateUncertain: item.dateUncertain,
-            sortDate: item.sortDate,
-            quality: item.quality,
-            created: item.created,
-            modified: item.modified,
-            managedTags: tagsJSON
-        )
+        // The Item→row mapping lives on NoteIndexRow so the edit-path re-index (W6-S7) matches exactly.
+        return NoteIndexRow(item: item, mtime: ref.mtime)
     }
 
     // MARK: - Internal

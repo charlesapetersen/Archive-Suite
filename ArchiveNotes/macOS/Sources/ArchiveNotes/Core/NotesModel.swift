@@ -303,6 +303,55 @@ final class NotesModel: ObservableObject {
         return "\(base) \(n)"
     }
 
+    // MARK: Metadata edits (W6-S7 — dates & quality, §16.1)
+    //
+    // Front-matter ONLY (00-overview D2/D9): a note's date + quality live in its own `.md` YAML, never
+    // in a macOS Finder tag. These methods DELIBERATELY do not touch `NotesTagProjector` — subjects are
+    // the one projected facet. Each loads the item through the `NoteStore` actor, mutates a single
+    // field, writes it back atomically, re-indexes that one row, and refreshes the shared `allItems` so
+    // both windows' lists + the detail header update live.
+
+    /// Set the item's date + precision (a `nil`/blank date clears the date entirely). The pair is
+    /// normalized (`Item.normalizedDate`) so the stored string always matches its precision, keeping
+    /// `sortDate` correct — decade → `decade * 10_000`; an uncertain date still sorts by its value
+    /// (rendered italic), never dumped last.
+    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async {
+        let n = Item.normalizedDate(date, precision: precision)
+        await mutateItem(id, "set the date") { item in
+            item.date = n.date
+            item.datePrecision = n.precision
+        }
+    }
+
+    /// Toggle the "date uncertain" flag (the date renders italic but still sorts by its value).
+    func setDateUncertain(_ uncertain: Bool, for id: UUID) async {
+        await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
+    }
+
+    /// Set the quality rating (1...5, 5 highest; `nil` clears it — the "None" case). Written to the
+    /// front-matter `quality` key ONLY (priority-style, D9) — never a Finder tag. Values are clamped
+    /// into 1...5 defensively (the UI offers only None + 1…5).
+    func setQuality(_ quality: Int?, for id: UUID) async {
+        let clamped = quality.map { min(max($0, 1), 5) }
+        await mutateItem(id, "set the quality") { $0.quality = clamped }
+    }
+
+    /// Shared load → mutate → atomic save → single-row re-index → publish path for the field editors
+    /// above. A no-op with no `noteStore` (an injected test model built without one). The on-disk `.md`
+    /// is the source of truth and the index is a rebuilt-from-disk projection, so nothing here can
+    /// corrupt data; errors surface via `statusMessage` like the other mutations.
+    private func mutateItem(_ id: UUID, _ action: String, _ mutate: (inout Item) -> Void) async {
+        guard let noteStore else { return }
+        do {
+            var item = try await noteStore.load(id)
+            mutate(&item)
+            item.modified = Date()
+            let ref = try await noteStore.save(item)
+            if let index { try await index.upsertBatch([NoteIndexRow(item: item, mtime: ref.mtime)]) }
+            await reloadItems()
+        } catch { report(error, action) }
+    }
+
     // MARK: Tree rebuild
 
     /// Recompute the rendered tree + counts from the current organization graph. Call after any

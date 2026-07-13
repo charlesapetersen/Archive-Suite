@@ -21,6 +21,38 @@ struct NoteIndexRow: Sendable {
     let managedTags: String   // JSON array for the items table
 }
 
+extension NoteIndexRow {
+    /// Build a row straight from an in-memory `Item` + its file mtime — the single-item re-index path
+    /// used after an edit (W6-S7 `NotesModel.setDate`/`setQuality`). Mirrors `NotesIndexer.extractRow`
+    /// field-for-field (same body join, same JSON encoding) so a one-item upsert lands identically to a
+    /// full off-actor scan; `extractRow` delegates here to keep the mapping DRY.
+    init(item: Item, mtime: Double) {
+        let bodyText = item.blocks.map(\.markdown).joined(separator: "\n")
+        let fullBody = item.trailingBodyRaw.map { $0 + "\n" + bodyText } ?? bodyText
+        let encoder = JSONEncoder()
+        let tagsJSON = (try? encoder.encode(item.tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let authorsJSON = (try? encoder.encode(item.authors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        self.init(
+            id: item.id,
+            mtime: mtime,
+            title: item.title,
+            kind: item.kind,
+            tags: item.tags.joined(separator: " "),
+            authors: item.authors.joined(separator: " "),
+            authorsJSON: authorsJSON,
+            body: fullBody,
+            date: item.date,
+            datePrecision: item.datePrecision,
+            dateUncertain: item.dateUncertain,
+            sortDate: item.sortDate,
+            quality: item.quality,
+            created: item.created,
+            modified: item.modified,
+            managedTags: tagsJSON
+        )
+    }
+}
+
 /// Lightweight projection of an indexed item — every field the list/sort UI needs
 /// without reading .md files (closes the W6 gap per §16.5).
 struct ItemSummary: Sendable, Identifiable {

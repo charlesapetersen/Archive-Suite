@@ -58,3 +58,45 @@ struct Item: Sendable, Equatable, Identifiable {
         }
     }
 }
+
+extension Item {
+    /// Normalize a `(date, precision)` pair into a *self-consistent* one before it is written to
+    /// front-matter (W6-S7 date UI). The invariant this enforces: the `date` string always carries
+    /// exactly the components its `datePrecision` claims, so `sortDate`/`displayDate` never see a
+    /// string too coarse for the precision (which would silently nil the sort key or drop the item to
+    /// the end of a chronological list). Rules:
+    ///   * no usable 4-digit-ish year ⟹ `(nil, nil)` (undated — the cell shows "—");
+    ///   * `decade` floors the year to its decade ("1975" ⟹ "1970", rendered "1970s");
+    ///   * `month`/`day` **downgrade** to the finest precision the string actually specifies when a
+    ///     lower field is missing/out-of-range (e.g. `day` precision with no day ⟹ `month`; no month
+    ///     ⟹ `year`). Components are zero-padded ("1970-03-05") to match the SPEC date convention.
+    /// Pure + locale-independent; the single source of truth for the write path and unit-tested directly.
+    static func normalizedDate(_ date: String?,
+                               precision: DatePrecision?) -> (date: String?, precision: DatePrecision?) {
+        guard let raw = date?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return (nil, nil) }
+        let parts = raw.split(separator: "-").map(String.init)
+        guard let year = parts.first.flatMap({ Int($0) }), year > 0 else { return (nil, nil) }
+        let yr = String(year)
+        let month = parts.count >= 2 ? Int(parts[1]) : nil
+        let day = parts.count >= 3 ? Int(parts[2]) : nil
+        let validMonth = month.flatMap { (1...12).contains($0) ? $0 : nil }
+        let validDay = day.flatMap { (1...31).contains($0) ? $0 : nil }
+
+        switch precision ?? .year {
+        case .decade:
+            return (String((year / 10) * 10), .decade)
+        case .year:
+            return (yr, .year)
+        case .month:
+            if let m = validMonth { return ("\(yr)-\(pad2(m))", .month) }
+            return (yr, .year)
+        case .day:
+            if let m = validMonth, let d = validDay { return ("\(yr)-\(pad2(m))-\(pad2(d))", .day) }
+            if let m = validMonth { return ("\(yr)-\(pad2(m))", .month) }
+            return (yr, .year)
+        }
+    }
+
+    /// Zero-pad a 1–2 digit component to two digits ("3" → "03"), locale-independent.
+    private static func pad2(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
+}
