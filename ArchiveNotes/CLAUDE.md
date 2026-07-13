@@ -44,14 +44,26 @@ macOS/Sources/ArchiveNotes/
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
   Index/
     NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection)
-    NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates)
+    NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
+                                   allSummaries() list projection (W6-S3)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
-                                   async create/rename/move/delete folders + selection scope (W6-S2)
+                                   async create/rename/move/delete folders + selection scope (W6-S2);
+                                   shared item source (allItems + reloadItems/replaceItems) for the
+                                   per-window list VMs (W6-S3)
+    NotesNavigationModel.swift     @MainActor per-window item-list VM (kindFilter/sort/selection/
+                                   displayed + displayedGeneration + instanceCounts); reads the shared
+                                   NotesModel.allItems, recompute() = kind-filter + sort with a FILTER
+                                   SEAM for W6-S4 (folder scope / tags / quality / date / FTS) (W6-S3)
+    NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
+                                   + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
+                                   adapts Reader LibrarySort)
+    ItemSummaryDisplay.swift       Pure item-list cell rendering: displayDate (decade/year/month/day),
+                                   qualityStars, displayTags (hides ArchiveSuite marker) (W6-S3)
     NotesFolderNode.swift          Id-keyed folder-tree node + buildNormalForest (group-by-parentId,
                                    sortOrder→name sort, distinct-subtree counts, orphan/cycle-safe)
                                    + smartFolderNodes (W6-S2)
@@ -86,13 +98,20 @@ macOS/Sources/ArchiveNotes/
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
-                                   toggle, NotesWindowAccessor window-size persistence, binds the shared
-                                   NotesModel (tree pane = NotesFolderTreeView; item pane → W6-S3;
-                                   detail → NoteEditorPane); .task bootstraps the store
+                                   toggle, NotesWindowAccessor window-size persistence; owns a per-window
+                                   NotesNavigationModel (@StateObject seeded from window kind); item pane =
+                                   kind Picker + NotesTableView, detail = selected-item header + NoteEditorPane
+                                   (W6-S3); .task bootstraps the store
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (OutlineGroup + two-way
                                    @State selection sync, Smart Folders / Folders sections, All Notes
                                    pseudo-row, context-menu create/rename/delete) (W6-S2). Adapts
                                    Reader SidebarView; drag-reparent + batched delete → W6-S5
+    NotesTableView.swift           Center pane — virtualized item table (NSViewRepresentable +
+                                   NSTableViewDiffableDataSource<Int, UUID> + ColumnPickerHeaderView
+                                   hide/show + secondary sort + ContextMenuTableView). Columns
+                                   kind/title/instances/date/quality/tags; tags READ-ONLY (edited in
+                                   detail, W6-S7). Adapts Reader AppKitTableView (no inline NSTokenField)
+                                   (W6-S3)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
