@@ -3,6 +3,24 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13, open)
+
+W7-S1a bound `NoteEditorPane` to the selected item's body (`NoteBodyEditorModel`: load-on-select,
+autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two conscious deferrals:
+
+- **Inline-image paste doesn't persist yet (item-scoped asset store deferred).** `NoteEditorPane` passes
+  **no** `EditorAssetStore`, so pasting/dropping an image into a note editor won't copy it into the item's
+  `assets/` (unchanged from before W7-S1a — the pane never had a store). The clean fix is an item-scoped
+  store backed by `NoteStore.importAsset`, but that API is an **async actor** method while
+  `EditorAssetStore.addAsset` is **synchronous** — bridging them without blocking the main thread is the
+  real work. Deferred to a focused follow-up. (The W2 asset-copy helper already covers *extract* snapshots
+  via `ExtractBuilder`; this gap is only the note editor's inline-paste path.)
+- **GUI drive of load/autosave deferred (GUI paused).** The load-on-select + autosave-on-switch behavior
+  is proven at the model layer (`NoteBodyEditorModelTests` incl. the cross-item race + generation guard;
+  `NotesModelBodyTests` round-trip/reindex/front-matter-preservation), but not yet driven in a live window.
+  When GUI resumes: select note A, type, select B → A's edit persists (assert the on-disk `.md`) and B
+  loads fresh; force-quit within the ~600 ms debounce is the known autosave-window caveat.
+
 ## Test harness — headless full-scheme run crashes (found 2026-07-13, open)
 
 Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore
