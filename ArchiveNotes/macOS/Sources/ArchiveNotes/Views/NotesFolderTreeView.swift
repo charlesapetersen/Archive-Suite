@@ -34,6 +34,7 @@ struct NotesFolderTreeView: View {
     @State private var deleteStranded: [UUID] = []
 
     private static let allNotesTag = "\u{0}ALL"
+    private static let templatesTag = "\u{0}TEMPLATES"
     private static let smartPrefix = "SS:"
 
     var body: some View {
@@ -61,6 +62,11 @@ struct NotesFolderTreeView: View {
                         }
                 }
             }
+            Section {
+                row(name: "Templates", systemImage: "square.on.square", count: model.templates.count)
+                    .tag(Self.templatesTag)
+                    .accessibilityIdentifier("an.sidebar.templates")
+            }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { bottomBar }
@@ -68,6 +74,7 @@ struct NotesFolderTreeView: View {
         .onChange(of: selection) { _, new in applySelection(new) }
         .onChange(of: model.selectedFolderId) { _, _ in syncSelectionFromModel() }
         .onChange(of: model.selectedSmartId) { _, _ in syncSelectionFromModel() }
+        .onChange(of: nav.showingTemplates) { _, _ in syncSelectionFromModel() }
         // Rename
         .alert("Rename Folder", isPresented: boolBinding($renameID), presenting: renameID) { id in
             TextField("Name", text: $renameText)
@@ -157,11 +164,51 @@ struct NotesFolderTreeView: View {
         Button("New Subfolder…") { beginNewFolder(parent: node.id) }
         Button("Rename…") { renameText = node.name; renameID = node.id }
         Divider()
+        templateAssignmentMenu(node)
+        Divider()
         Button("Delete", role: .destructive) {
             deleteName = node.name
             deleteStranded = model.strandedByDeletingFolder(node.id)   // fresh read at click time (§5)
             deleteID = node.id
         }
+    }
+
+    /// "Template ▸ (None / …each template… / Manage…)" — sets THIS folder's direct assignment (§16.4:
+    /// template↔folder lives only in `template_assignments`). A ✓ marks the folder's own assignment;
+    /// child folders inherit via the nearest-ancestor resolver, not shown here.
+    @ViewBuilder private func templateAssignmentMenu(_ node: NotesFolderNode) -> some View {
+        let assigned = assignedTemplateId(node.id)
+        Menu("Template") {
+            Button { Task { await model.assignTemplate(nil, to: node.id) } } label: {
+                checkableLabel("None", checked: assigned == nil)
+            }
+            if !model.templates.isEmpty {
+                Divider()
+                ForEach(model.templates) { t in
+                    Button { Task { await model.assignTemplate(t.id, to: node.id) } } label: {
+                        checkableLabel(t.name, checked: assigned == t.id)
+                    }
+                }
+            }
+            Divider()
+            Button("Manage…") { showTemplates() }
+        }
+    }
+
+    /// A menu label that shows a ✓ only when `checked` (no empty SF Symbol when unchecked).
+    @ViewBuilder private func checkableLabel(_ title: String, checked: Bool) -> some View {
+        Label { Text(title) } icon: { if checked { Image(systemName: "checkmark") } }
+    }
+
+    /// The template assigned directly to `folderId` (not inherited); nil if none.
+    private func assignedTemplateId(_ folderId: UUID) -> UUID? {
+        model.organization.assignments.first { $0.folderId == folderId }?.templateId
+    }
+
+    /// Enter the per-window templates-manager mode and reflect it in the sidebar selection.
+    private func showTemplates() {
+        nav.showingTemplates = true
+        selection = Self.templatesTag
     }
 
     private var bottomBar: some View {
@@ -202,6 +249,8 @@ struct NotesFolderTreeView: View {
     // MARK: Selection sync (mirrors SidebarView.applySelection / syncSelectionFromModel)
 
     private func applySelection(_ new: String?) {
+        if new == Self.templatesTag { nav.showingTemplates = true; return }
+        nav.showingTemplates = false   // any folder/smart/All-Notes selection leaves templates mode
         guard let new, new != Self.allNotesTag else { model.setAllNotesScope(); return }
         if new.hasPrefix(Self.smartPrefix) {
             if let id = UUID(uuidString: String(new.dropFirst(Self.smartPrefix.count))) {
@@ -214,7 +263,8 @@ struct NotesFolderTreeView: View {
 
     private func syncSelectionFromModel() {
         let want: String
-        if let s = model.selectedSmartId { want = Self.smartPrefix + s.uuidString }
+        if nav.showingTemplates { want = Self.templatesTag }
+        else if let s = model.selectedSmartId { want = Self.smartPrefix + s.uuidString }
         else if let f = model.selectedFolderId { want = f.uuidString }
         else { want = Self.allNotesTag }
         if selection != want { selection = want }

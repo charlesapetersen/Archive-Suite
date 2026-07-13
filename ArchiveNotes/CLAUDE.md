@@ -39,9 +39,13 @@ macOS/Sources/ArchiveNotes/
                                    effective(base:user:) merge, tolerant init(from:) (W6-S4)
   Store/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models
+    Template.swift                 Template projection (id/name/kind) + pure TemplateResolution
+                                   (nearest-ancestor walk + dangling detection, §16.4) (W6-S6)
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
-    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets
+    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets;
+                                   container-generic workers also back template storage under
+                                   Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6)
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
   Index/
@@ -60,7 +64,10 @@ macOS/Sources/ArchiveNotes/
                                    per-window list VMs (W6-S3); search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
                                    (fresh read), trashItems (recoverable Trash), deleteFolderDeletingStranded
-                                   (batched), titles(for:) (W6-S5)
+                                   (batched), titles(for:) (W6-S5); templates — @Published templates +
+                                   reloadTemplates, assignTemplate/effectiveTemplate (resolver + lazy
+                                   dangling-cleanup)/templates(matching:), create/duplicate/rename/delete
+                                   template, newItem(kind:in:from:) instantiation (W6-S6)
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
                                    proxy / sort / selection / displayed + displayedGeneration +
                                    instanceCounts); observes shared allItems + scope (mirrored from the
@@ -69,7 +76,8 @@ macOS/Sources/ArchiveNotes/
                                    order; clearUserFilters / saveAsSmartFolder (W6-S3/S4); replication +
                                    delete-last-instance guard — removeMembership (replicant→quiet,
                                    last→pendingDeletion modal), confirmDeletion/cancel (FRESH re-check
-                                   at confirm), move/replicate, locations(of:) (W6-S5)
+                                   at confirm), move/replicate, locations(of:) (W6-S5); windowKind +
+                                   showingTemplates (templates-manager mode) (W6-S6)
     NotesItemDrag.swift            Pure id-only pasteboard codec (JSON [uuidString], custom UTI +
                                    .string) + ⌥=replicate/plain=move resolution; foreign→[] (W6-S5)
     NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
@@ -114,13 +122,20 @@ macOS/Sources/ArchiveNotes/
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
                                    kind Picker + NotesTableView, detail = selected-item header + NoteEditorPane
-                                   (W6-S3); .task bootstraps the store
+                                   (W6-S3); .task bootstraps the store. Toolbar "New" menu (New \(kind) ⌘N
+                                   from nearest-ancestor template + New from Template ▸ matching kind); item
+                                   pane swaps to TemplatesManagerView in templates mode (W6-S6)
+    TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
+                                   list all templates + New/Duplicate/Rename/Delete via NotesModel; body
+                                   editing rides the (deferred) note-editor wiring (W6-S6)
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (OutlineGroup + two-way
                                    @State selection sync, Smart Folders / Folders sections, All Notes
                                    pseudo-row, context-menu create/rename/delete) (W6-S2). Adapts
                                    Reader SidebarView. Folder-row drop target (plain=MOVE / ⌥=REPLICATE
                                    via NSEvent.modifierFlags) + batched delete-last-instance guard
-                                   (fresh stranded read → §5 confirm) (W6-S5); drag-reparent → future
+                                   (fresh stranded read → §5 confirm) (W6-S5); drag-reparent → future.
+                                   Templates anchor row + folder "Template ▸" assignment submenu
+                                   (None / each template / Manage…) → NotesModel.assignTemplate (W6-S6)
     NotesTableView.swift           Center pane — virtualized item table (NSViewRepresentable +
                                    NSTableViewDiffableDataSource<Int, UUID> + ColumnPickerHeaderView
                                    hide/show + secondary sort + ContextMenuTableView). Columns
@@ -192,6 +207,11 @@ macOS/Tests/ArchiveNotesTests/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip
   OrganizationFileTests.swift      3 tests: round-trip, loadMissing, atomicWrite
+  TemplateTests.swift              19 tests (W6-S6): TemplateResolution (nearest-ancestor / self-over-
+                                   ancestor / blank / dangling-reported / dangling-fall-through / cycle),
+                                   NoteStore template CRUD + no-leak + rename-on-save, NotesModel
+                                   assign/effective-dangling/delete-clears-assignments/new-from-template/
+                                   blank-defaults-Inbox+Extracts/kind-filter
   EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
                                    flush, programmatic suppress, mode-switch undo-clear/text-preserve,
                                    lint (no .layoutManager in Editor/)

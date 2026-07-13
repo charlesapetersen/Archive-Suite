@@ -43,7 +43,7 @@ struct NotesBrowserView: View {
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
                              range: NotesLayoutSettings.treeWidthRange, id: "an.divider.tree")
             }
-            ItemListPane(nav: nav)
+            ItemListPane(model: model, nav: nav)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             PanelDivider(width: $detailWidth, panelOnLeft: false,
                          range: NotesLayoutSettings.detailWidthRange, id: "an.divider.detail")
@@ -82,6 +82,39 @@ struct NotesBrowserView: View {
             .help(showingTree ? "Hide Folders" : "Show Folders")
             .accessibilityIdentifier("an.toggleTree")
         }
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                // ⌘N: new item using the nearest-ancestor template of the current scope (§6), else blank.
+                Button("New \(kindLabel)") {
+                    newItem(from: model.effectiveTemplate(for: model.selectedFolderId)?.id)
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                Divider()
+                Menu("New from Template") {
+                    Button("Blank") { newItem(from: nil) }
+                    let offered = model.templates(matching: nav.windowKind)
+                    if !offered.isEmpty { Divider() }
+                    ForEach(offered) { t in Button(t.name) { newItem(from: t.id) } }
+                }
+            } label: {
+                Image(systemName: "square.and.pencil")
+            }
+            .help("New \(kindLabel.lowercased())")
+            .accessibilityIdentifier("an.toolbar.new")
+        }
+    }
+
+    private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }
+
+    /// Create a new item in the current folder scope (system default when unscoped, §16.6), from
+    /// `templateId` when given, then select it (leaving templates mode if active).
+    private func newItem(from templateId: UUID?) {
+        Task {
+            if let id = await model.newItem(kind: nav.windowKind, in: model.selectedFolderId, from: templateId) {
+                nav.showingTemplates = false
+                nav.selection = [id]
+            }
+        }
     }
 
     /// Restore the saved window frame on first appearance (centered on the active screen). Runs once
@@ -105,21 +138,29 @@ struct NotesBrowserView: View {
 // MARK: - Item-list pane (W6-S3 · filter bar W6-S4)
 
 /// Center pane: the filter bar (kind · keyword FTS · quality · tags · date range · Save/Clear, W6-S4)
-/// above the virtualized item table.
+/// above the virtualized item table — or, in templates mode (sidebar "Templates" row / a folder's
+/// "Template ▸ Manage…"), the templates manager (W6-S6).
 private struct ItemListPane: View {
+    @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            NotesFilterBar(nav: nav)
-            Divider()
-            NotesTableView(
-                model: nav,
-                selection: $nav.selection,
-                onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
-                buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) }  // W6-S5
-            )
-            .accessibilityIdentifier("an.list.table")
+        Group {
+            if nav.showingTemplates {
+                TemplatesManagerView(model: model, nav: nav)
+            } else {
+                VStack(spacing: 0) {
+                    NotesFilterBar(nav: nav)
+                    Divider()
+                    NotesTableView(
+                        model: nav,
+                        selection: $nav.selection,
+                        onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
+                        buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) }  // W6-S5
+                    )
+                    .accessibilityIdentifier("an.list.table")
+                }
+            }
         }
         .background(Color(nsColor: .textBackgroundColor))
     }

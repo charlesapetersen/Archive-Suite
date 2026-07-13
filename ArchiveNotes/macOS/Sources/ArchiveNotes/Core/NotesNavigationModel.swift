@@ -22,6 +22,11 @@ final class NotesNavigationModel: ObservableObject {
     /// the shared model never references back, so there is no retain cycle.
     let model: NotesModel
 
+    /// This window's default item kind (Notes window → `.note`, Extracts window → `.extract`). Drives
+    /// "New \(kind)" + which templates "New from Template" offers (§6). Distinct from the mutable
+    /// `filter.kind`, which the user can retarget via the kind picker.
+    let windowKind: Item.Kind
+
     /// The per-window user filter: kind (proxied by `kindFilter`) + tags + qualities + date range. Its
     /// `searchText` stays empty — the live keyword field (`searchText` below) drives FTS instead of a
     /// title substring, so body matches surface; `searchText` is only folded in on "Save as Smart
@@ -58,6 +63,10 @@ final class NotesNavigationModel: ObservableObject {
     /// Rows selected in the table. A single-row selection loads that item into the detail pane.
     @Published var selection: Set<UUID> = []
 
+    /// Per-window view mode: when true the item pane shows the templates manager instead of the note
+    /// list (the sidebar "Templates" row / a folder's "Template ▸ Manage…" toggles it). W6-S6.
+    @Published var showingTemplates = false
+
     /// A pending single-item **delete-last-instance** confirmation (§3.6, W6-S5). Non-nil ⟹ the view
     /// MUST present the mandatory modal before anything is deleted; `nil` = nothing pending. (The
     /// batched folder-delete variant lives on the shared tree, since folder structure is shared.)
@@ -89,6 +98,7 @@ final class NotesNavigationModel: ObservableObject {
 
     init(model: NotesModel, defaultKind: ItemKindShell) {
         self.model = model
+        self.windowKind = (defaultKind == .extract) ? .extract : .note
         self.filter = NotesFilter(kind: (defaultKind == .extract) ? .extracts : .notes)
         // Recompute whenever the shared item source changes (index load / refresh).
         model.$allItems
