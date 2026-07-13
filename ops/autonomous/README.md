@@ -18,7 +18,11 @@ context compaction, and session restarts. Standing principles: memory `autonomou
   early (see "Health watchdog" below) behind a 3 h wall-clock backstop, and a stale-lock guard so cycles never
   overlap. The script lives in `~/.local/bin` (outside the TCC-protected `~/Desktop`).
 - **L2 — the resume prompt (`resume-prompt.txt`).** The exact instructions each fresh session follows
-  (recover state → pick the first `[ ]` item → own worktree → verify → commit+push+tick → stop).
+  (recover state → pick the first `[ ]` item → own worktree → verify → **checkpoint-commit+push as it goes** →
+  finish+tick → stop). **Checkpointing bounds redo:** an interrupted session (usage cutoff / watchdog) loses
+  only the work since its last push, and the next session **continues** from the committed checkpoints
+  (detected via `git log` + the plan's Session Log) rather than restarting the whole item. Only the *final*
+  commit flips the `SUITE_TODO` checkbox; interim checkpoints are plain mid-feature commits.
 
 ## Install / run
 

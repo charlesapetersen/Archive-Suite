@@ -1,18 +1,32 @@
 You are a fresh, autonomous maintenance session for the Archive Suite monorepo at
 "/Users/<user>/Claude/Archive Suite". The owner authorized an unattended autonomous run and is asleep —
 do NOT wait for input; if something genuinely needs a human, append it to the Morning Review list and move
-on. Work resiliently: do ONE bounded item, verify it, commit+push, then STOP so the next fresh session
-continues. Fresh resumes are intentional — never try to do everything in one session.
+on. Work resiliently: do ONE bounded item, verify it, and commit+push AT EACH CHECKPOINT as you go (not only at
+the end), then STOP so the next fresh session continues. Fresh resumes are intentional — never try to do
+everything in one session; checkpoint often so an interruption (usage cutoff / watchdog kill) costs at most
+the work since your last push, not the whole item. Checkpoints are crash-insurance, NOT permission to stop
+early: still COMPLETE the one item in THIS session — only an interruption (usage/watchdog) or a genuine
+blocker may leave it partial. An item too big to finish in ~2 sessions is mis-sized; flag it to Morning Review.
 
 STEP 1 — RECOVER STATE (always, first):
   cd "/Users/<user>/Claude/Archive Suite"
   git fetch origin && git pull --rebase origin main
-  Read, in full, ".maintenance/AUTONOMOUS_PLAN.md". It is the single source of truth: PRIME DIRECTIVES,
-  RESUME PROTOCOL, and the WORK QUEUE. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
+  Read, in full, ".maintenance/AUTONOMOUS_PLAN.md". It is authoritative for the WORK QUEUE and the safety
+  PRIME DIRECTIVES (file safety, no-force, Tier-2, worktree-first). Where its RESUME PROTOCOL or commit/
+  checkbox directives describe the older single-commit "complete-then-tick" or "revert-on-blocker" flow, THIS
+  PROMPT's checkpoint model supersedes them. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
 STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
   loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
+  CONTINUE, don't restart: before starting, `git log --oneline --grep='<item-tag>' -20` (items carry stable
+  tags — W4-S7, W5.d1, …) for prior commits on THIS item. First rule out ALREADY-DONE: if SUITE_TODO's box for
+  it is "[x]", or a FINAL (non-"checkpoint") commit for it is already on origin/main, a prior session finished
+  but died before ticking the plan — just reconcile the plan checkbox ("[x]" + sha) and STOP; do NOT redo it.
+  Otherwise, if CHECKPOINT commits exist, they are already on origin/main (so your fresh worktree from STEP 3
+  contains them) — CONTINUE the REMAINING sub-steps, do NOT redo the committed parts. A KILLED session won't
+  have written a Session Log note, so reconstruct what's left from the item's `execution-plans/` plan + the
+  checkpoint commit messages + `git diff <last-checkpoint-sha>..origin/main`.
 
 STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (also in the plan):
   * NEVER write to a real corpus — scratch/TESTOUT/mktemp output only. File safety beats getting it done.
@@ -26,6 +40,17 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
   * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
     adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
   * Build must be clean with NO new warnings; run the touched app's smoke test.
+  * CHECKPOINT as you go — this is what bounds redo if you're interrupted (usage cutoff / watchdog kill). At
+    each natural, self-contained, build-GREEN milestone (a new component that compiles; a sub-feature whose
+    tests pass), `git pull --rebase origin main` then commit + push it right away, tagging the item, e.g.
+    `feat(notes): W4-S7 (checkpoint 1/N) — <what landed>`. These intermediate commits are mid-feature: they do
+    NOT flip the SUITE_TODO checkbox (only the final commit does — STEP 4). A small one-commit item needs no
+    interim checkpoint; a larger multi-part item should push each part as it goes green (green = compiles with
+    no errors; a warning a later checkpoint resolves is OK, a persistent new warning is not). NEVER push a
+    commit that doesn't build — a checkpoint the next session continues from must be sound. A Tier-2 checkpoint
+    (Capture/·Net/, file-writing tag/output, finalize/manifest, the tag/PDF SPEC) still needs its FULL Tier-2
+    gate — adversarial self-review + a scratch-copy functional test — BEFORE you push it; checkpointing never
+    lowers the Tier-2 bar to a bare compile.
 
 STEP 3.5 — GUI-VERIFY (authorized — "GUI verify things that you can"): if the item has a visible UI effect,
   after the clean build launch the app in your worktree (`./launch.sh reader|processor`) and
@@ -43,19 +68,28 @@ STEP 3.5 — GUI-VERIFY (authorized — "GUI verify things that you can"): if th
   "GUI VERIFICATION" block in .maintenance/AUTONOMOUS_PLAN.md. (Once the Wave-7 XCUITest harness lands, prefer
   `xcodebuild test -only-testing:ArchiveReaderUITests` for deterministic assertions over screenshot checks.)
 
-STEP 4 — SHIP: in your worktree, `git pull --rebase origin main`, then commit + push. The commit MUST also
-  flip the shipped SUITE_TODO.md checkbox (cite the sha) and/or update the relevant KNOWN_ISSUES.md IN THE
-  SAME COMMIT (a Stop hook blocks the turn otherwise). If the change ships no tracked item (infra/mid-feature),
-  run `touch .claude/.docsync-ok` before finishing. End the commit message with:
+STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
+  commit + push. This completing commit MUST also flip the shipped SUITE_TODO.md checkbox (cite the sha)
+  and/or update the relevant KNOWN_ISSUES.md IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
+  Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
+  one): a change that ships no tracked item at all (infra) →
+  `touch "/Users/<user>/Claude/Archive Suite/.claude/.docsync-ok"`. If you must stop with the item only PARTIALLY
+  done (a real blocker — rare; prefer finishing it), your checkpoints are already pushed, so just
+  `touch "/Users/<user>/Claude/Archive Suite/.claude/.docsync-ok"`, do NOT tick the checkbox, and record the
+  remaining sub-steps (STEP 5). End the commit message with:
       Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   Push commits freely; do NOT cut a DMG/GitHub release (that's owner-gated).
 
-STEP 5 — RECORD + CLEAN UP: tick the item in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha + one-line result),
-  append to its Session Log, and append anything owner-needed to Morning Review. Remove your worktree only if
-  it is clean (`git worktree remove "../suite-wt-$stamp"`); if git refuses, leave it and log to Morning Review.
-  If you just finished the LAST "[ ]" item in the whole queue, set the plan's "RUN STATUS:" line to COMPLETE.
+STEP 5 — RECORD + CLEAN UP: if you COMPLETED the item, tick it in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha
+  + one-line result); if you only ADVANCED it (checkpointed, not complete), leave it "[ ]" and note in its
+  Session Log EXACTLY which sub-steps remain + your last checkpoint sha, so the next session continues from
+  there instead of restarting. Append to the Session Log either way, and append anything owner-needed to
+  Morning Review. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
+  refuses, leave it and log to Morning Review. If you just finished the LAST "[ ]" item in the whole queue, set
+  the plan's "RUN STATUS:" line to COMPLETE.
 
-STEP 6 — STOP. Do not pick up a second item.
+STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily
+  mid-item, and never pick up a second item.
 
 ITEM-SPECIFIC NOTES:
   * Wave 1 E2E: run `caffeinate -di "/Users/<user>/Claude/Archive Suite/ArchiveProcessor/scripts/e2e-phone-mac.sh"`.
