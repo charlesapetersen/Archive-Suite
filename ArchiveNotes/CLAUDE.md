@@ -103,6 +103,10 @@ macOS/Sources/ArchiveNotes/
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle,
                                    extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1)
+    NotePassageSource.swift        NotePassageBlockMap (pure chip-delimited block-ordinal map, shared with
+                                   the S3 jump-to-source side) + EditorPassageSource (the live
+                                   PassageSelectionSource over a value snapshot of the editor text —
+                                   D7 independence; snapshotMarkdown → CommonMark + inline-image bytes) (W7-S2)
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
                                    list keyboard: Tab/Shift-Tab indent, Return continue,
@@ -260,6 +264,10 @@ macOS/Tests/ArchiveNotesTests/
                                    plain-text fallback, prefer-UTI, degrade nil (text-only/malformed/
                                    empty), payload→note-passage blocks bridge, notes-only coercion
                                    (keep well-formed / drop reader-source + malformed→freeform)
+  NotePassageSourceTests.swift     13 tests (W7-S2): blockRanges (empty / plain / prose+chip / starts-with-
+                                   chip / two-chips, all disjoint-covering), selection→passage (single /
+                                   cross-block / empty / discontiguous-in-doc-order), snapshotMarkdown
+                                   (serialize / image-bytes-by-bare-name / empty), live-init value-copy
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
   SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller
