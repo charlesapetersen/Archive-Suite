@@ -88,32 +88,16 @@ struct NotesBrowserView: View {
     }
 }
 
-// MARK: - Item-list pane (W6-S3)
+// MARK: - Item-list pane (W6-S3 · filter bar W6-S4)
 
-/// Center pane: kind segmented control (notes / extracts / both) above the virtualized item table.
+/// Center pane: the filter bar (kind · keyword FTS · quality · tags · date range · Save/Clear, W6-S4)
+/// above the virtualized item table.
 private struct ItemListPane: View {
     @ObservedObject var nav: NotesNavigationModel
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker("Kind", selection: $nav.kindFilter) {
-                    Text("Notes").tag(KindFilter.notes)
-                    Text("Extracts").tag(KindFilter.extracts)
-                    Text("Both").tag(KindFilter.both)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 260)
-                .accessibilityIdentifier("an.list.kind")
-                Spacer()
-                Text("\(nav.displayed.count)")
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .help("Items shown")
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            NotesFilterBar(nav: nav)
             Divider()
             NotesTableView(
                 model: nav,

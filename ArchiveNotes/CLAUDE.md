@@ -34,7 +34,9 @@ macOS/Sources/ArchiveNotes/
   ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), ZoteroCommands
                                    (Note ▸ Attach Zotero Link…), DebugBlockCommands
   Models/
-    NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
+    NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
+                                   date-range/tags ALL|ANY/title-substring/graph folder-membership),
+                                   effective(base:user:) merge, tolerant init(from:) (W6-S4)
   Store/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
@@ -47,18 +49,22 @@ macOS/Sources/ArchiveNotes/
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
                                    allSummaries() list projection (W6-S3)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
-    OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json
+    OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
+                                   subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
                                    async create/rename/move/delete folders + selection scope (W6-S2);
                                    shared item source (allItems + reloadItems/replaceItems) for the
-                                   per-window list VMs (W6-S3)
-    NotesNavigationModel.swift     @MainActor per-window item-list VM (kindFilter/sort/selection/
-                                   displayed + displayedGeneration + instanceCounts); reads the shared
-                                   NotesModel.allItems, recompute() = kind-filter + sort with a FILTER
-                                   SEAM for W6-S4 (folder scope / tags / quality / date / FTS) (W6-S3)
+                                   per-window list VMs (W6-S3); search(_:) FTS façade + createSmartFolder
+                                   (W6-S4)
+    NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
+                                   proxy / sort / selection / displayed + displayedGeneration +
+                                   instanceCounts); observes shared allItems + scope (mirrored from the
+                                   delivered @Published value); recompute() = scope → user filter →
+                                   keyword FTS (bm25, debounced, relevance auto-sort, generation guard) →
+                                   order; clearUserFilters / saveAsSmartFolder (W6-S3/S4)
     NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
@@ -112,6 +118,9 @@ macOS/Sources/ArchiveNotes/
                                    kind/title/instances/date/quality/tags; tags READ-ONLY (edited in
                                    detail, W6-S7). Adapts Reader AppKitTableView (no inline NSTokenField)
                                    (W6-S3)
+    NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
+                                   bm25 relevance as-you-type) · quality ★1–★5 toggles · tag ALL/ANY +
+                                   chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
@@ -151,7 +160,8 @@ macOS/Sources/ArchiveNotes/
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
   ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
-  NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable
+  NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable + matches (all facets,
+                                   ALL/ANY, date range, membership), effective merge, tolerant decode (W6-S4)
   NoteStoreTests.swift             13 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL
   RootMarkerStoreTests.swift       5 tests: fresh/idempotent/corrupt-guard/empty/JSON-round-trip
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
