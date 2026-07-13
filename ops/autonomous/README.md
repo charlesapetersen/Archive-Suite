@@ -10,12 +10,13 @@ context compaction, and session restarts. Standing principles: memory `autonomou
   single source of truth: PRIME DIRECTIVES + RESUME PROTOCOL + a checkboxed WORK QUEUE + Session Log +
   Morning Review. Every increment is committed+pushed, so any fresh session recovers full state from the
   plan + `git log` + `SUITE_TODO.md`. **This is what makes the run resilient to losing context/usage.**
-- **L1 — self-resume daemon (`archive-suite-autonomous.sh`).** A loop that every ~20 min fires ONE fresh
+- **L1 — self-resume daemon (`archive-suite-autonomous.sh`).** A loop that every ~90 s fires ONE fresh
   headless `claude -p` to advance the plan by one bounded item, then the session commits+pushes+stops. A
   usage-exhausted window just fails fast; the next cycle retries when the cap resets (~5h). Safety:
   `--permission-mode default` (**never** bypass), a scoped `--allowedTools` + a destructive
-  `--disallowedTools` denylist, `--max-budget-usd`, a wall-clock `timeout`, and a stale-lock guard so cycles
-  never overlap. The script lives in `~/.local/bin` (outside the TCC-protected `~/Desktop`).
+  `--disallowedTools` denylist, `--max-budget-usd`, a **health watchdog** that kills a wedged/runaway session
+  early (see "Health watchdog" below) behind a 3 h wall-clock backstop, and a stale-lock guard so cycles never
+  overlap. The script lives in `~/.local/bin` (outside the TCC-protected `~/Desktop`).
 - **L2 — the resume prompt (`resume-prompt.txt`).** The exact instructions each fresh session follows
   (recover state → pick the first `[ ]` item → own worktree → verify → commit+push+tick → stop).
 
@@ -63,6 +64,38 @@ pkill -f archive-suite-autonomous.sh                            # stop the detac
 launchctl bootout gui/$(id -u)/com.archivesuite.autonomous      # stop the LaunchAgent (also auto at COMPLETE)
 ```
 The daemon self-terminates when the plan's `RUN STATUS:` line reads `COMPLETE`.
+
+## Health watchdog (Layers 1+2) — added 2026-07-12
+
+Each session runs with `--output-format stream-json --verbose --include-partial-messages`, so
+`last-session.log` grows in real time with a JSON event per message/tool **and** per token-delta during
+generation. Concurrent watchdogs monitor the `claude` pid; every kill routes through `_terminate_tree`
+(snapshots the descendant set, TERMs the whole tree, then a detached KILL backstop 8 s later — so a runaway
+build child is never orphaned):
+
+- **Watchdog A — outer wall-clock backstop (`MAXRUN`, default 3 h).** Polls `kill -0 cpid` and self-exits when
+  the session ends, so it never fires against a stale/reused pid if the daemon dies uncleanly. Last resort.
+- **Watchdog C — health (the primary killer).** Two combined signals, so no single false-positive kills a
+  healthy session:
+  - **L1 event heartbeat:** the log's non-`rate_limit_event` bytes stop growing for `HB_STALL` (10 min) →
+    "quiet". Token-delta streaming keeps a long effort=max generation growing the log, so it isn't mistaken for
+    a hang; a rate-limit *wait* (only `rate_limit_event` lines) reads as quiet.
+  - **L2 liveness:** when quiet, spare the session if an active `claude` **descendant** exists (a running
+    subagent/Workflow child, whose work doesn't stream into the parent log) OR the tree is CPU-busy (a long
+    build/test). An idle tree with no subagent for `HB_IDLE_N` (3) consecutive polls → **wedged** → kill; a
+    CPU-busy tree with no subagent and no events for `HB_HARD` (40 min) → **runaway build/loop** → kill.
+- **No separate usage-limit watchdog.** CLI 2.1.207 fast-fails an exhausted limit itself (rc=1 in ~2 s,
+  observed), and a rate-limit wait is caught by L1. The old `"You've hit your limit"` grep was removed — it
+  can't see stream-json's structured event and would false-kill a session that merely *reads* a file
+  containing the phrase (this daemon being one).
+
+Knobs (env-overridable): `AUTONOMOUS_HB_POLL` / `HB_STALL` / `HB_HARD` / `HB_CPU` / `HB_IDLE_N`, and
+`AUTONOMOUS_MAXRUN`. **Accepted gap:** a CPU-busy *chatty* loop (log keeps growing) is bounded by
+`--max-budget-usd` + `MAXRUN`, not the watchdog. This replaced the old pure 75-min wall-clock guillotine, which
+killed healthy long sessions (Notes waves ran 30–78 min). Built Tier-2: a 10-case stub matrix
+(`hung/healthy/busy-child/rate-limit-spin/subagent-alive/stale-pid-guard/clean-exit`) + two independent
+adversarial reviews (kill-safety + detection-quality). **Requires CLI ≥ 2.1.207** (verified stream-json
+flushes per-event to the log; earlier text mode buffered to the end).
 
 ## Guardrails (never overridden)
 
@@ -133,9 +166,11 @@ The daemon (`archive-suite-autonomous.sh`), `arm.sh`, the resume prompt, and thi
 **Tier-2-equivalent infrastructure**: they drive autonomous, self-pushing work next to the file-safety
 blast radius. Treat every change to them like a Tier-2 code change:
 
-- **Adversarial self-review before install/arm.** Ask the failure-mode questions explicitly. (The idle-output
-  watchdog bug that false-killed healthy sessions would have been caught by one question: *"Does `claude -p`
-  actually write to `last-session.log` incrementally?"* — it does not; it emits output only at the end.)
+- **Adversarial self-review before install/arm.** Ask the failure-mode questions explicitly. (The original
+  idle-output watchdog false-killed healthy sessions because plain-text `claude -p` buffers output to the end —
+  one question would have caught it: *"Does `claude -p` write to the log incrementally?"* It does **not** in
+  text mode, which is exactly why the 2026-07-12 health watchdog switched to `--output-format stream-json`,
+  whose events DO flush per-event. See "Health watchdog" above.)
 - **Prove the mechanism, don't assume it.** Dry-run the changed logic (simulate the loop; confirm the daemon
   arms + finds its PLAN/STATE) before trusting it on a live run.
 - **Parity for renames/moves:** re-grep for stragglers AND confirm the daemon still arms, finds its plan, and
@@ -173,7 +208,8 @@ shared `origin/main` ref) so it can't hang the loop; never touches the primary c
   you slug anything else is never removed. Phase 2 may delete your merged `wt/*` *branch ref* once its worktree
   is gone (no data loss — it's on `origin/main`), but never while you have it checked out. Net: your active
   work is always safe; only fully-pushed leftovers get reclaimed.
-- **Known follow-ups (pre-existing, not this change):** the parent's `trap 'exit 0' TERM INT` doesn't kill the
-  backgrounded child, and the watchdog kills only claude's pid (not its process group), so a killed session can
-  orphan grandchildren. Harmless to housekeeping now (it won't remove their dirty/in-use worktree), but worth a
-  process-group fix later.
+- **Follow-up now resolved (2026-07-12):** the watchdogs previously killed only claude's pid, so a killed
+  session could orphan a runaway build child. The health-watchdog change routes every kill through
+  `_terminate_tree`, which TERM+KILLs claude's whole descendant tree (snapshotted up-front, with a detached
+  KILL backstop). (The parent's `trap 'exit 0' TERM INT` still doesn't reap the backgrounded child on a TERM to
+  the daemon itself — minor, and `arm.sh stop` covers it by pkill-matching the subshells.)
