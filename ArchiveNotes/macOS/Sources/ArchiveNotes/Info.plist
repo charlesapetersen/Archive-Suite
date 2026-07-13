@@ -48,5 +48,20 @@
             <dict/>
         </dict>
     </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.archivenotes.passage</string>
+            <key>UTTypeDescription</key>
+            <string>Archive Notes Passage</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict/>
+        </dict>
+    </array>
 </dict>
 </plist>

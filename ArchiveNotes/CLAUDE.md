@@ -192,6 +192,8 @@ macOS/Sources/ArchiveNotes/
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)
+    PassagePasteboard.swift        com.archivenotes.passage codec (W7-S2): write/read NotesPassagePayload
+                                   (custom UTI + plain-text fallback) for copy-Notes → paste-Extract (§5)
 
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
@@ -243,6 +245,10 @@ macOS/Tests/ArchiveNotesTests/
                                    scanURLs (page/doc/multi/non-archive/empty/non-PDF), thumbnail
                                    import (page/doc/collision), pasteboardHasArchiveLinks (UTI/text/no),
                                    readPasteboard (UTI/text/empty), block header §6 round-trip
+  PasteboardPassageTests.swift     12 tests (W7-S2): write→read round-trip (incl. asset bytes),
+                                   plain-text fallback, prefer-UTI, degrade nil (text-only/malformed/
+                                   empty), payload→note-passage blocks bridge, notes-only coercion
+                                   (keep well-formed / drop reader-source + malformed→freeform)
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
   SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller
