@@ -89,6 +89,11 @@ macOS/Sources/ArchiveNotes/
     ZoteroClient.swift             actor — probe cascade (BBT→localAPI→unavailable), CSL fetch,
                                    citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4)
     ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
+    ZoteroAutoFill.swift           CSL→front-matter mapping (authors/date+precision/title) +
+                                   AutoFillPlan (per-field diff, fill-empty default policy) (§D.4/D.5)
+    ZoteroAutoFillModel.swift      @MainActor confirmation view-model: per-field toggles, confirm
+                                   writes via injected NoteStore save + stamps citation/fetchedAt,
+                                   cancel writes nothing (§D.5)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)
@@ -141,6 +146,11 @@ macOS/Tests/ArchiveNotesTests/
                                    fetch CSL (BBT/localAPI/cache-hit/unavailable-throws/citation/group),
                                    CSL mapping (year/month/day precision, literal/given-family author),
                                    cache store (round-trip/loadMissing/cacheKey)
+  ZoteroAutoFillTests.swift        21 tests: CSL date-parts→precision (year/month/day, 3-digit year,
+                                   out-of-range m/d, raw-year fallback, no-decade), author/title
+                                   mapping, AutoFillPlan fill-empty/replace/no-op, apply-selected,
+                                   view-model confirm/cancel (fill-empty, replace-with-confirm,
+                                   no-write-on-cancel, stamps only the matching ref)
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite
