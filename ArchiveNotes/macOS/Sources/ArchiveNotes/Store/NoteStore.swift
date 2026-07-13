@@ -45,13 +45,69 @@ actor NoteStore {
         itemDir(id).appendingPathComponent("assets", isDirectory: true)
     }
 
-    // MARK: - CRUD
+    /// Templates area (00-overview §3.7): `<root>/Templates/<uuid>/<Name>.md`, parallel to `items/`.
+    /// Kept separate so templates never leak into the note list / All Notes count / FTS index.
+    func templatesDir() -> URL {
+        root.appendingPathComponent("Templates", isDirectory: true)
+    }
 
-    func create(_ item: Item) throws -> ItemRef {
-        let dir = itemDir(item.id)
+    func templateDir(_ id: UUID) -> URL {
+        templatesDir().appendingPathComponent(id.uuidString.lowercased(), isDirectory: true)
+    }
+
+    // MARK: - CRUD (notes — thin wrappers over the container-generic workers)
+
+    func create(_ item: Item) throws -> ItemRef { try createEntry(item, in: itemDir(item.id)) }
+    func load(_ id: UUID) throws -> Item { try loadEntry(id, in: itemDir(id)) }
+    func save(_ item: Item) throws -> ItemRef { try saveEntry(item, in: itemDir(item.id)) }
+
+    /// Move the item directory to the Trash (recoverable). Never `removeItem`.
+    func delete(_ id: UUID) throws { try deleteEntry(id, in: itemDir(id)) }
+
+    func allItemIDs() -> [UUID] {
+        let itemsDir = root.appendingPathComponent("items", isDirectory: true)
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: itemsDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return entries.compactMap { UUID(uuidString: $0.lastPathComponent) }
+    }
+
+    func mdURL(for id: UUID) throws -> URL { try mdURL(for: id, in: itemDir(id)) }
+
+    // MARK: - CRUD (templates — same primitives, stored under Templates/)
+
+    func createTemplate(_ item: Item) throws -> ItemRef { try createEntry(item, in: templateDir(item.id)) }
+    func loadTemplate(_ id: UUID) throws -> Item { try loadEntry(id, in: templateDir(id)) }
+    func saveTemplate(_ item: Item) throws -> ItemRef { try saveEntry(item, in: templateDir(item.id)) }
+
+    /// Move the template directory to the Trash (recoverable). Never `removeItem`.
+    func deleteTemplate(_ id: UUID) throws { try deleteEntry(id, in: templateDir(id)) }
+
+    /// Every template on disk, projected to `Template` (id / name=title / kind) by decoding each
+    /// `Templates/<uuid>/<Name>.md`. Unreadable entries are skipped (best-effort listing). Sorted by
+    /// localized name for stable menu/list order.
+    func allTemplates() -> [Template] {
+        guard let dirs = try? FileManager.default.contentsOfDirectory(
+            at: templatesDir(), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var result: [Template] = []
+        for dir in dirs {
+            guard let id = UUID(uuidString: dir.lastPathComponent),
+                  let item = try? loadEntry(id, in: dir) else { continue }
+            result.append(Template(id: item.id, name: item.title, kind: item.kind))
+        }
+        return result.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    // MARK: - Container-generic workers (shared by notes + templates)
+
+    private func createEntry(_ item: Item, in dir: URL) throws -> ItemRef {
         let fm = FileManager.default
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        try fm.createDirectory(at: assetsDir(item.id), withIntermediateDirectories: true)
+        try fm.createDirectory(at: dir.appendingPathComponent("assets", isDirectory: true),
+                               withIntermediateDirectories: true)
 
         let filename = Self.sanitizedTitle(item.title) + ".md"
         let fileURL = dir.appendingPathComponent(filename)
@@ -64,8 +120,8 @@ actor NoteStore {
         return ItemRef(id: item.id, url: fileURL, mtime: mtime)
     }
 
-    func load(_ id: UUID) throws -> Item {
-        let url = try mdURL(for: id)
+    private func loadEntry(_ id: UUID, in dir: URL) throws -> Item {
+        let url = try mdURL(for: id, in: dir)
         guard let data = FileManager.default.contents(atPath: url.path),
               let text = String(data: data, encoding: .utf8) else {
             throw StoreError.readFailed("Cannot read \(url.lastPathComponent)")
@@ -77,24 +133,23 @@ actor NoteStore {
         }
     }
 
-    func save(_ item: Item) throws -> ItemRef {
-        let dir = itemDir(item.id)
+    private func saveEntry(_ item: Item, in dir: URL) throws -> ItemRef {
         let fm = FileManager.default
 
         guard fm.fileExists(atPath: dir.path) else {
             throw StoreError.notFound(item.id)
         }
 
-        let currentURL = try mdURL(for: item.id)
+        let currentURL = try mdURL(for: item.id, in: dir)
         let newFilename = Self.sanitizedTitle(item.title) + ".md"
         var targetURL = dir.appendingPathComponent(newFilename)
 
         // Rename if the title changed (filename is a projection of the title).
         if currentURL.lastPathComponent != newFilename {
-            // Component-boundary guard: both URLs must be under this item's dir.
+            // Component-boundary guard: both URLs must be under this entry's dir.
             precondition(currentURL.deletingLastPathComponent().standardizedFileURL ==
                          dir.standardizedFileURL,
-                         "NoteStore: source URL escapes item dir")
+                         "NoteStore: source URL escapes entry dir")
 
             // Disambiguate intra-dir collision (defensive; one .md per dir by construction).
             if fm.fileExists(atPath: targetURL.path) {
@@ -113,9 +168,7 @@ actor NoteStore {
         return ItemRef(id: item.id, url: targetURL, mtime: mtime)
     }
 
-    /// Move the item directory to the Trash (recoverable). Never `removeItem`.
-    func delete(_ id: UUID) throws {
-        let dir = itemDir(id)
+    private func deleteEntry(_ id: UUID, in dir: URL) throws {
         guard FileManager.default.fileExists(atPath: dir.path) else {
             throw StoreError.notFound(id)
         }
@@ -123,16 +176,7 @@ actor NoteStore {
         try FileManager.default.trashItem(at: dir, resultingItemURL: &resultURL)
     }
 
-    func allItemIDs() -> [UUID] {
-        let itemsDir = root.appendingPathComponent("items", isDirectory: true)
-        guard let entries = try? FileManager.default.contentsOfDirectory(
-            at: itemsDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
-        ) else { return [] }
-        return entries.compactMap { UUID(uuidString: $0.lastPathComponent) }
-    }
-
-    func mdURL(for id: UUID) throws -> URL {
-        let dir = itemDir(id)
+    private func mdURL(for id: UUID, in dir: URL) throws -> URL {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
         ) else {

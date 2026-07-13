@@ -35,6 +35,13 @@ final class NotesModel: ObservableObject {
     /// refreshable via `reloadItems()`.
     @Published private(set) var allItems: [ItemSummary] = []
 
+    // MARK: Templates (W6-S6)
+
+    /// Every template on disk (id / name / kind), shared by both windows. Loaded on bootstrap and
+    /// after any template mutation. Drives the folder "Template ▸" assignment menu + "New from
+    /// template" (06-viewers §6). Kept out of `allItems` so templates never appear in the note list.
+    @Published private(set) var templates: [Template] = []
+
     // MARK: Current scope (drives the item list in W6-S3/S4)
 
     /// The active filter scope: `nil` = All Notes (no scope). A normal folder scopes by `folderId`;
@@ -120,6 +127,7 @@ final class NotesModel: ObservableObject {
         }
         rebuild()
         await reloadItems()
+        await reloadTemplates()
     }
 
     // MARK: Item list loading (W6-S3)
@@ -147,6 +155,152 @@ final class NotesModel: ObservableObject {
     func search(_ query: String) async -> [UUID] {
         guard let index, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         return await index.search(query)
+    }
+
+    // MARK: Templates (W6-S6 — §3.7, §6, §16.4)
+
+    /// Reload the template list from the store. A no-op with no `noteStore` (an injected test store
+    /// built without one); template tests inject a scratch `noteStore`.
+    func reloadTemplates() async {
+        guard let noteStore else { return }
+        templates = await noteStore.allTemplates()
+    }
+
+    /// Templates whose kind matches `kind` — the offering set for "New from template" (§6).
+    func templates(matching kind: Item.Kind) -> [Template] {
+        templates.filter { $0.kind == kind }
+    }
+
+    /// Assign `templateId` to `folderId` (`nil` clears it). Persisted atomically via `OrganizationStore`
+    /// (DB + organization.json). Template↔folder lives only in `template_assignments` (§16.4).
+    func assignTemplate(_ templateId: UUID?, to folderId: UUID) async {
+        do {
+            if let templateId { try await organization.assignTemplate(templateId, to: folderId) }
+            else { try await organization.removeTemplateAssignment(folder: folderId) }
+        } catch { report(error, "assign the template") }
+    }
+
+    /// The effective template for `folderId`: the nearest ancestor's live assignment (self first),
+    /// else `nil` ("Blank"). An assignment pointing at a deleted template is skipped **and** lazily
+    /// cleared (§6 dangling edge case), off the resolve path so this stays a pure read.
+    func effectiveTemplate(for folderId: UUID?) -> Template? {
+        let existing = Set(templates.map(\.id))
+        let (tid, dangling) = TemplateResolution.resolve(
+            folderId: folderId, folders: organization.folders,
+            assignments: organization.assignments, existingTemplateIDs: existing)
+        if !dangling.isEmpty { Task { await clearDanglingAssignments(dangling) } }
+        guard let tid else { return nil }
+        return templates.first { $0.id == tid }
+    }
+
+    private func clearDanglingAssignments(_ folderIds: [UUID]) async {
+        for f in folderIds { try? await organization.removeTemplateAssignment(folder: f) }
+        rebuild()
+    }
+
+    /// Create a new template of `kind` named `name` (empty body). Returns the new id.
+    @discardableResult
+    func createTemplate(name rawName: String, kind: Item.Kind) async -> UUID? {
+        guard let noteStore else { return nil }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { statusMessage = "A template needs a name."; return nil }
+        let item = blankItem(kind: kind, title: uniqueTemplateName(name))
+        do {
+            _ = try await noteStore.createTemplate(item)
+            await reloadTemplates()
+            return item.id
+        } catch { report(error, "create the template"); return nil }
+    }
+
+    /// Duplicate a template (fresh id + " copy" name), preserving kind + front-matter defaults + body.
+    @discardableResult
+    func duplicateTemplate(_ id: UUID) async -> UUID? {
+        guard let noteStore else { return nil }
+        do {
+            var item = try await noteStore.loadTemplate(id)
+            item.id = UUID()
+            item.title = uniqueTemplateName("\(item.title) copy")
+            item.created = Date(); item.modified = Date()
+            _ = try await noteStore.createTemplate(item)
+            await reloadTemplates()
+            return item.id
+        } catch { report(error, "duplicate the template"); return nil }
+    }
+
+    /// Rename a template (its title = its display name = its filename).
+    func renameTemplate(_ id: UUID, to rawName: String) async {
+        guard let noteStore else { return }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { statusMessage = "A template needs a name."; return }
+        do {
+            var item = try await noteStore.loadTemplate(id)
+            item.title = name; item.modified = Date()
+            _ = try await noteStore.saveTemplate(item)
+            await reloadTemplates()
+        } catch { report(error, "rename the template") }
+    }
+
+    /// Delete a template (to Trash) and clear every folder assignment that pointed at it (batched, §6).
+    /// Assignments are cleared FIRST so no folder is left referencing a since-trashed template (the
+    /// dangling-resolution fallback would also cover a stray, but keep the graph clean).
+    func deleteTemplate(_ id: UUID) async {
+        guard let noteStore else { return }
+        let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
+        for folderId in referencing {
+            try? await organization.removeTemplateAssignment(folder: folderId)
+        }
+        do { try await noteStore.deleteTemplate(id) }
+        catch { report(error, "delete the template") }
+        await reloadTemplates()
+        rebuild()
+    }
+
+    // MARK: New item (blank or from a template) (W6-S6)
+
+    /// Create a new item of `kind` in `folderId` (`nil` ⟹ the system default: Inbox for a note,
+    /// Extracts for an extract, §16.6), instantiated from `templateId` when given: the template's
+    /// front-matter defaults (title/date/quality/tags/authors/roundup) + body are cloned into a fresh
+    /// item (new UUID, fresh created/modified). Returns the new item id (nil on failure / no store).
+    @discardableResult
+    func newItem(kind: Item.Kind, in folderId: UUID?, from templateId: UUID?) async -> UUID? {
+        guard let noteStore else { return nil }
+        var item: Item
+        if let templateId {
+            do { item = try await noteStore.loadTemplate(templateId) }
+            catch { report(error, "read the template"); return nil }
+            item.id = UUID()
+            item.kind = kind
+            item.created = Date(); item.modified = Date()
+        } else {
+            item = blankItem(kind: kind, title: "")
+        }
+        let target = folderId ?? (kind == .extract ? organization.extractsHomeFolderId
+                                                    : OrganizationStore.inboxFolderId)
+        do {
+            _ = try await noteStore.create(item)
+            try await organization.addMembership(item: item.id, folder: target)
+            await reloadItems()
+            rebuild()
+            return item.id
+        } catch { report(error, "create the note"); return nil }
+    }
+
+    /// A fresh, empty item shell (schema 1) — a blank new item or a new template.
+    private func blankItem(kind: Item.Kind, title: String) -> Item {
+        let now = Date()
+        return Item(id: UUID(), kind: kind, title: title, authors: [], date: nil,
+                    datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
+                    zotero: [], roundup: false, created: now, modified: now, schema: 1,
+                    blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)
+    }
+
+    /// A name-unique template name (case-insensitive), appending " 2", " 3", … if taken.
+    private func uniqueTemplateName(_ base: String) -> String {
+        let taken = Set(templates.map { $0.name.lowercased() })
+        if !taken.contains(base.lowercased()) { return base }
+        var n = 2
+        while taken.contains("\(base) \(n)".lowercased()) { n += 1 }
+        return "\(base) \(n)"
     }
 
     // MARK: Tree rebuild
