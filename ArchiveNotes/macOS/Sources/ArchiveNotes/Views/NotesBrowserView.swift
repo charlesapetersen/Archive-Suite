@@ -168,10 +168,11 @@ private struct ItemListPane: View {
 
 // MARK: - Detail pane
 
-/// Right pane: a compact header for the currently-selected item above the shipped W3 editor. The
-/// header is the visible "selection → detail" signal (W6-S3). Wiring the editor to load + autosave the
-/// selected note's Markdown via `NoteStore` is the remaining detail-integration step (flagged to
-/// Morning Review); the editor below is the existing (not-yet-persistence-wired) note editor.
+/// Right pane: a compact header, the locations inspector, and the metadata inspector (date + quality,
+/// W6-S7 — front-matter only, never a Finder tag) for the currently-selected item, above the shipped
+/// W3 editor. The header is the visible "selection → detail" signal (W6-S3). Wiring the editor to load
+/// + autosave the selected note's Markdown via `NoteStore` is the remaining detail-integration step
+/// (flagged to Morning Review); the editor below is the existing (not-yet-persistence-wired) note editor.
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
 
@@ -183,6 +184,10 @@ private struct DetailPane: View {
                 LocationsInspector(nav: nav, itemId: id)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+            }
+            if let summary = nav.selectedSummary {
+                Divider()
+                NoteMetadataInspector(nav: nav, item: summary)   // date + quality (front-matter only, W6-S7)
             }
             Divider()
             NoteEditorPane()

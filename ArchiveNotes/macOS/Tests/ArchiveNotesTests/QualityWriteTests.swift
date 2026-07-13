@@ -86,6 +86,24 @@ struct QualityWriteTests {
         #expect(try await finderTags(env, id).isEmpty)
     }
 
+    @Test("editing quality preserves the rest of the front-matter + body")
+    func preservesOtherFields() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let item = Item(id: UUID(), kind: .note, title: "Keep Me", authors: ["A. Author"], date: "1968",
+                        datePrecision: .year, dateUncertain: true, quality: nil, tags: ["Subject"],
+                        zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
+                        blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Body text")
+        _ = try await env.store.create(item)
+        await env.model.setQuality(3, for: item.id)
+        let r = try await env.store.load(item.id)
+        #expect(r.quality == 3)                       // the one field we changed…
+        #expect(r.title == "Keep Me")                 // …and everything else round-trips untouched
+        #expect(r.authors == ["A. Author"])
+        #expect(r.date == "1968" && r.datePrecision == .year && r.dateUncertain == true)
+        #expect(r.tags == ["Subject"])
+        #expect(r.trailingBodyRaw == "Body text")
+    }
+
     @Test("out-of-range ratings clamp into 1…5")
     func clampsRange() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

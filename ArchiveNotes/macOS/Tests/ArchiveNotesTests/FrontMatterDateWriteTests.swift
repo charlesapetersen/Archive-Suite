@@ -177,6 +177,24 @@ struct FrontMatterDateWriteTests {
         #expect(e.sortDate! < l.sortDate!)                   // 1968 (uncertain) still precedes 1980
     }
 
+    @Test("editing the date preserves quality + tags + authors + body")
+    func preservesOtherFields() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let item = Item(id: UUID(), kind: .note, title: "Keep", authors: ["Auth"], date: nil,
+                        datePrecision: nil, dateUncertain: false, quality: 4, tags: ["Subject"],
+                        zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
+                        blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Body")
+        _ = try await env.store.create(item)
+        await env.model.setDate("1970-05", precision: .month, for: item.id)
+        let r = try await env.store.load(item.id)
+        #expect(r.date == "1970-05" && r.datePrecision == .month)   // changed…
+        #expect(r.quality == 4)                                     // …rest untouched
+        #expect(r.tags == ["Subject"])
+        #expect(r.authors == ["Auth"])
+        #expect(r.title == "Keep")
+        #expect(r.trailingBodyRaw == "Body")
+    }
+
     // MARK: - Index projection reflects the write
 
     @Test("editing the date re-indexes the row (index projection matches disk)")
