@@ -29,8 +29,10 @@ this file is authoritative for Notes‑specific work.
 
 ```
 macOS/Sources/ArchiveNotes/
-  ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands
-  ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), DebugBlockCommands
+  ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands;
+                                   injects ZoteroStatusModel into both windows
+  ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), ZoteroCommands
+                                   (Note ▸ Attach Zotero Link…), DebugBlockCommands
   Models/
     NotesFilter.swift              Tag/kind filter (§16.3 interface contract)
   Store/
@@ -94,6 +96,12 @@ macOS/Sources/ArchiveNotes/
     ZoteroAutoFillModel.swift      @MainActor confirmation view-model: per-field toggles, confirm
                                    writes via injected NoteStore save + stamps citation/fetchedAt,
                                    cancel writes nothing (§D.5)
+    ZoteroClipboardDetect.swift    Pure clipboard-detect: (pasteboard string, attached links) →
+                                   fresh ZoteroRef? (canonical-dedup); no NSPasteboard dep (§D.5)
+    ZoteroStatusModel.swift        @MainActor bridge: backend availability (cancellable Task) +
+                                   frontmost-gated clipboard detection (changeCount-gated, no timer)
+    ZoteroChipView.swift           Reusable Zotero pill (SwiftUI) + pure ZoteroChipPresentation
+                                   (label/glyph/a11y); click → NSWorkspace.open(selectLink) (§D.5)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)

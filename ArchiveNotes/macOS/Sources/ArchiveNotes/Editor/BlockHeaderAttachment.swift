@@ -152,17 +152,38 @@ final class BlockHeaderChipView: NSView {
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let revealButton = NSButton(title: "Reveal", target: self, action: #selector(revealClicked))
-        revealButton.bezelStyle = .inline
-        revealButton.controlSize = .small
-        revealButton.font = .systemFont(ofSize: 10)
+        // Assemble action buttons by what the block actually supports:
+        //  - a source anchor (`link`) gets Reveal + Preview (reader-page / reader-doc);
+        //  - a Zotero ref (`zoteroSelect`) gets "Open in Zotero".
+        // A block with neither (freeform / note-passage) shows just its label rather
+        // than dead buttons.
+        var views: [NSView] = [label]
 
-        let previewButton = NSButton(title: "Preview", target: self, action: #selector(previewClicked))
-        previewButton.bezelStyle = .inline
-        previewButton.controlSize = .small
-        previewButton.font = .systemFont(ofSize: 10)
+        if box.anchor.link != nil {
+            let revealButton = NSButton(title: "Reveal", target: self, action: #selector(revealClicked))
+            revealButton.bezelStyle = .inline
+            revealButton.controlSize = .small
+            revealButton.font = .systemFont(ofSize: 10)
 
-        let stack = NSStackView(views: [label, revealButton, previewButton])
+            let previewButton = NSButton(title: "Preview", target: self, action: #selector(previewClicked))
+            previewButton.bezelStyle = .inline
+            previewButton.controlSize = .small
+            previewButton.font = .systemFont(ofSize: 10)
+
+            views.append(revealButton)
+            views.append(previewButton)
+        }
+
+        if box.anchor.zoteroSelect != nil {
+            let zoteroButton = NSButton(title: "Open in Zotero", target: self,
+                                        action: #selector(openZoteroClicked))
+            zoteroButton.bezelStyle = .inline
+            zoteroButton.controlSize = .small
+            zoteroButton.font = .systemFont(ofSize: 10)
+            views.append(zoteroButton)
+        }
+
+        let stack = NSStackView(views: views)
         stack.orientation = .horizontal
         stack.spacing = 6
         stack.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
@@ -183,5 +204,11 @@ final class BlockHeaderChipView: NSView {
 
     @objc private func previewClicked() {
         onPreview?(box.anchor, self)
+    }
+
+    @objc private func openZoteroClicked() {
+        guard let select = box.anchor.zoteroSelect,
+              let url = URL(string: select) else { return }
+        NSWorkspace.shared.open(url)
     }
 }

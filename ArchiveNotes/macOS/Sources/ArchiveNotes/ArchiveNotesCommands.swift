@@ -64,6 +64,18 @@ struct SourceBlockCommands: Commands {
     }
 }
 
+/// Note-menu command: attach a Zotero reference from the clipboard (or a prompt).
+struct ZoteroCommands: Commands {
+    @FocusedValue(\.formattingContext) private var formatting
+
+    var body: some Commands {
+        CommandMenu("Note") {
+            Button("Attach Zotero Link\u{2026}") { formatting?.attachZoteroLink() }
+                .disabled(formatting == nil)
+        }
+    }
+}
+
 #if DEBUG
 /// Debug menu: insert a test source block to exercise the chip rendering + round-trip.
 struct DebugBlockCommands: Commands {

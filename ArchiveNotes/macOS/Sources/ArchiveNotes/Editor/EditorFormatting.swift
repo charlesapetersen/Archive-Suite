@@ -125,6 +125,40 @@ final class FormattingContext: ObservableObject {
         guard !entries.isEmpty else { return }
         _ = coordinator?.handleSourceBlockPaste(entries)
     }
+
+    /// Attach a Zotero reference (Note ▸ Attach Zotero Link… / clipboard banner).
+    /// Prefers a `zotero://select/…` link already on the clipboard; otherwise prompts.
+    /// Never blocks on Zotero being reachable — it only inserts the durable link.
+    func attachZoteroLink() {
+        if let clip = NSPasteboard.general.string(forType: .string),
+           let ref = ZoteroSelectLink.parse(clip) {
+            insertZoteroBlock(ref)
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Attach Zotero Link"
+        alert.informativeText = "Paste a zotero://select/… link."
+        alert.addButton(withTitle: "Attach")
+        alert.addButton(withTitle: "Cancel")
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        input.placeholderString = "zotero://select/library/items/ABCD1234"
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        guard alert.runModal() == .alertFirstButtonReturn,
+              let ref = ZoteroSelectLink.parse(input.stringValue) else { return }
+        insertZoteroBlock(ref)
+    }
+
+    /// Insert a Zotero source block (§6 `zotero:` header) at the caret. The chip
+    /// renders with an "Open in Zotero" affordance; the ref persists via the block header.
+    func insertZoteroBlock(_ ref: ZoteroRef) {
+        let kind: Block.Kind = (ref.kind == .attachment) ? .zoteroAttachment : .zoteroItem
+        let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey,
+                                  zoteroSelect: ref.selectLink)
+        coordinator?.insertBlock(kind: kind, anchor: anchor)
+    }
 }
 
 // MARK: - FocusedValue key

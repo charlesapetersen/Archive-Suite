@@ -6,12 +6,14 @@ import ArchiveCore
 struct ArchiveNotesApp: App {
     @StateObject private var deepLinkRouter = NotesDeepLinkRouter()
     @StateObject private var previewState = SourceBlockPreviewState()
+    @StateObject private var zoteroStatus = ZoteroStatusModel()
 
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
             NotesShellView(kind: .note)
                 .environmentObject(deepLinkRouter)
                 .environmentObject(previewState)
+                .environmentObject(zoteroStatus)
                 .onOpenURL { url in
                     NSApp.activate(ignoringOtherApps: true)
                     deepLinkRouter.handle(url)
@@ -20,6 +22,7 @@ struct ArchiveNotesApp: App {
         .commands {
             FormatCommands()
             SourceBlockCommands()
+            ZoteroCommands()
             #if DEBUG
             DebugBlockCommands()
             #endif
@@ -27,6 +30,7 @@ struct ArchiveNotesApp: App {
         Window("Extracts", id: NotesWindowID.extracts) {
             NotesShellView(kind: .extract)
                 .environmentObject(previewState)
+                .environmentObject(zoteroStatus)
         }
         Settings { NotesSettingsView() }
     }
