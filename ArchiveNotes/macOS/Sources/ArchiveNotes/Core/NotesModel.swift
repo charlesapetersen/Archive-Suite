@@ -27,6 +27,14 @@ final class NotesModel: ObservableObject {
     /// based here; the exact index-served count arrives with the item list in W6-S4.)
     @Published private(set) var allNotesCount: Int = 0
 
+    // MARK: Item list source (W6-S3)
+
+    /// Every indexed item (the `ItemSummary` projection, §16.5), shared by both windows. Each window's
+    /// `NotesNavigationModel` filters + sorts this into its own `displayed` list, so the two windows can
+    /// differ by kind/sort/selection while reading one source of truth. Loaded on bootstrap and
+    /// refreshable via `reloadItems()`.
+    @Published private(set) var allItems: [ItemSummary] = []
+
     // MARK: Current scope (drives the item list in W6-S3/S4)
 
     /// The active filter scope: `nil` = All Notes (no scope). A normal folder scopes by `folderId`;
@@ -93,6 +101,24 @@ final class NotesModel: ObservableObject {
             report(error, "open the notes store")
         }
         rebuild()
+        await reloadItems()
+    }
+
+    // MARK: Item list loading (W6-S3)
+
+    /// Reload the shared item set from the index (app path). A no-op for an injected (test) store,
+    /// which seeds items via `replaceItems(_:)` instead.
+    func reloadItems() async {
+        guard let index else { return }
+        let items = await index.allSummaries()
+        replaceItems(items)
+    }
+
+    /// Replace the shared item set. The app path calls this from `reloadItems()`; tests call it
+    /// directly to seed synthetic summaries without a real index. Published, so each window's
+    /// navigation model recomputes its `displayed` list.
+    func replaceItems(_ items: [ItemSummary]) {
+        allItems = items
     }
 
     // MARK: Tree rebuild

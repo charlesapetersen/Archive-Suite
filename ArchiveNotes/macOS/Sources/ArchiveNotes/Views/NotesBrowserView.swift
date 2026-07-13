@@ -3,18 +3,23 @@ import AppKit
 import ArchiveCore
 
 /// The reusable 3-pane browsing shell (folder tree │ item list │ detail), instantiated as the
-/// Notes window and the Extracts window (06-viewers §1, W6-S1). The tree and item-list panes are
-/// placeholders here — W6-S2 swaps in `NotesFolderTreeView`, W6-S3 the item-list table — while the
-/// detail pane already hosts the shipped W3 editor (`NoteEditorPane`).
+/// Notes window and the Extracts window (06-viewers §1, W6-S1). W6-S2 swapped in the folder tree;
+/// W6-S3 swaps in the item-list table (`NotesTableView`) + kind segmented control; the detail pane
+/// hosts the shipped W3 editor (`NoteEditorPane`) with a selected-item header.
 ///
-/// Persistence (W6-S1): panel widths + the tree-visibility toggle survive relaunch via `@AppStorage`
-/// over the `an.*` keys; the window size persists via `NotesAppSettings` (mirrors Reader's DV-1
-/// document-window sizing).
+/// The shared `NotesModel` (org graph + item source, one instance for both windows) is passed in from
+/// `ArchiveNotesApp`; each window owns a private `NotesNavigationModel` (@StateObject) seeded with its
+/// default kind, so the two windows differ by kind/sort/selection while reading one item source.
+///
+/// Persistence (W6-S1): panel widths + tree-visibility survive relaunch via `@AppStorage`; window size
+/// via `NotesAppSettings`; hidden item-list columns via `NotesAppSettings.hiddenColumns` (W6-S3).
 struct NotesBrowserView: View {
     let kind: ItemKindShell
 
-    /// The shared UI façade (folder tree + scope; grows into item list/detail in later sub-tasks).
-    @EnvironmentObject private var model: NotesModel
+    /// The shared UI façade (folder tree + scope + item source), passed from the app.
+    @ObservedObject private var model: NotesModel
+    /// Per-window item-list state (kind filter, sort, selection, displayed list).
+    @StateObject private var nav: NotesNavigationModel
 
     @AppStorage(NotesLayoutSettingsKey.showTree)    private var showingTree = true
     @AppStorage(NotesLayoutSettingsKey.treeWidth)   private var treeWidth   = NotesLayoutSettings.defaultTreeWidth
@@ -22,6 +27,12 @@ struct NotesBrowserView: View {
 
     @State private var window: NSWindow?
     @State private var didConfigureWindow = false
+
+    init(kind: ItemKindShell, model: NotesModel) {
+        self.kind = kind
+        self._model = ObservedObject(wrappedValue: model)
+        self._nav = StateObject(wrappedValue: NotesNavigationModel(model: model, defaultKind: kind))
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -32,19 +43,18 @@ struct NotesBrowserView: View {
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
                              range: NotesLayoutSettings.treeWidthRange, id: "an.divider.tree")
             }
-            ItemListPane(kind: kind)
+            ItemListPane(nav: nav)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             PanelDivider(width: $detailWidth, panelOnLeft: false,
                          range: NotesLayoutSettings.detailWidthRange, id: "an.divider.detail")
-            DetailPane(kind: kind)
+            DetailPane(nav: nav)
                 .frame(width: detailWidth)
         }
         .frame(minWidth: 900, minHeight: 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
-        .task { await model.bootstrap() }   // open the store + load organization on first appearance (idempotent)
+        .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
         .toolbar { toolbar }
-        // On close, the current window size becomes the default the next time this window opens.
         .onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }
     }
 
@@ -60,9 +70,8 @@ struct NotesBrowserView: View {
         }
     }
 
-    /// Restore the saved window frame on first appearance (centered on the active screen); if none
-    /// was saved the window keeps its scene default. Runs once per window (guarded), then keeps the
-    /// handle so `onDisappear` can persist the final size. Mirrors Reader `configureWindow` (DV-1).
+    /// Restore the saved window frame on first appearance (centered on the active screen). Runs once
+    /// per window (guarded), then keeps the handle so `onDisappear` persists the final size (DV-1).
     private func configureWindow(_ window: NSWindow) {
         guard !didConfigureWindow else { return }
         didConfigureWindow = true
@@ -79,22 +88,94 @@ struct NotesBrowserView: View {
     }
 }
 
-// MARK: - Placeholder panes (replaced in W6-S3)
+// MARK: - Item-list pane (W6-S3)
 
-/// Center pane — item list. Placeholder until the `NotesTableView` list pane lands in W6-S3.
+/// Center pane: kind segmented control (notes / extracts / both) above the virtualized item table.
 private struct ItemListPane: View {
-    let kind: ItemKindShell
-    var body: some View { placeholder("Items") }
-}
+    @ObservedObject var nav: NotesNavigationModel
 
-/// Right pane — detail. Already the shipped W3 editor (source-block chips, formatting, Zotero).
-private struct DetailPane: View {
-    let kind: ItemKindShell
     var body: some View {
-        NoteEditorPane()
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Kind", selection: $nav.kindFilter) {
+                    Text("Notes").tag(KindFilter.notes)
+                    Text("Extracts").tag(KindFilter.extracts)
+                    Text("Both").tag(KindFilter.both)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 260)
+                .accessibilityIdentifier("an.list.kind")
+                Spacer()
+                Text("\(nav.displayed.count)")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .help("Items shown")
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            Divider()
+            NotesTableView(
+                model: nav,
+                selection: $nav.selection,
+                onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
+                buildContextMenu: { _ in nil }   // context menu accretes in W6-S4..S7 (open/link/delete/…)
+            )
+            .accessibilityIdentifier("an.list.table")
+        }
+        .background(Color(nsColor: .textBackgroundColor))
     }
 }
 
-private func placeholder(_ t: String) -> some View {
-    ZStack { Color(nsColor: .textBackgroundColor); Text(t).foregroundStyle(.tertiary) }
+// MARK: - Detail pane
+
+/// Right pane: a compact header for the currently-selected item above the shipped W3 editor. The
+/// header is the visible "selection → detail" signal (W6-S3). Wiring the editor to load + autosave the
+/// selected note's Markdown via `NoteStore` is the remaining detail-integration step (flagged to
+/// Morning Review); the editor below is the existing (not-yet-persistence-wired) note editor.
+private struct DetailPane: View {
+    @ObservedObject var nav: NotesNavigationModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            selectedHeader
+            Divider()
+            NoteEditorPane()
+        }
+    }
+
+    @ViewBuilder private var selectedHeader: some View {
+        if let item = nav.selectedSummary {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: item.kind == .extract ? "quote.opening" : "doc.text")
+                        .foregroundStyle(.secondary)
+                    Text(item.title.isEmpty ? "Untitled" : item.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 10) {
+                    if let d = item.displayDate { Label(d, systemImage: "calendar").labelStyle(.titleAndIcon) }
+                    if item.quality != nil { Text(item.qualityStars).foregroundStyle(.yellow) }
+                    if !item.authors.isEmpty {
+                        Label(item.authors.joined(separator: ", "), systemImage: "person")
+                            .lineLimit(1)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .accessibilityIdentifier("an.detail.header")
+        } else {
+            Text(nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+    }
 }

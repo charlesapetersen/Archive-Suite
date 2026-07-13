@@ -225,6 +225,23 @@ actor NotesIndex {
         return readSummaryRow(stmt)
     }
 
+    /// Load every indexed item as an `ItemSummary` (the item-list projection, §16.5). Used by the
+    /// browser to render the list without touching `.md` files. Ordering is left to the UI
+    /// (`NotesSort`); rows that fail to decode (corrupt UUID) are skipped rather than aborting.
+    func allSummaries() -> [ItemSummary] {
+        guard let stmt = prepare("""
+            SELECT id, title, kind, date, date_precision, date_uncertain, authors,
+                   sort_date, quality, created, modified, mtime, managed_tags
+            FROM items;
+            """) else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var out: [ItemSummary] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let row = readSummaryRow(stmt) { out.append(row) }
+        }
+        return out
+    }
+
     /// All indexed item IDs as a set.
     func allIndexedIDs() -> Set<UUID> {
         guard let stmt = prepare("SELECT id FROM items;") else { return [] }
