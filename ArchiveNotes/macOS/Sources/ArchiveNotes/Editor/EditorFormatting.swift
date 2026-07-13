@@ -41,6 +41,13 @@ final class FormattingContext: ObservableObject {
     weak var textView: EditorTextView?
     var fontSize: CGFloat = 14
 
+    /// Identity of the note currently loaded in the editor (W7-S1a). W7's Create-Extract reads these to
+    /// anchor a passage's provenance — `sourceNoteId` plus the snapshot title/date shown in its chip. A
+    /// `nil` id means nothing is single-selected, so Create-Extract is unavailable.
+    var currentItemID: UUID?
+    var currentItemTitle: String = ""
+    var currentItemDateDisplay: String = ""
+
     func toggleBold() {
         guard let tv = textView else { return }
         EditorFormatting.toggleBold(tv, fontSize: fontSize)

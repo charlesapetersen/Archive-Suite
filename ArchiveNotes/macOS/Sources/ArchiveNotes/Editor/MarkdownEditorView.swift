@@ -1,6 +1,16 @@
 import SwiftUI
 import AppKit
 
+/// A handle the host view can call to push the editor's pending (debounced) serialize into its
+/// `markdown` binding **synchronously** — used before a selection switch so a flush-on-switch captures
+/// the last keystrokes even if the 400 ms debounce hasn't fired (W7-S1a). The coordinator populates
+/// `flush` in `makeNSView`.
+@MainActor
+final class EditorFlushBox {
+    var flush: (() -> Void)?
+    init() {}
+}
+
 /// NSViewRepresentable wrapping an EditorTextView in an NSScrollView.
 /// Two-way binding to a Markdown string, with debounced write-back, freeze-during-edit,
 /// undo/find, and a raw-Markdown toggle (⌘/).
@@ -10,6 +20,9 @@ struct MarkdownEditorView: NSViewRepresentable {
     var fontSize: CGFloat = 14
     var formatting: FormattingContext?
     var assetStore: EditorAssetStore?
+    /// Optional flush handle: populated by the coordinator so the host can force a synchronous
+    /// write-back of pending edits (W7-S1a autosave flush-on-switch).
+    var flushBox: EditorFlushBox?
     /// Called when "Reveal in Reader" is clicked on a block chip.
     var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
     /// Called when "Preview" is clicked on a block chip. Receives anchor + anchor view for popover.
@@ -36,6 +49,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
         context.coordinator.onPreviewBlock = onPreviewBlock
+        flushBox?.flush = { [weak coordinator = context.coordinator] in coordinator?.flushWriteBack() }
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
         }

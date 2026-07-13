@@ -71,7 +71,10 @@ macOS/Sources/ArchiveNotes/
                                    (batched), titles(for:) (W6-S5); templates — @Published templates +
                                    reloadTemplates, assignTemplate/effectiveTemplate (resolver + lazy
                                    dangling-cleanup)/templates(matching:), create/duplicate/rename/delete
-                                   template, newItem(kind:in:from:) instantiation (W6-S6)
+                                   template, newItem(kind:in:from:) instantiation (W6-S6); mutateItem
+                                   write path (load→atomic .md save→one-row re-index→publish) behind
+                                   setDate/setDateUncertain/setQuality (W6-S7, front-matter only) and
+                                   loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks))
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
                                    proxy / sort / selection / displayed + displayedGeneration +
                                    instanceCounts); observes shared allItems + scope (mirrored from the
@@ -106,7 +109,12 @@ macOS/Sources/ArchiveNotes/
                                    Backspace-at-start outdent, paste/drag image + text)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
-                                   EditorAssetStore plumbing, onRevealBlock seam, insertBlock method
+                                   EditorAssetStore plumbing, onRevealBlock seam, insertBlock method;
+                                   EditorFlushBox handle → force a synchronous write-back (W7-S1a)
+    NoteBodyEditorModel.swift      @MainActor — owns the editor body for ONE selected item; autosave-
+                                   safe across selection switches (captures loadedID at schedule time,
+                                   flush-outgoing-before-load, drops superseded loads via a generation,
+                                   same-id reselect no-op); injected load/save/flushEditor seams (W7-S1a)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
                                    CommonMark); block-header chips (<!-- block: --> → chip attachments);
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent
@@ -159,8 +167,11 @@ macOS/Sources/ArchiveNotes/
                                    Move to Folder ▸ / Remove-from-scope — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
-    NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
-                                   wires Reveal (NSWorkspace.open) + Preview (popover) callbacks
+    NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView,
+                                   BOUND to the selected item's body via NoteBodyEditorModel (load-on-
+                                   select + autosave + flush-on-switch, W7-S1a); publishes the item's
+                                   id/title/date to FormattingContext for W7 Create-Extract; wires
+                                   Reveal (NSWorkspace.open) + Preview (popover) callbacks
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
                                    style / advanced host+port), @AppStorage-bound (§D.8)
