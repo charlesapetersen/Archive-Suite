@@ -336,6 +336,38 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set the quality") { $0.quality = clamped }
     }
 
+    // MARK: Note body load / save (W7-S1a — the editor↔item wiring that gates W7 Extracts)
+    //
+    // The detail-pane editor edits the note's FULL body markdown: the leading prose plus the serialized
+    // `<!-- block: -->` source-block headers (00-overview §5/§6). Load serializes the stored
+    // `(trailingBodyRaw, blocks)` back to that markdown; save parses it and writes through the SAME
+    // audited `mutateItem` path the date/quality editors use (load-fresh → atomic `.md` save → one-row
+    // re-index → publish). Body text is Notes' OWN store only — never a Finder tag, never the archival
+    // corpus (Prime Directive #1). `setBody` bumps `modified` (via `mutateItem`) since it is a real edit.
+
+    /// Serialize the item's stored body to the editor's full-body markdown, or nil if it can't be read
+    /// (missing/unreadable note — the caller then leaves the editor empty rather than showing a stale
+    /// buffer). Read-only: does not touch the store.
+    func loadBody(for id: UUID) async -> String? {
+        guard let noteStore else { return nil }
+        do {
+            let item = try await noteStore.load(id)
+            return BlockParser.serialize(leadingText: item.trailingBodyRaw, blocks: item.blocks)
+        } catch { report(error, "load the note body"); return nil }
+    }
+
+    /// Parse edited body markdown back into `(leadingText, blocks)` and persist it atomically through
+    /// `mutateItem`, so it shares the date/quality write path's guarantees (fresh load → atomic save →
+    /// single-row re-index → publish). A failed write surfaces via `statusMessage` and leaves the
+    /// on-disk `.md` untouched (the disk is the source of truth). A no-op with no `noteStore`.
+    func setBody(_ markdown: String, for id: UUID) async {
+        let parsed = BlockParser.parse(markdown)
+        await mutateItem(id, "save the note") { item in
+            item.trailingBodyRaw = parsed.leadingText
+            item.blocks = parsed.blocks
+        }
+    }
+
     /// Shared load → mutate → atomic save → single-row re-index → publish path for the field editors
     /// above. A no-op with no `noteStore` (an injected test model built without one). The on-disk `.md`
     /// is the source of truth and the index is a rebuilt-from-disk projection, so nothing here can
