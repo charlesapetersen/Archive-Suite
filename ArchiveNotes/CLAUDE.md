@@ -48,6 +48,10 @@ macOS/Sources/ArchiveNotes/
                                    Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6)
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
+    SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
+                                   (reuses ArchiveCore.DurableLink §8.2 URL) (W7-S1)
+    NotesPassagePayload.swift      Copy-in-Notes → paste-into-Extract pasteboard payload
+                                   (com.archivenotes.passage; snapshot bytes per segment) (W7-S1)
   Index/
     NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection)
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
@@ -93,6 +97,9 @@ macOS/Sources/ArchiveNotes/
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
+    ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
+                                   append (snapshot copy via NoteStore.importAsset), defaultTitle,
+                                   extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1)
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
                                    list keyboard: Tab/Shift-Tab indent, Return continue,
