@@ -13,6 +13,9 @@ import ArchiveCore
 struct NotesBrowserView: View {
     let kind: ItemKindShell
 
+    /// The shared UI façade (folder tree + scope; grows into item list/detail in later sub-tasks).
+    @EnvironmentObject private var model: NotesModel
+
     @AppStorage(NotesLayoutSettingsKey.showTree)    private var showingTree = true
     @AppStorage(NotesLayoutSettingsKey.treeWidth)   private var treeWidth   = NotesLayoutSettings.defaultTreeWidth
     @AppStorage(NotesLayoutSettingsKey.detailWidth) private var detailWidth = NotesLayoutSettings.defaultDetailWidth
@@ -23,7 +26,7 @@ struct NotesBrowserView: View {
     var body: some View {
         HStack(spacing: 0) {
             if showingTree {
-                SidebarPane(kind: kind)
+                NotesFolderTreeView(model: model)
                     .frame(width: treeWidth)
                     .transition(.move(edge: .leading))
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
@@ -39,6 +42,7 @@ struct NotesBrowserView: View {
         .frame(minWidth: 900, minHeight: 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
+        .task { await model.bootstrap() }   // open the store + load organization on first appearance (idempotent)
         .toolbar { toolbar }
         // On close, the current window size becomes the default the next time this window opens.
         .onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }
@@ -75,13 +79,7 @@ struct NotesBrowserView: View {
     }
 }
 
-// MARK: - Placeholder panes (replaced in W6-S2 / W6-S3)
-
-/// Left pane — folder tree. Placeholder until `NotesFolderTreeView` lands in W6-S2.
-private struct SidebarPane: View {
-    let kind: ItemKindShell
-    var body: some View { placeholder("Folders") }
-}
+// MARK: - Placeholder panes (replaced in W6-S3)
 
 /// Center pane — item list. Placeholder until the `NotesTableView` list pane lands in W6-S3.
 private struct ItemListPane: View {

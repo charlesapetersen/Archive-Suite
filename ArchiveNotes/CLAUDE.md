@@ -49,6 +49,12 @@ macOS/Sources/ArchiveNotes/
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
+    NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
+                                   (+ index/root in the app path); @Published folder tree + scope;
+                                   async create/rename/move/delete folders + selection scope (W6-S2)
+    NotesFolderNode.swift          Id-keyed folder-tree node + buildNormalForest (group-by-parentId,
+                                   sortOrder→name sort, distinct-subtree counts, orphan/cycle-safe)
+                                   + smartFolderNodes (W6-S2)
     NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
                                    + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings
@@ -80,8 +86,13 @@ macOS/Sources/ArchiveNotes/
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
-                                   toggle, NotesWindowAccessor window-size persistence, placeholder
-                                   tree/list panes (→ W6-S2/S3), detail → NoteEditorPane
+                                   toggle, NotesWindowAccessor window-size persistence, binds the shared
+                                   NotesModel (tree pane = NotesFolderTreeView; item pane → W6-S3;
+                                   detail → NoteEditorPane); .task bootstraps the store
+    NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (OutlineGroup + two-way
+                                   @State selection sync, Smart Folders / Folders sections, All Notes
+                                   pseudo-row, context-menu create/rename/delete) (W6-S2). Adapts
+                                   Reader SidebarView; drag-reparent + batched delete → W6-S5
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;

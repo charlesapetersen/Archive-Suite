@@ -4,6 +4,9 @@ import ArchiveCore
 
 @main
 struct ArchiveNotesApp: App {
+    /// The single UI façade + organization graph, shared by both windows (§16.1). Bootstraps its
+    /// store lazily from each window's `.task`.
+    @StateObject private var notesModel = NotesModel()
     @StateObject private var deepLinkRouter = NotesDeepLinkRouter()
     @StateObject private var previewState = SourceBlockPreviewState()
     // Point the client at the configured host/port (Options ▸ Zotero, advanced). Applied at
@@ -14,6 +17,7 @@ struct ArchiveNotesApp: App {
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
             NotesBrowserView(kind: .note)
+                .environmentObject(notesModel)
                 .environmentObject(deepLinkRouter)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
@@ -32,6 +36,7 @@ struct ArchiveNotesApp: App {
         }
         Window("Extracts", id: NotesWindowID.extracts) {
             NotesBrowserView(kind: .extract)
+                .environmentObject(notesModel)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
         }

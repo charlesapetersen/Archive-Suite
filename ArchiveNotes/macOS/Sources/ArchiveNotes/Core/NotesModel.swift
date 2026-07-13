@@ -110,9 +110,12 @@ final class NotesModel: ObservableObject {
 
     // MARK: Scope selection
 
-    /// Scope to a normal folder. `nil` or the All-Notes root clears the scope (show everything).
+    /// Scope to a normal folder. `nil` or the All-Notes root clears the scope (show everything). The
+    /// no-op guard (already scoped to `id`) is the second half of the sidebar selection-sync
+    /// loop-breaker (the view holds the first; see Reader `SidebarView.swift:8-13`).
     func setFolderScope(_ id: UUID?) {
         guard let id, id != OrganizationStore.allNotesFolderId else { setAllNotesScope(); return }
+        guard selectedFolderId != id || selectedSmartId != nil else { return }
         selectedFolderId = id
         selectedSmartId = nil
         scope = NotesFilter(folderId: id)
@@ -120,6 +123,7 @@ final class NotesModel: ObservableObject {
 
     /// Clear the scope — the "All Notes" pseudo-row.
     func setAllNotesScope() {
+        guard selectedFolderId != nil || selectedSmartId != nil || scope != nil else { return }
         selectedFolderId = nil
         selectedSmartId = nil
         scope = nil
