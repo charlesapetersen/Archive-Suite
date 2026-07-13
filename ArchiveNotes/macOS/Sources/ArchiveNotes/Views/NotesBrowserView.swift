@@ -37,7 +37,7 @@ struct NotesBrowserView: View {
     var body: some View {
         HStack(spacing: 0) {
             if showingTree {
-                NotesFolderTreeView(model: model)
+                NotesFolderTreeView(model: model, nav: nav)
                     .frame(width: treeWidth)
                     .transition(.move(edge: .leading))
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
@@ -56,6 +56,20 @@ struct NotesBrowserView: View {
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
         .toolbar { toolbar }
         .onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }
+        // The mandatory delete-last-instance confirmation (§3.6, W6-S5). Set by a guarded membership
+        // removal (Remove-from-folder / MOVE source-removal); no note is deleted until the user
+        // confirms here. "Permanently" is the spec wording — the note actually moves to the Trash.
+        .alert("Delete “\(nav.pendingDeletion?.title ?? "")”?",
+               isPresented: Binding(get: { nav.pendingDeletion != nil },
+                                    set: { if !$0 { nav.pendingDeletion = nil } }),
+               presenting: nav.pendingDeletion) { pending in
+            // Capture `pending` from the presentation value: SwiftUI clears the binding (→
+            // pendingDeletion = nil) the instant a button is tapped, before this async Task runs.
+            Button("Delete Note", role: .destructive) { Task { await nav.confirmDeletion(pending) } }
+            Button("Cancel", role: .cancel) { }
+        } message: { pending in
+            Text("This is the only remaining instance of “\(pending.title)” — deleting it removes the note permanently.")
+        }
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -103,7 +117,7 @@ private struct ItemListPane: View {
                 model: nav,
                 selection: $nav.selection,
                 onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
-                buildContextMenu: { _ in nil }   // context menu accretes in W6-S4..S7 (open/link/delete/…)
+                buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) }  // W6-S5
             )
             .accessibilityIdentifier("an.list.table")
         }
@@ -123,6 +137,12 @@ private struct DetailPane: View {
     var body: some View {
         VStack(spacing: 0) {
             selectedHeader
+            if let id = nav.selectedItemID {
+                Divider()
+                LocationsInspector(nav: nav, itemId: id)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            }
             Divider()
             NoteEditorPane()
         }

@@ -129,6 +129,22 @@ struct NotesReplicationTests {
         #expect(!itemDirExists(env, b))                              // dir moved to Trash (recoverable)
     }
 
+    @Test("confirmDeletion(pending) still deletes after pendingDeletion is cleared (SwiftUI dismiss race)")
+    func confirmDeletionWithCapturedValueDeletes() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let ids = try await makeItems(env, ["B"]); let b = ids[0]
+        let f1 = try await makeFolder(env, "F1")
+        try await env.org.addMembership(item: b, folder: f1)
+        await env.nav.removeMembership(b, from: f1)      // → pending
+        let pending = try #require(env.nav.pendingDeletion)
+
+        env.nav.pendingDeletion = nil                     // SwiftUI clears the binding the instant a button is tapped
+        await env.nav.confirmDeletion(pending)            // the view path acts on the CAPTURED value
+
+        #expect(env.org.membershipCount(item: b) == 0)
+        #expect(!itemDirExists(env, b))                   // still deleted despite the cleared @Published
+    }
+
     @Test("confirm re-checks fresh: a concurrent replicate between modal and confirm KEEPS the file")
     func confirmAfterConcurrentReplicateKeepsFile() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

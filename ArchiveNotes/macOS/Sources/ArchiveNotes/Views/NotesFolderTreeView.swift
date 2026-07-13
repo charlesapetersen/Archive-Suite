@@ -14,6 +14,9 @@ import ArchiveCore
 /// selection now.
 struct NotesFolderTreeView: View {
     @ObservedObject var model: NotesModel
+    /// This window's item-list model — drops route through its `move`/`replicate` so the acting window
+    /// refreshes; the delete guard's per-window modal state also lives there (W6-S5).
+    @ObservedObject var nav: NotesNavigationModel
 
     // Real @State, not a computed Binding: OutlineGroup rows don't fire a computed Binding's setter
     // (Reader SidebarView.swift:8-13). Tags: allNotesTag · smartPrefix+uuid · uuid.
@@ -27,6 +30,8 @@ struct NotesFolderTreeView: View {
     @State private var newFolderText = ""
     @State private var deleteID: UUID?
     @State private var deleteName = ""
+    // Sole-instance items (fresh read at delete-tap time) that deleting the folder would delete (§5).
+    @State private var deleteStranded: [UUID] = []
 
     private static let allNotesTag = "\u{0}ALL"
     private static let smartPrefix = "SS:"
@@ -51,6 +56,9 @@ struct NotesFolderTreeView: View {
                         .tag(node.id.uuidString)
                         .accessibilityIdentifier("an.sidebar.folder")
                         .contextMenu { folderMenu(node) }
+                        .dropDestination(for: String.self) { items, _ in
+                            handleItemDrop(items, onto: node.id)
+                        }
                 }
             }
         }
@@ -81,14 +89,55 @@ struct NotesFolderTreeView: View {
         } message: {
             Text(newFolderParentID == nil ? "Create a top-level folder." : "Create a subfolder.")
         }
-        // Delete
+        // Delete — batched delete-last-instance guard (§3.6, §5). If deleting the folder would strand
+        // sole-instance notes, the button + message name the permanent deletion; otherwise it's a plain
+        // (non-destructive) folder delete.
         .confirmationDialog("Delete “\(deleteName)”?", isPresented: boolBinding($deleteID),
                             presenting: deleteID) { id in
-            Button("Delete Folder", role: .destructive) { Task { _ = await model.deleteFolder(id) } }
+            Button(deleteConfirmLabel, role: .destructive) {
+                let stranded = deleteStranded
+                Task {
+                    if stranded.isEmpty { _ = await model.deleteFolder(id) }
+                    else { await model.deleteFolderDeletingStranded(id, stranded: stranded) }
+                    nav.recompute()
+                }
+            }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("The folder is removed; its notes stay in the library. Any note that was only in this folder moves to All Notes.")
+        } message: { _ in Text(deleteMessage) }
+    }
+
+    /// The delete button's label — names the note-deletion count when the folder strands sole instances.
+    private var deleteConfirmLabel: String {
+        guard !deleteStranded.isEmpty else { return "Delete Folder" }
+        let n = deleteStranded.count
+        return "Delete Folder & \(n) Note\(n == 1 ? "" : "s")"
+    }
+
+    /// The delete dialog's message. §5 wording for the batched sole-instance case; the reassuring
+    /// non-destructive message otherwise. (Deletion is to the Trash — recoverable — despite "permanently".)
+    private var deleteMessage: String {
+        guard !deleteStranded.isEmpty else {
+            return "The folder is removed; its notes stay in the library (they live in other folders or under All Notes)."
         }
+        let titles = model.titles(for: deleteStranded)
+        let shown = titles.prefix(8).joined(separator: ", ")
+        let list = titles.count > 8 ? "\(shown), …" : shown
+        let n = deleteStranded.count
+        return "Deleting this folder will permanently delete \(n) note\(n == 1 ? "" : "s") that exist nowhere else: \(list)."
+    }
+
+    /// Handle a table→folder drop: plain = MOVE (from the current scope), ⌥ = REPLICATE. Reads the
+    /// modifier at drop time (`NSEvent.modifierFlags`); the ids-only payload decodes to `[]` for a
+    /// foreign/stray drop (an inert no-op). `move`/`replicate` refuse a non-normal target (§5).
+    private func handleItemDrop(_ payloads: [String], onto folderId: UUID) -> Bool {
+        let ids = payloads.flatMap { NotesItemDrag.decode(string: $0) }
+        guard !ids.isEmpty else { return false }
+        let replicate = NSEvent.modifierFlags.contains(.option)
+        Task {
+            if replicate { await nav.replicate(ids, to: folderId) }
+            else { await nav.move(ids, to: folderId, from: model.selectedFolderId) }
+        }
+        return true
     }
 
     // MARK: Rows & chrome
@@ -108,7 +157,11 @@ struct NotesFolderTreeView: View {
         Button("New Subfolder…") { beginNewFolder(parent: node.id) }
         Button("Rename…") { renameText = node.name; renameID = node.id }
         Divider()
-        Button("Delete", role: .destructive) { deleteName = node.name; deleteID = node.id }
+        Button("Delete", role: .destructive) {
+            deleteName = node.name
+            deleteStranded = model.strandedByDeletingFolder(node.id)   // fresh read at click time (§5)
+            deleteID = node.id
+        }
     }
 
     private var bottomBar: some View {

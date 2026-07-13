@@ -200,16 +200,25 @@ final class NotesNavigationModel: ObservableObject {
         } catch { model.statusMessage = "Couldn't remove the note from the folder." }
     }
 
-    /// Confirm the pending delete-last-instance. **Re-checks the membership count FRESH at confirm
-    /// time**, not just when the modal opened: if a replicate in the other window added another
-    /// instance in between, this is no longer the last one → we quietly unlink and KEEP the file
-    /// (trashing it would strand the new replicant on a trashed note). Only when it is *still* the last
-    /// instance do we force-remove the final membership and move the note to Trash (recoverable) + drop
-    /// its index row. Membership first, file second — a trash failure leaves a recoverable, still-
-    /// findable note (§5). No-op if nothing is pending.
+    /// Confirm the currently-pending delete-last-instance (test/programmatic entry point). Reads
+    /// `pendingDeletion`, clears it, and performs the delete. The VIEW instead calls
+    /// `confirmDeletion(_:)` with the value captured when the alert was shown, because SwiftUI clears
+    /// `pendingDeletion` (via the presentation binding) the instant the button is tapped — before this
+    /// async work runs — so reading it back here would see `nil`.
     func confirmPendingDeletion() async {
         guard let pending = pendingDeletion else { return }
         pendingDeletion = nil
+        await confirmDeletion(pending)
+    }
+
+    /// Perform a confirmed delete-last-instance for a specific pending item. **Re-checks the membership
+    /// count FRESH at confirm time**, not just when the modal opened: if a replicate in the other
+    /// window added another instance in between, this is no longer the last one → we quietly unlink and
+    /// KEEP the file (trashing it would strand the new replicant on a trashed note). Only when it is
+    /// *still* the last instance do we force-remove the final membership and move the note to Trash
+    /// (recoverable) + drop its index row. Membership first, file second — a trash failure leaves a
+    /// recoverable, still-findable note (§5).
+    func confirmDeletion(_ pending: PendingDeletion) async {
         do {
             switch try await model.organization.removeMembership(item: pending.itemId, folder: pending.folderId) {
             case .removed:

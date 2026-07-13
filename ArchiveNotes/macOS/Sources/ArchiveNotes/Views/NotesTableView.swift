@@ -96,11 +96,13 @@ struct NotesTableView: NSViewRepresentable {
         coordinator.tableView = tableView
         coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
-        let dataSource = NSTableViewDiffableDataSource<Int, UUID>(tableView: tableView) { tv, column, row, itemID in
+        let dataSource = NotesTableDataSource(tableView: tableView) { tv, column, row, itemID in
             coordinator.makeCell(tableView: tv, column: column, row: row, itemID: itemID)
         }
         coordinator.dataSource = dataSource
         tableView.delegate = coordinator
+        // Rows are draggable onto folder-tree rows: MOVE (plain) / REPLICATE (⌥) — W6-S5.
+        tableView.setDraggingSourceOperationMask([.move, .copy], forLocal: true)
         tableView.sortDescriptors = sortDescriptorsFromModel()
 
         coordinator.applySnapshot(model.displayed.map(\.id), animated: false)
@@ -228,7 +230,20 @@ struct NotesTableView: NSViewRepresentable {
 
             switch colID {
             case "title":
-                tf.stringValue = item.title.isEmpty ? "Untitled" : item.title
+                let displayTitle = item.title.isEmpty ? "Untitled" : item.title
+                // Replicated items (in >1 folder) get a subtle accent-colored chain glyph prefix, so a
+                // replicant reads as one at a glance (the "In" column shows the count). W6-S5, §5.
+                if (parent.model.instanceCounts[item.id] ?? 0) > 1 {
+                    let styled = NSMutableAttributedString(
+                        string: "⧉ ",
+                        attributes: [.foregroundColor: NSColor.controlAccentColor, .font: regularFont])
+                    styled.append(NSAttributedString(
+                        string: displayTitle,
+                        attributes: [.foregroundColor: NSColor.labelColor, .font: regularFont]))
+                    tf.attributedStringValue = styled
+                } else {
+                    tf.stringValue = displayTitle
+                }
                 tf.lineBreakMode = .byTruncatingMiddle
                 tf.setAccessibilityIdentifier("an.cell.title.\(item.id.uuidString)")
 
@@ -400,6 +415,26 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     }
     @objc private func removeSecondary(_ sender: NSMenuItem) { onRemoveSecondarySort?() }
     @objc private func resetSort(_ sender: NSMenuItem) { onResetSort?() }
+}
+
+// MARK: - Drag-source data source
+
+/// `NSTableViewDiffableDataSource` subclass that makes rows draggable, carrying the row's item id
+/// (06-viewers §5, W6-S5). The payload is **ids only** — the custom `com.archivenotes.item-ids` type
+/// plus the same JSON as `.string` (so the SwiftUI `dropDestination(for: String.self)` on folder rows
+/// can read it without a declared `UTType`). No file bytes ever cross the pasteboard.
+@MainActor
+final class NotesTableDataSource: NSTableViewDiffableDataSource<Int, UUID> {
+    // Optional NSTableViewDataSource method (not declared on the diffable superclass, so no `override`);
+    // @objc-exposed via the inherited NSTableViewDataSource conformance so NSTableView calls it.
+    @objc func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        let ids = snapshot().itemIdentifiers(inSection: 0)
+        guard row >= 0, row < ids.count else { return nil }
+        let item = NSPasteboardItem()
+        item.setData(NotesItemDrag.encode([ids[row]]), forType: NotesItemDrag.pasteboardType)
+        item.setString(NotesItemDrag.encodedString([ids[row]]), forType: .string)
+        return item
+    }
 }
 
 // MARK: - Context-menu NSTableView subclass

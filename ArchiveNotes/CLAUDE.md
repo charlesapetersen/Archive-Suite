@@ -58,13 +58,20 @@ macOS/Sources/ArchiveNotes/
                                    async create/rename/move/delete folders + selection scope (W6-S2);
                                    shared item source (allItems + reloadItems/replaceItems) for the
                                    per-window list VMs (W6-S3); search(_:) FTS façade + createSmartFolder
-                                   (W6-S4)
+                                   (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
+                                   (fresh read), trashItems (recoverable Trash), deleteFolderDeletingStranded
+                                   (batched), titles(for:) (W6-S5)
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
                                    proxy / sort / selection / displayed + displayedGeneration +
                                    instanceCounts); observes shared allItems + scope (mirrored from the
                                    delivered @Published value); recompute() = scope → user filter →
                                    keyword FTS (bm25, debounced, relevance auto-sort, generation guard) →
-                                   order; clearUserFilters / saveAsSmartFolder (W6-S3/S4)
+                                   order; clearUserFilters / saveAsSmartFolder (W6-S3/S4); replication +
+                                   delete-last-instance guard — removeMembership (replicant→quiet,
+                                   last→pendingDeletion modal), confirmDeletion/cancel (FRESH re-check
+                                   at confirm), move/replicate, locations(of:) (W6-S5)
+    NotesItemDrag.swift            Pure id-only pasteboard codec (JSON [uuidString], custom UTI +
+                                   .string) + ⌥=replicate/plain=move resolution; foreign→[] (W6-S5)
     NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
@@ -111,16 +118,23 @@ macOS/Sources/ArchiveNotes/
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (OutlineGroup + two-way
                                    @State selection sync, Smart Folders / Folders sections, All Notes
                                    pseudo-row, context-menu create/rename/delete) (W6-S2). Adapts
-                                   Reader SidebarView; drag-reparent + batched delete → W6-S5
+                                   Reader SidebarView. Folder-row drop target (plain=MOVE / ⌥=REPLICATE
+                                   via NSEvent.modifierFlags) + batched delete-last-instance guard
+                                   (fresh stranded read → §5 confirm) (W6-S5); drag-reparent → future
     NotesTableView.swift           Center pane — virtualized item table (NSViewRepresentable +
                                    NSTableViewDiffableDataSource<Int, UUID> + ColumnPickerHeaderView
                                    hide/show + secondary sort + ContextMenuTableView). Columns
                                    kind/title/instances/date/quality/tags; tags READ-ONLY (edited in
                                    detail, W6-S7). Adapts Reader AppKitTableView (no inline NSTokenField)
-                                   (W6-S3)
+                                   (W6-S3). Drag source (NotesTableDataSource pasteboardWriterForRow,
+                                   id-only) + accent-glyph replicant title styling (W6-S5)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★5 toggles · tag ALL/ANY +
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
+    LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
+                                   a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
+    NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
+                                   Move to Folder ▸ / Remove-from-scope — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
@@ -162,6 +176,11 @@ macOS/Tests/ArchiveNotesTests/
   ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
   NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable + matches (all facets,
                                    ALL/ANY, date range, membership), effective merge, tolerant decode (W6-S4)
+  NotesReplicationTests.swift      16 Tier-2 scratch-store tests: guard (replicant-quiet / last→pending
+                                   no-mutate / confirm→Trash / cancel-noop / fresh re-check TOCTOU ×2 /
+                                   captured-value confirm), move/replicate (incl. smart-folder refusal),
+                                   batched folder-delete, stranded fresh read, locations (W6-S5)
+  NotesItemDragTests.swift         6 tests: id-codec round-trip, malformed/foreign→[], ⌥/plain op (W6-S5)
   NoteStoreTests.swift             13 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL
   RootMarkerStoreTests.swift       5 tests: fresh/idempotent/corrupt-guard/empty/JSON-round-trip
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
