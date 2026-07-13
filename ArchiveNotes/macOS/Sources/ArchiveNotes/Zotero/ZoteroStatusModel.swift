@@ -31,6 +31,12 @@ final class ZoteroStatusModel: ObservableObject {
     /// so rapid re-triggers coalesce to the latest result.
     func refreshAvailability() {
         availabilityTask?.cancel()
+        // Integration disabled (Options ▸ Zotero) → never probe; report unavailable so the
+        // auto-fill affordance stays hidden. Link attach + chip-open remain available regardless.
+        guard ZoteroSettingsStore.current.enabled else {
+            backend = .unavailable
+            return
+        }
         availabilityTask = Task { [weak self] in
             guard let self else { return }
             let result = await self.client.availability()
@@ -43,6 +49,12 @@ final class ZoteroStatusModel: ObservableObject {
     /// work when the pasteboard hasn't changed since the last read.
     /// - Parameter attachedLinks: canonical select links already attached (deduped out).
     func refreshClipboard(attachedLinks: Set<String> = []) {
+        // Detection off, or the whole integration disabled → never surface a banner.
+        let settings = ZoteroSettingsStore.current
+        guard settings.enabled, settings.clipboardDetect else {
+            if clipboardRef != nil { clipboardRef = nil }
+            return
+        }
         let pasteboard = NSPasteboard.general
         if pasteboard.changeCount == lastChangeCount { return }
         lastChangeCount = pasteboard.changeCount

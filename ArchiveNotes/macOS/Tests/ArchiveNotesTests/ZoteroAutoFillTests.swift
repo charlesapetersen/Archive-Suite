@@ -345,4 +345,37 @@ struct ZoteroAutoFillTests {
         #expect(untouched?.citation == nil)
         #expect(untouched?.fetchedAt == nil)
     }
+
+    // MARK: - Degrade (W5-S5): a failed citation fetch must not erase a stored citation
+
+    @Test("fetch failure (no new citation) leaves the ref's existing citation intact")
+    @MainActor
+    func modelPreservesExistingCitationWhenFetchFails() async throws {
+        let link = "zotero://select/library/items/ABCD1234"
+        // A prior successful fetch already stored a citation on the ref (the durable survivor, §5).
+        var existing = ref(link)
+        existing.citation = "Previously fetched citation."
+        existing.fetchedAt = Date(timeIntervalSince1970: 10)
+        let item = makeItem(zotero: [existing])   // empty title → the title fill is default-selected
+        let recorder = SaveRecorder()
+        let when = Date(timeIntervalSince1970: 2_000)
+
+        // citation: nil = the citation fetch failed this time (offline / style error), even though
+        // CSL metadata for author/date/title came through.
+        let model = ZoteroAutoFillModel(
+            item: item,
+            csl: csl(title: "Oral History"),
+            refSelectLink: link,
+            citation: nil,
+            fetchedAt: when,
+            save: { saved in await recorder.record(saved) })
+
+        try await model.confirm()
+
+        let out = try #require(await recorder.snapshot().first)
+        let stamped = out.zotero.first { $0.selectLink == link }
+        #expect(stamped?.citation == "Previously fetched citation.")  // intact, not wiped
+        #expect(stamped?.fetchedAt == when)                            // fetch attempt still stamped
+        #expect(out.title == "Oral History")                           // the fill still applied
+    }
 }

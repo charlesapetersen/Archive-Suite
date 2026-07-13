@@ -79,7 +79,8 @@ macOS/Sources/ArchiveNotes/
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
                                    wires Reveal (NSWorkspace.open) + Preview (popover) callbacks
     PanelDivider.swift             Draggable divider (copied from Reader)
-    NotesSettingsView.swift        Settings form (placeholder)
+    NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
+                                   style / advanced host+port), @AppStorage-bound (§D.8)
     ThumbnailImageCache.swift      @MainActor NSCache<NSString, NSImage> (300 count / 64 MB)
     NotesPDFPaneView.swift         Notes-side PDFPaneController + PDFPaneView (read-only, no-persist)
     ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for
@@ -102,6 +103,9 @@ macOS/Sources/ArchiveNotes/
                                    frontmost-gated clipboard detection (changeCount-gated, no timer)
     ZoteroChipView.swift           Reusable Zotero pill (SwiftUI) + pure ZoteroChipPresentation
                                    (label/glyph/a11y); click → NSWorkspace.open(selectLink) (§D.5)
+    ZoteroSettings.swift           ZoteroSettingsKey + ZoteroSettings (validated resolve from
+                                   UserDefaults, defaults, clientConfig) + ZoteroSettingsStore
+                                   (point-of-use accessor); gates probe/clipboard-detect (§D.8)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
                                    thumbnail asset import, entry-count cap (100)

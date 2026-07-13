@@ -6,7 +6,10 @@ import ArchiveCore
 struct ArchiveNotesApp: App {
     @StateObject private var deepLinkRouter = NotesDeepLinkRouter()
     @StateObject private var previewState = SourceBlockPreviewState()
-    @StateObject private var zoteroStatus = ZoteroStatusModel()
+    // Point the client at the configured host/port (Options ▸ Zotero, advanced). Applied at
+    // launch; the enabled/clipboard-detect gates are read at point of use in the status model.
+    @StateObject private var zoteroStatus = ZoteroStatusModel(
+        client: ZoteroClient(config: ZoteroSettingsStore.current.clientConfig))
 
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
