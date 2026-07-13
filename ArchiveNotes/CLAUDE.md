@@ -49,6 +49,9 @@ macOS/Sources/ArchiveNotes/
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
+    NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
+                                   + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
+                                   point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
   Editor/
@@ -75,7 +78,12 @@ macOS/Sources/ArchiveNotes/
                                    pasteSourceBlocks + FocusedValue key
     FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
   Views/
-    NotesShellView.swift           3-pane shell (HStack + PanelDivider), detail → NoteEditorPane
+    NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
+                                   Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
+                                   toggle, NotesWindowAccessor window-size persistence, placeholder
+                                   tree/list panes (→ W6-S2/S3), detail → NoteEditorPane
+    NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
+                                   window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView;
                                    wires Reveal (NSWorkspace.open) + Preview (popover) callbacks
     PanelDivider.swift             Draggable divider (copied from Reader)

@@ -13,7 +13,7 @@ struct ArchiveNotesApp: App {
 
     var body: some Scene {
         Window("Archive Notes", id: NotesWindowID.notes) {
-            NotesShellView(kind: .note)
+            NotesBrowserView(kind: .note)
                 .environmentObject(deepLinkRouter)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
@@ -31,7 +31,7 @@ struct ArchiveNotesApp: App {
             #endif
         }
         Window("Extracts", id: NotesWindowID.extracts) {
-            NotesShellView(kind: .extract)
+            NotesBrowserView(kind: .extract)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
         }
