@@ -79,6 +79,8 @@ struct NoteEditorPane: View {
         bodyEditor.load = { id in await model.loadBody(for: id) }
         bodyEditor.save = { id, markdown in await model.setBody(markdown, for: id) }
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
+        // W7-S2: give the formatting context the shared model so Create/Append Extract can persist.
+        formatting.notesModel = model
     }
 
     /// Publish the selected item's identity to the formatting context so W7's Create-Extract can anchor
@@ -87,6 +89,7 @@ struct NoteEditorPane: View {
         formatting.currentItemID = nav.selectedItemID
         formatting.currentItemTitle = nav.selectedSummary?.title ?? ""
         formatting.currentItemDateDisplay = nav.selectedSummary?.displayDate ?? ""
+        formatting.currentItemKind = nav.selectedSummary?.kind   // W7-S2: gate Create/Append Extract to notes
     }
 
     /// "Zotero link on clipboard — Attach" affordance (00-overview §D.5).

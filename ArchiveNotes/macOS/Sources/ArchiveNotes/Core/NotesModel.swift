@@ -303,6 +303,71 @@ final class NotesModel: ObservableObject {
         return "\(base) \(n)"
     }
 
+    // MARK: Extracts (W7-S2 — create / append from a note-editor selection)
+    //
+    // The extract experience mints a new, independently-editable `Item(kind: .extract)` holding a
+    // SNAPSHOT copy of a note passage plus a durable note-passage provenance link (07-extracts §2/§5).
+    // Persistence goes ONLY through the audited `NoteStore` (via `ExtractBuilder`) + the atomic
+    // `OrganizationStore` membership write — W7 adds no new file-writing choke-point (keeps it Tier-1).
+    // The source note is READ-ONLY at snapshot; the archival corpus is never touched (Prime Directive
+    // #1). Unlike `newItem`, these upsert the one new/changed index row inline so the extract appears
+    // in the Extracts window's list immediately (no full re-index pass needed) — same idiom as
+    // `mutateItem`.
+
+    /// Create a new extract from a live note selection and file it into the Extracts home folder
+    /// (or `folderId`). Returns the new extract's id (nil on empty selection / no store / failure).
+    /// Both windows observe `allItems`, so the Extracts window features the new extract at once.
+    @discardableResult
+    func createExtract(from source: PassageSelectionSource, into folderId: UUID? = nil) async -> UUID? {
+        guard let noteStore else { return nil }
+        let passages = ExtractBuilder.passageBlocks(fromSelectionIn: source)
+        guard !passages.isEmpty else {
+            statusMessage = "Select text in a note to make an extract."
+            return nil
+        }
+        do {
+            let created = try await ExtractBuilder(store: noteStore).createExtract(from: passages)
+            try await organization.addMembership(item: created.id,
+                                                 folder: folderId ?? organization.extractsHomeFolderId)
+            if let index {
+                try await index.upsertBatch([NoteIndexRow(item: created,
+                                                          mtime: created.modified.timeIntervalSince1970)])
+            }
+            await reloadItems()
+            rebuild()
+            return created.id
+        } catch { report(error, "create the extract"); return nil }
+    }
+
+    /// Append a live note selection to an EXISTING extract (cross-note segmentation, §D7). No-op on an
+    /// empty selection. The source note is never mutated; errors surface via `statusMessage`.
+    func appendToExtract(_ id: UUID, from source: PassageSelectionSource) async {
+        guard let noteStore else { return }
+        let passages = ExtractBuilder.passageBlocks(fromSelectionIn: source)
+        guard !passages.isEmpty else {
+            statusMessage = "Select text in a note to append to an extract."
+            return
+        }
+        do {
+            try await ExtractBuilder(store: noteStore).append(toExtract: id, passages: passages)
+            let updated = try await noteStore.load(id)
+            if let index {
+                try await index.upsertBatch([NoteIndexRow(item: updated,
+                                                          mtime: updated.modified.timeIntervalSince1970)])
+            }
+            await reloadItems()
+            rebuild()
+        } catch { report(error, "append to the extract") }
+    }
+
+    /// The extracts currently in the store (id + display title), for the "Append to Extract…" chooser.
+    /// Sorted by localized title for a stable menu; empty titles render as "Untitled".
+    var existingExtracts: [(id: UUID, title: String)] {
+        allItems.filter { $0.kind == .extract }
+            .map { (id: $0.id, title: $0.title.isEmpty ? "Untitled" : $0.title) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
     // MARK: Metadata edits (W6-S7 — dates & quality, §16.1)
     //
     // Front-matter ONLY (00-overview D2/D9): a note's date + quality live in its own `.md` YAML, never

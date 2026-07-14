@@ -76,6 +76,25 @@ struct ZoteroCommands: Commands {
     }
 }
 
+/// Extract menu: mint a new extract from the current note selection, or append it to an existing one
+/// (07-extracts §5/§6). Dispatched to the focused editor's `FormattingContext`, which holds the live
+/// selection + the shared model. Both source a passage FROM a note; invoked with an extract loaded (the
+/// Extracts window) or no selection, they no-op with a status hint. (The plan sketched a "Selection"
+/// menu; a dedicated Extract menu is the coherent realization alongside the existing Format/Note menus.)
+struct ExtractCommands: Commands {
+    @FocusedValue(\.formattingContext) private var formatting
+
+    var body: some Commands {
+        CommandMenu("Extract") {
+            Button("Create Extract") { formatting?.createExtract() }
+                .keyboardShortcut("e", modifiers: [.command, .option])
+                .disabled(formatting == nil)
+            Button("Append to Extract\u{2026}") { formatting?.appendToExtract() }
+                .disabled(formatting == nil)
+        }
+    }
+}
+
 #if DEBUG
 /// Debug menu: insert a test source block to exercise the chip rendering + round-trip.
 struct DebugBlockCommands: Commands {

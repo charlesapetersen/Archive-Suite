@@ -79,11 +79,23 @@ enum BlockParser {
     }
 
     /// Serialize blocks back to body text.
+    ///
+    /// A block header is only recognized by `parse` at the **start of a line**, so every header must
+    /// begin on its own line. A block body (or the leading text) that does not end in a newline —
+    /// e.g. a partial-paragraph passage snapshot (W7 extracts) — would otherwise butt directly up
+    /// against the next `<!-- block:` and be silently merged into one block on reload. We therefore
+    /// insert a single separating newline before a header whenever the preceding text lacks one. The
+    /// final block is left untouched (no spurious trailing newline), so a single-block or already
+    /// newline-terminated body round-trips byte-for-byte.
     static func serialize(leadingText: String?, blocks: [Block]) -> String {
         var out = leadingText ?? ""
-        for block in blocks {
+        if !blocks.isEmpty, !out.isEmpty, !out.hasSuffix("\n") { out += "\n" }
+        for (i, block) in blocks.enumerated() {
             out += serializeHeader(block)
             out += block.markdown
+            if i + 1 < blocks.count, !block.markdown.isEmpty, !block.markdown.hasSuffix("\n") {
+                out += "\n"
+            }
         }
         return out
     }

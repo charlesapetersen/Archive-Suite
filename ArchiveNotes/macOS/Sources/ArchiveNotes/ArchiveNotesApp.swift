@@ -30,6 +30,7 @@ struct ArchiveNotesApp: App {
             FormatCommands()
             SourceBlockCommands()
             ZoteroCommands()
+            ExtractCommands()
             #if DEBUG
             DebugBlockCommands()
             #endif

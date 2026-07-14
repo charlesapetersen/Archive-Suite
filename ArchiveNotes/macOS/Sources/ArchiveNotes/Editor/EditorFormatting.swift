@@ -47,6 +47,14 @@ final class FormattingContext: ObservableObject {
     var currentItemID: UUID?
     var currentItemTitle: String = ""
     var currentItemDateDisplay: String = ""
+    /// Kind of the loaded item (W7-S2). Create/Append-Extract and the copy-as-passage representation
+    /// source a passage FROM a note, so they are gated on this being `.note`; in the Extracts window
+    /// (an extract is loaded) Create-Extract no-ops with a status hint.
+    var currentItemKind: Item.Kind?
+
+    /// The shared model, for the extract create/append actions (W7-S2). Weak — the model is an
+    /// app-lifetime `@StateObject` that outlives this per-editor context and never references back.
+    weak var notesModel: NotesModel?
 
     func toggleBold() {
         guard let tv = textView else { return }
@@ -165,6 +173,69 @@ final class FormattingContext: ObservableObject {
         let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey,
                                   zoteroSelect: ref.selectLink)
         coordinator?.insertBlock(kind: kind, anchor: anchor)
+    }
+
+    // MARK: - Extracts (W7-S2)
+
+    /// Build a passage-selection source over the LIVE editor for the current note, or nil when no note
+    /// is loaded / there is no non-empty selection. Snapshots the text by value (D7 independence). The
+    /// asset store is nil until the item-scoped asset store lands (W7-S5): image *references* are
+    /// preserved in the snapshot markdown, but inline-image bytes aren't embedded yet.
+    func makeNotePassageSource() -> EditorPassageSource? {
+        guard let tv = textView, currentItemKind == .note, let id = currentItemID else { return nil }
+        let source = EditorPassageSource(textView: tv,
+                                         sourceNoteId: id,
+                                         sourceTitle: currentItemTitle,
+                                         sourceDateDisplay: currentItemDateDisplay,
+                                         assetStore: nil)
+        guard source.selectedRanges.contains(where: { $0.length > 0 }) else { return nil }
+        return source
+    }
+
+    /// Create Extract (⌘⌥E): snapshot the current note selection into a new extract filed under
+    /// Extracts. A no-op (with a status hint) when nothing is selected or an extract — not a note — is
+    /// loaded (you extract *from* a note).
+    func createExtract() {
+        guard let model = notesModel else { return }
+        guard let source = makeNotePassageSource() else {
+            model.statusMessage = "Select text in a note to make an extract."
+            return
+        }
+        Task { await model.createExtract(from: source) }
+    }
+
+    /// Append to Extract…: snapshot the current note selection and append it to a chosen existing
+    /// extract (cross-note segmentation, §D7). Presents the standard NSAlert picker idiom.
+    func appendToExtract() {
+        guard let model = notesModel else { return }
+        guard let source = makeNotePassageSource() else {
+            model.statusMessage = "Select text in a note to append to an extract."
+            return
+        }
+        let extracts = model.existingExtracts
+        guard !extracts.isEmpty else {
+            model.statusMessage = "There are no extracts yet — use Create Extract first."
+            return
+        }
+        guard let chosen = Self.chooseExtract(from: extracts) else { return }
+        Task { await model.appendToExtract(chosen, from: source) }
+    }
+
+    /// Modal picker for "Append to Extract…" (mirrors the NSAlert idiom in `attachZoteroLink` /
+    /// `insertLink`). Returns the chosen extract id, or nil when cancelled / nothing valid picked.
+    private static func chooseExtract(from extracts: [(id: UUID, title: String)]) -> UUID? {
+        let alert = NSAlert()
+        alert.messageText = "Append to Extract"
+        alert.informativeText = "Choose the extract to append this passage to."
+        alert.addButton(withTitle: "Append")
+        alert.addButton(withTitle: "Cancel")
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        for e in extracts { popup.addItem(withTitle: e.title) }
+        alert.accessoryView = popup
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let idx = popup.indexOfSelectedItem
+        guard extracts.indices.contains(idx) else { return nil }
+        return extracts[idx].id
     }
 }
 

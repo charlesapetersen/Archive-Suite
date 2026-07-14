@@ -191,4 +191,37 @@ final class BlockParserTests: XCTestCase {
         let serialized = BlockParser.serialize(leadingText: leading, blocks: blocks)
         XCTAssertEqual(serialized, body)
     }
+
+    /// W7-S2 regression: two blocks whose bodies do NOT end in a newline (a partial-paragraph passage
+    /// snapshot) must still serialize so each `<!-- block:` header starts on its own line — otherwise
+    /// `parse` (which only recognizes a header at a line start) silently merges them into one block.
+    func testSerializeSeparatesNonNewlineTerminatedBlocks() {
+        let a = SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 0,
+                                         sourceTitle: "A", sourceDateDisplay: "1968")
+        let b = SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 1,
+                                         sourceTitle: "B", sourceDateDisplay: "1972")
+        let blocks = [Block(kind: .notePassage, source: a, markdown: "First body", unknownHeaderFields: []),
+                      Block(kind: .notePassage, source: b, markdown: "Second body", unknownHeaderFields: [])]
+        let serialized = BlockParser.serialize(leadingText: nil, blocks: blocks)
+        let (_, reparsed) = BlockParser.parse(serialized)
+        XCTAssertEqual(reparsed.count, 2)
+        XCTAssertEqual(reparsed[0].markdown.trimmingCharacters(in: .newlines), "First body")
+        XCTAssertEqual(reparsed[1].markdown.trimmingCharacters(in: .newlines), "Second body")
+        XCTAssertEqual(reparsed[0].source?.notePassageTarget?.block, 0)
+        XCTAssertEqual(reparsed[1].source?.notePassageTarget?.block, 1)
+        // Second serialize is idempotent (bodies now carry the separating newline).
+        XCTAssertEqual(BlockParser.serialize(leadingText: nil, blocks: reparsed), serialized)
+    }
+
+    /// Leading text lacking a trailing newline must not swallow the first block's header either.
+    func testSerializeSeparatesNonNewlineTerminatedLeadingText() {
+        let a = SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 3,
+                                         sourceTitle: "A", sourceDateDisplay: "1968")
+        let blocks = [Block(kind: .notePassage, source: a, markdown: "Body\n", unknownHeaderFields: [])]
+        let serialized = BlockParser.serialize(leadingText: "Intro prose", blocks: blocks)
+        let (leading, reparsed) = BlockParser.parse(serialized)
+        XCTAssertEqual(leading?.trimmingCharacters(in: .newlines), "Intro prose")
+        XCTAssertEqual(reparsed.count, 1)
+        XCTAssertEqual(reparsed[0].source?.notePassageTarget?.block, 3)
+    }
 }
