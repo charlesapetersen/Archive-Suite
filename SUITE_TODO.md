@@ -182,6 +182,12 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `ftsGeneration` token handles superseded queries. `.onSubmit` removed (debounce handles it); clear
   button still calls explicitly for instant feedback. 191 tests green, 0 new warnings.
   | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | done
+- [ ] **In-viewer find, scoped to the open PDF(s)** _(owner-requested 2026-07-14)_ — a ⌘F find bar in the
+  document viewer that searches ONLY the PDF(s) currently open in the viewer, NOT the corpus/library FTS (that's
+  the as-you-type OCR search above). Match-highlight + next/prev navigation within the document; when multiple
+  docs are open in the viewer, search across all of them. Likely via PDFKit (`PDFDocument.findString` / `PDFView`
+  selection). Read-only, no writes → Tier-1. | files (verify at impl): Views/DocumentWindowView.swift,
+  Views/PDFPaneView.swift, Core/DocumentViewerModel.swift | M | low | none
 
 ### Archive Reader — sort & smart folders
 - [x] **Drop the top-bar Sort button; sort via column headers** — removed the toolbar Sort menu; primary
