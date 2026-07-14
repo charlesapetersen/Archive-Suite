@@ -175,4 +175,38 @@ struct NotePassageResolveTests {
         #expect(model.resolvePassage(passageAnchor(block: 1))
                 == .resolved(id: sourceID, block: 1, liveTitle: "Live title", dateDisplay: "1970"))
     }
+
+    // MARK: openAction — which window handles an openItem(id:block:) request
+
+    @Test func openActionSelectsAndScrollsWhenKindMatchesWindow() {
+        // A note target + the Note window → that window selects it and scrolls to the block.
+        let items = [summary(sourceID, title: "The source note", kind: .note)]
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 3, among: items, windowKind: .note)
+                == .selectAndScroll(id: sourceID, block: 3))
+    }
+
+    @Test func openActionIgnoresWhenTargetKindDiffersFromWindow() {
+        // The Extract window must NOT act on a note target — the Note window owns it.
+        let items = [summary(sourceID, title: "The source note", kind: .note)]
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 3, among: items, windowKind: .extract)
+                == .ignore)
+    }
+
+    @Test func openActionExtractTargetHandledByExtractWindow() {
+        // The generic archivenotes://open path can target an extract; the Extract window handles it,
+        // the Note window ignores it (no false "source missing" report for an existing item).
+        let items = [summary(sourceID, title: "An extract", kind: .extract)]
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: nil, among: items, windowKind: .extract)
+                == .selectAndScroll(id: sourceID, block: nil))
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: nil, among: items, windowKind: .note)
+                == .ignore)
+    }
+
+    @Test func openActionReportsMissingOnNoteWindowOnly() {
+        // Deleted target: the Note window reports the preserved-text status; the Extract window stays quiet.
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 0, among: [], windowKind: .note)
+                == .reportSourceMissing)
+        #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 0, among: [], windowKind: .extract)
+                == .ignore)
+    }
 }

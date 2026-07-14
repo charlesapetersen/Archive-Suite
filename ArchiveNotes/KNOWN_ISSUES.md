@@ -46,6 +46,38 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
   `BlockParserTests`).
 
+## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13, open)
+
+W7-S3 shipped the note-passage provenance chip's **Jump to Source** button + live-title label + the
+in-app navigation channel (`NotesModel.openItem`/`pendingOpen`) and the Note-window consume side
+(observe → `NotePassageResolve.openAction` → select + scroll-to-block, gated on `loadedID`). Pure logic
+is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscious gaps / edges:
+
+- **GUI drive deferred (GUI paused).** Not yet driven live: click Jump in an extract block → the Note
+  window selects the source note and scrolls to the right block; a deleted source → greyed chip +
+  "source no longer exists — extract text preserved" status; a stale ordinal → scroll-to-top +
+  "source has changed" status; a renamed source → chip shows the current title. Verify with
+  `cliclick` on `an.chip.jump` + a screenshot when GUI resumes.
+- **Window is selected + scrolled but not programmatically RAISED.** `openItem` reveals + scrolls the
+  source note in the window that features its kind, but does not `orderFront`/focus that window (the
+  cross-window channel W7-S2 flagged as missing now EXISTS for select+scroll; only the raise is left).
+  A GUI follow-up (best verified live).
+- **Chip live title refreshes on re-style, not reactively.** The chip resolves the source's current
+  title/date from `allItems` when the extract editor (re)styles its content (open / select / raw-toggle
+  / paste). A rename in the *other* window while the extract editor sits idle won't recolor the chip
+  until it next re-styles. Acceptable (the common path — open the extract — shows current titles).
+- **Same-window active-editing edge.** If the jump target note is being actively edited *in the same
+  window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
+  scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
+  realistic jump is cross-window (Extract → Note window), where the target window isn't first responder,
+  so content re-applies and the scroll is exact.
+- **Folder-scope-hidden target.** A jump clears the window's *user* filters so the row is reachable, but
+  a shared *folder scope* that excludes the note is left intact; the editor still loads + scrolls the
+  note (detail reads `allItems`, not the filtered list), but the list-row highlight may be absent.
+- **Pre-existing warning (not W7-S3):** `Core/NotePassageSource.swift:118` — "conditional cast from
+  '[NSValue]' to '[NSValue]' always succeeds" (W7-S2 code; surfaces on a clean compile). Trivial; fold
+  into a future W7 touch.
+
 ## Test harness — headless full-scheme run crashes (found 2026-07-13, open)
 
 Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore

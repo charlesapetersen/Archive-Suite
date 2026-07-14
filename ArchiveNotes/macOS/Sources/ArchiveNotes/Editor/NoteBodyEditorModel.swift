@@ -35,8 +35,9 @@ final class NoteBodyEditorModel: ObservableObject {
     }
 
     /// The item whose body is currently in the editor (nil = nothing loaded / multi- or no selection).
-    /// Saves and flushes target THIS id, captured at schedule time — never a newer selection.
-    private(set) var loadedID: UUID?
+    /// Saves and flushes target THIS id, captured at schedule time — never a newer selection. Published
+    /// so the host can gate a jump-to-source scroll on "the target's body is loaded" (W7-S3).
+    @Published private(set) var loadedID: UUID?
 
     // MARK: Injected seams (real wiring in `NoteEditorPane`; closures in tests)
 

@@ -42,7 +42,9 @@ enum MarkdownBridge {
     static func parse(markdown: String, fontSize: CGFloat = 14,
                        assetStore: EditorAssetStore? = nil,
                        onRevealBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
-                       onPreviewBlock: ((SourceAnchor, NSView) -> Void)? = nil) -> NSAttributedString {
+                       onPreviewBlock: ((SourceAnchor, NSView) -> Void)? = nil,
+                       onJumpBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
+                       passageSummaries: [ItemSummary] = []) -> NSAttributedString {
         if markdown.isEmpty {
             return NSAttributedString(string: "")
         }
@@ -67,7 +69,7 @@ enum MarkdownBridge {
         for block in blocks {
             let chipStr = buildChipAttributedString(
                 block: block, fontSize: fontSize, onReveal: onRevealBlock,
-                onPreview: onPreviewBlock
+                onPreview: onPreviewBlock, onJump: onJumpBlock, passageSummaries: passageSummaries
             )
             result.append(chipStr)
 
@@ -89,7 +91,9 @@ enum MarkdownBridge {
     private static func buildChipAttributedString(
         block: Block, fontSize: CGFloat,
         onReveal: (@Sendable (SourceAnchor) -> Void)?,
-        onPreview: ((SourceAnchor, NSView) -> Void)? = nil
+        onPreview: ((SourceAnchor, NSView) -> Void)? = nil,
+        onJump: (@Sendable (SourceAnchor) -> Void)? = nil,
+        passageSummaries: [ItemSummary] = []
     ) -> NSAttributedString {
         let anchor = block.source ?? SourceAnchor()
         let box = SourceAnchorBox(
@@ -101,6 +105,13 @@ enum MarkdownBridge {
         let attachment = BlockHeaderAttachment(sourceBox: box)
         attachment.onReveal = onReveal
         attachment.onPreview = onPreview
+        attachment.onJump = onJump
+        // W7-S3: for a note-passage (extract) chip, resolve the source note's CURRENT title/date and
+        // whether it still exists, so the chip prefers the live label and greys a removed source.
+        if anchor.notePassageTarget != nil, !passageSummaries.isEmpty {
+            attachment.passageLiveLabel = NotePassageResolve.chipLabel(anchor: anchor, among: passageSummaries)
+            attachment.passageSourceMissing = NotePassageResolve.isSourceMissing(anchor: anchor, among: passageSummaries)
+        }
 
         let attachStr = NSMutableAttributedString(attachment: attachment)
         let range = NSRange(location: 0, length: attachStr.length)
@@ -170,7 +181,9 @@ enum MarkdownBridge {
         unknownHeaderFields: [(String, String)] = [],
         fontSize: CGFloat = 14,
         onReveal: (@Sendable (SourceAnchor) -> Void)? = nil,
-        onPreview: ((SourceAnchor, NSView) -> Void)? = nil
+        onPreview: ((SourceAnchor, NSView) -> Void)? = nil,
+        onJump: (@Sendable (SourceAnchor) -> Void)? = nil,
+        passageSummaries: [ItemSummary] = []
     ) -> NSAttributedString {
         let block = Block(
             kind: kind, source: anchor, markdown: "",
@@ -178,7 +191,7 @@ enum MarkdownBridge {
         )
         return buildChipAttributedString(
             block: block, fontSize: fontSize, onReveal: onReveal,
-            onPreview: onPreview
+            onPreview: onPreview, onJump: onJump, passageSummaries: passageSummaries
         )
     }
 

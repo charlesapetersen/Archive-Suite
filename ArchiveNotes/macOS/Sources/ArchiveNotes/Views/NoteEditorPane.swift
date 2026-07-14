@@ -13,6 +13,9 @@ struct NoteEditorPane: View {
 
     @StateObject private var bodyEditor = NoteBodyEditorModel()
     @State private var isRaw = false
+    /// W7-S3 — a pending jump-to-source request this window should honor (select the note + scroll to
+    /// its block). Set by `handleOpen`; the scroll fires once `bodyEditor.loadedID` reaches the target.
+    @State private var jumpTarget: NotesModel.OpenRequest?
     @StateObject private var formatting = FormattingContext()
     /// Stable across re-renders (populated once in `MarkdownEditorView.makeNSView`) so flush-on-switch
     /// keeps working after the parent re-renders.
@@ -43,6 +46,24 @@ struct NoteEditorPane: View {
                 },
                 onPreviewBlock: { [weak previewPopover] anchor, anchorView in
                     previewPopover?.show(for: anchor, relativeTo: anchorView)
+                },
+                onJumpBlock: { [model = nav.model] anchor in
+                    // W7-S3: extract provenance chip → in-app navigation to the source note + block.
+                    // The chip's action fires on the main thread; assumeIsolated satisfies the
+                    // @Sendable callback type without an async hop.
+                    guard let target = anchor.notePassageTarget else { return }
+                    MainActor.assumeIsolated { model.openItem(id: target.id, block: target.block) }
+                },
+                passageSummaries: nav.model.allItems,   // resolve chip live titles / missing state
+                scrollRequest: scrollRequest,
+                onScrollOutcome: { hitExact in
+                    // Runs inside updateNSView — defer state mutation out of the view-update pass.
+                    DispatchQueue.main.async {
+                        if !hitExact {
+                            nav.model.statusMessage = "The source note has changed since this extract was made."
+                        }
+                        jumpTarget = nil
+                    }
                 }
             )
             .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
@@ -67,6 +88,36 @@ struct NoteEditorPane: View {
             // Frontmost-only: re-read the clipboard when the app becomes active
             // (no background polling).
             refreshZotero()
+        }
+        // W7-S3 jump-to-source consume side: the window featuring the target's kind selects it + scrolls.
+        .onReceive(nav.model.$pendingOpen) { handleOpen($0) }
+    }
+
+    /// The scroll request to hand the editor: present only once the target item's body is actually
+    /// loaded (`loadedID` matches), so the block-ordinal map maps against the right note's content.
+    private var scrollRequest: EditorScrollRequest? {
+        guard let t = jumpTarget, bodyEditor.loadedID == t.id else { return nil }
+        return EditorScrollRequest(token: t.token, block: t.block)
+    }
+
+    /// Handle an in-app open request (jump-to-source or an `archivenotes://open`). Only the window that
+    /// features the target's kind acts; degradations (deleted / non-note source) surface a status. Pure
+    /// decision in `NotePassageResolve.openAction`; this method does the SwiftUI select + scroll setup.
+    private func handleOpen(_ req: NotesModel.OpenRequest?) {
+        guard let req else { return }
+        switch NotePassageResolve.openAction(forItemID: req.id, block: req.block,
+                                             among: nav.model.allItems, windowKind: nav.windowKind) {
+        case let .selectAndScroll(id, _):
+            // Make sure the note is reachable in this window's list before selecting it.
+            if !nav.displayed.contains(where: { $0.id == id }) { nav.clearUserFilters() }
+            nav.select(id)          // triggers the body load via the selectedItemID onChange
+            jumpTarget = req        // arm the scroll; fires when loadedID reaches the target
+            DispatchQueue.main.async { nav.model.consumeOpen() }
+        case .reportSourceMissing:
+            nav.model.statusMessage = "The source note for this passage no longer exists — the extract text is preserved."
+            DispatchQueue.main.async { nav.model.consumeOpen() }
+        case .ignore:
+            break               // the window featuring the target's kind handles it
         }
     }
 

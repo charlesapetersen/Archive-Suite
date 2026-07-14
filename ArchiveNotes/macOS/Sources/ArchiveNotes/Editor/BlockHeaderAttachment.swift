@@ -43,6 +43,20 @@ final class BlockHeaderAttachment: NSTextAttachment {
     /// Receives the anchor and the view to anchor the popover to.
     nonisolated(unsafe) var onPreview: ((SourceAnchor, NSView) -> Void)?
 
+    /// W7-S3 — invoked when the user clicks "Jump to Source" on a note-passage (extract) chip.
+    /// Set once after init, read from the nonisolated viewProvider.
+    nonisolated(unsafe) var onJump: (@Sendable (SourceAnchor) -> Void)?
+
+    /// W7-S3 — the source note's CURRENT title + date (resolved against the live item set at style
+    /// time), preferred over the snapshot `display`; nil ⟹ use the snapshot label. Only set for
+    /// note-passage chips (in the extract editor).
+    nonisolated(unsafe) var passageLiveLabel: String?
+
+    /// W7-S3 — true when a note-passage source no longer resolves (deleted / trashed). The chip renders
+    /// greyed with a "source removed" tooltip; the jump still fires (it surfaces the preserved-text
+    /// status). Only meaningful for note-passage chips.
+    nonisolated(unsafe) var passageSourceMissing = false
+
     init(sourceBox: SourceAnchorBox) {
         self.sourceBox = sourceBox
         super.init(data: nil, ofType: nil)
@@ -70,6 +84,9 @@ final class BlockHeaderAttachment: NSTextAttachment {
         provider.chipBox = sourceBox
         provider.chipReveal = onReveal
         provider.chipPreview = onPreview
+        provider.chipJump = onJump
+        provider.chipLiveLabel = passageLiveLabel
+        provider.chipSourceMissing = passageSourceMissing
         provider.tracksTextAttachmentViewBounds = true
         return provider
     }
@@ -95,16 +112,23 @@ final class BlockHeaderViewProvider: NSTextAttachmentViewProvider {
     nonisolated(unsafe) var chipBox: SourceAnchorBox?
     nonisolated(unsafe) var chipReveal: (@Sendable (SourceAnchor) -> Void)?
     nonisolated(unsafe) var chipPreview: ((SourceAnchor, NSView) -> Void)?
+    nonisolated(unsafe) var chipJump: (@Sendable (SourceAnchor) -> Void)?
+    nonisolated(unsafe) var chipLiveLabel: String?
+    nonisolated(unsafe) var chipSourceMissing = false
 
     // loadView is always called on the main thread by TextKit 2.
     @preconcurrency override func loadView() {
         let box = chipBox
         let reveal = chipReveal
+        let jump = chipJump
+        let liveLabel = chipLiveLabel
+        let sourceMissing = chipSourceMissing
         let previewBox = PreviewCallbackBox(chipPreview)
         // NSView.init is @MainActor — assumeIsolated is correct here (always main thread).
         let chipView: NSView = MainActor.assumeIsolated {
             if let box {
-                return BlockHeaderChipView(box: box, onReveal: reveal, onPreview: previewBox.callback)
+                return BlockHeaderChipView(box: box, onReveal: reveal, onPreview: previewBox.callback,
+                                           onJump: jump, liveLabel: liveLabel, sourceMissing: sourceMissing)
             }
             return NSView()
         }
@@ -120,13 +144,23 @@ final class BlockHeaderChipView: NSView {
     private let box: SourceAnchorBox
     private var onReveal: (@Sendable (SourceAnchor) -> Void)?
     private var onPreview: ((SourceAnchor, NSView) -> Void)?
+    private var onJump: (@Sendable (SourceAnchor) -> Void)?
+    /// W7-S3 — resolved live label (source note's current title + date); nil ⟹ use the snapshot.
+    private let liveLabel: String?
+    /// W7-S3 — the note-passage source no longer resolves; render greyed with a "source removed" hint.
+    private let sourceMissing: Bool
 
     @preconcurrency
     init(box: SourceAnchorBox, onReveal: (@Sendable (SourceAnchor) -> Void)?,
-         onPreview: ((SourceAnchor, NSView) -> Void)? = nil) {
+         onPreview: ((SourceAnchor, NSView) -> Void)? = nil,
+         onJump: (@Sendable (SourceAnchor) -> Void)? = nil,
+         liveLabel: String? = nil, sourceMissing: Bool = false) {
         self.box = box
         self.onReveal = onReveal
         self.onPreview = onPreview
+        self.onJump = onJump
+        self.liveLabel = liveLabel
+        self.sourceMissing = sourceMissing
         super.init(frame: .zero)
         setupSubviews()
     }
@@ -135,12 +169,22 @@ final class BlockHeaderChipView: NSView {
     required init?(coder: NSCoder) { fatalError("Not supported") }
 
     private func setupSubviews() {
+        // A note-passage chip (extract provenance, W7-S3) offers "Jump to Source" and prefers the
+        // source note's live title; a missing source renders greyed.
+        let isPassage = box.anchor.notePassageTarget != nil
+        let tint: NSColor = (isPassage && sourceMissing) ? .secondaryLabelColor : .controlAccentColor
+
         wantsLayer = true
         layer?.cornerRadius = 6
-        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        layer?.backgroundColor = tint.withAlphaComponent(0.12).cgColor
+        if isPassage && sourceMissing {
+            toolTip = "The source note for this passage no longer exists — the extract text is preserved."
+        }
 
         let displayText: String
-        if let d = box.anchor.display, !d.isEmpty {
+        if isPassage, let live = liveLabel, !live.isEmpty {
+            displayText = live
+        } else if let d = box.anchor.display, !d.isEmpty {
             displayText = d
         } else {
             displayText = box.kind.rawValue
@@ -148,16 +192,29 @@ final class BlockHeaderChipView: NSView {
 
         let label = NSTextField(labelWithString: displayText)
         label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .controlAccentColor
+        label.textColor = tint
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         // Assemble action buttons by what the block actually supports:
         //  - a source anchor (`link`) gets Reveal + Preview (reader-page / reader-doc);
-        //  - a Zotero ref (`zoteroSelect`) gets "Open in Zotero".
-        // A block with neither (freeform / note-passage) shows just its label rather
-        // than dead buttons.
+        //  - a Zotero ref (`zoteroSelect`) gets "Open in Zotero";
+        //  - a note-passage (extract) anchor gets "Jump to Source" (W7-S3).
+        // A block with none of these (plain freeform) shows just its label rather than dead buttons.
         var views: [NSView] = [label]
+
+        if isPassage {
+            let jumpButton = NSButton(title: "Jump to Source", target: self,
+                                      action: #selector(jumpClicked))
+            jumpButton.bezelStyle = .inline
+            jumpButton.controlSize = .small
+            jumpButton.font = .systemFont(ofSize: 10)
+            jumpButton.image = NSImage(systemSymbolName: "arrow.up.forward.square",
+                                       accessibilityDescription: "Jump to source")
+            jumpButton.imagePosition = .imageLeading
+            jumpButton.setAccessibilityIdentifier("an.chip.jump")
+            views.append(jumpButton)
+        }
 
         if box.anchor.link != nil {
             let revealButton = NSButton(title: "Reveal", target: self, action: #selector(revealClicked))
@@ -204,6 +261,10 @@ final class BlockHeaderChipView: NSView {
 
     @objc private func previewClicked() {
         onPreview?(box.anchor, self)
+    }
+
+    @objc private func jumpClicked() {
+        onJump?(box.anchor)
     }
 
     @objc private func openZoteroClicked() {

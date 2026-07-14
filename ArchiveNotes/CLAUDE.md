@@ -75,7 +75,9 @@ macOS/Sources/ArchiveNotes/
                                    template, newItem(kind:in:from:) instantiation (W6-S6); mutateItem
                                    write path (load→atomic .md save→one-row re-index→publish) behind
                                    setDate/setDateUncertain/setQuality (W6-S7, front-matter only) and
-                                   loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks))
+                                   loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks));
+                                   openItem(id:block:)/pendingOpen/consumeOpen — the shared cross-window
+                                   jump-to-source channel + resolvePassage (W7-S3)
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
                                    proxy / sort / selection / displayed + displayedGeneration +
                                    instanceCounts); observes shared allItems + scope (mirrored from the
@@ -109,6 +111,11 @@ macOS/Sources/ArchiveNotes/
                                    the S3 jump-to-source side) + EditorPassageSource (the live
                                    PassageSelectionSource over a value snapshot of the editor text —
                                    D7 independence; snapshotMarkdown → CommonMark + inline-image bytes) (W7-S2)
+    NotePassageResolve.swift       Pure jump-to-source + provenance-chip logic over the in-memory
+                                   [ItemSummary]: resolve(anchor:)→PassageResolution taxonomy, chipLabel
+                                   (live title, snapshot fallback), isSourceMissing, scrollRange
+                                   (#block-n ordinal→NSRange via NotePassageBlockMap), openAction
+                                   (which window selects+scrolls vs reports-missing vs ignores) (W7-S3)
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
                                    list keyboard: Tab/Shift-Tab indent, Return continue,
@@ -117,14 +124,20 @@ macOS/Sources/ArchiveNotes/
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
                                    EditorAssetStore plumbing, onRevealBlock seam, insertBlock method;
-                                   EditorFlushBox handle → force a synchronous write-back (W7-S1a)
+                                   EditorFlushBox handle → force a synchronous write-back (W7-S1a);
+                                   onJumpBlock + passageSummaries (chip live-title resolve) +
+                                   EditorScrollRequest scroll-to-block (token-coalesced) + onScrollOutcome
+                                   stale-ordinal report (W7-S3)
     NoteBodyEditorModel.swift      @MainActor — owns the editor body for ONE selected item; autosave-
                                    safe across selection switches (captures loadedID at schedule time,
                                    flush-outgoing-before-load, drops superseded loads via a generation,
-                                   same-id reselect no-op); injected load/save/flushEditor seams (W7-S1a)
+                                   same-id reselect no-op); injected load/save/flushEditor seams (W7-S1a);
+                                   loadedID @Published so the pane gates a jump-to-source scroll (W7-S3)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
                                    CommonMark); block-header chips (<!-- block: --> → chip attachments);
-                                   inline images (![alt](path)); buildInsertableBlock seam; idempotent
+                                   inline images (![alt](path)); buildInsertableBlock seam; idempotent;
+                                   onJumpBlock + passageSummaries thread note-passage chip jump + live
+                                   title/missing resolve into BlockHeaderAttachment (W7-S3)
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path),
@@ -132,7 +145,10 @@ macOS/Sources/ArchiveNotes/
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
-                                   TextKit 2 view provider); W4 seam: onRevealBlock callback
+                                   TextKit 2 view provider); W4 seam: onRevealBlock callback; W7-S3:
+                                   note-passage chips get a "Jump to Source" button (onJump) + prefer the
+                                   source's live label (passageLiveLabel) + grey a removed source
+                                   (passageSourceMissing)
     EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject; currentItemID/
                                    Title/DateDisplay/Kind + weak notesModel) + EditorFormatting actions
                                    (bold/italic/code/link/heading/list/blockquote/code-block/indent/
@@ -179,7 +195,9 @@ macOS/Sources/ArchiveNotes/
                                    BOUND to the selected item's body via NoteBodyEditorModel (load-on-
                                    select + autosave + flush-on-switch, W7-S1a); publishes the item's
                                    id/title/date to FormattingContext for W7 Create-Extract; wires
-                                   Reveal (NSWorkspace.open) + Preview (popover) callbacks
+                                   Reveal (NSWorkspace.open) + Preview (popover) callbacks; W7-S3 jump-to-
+                                   source: onJumpBlock→NotesModel.openItem (publish) + observes pendingOpen
+                                   → openAction → select + scroll-to-block (consume, gated on loadedID)
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
                                    style / advanced host+port), @AppStorage-bound (§D.8)
@@ -278,6 +296,10 @@ macOS/Tests/ArchiveNotesTests/
                                    chip / two-chips, all disjoint-covering), selection→passage (single /
                                    cross-block / empty / discontiguous-in-doc-order), snapshotMarkdown
                                    (serialize / image-bytes-by-bare-name / empty), live-init value-copy
+  NotePassageResolveTests.swift    20 tests (W7-S3): resolve ×4 outcomes, chipLabel live/fallback/format,
+                                   isSourceMissing, scrollRange in/out-of-range/nil/empty, openItem token
+                                   re-fire, resolvePassage, openAction (select-scroll / kind-mismatch
+                                   ignore / extract target / missing-on-note-window-only)
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
   SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller

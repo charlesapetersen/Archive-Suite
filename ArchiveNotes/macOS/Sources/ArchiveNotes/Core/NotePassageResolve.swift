@@ -80,4 +80,29 @@ enum NotePassageResolve {
         guard block < ranges.count else { return nil }
         return ranges[block].range
     }
+
+    /// What the window observing an `openItem(id:block:)` request should do with it (W7-S3 consume
+    /// side), decided purely from the live item set + the window's featured kind, so it unit-tests
+    /// without a window or a store.
+    static func openAction(forItemID id: UUID, block: Int?, among summaries: [ItemSummary],
+                           windowKind: Item.Kind) -> PassageOpenAction {
+        guard let summary = summaries.first(where: { $0.id == id }) else {
+            // Target no longer exists. Jump-to-source targets are always notes, so the Note window
+            // owns the "source removed" report; other windows stay quiet (no duplicate status).
+            return windowKind == .note ? .reportSourceMissing : .ignore
+        }
+        // The window featuring the target's kind handles it; the other window ignores it.
+        return summary.kind == windowKind ? .selectAndScroll(id: id, block: block) : .ignore
+    }
+}
+
+/// The action the observing window takes for an in-app open request (W7-S3). Pure/`Equatable` so the
+/// consume-side decision is testable off the main actor (the actual select + scroll is the view's job).
+enum PassageOpenAction: Equatable {
+    /// This window features the target's kind — select it and scroll to `block` (nil ⟹ just reveal it).
+    case selectAndScroll(id: UUID, block: Int?)
+    /// The target no longer resolves to any item — report the preserved-text status (Note window only).
+    case reportSourceMissing
+    /// Not this window's concern; the window that features the target's kind handles it.
+    case ignore
 }

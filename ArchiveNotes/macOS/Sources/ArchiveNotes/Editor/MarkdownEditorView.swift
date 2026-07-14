@@ -11,6 +11,14 @@ final class EditorFlushBox {
     init() {}
 }
 
+/// A request to scroll the editor to a note-passage block ordinal (W7-S3 jump-to-source consume side).
+/// `token` makes a repeat jump to the SAME block re-fire (the coalescing-counter idiom); `block == nil`
+/// means "just reveal the item" (scroll to the top). Equatable so `updateNSView` fires only on a new token.
+struct EditorScrollRequest: Equatable {
+    let token: Int
+    let block: Int?
+}
+
 /// NSViewRepresentable wrapping an EditorTextView in an NSScrollView.
 /// Two-way binding to a Markdown string, with debounced write-back, freeze-during-edit,
 /// undo/find, and a raw-Markdown toggle (⌘/).
@@ -27,6 +35,16 @@ struct MarkdownEditorView: NSViewRepresentable {
     var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
     /// Called when "Preview" is clicked on a block chip. Receives anchor + anchor view for popover.
     var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
+    /// W7-S3 — called when "Jump to Source" is clicked on a note-passage (extract) chip.
+    var onJumpBlock: (@Sendable (SourceAnchor) -> Void)?
+    /// W7-S3 — live item summaries used to resolve a note-passage chip's current title + missing state.
+    var passageSummaries: [ItemSummary] = []
+    /// W7-S3 — a pending jump-to-source scroll (nil = none). When its token changes, the editor scrolls
+    /// the current content to the block's range (or the top when the ordinal is stale / absent).
+    var scrollRequest: EditorScrollRequest?
+    /// W7-S3 — reports the scroll outcome: `true` if the exact block was found, `false` if the ordinal
+    /// was stale (source edited since snapshot) and the editor fell back to the top.
+    var onScrollOutcome: ((Bool) -> Void)?
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -49,6 +67,8 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
         context.coordinator.onPreviewBlock = onPreviewBlock
+        context.coordinator.onJumpBlock = onJumpBlock
+        context.coordinator.passageSummaries = passageSummaries
         flushBox?.flush = { [weak coordinator = context.coordinator] in coordinator?.flushWriteBack() }
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
@@ -65,7 +85,9 @@ struct MarkdownEditorView: NSViewRepresentable {
             let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
                                                assetStore: assetStore,
                                                onRevealBlock: onRevealBlock,
-                                               onPreviewBlock: onPreviewBlock)
+                                               onPreviewBlock: onPreviewBlock,
+                                               onJumpBlock: onJumpBlock,
+                                               passageSummaries: passageSummaries)
             textView.textStorage?.setAttributedString(styled)
         }
 
@@ -88,6 +110,11 @@ struct MarkdownEditorView: NSViewRepresentable {
         let coordinator = context.coordinator
         guard let textView = coordinator.textView else { return }
         coordinator.parent = self
+        // Keep the block-chip callbacks + live summaries current (the struct is recreated each render).
+        coordinator.onRevealBlock = onRevealBlock
+        coordinator.onPreviewBlock = onPreviewBlock
+        coordinator.onJumpBlock = onJumpBlock
+        coordinator.passageSummaries = passageSummaries
 
         // Font / raw-mode change
         let wantRaw = isRaw
@@ -113,11 +140,25 @@ struct MarkdownEditorView: NSViewRepresentable {
                     let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
                                                        assetStore: coordinator.assetStore,
                                                        onRevealBlock: coordinator.onRevealBlock,
-                                                       onPreviewBlock: coordinator.onPreviewBlock)
+                                                       onPreviewBlock: coordinator.onPreviewBlock,
+                                                       onJumpBlock: coordinator.onJumpBlock,
+                                                       passageSummaries: coordinator.passageSummaries)
                     textView.textStorage?.setAttributedString(styled)
                 }
                 coordinator.isApplyingProgrammaticChange = false
             }
+        }
+
+        // W7-S3 jump-to-source: scroll to the requested block once (per token). The content above has
+        // just been (re)applied when the loaded item changed, so the block-ordinal map is current; the
+        // host only sets `scrollRequest` once the target item's body is loaded (gated on `loadedID`).
+        if !wantRaw, let req = scrollRequest, coordinator.lastScrollToken != req.token {
+            coordinator.lastScrollToken = req.token
+            let rendered = textView.textStorage ?? NSAttributedString()
+            let range = NotePassageResolve.scrollRange(forBlock: req.block, in: rendered)
+            let hitExact = (req.block == nil) || (range != nil)
+            textView.scrollRangeToVisible(range ?? NSRange(location: 0, length: 0))
+            onScrollOutcome?(hitExact)
         }
     }
 
@@ -131,6 +172,10 @@ struct MarkdownEditorView: NSViewRepresentable {
         weak var assetStore: EditorAssetStore?
         var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
         var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
+        var onJumpBlock: (@Sendable (SourceAnchor) -> Void)?
+        var passageSummaries: [ItemSummary] = []
+        /// The last scroll token handled by `updateNSView`, so a jump fires once per request (W7-S3).
+        var lastScrollToken: Int?
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
@@ -215,7 +260,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                    fontSize: currentFontSize,
                                                    assetStore: assetStore,
                                                    onRevealBlock: onRevealBlock,
-                                                   onPreviewBlock: onPreviewBlock)
+                                                   onPreviewBlock: onPreviewBlock,
+                                                   onJumpBlock: onJumpBlock,
+                                                   passageSummaries: passageSummaries)
                 textView.textStorage?.setAttributedString(styled)
             }
 
@@ -301,7 +348,9 @@ struct MarkdownEditorView: NSViewRepresentable {
             let attributed = MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
                                                   assetStore: assetStore,
                                                   onRevealBlock: onRevealBlock,
-                                                  onPreviewBlock: onPreviewBlock)
+                                                  onPreviewBlock: onPreviewBlock,
+                                                  onJumpBlock: onJumpBlock,
+                                                  passageSummaries: passageSummaries)
             textView.undoManager?.beginUndoGrouping()
             textView.insertText(attributed, replacementRange: textView.selectedRange())
             textView.undoManager?.endUndoGrouping()
