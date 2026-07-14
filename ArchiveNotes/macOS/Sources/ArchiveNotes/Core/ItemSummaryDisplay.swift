@@ -44,6 +44,12 @@ extension ItemSummary {
             .joined(separator: ", ")
     }
 
+    /// Distinct-source-note count for the "Sources" column (W7-S4), rendered as a plain integer for a
+    /// segmented extract and **blank** when there are no note-passage sources — so a plain note or a
+    /// source-less extract shows nothing rather than a distracting "0". Extracts feature this column;
+    /// in a notes list every cell is naturally blank.
+    var sourcesText: String { sourceNoteCount > 0 ? String(sourceNoteCount) : "" }
+
     /// Fixed English month abbreviations (1...12); nil for out-of-range so the caller degrades to the
     /// raw stored date rather than crashing on corrupt front-matter.
     private static func monthName(_ m: Int) -> String? {

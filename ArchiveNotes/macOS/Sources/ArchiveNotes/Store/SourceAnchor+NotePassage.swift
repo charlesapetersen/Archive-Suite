@@ -54,3 +54,19 @@ extension SourceAnchor {
         return (id, block)
     }
 }
+
+extension Sequence where Element == Block {
+    /// Distinct source-note count for the extract "Sources" column (W7-S4, 07-extracts §4): the number
+    /// of **unique source-note UUIDs** among this item's `.notePassage` blocks — a segmented extract
+    /// appended from two different notes reports 2, one appended twice from the same note reports 1.
+    /// Notes (which never carry note-passage provenance) and freeform / reader / zotero blocks
+    /// contribute 0, so a plain note or a source-less extract reports 0 (the column renders blank).
+    /// Pure + deterministic; the index projects it so the list never re-reads `.md` files.
+    var distinctSourceNoteCount: Int {
+        var ids = Set<UUID>()
+        for block in self where block.kind == .notePassage {
+            if let id = block.source?.notePassageTarget?.id { ids.insert(id) }
+        }
+        return ids.count
+    }
+}

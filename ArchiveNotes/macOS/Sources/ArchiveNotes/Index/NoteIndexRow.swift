@@ -19,6 +19,9 @@ struct NoteIndexRow: Sendable {
     let created: Date
     let modified: Date
     let managedTags: String   // JSON array for the items table
+    /// Distinct source-note count (extract provenance) — the "Sources" column (W7-S4). 0 for notes
+    /// and source-less extracts. Projected into `items.source_count` so the list never reads `.md`.
+    let sourceCount: Int
 }
 
 extension NoteIndexRow {
@@ -48,7 +51,8 @@ extension NoteIndexRow {
             quality: item.quality,
             created: item.created,
             modified: item.modified,
-            managedTags: tagsJSON
+            managedTags: tagsJSON,
+            sourceCount: item.blocks.distinctSourceNoteCount
         )
     }
 }
@@ -69,4 +73,8 @@ struct ItemSummary: Sendable, Identifiable {
     let modified: Date
     let mtime: Double
     let managedTags: [String]
+    /// Distinct source-note count for the extract "Sources" column (W7-S4). Trailing + defaulted so
+    /// existing `ItemSummary(...)` call sites (tests, older projections) keep compiling; the index
+    /// projection (`NotesIndex.readSummaryRow`) supplies the real value from `items.source_count`.
+    var sourceNoteCount: Int = 0
 }

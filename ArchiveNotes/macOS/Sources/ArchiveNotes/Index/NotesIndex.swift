@@ -49,9 +49,19 @@ actor NotesIndex {
                 quality INTEGER,
                 created REAL,
                 modified REAL,
-                managed_tags TEXT
+                managed_tags TEXT,
+                source_count INTEGER DEFAULT 0
             );
             """)
+
+        // Additive migration (W7-S4): a DB created before `source_count` existed keeps its rows, so
+        // `CREATE TABLE IF NOT EXISTS` above is a no-op for it. The items table is a rebuildable cache,
+        // so an `ADD COLUMN` (default 0) is safe + non-destructive; stale rows read 0 until their next
+        // mtime-triggered re-index refreshes the count. Guarded so a fresh DB (column already present)
+        // doesn't hit a duplicate-column error.
+        if !itemsHasColumn("source_count") {
+            try exec("ALTER TABLE items ADD COLUMN source_count INTEGER DEFAULT 0;")
+        }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
         try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(title, tags, authors, body, id UNINDEXED);")
@@ -139,18 +149,19 @@ actor NotesIndex {
             try run("""
                 UPDATE items SET mtime=?, title=?, kind=?, date=?, date_precision=?,
                     date_uncertain=?, authors=?, sort_date=?, quality=?, created=?,
-                    modified=?, managed_tags=? WHERE rowid=?;
+                    modified=?, managed_tags=?, source_count=? WHERE rowid=?;
                 """) { stmt in
                 self.bindItemColumns(stmt, row, startIndex: 1)
-                sqlite3_bind_int64(stmt, 13, rowid)
+                sqlite3_bind_int64(stmt, 14, rowid)
             }
             try insertFTS(rowid: rowid, row: row)
         } else {
             // Insert new row.
             try run("""
                 INSERT INTO items(id, mtime, title, kind, date, date_precision,
-                    date_uncertain, authors, sort_date, quality, created, modified, managed_tags)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    date_uncertain, authors, sort_date, quality, created, modified, managed_tags,
+                    source_count)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """) { stmt in
                 self.bindText(stmt, 1, idStr)
                 self.bindItemColumns(stmt, row, startIndex: 2)
@@ -173,6 +184,7 @@ actor NotesIndex {
         sqlite3_bind_double(stmt, s + 9, row.created.timeIntervalSince1970)
         sqlite3_bind_double(stmt, s + 10, row.modified.timeIntervalSince1970)
         bindText(stmt, s + 11, row.managedTags)
+        sqlite3_bind_int(stmt, s + 12, Int32(row.sourceCount))
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
@@ -216,7 +228,7 @@ actor NotesIndex {
     func summary(for id: UUID) -> ItemSummary? {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count
             FROM items WHERE id = ?;
             """) else { return nil }
         defer { sqlite3_finalize(stmt) }
@@ -231,7 +243,7 @@ actor NotesIndex {
     func allSummaries() -> [ItemSummary] {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count
             FROM items;
             """) else { return [] }
         defer { sqlite3_finalize(stmt) }
@@ -480,12 +492,13 @@ actor NotesIndex {
         let mtime = sqlite3_column_double(stmt, 11)
         let tagsJSON = sqlite3_column_text(stmt, 12).map { String(cString: $0) } ?? "[]"
         let managedTags = (try? JSONDecoder().decode([String].self, from: Data(tagsJSON.utf8))) ?? []
+        let sourceCount = Int(sqlite3_column_int(stmt, 13))
 
         return ItemSummary(id: uuid, title: title, kind: kind, date: date,
                            datePrecision: datePrecision, dateUncertain: dateUncertain,
                            authors: authors, sortDate: sortDate, quality: quality,
                            created: created, modified: modified, mtime: mtime,
-                           managedTags: managedTags)
+                           managedTags: managedTags, sourceNoteCount: sourceCount)
     }
 
     private func exec(_ sql: String) throws {
@@ -508,6 +521,17 @@ actor NotesIndex {
     private func prepare(_ sql: String) -> OpaquePointer? {
         var stmt: OpaquePointer?
         return sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK ? stmt : nil
+    }
+
+    /// Whether the `items` table already has `column` — the additive-migration guard (W7-S4). Uses
+    /// `PRAGMA table_info` so a fresh DB (new column baked into `CREATE TABLE`) skips the `ALTER`.
+    private func itemsHasColumn(_ column: String) -> Bool {
+        guard let stmt = prepare("PRAGMA table_info(items);") else { return false }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 1), String(cString: c) == column { return true }
+        }
+        return false
     }
 
     private func bindText(_ stmt: OpaquePointer?, _ index: Int32, _ value: String) {

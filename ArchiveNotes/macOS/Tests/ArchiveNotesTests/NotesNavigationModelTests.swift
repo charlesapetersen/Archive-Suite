@@ -305,6 +305,6 @@ struct NotesNavigationModelTests {
         return NoteIndexRow(id: id, mtime: 0, title: title, kind: kind, tags: "", authors: "",
                             authorsJSON: "[]", body: body, date: nil, datePrecision: nil,
                             dateUncertain: false, sortDate: nil, quality: nil, created: t,
-                            modified: t, managedTags: "[]")
+                            modified: t, managedTags: "[]", sourceCount: 0)
     }
 }

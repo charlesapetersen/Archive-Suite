@@ -35,13 +35,14 @@ import Foundation
         quality: Int? = nil,
         created: Date = Date(),
         modified: Date = Date(),
-        managedTags: String = "[]"
+        managedTags: String = "[]",
+        sourceCount: Int = 0
     ) -> NoteIndexRow {
         NoteIndexRow(id: id, mtime: mtime, title: title, kind: kind, tags: tags,
                      authors: authors, authorsJSON: authorsJSON, body: body, date: date,
                      datePrecision: datePrecision, dateUncertain: dateUncertain,
                      sortDate: sortDate, quality: quality, created: created,
-                     modified: modified, managedTags: managedTags)
+                     modified: modified, managedTags: managedTags, sourceCount: sourceCount)
     }
 
     private func cleanup(_ dir: URL) {
@@ -248,6 +249,29 @@ import Foundation
         #expect(summary?.sortDate == 19200300)
         #expect(summary?.quality == 4)
         #expect(summary?.managedTags == ["History", "ArchiveSuite"])
+    }
+
+    /// The `source_count` column (W7-S4) round-trips through insert → UPDATE → both projections. This
+    /// guards the SQLite column bind/read indices — the riskiest part of the extract "Sources" column.
+    @Test func sourceCountRoundTrip() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+
+        let extractID = UUID(), noteID = UUID()
+        try await index.upsertBatch([
+            makeRow(id: extractID, title: "Segmented Extract", kind: .extract, sourceCount: 3),
+            makeRow(id: noteID, title: "Plain Note", kind: .note, sourceCount: 0),
+        ])
+        // Per-id projection.
+        #expect(await index.summary(for: extractID)?.sourceNoteCount == 3)
+        #expect(await index.summary(for: noteID)?.sourceNoteCount == 0)
+        // Bulk projection (the list path).
+        let all = await index.allSummaries()
+        #expect(all.first { $0.id == extractID }?.sourceNoteCount == 3)
+        #expect(all.first { $0.id == noteID }?.sourceNoteCount == 0)
+        // UPDATE path (re-upsert same id with a new count).
+        try await index.upsertBatch([makeRow(id: extractID, title: "Segmented Extract", kind: .extract, sourceCount: 5)])
+        #expect(await index.summary(for: extractID)?.sourceNoteCount == 5)
     }
 
     // MARK: - Organizational tables exist
