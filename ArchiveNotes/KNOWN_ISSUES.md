@@ -3,6 +3,34 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Zotero client tested over the REAL transport (in-process HTTP stub); attachment-kind reconciled (W8-S5, 2026-07-14)
+
+W8-S5 added `ZoteroLocalServerTests` (plan §1.8, 5 tests, all green, no network egress). Unlike the W5-S2
+`ZoteroClientTests` — which inject a hand-written `ZoteroTransport` stub that never builds a URLSession —
+these drive the **production** `URLSessionZoteroTransport` over a URLSession whose `protocolClasses`
+intercept every request in-process. So the full runtime HTTP stack is exercised: `Config` base-URL seam →
+`URLRequest` → `URLSession.data(for:)` → `HTTPURLResponse` cast → probe/fetch/citation/degrade/**timeout**
+(the timeout test really waits ~1.2 s for two 0.6 s request timeouts to fire — the bound is real, not stubbed).
+
+- **HARNESS RECONCILIATION — `URLProtocol`, not a real `NWListener`.** The plan's headline was a localhost
+  HTTP server, but the test bundle is hosted by the sandboxed app (`TEST_HOST`) which ships only
+  `network.client` — a real listener can't accept loopback connections without `network.server`, and widening
+  the shipping app's entitlements for a test would be wrong. `URLProtocol` needs no network entitlement and
+  guarantees zero egress; the plan explicitly lists it as an allowed harness. Required one tiny, additive
+  production seam: `URLSessionZoteroTransport.init(session:)` (dependency injection; the client's own
+  ephemeral session can't have a `URLProtocol` injected, and global `URLProtocol.registerClass` doesn't apply
+  to custom-configured sessions).
+- **RECONCILIATION — `testAttachmentSelectLinkParsed`.** A `zotero://select/…` URL does **not** encode
+  item-vs-attachment (confirmed by `ZoteroSelectLinkTests.testDefaultKindIsItem`); attachment-ness is a
+  front-matter/model attribute (`ZoteroRef.kind` = `.attachment` + `parentKey`, covered by
+  `ZoteroFrontMatterRoundTripTests`). The test therefore pins the achievable contract: the URL yields the
+  right key+library, and an attachment ref both carries `kind:.attachment`/`parentKey` and fetches over the
+  client just like an item ref (attachments are addressed by their own key on the local API) — D8's "item AND
+  attachment" support. No production change to the parser (a testing sub-task must not invent behaviour).
+- **No bug found.** The read-only client degraded correctly on connection-refused (`.unavailable`, no throw to
+  the caller) and on hang (bounded timeout); the stored `selectLink`/`citation` survive a down server so the
+  chip stays usable. No file-safety surface (no corpus/store writes) → Tier-1.
+
 ## Virtual-folder / durable-link / date-sort parity suites; sortDate cross-app divergence guarded (W8-S4, 2026-07-14)
 
 W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a real cross-app divergence.

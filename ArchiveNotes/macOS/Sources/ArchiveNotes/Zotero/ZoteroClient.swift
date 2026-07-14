@@ -18,6 +18,13 @@ struct URLSessionZoteroTransport: ZoteroTransport {
         session = URLSession(configuration: cfg)
     }
 
+    /// Dependency-injection seam: run the real transport over a caller-supplied
+    /// session. Tests pass a session whose `protocolClasses` intercept requests
+    /// (so the production `send` path is exercised without any network egress).
+    init(session: URLSession) {
+        self.session = session
+    }
+
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {

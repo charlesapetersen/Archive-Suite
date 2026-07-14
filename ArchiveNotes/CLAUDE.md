@@ -234,7 +234,8 @@ macOS/Sources/ArchiveNotes/
     ZoteroRef.swift                ZoteroRef/ZoteroLibrary/ZoteroRefKind value types (§D.1)
     ZoteroSelectLink.swift         Pure total parser for zotero://select/… links (§D.2)
     ZoteroClient.swift             actor — probe cascade (BBT→localAPI→unavailable), CSL fetch,
-                                   citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4)
+                                   citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4);
+                                   URLSessionZoteroTransport has an init(session:) DI seam (W8-S5 tests)
     ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
     ZoteroAutoFill.swift           CSL→front-matter mapping (authors/date+precision/title) +
                                    AutoFillPlan (per-field diff, fill-empty default policy) (§D.4/D.5)
@@ -365,7 +366,14 @@ macOS/Tests/ArchiveNotesTests/
   ZoteroClientTests.swift          23 tests: probe (BBT/localAPI/unavailable/cache-TTL/reset),
                                    fetch CSL (BBT/localAPI/cache-hit/unavailable-throws/citation/group),
                                    CSL mapping (year/month/day precision, literal/given-family author),
-                                   cache store (round-trip/loadMissing/cacheKey)
+                                   cache store (round-trip/loadMissing/cacheKey) — via a protocol-level
+                                   ZoteroTransport stub (never builds a URLSession)
+  ZoteroLocalServerTests.swift     5 tests (W8-S5, §1.8): the REAL transport over an in-process
+                                   URLProtocol stub (no network egress) — item metadata parse+auto-fill
+                                   +citation, attachment ref parse/fetch (D8), multi-ref note round-trip
+                                   +fetch, degrade-when-down (closed→.unavailable, never throws to caller),
+                                   bounded request timeout (hang→URLSession timeout fires). Pointed at a
+                                   non-default port to prove the Config base-URL seam
   ZoteroAutoFillTests.swift        21 tests: CSL date-parts→precision (year/month/day, 3-digit year,
                                    out-of-range m/d, raw-year fallback, no-decade), author/title
                                    mapping, AutoFillPlan fill-empty/replace/no-op, apply-selected,
