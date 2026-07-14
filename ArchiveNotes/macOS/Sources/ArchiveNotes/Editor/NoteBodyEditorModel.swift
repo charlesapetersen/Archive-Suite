@@ -95,6 +95,19 @@ final class NoteBodyEditorModel: ObservableObject {
         if loadedID == id, markdown == body { dirty = false }
     }
 
+    /// Flush BOTH debounces then await the write: first `flushEditor()` (synchronously push the live
+    /// editor's own ~400 ms serialize into `markdown`), then `flush()` (cancel this model's ~600 ms
+    /// autosave debounce and persist). This is the flush the app-terminate / window-close path uses
+    /// (W7-S6, via `EditorFlushRegistry`) so a force-quit within *either* debounce still persists the last
+    /// keystrokes instead of dropping them. It mirrors the sequence `select` runs before a selection
+    /// switch, but is a distinct method: `select` keeps that sequence *inline* on purpose — the extra
+    /// async frame of calling through here perturbs the actor scheduling its superseded-load race relies
+    /// on, so the two intentionally do not share a call.
+    func flushPending() async {
+        flushEditor()
+        await flush()
+    }
+
     // MARK: Private
 
     /// Install a freshly-loaded body without tripping autosave, and reset per-item state.
