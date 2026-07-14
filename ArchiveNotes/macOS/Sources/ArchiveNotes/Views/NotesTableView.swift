@@ -252,6 +252,7 @@ struct NotesTableView: NSViewRepresentable {
                 let n = parent.model.instanceCounts[item.id] ?? 0
                 tf.stringValue = n > 1 ? "▣ \(n)" : ""
                 tf.textColor = .secondaryLabelColor
+                tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":
                 tf.stringValue = item.displayDate ?? "—"
@@ -259,10 +260,12 @@ struct NotesTableView: NSViewRepresentable {
                 if item.dateUncertain {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
+                tf.setAccessibilityIdentifier("an.cell.date.\(item.id.uuidString)")
 
             case "quality":
                 tf.stringValue = item.qualityStars
                 tf.textColor = item.quality == nil ? .secondaryLabelColor : .systemYellow
+                tf.setAccessibilityIdentifier("an.cell.quality.\(item.id.uuidString)")
 
             case "sources":
                 // Distinct source notes for a segmented extract; blank for notes / source-less
@@ -274,6 +277,7 @@ struct NotesTableView: NSViewRepresentable {
             case "tags":
                 tf.stringValue = item.displayTags
                 tf.textColor = .secondaryLabelColor
+                tf.setAccessibilityIdentifier("an.cell.tags.\(item.id.uuidString)")
 
             default:
                 tf.stringValue = ""
@@ -304,6 +308,7 @@ struct NotesTableView: NSViewRepresentable {
             let symbol = (item?.kind == .extract) ? "quote.opening" : "doc.text"
             cell.imageView?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item?.kind.rawValue)
             cell.imageView?.contentTintColor = .secondaryLabelColor
+            cell.setAccessibilityIdentifier(item.map { "an.cell.kind.\($0.id.uuidString)" })
             return cell
         }
 

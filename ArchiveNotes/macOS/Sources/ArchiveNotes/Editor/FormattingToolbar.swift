@@ -22,17 +22,21 @@ struct FormattingToolbar: View {
 
     private var inlineGroup: some View {
         Group {
-            toggleButton(systemImage: "bold", active: context.state.isBold) {
+            toggleButton(systemImage: "bold", active: context.state.isBold,
+                         identifier: "an.editor.toolbar.bold") {
                 context.toggleBold()
             }
-            toggleButton(systemImage: "italic", active: context.state.isItalic) {
+            toggleButton(systemImage: "italic", active: context.state.isItalic,
+                         identifier: "an.editor.toolbar.italic") {
                 context.toggleItalic()
             }
             toggleButton(systemImage: "chevron.left.forwardslash.chevron.right",
-                         active: context.state.isCode) {
+                         active: context.state.isCode,
+                         identifier: "an.editor.toolbar.code") {
                 context.toggleInlineCode()
             }
-            toggleButton(systemImage: "link", active: context.state.hasLink) {
+            toggleButton(systemImage: "link", active: context.state.hasLink,
+                         identifier: "an.editor.toolbar.link") {
                 context.insertLink()
             }
         }
@@ -54,6 +58,7 @@ struct FormattingToolbar: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .accessibilityIdentifier("an.editor.toolbar.heading")
     }
 
     private var headingLabel: String {
@@ -68,19 +73,23 @@ struct FormattingToolbar: View {
     private var blockGroup: some View {
         Group {
             toggleButton(systemImage: "list.bullet",
-                         active: context.state.isUnorderedList) {
+                         active: context.state.isUnorderedList,
+                         identifier: "an.editor.toolbar.bullet") {
                 context.toggleUnorderedList()
             }
             toggleButton(systemImage: "list.number",
-                         active: context.state.isOrderedList) {
+                         active: context.state.isOrderedList,
+                         identifier: "an.editor.toolbar.numbered") {
                 context.toggleOrderedList()
             }
             toggleButton(systemImage: "text.quote",
-                         active: context.state.isBlockquote) {
+                         active: context.state.isBlockquote,
+                         identifier: "an.editor.toolbar.quote") {
                 context.toggleBlockquote()
             }
             toggleButton(systemImage: "curlybraces",
-                         active: context.state.isCodeBlock) {
+                         active: context.state.isCodeBlock,
+                         identifier: "an.editor.toolbar.codeblock") {
                 context.toggleCodeBlock()
             }
         }
@@ -90,6 +99,7 @@ struct FormattingToolbar: View {
 
     private func toggleButton(systemImage: String,
                                active: Bool,
+                               identifier: String,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
@@ -98,5 +108,6 @@ struct FormattingToolbar: View {
         .buttonStyle(.borderless)
         .background(active ? Color.accentColor.opacity(0.15) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        .accessibilityIdentifier(identifier)
     }
 }

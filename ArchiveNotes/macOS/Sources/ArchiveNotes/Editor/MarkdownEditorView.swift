@@ -52,6 +52,7 @@ struct MarkdownEditorView: NSViewRepresentable {
     @MainActor
     func makeNSView(context: Context) -> NSScrollView {
         let textView = EditorTextView()
+        textView.setAccessibilityIdentifier("an.editor.text")
         textView.delegate = context.coordinator
         textView.configuredFontSize = fontSize
         textView.applyRawMode(isRaw, fontSize: fontSize)

@@ -221,11 +221,13 @@ final class BlockHeaderChipView: NSView {
             revealButton.bezelStyle = .inline
             revealButton.controlSize = .small
             revealButton.font = .systemFont(ofSize: 10)
+            revealButton.setAccessibilityIdentifier("an.chip.reveal")
 
             let previewButton = NSButton(title: "Preview", target: self, action: #selector(previewClicked))
             previewButton.bezelStyle = .inline
             previewButton.controlSize = .small
             previewButton.font = .systemFont(ofSize: 10)
+            previewButton.setAccessibilityIdentifier("an.chip.preview")
 
             views.append(revealButton)
             views.append(previewButton)
@@ -237,6 +239,7 @@ final class BlockHeaderChipView: NSView {
             zoteroButton.bezelStyle = .inline
             zoteroButton.controlSize = .small
             zoteroButton.font = .systemFont(ofSize: 10)
+            zoteroButton.setAccessibilityIdentifier("an.chip.zoteroOpen")
             views.append(zoteroButton)
         }
 

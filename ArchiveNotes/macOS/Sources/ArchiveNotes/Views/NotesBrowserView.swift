@@ -68,7 +68,9 @@ struct NotesBrowserView: View {
             // Capture `pending` from the presentation value: SwiftUI clears the binding (→
             // pendingDeletion = nil) the instant a button is tapped, before this async Task runs.
             Button("Delete Note", role: .destructive) { Task { await nav.confirmDeletion(pending) } }
+                .accessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
             Button("Cancel", role: .cancel) { }
+                .accessibilityIdentifier("an.dialog.deleteLastInstance.cancel")
         } message: { pending in
             Text("This is the only remaining instance of “\(pending.title)” — deleting it removes the note permanently.")
         }

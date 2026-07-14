@@ -16,7 +16,7 @@ struct ZoteroChipPresentationTests {
         let p = ZoteroChipPresentation(ref: ref())
         #expect(p.systemImage == "book.closed")
         #expect(p.label == "ABCD1234")
-        #expect(p.accessibilityID == "ar.zotero.chip.ABCD1234")
+        #expect(p.accessibilityID == "an.zotero.chip.ABCD1234")
     }
 
     @Test("citation used as the label when present")

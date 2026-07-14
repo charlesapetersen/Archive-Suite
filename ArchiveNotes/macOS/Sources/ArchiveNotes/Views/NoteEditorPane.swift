@@ -185,7 +185,7 @@ struct NoteEditorPane: View {
                 formatting.attachZoteroLink()
                 zoteroStatus.dismissClipboardRef()
             }
-            .accessibilityIdentifier("ar.zotero.banner.attach")
+            .accessibilityIdentifier("an.zotero.banner.attach")
             Button {
                 zoteroStatus.dismissClipboardRef()
             } label: {
@@ -197,7 +197,7 @@ struct NoteEditorPane: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.accentColor.opacity(0.10))
-        .accessibilityIdentifier("ar.zotero.banner")
+        .accessibilityIdentifier("an.zotero.banner")
     }
 
     private func refreshZotero() {
@@ -216,6 +216,7 @@ struct NoteEditorPane: View {
             }
             .buttonStyle(.borderless)
             .keyboardShortcut("/", modifiers: .command)
+            .accessibilityIdentifier("an.editor.rawToggle")
             .padding(.trailing, 8)
         }
         .frame(height: 28)

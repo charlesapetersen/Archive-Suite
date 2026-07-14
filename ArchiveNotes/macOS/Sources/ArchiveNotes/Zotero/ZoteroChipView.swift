@@ -17,7 +17,7 @@ struct ZoteroChipPresentation: Equatable {
             label = ref.itemKey
         }
         systemImage = (ref.kind == .attachment) ? "paperclip" : "book.closed"
-        accessibilityID = "ar.zotero.chip.\(ref.itemKey)"
+        accessibilityID = "an.zotero.chip.\(ref.itemKey)"
         help = ref.citation ?? ref.selectLink
     }
 }
