@@ -10,15 +10,32 @@ final class NotesIndexer: ObservableObject {
     /// (done, total) while indexing; nil when idle.
     @Published private(set) var progress: (done: Int, total: Int)?
 
+    /// Monotonic **completion** token — bumped by one each time the driver settles to idle (a build
+    /// pass finished with no coalesced successor, or an empty / no-work scope cleared it). Distinct
+    /// from the private launch-epoch `generation` below (which only discards stale reports). XCUITest
+    /// polls the hidden `an.status.indexReady` element for a change in this token to know a build
+    /// settled, instead of racing the async build (08-testing §3.4).
+    @Published private(set) var indexGeneration = 0
+    /// `true` once the driver has settled at least once — i.e. the initial build has completed. Tests
+    /// (and the hidden probe) await this deterministic state before asserting FTS / relevance results.
+    @Published private(set) var isIndexReady = false
+
     private let index: NotesIndex
     private var task: Task<Void, Never>?
     private var pending: [ItemRef]?
     private var generation = 0
+    /// Continuations parked in `awaitSettled()`, resumed together the next time the driver settles.
+    private var settledWaiters: [CheckedContinuation<Void, Never>] = []
 
-    init() {
+    /// Inject the shared `NotesIndex` (app path) so this driver and `NotesModel` use **one** sqlite
+    /// handle to the same file rather than two independent connections.
+    init(index: NotesIndex) { self.index = index }
+
+    /// Standalone convenience — owns its own default-location index. Retained for isolated use.
+    convenience init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveNotes", isDirectory: true)
-        index = NotesIndex(url: dir.appendingPathComponent("notes-index-v1.sqlite3"))
+        self.init(index: NotesIndex(url: dir.appendingPathComponent("notes-index-v1.sqlite3")))
     }
 
     /// Incrementally index the given items (skips unchanged via mtime).
@@ -29,6 +46,7 @@ final class NotesIndexer: ObservableObject {
         guard !refs.isEmpty else {
             generation += 1
             task?.cancel(); task = nil; pending = nil; progress = nil
+            markSettled()   // reached idle (empty scope / no items) — the probe reads "ready"
             return
         }
         if task != nil { pending = refs; return }
@@ -204,6 +222,24 @@ final class NotesIndexer: ObservableObject {
         guard gen == generation else { return }
         task = nil
         if let next = pending { pending = nil; launch(next) }
-        else { progress = nil }
+        else { progress = nil; markSettled() }
+    }
+
+    /// Suspend until the driver is idle — no running pass and nothing coalesced-pending. Returns
+    /// immediately if already idle. The app path awaits this after kicking the initial disk build so
+    /// `isIndexReady` / `indexGeneration` reflect a **settled** index (08-testing §3.4).
+    func awaitSettled() async {
+        if task == nil && pending == nil { return }
+        await withCheckedContinuation { settledWaiters.append($0) }
+    }
+
+    /// The driver reached idle: advance the completion token, mark ready, and resume every parked
+    /// `awaitSettled()` waiter. A coalesced chain (`pending` re-launched) settles only once, at the end.
+    private func markSettled() {
+        indexGeneration += 1
+        isIndexReady = true
+        let waiters = settledWaiters
+        settledWaiters = []
+        for w in waiters { w.resume() }
     }
 }

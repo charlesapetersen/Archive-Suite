@@ -56,7 +56,8 @@ macOS/Sources/ArchiveNotes/
                                    container-generic workers also back template storage under
                                    Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6);
                                    writeReservedAsset (pre-named, no re-disambiguation, never-overwrite,
-                                   component-boundary) + nonisolated static path helpers + rootURL (W7-S5)
+                                   component-boundary) + nonisolated static path helpers + rootURL (W7-S5);
+                                   allItemRefs() read-only enumeration for the full index (re)build (W8-S7)
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
     SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
@@ -72,7 +73,9 @@ macOS/Sources/ArchiveNotes/
                                    additive migration (W7-S4)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, search;
                                    prune via pure `pruneDecision` two-emission gate (empty-snapshot-safe,
-                                   W8-S3) — refuses to prune on an empty/unsettled snapshot
+                                   W8-S3) — refuses to prune on an empty/unsettled snapshot; init(index:)
+                                   DI (one shared sqlite handle) + indexGeneration/isIndexReady completion
+                                   signal + awaitSettled() the app path awaits after the disk build (W8-S7 §3.4)
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
                                    subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
@@ -92,7 +95,10 @@ macOS/Sources/ArchiveNotes/
                                    setDate/setDateUncertain/setQuality (W6-S7, front-matter only) and
                                    loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks));
                                    openItem(id:block:)/pendingOpen/consumeOpen — the shared cross-window
-                                   jump-to-source channel + resolvePassage (W7-S3)
+                                   jump-to-source channel + resolvePassage (W7-S3); bootstrap now runs
+                                   buildIndexFromDisk (owns a NotesIndexer, (re)builds the disposable index
+                                   from disk, awaits settle) + @Published isIndexReady/indexGeneration
+                                   deterministic index-ready signal (W8-S7 §3.4)
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
                                    proxy — per-window default + persistence via persistingKindTo (W7-S4);
                                    sort / selection / displayed + displayedGeneration +
@@ -192,7 +198,8 @@ macOS/Sources/ArchiveNotes/
                                    kind Picker + NotesTableView, detail = selected-item header + NoteEditorPane
                                    (W6-S3); .task bootstraps the store. Toolbar "New" menu (New \(kind) ⌘N
                                    from nearest-ancestor template + New from Template ▸ matching kind); item
-                                   pane swaps to TemplatesManagerView in templates mode (W6-S6)
+                                   pane swaps to TemplatesManagerView in templates mode (W6-S6). Hosts the
+                                   hidden `an.status.indexReady` a11y probe the GUI harness polls (W8-S7 §3.4)
     TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
                                    list all templates + New/Duplicate/Rename/Delete via NotesModel; body
                                    editing rides the (deferred) note-editor wiring (W6-S6)
@@ -292,6 +299,10 @@ macOS/Tests/ArchiveNotesTests/
                                    replaces-body, prune-gate ×4 (empty-snapshot-never-wipes /
                                    two-emission / transient-drop / confirmed-only), org-graph DB
                                    persist+reload (folders+memberships+template assignments)
+  NotesIndexReadyTests.swift       7 tests (W8-S7 §3.4): NotesIndexer completion signal (fresh-not-ready,
+                                   empty-scope-settles, build-indexes+settles, awaitSettled idle fast-path,
+                                   coalesced-chain-settles-once) + NotesModel.buildIndexFromDisk (populates
+                                   list + flips ready; no-indexer store still ready)
   OrganizationStoreTests.swift     13 tests: system-folder seeding, create/rename/move(cycle-guard)/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip

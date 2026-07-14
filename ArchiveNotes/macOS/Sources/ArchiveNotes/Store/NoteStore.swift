@@ -86,6 +86,21 @@ actor NoteStore {
 
     func mdURL(for id: UUID) throws -> URL { try mdURL(for: id, in: itemDir(id)) }
 
+    /// Every on-disk item as an `ItemRef` (id + `.md` URL + mtime) for a full index (re)build. Items
+    /// whose `.md` can't be located are skipped (best-effort, like `allTemplates`). The mtime uses the
+    /// same `timeIntervalSinceReferenceDate` convention `createEntry` / `saveEntry` stamp, so the
+    /// indexer's mtime skip-map (`NotesIndex.existingMTimes`) compares like-for-like.
+    func allItemRefs() -> [ItemRef] {
+        var refs: [ItemRef] = []
+        for id in allItemIDs() {
+            guard let url = try? mdURL(for: id) else { continue }
+            let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?
+                .timeIntervalSinceReferenceDate ?? 0
+            refs.append(ItemRef(id: id, url: url, mtime: mtime))
+        }
+        return refs
+    }
+
     // MARK: - CRUD (templates — same primitives, stored under Templates/)
 
     func createTemplate(_ item: Item) throws -> ItemRef { try createEntry(item, in: templateDir(item.id)) }

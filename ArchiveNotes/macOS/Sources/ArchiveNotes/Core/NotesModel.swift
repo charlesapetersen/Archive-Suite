@@ -42,6 +42,16 @@ final class NotesModel: ObservableObject {
     /// template" (06-viewers §6). Kept out of `allItems` so templates never appear in the note list.
     @Published private(set) var templates: [Template] = []
 
+    // MARK: Deterministic index-ready signal (§3.4 — XCUITest polls this before FTS/relevance asserts)
+
+    /// `true` once the initial on-disk index build has settled (app path). A pure injected test store
+    /// with no background indexer surfaces ready immediately (nothing to build), so the hidden probe
+    /// still resolves rather than polling forever.
+    @Published private(set) var isIndexReady = false
+    /// Completion token mirrored from `NotesIndexer` — flips `0 → ≥1` once the initial build settles.
+    /// Surfaced to XCUITest via the hidden `an.status.indexReady` element (08-testing §3.4).
+    @Published private(set) var indexGeneration = 0
+
     // MARK: Current scope (drives the item list in W6-S3/S4)
 
     /// The active filter scope: `nil` = All Notes (no scope). A normal folder scopes by `folderId`;
@@ -96,6 +106,10 @@ final class NotesModel: ObservableObject {
     private let ownsDataLayer: Bool
     private let index: NotesIndex?
     private let rootStore: RootFolderStore?
+    /// Background full-index driver (app path) — shares `index`'s sqlite handle so there is one
+    /// connection to the file. Injectable for tests that exercise the disk-build / ready-signal path;
+    /// `nil` for a pure injected store.
+    private let indexer: NotesIndexer?
     /// The only file-deleting layer (W2, §16.1). Built in `bootstrap()` on the app path; injectable for
     /// tests. `delete(_:)` moves an item dir to the macOS Trash (recoverable) — never `removeItem`.
     private var noteStore: NoteStore?
@@ -109,6 +123,7 @@ final class NotesModel: ObservableObject {
         self.ownsDataLayer = false
         self.index = nil
         self.rootStore = nil
+        self.indexer = nil
         rebuild()
     }
 
@@ -117,12 +132,14 @@ final class NotesModel: ObservableObject {
     /// and, when a `noteStore` is supplied, the delete-last-instance path to a real (scratch) store. It
     /// still does **not** own the data layer (`bootstrap()` stays a no-op), so callers seed items via
     /// `replaceItems`.
-    init(organization: OrganizationStore, index: NotesIndex, noteStore: NoteStore? = nil) {
+    init(organization: OrganizationStore, index: NotesIndex, noteStore: NoteStore? = nil,
+         indexer: NotesIndexer? = nil) {
         self.organization = organization
         self.ownsDataLayer = false
         self.index = index
         self.rootStore = nil
         self.noteStore = noteStore
+        self.indexer = indexer
         rebuild()
     }
 
@@ -144,6 +161,7 @@ final class NotesModel: ObservableObject {
         self.ownsDataLayer = true
         self.index = index
         self.rootStore = rootStore
+        self.indexer = NotesIndexer(index: index)   // shares the one NotesIndex handle
         // Tree stays empty until bootstrap().
     }
 
@@ -152,7 +170,10 @@ final class NotesModel: ObservableObject {
     func bootstrap() async {
         guard ownsDataLayer, !didBootstrap else { return }
         didBootstrap = true
-        guard let index, let rootStore, let root = rootStore.root else { rebuild(); return }
+        guard let index, let rootStore, let root = rootStore.root else {
+            // No store chosen yet: nothing to index. Still flip ready so the probe resolves.
+            rebuild(); markIndexReady(generation: max(indexGeneration, 1)); return
+        }
         noteStore = NoteStore(root: root)
         do {
             try await index.open()
@@ -161,8 +182,9 @@ final class NotesModel: ObservableObject {
             report(error, "open the notes store")
         }
         rebuild()
-        await reloadItems()
+        await reloadItems()          // fast first paint from whatever is already indexed
         await reloadTemplates()
+        await buildIndexFromDisk()   // (re)build the disposable index from disk, then flip ready (§3.4)
     }
 
     // MARK: Item list loading (W6-S3)
@@ -180,6 +202,32 @@ final class NotesModel: ObservableObject {
     /// navigation model recomputes its `displayed` list.
     func replaceItems(_ items: [ItemSummary]) {
         allItems = items
+    }
+
+    // MARK: Initial index build + ready signal (§3.4)
+
+    /// App-path initial build: (re)index every on-disk item into the disposable FTS index, then refresh
+    /// the shared item list and flip the deterministic index-ready signal. Awaits the background build so
+    /// `isIndexReady` / `indexGeneration` reflect a **settled** index — XCUITest polls the hidden
+    /// `an.status.indexReady` element for this before asserting search / relevance (08-testing §3.4).
+    /// The index is a disposable cache, so this is read-only w.r.t. the store (mtime-skipped upserts
+    /// only; no prune here — that stays gated on a settled snapshot elsewhere).
+    func buildIndexFromDisk() async {
+        guard let indexer, let noteStore else {
+            // Pure injected store (no background indexer/store): nothing to build — surface ready anyway.
+            markIndexReady(generation: max(indexGeneration, 1))
+            return
+        }
+        let refs = await noteStore.allItemRefs()
+        indexer.startIndexing(refs)
+        await indexer.awaitSettled()
+        await reloadItems()
+        markIndexReady(generation: indexer.indexGeneration)
+    }
+
+    private func markIndexReady(generation: Int) {
+        indexGeneration = generation
+        isIndexReady = true
     }
 
     // MARK: Keyword search (W6-S4)

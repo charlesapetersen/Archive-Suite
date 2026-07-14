@@ -54,6 +54,7 @@ struct NotesBrowserView: View {
         }
         .frame(minWidth: 900, minHeight: 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
+        .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
         .toolbar { toolbar }
@@ -106,6 +107,19 @@ struct NotesBrowserView: View {
             .help("New \(kindLabel.lowercased())")
             .accessibilityIdentifier("an.toolbar.new")
         }
+    }
+
+    /// A zero-footprint, visually-invisible accessibility probe the XCUITest harness polls (08-testing
+    /// §3.4): its `accessibilityValue` is empty until the initial index build settles, then the
+    /// completion token. Kept in the a11y tree (never `.accessibilityHidden`) and non-interactive so it
+    /// resolves for tests without affecting users. The live poll runs under W8-S8 (GUI on).
+    private var indexReadyProbe: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .allowsHitTesting(false)
+            .accessibilityElement()
+            .accessibilityIdentifier("an.status.indexReady")
+            .accessibilityValue(model.isIndexReady ? String(model.indexGeneration) : "")
     }
 
     private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }
