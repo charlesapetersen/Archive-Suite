@@ -23,6 +23,12 @@ this file is authoritative for Notes‑specific work.
 - **Build:** `cd ArchiveNotes/macOS && xcodegen generate && xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`
 - **Run:** `./launch.sh notes` from the repo root, or `cd ArchiveNotes && ./launch.sh`.
 - **Test:** `./test-smoke.sh notes` from the repo root, or `cd ArchiveNotes && ./test-smoke.sh`.
+- **GUI harness (W8-S7, in progress):** `scripts/make-notes-fixture.sh` builds a SCRATCH store at
+  `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (notes + reader-page/Zotero/extract items,
+  replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
+  `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
+  library (scratch-only; reads tags to assert, never drives the store picker). Running the `ArchiveNotesUITests`
+  scheme is GUI-gated (deferred to W8-S8).
 - **Bundle ID:** `com.archivenotes.app`. Ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
 
 ## Implementation Map
