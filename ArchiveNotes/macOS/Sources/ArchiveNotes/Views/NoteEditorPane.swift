@@ -26,6 +26,12 @@ struct NoteEditorPane: View {
     @State private var assetStore: ItemAssetStore?
     @EnvironmentObject private var previewPopover: SourceBlockPreviewState
     @EnvironmentObject private var zoteroStatus: ZoteroStatusModel
+    /// W7-S6 — app-level registry this pane registers its flush into, so a hard ⌘Q / app terminate (which
+    /// doesn't reliably fire `.onDisappear`) still persists the last keystrokes via the app delegate.
+    @EnvironmentObject private var flushRegistry: EditorFlushRegistry
+    /// Stable per-pane identity for the flush registry (survives re-renders; each window's pane is
+    /// distinct), so register/deregister pair up and a closed window removes exactly its own entry.
+    @State private var paneID = UUID()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,6 +87,9 @@ struct NoteEditorPane: View {
             refreshAssetStore(for: nav.selectedItemID)
             Task { await bodyEditor.select(nav.selectedItemID) }
             refreshZotero()
+            // W7-S6: register this pane's flush so app-terminate persists its pending edit (idempotent —
+            // onAppear may fire more than once, and the same paneID just overwrites its own entry).
+            flushRegistry.register(paneID) { [bodyEditor] in await bodyEditor.flushPending() }
         }
         .onChange(of: nav.selectedItemID) { _, newID in
             syncFormattingIdentity()
@@ -88,8 +97,10 @@ struct NoteEditorPane: View {
             Task { await bodyEditor.select(newID) }
         }
         .onDisappear {
-            // Persist the in-flight edit before the pane/window tears down (never drop a dirty buffer).
-            Task { await bodyEditor.flush() }
+            // Persist the in-flight edit before the pane/window tears down (never drop a dirty buffer),
+            // and drop this pane from the terminate registry so a later quit doesn't flush a dead editor.
+            flushRegistry.deregister(paneID)
+            Task { await bodyEditor.flushPending() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Frontmost-only: re-read the clipboard when the app becomes active

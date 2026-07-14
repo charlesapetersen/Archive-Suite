@@ -30,7 +30,9 @@ this file is authoritative for Notes‑specific work.
 ```
 macOS/Sources/ArchiveNotes/
   ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands;
-                                   injects ZoteroStatusModel into both windows
+                                   injects ZoteroStatusModel into both windows; NotesAppDelegate
+                                   (NSApplicationDelegateAdaptor) owns the EditorFlushRegistry +
+                                   applicationShouldTerminate bounded editor-flush on quit (W7-S6)
   ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), ZoteroCommands
                                    (Note ▸ Attach Zotero Link…), ExtractCommands (Extract ▸ Create
                                    Extract ⌘⌥E / Append to Extract…, W7-S2), DebugBlockCommands
@@ -140,7 +142,13 @@ macOS/Sources/ArchiveNotes/
                                    safe across selection switches (captures loadedID at schedule time,
                                    flush-outgoing-before-load, drops superseded loads via a generation,
                                    same-id reselect no-op); injected load/save/flushEditor seams (W7-S1a);
-                                   loadedID @Published so the pane gates a jump-to-source scroll (W7-S3)
+                                   loadedID @Published so the pane gates a jump-to-source scroll (W7-S3);
+                                   flushPending() (both-debounce flush) for the app-terminate path (W7-S6)
+    EditorFlushRegistry.swift      App-level per-pane flush registry (EditorFlushRegistry — each
+                                   NoteEditorPane registers its flushPending on appear, deregisters on
+                                   disappear) + TerminateFlushCoordinator (bounded reply — flush-complete
+                                   OR timeout, whichever first). Backs NotesAppDelegate's terminate flush
+                                   so a force-quit within the autosave debounce can't lose an edit (W7-S6)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
                                    CommonMark); block-header chips (<!-- block: --> → chip attachments);
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent;

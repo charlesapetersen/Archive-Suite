@@ -28,7 +28,15 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   is proven at the model layer (`NoteBodyEditorModelTests` incl. the cross-item race + generation guard;
   `NotesModelBodyTests` round-trip/reindex/front-matter-preservation), but not yet driven in a live window.
   When GUI resumes: select note A, type, select B → A's edit persists (assert the on-disk `.md`) and B
-  loads fresh; force-quit within the ~600 ms debounce is the known autosave-window caveat.
+  loads fresh. The **force-quit-within-the-debounce caveat is now CLOSED (W7-S6):** app-terminate and
+  window-close flush every open editor's pending edit before the process exits, via an app-level
+  `EditorFlushRegistry` each pane registers into + the delegate's `applicationShouldTerminate`, which
+  awaits the flush under a bounded timeout (`TerminateFlushCoordinator` — replies on flush-complete OR
+  timeout, whichever first, so a wedged write never deadlocks quit). Proven at the model layer
+  (`EditorFlushRegistryTests`: registry collection, bounded reply, and a scratch-store "edit within the
+  debounce → on disk after flush" functional test). A live GUI confirm (type → ⌘Q at once → reopen →
+  edit present) is still deferred with the rest of Notes' GUI drive until the scratch-store launch
+  override lands (W8-S7) — driving the live app would write the owner's real store.
 
 ## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13, open)
 

@@ -4,6 +4,9 @@ import ArchiveCore
 
 @main
 struct ArchiveNotesApp: App {
+    /// W7-S6 — owns the app-lifetime editor-flush registry + the `applicationShouldTerminate` hook that
+    /// flushes every open editor's pending edit (bounded) before the process exits.
+    @NSApplicationDelegateAdaptor(NotesAppDelegate.self) private var appDelegate
     /// The single UI façade + organization graph, shared by both windows (§16.1). Bootstraps its
     /// store lazily from each window's `.task`.
     @StateObject private var notesModel = NotesModel()
@@ -21,6 +24,7 @@ struct ArchiveNotesApp: App {
                 .environmentObject(deepLinkRouter)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
+                .environmentObject(appDelegate.flushRegistry)   // W7-S6
                 .onOpenURL { url in
                     NSApp.activate(ignoringOtherApps: true)
                     deepLinkRouter.handle(url)
@@ -40,8 +44,34 @@ struct ArchiveNotesApp: App {
                 .environmentObject(notesModel)
                 .environmentObject(previewState)
                 .environmentObject(zoteroStatus)
+                .environmentObject(appDelegate.flushRegistry)   // W7-S6
         }
         Settings { NotesSettingsView() }
+    }
+}
+
+/// App delegate hosting the W7-S6 terminate-flush. Owns the `EditorFlushRegistry` (app-lifetime, not a
+/// SwiftUI `@StateObject`, so `applicationShouldTerminate` can reach it directly) which each open
+/// `NoteEditorPane` registers its flush into. On quit, every pending editor edit is persisted first —
+/// but under a bounded timeout, so a wedged store write can never deadlock quit.
+@MainActor
+final class NotesAppDelegate: NSObject, NSApplicationDelegate {
+    /// Registered into both windows' environments by the App; flushed here on terminate.
+    let flushRegistry = EditorFlushRegistry()
+
+    /// Upper bound on how long quit waits for the flush. A note-body write is tiny (atomic local file),
+    /// so the flush path essentially always wins this race; the bound only guards a pathological hang.
+    static let terminateFlushTimeout: Duration = .seconds(2)
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Nothing editing → quit immediately. Otherwise flush every open editor's pending edit first, but
+        // reply as soon as the flush finishes OR the bounded timeout elapses (never block quit forever).
+        guard !flushRegistry.isEmpty else { return .terminateNow }
+        let registry = flushRegistry
+        TerminateFlushCoordinator {
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }.begin(flush: { await registry.flushAll() }, timeout: Self.terminateFlushTimeout)
+        return .terminateLater
     }
 }
 
