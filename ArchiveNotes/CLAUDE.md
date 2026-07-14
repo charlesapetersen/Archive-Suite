@@ -280,11 +280,24 @@ macOS/Tests/ArchiveNotesTests/
   EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
                                    flush, programmatic suppress, mode-switch undo-clear/text-preserve,
                                    lint (no .layoutManager in Editor/)
-  MarkdownBridgeTests.swift        28 tests: per-construct idempotency (h1–h6, bold, italic,
+  MarkdownBridgeTests.swift        31 tests: per-construct idempotency (h1–h6, bold, italic,
                                    bold+italic, inline code, link, ul, ol, blockquote, code block,
                                    code block+lang), mixed doc, second-round-trip no-op,
                                    unknown-styling-drops-text-preserved, Apple-parser semantic
-                                   snapshots, block-kind stamping, text-never-dropped
+                                   snapshots, block-kind stamping, text-never-dropped; + W8-S1:
+                                   attributed→md→attributed structural idempotency (per-char
+                                   fingerprint), mid-paragraph unsupported-attr degrade, relative
+                                   image-ref through bridge
+  NotesFrontMatterTests.swift      9 tests (W8-S1): all-known-keys round-trip, unknown-key byte-for-byte
+                                   (canonical) + repositioned-preserved, minimal-defaults, missing-id
+                                   typed-throw, edge-whitespace-scalar characterization, + seeded
+                                   splitmix64 fuzz (2000 garbage→no-crash/typed-only; 600 corrupt-fronts
+                                   →idempotent-or-typed + unknown-never-dropped; 400 well-formed Items
+                                   →byte-idempotent). Found+fixed the flow-list quote data-loss bug.
+  BlockHeaderTests.swift           6 tests (W8-S1): every §6 kind round-trips, unrecognized header
+                                   fields verbatim, headerless-body=single-freeform-region, malformed
+                                   header degrades to freeform (text preserved), canonical §6 wire
+                                   strings parse
   FormattingActionTests.swift      22 tests: per-action apply-then-serialize (bold, italic,
                                    inline code, bold+italic, link apply/remove, h1/h2/heading→plain,
                                    ul/ol/blockquote/code-block toggle + toggle-twice-no-op), state

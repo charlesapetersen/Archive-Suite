@@ -438,6 +438,12 @@ enum FrontMatterCodec {
     private static func needsQuotingInFlow(_ s: String) -> Bool {
         if needsQuoting(s) { return true }
         if s.contains(",") || s.contains("[") || s.contains("]") { return true }
+        // A quote char anywhere in an UNquoted flow element is treated as a delimiter by
+        // `parseFlowList` (it toggles in-single/in-double state mid-stream), which drops a
+        // single-quote (e.g. author "O'Brien" → "OBrien") or merges elements across a stray
+        // double-quote. Double-quoting the element (quoteFlowElement escapes `\` and `"`) makes
+        // the parser treat both quote kinds as literal content. (Found by NotesFrontMatterTests fuzz.)
+        if s.contains("\"") || s.contains("'") { return true }
         return false
     }
 

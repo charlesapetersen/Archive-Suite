@@ -321,7 +321,81 @@ struct MarkdownBridgeTests {
         }
     }
 
+    // MARK: - W8-S1: attributed-side structural idempotency
+
+    /// For a table of canonical Markdown inputs: `attributed → md → attributed'` preserves the
+    /// *rendered* attributes (bold/italic/inline-code/block-kind/link) character-for-character.
+    /// The existing `secondRoundTripIsNoOp` covers the string side (`md → attributed → md'`); this
+    /// pins the attributed side so a serializer drift that changes styling can't slip through.
+    @Test @MainActor
+    func attributedIdempotentForSupportedSubset() {
+        let canonical = [
+            "# Heading One",
+            "Some **bold** text",
+            "Some *italic* text",
+            "Some ***bold italic*** text",
+            "Use `code` here",
+            "[Click here](https://example.com)",
+            "> A quoted line",
+        ]
+        for md in canonical {
+            let a1 = MarkdownBridge.parse(markdown: md)
+            let md1 = MarkdownBridge.serialize(a1)
+            let a2 = MarkdownBridge.parse(markdown: md1)
+            #expect(renderedFingerprint(a1) == renderedFingerprint(a2),
+                    "attributed→md→attributed not stable for: \(md)")
+        }
+    }
+
+    /// An unsupported attribute (underline) applied to a run in the MIDDLE of a paragraph is dropped
+    /// on serialize without mangling the adjacent text or injecting stray Markdown markers.
+    @Test @MainActor
+    func unsupportedAttributeMidParagraphDegradesWithoutManglingAdjacent() {
+        let font = NSFont.systemFont(ofSize: 14)
+        let result = NSMutableAttributedString()
+        let base: [NSAttributedString.Key: Any] = [.font: font, .noteBlockKind: BlockKind.plain]
+        result.append(NSAttributedString(string: "Start ", attributes: base))
+        var mid = base
+        mid[.underlineStyle] = NSUnderlineStyle.single.rawValue   // unsupported
+        result.append(NSAttributedString(string: "middle", attributes: mid))
+        result.append(NSAttributedString(string: " end", attributes: base))
+
+        let serialized = MarkdownBridge.serialize(result)
+        #expect(serialized == "Start middle end")
+    }
+
+    /// Inline images round-trip through the bridge as a RELATIVE `assets/…` reference (never
+    /// rewritten to an absolute or `file://` path).
+    @Test @MainActor
+    func imageReferenceStaysRelativeThroughBridge() {
+        let md = "Before ![cap](assets/pic.png) after"
+        let serialized = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md))
+        #expect(serialized.contains("](assets/pic.png)"))
+        #expect(!serialized.contains("](/"))
+        #expect(!serialized.contains("file://"))
+    }
+
     // MARK: - Helpers
+
+    /// A per-character fingerprint of the rendered (not semantic) attributes we model, for
+    /// structural-idempotency comparison of two attributed strings.
+    @MainActor
+    private func renderedFingerprint(_ s: NSAttributedString) -> [String] {
+        var out: [String] = []
+        let ns = s.string as NSString
+        for i in 0..<s.length {
+            let ch = ns.substring(with: NSRange(location: i, length: 1))
+            let attrs = s.attributes(at: i, effectiveRange: nil)
+            let traits = (attrs[.font] as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
+            let bold = traits.contains(.boldFontMask)
+            let italic = traits.contains(.italicFontMask)
+            let code = (attrs[.noteInlineCode] as? Bool) == true
+            let kind = (attrs[.noteBlockKind] as? BlockKind) ?? .plain
+            let link = attrs[.link] != nil
+            out.append("\(ch)|b\(bold)|i\(italic)|c\(code)|k\(kind)|l\(link)")
+        }
+        return out
+    }
 
     /// Assert that parse→serialize produces the expected normalized form,
     /// and that a second round-trip is identical (fixed-point after one pass).

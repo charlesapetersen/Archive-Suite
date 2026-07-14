@@ -3,6 +3,34 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Front-matter codec — flow-list quote data-loss FIXED; two edge-normalizations pinned (W8-S1, 2026-07-14)
+
+W8-S1's new `NotesFrontMatterTests` fuzz/property suite (seeded splitmix64: 2000 garbage blobs + 600
+structurally-corrupt fronts + 400 well-formed `Item`s) exercised the YAML codec adversarially and found
+one real bug plus two benign edge-normalizations:
+
+- **FIXED — flow-list elements containing a quote char were data-lossy.** `emitFlowList` (tags/authors)
+  emitted an element like `O'Brien` **unquoted**, and `parseFlowList` treats `'`/`"` as delimiters
+  mid-stream → it dropped the apostrophe (`O'Brien` → `OBrien`) or merged elements across a stray `"`.
+  Real bug (apostrophes in author names are common). **Fix:** `FrontMatterCodec.needsQuotingInFlow` now
+  also quotes any element containing `"` or `'`; `quoteFlowElement` already double-quotes + escapes `\`/`"`,
+  and `parseFlowList` treats a double-quoted element's inner quotes as literal. Round-trip proven for `'`,
+  `"`, and `\`+`"` combos by the fuzz suite + the well-formed-`Item` loop; no regression across
+  `FrontMatterCodecTests`/`ZoteroFrontMatterRoundTripTests`/`NoteStoreTests`/`NotesIndexTests`. Scalar
+  values (e.g. `title`) were never affected (`unquoteScalar` only strips *both-end* quotes).
+- **PINNED (characterization, not fixed) — leading/trailing non-U+0020 whitespace in a scalar is trimmed
+  on read.** `decode` trims a scalar value with `.whitespaces` (which includes tab + category-Zs like
+  NBSP), but `encode`'s `needsQuoting` only quotes a *leading/trailing regular space*, so a leading/
+  trailing **tab** or **NBSP** on e.g. a title is normalized away (`"\tTabbed"` → `"Tabbed"`). Edge
+  regular-spaces DO survive (they're quoted); interior whitespace is unaffected. Pinned by
+  `leadingTrailingEdgeWhitespaceInScalarIsNormalized` so a future `needsQuoting` tightening is intentional.
+  Marginal (who titles a note with an edge tab?) → flagged to Morning Review, not fixed this session.
+- **NOTED (marginal) — `\r\r\n` in body text leaves a residual `\r\n` after one decode.** `decode`'s
+  `replacingOccurrences("\r\n" → "\n")` is a single left-to-right pass, so `CR CR LF` collapses to a
+  *residual* `\r\n` that then normalizes on a second decode → a body containing raw CR-soup isn't
+  byte-idempotent. Real editors emit `\n` or clean `\r\n` (both handled correctly), so this is a
+  fuzz-only artifact; the fuzz body generator excludes lone CR and the observation is logged, not fixed.
+
 ## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13, open)
 
 W7-S1a bound `NoteEditorPane` to the selected item's body (`NoteBodyEditorModel`: load-on-select,
