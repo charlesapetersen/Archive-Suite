@@ -106,4 +106,27 @@ struct NotesAppSettingsTests {
     @Test func hiddenColumnsEmptyByDefault() {
         #expect(NotesLayoutSettings(reading: scratchDefaults()).hiddenColumns.isEmpty)
     }
+
+    // MARK: per-window kind featuring (W7-S4)
+
+    @Test func windowKindDefaultsToNilUnset() {
+        let d = scratchDefaults()
+        #expect(NotesAppSettings.windowKindFilter(for: .note, from: d) == nil)
+        #expect(NotesAppSettings.windowKindFilter(for: .extract, from: d) == nil)
+    }
+
+    @Test func windowKindRoundTripsPerWindowIndependently() {
+        let d = scratchDefaults()
+        NotesAppSettings.setWindowKindFilter(.both, for: .note, into: d)
+        NotesAppSettings.setWindowKindFilter(.notes, for: .extract, into: d)
+        // The two windows persist under distinct keys — neither clobbers the other.
+        #expect(NotesAppSettings.windowKindFilter(for: .note, from: d) == .both)
+        #expect(NotesAppSettings.windowKindFilter(for: .extract, from: d) == .notes)
+    }
+
+    @Test func windowKindUnrecognizedRawValueIsNil() {
+        let d = scratchDefaults()
+        d.set("nonsense", forKey: NotesLayoutSettingsKey.noteWindowKind)
+        #expect(NotesAppSettings.windowKindFilter(for: .note, from: d) == nil)   // → caller uses default
+    }
 }

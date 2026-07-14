@@ -78,6 +78,31 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   '[NSValue]' to '[NSValue]' always succeeds" (W7-S2 code; surfaces on a clean compile). Trivial; fold
   into a future W7 touch.
 
+## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14, open)
+
+W7-S4 gave each window its kind featuring (Note→notes, Extract→extracts, remembered per window) via the
+already-shipped segmented control, and added the extract-only **Sources** column (distinct source notes,
+indexed into `items.source_count`). Logic is fully unit-tested (`KindFilterQueryTests` kind predicate +
+distinct-source count; `NotesIndexTests.sourceCountRoundTrip` SQLite bind/read; `NotesAppSettingsTests`
+per-window kind round-trip; `NotesNavigationModelTests` window defaults). Conscious gaps:
+
+- **GUI drive deferred — no scratch Notes-store override yet (blocked on W8-S7).** Unlike Reader
+  (`-ARUITestRootPath`), Notes has **no** DEBUG launch-arg to point the app at a throwaway store, so
+  driving the live app to *create a segmented extract* would write into the owner's real Notes store
+  (the file-safety analog of the Reader "never mutate the live root" incident). So the live checks —
+  Extract window opens featuring extracts / Note window features notes / toggling to `both` unions /
+  the Sources column shows the right count for a segmented extract — are deferred to Morning Review and
+  are the natural payload for the **W8-S7** fixture-rooted XCUITest (which builds the scratch store).
+- **The "Sources" column is always present, not per-window-hidden.** It renders the count for extracts
+  and blank for notes, in *both* windows (so a notes list shows an empty column rather than adapting the
+  column set away). Per-window default column visibility would need per-window `hiddenColumns` (today a
+  single global `NotesAppSettings.hiddenColumns`); deferred as a polish item — the user can hide it via
+  the existing right-click column picker.
+- **`source_count` back-fills on re-index, not instantly, for a pre-`source_count` DB.** The additive
+  `ALTER TABLE` defaults existing rows to 0; a stale row shows a blank Sources cell until its mtime
+  changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this
+  change; a fresh index is correct from first build.
+
 ## Test harness — headless full-scheme run crashes (found 2026-07-13, open)
 
 Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore

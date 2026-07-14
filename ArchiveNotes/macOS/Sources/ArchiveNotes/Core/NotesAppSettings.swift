@@ -13,6 +13,10 @@ enum NotesLayoutSettingsKey {
     static let detailWidth = "an.detailWidth"
     static let showTree = "an.showTree"
     static let hiddenColumns = "an.hiddenColumns"   // [String] — item-list columns hidden (W6-S3)
+    // Per-window kind featuring (W7-S4, 07-extracts §4): the Note vs Extract window each remember the
+    // last kind their segmented control showed, separately.
+    static let noteWindowKind = "an.noteWindow.kindFilter"
+    static let extractWindowKind = "an.extractWindow.kindFilter"
 }
 
 /// Resolved, validated Notes layout/window settings. A pure value type so the resolution logic is
@@ -84,5 +88,20 @@ enum NotesAppSettings {
     static var hiddenColumns: Set<String> { current.hiddenColumns }
     static func setHiddenColumns(_ hidden: Set<String>, into store: UserDefaults = .standard) {
         store.set(Array(hidden).sorted(), forKey: NotesLayoutSettingsKey.hiddenColumns)
+    }
+
+    /// The `KindFilter` the given window last showed (W7-S4, 07-extracts §4). Each window features its
+    /// own kind by default (Note→`.notes`, Extract→`.extracts`); once the user retargets the segmented
+    /// control, that choice is remembered per window. `nil` (never set / unrecognized raw value) ⟹ the
+    /// caller falls back to the window default. `from:`/`into:` injectable so the round-trip is testable
+    /// against a scratch domain (mirrors `setWindowSize` / `setHiddenColumns`).
+    static func windowKindFilter(for windowKind: Item.Kind, from store: UserDefaults = .standard) -> KindFilter? {
+        store.string(forKey: kindKey(windowKind)).flatMap(KindFilter.init(rawValue:))
+    }
+    static func setWindowKindFilter(_ kind: KindFilter, for windowKind: Item.Kind, into store: UserDefaults = .standard) {
+        store.set(kind.rawValue, forKey: kindKey(windowKind))
+    }
+    private static func kindKey(_ windowKind: Item.Kind) -> String {
+        windowKind == .extract ? NotesLayoutSettingsKey.extractWindowKind : NotesLayoutSettingsKey.noteWindowKind
     }
 }

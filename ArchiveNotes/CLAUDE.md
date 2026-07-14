@@ -50,13 +50,16 @@ macOS/Sources/ArchiveNotes/
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
     SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
-                                   (reuses ArchiveCore.DurableLink §8.2 URL) (W7-S1)
+                                   (reuses ArchiveCore.DurableLink §8.2 URL) (W7-S1);
+                                   [Block].distinctSourceNoteCount for the extract Sources column (W7-S4)
     NotesPassagePayload.swift      Copy-in-Notes → paste-into-Extract pasteboard payload
                                    (com.archivenotes.passage; snapshot bytes per segment) (W7-S1)
   Index/
-    NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection)
+    NoteIndexRow.swift             NoteIndexRow (extraction payload) + ItemSummary (list/sort projection);
+                                   both carry sourceCount/sourceNoteCount (distinct source notes) (W7-S4)
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
-                                   allSummaries() list projection (W6-S3)
+                                   allSummaries() list projection (W6-S3); items.source_count column +
+                                   additive migration (W7-S4)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
                                    subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
@@ -79,7 +82,8 @@ macOS/Sources/ArchiveNotes/
                                    openItem(id:block:)/pendingOpen/consumeOpen — the shared cross-window
                                    jump-to-source channel + resolvePassage (W7-S3)
     NotesNavigationModel.swift     @MainActor per-window item-list VM (full NotesFilter w/ kindFilter
-                                   proxy / sort / selection / displayed + displayedGeneration +
+                                   proxy — per-window default + persistence via persistingKindTo (W7-S4);
+                                   sort / selection / displayed + displayedGeneration +
                                    instanceCounts); observes shared allItems + scope (mirrored from the
                                    delivered @Published value); recompute() = scope → user filter →
                                    keyword FTS (bm25, debounced, relevance auto-sort, generation guard) →
@@ -94,13 +98,15 @@ macOS/Sources/ArchiveNotes/
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
     ItemSummaryDisplay.swift       Pure item-list cell rendering: displayDate (decade/year/month/day),
-                                   qualityStars, displayTags (hides ArchiveSuite marker) (W6-S3)
+                                   qualityStars, displayTags (hides ArchiveSuite marker) (W6-S3);
+                                   sourcesText (count for extracts, blank otherwise) (W7-S4)
     NotesFolderNode.swift          Id-keyed folder-tree node + buildNormalForest (group-by-parentId,
                                    sortOrder→name sort, distinct-subtree counts, orphan/cycle-safe)
                                    + smartFolderNodes (W6-S2)
     NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
                                    + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
-                                   point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings
+                                   point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings;
+                                   windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4)
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
@@ -178,8 +184,9 @@ macOS/Sources/ArchiveNotes/
     NotesTableView.swift           Center pane — virtualized item table (NSViewRepresentable +
                                    NSTableViewDiffableDataSource<Int, UUID> + ColumnPickerHeaderView
                                    hide/show + secondary sort + ContextMenuTableView). Columns
-                                   kind/title/instances/date/quality/tags; tags READ-ONLY (edited in
-                                   detail, W6-S7). Adapts Reader AppKitTableView (no inline NSTokenField)
+                                   kind/title/instances/date/quality/sources/tags; sources = distinct
+                                   source notes for extracts (blank for notes, W7-S4); tags READ-ONLY
+                                   (edited in detail, W6-S7). Adapts Reader AppKitTableView (no NSTokenField)
                                    (W6-S3). Drag source (NotesTableDataSource pasteboardWriterForRow,
                                    id-only) + accent-glyph replicant title styling (W6-S5)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,

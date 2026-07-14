@@ -31,7 +31,9 @@ struct NotesBrowserView: View {
     init(kind: ItemKindShell, model: NotesModel) {
         self.kind = kind
         self._model = ObservedObject(wrappedValue: model)
-        self._nav = StateObject(wrappedValue: NotesNavigationModel(model: model, defaultKind: kind))
+        // `.standard` ⟹ this window's kind featuring is remembered across launches (W7-S4).
+        self._nav = StateObject(wrappedValue: NotesNavigationModel(model: model, defaultKind: kind,
+                                                                   persistingKindTo: .standard))
     }
 
     var body: some View {

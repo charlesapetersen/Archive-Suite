@@ -73,6 +73,7 @@ struct NotesTableView: NSViewRepresentable {
             ("instances",  "In",      46,  40,   70,  nil),
             ("date",       "Date",    140, 100,  220, .date),
             ("quality",    "Quality", 90,  70,   120, .quality),
+            ("sources",    "Sources", 70,  50,   120, nil),
             ("tags",       "Tags",    280, 140,  600, nil),
         ]
         for col in columns {
@@ -262,6 +263,13 @@ struct NotesTableView: NSViewRepresentable {
             case "quality":
                 tf.stringValue = item.qualityStars
                 tf.textColor = item.quality == nil ? .secondaryLabelColor : .systemYellow
+
+            case "sources":
+                // Distinct source notes for a segmented extract; blank for notes / source-less
+                // extracts. The Extracts window features this; a notes list shows it empty (W7-S4, §4).
+                tf.stringValue = item.sourcesText
+                tf.textColor = .secondaryLabelColor
+                tf.setAccessibilityIdentifier("an.cell.sources.\(item.id.uuidString)")
 
             case "tags":
                 tf.stringValue = item.displayTags

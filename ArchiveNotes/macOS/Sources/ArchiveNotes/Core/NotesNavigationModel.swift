@@ -31,7 +31,18 @@ final class NotesNavigationModel: ObservableObject {
     /// `searchText` stays empty — the live keyword field (`searchText` below) drives FTS instead of a
     /// title substring, so body matches surface; `searchText` is only folded in on "Save as Smart
     /// Folder" so a persisted smart folder reproduces from durable data without the disposable index.
-    @Published var filter: NotesFilter { didSet { if filter != oldValue { recompute() } } }
+    @Published var filter: NotesFilter {
+        didSet {
+            guard filter != oldValue else { return }
+            // Remember this window's kind featuring across launches (W7-S4). Only on a kind change,
+            // and only when a persistence store was injected (the real app passes `.standard`; tests
+            // pass nil so they neither read nor write `UserDefaults`).
+            if filter.kind != oldValue.kind, let store = kindPersistStore {
+                NotesAppSettings.setWindowKindFilter(filter.kind, for: windowKind, into: store)
+            }
+            recompute()
+        }
+    }
 
     /// Which kinds this window shows. Proxies `filter.kind` so the segmented control's binding and the
     /// W6-S3 tests keep the stable `kindFilter` name while kind lives inside `NotesFilter` (§16.3).
@@ -94,12 +105,23 @@ final class NotesNavigationModel: ObservableObject {
     /// emits in `willSet` — reading `model.scope` inside the sink would see the STALE prior value.
     private var scope: NotesFilter?
 
+    /// Where per-window kind featuring is persisted (W7-S4). `nil` ⟹ don't touch `UserDefaults` (tests);
+    /// the real app injects `.standard` via `NotesBrowserView`.
+    private let kindPersistStore: UserDefaults?
+
     private var cancellables: Set<AnyCancellable> = []
 
-    init(model: NotesModel, defaultKind: ItemKindShell) {
+    init(model: NotesModel, defaultKind: ItemKindShell, persistingKindTo store: UserDefaults? = nil) {
         self.model = model
-        self.windowKind = (defaultKind == .extract) ? .extract : .note
-        self.filter = NotesFilter(kind: (defaultKind == .extract) ? .extracts : .notes)
+        let windowKind: Item.Kind = (defaultKind == .extract) ? .extract : .note
+        self.windowKind = windowKind
+        self.kindPersistStore = store
+        // Restore this window's last-shown kind (W7-S4); fall back to the window default when never set
+        // (or when no store is injected). Setting `filter` in init does NOT fire `didSet`, so restoring
+        // never re-persists.
+        let windowDefaultKind: KindFilter = (defaultKind == .extract) ? .extracts : .notes
+        let restoredKind = store.flatMap { NotesAppSettings.windowKindFilter(for: windowKind, from: $0) }
+        self.filter = NotesFilter(kind: restoredKind ?? windowDefaultKind)
         // Recompute whenever the shared item source changes (index load / refresh).
         model.$allItems
             .sink { [weak self] items in self?.recompute(items: items) }
