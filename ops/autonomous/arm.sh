@@ -29,6 +29,9 @@ LOG="$STATE/daemon.log"
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
 # taskport = the debugger right XCUITest needs; 'allow' = password-free. Set on `gui on`, reverted on `gui off`.
 tp_is_allow() { security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>'; }
+# UI-automation mode (macOS Sequoia+): the "XCTest is trying to Enable UI Automation" prompt. `automationmodetool
+# enable-automationmode-without-authentication` pre-authorizes it (Apple's CI workaround) — separate from taskport.
+am_state() { automationmodetool 2>/dev/null | grep -qi 'requires.*authentication' && echo auth-required || echo no-auth; }
 
 status() {
   echo "== daemon process =="
@@ -36,7 +39,7 @@ status() {
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
   echo "== GUI mode =="
-  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)   (toggle: $0 gui on|off)"
+  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)  |  UI-automation: $(am_state)   (toggle: $0 gui on|off)"
   echo "== recent daemon.log =="
   tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
 }
@@ -87,6 +90,15 @@ case "${1:-arm}" in
             echo "  ⚠️ taskport sudo failed/cancelled — GUI is ON (cliclick works), but XCUITest may prompt for a password."
           fi
         fi
+        # UI-automation mode (Sequoia+ "Enable UI Automation" prompt — a SEPARATE gate from taskport).
+        if [ "$(am_state)" = no-auth ]; then
+          echo "  UI-automation mode: already enabled without auth."
+        else
+          echo "  Enabling UI-automation mode for XCUITest (sudo)…"
+          sudo automationmodetool enable-automationmode-without-authentication >/dev/null 2>&1 \
+            && echo "  UI-automation mode -> enabled ✅ (no 'Enable UI Automation' prompt)." \
+            || echo "  ⚠️ automationmodetool failed/cancelled — XCUITest may still prompt 'Enable UI Automation'."
+        fi
         ;;
       off)
         echo off > "$STATE/gui-mode"
@@ -104,8 +116,17 @@ case "${1:-arm}" in
         else
           echo "  ⚠️ taskport is 'allow' but no backup at $TP_BACKUP — cannot auto-revert; do it manually."
         fi
+        # Revert UI-automation mode (re-require auth).
+        if [ "$(am_state)" = auth-required ]; then
+          echo "  UI-automation mode: already requires auth."
+        else
+          echo "  Reverting UI-automation mode (sudo)…"
+          sudo automationmodetool disable-automationmode-without-authentication >/dev/null 2>&1 \
+            && echo "  UI-automation mode -> requires auth ✅." \
+            || echo "  ⚠️ revert failed — disable manually: sudo automationmodetool disable-automationmode-without-authentication"
+        fi
         ;;
-      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)" ;;
+      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)  |  UI-automation: $(am_state)" ;;
       *) fail "usage: $0 gui on|off|status" ;;
     esac
     exit 0 ;;
