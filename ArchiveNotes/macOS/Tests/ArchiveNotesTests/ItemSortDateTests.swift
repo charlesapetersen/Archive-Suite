@@ -1,5 +1,6 @@
 import XCTest
 @testable import ArchiveNotes
+import ArchiveCore
 
 /// Verify Item.sortDate parity with the SPEC formula (DocumentTags.sortDate:89-92):
 ///   year * 10_000 + month * 100 + day
@@ -96,5 +97,46 @@ final class ItemSortDateTests: XCTestCase {
         var item = makeItem(date: "1968", precision: .year)
         item.dateUncertain = true
         XCTAssertEqual(item.sortDate, 19_680_000, "Uncertain dates still sort by the stated date")
+    }
+
+    // MARK: - Cross-implementation parity guard (reconciles §1.7 `testReuseNotReimplemented`)
+    //
+    // `Item.sortDate` RE-IMPLEMENTS the SPEC formula locally (over `date: String?` + precision)
+    // instead of calling `ArchiveCore.DocumentTags.sortDate` the way Reader does, so a literal
+    // "routes through the shared function" guard isn't satisfiable today. This asserts the
+    // stronger observable property instead: for the same logical date, Notes' key MUST equal the
+    // shared ArchiveCore key. If Notes' formula ever drifts from the SPEC, this fails.
+    // (Follow-up flagged to Morning Review: extract a shared numeric combiner in ArchiveCore so
+    // both sides can literally reuse it.)
+    func testItemSortDateMatchesArchiveCoreSharedFormula() {
+        // The shared ArchiveCore key for the equivalent typed date fields.
+        func core(year: Int?, month: Int?, day: Int?, decade: Int?) -> Int? {
+            DocumentTags(
+                raw: [], labelNumber: nil,
+                year: year,
+                month: month.map { DocumentTags.Month(number: $0, name: "") },
+                day: day, dateUncertain: false, decade: decade,
+                priority: nil, readState: nil, color: nil, subjects: [],
+                yearToken: nil, monthToken: nil, dayToken: nil, decadeToken: nil, priorityToken: nil
+            ).sortDate
+        }
+
+        // Each row feeds the SAME logical date to both implementations.
+        XCTAssertEqual(makeItem(date: "1970", precision: .decade).sortDate,
+                       core(year: nil, month: nil, day: nil, decade: 1970))
+        XCTAssertEqual(makeItem(date: "1968", precision: .year).sortDate,
+                       core(year: 1968, month: nil, day: nil, decade: nil))
+        XCTAssertEqual(makeItem(date: "1968-03", precision: .month).sortDate,
+                       core(year: 1968, month: 3, day: nil, decade: nil))
+        XCTAssertEqual(makeItem(date: "1968-03-25", precision: .day).sortDate,
+                       core(year: 1968, month: 3, day: 25, decade: nil))
+        XCTAssertEqual(makeItem(date: "842", precision: .year).sortDate,
+                       core(year: 842, month: nil, day: nil, decade: nil))
+        XCTAssertEqual(makeItem(date: "1215-05-25", precision: .day).sortDate,
+                       core(year: 1215, month: 5, day: 25, decade: nil))
+        // Both agree that an undated item has no key.
+        XCTAssertEqual(makeItem(date: nil, precision: nil).sortDate,
+                       core(year: nil, month: nil, day: nil, decade: nil))
+        XCTAssertNil(makeItem(date: nil, precision: nil).sortDate)
     }
 }

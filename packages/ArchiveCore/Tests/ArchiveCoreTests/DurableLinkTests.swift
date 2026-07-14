@@ -48,6 +48,24 @@ struct DurableLinkTests {
         #expect(parsed == link)
     }
 
+    @Test func readerRevealPreservesSlashesInMultiSegmentPath() {
+        // Corpus folders nest, so a rel path carries both '/' separators and spaces. The '/'
+        // must stay LITERAL on the wire (not percent-encoded to %2F) while spaces DO encode,
+        // and the exact rel path must round-trip.
+        let rel = "Box 1/Folder 2/old scan.pdf"
+        let link = DurableLink.readerReveal(rootGUID: sampleUUID, relativePath: rel, page: 4)
+        let url = link.url
+
+        #expect(!url.absoluteString.contains("%2F"))
+        #expect(url.absoluteString.contains("Box%201/Folder%202/old%20scan.pdf"))
+
+        guard case let .readerReveal(_, parsedRel, parsedPage)? = DurableLink(url: url) else {
+            Issue.record("expected a readerReveal link"); return
+        }
+        #expect(parsedRel == rel)
+        #expect(parsedPage == 4)
+    }
+
     // MARK: - notesOpen
 
     @Test func notesOpenRoundTripWithBlock() {

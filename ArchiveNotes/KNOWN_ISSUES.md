@@ -3,6 +3,34 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Virtual-folder / durable-link / date-sort parity suites; sortDate cross-app divergence guarded (W8-S4, 2026-07-14)
+
+W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a real cross-app divergence.
+
+- **NEW parity suites (all green, scratch-only):** `VirtualFolderReplicationTests` (7, §1.5 — DevonThink
+  replicant + delete-last-instance invariants on a scratch `OrganizationStore`) and
+  `ArchiveCoreTests/DateSortParityTests` (7, §1.7 — the shared SPEC §7 `DocumentTags.sortDate` key), plus a
+  `/`-in-multi-segment-rel-path round-trip added to `ArchiveCoreTests/DurableLinkTests` (§1.6) and a
+  cross-implementation parity guard added to `ItemSortDateTests`.
+- **FINDING (flagged to Morning Review) — Notes `Item.sortDate` RE-IMPLEMENTS the shared sort formula
+  rather than reusing it.** §1.7's `testReuseNotReimplemented` wanted a "routes through the shared
+  `DocumentTags.sortDate`" guard, but `Item.sortDate` (`Store/Item.swift`) duplicates the `*10_000/*100`
+  arithmetic inline over `date:String?`+`datePrecision`, whereas Reader reuses
+  `ArchiveCore.DocumentTags.sortDate`. ArchiveCore exposes no shared `(year,month,day,decade)→Int?`
+  combiner for the string+precision input to call, so a literal reuse-guard isn't satisfiable today.
+  Reconciled to a **value-parity guard** (`ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula`):
+  for a shared table of dates, `Item.sortDate` MUST equal `DocumentTags.sortDate`, so any future drift
+  fails a test. Sort order is a display/ordering concern (never written to a corpus → low file-safety
+  stakes); the hardening follow-up — extract a shared numeric combiner in ArchiveCore and route both sides
+  through it — is a Morning-Review item, out of scope for this testing sub-task.
+- **RECONCILED — §1.6 resolve / re-grant / fallback live at the Notes layer, not ArchiveCore.** The plan
+  placed the durable-link *resolver* cases in `ArchiveCoreTests/DurableLinkTests`, but the resolver
+  (`ReaderLinkResolver` + `LinkResolution`, W4-S5) is a `@MainActor` type in the Notes app (it needs
+  security-scoped bookmarks), so those cases already live in `ReaderLinkResolverTests` (resolve /
+  unknown-guid→`needsRootGrant` / missing→`notFound` / renamed-candidate / path-traversal-rejected /
+  grant-verify). ArchiveCore's DurableLink coverage is codec-only; W8-S4 closed its one gap (literal `/`
+  preserved on the wire, not percent-encoded to `%2F`).
+
 ## Index suite completed + prune-gate hardened; bm25 columns reconciled (W8-S3, 2026-07-14)
 
 W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened the prune path it covers.

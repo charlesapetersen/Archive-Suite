@@ -289,6 +289,14 @@ macOS/Tests/ArchiveNotesTests/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip
   OrganizationFileTests.swift      3 tests: round-trip, loadMissing, atomicWrite
+  VirtualFolderReplicationTests.swift  7 tests (W8-S4, §1.5, Tier-2): item-in-K-folders=K-memberships,
+                                   replicate=membership-row-not-a-copy, remove-replicant-only, remove-
+                                   last→.wasLastInstance (fires ONLY on the last, no mutation), moveFolder-
+                                   preserves-memberships, smart-folder=query-with-zero-rows, cycle-guard-on-
+                                   reparent — all on a scratch OrganizationStore (temp index.db)
+  ItemSortDateTests.swift          13 tests: (date,precision)→sortDate parity table (decade/year/month/day/
+                                   medieval-842/uncertain/malformed/no-precision) + W8-S4 cross-impl parity
+                                   guard (Item.sortDate ≡ ArchiveCore DocumentTags.sortDate — divergence tripwire)
   TemplateTests.swift              19 tests (W6-S6): TemplateResolution (nearest-ancestor / self-over-
                                    ancestor / blank / dangling-reported / dangling-fall-through / cycle),
                                    NoteStore template CRUD + no-leak + rename-on-save, NotesModel
