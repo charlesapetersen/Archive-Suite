@@ -281,28 +281,25 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this
   change; a fresh index is correct from first build.
 
-## Test harness — headless full-scheme run crashes (found 2026-07-13, open)
+## Test harness — headless full-scheme run crashes — RESOLVED 2026-07-14 (W8-S6)
 
 Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore
-`test-smoke.sh notes`) aborts the shared Swift-Testing process with:
+`test-smoke.sh notes`) used to abort the shared Swift-Testing process with:
 
 ```
 NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: unrecognized selector
 ```
 
-- **Source:** `SourceBlockViewTests` → "reveal callback receives the anchor" (a W4-S7 **display** test
-  that drives the chip's Reveal button). It reproduces identically on `main` **before** any later files
-  are compiled, so it is pre-existing — not tied to whatever change a session is making.
-- **Impact:** one fatal `NSException` in a display test aborts *all* Swift-Testing tests in that process,
-  so the whole-scheme smoke gate is red headless even when the logic suites are green. This is why W4-S7
-  reported "**92 non-display** tests green".
-- **Workaround (until fixed):** verify per-suite, not whole-scheme. `-only-testing:`/`-skip-testing:` do
-  **not** match Swift-Testing suites in this Xcode/SDK (see below), so you can't skip the crashing suite
-  by name; instead run the specific logic suite(s) you touched (e.g.
-  `-only-testing:ArchiveNotesTests/<YourSwiftTestingSuite>` — which DOES run once the files are compiled).
-- **Fix candidates (GUI-paused, deferred):** make `BlockHeaderChipView` respond to / forward
-  `performClick:` (or have the test click the hosted `NSButton`, not the container `NSView`); and/or gate
-  the display suites behind a trait so headless runs skip them. Then confirm the whole scheme is green.
+- **Root cause:** `SourceBlockViewTests` → "reveal callback receives the anchor" (a W4-S7 display test)
+  sent `performClick:` to the chip's **container view**. `BlockHeaderChipView` is an `NSView`, not an
+  `NSControl`, so it doesn't respond to `performClick:`; the resulting `NSException` SIGABRT'd the whole
+  Swift-Testing process, so the smoke gate was red headless even when every logic suite was green (this is
+  why W4-S7 reported "**92 non-display** tests green").
+- **Fix (W8-S6):** the test now invokes the Reveal **button's** target/action directly (and finally
+  asserts the callback received the anchor); the vestigial `performClick:`-on-the-view line is gone.
+  Verified headless: `xcodebuild test -only-testing:ArchiveNotesTests` →
+  **TEST SUCCEEDED · 492 Swift-Testing tests in 59 suites + 187 XCTest · 0 failures · no abort**. The
+  whole-scheme smoke gate (`test-smoke.sh notes`) is green headless again.
 
 ## Build/test gotchas (XcodeGen + Swift Testing, 2026-07-13)
 
@@ -315,4 +312,5 @@ NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: u
   A `Target/SuiteType` (or `Target/SuiteType/func`) filter selects 0 for `@Suite`/`@Test` types; the XCTest
   "Executed N tests" summary also excludes Swift-Testing results (those print as `✔ Test "…"` lines). Read
   the `✔ Test`/`✔ Suite`/`Test run with N tests` lines to confirm a Swift-Testing suite ran, not the XCTest
-  summary. A bare `-only-testing:<Target>` runs everything (and hits the crash above).
+  summary. A bare `-only-testing:<Target>` runs everything — this is the headless smoke path (the
+  `performClick:` abort that used to make it red is fixed; see the RESOLVED note above).

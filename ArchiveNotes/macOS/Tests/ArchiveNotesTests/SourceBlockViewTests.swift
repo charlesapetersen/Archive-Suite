@@ -59,14 +59,23 @@ struct BlockHeaderChipViewCallbackTests {
             display: "Test"
         )
         let box = SourceAnchorBox(anchor: anchor, kind: .readerDoc)
-        var received: SourceAnchor?
+        // onReveal is @Sendable; the callback fires synchronously on this @MainActor test,
+        // so the capture is safe — nonisolated(unsafe) documents that and silences the diagnostic.
+        nonisolated(unsafe) var received: SourceAnchor?
         let chip = BlockHeaderChipView(box: box, onReveal: { a in received = a })
-        // Simulate the reveal button click
-        chip.perform(#selector(NSButton.performClick(_:)))
-        // The chip's revealClicked is @objc — call it via the button's target/action
-        // Instead, we can test the callback directly:
-        chip.value(forKey: "onReveal") // just verify the chip was created without crash
-        #expect(chip.subviews.count > 0, "Chip should have subviews (stack with buttons)")
+        // Invoke the Reveal button's target/action directly. Do NOT send performClick: to
+        // the container view: BlockHeaderChipView is an NSView (not an NSControl), so that
+        // raised `unrecognized selector` and the resulting NSException SIGABRT'd the whole
+        // Swift-Testing process, turning the headless smoke gate red even when every logic
+        // suite was green (see KNOWN_ISSUES "headless full-scheme run crashes", now fixed).
+        let revealButton = findButtons(in: chip).first { $0.title == "Reveal" }
+        #expect(revealButton != nil, "Chip should have a Reveal button")
+        if let button = revealButton,
+           let action = button.action,
+           let target = button.target as? NSObject {
+            _ = target.perform(action, with: button)
+        }
+        #expect(received?.link == anchor.link, "Reveal callback should receive the clicked anchor")
     }
 
     @MainActor @Test("chip has Reveal and Preview buttons")
@@ -81,7 +90,7 @@ struct BlockHeaderChipViewCallbackTests {
         #expect(titles.contains("Preview"), "Should have a Preview button")
     }
 
-    private func findButtons(in view: NSView) -> [NSButton] {
+    @MainActor private func findButtons(in view: NSView) -> [NSButton] {
         var result: [NSButton] = []
         for sub in view.subviews {
             if let btn = sub as? NSButton { result.append(btn) }
@@ -102,10 +111,9 @@ struct MarkdownBridgePreviewTests {
         <!-- block: kind=reader-page link=archivereader://reveal?root=00000000-0000-0000-0000-000000000001&rel=test.pdf display=Test page=1 -->
         Some body text.
         """
-        var previewCalled = false
         let styled = MarkdownBridge.parse(
             markdown: md,
-            onPreviewBlock: { _, _ in previewCalled = true }
+            onPreviewBlock: { _, _ in }
         )
         // The attachment should be in the attributed string
         var foundAttachment = false
@@ -121,10 +129,9 @@ struct MarkdownBridgePreviewTests {
     @MainActor @Test("buildInsertableBlock threads onPreview")
     func buildInsertableBlockThreadsPreview() {
         let anchor = SourceAnchor(link: "archivereader://reveal?root=00000000-0000-0000-0000-000000000001&rel=doc.pdf", display: "Doc")
-        var previewCalled = false
         let chip = MarkdownBridge.buildInsertableBlock(
             anchor: anchor,
-            onPreview: { _, _ in previewCalled = true }
+            onPreview: { _, _ in }
         )
         var found = false
         chip.enumerateAttribute(.attachment, in: NSRange(location: 0, length: chip.length)) { val, _, _ in
