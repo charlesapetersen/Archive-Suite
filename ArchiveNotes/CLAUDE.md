@@ -64,7 +64,9 @@ macOS/Sources/ArchiveNotes/
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
                                    allSummaries() list projection (W6-S3); items.source_count column +
                                    additive migration (W7-S4)
-    NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, prune, search
+    NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, search;
+                                   prune via pure `pruneDecision` two-emission gate (empty-snapshot-safe,
+                                   W8-S3) — refuses to prune on an empty/unsettled snapshot
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
                                    subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
@@ -278,8 +280,11 @@ macOS/Tests/ArchiveNotesTests/
                                    verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,
                                    title-casing, §7 label-never-written, isScratchPath predicate +
                                    scratch-guard-live-under-XCTest
-  NotesIndexTests.swift            10 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
-                                   search, summaryRoundTrip, org tables exist
+  NotesIndexTests.swift            16 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
+                                   search, summaryRoundTrip, org tables exist; + W8-S3: reindex-
+                                   replaces-body, prune-gate ×4 (empty-snapshot-never-wipes /
+                                   two-emission / transient-drop / confirmed-only), org-graph DB
+                                   persist+reload (folders+memberships+template assignments)
   OrganizationStoreTests.swift     13 tests: system-folder seeding, create/rename/move(cycle-guard)/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip

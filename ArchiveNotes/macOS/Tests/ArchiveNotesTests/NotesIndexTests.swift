@@ -287,4 +287,141 @@ import Foundation
         // The tables existing is proven by the fact that open() didn't throw.
         // W2-S5 will add CRUD; for now we just verify the schema is in place.
     }
+
+    // MARK: - Re-index replaces stale body (W8-S3 §1.4)
+
+    /// Re-upserting the same id with a new BODY replaces the stale body: the old body text no longer
+    /// matches, the new one does, and the row count stays at one (parity with Reader's
+    /// `testReindexReplacesOldBody`). Complements `incrementalMtimeSkip`, which only covers the title.
+    @Test func reindexReplacesOldBody() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+
+        let id = UUID()
+        try await index.upsertBatch([makeRow(id: id, title: "Fixed Title", body: "alpha unique body")])
+        #expect(await index.search("alpha") == [id])
+
+        // Re-index the same id with a different body.
+        try await index.upsertBatch([makeRow(id: id, title: "Fixed Title", body: "beta different body")])
+        #expect(await index.search("beta") == [id])
+        #expect((await index.search("alpha")).isEmpty, "Stale body text must not match after re-index")
+        #expect(await index.indexedCount() == 1, "Re-upsert replaces the row, never duplicates it")
+    }
+
+    // MARK: - Prune gate (W8-S3 §1.4): the two-emission decision is pure + empty-snapshot-safe
+
+    /// The crown-jewel data-safety property: an empty `currentIDs` snapshot NEVER prunes — not on the
+    /// first emission, and not even when repeated. A naive two-emission gate would stash the whole
+    /// index on the first empty snapshot and then WIPE it on the second; the empty-snapshot guard in
+    /// `pruneDecision` makes that impossible (the index is a rebuildable cache — refusing to prune is safe).
+    @Test func pruneGateEmptySnapshotNeverWipes() {
+        let a = UUID(), b = UUID()
+        let indexed: Set<UUID> = [a, b]
+
+        // First emission, empty snapshot, no prior pending → delete nothing, stash nothing.
+        let first = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [], previousPending: nil)
+        #expect(first.delete.isEmpty)
+        #expect(first.newPending == nil)
+
+        // Second emission, STILL empty (as if [a,b] had been stashed) → STILL deletes nothing.
+        let second = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [], previousPending: indexed)
+        #expect(second.delete.isEmpty, "A persistent empty snapshot must never wipe the index")
+        #expect(second.newPending == nil)
+    }
+
+    /// A real absence is deleted only after being confirmed across two consecutive emissions.
+    @Test func pruneGateRequiresTwoEmissions() {
+        let keep = UUID(), gone = UUID()
+        let indexed: Set<UUID> = [keep, gone]
+        let current: Set<UUID> = [keep]   // `gone` is absent on disk
+
+        // Emission 1 (no prior pending): stash the absence, delete nothing.
+        let e1 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: current, previousPending: nil)
+        #expect(e1.delete.isEmpty)
+        #expect(e1.newPending == [gone])
+
+        // Emission 2 (same absence): now confirmed → delete exactly `gone`, nothing left pending.
+        let e2 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: current, previousPending: e1.newPending)
+        #expect(e2.delete == [gone])
+        #expect(e2.newPending == nil)
+    }
+
+    /// A transient one-emission drop that reappears the next emission is never deleted.
+    @Test func pruneGateTransientDropNotDeleted() {
+        let a = UUID(), b = UUID()
+        let indexed: Set<UUID> = [a, b]
+
+        // Emission 1: `b` momentarily absent → stashed.
+        let e1 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [a], previousPending: nil)
+        #expect(e1.newPending == [b])
+
+        // Emission 2: `b` is back (full snapshot) → nothing absent → delete nothing, pending cleared.
+        let e2 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [a, b], previousPending: e1.newPending)
+        #expect(e2.delete.isEmpty, "A reappearing item must not be pruned")
+        #expect(e2.newPending == nil)
+    }
+
+    /// With multiple absences, only those confirmed across BOTH emissions are deleted; a newly-absent
+    /// item is stashed (needs its own second confirmation) and present items are always kept.
+    @Test func pruneGateDeletesOnlyConfirmedAbsent() {
+        let keep = UUID(), goneA = UUID(), goneB = UUID()
+        let indexed: Set<UUID> = [keep, goneA, goneB]
+
+        // Emission 1: only goneA absent → stashed.
+        let e1 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [keep, goneB], previousPending: nil)
+        #expect(e1.delete.isEmpty)
+        #expect(e1.newPending == [goneA])
+
+        // Emission 2: goneA still absent (confirmed → delete) AND goneB now newly absent (stash only).
+        let e2 = NotesIndexer.pruneDecision(indexed: indexed, currentIDs: [keep], previousPending: e1.newPending)
+        #expect(e2.delete == [goneA], "Only the twice-confirmed absence is deleted")
+        #expect(e2.newPending == [goneB], "A newly-absent item is carried forward, not deleted yet")
+    }
+
+    // MARK: - Organizational graph persists across a DB close/reopen (W8-S3 §1.4)
+
+    /// The org-graph durable tables (folders / memberships / template assignments) survive a
+    /// close→reopen of the SAME db file. Unlike the FTS `items` cache these are app-owned durable data
+    /// (§11), so they must reload verbatim. Complements `OrganizationStoreTests.foldersPersistToDB` by
+    /// asserting the NotesIndex DB layer directly — including **template assignments**, which the
+    /// store-level DB-persist test does not exercise.
+    @Test func organizationGraphPersistsAndReloads() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotesIndexTests-org-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dbURL = dir.appendingPathComponent("org-index.sqlite3")
+
+        let parentID = UUID(), childID = UUID(), itemID = UUID(), templateID = UUID()
+        let addedAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let index1 = NotesIndex(url: dbURL)
+        try await index1.open()
+        try await index1.insertFolder(VFolder(id: parentID, name: "Research", parentId: nil,
+                                               sortOrder: 0, kind: .normal, queryJSON: nil))
+        try await index1.insertFolder(VFolder(id: childID, name: "1970s", parentId: parentID,
+                                               sortOrder: 1, kind: .normal, queryJSON: nil))
+        try await index1.insertMembership(Membership(itemId: itemID, folderId: childID, addedAt: addedAt))
+        try await index1.insertTemplateAssignment(TemplateAssignment(folderId: parentID, templateId: templateID))
+        await index1.close()
+
+        // Reopen the same DB file — durable tables must reload verbatim.
+        let index2 = NotesIndex(url: dbURL)
+        try await index2.open()
+
+        let folders = await index2.allFolders()
+        #expect(folders.contains { $0.id == parentID && $0.name == "Research" && $0.parentId == nil })
+        #expect(folders.contains { $0.id == childID && $0.parentId == parentID && $0.sortOrder == 1 })
+
+        let memberships = await index2.allMemberships()
+        let reloaded = memberships.first { $0.itemId == itemID }
+        #expect(reloaded?.folderId == childID)
+        #expect(reloaded.map { abs($0.addedAt.timeIntervalSince(addedAt)) < 1 } == true,
+                "addedAt round-trips to within epoch-seconds precision")
+
+        let assignments = await index2.allTemplateAssignments()
+        #expect(assignments.contains { $0.folderId == parentID && $0.templateId == templateID })
+
+        await index2.close()
+    }
 }

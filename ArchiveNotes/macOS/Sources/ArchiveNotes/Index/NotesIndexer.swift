@@ -131,8 +131,12 @@ final class NotesIndexer: ObservableObject {
     private var pruneTask: Task<Void, Never>?
 
     /// Evict index rows for items no longer present:
-    ///   Gate 1: caller ensures snapshot is settled and non-empty.
-    ///   Gate 2: UUID must be absent in two consecutive calls (transient-drop guard).
+    ///   Gate 0 (empty-snapshot): an empty `currentIDs` is treated as "no reliable snapshot"
+    ///     (mid-build / scope-cleared) and NEVER prunes, so a persistent empty snapshot can't wipe
+    ///     the index. Enforced inside `pruneDecision`, so the guarantee holds without a caller check.
+    ///   Gate 1: caller should still only call this on a settled, boundary-scoped snapshot.
+    ///   Gate 2: a UUID must be absent in two consecutive calls (transient-drop guard).
+    /// The pure decision lives in `pruneDecision` (unit-tested; no async, no index, no real store).
     func pruneIfSettled(currentIDs: Set<UUID>) {
         pruneTask?.cancel()
         let idx = index
@@ -142,27 +146,41 @@ final class NotesIndexer: ObservableObject {
             let indexed = await idx.allIndexedIDs()
             guard !Task.isCancelled else { return }
 
-            let absent = indexed.subtracting(currentIDs)
-            guard !absent.isEmpty else {
-                await MainActor.run { [weak self] in self?.pendingPrune = nil }
-                return
-            }
-
             let previousPending: Set<UUID>? = await MainActor.run { [weak self] in self?.pendingPrune }
-            if let prev = previousPending {
-                let confirmed = absent.intersection(prev)
-                if !confirmed.isEmpty {
-                    try? await idx.deleteItems(Array(confirmed))
-                    await idx.performMaintenance(rowsIndexed: 0)
-                }
-                await MainActor.run { [weak self] in
-                    let remaining = absent.subtracting(confirmed)
-                    self?.pendingPrune = remaining.isEmpty ? nil : remaining
-                }
-            } else {
-                await MainActor.run { [weak self] in self?.pendingPrune = absent }
+            let decision = Self.pruneDecision(indexed: indexed,
+                                              currentIDs: currentIDs,
+                                              previousPending: previousPending)
+            if !decision.delete.isEmpty {
+                try? await idx.deleteItems(Array(decision.delete))
+                await idx.performMaintenance(rowsIndexed: 0)
             }
+            await MainActor.run { [weak self] in self?.pendingPrune = decision.newPending }
         }
+    }
+
+    /// Pure two-emission prune gate (extracted so the data-safety guarantee is deterministically
+    /// unit-testable — no async, no `NotesIndex`, no real store). Returns which indexed rows to
+    /// delete now and the pending-absence set to carry into the next emission.
+    ///
+    /// - `currentIDs` empty → `([], nil)`: an empty snapshot is never a reason to prune (mid-build or
+    ///   scope-cleared). This is the "empty-snapshot can't wipe the index" guarantee — the index is a
+    ///   rebuildable cache, so refusing to prune is always the safe choice.
+    /// - nothing absent → `([], nil)`.
+    /// - first emission of an absence (no prior pending) → stash it, delete nothing.
+    /// - an absence confirmed across two consecutive emissions → delete it; carry any not-yet-confirmed
+    ///   absences forward.
+    nonisolated static func pruneDecision(
+        indexed: Set<UUID>,
+        currentIDs: Set<UUID>,
+        previousPending: Set<UUID>?
+    ) -> (delete: Set<UUID>, newPending: Set<UUID>?) {
+        guard !currentIDs.isEmpty else { return ([], nil) }
+        let absent = indexed.subtracting(currentIDs)
+        guard !absent.isEmpty else { return ([], nil) }
+        guard let prev = previousPending else { return ([], absent) }   // first emission: stash
+        let confirmed = absent.intersection(prev)
+        let remaining = absent.subtracting(confirmed)
+        return (confirmed, remaining.isEmpty ? nil : remaining)
     }
 
     func resetPruneState() { pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil }

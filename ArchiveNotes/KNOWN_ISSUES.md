@@ -3,6 +3,38 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Index suite completed + prune-gate hardened; bm25 columns reconciled (W8-S3, 2026-07-14)
+
+W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened the prune path it covers.
+
+- **HARDENED — the two-emission prune gate now provably can't wipe the index on an empty snapshot.**
+  The gate logic was inline in `NotesIndexer.pruneIfSettled`'s detached task, so its data-safety property
+  was neither deterministically testable nor guaranteed against a *persistent* empty snapshot: a naive
+  two-emission gate stashes the whole index as "absent" on the first empty `currentIDs`, then DELETES it
+  all on the second. The gate is now a pure `nonisolated static func pruneDecision(indexed:currentIDs:
+  previousPending:)` whose **first rule is an empty-`currentIDs` guard** (empty → delete nothing, stash
+  nothing). `pruneIfSettled` calls it; the non-empty behaviour is byte-identical to before (verified by
+  re-derivation — same absent/confirmed/remaining math, same delete-only-if-nonempty, same pending
+  carry-forward). The index is a rebuildable cache, so refusing to prune on an empty snapshot is always
+  safe (a mid-build / scope-cleared snapshot is far likelier than a genuine zero-item store, which clears
+  via the normal delete path anyway). Note `pruneIfSettled` is **not yet wired to a caller** in Notes
+  (mirrors Reader's `ContentIndexer`; future wiring adds the settled/boundary-scope Gate 1), so this was a
+  latent risk, not an active bug — but the guarantee now holds inside the method, independent of any
+  caller. Pinned by four pure `pruneGate…` tests (empty-snapshot never wipes even when repeated;
+  two-emission required; transient drop not deleted; only twice-confirmed absences deleted).
+- **RECONCILED (plan §1.4 vs shipped) — the FTS index has four weighted columns, not five.** §1.4 lists a
+  `linked-doc-display=3` weight, but the shipped `fts5(title, tags, authors, body, id UNINDEXED)` schema
+  (W2-S4) has no such column and orders by `bm25(fts, 10, 6, 4, 1)`. The existing bm25 tests
+  (`bm25TitleOutranksBody`, `tagsOutrankAuthorsOutrankBody`) therefore already cover every weighted column;
+  no linked-doc-display test was invented. A linked-doc-display column would be a schema + indexer change,
+  not a test gap.
+- **Coverage added to `NotesIndexTests`** (10 → 16): `reindexReplacesOldBody` (body-specific re-index; the
+  existing `incrementalMtimeSkip` covered only the title) and `organizationGraphPersistsAndReloads` (the
+  NotesIndex DB layer directly — folders + memberships + **template assignments** survive a close/reopen;
+  `OrganizationStoreTests.foldersPersistToDB` covers the store layer but not template assignments via DB).
+  All 16 green on scratch sqlite; adjacent `OrganizationStoreTests`/`OrganizationFileTests`/`NotesModelTests`
+  (31) green. Tier-2 (the org-graph writer + `organization.json` are durable app-owned data).
+
 ## Tag projector safety suite + a latent concurrent-write race (W8-S2, 2026-07-14)
 
 W8-S2 landed the **crown-jewel** `NotesTagProjectorSafetyTests` (10 scratch-file tests) covering every
