@@ -53,6 +53,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
         }
+        textView.passageCopyHandler = { [weak coordinator = context.coordinator] in
+            coordinator?.copyPassageIfNote() ?? false
+        }
+        textView.passagePasteHandler = { [weak coordinator = context.coordinator] in
+            coordinator?.handlePassagePaste() ?? false
+        }
         if isRaw {
             textView.string = markdown
         } else {
@@ -243,6 +249,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// Imports thumbnails via assetStore and inserts each block at the caret.
         func handleSourceBlockPaste(_ entries: [SourceBlockPaster.PasteEntry]) -> Bool {
             guard let textView, !currentIsRaw, !entries.isEmpty else { return false }
+            // Extracts reference NOTES only (§D7): a Reader/zotero link paste must not attach an
+            // outside-document source block to an extract — decline so it degrades to plain text.
+            if formattingContext?.currentItemKind == .extract { return false }
             textView.undoManager?.beginUndoGrouping()
             for var entry in entries.prefix(100) {
                 if let thumbData = entry.thumbnailData, let store = assetStore {
@@ -261,6 +270,54 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
             return true
+        }
+
+        // MARK: Passage copy / paste (W7-S2)
+
+        /// Copy the current selection as a `com.archivenotes.passage` payload when a NOTE is loaded
+        /// (07-extracts §5). Writes plain + system RTF + the passage UTI, so external apps and note
+        /// pastes get text/RTF while an extract paste restores full provenance. Returns false (→ the
+        /// default RTF/plain copy) when no note is loaded or nothing is selected.
+        func copyPassageIfNote() -> Bool {
+            guard let textView, !currentIsRaw, let fmt = formattingContext,
+                  fmt.currentItemKind == .note, let noteId = fmt.currentItemID else { return false }
+            let source = EditorPassageSource(textView: textView, sourceNoteId: noteId,
+                                             sourceTitle: fmt.currentItemTitle,
+                                             sourceDateDisplay: fmt.currentItemDateDisplay,
+                                             assetStore: assetStore)
+            guard let payload = ExtractBuilder.passagePayload(fromSelectionIn: source) else { return false }
+            return PassagePasteboard.write(payload, rtf: rtfForSelection(textView))
+        }
+
+        /// Paste a `com.archivenotes.passage` payload as note-passage block(s) into an EXTRACT editor
+        /// (07-extracts §5). Declines (→ falls through to plain paste) unless an extract is loaded and a
+        /// passage payload is present; the markdown is coerced to notes-only + rendered exactly as a
+        /// saved-then-reloaded extract would render (chip + body).
+        func handlePassagePaste() -> Bool {
+            guard let textView, !currentIsRaw, formattingContext?.currentItemKind == .extract,
+                  let payload = PassagePasteboard.read() else { return false }
+            let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload)
+            guard !markdown.isEmpty else { return false }
+            let attributed = MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
+                                                  assetStore: assetStore,
+                                                  onRevealBlock: onRevealBlock,
+                                                  onPreviewBlock: onPreviewBlock)
+            textView.undoManager?.beginUndoGrouping()
+            textView.insertText(attributed, replacementRange: textView.selectedRange())
+            textView.undoManager?.endUndoGrouping()
+            scheduleWriteBack()
+            return true
+        }
+
+        /// System RTF for the primary selected range (the copy path's rich-text fallback), or nil when
+        /// nothing is selected / RTF generation fails.
+        private func rtfForSelection(_ textView: NSTextView) -> Data? {
+            let sel = textView.selectedRange()
+            guard sel.length > 0, let storage = textView.textStorage,
+                  sel.location + sel.length <= storage.length else { return nil }
+            let sub = storage.attributedSubstring(from: sel)
+            return try? sub.data(from: NSRange(location: 0, length: sub.length),
+                                 documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         }
     }
 }

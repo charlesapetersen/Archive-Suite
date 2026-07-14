@@ -102,6 +102,35 @@ struct ExtractBuilder {
         }
     }
 
+    /// Build the `com.archivenotes.passage` copy payload for the current note selection, or nil when
+    /// there is no non-empty selection (07-extracts §5). The one place the copy path turns a live
+    /// selection into durable provenance; pure over the seam so it unit-tests with a fake source. The
+    /// segment ordinal is recovered from the anchor `passageBlocks` already built (`#block-<n>`).
+    static func passagePayload(fromSelectionIn source: PassageSelectionSource) -> NotesPassagePayload? {
+        let passages = passageBlocks(fromSelectionIn: source)
+        guard !passages.isEmpty else { return nil }
+        let segments = passages.map { p in
+            NotesPassagePayload.Segment(
+                sourceBlockIndex: p.block.source?.notePassageTarget?.block ?? 0,
+                markdown: p.block.markdown,
+                assetPNGs: p.pendingAssets)
+        }
+        return NotesPassagePayload(sourceNoteId: source.sourceNoteId,
+                                   sourceTitle: source.sourceTitle,
+                                   sourceDateDisplay: source.sourceDateDisplay,
+                                   segments: segments)
+    }
+
+    /// The body markdown to insert when pasting a passage payload into an extract editor (07-extracts
+    /// §5): the payload's segments as note-passage blocks, run through the extracts-reference-notes-only
+    /// coercion, serialized to the on-disk `<!-- block: -->` form so `MarkdownBridge.parse` renders the
+    /// chip + body identically to a saved-then-reloaded extract. Empty when the payload has no segments.
+    nonisolated static func pastedExtractMarkdown(from payload: NotesPassagePayload) -> String {
+        let blocks = coercedToNotesOnly(passageBlocks(from: payload).map { $0.block })
+        guard !blocks.isEmpty else { return "" }
+        return BlockParser.serialize(leadingText: nil, blocks: blocks)
+    }
+
     // MARK: - Extract-references-notes-only invariant (the single choke-point, §Risks)
 
     /// Coerce any block that is NOT a resolvable note-passage (a reader-page/-doc, a zotero-*, or a

@@ -193,4 +193,81 @@ final class PasteboardPassageTests: XCTestCase {
         XCTAssertEqual(coerced[0].kind, .freeform)
         XCTAssertNil(coerced[0].source)
     }
+
+    // MARK: - Copy side: selection → payload (W7-S2 (d))
+
+    @MainActor
+    func testPassagePayloadFromSelectionBuildsSegments() throws {
+        let nid = UUID()
+        // Selection spans two blocks (§Algorithm: one segment per covered source block).
+        let src = FakeSelectionSource(sourceNoteId: nid, sourceTitle: "Src", sourceDateDisplay: "1968",
+                                      fullText: "AAAA\nBBBB\n",
+                                      selectedRanges: [NSRange(location: 2, length: 6)],
+                                      blockRanges: [(0, NSRange(location: 0, length: 5)),
+                                                    (1, NSRange(location: 5, length: 5))])
+        let payload = try XCTUnwrap(ExtractBuilder.passagePayload(fromSelectionIn: src))
+        XCTAssertEqual(payload.sourceNoteId, nid)
+        XCTAssertEqual(payload.sourceTitle, "Src")
+        XCTAssertEqual(payload.segments.map(\.sourceBlockIndex), [0, 1])
+    }
+
+    @MainActor
+    func testPassagePayloadEmptySelectionIsNil() {
+        let src = FakeSelectionSource(fullText: "abc",
+                                      selectedRanges: [NSRange(location: 0, length: 0)],
+                                      blockRanges: [(0, NSRange(location: 0, length: 3))])
+        XCTAssertNil(ExtractBuilder.passagePayload(fromSelectionIn: src))
+    }
+
+    /// A note selection round-trips copy → paste: `passagePayload` → pasteboard → `pastedExtractMarkdown`
+    /// reparses to the same note-passage blocks (the full (d)→(e) provenance-preserving round-trip).
+    @MainActor
+    func testCopyPastePayloadRoundTripPreservesProvenance() throws {
+        let pb = namedPasteboard("copypaste")
+        let nid = UUID()
+        let src = FakeSelectionSource(sourceNoteId: nid, sourceTitle: "Src", sourceDateDisplay: "1968",
+                                      fullText: "Hello there",
+                                      selectedRanges: [NSRange(location: 0, length: 5)],
+                                      blockRanges: [(4, NSRange(location: 0, length: 11))])
+        let payload = try XCTUnwrap(ExtractBuilder.passagePayload(fromSelectionIn: src))
+        XCTAssertTrue(PassagePasteboard.write(payload, to: pb))
+
+        let read = try XCTUnwrap(PassagePasteboard.read(from: pb))
+        let (_, blocks) = BlockParser.parse(ExtractBuilder.pastedExtractMarkdown(from: read))
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks[0].kind, .notePassage)
+        XCTAssertEqual(blocks[0].source?.notePassageTarget?.id, nid)
+        XCTAssertEqual(blocks[0].source?.notePassageTarget?.block, 4)
+    }
+
+    // MARK: - Paste side: payload → insertable markdown (W7-S2 (e))
+
+    func testPastedExtractMarkdownReparsesToNotePassageBlocks() {
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: samplePayload())
+        let (_, blocks) = BlockParser.parse(markdown)
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertTrue(blocks.allSatisfy { $0.kind == .notePassage })
+        XCTAssertEqual(blocks[0].source?.notePassageTarget?.block, 2)
+        XCTAssertEqual(blocks[1].source?.notePassageTarget?.block, 5)
+    }
+
+    func testPastedExtractMarkdownEmptyPayloadIsEmpty() {
+        let payload = NotesPassagePayload(sourceNoteId: UUID(), sourceTitle: "T",
+                                          sourceDateDisplay: "", segments: [])
+        XCTAssertEqual(ExtractBuilder.pastedExtractMarkdown(from: payload), "")
+    }
+
+    // MARK: - Multi-representation: system RTF (W7-S2 (d))
+
+    @MainActor
+    func testWriteWithRTFIncludesAllThreeRepresentations() throws {
+        let pb = namedPasteboard("rtf")
+        let styled = NSAttributedString(string: "Hello", attributes: [.font: NSFont.systemFont(ofSize: 12)])
+        let rtf = try styled.data(from: NSRange(location: 0, length: styled.length),
+                                  documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+        XCTAssertTrue(PassagePasteboard.write(samplePayload(), rtf: rtf, to: pb))
+        XCTAssertNotNil(pb.data(forType: .rtf), "system RTF representation present")
+        XCTAssertNotNil(pb.string(forType: .string), "plain-text fallback present")
+        XCTAssertNotNil(PassagePasteboard.read(from: pb), "passage payload still readable alongside RTF")
+    }
 }

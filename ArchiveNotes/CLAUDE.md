@@ -32,7 +32,8 @@ macOS/Sources/ArchiveNotes/
   ArchiveNotesApp.swift            @main; Notes + Extracts windows + Settings + FormatCommands;
                                    injects ZoteroStatusModel into both windows
   ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), ZoteroCommands
-                                   (Note ▸ Attach Zotero Link…), DebugBlockCommands
+                                   (Note ▸ Attach Zotero Link…), ExtractCommands (Extract ▸ Create
+                                   Extract ⌘⌥E / Append to Extract…, W7-S2), DebugBlockCommands
   Models/
     NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
                                    date-range/tags ALL|ANY/title-substring/graph folder-membership),
@@ -102,7 +103,8 @@ macOS/Sources/ArchiveNotes/
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle,
-                                   extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1)
+                                   extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1);
+                                   passagePayload (copy side) + pastedExtractMarkdown (paste side) (W7-S2)
     NotePassageSource.swift        NotePassageBlockMap (pure chip-delimited block-ordinal map, shared with
                                    the S3 jump-to-source side) + EditorPassageSource (the live
                                    PassageSelectionSource over a value snapshot of the editor text —
@@ -110,7 +112,8 @@ macOS/Sources/ArchiveNotes/
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
                                    list keyboard: Tab/Shift-Tab indent, Return continue,
-                                   Backspace-at-start outdent, paste/drag image + text)
+                                   Backspace-at-start outdent, paste/drag image + text); copy(_:) +
+                                   passageCopyHandler / passagePasteHandler seams (W7-S2 copy/paste)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
                                    EditorAssetStore plumbing, onRevealBlock seam, insertBlock method;
@@ -130,10 +133,11 @@ macOS/Sources/ArchiveNotes/
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
                                    TextKit 2 view provider); W4 seam: onRevealBlock callback
-    EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject) +
-                                   EditorFormatting actions (bold/italic/code/link/heading/list/
-                                   blockquote/code-block/indent/outdent) + insertTestBlock +
-                                   pasteSourceBlocks + FocusedValue key
+    EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject; currentItemID/
+                                   Title/DateDisplay/Kind + weak notesModel) + EditorFormatting actions
+                                   (bold/italic/code/link/heading/list/blockquote/code-block/indent/
+                                   outdent) + insertTestBlock + pasteSourceBlocks + createExtract/
+                                   appendToExtract + makeNotePassageSource (W7-S2) + FocusedValue key
     FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
@@ -260,10 +264,16 @@ macOS/Tests/ArchiveNotesTests/
                                    scanURLs (page/doc/multi/non-archive/empty/non-PDF), thumbnail
                                    import (page/doc/collision), pasteboardHasArchiveLinks (UTI/text/no),
                                    readPasteboard (UTI/text/empty), block header §6 round-trip
-  PasteboardPassageTests.swift     12 tests (W7-S2): write→read round-trip (incl. asset bytes),
+  PasteboardPassageTests.swift     18 tests (W7-S2): write→read round-trip (incl. asset bytes),
                                    plain-text fallback, prefer-UTI, degrade nil (text-only/malformed/
                                    empty), payload→note-passage blocks bridge, notes-only coercion
-                                   (keep well-formed / drop reader-source + malformed→freeform)
+                                   (keep well-formed / drop reader-source + malformed→freeform);
+                                   passagePayload (selection→payload) + pastedExtractMarkdown (paste
+                                   side) + copy→paste provenance round-trip + system-RTF representation
+  ExtractCommandTests.swift        6 tests (W7-S2): NotesModel.createExtract (files in Extracts home +
+                                   indexed/listed + on-disk note-passage block) / into explicit folder /
+                                   empty-selection no-op+status / appendToExtract cross-note segment /
+                                   existingExtracts sorted
   NotePassageSourceTests.swift     13 tests (W7-S2): blockRanges (empty / plain / prose+chip / starts-with-
                                    chip / two-chips, all disjoint-covering), selection→passage (single /
                                    cross-block / empty / discontiguous-in-doc-order), snapshotMarkdown

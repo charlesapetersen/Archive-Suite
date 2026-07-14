@@ -30,15 +30,19 @@ enum PassagePasteboard {
             .joined(separator: "\n\n")
     }
 
-    /// Write a multi-representation pasteboard item: the durable `com.archivenotes.passage` JSON plus a
-    /// plain-string fallback. Clears the pasteboard first (single-item copy), matching the Reader's
-    /// `copyLinks()` idiom. Returns false only if the payload unexpectedly fails to encode.
+    /// Write a multi-representation pasteboard item: the durable `com.archivenotes.passage` JSON, an
+    /// optional system RTF representation (the live copy path passes the selection's attributed
+    /// substring so an external app / a note paste gets styled text), plus a plain-string fallback.
+    /// Clears the pasteboard first (single-item copy), matching the Reader's `copyLinks()` idiom.
+    /// Returns false only if the payload unexpectedly fails to encode.
     @discardableResult
-    static func write(_ payload: NotesPassagePayload, to pasteboard: NSPasteboard = .general) -> Bool {
+    static func write(_ payload: NotesPassagePayload, rtf: Data? = nil,
+                      to pasteboard: NSPasteboard = .general) -> Bool {
         guard let data = payload.data else { return false }
         pasteboard.clearContents()
         let item = NSPasteboardItem()
         item.setData(data, forType: type)
+        if let rtf { item.setData(rtf, forType: .rtf) }
         item.setString(plainText(for: payload), forType: .string)
         return pasteboard.writeObjects([item])
     }

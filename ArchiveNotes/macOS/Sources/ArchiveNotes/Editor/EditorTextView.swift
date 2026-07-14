@@ -162,6 +162,14 @@ final class EditorTextView: NSTextView {
     /// Set by the coordinator; returns true if handled.
     var sourceBlockPasteHandler: (([SourceBlockPaster.PasteEntry]) -> Bool)?
 
+    /// W7-S2: copy the selection as a `com.archivenotes.passage` payload (note editor only). Set by the
+    /// coordinator; returns true when it wrote a passage (so the default RTF/plain copy is skipped).
+    var passageCopyHandler: (() -> Bool)?
+
+    /// W7-S2: paste a `com.archivenotes.passage` payload as note-passage block(s) (extract editor only).
+    /// Set by the coordinator; returns true when it inserted the passage.
+    var passagePasteHandler: (() -> Bool)?
+
     /// Image UTIs we accept on the pasteboard.
     private static let imageTypes: Set<NSPasteboard.PasteboardType> = [
         .png, .tiff,
@@ -169,9 +177,19 @@ final class EditorTextView: NSTextView {
         NSPasteboard.PasteboardType("public.heic")
     ]
 
+    override func copy(_ sender: Any?) {
+        // W7-S2: a note selection copies as a com.archivenotes.passage payload (+ RTF + plain); an
+        // extract paste then restores full provenance. Anything else uses the default RTF/plain copy.
+        if passageCopyHandler?() == true { return }
+        super.copy(sender)
+    }
+
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
         if tryPasteImage(from: pb) { return }
+        // W7-S2: in an extract editor, a passage payload pastes as note-passage block(s) (provenance
+        // preserved). The handler declines outside an extract editor / without a passage payload.
+        if tryPastePassage(from: pb) { return }
         if tryPasteSourceBlocks(from: pb) { return }
         // For text: prefer plain string to avoid importing unmodeled rich styling
         if let str = pb.string(forType: .string), !str.isEmpty {
@@ -179,6 +197,14 @@ final class EditorTextView: NSTextView {
             return
         }
         super.paste(sender)
+    }
+
+    /// Delegate a passage-payload paste to the coordinator (extract editor only). No-op when the
+    /// pasteboard carries no `com.archivenotes.passage` representation.
+    @discardableResult
+    private func tryPastePassage(from pb: NSPasteboard) -> Bool {
+        guard PassagePasteboard.hasPassage(pb), let handler = passagePasteHandler else { return false }
+        return handler()
     }
 
     /// Check the pasteboard for archive-link payloads and delegate to the source-block handler.

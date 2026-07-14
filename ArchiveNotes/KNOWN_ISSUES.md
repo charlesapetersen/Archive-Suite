@@ -21,6 +21,31 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   When GUI resumes: select note A, type, select B → A's edit persists (assert the on-disk `.md`) and B
   loads fresh; force-quit within the ~600 ms debounce is the known autosave-window caveat.
 
+## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13, open)
+
+W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands and the copy-in-Notes →
+paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
+paste in an extract editor → note-passage blocks). Model + codec paths are unit-tested; conscious gaps:
+
+- **Inline-image BYTES don't survive the copy→paste round-trip yet (rides the deferred asset store,
+  W7-S5).** `NoteEditorPane` passes **no** `EditorAssetStore`, so `EditorPassageSource` snapshots the
+  passage's markdown image *references* (`assets/<name>`) but not the bytes; the extract paste inserts
+  those refs (rendering as missing-asset placeholders) rather than importing bytes into the extract's
+  own `assets/`. The Create/Append *commands* copy bytes correctly **when** a store is present (proven
+  by `ExtractBuilder` create/append asset tests) — this gap is only the editor's live copy/paste path,
+  and closes when the same item-scoped `EditorAssetStore` (W7-S5) lands for both note-image paste and
+  passage copy.
+- **Create-Extract doesn't auto-raise + select the new extract in the Extracts window (GUI, deferred).**
+  The extract is created, filed into the Extracts home folder, and appears in the Extracts window's list
+  immediately (both windows observe `allItems`), but the two windows hold independent
+  `NotesNavigationModel` selections with no cross-window "open + select id X" channel yet. Raising/
+  selecting the Extracts window on create → a GUI follow-up (needs a shared open-request on `NotesModel`
+  or `openWindow`, best verified live). Same for the Append picker (an `NSAlert` popup, model-tested).
+- **GUI drive deferred (GUI paused).** Not yet driven live: ⌘⌥E on a two-block selection → a two-block
+  extract; copy-note → paste-into-extract → provenanced blocks; plain external paste → freeform; the
+  Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
+  `BlockParserTests`).
+
 ## Test harness — headless full-scheme run crashes (found 2026-07-13, open)
 
 Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore
