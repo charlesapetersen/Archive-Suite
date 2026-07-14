@@ -56,6 +56,41 @@ final class NotesModel: ObservableObject {
     /// items after a folder delete). The view surfaces it and clears it.
     @Published var statusMessage: String?
 
+    // MARK: In-app navigation (W7-S3 jump-to-source; also consumes external archivenotes:// opens)
+
+    /// A request to reveal an item (and optionally scroll to a block) in the window that features its
+    /// kind. Shared across both windows via this single model (§16.1) — the only cross-window channel.
+    /// `token` makes a repeat request to the SAME `(id, block)` re-fire, so jumping to the same passage
+    /// twice still scrolls (the coalescing-counter idiom, cf. Reader `NavigationModel.requestScroll`).
+    struct OpenRequest: Equatable, Sendable {
+        let id: UUID
+        let block: Int?
+        let token: Int
+    }
+    /// The current pending open request; the featuring window observes it, selects the item + scrolls,
+    /// then calls `consumeOpen()`. `nil` when nothing is pending.
+    @Published private(set) var pendingOpen: OpenRequest?
+    private var openToken = 0
+
+    /// In-process navigation entry point (§16.1) — called by W7's jump-to-source chip and by the
+    /// `archivenotes://open` URL router. Publishes an `OpenRequest`; the featuring window consumes it.
+    /// Pure signal: resolution/degradation (deleted note, wrong kind, stale ordinal) is the observer's
+    /// job via `resolvePassage`/`NotePassageResolve` — this never throws and never touches the store.
+    func openItem(id: UUID, block: Int?) {
+        openToken &+= 1
+        pendingOpen = OpenRequest(id: id, block: block, token: openToken)
+    }
+
+    /// Clear the pending open request once a window has handled it.
+    func consumeOpen() {
+        pendingOpen = nil
+    }
+
+    /// Resolve a note-passage provenance anchor against the current item set (W7-S3 degradation logic).
+    func resolvePassage(_ anchor: SourceAnchor) -> PassageResolution {
+        NotePassageResolve.resolve(anchor: anchor, among: allItems)
+    }
+
     // MARK: App-path lifecycle (nil when a test injects a pre-loaded store)
 
     private let ownsDataLayer: Bool
