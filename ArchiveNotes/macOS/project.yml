@@ -33,13 +33,15 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         SWIFT_VERSION: "6.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    entitlements:
-      path: Sources/ArchiveNotes/ArchiveNotes.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.files.user-selected.read-write: true
-        com.apple.security.files.bookmarks.app-scope: true
-        com.apple.security.network.client: true
+      configs:
+        # Debug uses the UITest entitlements (superset: adds a temporary-exception for the
+        # fixture path under /Users/ so XCUITests can read/write tags in the sandbox). The
+        # override code path is #if DEBUG + launch-arg gated — inactive in normal Debug runs.
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Sources/ArchiveNotes/ArchiveNotes.uitest.entitlements
+        # Release uses the production entitlements (byte-identical to the original).
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Sources/ArchiveNotes/ArchiveNotes.entitlements
 
   ArchiveNotesTests:
     type: bundle.unit-test
@@ -54,15 +56,37 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivenotes.tests
 
+  ArchiveNotesUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - Tests/ArchiveNotesUITests
+    dependencies:
+      - target: ArchiveNotes
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.archivenotes.uitests
+        TEST_TARGET_NAME: ArchiveNotes
+        # Ad-hoc signing (CODE_SIGN_IDENTITY "-") requires ENABLE_HARDENED_RUNTIME: NO on the
+        # UITest target, or the Runner can't load the xctest plugin (library validation rejects
+        # mismatched CDHashes) — the key finding from the Reader harness (W7.1).
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        ENABLE_HARDENED_RUNTIME: NO
+
 schemes:
   ArchiveNotes:
     build:
       targets:
         ArchiveNotes: all
         ArchiveNotesTests: [test]
+        ArchiveNotesUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - ArchiveNotesTests
+        - ArchiveNotesUITests

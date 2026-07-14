@@ -17,6 +17,17 @@ final class RootFolderStore: ObservableObject {
     private let key = "notesStoreRootBookmark"
 
     init() {
+#if DEBUG
+        // XCUITest sets -ANUITestStorePath <path> via launchArguments. The argument domain is
+        // volatile (never written to disk), so this can never shadow a normal launch. We set
+        // `root` directly without persisting a bookmark and without reading/writing
+        // `notesStoreRootBookmark` — the real store root is never touched, and no default store
+        // is bootstrapped (the override returns before resolveSaved()/bootstrapDefaultRoot()).
+        if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            adoptTestStore(URL(fileURLWithPath: path, isDirectory: true))
+            return
+        }
+#endif
         resolveSaved()
         if root == nil {
             bootstrapDefaultRoot()
@@ -103,4 +114,18 @@ final class RootFolderStore: ObservableObject {
     private func stopAccessing() {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }
     }
+
+#if DEBUG
+    /// Set the store root for UI testing without persisting a bookmark or starting a security
+    /// scope. The fixture path is accessible via the UITest-only temporary-exception entitlement,
+    /// so no security-scoped resource dance is needed. This method does NOT read or write
+    /// `notesStoreRootBookmark` in UserDefaults — the real store root is never touched — and it
+    /// never CREATES a marker (it only reads one the fixture builder may provide).
+    private func adoptTestStore(_ url: URL) {
+        root = url
+        // `accessing` stays nil — no scope to release. No bookmark persisted.
+        // Read (but don't create) a marker if present — the fixture builder may provide one.
+        marker = try? RootMarker.read(at: url)
+    }
+#endif
 }
