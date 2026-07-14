@@ -20,6 +20,10 @@ struct NoteEditorPane: View {
     /// Stable across re-renders (populated once in `MarkdownEditorView.makeNSView`) so flush-on-switch
     /// keeps working after the parent re-renders.
     @State private var flushBox = EditorFlushBox()
+    /// W7-S5 — item-scoped inline-image asset store (one instance, retargeted to the selected item), so a
+    /// pasted/dropped image persists into that item's `assets/`. Created lazily once the model's
+    /// `NoteStore` has bootstrapped; nil for an injected (store-less) model.
+    @State private var assetStore: ItemAssetStore?
     @EnvironmentObject private var previewPopover: SourceBlockPreviewState
     @EnvironmentObject private var zoteroStatus: ZoteroStatusModel
 
@@ -39,6 +43,7 @@ struct NoteEditorPane: View {
                 markdown: $bodyEditor.markdown,
                 isRaw: $isRaw,
                 formatting: formatting,
+                assetStore: assetStore,
                 flushBox: flushBox,
                 onRevealBlock: { anchor in
                     guard let link = anchor.link, let url = URL(string: link) else { return }
@@ -73,11 +78,13 @@ struct NoteEditorPane: View {
         .onAppear {
             wireBodySeams()
             syncFormattingIdentity()
+            refreshAssetStore(for: nav.selectedItemID)
             Task { await bodyEditor.select(nav.selectedItemID) }
             refreshZotero()
         }
         .onChange(of: nav.selectedItemID) { _, newID in
             syncFormattingIdentity()
+            refreshAssetStore(for: newID)
             Task { await bodyEditor.select(newID) }
         }
         .onDisappear {
@@ -132,6 +139,15 @@ struct NoteEditorPane: View {
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
         // W7-S2: give the formatting context the shared model so Create/Append Extract can persist.
         formatting.notesModel = model
+    }
+
+    /// Ensure the item-scoped inline-image asset store exists (lazily, once the model's `NoteStore` has
+    /// bootstrapped) and point it at the selected item (W7-S5). One instance is retargeted per selection
+    /// — a paste always lands in the *current* note's `assets/`, and the editor coordinator's wiring
+    /// (established in `makeNSView`) never goes stale across selection switches.
+    private func refreshAssetStore(for id: UUID?) {
+        if assetStore == nil { assetStore = nav.model.makeAssetStore() }
+        assetStore?.itemID = id
     }
 
     /// Publish the selected item's identity to the formatting context so W7's Create-Extract can anchor

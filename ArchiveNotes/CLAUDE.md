@@ -46,7 +46,9 @@ macOS/Sources/ArchiveNotes/
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
     NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets;
                                    container-generic workers also back template storage under
-                                   Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6)
+                                   Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6);
+                                   writeReservedAsset (pre-named, no re-disambiguation, never-overwrite,
+                                   component-boundary) + nonisolated static path helpers + rootURL (W7-S5)
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
     SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
@@ -147,7 +149,9 @@ macOS/Sources/ArchiveNotes/
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path),
-                                   EditorAssetStore protocol, ScratchAssetStore (test impl)
+                                   EditorAssetStore protocol, ScratchAssetStore (test impl),
+                                   ItemAssetStore (production: @MainActor sync name-reserve → async
+                                   NoteStore.writeReservedAsset byte-write; single name arbiter) (W7-S5)
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,

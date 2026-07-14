@@ -8,13 +8,22 @@ Running log of quirks, risks, and things verified/unverified for the Notes app. 
 W7-S1a bound `NoteEditorPane` to the selected item's body (`NoteBodyEditorModel`: load-on-select,
 autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two conscious deferrals:
 
-- **Inline-image paste doesn't persist yet (item-scoped asset store deferred).** `NoteEditorPane` passes
-  **no** `EditorAssetStore`, so pasting/dropping an image into a note editor won't copy it into the item's
-  `assets/` (unchanged from before W7-S1a — the pane never had a store). The clean fix is an item-scoped
-  store backed by `NoteStore.importAsset`, but that API is an **async actor** method while
-  `EditorAssetStore.addAsset` is **synchronous** — bridging them without blocking the main thread is the
-  real work. Deferred to a focused follow-up. (The W2 asset-copy helper already covers *extract* snapshots
-  via `ExtractBuilder`; this gap is only the note editor's inline-paste path.)
+- **~~Inline-image paste doesn't persist yet~~ — RESOLVED (W7-S5, `ItemAssetStore`).** `NoteEditorPane` now
+  creates an item-scoped `ItemAssetStore` (retargeted to the selected item) and passes it to
+  `MarkdownEditorView`, so pasting/dropping an image copies it into the item's `assets/`. The sync↔async
+  bridge: `ItemAssetStore` (the single @MainActor name arbiter) reserves a unique `assets/<name>`
+  *synchronously* (matching `NoteStore.disambiguateAsset`, against on-disk files + an in-flight `reserved`
+  set) and hands it to the editor, then writes the bytes off-main via `NoteStore.writeReservedAsset`
+  (exact name, never re-disambiguates → the ref always matches the file that lands; no-overwrite guard).
+  Proven on a scratch store (`ItemAssetStoreTests`, 7 tests: persist/reload, same-name disambiguation,
+  skip-preexisting, retarget, no-target-throw, never-overwrite, path-traversal-reject). Residual edges
+  (non-blocking, documented for a future touch): (a) an async write *failure* (e.g. disk full) leaves a
+  dangling ref → missing-asset placeholder (no data loss; logged, not surfaced to the user); (b) two
+  windows editing the **same** note and pasting the same-named image in the same second have independent
+  `reserved` sets, so the second write is refused by the no-overwrite guard (safe — no clobber — but that
+  paste shows a placeholder); a shared name authority would need a single store, which can't serve two
+  windows' differing selections. GUI drive of a live paste is deferred with the rest of W7 (Notes has no
+  scratch-store launch override until **W8-S7** — driving the live app would write the owner's real store).
 - **GUI drive of load/autosave deferred (GUI paused).** The load-on-select + autosave-on-switch behavior
   is proven at the model layer (`NoteBodyEditorModelTests` incl. the cross-item race + generation guard;
   `NotesModelBodyTests` round-trip/reindex/front-matter-preservation), but not yet driven in a live window.
@@ -27,14 +36,17 @@ W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands 
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
 paste in an extract editor → note-passage blocks). Model + codec paths are unit-tested; conscious gaps:
 
-- **Inline-image BYTES don't survive the copy→paste round-trip yet (rides the deferred asset store,
-  W7-S5).** `NoteEditorPane` passes **no** `EditorAssetStore`, so `EditorPassageSource` snapshots the
-  passage's markdown image *references* (`assets/<name>`) but not the bytes; the extract paste inserts
-  those refs (rendering as missing-asset placeholders) rather than importing bytes into the extract's
-  own `assets/`. The Create/Append *commands* copy bytes correctly **when** a store is present (proven
-  by `ExtractBuilder` create/append asset tests) — this gap is only the editor's live copy/paste path,
-  and closes when the same item-scoped `EditorAssetStore` (W7-S5) lands for both note-image paste and
-  passage copy.
+- **Inline-image BYTES: copy side now embeds them (W7-S5); extract-paste byte import still a follow-up.**
+  With W7-S5's `ItemAssetStore` wired into `NoteEditorPane`, the **copy** path
+  (`copyPassageIfNote` → `EditorPassageSource(assetStore:)`) now resolves + snapshots the passage's inline-
+  image *bytes* (not just the `assets/<name>` refs) into the `com.archivenotes.passage` payload. The
+  Create/Append *commands* already persist those bytes into the new extract's `assets/` (proven by
+  `ExtractBuilder` create/append asset tests). **Remaining gap:** the live extract-editor *paste* handler
+  (`MarkdownEditorView.handlePassagePaste` → `ExtractBuilder.pastedExtractMarkdown`) inserts the passage
+  markdown with image *references* but does not yet import the payload's bytes into the extract's own
+  `assets/` (and rewrite the refs on name collision) — so a live copy→paste into an extract renders those
+  images as missing-asset placeholders until saved via Create/Append. Closing this is a focused follow-up
+  on the paste handler (the store + payload bytes are now both present); best confirmed under GUI drive.
 - **Create-Extract doesn't auto-raise + select the new extract in the Extracts window (GUI, deferred).**
   The extract is created, filed into the Extracts home folder, and appears in the Extracts window's list
   immediately (both windows observe `allItems`), but the two windows hold independent

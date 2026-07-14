@@ -115,6 +115,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         coordinator.onPreviewBlock = onPreviewBlock
         coordinator.onJumpBlock = onJumpBlock
         coordinator.passageSummaries = passageSummaries
+        // Keep the asset store current — it can appear/refresh after makeNSView (W7-S5: the pane creates
+        // the item-scoped store in onAppear, once the NotesModel's NoteStore has bootstrapped).
+        if coordinator.assetStore !== assetStore {
+            coordinator.assetStore = assetStore
+            textView.assetStore = assetStore
+        }
 
         // Font / raw-mode change
         let wantRaw = isRaw

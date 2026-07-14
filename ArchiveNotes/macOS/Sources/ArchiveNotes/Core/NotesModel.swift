@@ -468,6 +468,14 @@ final class NotesModel: ObservableObject {
         }
     }
 
+    /// W7-S5 — an item-scoped inline-image asset store over the audited `NoteStore`, or nil before
+    /// bootstrap / for an injected (store-less) test model. The editor pane creates one and retargets it
+    /// to the selected item so pasted/dropped images persist into that item's `assets/`.
+    func makeAssetStore() -> ItemAssetStore? {
+        guard let noteStore else { return nil }
+        return ItemAssetStore(store: noteStore, root: noteStore.rootURL)
+    }
+
     /// Shared load → mutate → atomic save → single-row re-index → publish path for the field editors
     /// above. A no-op with no `noteStore` (an injected test model built without one). The on-disk `.md`
     /// is the source of truth and the index is a rebuilt-from-disk projection, so nothing here can

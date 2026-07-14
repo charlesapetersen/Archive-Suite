@@ -36,14 +36,26 @@ actor NoteStore {
 
     // MARK: - Directory URLs (pure, no I/O)
 
-    func itemDir(_ id: UUID) -> URL {
+    /// The store's root URL. Immutable + `Sendable`, so it is safe to read synchronously off-actor —
+    /// the @MainActor `ItemAssetStore` (W7-S5) reads it to derive `assets/` paths without an actor hop.
+    nonisolated var rootURL: URL { root }
+
+    /// Pure path math for an item's dir / assets dir, exposed `nonisolated static` so the @MainActor
+    /// `ItemAssetStore` can compute the *same* paths this actor writes to — keeping the on-disk layout a
+    /// single source of truth (no divergence between the synchronous asset-name reservation and the
+    /// actor's byte write).
+    nonisolated static func itemDir(root: URL, id: UUID) -> URL {
         root.appendingPathComponent("items", isDirectory: true)
             .appendingPathComponent(id.uuidString.lowercased(), isDirectory: true)
     }
 
-    func assetsDir(_ id: UUID) -> URL {
-        itemDir(id).appendingPathComponent("assets", isDirectory: true)
+    nonisolated static func assetsDir(root: URL, id: UUID) -> URL {
+        itemDir(root: root, id: id).appendingPathComponent("assets", isDirectory: true)
     }
+
+    func itemDir(_ id: UUID) -> URL { Self.itemDir(root: root, id: id) }
+
+    func assetsDir(_ id: UUID) -> URL { Self.assetsDir(root: root, id: id) }
 
     /// Templates area (00-overview §3.7): `<root>/Templates/<uuid>/<Name>.md`, parallel to `items/`.
     /// Kept separate so templates never leak into the note list / All Notes count / FTS index.
@@ -220,6 +232,37 @@ actor NoteStore {
             throw StoreError.assetWriteFailed(error.localizedDescription)
         }
         return "assets/\(targetURL.lastPathComponent)"
+    }
+
+    /// W7-S5 — write pre-named inline-image bytes into `id`'s `assets/<name>`, **without**
+    /// re-disambiguating. The @MainActor `ItemAssetStore` is the single arbiter of asset names: it
+    /// reserves a unique `name` synchronously and hands the editor the matching `assets/<name>` markdown
+    /// reference, then calls this to persist the bytes at exactly that name. Contrast `importAsset`,
+    /// which disambiguates itself and is used where the caller does *not* pre-commit a name. Guarantees:
+    ///  - **Never overwrite** (no data loss): if `name` already exists, throws — a dangling reference
+    ///    renders as a missing-asset placeholder, never a silent byte replacement.
+    ///  - **Component boundary:** `name` must be a single path component, so a crafted name can't escape
+    ///    the item's `assets/` dir.
+    func writeReservedAsset(_ data: Data, name: String, into id: UUID) throws {
+        guard !name.isEmpty, !name.contains("/"), name != "..", name != "." else {
+            throw StoreError.assetWriteFailed("unsafe asset name: \(name)")
+        }
+        let dir = assetsDir(id)
+        let fm = FileManager.default
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let target = dir.appendingPathComponent(name)
+        // Defense in depth: the resolved parent must be exactly the assets dir (matches `saveEntry`).
+        precondition(target.deletingLastPathComponent().standardizedFileURL == dir.standardizedFileURL,
+                     "NoteStore.writeReservedAsset: name escapes assets dir")
+        guard !fm.fileExists(atPath: target.path) else {
+            throw StoreError.assetWriteFailed("asset already exists: \(name)")
+        }
+        do {
+            try data.write(to: target, options: [.atomic])
+        } catch {
+            throw StoreError.assetWriteFailed(error.localizedDescription)
+        }
     }
 
     // MARK: - Filename sanitization

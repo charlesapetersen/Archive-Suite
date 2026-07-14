@@ -169,3 +169,99 @@ final class ScratchAssetStore: EditorAssetStore {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 }
+
+// MARK: - Item-scoped asset store (W7-S5)
+
+/// Error surfaced when the editor tries to persist an asset with no item selected.
+enum ItemAssetStoreError: Error, Sendable { case noTargetItem }
+
+/// The production `EditorAssetStore`: persists pasted / dropped images into the *currently-selected*
+/// item's `assets/` folder through the audited async `NoteStore`, keyed to `itemID` (retargeted by
+/// `NoteEditorPane` on selection change).
+///
+/// **The sync↔async bridge (the crux of W7-S5).** `EditorAssetStore.addAsset` is *synchronous*
+/// (`throws -> String`) because the editor needs the `assets/<name>` reference *immediately* to build the
+/// inline-image attachment + markdown, but `NoteStore` is an `actor` (async) and the image bytes may be
+/// large. So `addAsset`:
+///   1. computes a **unique** filename synchronously (matching `NoteStore.disambiguateAsset`'s
+///      `stem-1`, `stem-2`… scheme, against both on-disk files *and* an in-flight `reserved` set),
+///      returning `assets/<name>` at once;
+///   2. persists the bytes on a background `Task` via `NoteStore.writeReservedAsset` (off the main
+///      thread — no UI stall on a big paste).
+/// Because this @MainActor store is the *single arbiter* of names (every paste for the item flows through
+/// it, serialized on the main actor) and the actor writes to the *exact* reserved name (never
+/// re-disambiguating), the reference handed to the editor always matches the file that lands on disk —
+/// even for rapid same-named pastes. A failed write leaves a dangling reference (a missing-asset
+/// placeholder), never corrupt or clobbered bytes.
+@MainActor
+final class ItemAssetStore: EditorAssetStore {
+    private let store: NoteStore
+    private let root: URL
+
+    /// The item whose `assets/` receives pastes. `NoteEditorPane` retargets it on selection change.
+    var itemID: UUID?
+
+    /// Names handed to the editor this session whose bytes may not be on disk yet (write in flight), per
+    /// item. Closes the window in which a second same-name paste could pick the same name before the
+    /// first `Task`'s write lands. Bounded by pastes-per-session (trivially small).
+    private var reserved: [UUID: Set<String>] = [:]
+
+    /// In-flight byte-write tasks, so `awaitPendingWrites()` can flush them (tests; future quit-flush).
+    private var pendingWrites: [Task<Void, Never>] = []
+
+    init(store: NoteStore, root: URL, itemID: UUID? = nil) {
+        self.store = store
+        self.root = root
+        self.itemID = itemID
+    }
+
+    func addAsset(_ data: Data, preferredName: String) throws -> String {
+        guard let id = itemID else { throw ItemAssetStoreError.noTargetItem }
+        let dir = NoteStore.assetsDir(root: root, id: id)
+        let name = uniqueName(preferredName, in: dir, itemID: id)
+        reserved[id, default: []].insert(name)
+
+        // Persist the bytes off-main through the audited actor, at exactly the reserved name. A failed
+        // write leaves a dangling reference (missing-asset placeholder) — never corrupt/clobbered bytes.
+        let task = Task.detached(priority: .utility) { [store] in
+            do { try await store.writeReservedAsset(data, name: name, into: id) }
+            catch { NSLog("ItemAssetStore: asset write failed for %@: %@", name, "\(error)") }
+        }
+        pendingWrites.append(task)
+        return "assets/\(name)"
+    }
+
+    func resolveAsset(_ relativePath: String) -> URL? {
+        guard let id = itemID else { return nil }
+        let url = NoteStore.itemDir(root: root, id: id).appendingPathComponent(relativePath)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// Await all in-flight asset byte-writes (used by tests; a natural flush seam for a future
+    /// window-close / quit save, W7-S6).
+    func awaitPendingWrites() async {
+        let tasks = pendingWrites
+        pendingWrites.removeAll()
+        for t in tasks { await t.value }
+    }
+
+    /// Pick a filename not taken on disk or by an in-flight write, matching `NoteStore.disambiguateAsset`
+    /// (`stem-1`, `stem-2`, …) so the actor write and this pre-commit never diverge.
+    private func uniqueName(_ preferred: String, in dir: URL, itemID id: UUID) -> String {
+        let fm = FileManager.default
+        let inFlight = reserved[id] ?? []
+        func taken(_ n: String) -> Bool {
+            inFlight.contains(n) || fm.fileExists(atPath: dir.appendingPathComponent(n).path)
+        }
+        if !taken(preferred) { return preferred }
+        let ns = preferred as NSString
+        let stem = ns.deletingPathExtension
+        let ext = ns.pathExtension
+        var n = 1
+        while true {
+            let candidate = ext.isEmpty ? "\(stem)-\(n)" : "\(stem)-\(n).\(ext)"
+            if !taken(candidate) { return candidate }
+            n += 1
+        }
+    }
+}
