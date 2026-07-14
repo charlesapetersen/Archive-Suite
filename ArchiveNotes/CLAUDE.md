@@ -112,7 +112,10 @@ macOS/Sources/ArchiveNotes/
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings;
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4)
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
-    NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files
+    NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files;
+                                   isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts
+                                   only, off in the real app, out of Release) mechanically refuse a tag
+                                   write outside scratch (W8-S2 §5)
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle,
                                    extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1);
@@ -266,6 +269,15 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed
+  NotesTagProjectorSafetyTests.swift  10 crown-jewel safety tests (W8-S2, Tier-2, scratch .md +
+                                   data-fork byte-equality): §3 read-failure aborts (no []-coercion,
+                                   neighbors untouched), concurrent-projections-never-corrupt (marker
+                                   never lost — pins the latent lost-update race, see KNOWN_ISSUES),
+                                   §5 unmanaged-tag lossless, §6 "ArchiveSuite"-subject collision
+                                   (single/whole-string/marker-never-stripped), §8/§9 disk-backed
+                                   verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,
+                                   title-casing, §7 label-never-written, isScratchPath predicate +
+                                   scratch-guard-live-under-XCTest
   NotesIndexTests.swift            10 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
                                    search, summaryRoundTrip, org tables exist
   OrganizationStoreTests.swift     13 tests: system-folder seeding, create/rename/move(cycle-guard)/

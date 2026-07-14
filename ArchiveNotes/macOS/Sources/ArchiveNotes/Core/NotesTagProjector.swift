@@ -63,6 +63,19 @@ enum NotesTagProjector {
             throw ProjectError.outsideItemDir("URL \(url.path) is not under \(itemDir.path)")
         }
 
+        #if DEBUG
+        // §5 (W8) belt-and-suspenders: under a unit-test harness OR the GUI-drive store override,
+        // a projector tag write MUST target scratch. This mechanically aborts a test or GUI drive
+        // that ever aims a Finder-tag write at a non-scratch path (the real store or, worse, the
+        // corpus). It is OFF in the real DEBUG app (no test env, no UITest override) and compiled
+        // out of Release entirely, so ordinary tag writes to the real store are never affected.
+        if inTestOrGUIDriveContext {
+            precondition(
+                isScratchPath(stdURL),
+                "NotesTagProjector: refusing a tag write outside scratch during tests/GUI-drive: \(stdURL)")
+        }
+        #endif
+
         let result = try CoordinatedTagWriter.write(url) { currentTags, currentLabel in
             // §4 Lossless delta: compute what to remove and what to add.
             // remove = tokens we previously managed that are no longer desired.
@@ -106,4 +119,31 @@ enum NotesTagProjector {
         let candidates = NotesTagVocabulary.managedTokens(for: item)
         return candidates.intersection(currentTags)
     }
+
+    // MARK: - Scratch-write guard (W8 §5)
+
+    /// Whether `path` is under a known scratch prefix — the system temp dir (`mktemp` /
+    /// `NSTemporaryDirectory()`, incl. `/private/var/folders/…`), `/tmp`, or an `AN-GUI-Fixture`
+    /// store. Pure + total; symlink-resolved on both sides so `/var` vs `/private/var` never causes
+    /// a false negative. Backs the DEBUG test/GUI-drive precondition (and is unit-tested directly).
+    static func isScratchPath(_ path: String) -> Bool {
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).resolvingSymlinksInPath().path
+        let tmpPrefix = tmp.hasSuffix("/") ? tmp : tmp + "/"
+        if resolved == tmp || resolved.hasPrefix(tmpPrefix) { return true }
+        for prefix in ["/private/var/folders/", "/private/tmp/", "/tmp/"] {
+            if resolved.hasPrefix(prefix) { return true }
+        }
+        return resolved.contains("/AN-GUI-Fixture/") || resolved.hasSuffix("/AN-GUI-Fixture")
+    }
+
+    #if DEBUG
+    /// True only in the two contexts where a projector write must stay in scratch: running under a
+    /// unit-test harness, or with the GUI-drive store override active. False in the real DEBUG app.
+    private static var inTestOrGUIDriveContext: Bool {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return true }
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
+        return false
+    }
+    #endif
 }

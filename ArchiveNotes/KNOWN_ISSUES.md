@@ -3,6 +3,48 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## Tag projector safety suite + a latent concurrent-write race (W8-S2, 2026-07-14)
+
+W8-S2 landed the **crown-jewel** `NotesTagProjectorSafetyTests` (10 scratch-file tests) covering every
+`TagWriter`/`CoordinatedTagWriter` invariant the projector reimplements: read-failure aborts (never
+coerce a failed read to `[]`), lossless preservation of unmanaged tags, the `"ArchiveSuite"`-subject
+collision (single token / whole-string match / marker never stripped by dropping the subject),
+verify-by-re-read backed by an independent ground-truth read + reconcile-via-fresh-delta, idempotent
+no-op (no mod-date churn), shared-convention title-casing, the §7 label-drift guard, and a data-fork
+byte-equality assertion on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector`
+(see below). All green; existing `NotesTagProjectorTests` (9) unaffected.
+
+- **LATENT (found by this suite; NOT fixed — shared cross-app choke-point) — two concurrent same-file
+  metadata writes can lose a racing tag.** `ArchiveCore.CoordinatedTagWriter.write` coordinates via
+  `NSFileCoordinator(.contentIndependentMetadataOnly)`, which does **not** mutually-exclude two
+  concurrent metadata-only write *claims* on the same file. Two projections dispatched in parallel to the
+  same `.md` (each adding a distinct subject) each read the pre-write state, and the later `setxattr`
+  wins — so one subject is superseded (a lost update; verified deterministic-loss / nondeterministic-
+  winner across runs). **File-safety guarantees that DO hold** and are pinned by the suite: no corruption
+  / no torn array (each `setxattr` is atomic), the `ArchiveSuite` marker is never lost or duplicated, the
+  file is never wiped, and bytes never change. **Why it's latent, not an active bug:** all three apps
+  write one-writer-per-file — Reader/Processor batch tag edits across *different* files, Notes saves one
+  note at a time, and the projector isn't yet wired to any concurrent path. It would only bite if a future
+  design ran the projector on a background re-index *concurrently* with an interactive save of the **same**
+  note. **Not fixed here** (S2 is the test suite; touching the shared audited writer's concurrency is a
+  separate Tier-2 item — a per-path serialization actor/lock, and it wouldn't cover cross-process writers
+  anyway). → flagged to Morning Review as a follow-up-if-it-becomes-real.
+- **Added — DEBUG scratch-write guard on `NotesTagProjector` (belt-and-suspenders, plan §5).** Under a
+  unit-test harness (`XCTestConfigurationFilePath` set) **or** the GUI-drive store override
+  (`ANUITestStorePath` set), `project(…)` now `precondition`s that the write target is under a known
+  scratch prefix (`NSTemporaryDirectory()` / `/tmp` / `/private/var/folders` / an `AN-GUI-Fixture` store)
+  — mechanically aborting any test or GUI drive that ever aims a Finder-tag write at the real store or the
+  corpus. **OFF in the real DEBUG app** (neither trigger present) and **compiled out of Release**, so
+  ordinary tag writes to the real store are unaffected. The pure predicate `isScratchPath` is unit-tested
+  directly; a companion test asserts the trigger env var is present so the guard is provably live (not
+  dormant) during the suite.
+- **Verify-fail path is tested at the projector boundary, not via fault injection.** Case 5 pins that a
+  reported success equals an independent on-disk re-read and that a subsequent projection reconciles
+  against a fresh read (preserving a concurrent third-party tag — never a blind full-array restore). The
+  post-write multiset verify itself (throw-on-mismatch, never silent success) lives inside the shared
+  `CoordinatedTagWriter`; a fault-injection seam was deliberately **not** added to that audited cross-app
+  choke-point for a test.
+
 ## Front-matter codec — flow-list quote data-loss FIXED; two edge-normalizations pinned (W8-S1, 2026-07-14)
 
 W8-S1's new `NotesFrontMatterTests` fuzz/property suite (seeded splitmix64: 2000 garbage blobs + 600
