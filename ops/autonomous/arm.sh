@@ -27,6 +27,8 @@ PLAN="$REPO/.maintenance/AUTONOMOUS_PLAN.md"
 LOG="$STATE/daemon.log"
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
+# taskport = the debugger right XCUITest needs; 'allow' = password-free. Set on `gui on`, reverted on `gui off`.
+tp_is_allow() { security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>'; }
 
 status() {
   echo "== daemon process =="
@@ -34,7 +36,7 @@ status() {
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
   echo "== GUI mode =="
-  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')   (toggle: $0 gui on|off)"
+  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)   (toggle: $0 gui on|off)"
   echo "== recent daemon.log =="
   tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
 }
@@ -55,16 +57,55 @@ case "${1:-arm}" in
     exit 0 ;;
   gui)
     # GUI-mode flag: each resume session reads $STATE/gui-mode to decide whether to drive/verify GUI (see the
-    # resume prompt). ON needs the machine GUI-ready — TCC Accessibility + Screen Recording, an unlocked/no-sleep
-    # screen, and taskport=allow for XCUITest. OFF = build+unit only, defer GUI to Morning Review, skip GUI-only
-    # items (Notes W8-S7/S8, Reader W7.6). Absent flag = off (safe default).
+    # resume prompt). ON also makes XCUITest password-free by setting `taskport` allow via sudo (you're prompted
+    # ONCE now, instead of a random prompt mid-run); OFF reverts taskport to secure. ON still needs TCC
+    # Accessibility + Screen Recording + an unlocked/no-sleep screen. Absent flag = off (safe default).
+    TP_BACKUP="$STATE/taskport-rule.backup.plist"
     case "${2:-status}" in
-      on)  echo on  > "$STATE/gui-mode"
-           echo "GUI mode -> ON — sessions will drive+verify GUI for visible-effect items."
-           echo "  Requires: TCC Accessibility+Screen Recording + unlocked/no-sleep screen; taskport=allow for XCUITest." ;;
-      off) echo off > "$STATE/gui-mode"
-           echo "GUI mode -> OFF — sessions do build+unit only, defer GUI to Morning Review, skip GUI-only items." ;;
-      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')" ;;
+      on)
+        echo on > "$STATE/gui-mode"
+        echo "GUI mode -> ON — sessions will drive+verify GUI for visible-effect items."
+        echo "  Requires: TCC Accessibility + Screen Recording + an unlocked/no-sleep screen."
+        # Ensure a SECURE revert target exists — never overwrite a good backup, never capture 'allow' as the
+        # revert (that would make `gui off` restore the insecure state).
+        if [ ! -f "$TP_BACKUP" ]; then
+          if tp_is_allow; then
+            echo "  ⚠️ taskport is already 'allow' with no backup — cannot capture a secure revert target."
+            echo "     When it's secure, run: security authorizationdb read system.privilege.taskport > \"$TP_BACKUP\""
+          else
+            security authorizationdb read system.privilege.taskport > "$TP_BACKUP" 2>/dev/null \
+              && echo "  backed up the current (secure) taskport rule -> $TP_BACKUP"
+          fi
+        fi
+        if tp_is_allow; then
+          echo "  taskport: already 'allow' (XCUITest ready)."
+        else
+          echo "  Setting taskport password-free for XCUITest (sudo — you'll be prompted once)…"
+          if sudo security authorizationdb write system.privilege.taskport allow; then
+            echo "  taskport -> allow ✅ (reverted automatically on \`$0 gui off\`)."
+          else
+            echo "  ⚠️ taskport sudo failed/cancelled — GUI is ON (cliclick works), but XCUITest may prompt for a password."
+          fi
+        fi
+        ;;
+      off)
+        echo off > "$STATE/gui-mode"
+        echo "GUI mode -> OFF — sessions do build+unit only, defer GUI to Morning Review, skip GUI-only items."
+        if ! tp_is_allow; then
+          echo "  taskport: already secure."
+        elif [ -f "$TP_BACKUP" ]; then
+          echo "  Reverting taskport to secure (sudo — you'll be prompted once)…"
+          if sudo security authorizationdb write system.privilege.taskport < "$TP_BACKUP"; then
+            echo "  taskport -> secure ✅."
+          else
+            echo "  ⚠️ taskport revert failed/cancelled — it is STILL 'allow'. Revert manually:"
+            echo "     sudo security authorizationdb write system.privilege.taskport < \"$TP_BACKUP\""
+          fi
+        else
+          echo "  ⚠️ taskport is 'allow' but no backup at $TP_BACKUP — cannot auto-revert; do it manually."
+        fi
+        ;;
+      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)" ;;
       *) fail "usage: $0 gui on|off|status" ;;
     esac
     exit 0 ;;
