@@ -33,6 +33,15 @@ struct NoteEditorPane: View {
     /// distinct), so register/deregister pair up and a closed window removes exactly its own entry.
     @State private var paneID = UUID()
 
+#if DEBUG
+    /// DEBUG-only UITest seam (W8-S7 §3.3): a hidden control strip (shown ONLY under `-ANUITestStorePath`)
+    /// lets XCUITest commit body text / set a selection without focusing the styled NSTextView (a known
+    /// XCUITest weak spot). Stable across re-renders like `flushBox`. Compiled out of Release.
+    @State private var testBox = EditorTestBox()
+    @State private var testCommitInput = ""
+    @State private var testSelectionInput = ""
+#endif
+
     var body: some View {
         VStack(spacing: 0) {
             if let ref = zoteroStatus.clipboardRef {
@@ -45,39 +54,11 @@ struct NoteEditorPane: View {
             }
             rawToggleBar
             Divider()
-            MarkdownEditorView(
-                markdown: $bodyEditor.markdown,
-                isRaw: $isRaw,
-                formatting: formatting,
-                assetStore: assetStore,
-                flushBox: flushBox,
-                onRevealBlock: { anchor in
-                    guard let link = anchor.link, let url = URL(string: link) else { return }
-                    NSWorkspace.shared.open(url)
-                },
-                onPreviewBlock: { [weak previewPopover] anchor, anchorView in
-                    previewPopover?.show(for: anchor, relativeTo: anchorView)
-                },
-                onJumpBlock: { [model = nav.model] anchor in
-                    // W7-S3: extract provenance chip → in-app navigation to the source note + block.
-                    // The chip's action fires on the main thread; assumeIsolated satisfies the
-                    // @Sendable callback type without an async hop.
-                    guard let target = anchor.notePassageTarget else { return }
-                    MainActor.assumeIsolated { model.openItem(id: target.id, block: target.block) }
-                },
-                passageSummaries: nav.model.allItems,   // resolve chip live titles / missing state
-                scrollRequest: scrollRequest,
-                onScrollOutcome: { hitExact in
-                    // Runs inside updateNSView — defer state mutation out of the view-update pass.
-                    DispatchQueue.main.async {
-                        if !hitExact {
-                            nav.model.statusMessage = "The source note has changed since this extract was made."
-                        }
-                        jumpTarget = nil
-                    }
-                }
-            )
-            .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
+            bodyEditorView
+                .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
+#if DEBUG
+            uiTestControlStrip
+#endif
         }
         .background(Color(nsColor: .textBackgroundColor))
         .focusedSceneValue(\.formattingContext, formatting)
@@ -110,6 +91,87 @@ struct NoteEditorPane: View {
         // W7-S3 jump-to-source consume side: the window featuring the target's kind selects it + scrolls.
         .onReceive(nav.model.$pendingOpen) { handleOpen($0) }
     }
+
+    /// The Markdown editor. Extracted from `body` so the DEBUG UITest seam (W8-S7 §3.3) can be attached
+    /// to the value-type representable before it's returned; Release omits the seam entirely (the editor
+    /// is byte-identical to the previous inline construction).
+    private var bodyEditorView: MarkdownEditorView {
+        var view = MarkdownEditorView(
+            markdown: $bodyEditor.markdown,
+            isRaw: $isRaw,
+            formatting: formatting,
+            assetStore: assetStore,
+            flushBox: flushBox,
+            onRevealBlock: { anchor in
+                guard let link = anchor.link, let url = URL(string: link) else { return }
+                NSWorkspace.shared.open(url)
+            },
+            onPreviewBlock: { [weak previewPopover] anchor, anchorView in
+                previewPopover?.show(for: anchor, relativeTo: anchorView)
+            },
+            onJumpBlock: { [model = nav.model] anchor in
+                // W7-S3: extract provenance chip → in-app navigation to the source note + block.
+                // The chip's action fires on the main thread; assumeIsolated satisfies the
+                // @Sendable callback type without an async hop.
+                guard let target = anchor.notePassageTarget else { return }
+                MainActor.assumeIsolated { model.openItem(id: target.id, block: target.block) }
+            },
+            passageSummaries: nav.model.allItems,   // resolve chip live titles / missing state
+            scrollRequest: scrollRequest,
+            onScrollOutcome: { hitExact in
+                // Runs inside updateNSView — defer state mutation out of the view-update pass.
+                DispatchQueue.main.async {
+                    if !hitExact {
+                        nav.model.statusMessage = "The source note has changed since this extract was made."
+                    }
+                    jumpTarget = nil
+                }
+            }
+        )
+#if DEBUG
+        view.testBox = testBox
+#endif
+        return view
+    }
+
+#if DEBUG
+    /// Hidden UITest control strip (W8-S7 §3.3). Present ONLY under `-ANUITestStorePath`, so a normal
+    /// DEBUG run never shows it. XCUITest reliably types into these plain `TextField`s + clicks these
+    /// buttons (unlike the styled NSTextView), driving the editor through `testBox`.
+    @ViewBuilder
+    private var uiTestControlStrip: some View {
+        if Self.isUITestHarness {
+            HStack(spacing: 2) {
+                TextField("", text: $testCommitInput)
+                    .accessibilityIdentifier("an.editor.test.input")
+                Button("commit") { testBox.replaceMarkdown?(testCommitInput) }
+                    .accessibilityIdentifier("an.editor.test.commit")
+                Button("insert") { testBox.insertMarkdown?(testCommitInput) }
+                    .accessibilityIdentifier("an.editor.test.insert")
+                TextField("", text: $testSelectionInput)
+                    .accessibilityIdentifier("an.editor.test.selectionInput")
+                Button("select") {
+                    let parts = testSelectionInput.split(separator: ",")
+                    if parts.count == 2,
+                       let loc = Int(parts[0].trimmingCharacters(in: .whitespaces)),
+                       let len = Int(parts[1].trimmingCharacters(in: .whitespaces)) {
+                        testBox.setSelection?(loc, len)
+                    }
+                }
+                .accessibilityIdentifier("an.editor.test.select")
+            }
+            .frame(height: 14)
+            .font(.caption2)
+        }
+    }
+
+    /// True when the app was launched by the UITest harness (`-ANUITestStorePath`), mirroring the
+    /// `RootFolderStore` / `NotesTagProjector` gate — keeps the test strip out of a normal DEBUG run.
+    private static var isUITestHarness: Bool {
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
+        return false
+    }
+#endif
 
     /// The scroll request to hand the editor: present only once the target item's body is actually
     /// loaded (`loadedID` matches), so the block-ordinal map maps against the right note's content.

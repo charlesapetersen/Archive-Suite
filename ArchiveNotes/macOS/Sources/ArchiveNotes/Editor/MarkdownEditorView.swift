@@ -11,6 +11,20 @@ final class EditorFlushBox {
     init() {}
 }
 
+#if DEBUG
+/// W8-S7 §3.3 — a DEBUG-only test seam mirroring `EditorFlushBox`. Driving the styled TextKit-2
+/// `NSTextView` through XCUITest is unreliable, so the host exposes hidden controls that call these
+/// closures to commit body text / insert at the caret / set a selection without field-editor focus.
+/// The coordinator populates them in `makeNSView`. Compiled out of Release.
+@MainActor
+final class EditorTestBox {
+    var replaceMarkdown: ((String) -> Void)?
+    var insertMarkdown: ((String) -> Void)?
+    var setSelection: ((Int, Int) -> Void)?
+    init() {}
+}
+#endif
+
 /// A request to scroll the editor to a note-passage block ordinal (W7-S3 jump-to-source consume side).
 /// `token` makes a repeat jump to the SAME block re-fire (the coalescing-counter idiom); `block == nil`
 /// means "just reveal the item" (scroll to the top). Equatable so `updateNSView` fires only on a new token.
@@ -45,6 +59,11 @@ struct MarkdownEditorView: NSViewRepresentable {
     /// W7-S3 — reports the scroll outcome: `true` if the exact block was found, `false` if the ordinal
     /// was stale (source edited since snapshot) and the editor fell back to the top.
     var onScrollOutcome: ((Bool) -> Void)?
+#if DEBUG
+    /// DEBUG-only UITest seam (W8-S7 §3.3): populated by the coordinator so the host's hidden UITest
+    /// controls can drive the editor (commit / insert / select) without field-editor focus.
+    var testBox: EditorTestBox?
+#endif
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -71,6 +90,17 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.onJumpBlock = onJumpBlock
         context.coordinator.passageSummaries = passageSummaries
         flushBox?.flush = { [weak coordinator = context.coordinator] in coordinator?.flushWriteBack() }
+#if DEBUG
+        testBox?.replaceMarkdown = { [weak coordinator = context.coordinator] in
+            coordinator?.uiTestReplaceMarkdown($0)
+        }
+        testBox?.insertMarkdown = { [weak coordinator = context.coordinator] in
+            coordinator?.uiTestInsertMarkdown($0)
+        }
+        testBox?.setSelection = { [weak coordinator = context.coordinator] loc, len in
+            coordinator?.uiTestSetSelection(loc, len)
+        }
+#endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
         }
@@ -375,5 +405,44 @@ struct MarkdownEditorView: NSViewRepresentable {
             return try? sub.data(from: NSRange(location: 0, length: sub.length),
                                  documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         }
+
+        // MARK: - DEBUG test seam (W8-S7 §3.3)
+
+#if DEBUG
+        /// Replace the whole body from a Markdown string (parsed styled, or raw when in raw mode), then
+        /// synchronously write back to the binding so a UITest can assert the saved `.md` immediately.
+        func uiTestReplaceMarkdown(_ markdown: String) {
+            guard let textView else { return }
+            textView.uiTestReplace(with: attributedForTest(markdown))
+            flushWriteBack()
+        }
+
+        /// Insert a Markdown fragment at the caret (styled, or raw when in raw mode); schedules write-back.
+        func uiTestInsertMarkdown(_ markdown: String) {
+            guard let textView else { return }
+            textView.uiTestInsert(attributedForTest(markdown))
+            scheduleWriteBack()
+        }
+
+        /// Set the editor selection to a clamped range (supports the extract-from-selection check, G9).
+        func uiTestSetSelection(_ location: Int, _ length: Int) {
+            textView?.uiTestSetSelection(location: location, length: length)
+        }
+
+        /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same
+        /// `MarkdownBridge.parse` the real load path uses (so styling + serialize-back match).
+        private func attributedForTest(_ markdown: String) -> NSAttributedString {
+            if currentIsRaw {
+                return NSAttributedString(string: markdown, attributes: [
+                    .font: NSFont.monospacedSystemFont(ofSize: currentFontSize, weight: .regular),
+                    .foregroundColor: NSColor.textColor
+                ])
+            }
+            return MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
+                                        assetStore: assetStore, onRevealBlock: onRevealBlock,
+                                        onPreviewBlock: onPreviewBlock, onJumpBlock: onJumpBlock,
+                                        passageSummaries: passageSummaries)
+        }
+#endif
     }
 }

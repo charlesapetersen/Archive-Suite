@@ -368,4 +368,50 @@ final class EditorTextView: NSTextView {
             ]
         }
     }
+
+    // MARK: - DEBUG test seam (W8-S7 §3.3)
+
+#if DEBUG
+    // Driving this TextKit-2 styled NSTextView through XCUITest is a documented weak spot — focusing the
+    // field editor and typing styled text is flaky. These DEBUG-only hooks let a UITest commit text and
+    // set a selection deterministically WITHOUT relying on field-editor focus. They go through the
+    // sanctioned `shouldChangeText`/`didChangeText` editing path so the delegate's `textDidChange` (→
+    // debounced write-back to the bound `.md`) fires exactly as for a keystroke, and work regardless of
+    // first-responder state. Compiled out of Release; the coordinator parses Markdown into the attributed
+    // string it hands here (so styling + serialize-back match the real load path).
+
+    /// Replace the entire document with `attributed` via the standard editing path (registers undo,
+    /// notifies the delegate).
+    func uiTestReplace(with attributed: NSAttributedString) {
+        let full = NSRange(location: 0, length: (string as NSString).length)
+        guard shouldChangeText(in: full, replacementString: attributed.string) else { return }
+        textStorage?.replaceCharacters(in: full, with: attributed)
+        didChangeText()
+    }
+
+    /// Insert `attributed` over the current selection (grouped for undo) and leave the caret after it.
+    func uiTestInsert(_ attributed: NSAttributedString) {
+        let range = selectedRange()
+        guard shouldChangeText(in: range, replacementString: attributed.string) else { return }
+        undoManager?.beginUndoGrouping()
+        textStorage?.replaceCharacters(in: range, with: attributed)
+        didChangeText()
+        undoManager?.endUndoGrouping()
+        setSelectedRange(NSRange(location: range.location + attributed.length, length: 0))
+    }
+
+    /// Set the selection to a range clamped into the current text (out-of-range never crashes) — used by
+    /// the extract-from-selection GUI check (G9).
+    func uiTestSetSelection(location: Int, length: Int) {
+        setSelectedRange(uiTestClampedRange(location: location, length: length))
+    }
+
+    /// Clamp a requested `(location, length)` into `[0, textLength]`. Pure — unit-tested directly.
+    func uiTestClampedRange(location: Int, length: Int) -> NSRange {
+        let total = (string as NSString).length
+        let loc = min(max(location, 0), total)
+        let len = min(max(length, 0), total - loc)
+        return NSRange(location: loc, length: len)
+    }
+#endif
 }
