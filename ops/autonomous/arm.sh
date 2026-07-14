@@ -33,6 +33,8 @@ status() {
   pgrep -fl archive-suite-autonomous.sh || echo "  (not running)"
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
+  echo "== GUI mode =="
+  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')   (toggle: $0 gui on|off)"
   echo "== recent daemon.log =="
   tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
 }
@@ -51,8 +53,23 @@ case "${1:-arm}" in
     pkill -f 'autonomous maintenance session for the Archive Suite' && k=1
     [ "$k" = 1 ] && echo "daemon + any resume session stopped." || echo "daemon was not running."
     exit 0 ;;
+  gui)
+    # GUI-mode flag: each resume session reads $STATE/gui-mode to decide whether to drive/verify GUI (see the
+    # resume prompt). ON needs the machine GUI-ready — TCC Accessibility + Screen Recording, an unlocked/no-sleep
+    # screen, and taskport=allow for XCUITest. OFF = build+unit only, defer GUI to Morning Review, skip GUI-only
+    # items (Notes W8-S7/S8, Reader W7.6). Absent flag = off (safe default).
+    case "${2:-status}" in
+      on)  echo on  > "$STATE/gui-mode"
+           echo "GUI mode -> ON — sessions will drive+verify GUI for visible-effect items."
+           echo "  Requires: TCC Accessibility+Screen Recording + unlocked/no-sleep screen; taskport=allow for XCUITest." ;;
+      off) echo off > "$STATE/gui-mode"
+           echo "GUI mode -> OFF — sessions do build+unit only, defer GUI to Morning Review, skip GUI-only items." ;;
+      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')" ;;
+      *) fail "usage: $0 gui on|off|status" ;;
+    esac
+    exit 0 ;;
   arm) : ;;
-  *) fail "unknown command '${1}'. Use: arm | status | stop" ;;
+  *) fail "unknown command '${1}'. Use: arm | status | stop | gui on|off|status" ;;
 esac
 
 # ---- arm ----
