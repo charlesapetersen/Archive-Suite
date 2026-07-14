@@ -4,6 +4,10 @@
 # Build + run the unit-test suite. No network, no corpus access.
 # Prints PASS/FAIL + the executed test count.
 #
+# File safety: see GUI_SAFETY.md — no test/GUI drive ever writes the real store
+# or corpus; NotesTagProjector's DEBUG scratch-write guard enforces it. The
+# durable-link E2E lives in DurableLinkE2ETests + scripts/e2e-durable-links.sh.
+#
 #   xcodegen generate
 #   xcodebuild test -scheme ArchiveNotes -destination 'platform=macOS' -derivedDataPath ./build/DD
 #

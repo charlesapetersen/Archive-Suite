@@ -13,6 +13,9 @@ this file is authoritative for Notes‑specific work.
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors front‑matter onto the
   note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
 - Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
+- **Full protocol:** [`GUI_SAFETY.md`](GUI_SAFETY.md) — the scratch-corpus rules (never drive the store
+  picker; confirm scratch before any tag write) + the DEBUG scratch-write guard that mechanically aborts
+  any `NotesTagProjector` write outside scratch under a test / GUI-drive context.
 
 ## Stack & build
 
@@ -29,6 +32,10 @@ this file is authoritative for Notes‑specific work.
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
   library (scratch-only; reads tags to assert, never drives the store picker). Running the `ArchiveNotesUITests`
   scheme is GUI-gated (deferred to W8-S8).
+- **Durable-link E2E + safety (W8-S9):** `scripts/e2e-durable-links.sh` is a build-free filesystem proof
+  that a `reader-page` link survives a computer move (same GUID, new absolute path → still resolves;
+  guarded teardown); `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.
+  [`GUI_SAFETY.md`](GUI_SAFETY.md) is the authoritative test file-safety protocol.
 - **Bundle ID:** `com.archivenotes.app`. Ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
 
 ## Implementation Map
@@ -377,6 +384,10 @@ macOS/Tests/ArchiveNotesTests/
                                    ignore / extract target / missing-on-note-window-only)
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
+  DurableLinkE2ETests.swift        4 tests (W8-S9): the durable-link scenario — link round-trip +
+                                   resolve, computer-move re-grant by GUID, unknown-GUID/wrong-folder
+                                   needs-regrant (never silent), renamed-candidate; hermetic (scratch
+                                   temp dirs + snapshot/restore readerRootBookmarks)
   SourceBlockViewTests.swift       7 tests: ThumbnailImageCache (set/miss/removeAll), controller
                                    no-crash, chip Reveal+Preview buttons, MarkdownBridge onPreview
                                    threading, buildInsertableBlock preview, reveal URL validation
