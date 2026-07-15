@@ -63,6 +63,41 @@ parity holds.
   `itemDirs()` snapshot — so leftovers never change a result. (The earlier "best-effort cleanup / Route-B is
   RW" comment was wrong for the runner and was removed.)
 
+## GUI harness (W8-S8 pass 3): G5 paste-as-source-block green (2026-07-15)
+
+Added **G5** (`NotesGUITests.testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock`). Flow: seed
+`NSPasteboard.general` (from the test runner, cross-process) with a plain-text `archivereader://reveal?…&page=2`
+durable link → select the Zotero fixture note (`idZotero`, a real `kind: note`) → ensure STYLED mode →
+**Edit ▸ Paste as Source Block(s) (⌘⇧V)** → flush the editor write-back (select-away, W7-S6 inline flush) →
+assert the note's `.md` gains a `<!-- block: reader-page … -->` block that preserves the durable link, and the
+note's original `zotero-item` block survives (paste is additive). Passes live (~15 s, no hang); G1 + G3 + G9 +
+SmokeUITest all still green in the same run (**TEST EXECUTE SUCCEEDED**). 0 new warnings (the 22 residual
+`NotesGUITests.swift` warnings are pre-existing base-class `setUpWithError` main-actor-isolation notes, W8-S7's
+accepted "32 residual" — none in the G5 additions). File-safe: the block write landed only in the scratch
+fixture's `idZotero` note; the real Store is absent and `notesStoreRootBookmark` was not persisted.
+
+- **Uses the plain-text fallback** (`SourceBlockPaster.scanURLs`), not the custom UTI, so no `ArchiveLinkPayload`
+  encode is needed and there is no thumbnail render (the pasted `.readerPage` block has `thumbnailData == nil`)
+  — G5 deliberately avoids the reader-page-chip thumbnail path (that render idle-check rides G6). Target is
+  `idZotero`, not the plain note, so G5 doesn't perturb the note G3/G9 depend on; the Zotero chip has no
+  thumbnail either. `handleSourceBlockPaste` requires `!currentIsRaw` (paste only in styled mode) and declines a
+  Reader link pasted into an *extract* (§D7) — both honored by the target/mode choice.
+- **BLOCKER for G7/G8 (folder replicate / delete-last-instance) — the INDEX-DB caveat, now fully traced.** The
+  folder tree loads **DB-first**: `OrganizationStore.load(storeRoot:)` reads folders from the sqlite index
+  (`NotesIndex.allFolders()`) and consults the store's `organization.json` **only when that DB has zero
+  folders**. The index DB lives in the app **container**
+  (`~/Library/Containers/com.archivenotes.app/Data/Library/Application Support/ArchiveNotes/notes-index-v1.sqlite3`),
+  NOT under the `-ANUITestStorePath` fixture, and it **survives across launches** (no UITest reset), so a prior
+  run's cached graph shadows the fixture's `organization.json` and the fixture's Reading/Ideas folders never
+  appear. Replicate/delete DO persist to both the DB and `<fixture>/organization.json` (`OrganizationStore.add/
+  forceRemoveLastMembership → exportOrganization`), so a test can assert on `organization.json` — but the folders
+  must first LOAD. **Fix for the next session (do NOT delete the owner's container):** add a DEBUG seam that, under
+  `-ANUITestStorePath`, points `NotesIndex`'s DB at a path *inside the fixture* (or a temp dir) instead of the
+  container — then the fixture DB starts empty → `organization.json` loads fresh → G7/G8 become deterministic,
+  and the container is never touched. G8's confirm/cancel IDs are `an.dialog.deleteLastInstance.confirm`/`.cancel`
+  (`NotesBrowserView`); the `an.locations.remove` button (`LocationsInspector`) is the trigger; confirm →
+  `NoteStore.delete` → `FileManager.trashItem` (recoverable, never `removeItem`).
+
 ## Zotero client tested over the REAL transport (in-process HTTP stub); attachment-kind reconciled (W8-S5, 2026-07-14)
 
 W8-S5 added `ZoteroLocalServerTests` (plan §1.8, 5 tests, all green, no network egress). Unlike the W5-S2

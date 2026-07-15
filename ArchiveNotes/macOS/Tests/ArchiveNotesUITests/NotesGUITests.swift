@@ -1,4 +1,5 @@
 import XCTest
+import AppKit   // NSPasteboard — seed the general pasteboard for the source-block paste check (G5)
 import Darwin   // getpwuid / getuid — resolve the REAL home from the password DB
 
 /// Base class for the per-wave Archive Notes GUI checks (08-testing §3.7, W8-S8).
@@ -35,8 +36,12 @@ class NotesFixtureUITestCase: XCTestCase {
     }()
 
     // Fixed fixture item UUIDs (match make-notes-fixture.sh).
-    static let idPlain  = "11111111-1111-1111-1111-111111111111"   // plain note, carries `#`/`**` Markdown
-    static let idReader = "22222222-2222-2222-2222-222222222222"   // the reader-page source-block note
+    static let idPlain   = "11111111-1111-1111-1111-111111111111"  // plain note, carries `#`/`**` Markdown
+    static let idReader  = "22222222-2222-2222-2222-222222222222"  // the reader-page source-block note
+    static let idZotero  = "33333333-3333-3333-3333-333333333333"  // the Zotero-chip note (a kind:note)
+    static let idExtract = "44444444-4444-4444-4444-444444444444"  // the extract with a note-passage block
+    // The embedded scratch Reader corpus root GUID (durable links resolve under it).
+    static let corpusRootGUID = "c07b0700-2000-4000-8000-000000000002"
 
     var app: XCUIApplication!
 
@@ -216,11 +221,16 @@ class NotesFixtureUITestCase: XCTestCase {
 }
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
-/// Session Log + Morning Review): pass 1 = G1 (create) + G3 (raw toggle); this pass adds G9 (create
-/// extract from a note selection), which exercises the DEBUG selection seam (`an.editor.test.select`)
-/// for the first time. Still to land: G5 (paste→source block) + G7/G8 (folder replicate / delete-last-
-/// instance, which need the org-graph folders loaded — mind the INDEX-DB caveat) under XCUITest, and
-/// the cliclick checks G4/G6/G10/G11.
+/// Session Log + Morning Review): pass 1 = G1 (create) + G3 (raw toggle); pass 2 = G9 (create extract
+/// from a note selection, first use of the DEBUG selection seam `an.editor.test.select`); this pass
+/// adds G5 (paste archive links as a source block via ⌘⇧V). Still to land: G7/G8 (folder replicate /
+/// delete-last-instance) under XCUITest — these need the org-graph folders loaded, which is blocked by
+/// the INDEX-DB caveat: the org graph loads DB-first from the app *container's* `notes-index-v1.sqlite3`
+/// (survives across launches, never reset), so the fixture's `organization.json` is shadowed unless the
+/// app launches against a fresh container. Making them deterministic needs a DEBUG seam that redirects
+/// the index DB into the fixture under `-ANUITestStorePath` (so the container is never polluted and the
+/// fixture's `organization.json` loads fresh) — recorded for the next session. Then the cliclick checks
+/// G4/G6/G10/G11.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -311,6 +321,85 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "raw/styled toggle must preserve the note body content (whitespace may canonicalize)")
         XCTAssertEqual(bodyAfter?.contains("**bold**"), true, "the bold source must survive the round-trip")
         XCTAssertEqual(bodyAfter?.contains("# Plain Note"), true, "the heading source must survive the round-trip")
+    }
+
+    /// G5 — Paste archive links as a source block (Edit ▸ Paste as Source Block(s), ⌘⇧V). Seeds the
+    /// general pasteboard with a plain-text `archivereader://reveal?…` URL (the paster's plain-text
+    /// fallback — no custom UTI needed, and `NSPasteboard.general` is settable cross-process from the
+    /// test runner) and pastes it into a note editor, asserting the note's on-disk `.md` gains a
+    /// `<!-- block: reader-page … -->` provenance block that preserves the durable link.
+    ///
+    /// Target = the Zotero note (`idZotero`, a real `kind: note`): the paster DECLINES a Reader link
+    /// pasted into an *extract* (§D7, `handleSourceBlockPaste`), and no other XCUITest check depends on
+    /// this note's body (the cliclick G11 Zotero check runs against a freshly-rebuilt fixture). The
+    /// paste also requires STYLED mode (`handleSourceBlockPaste` guards `!currentIsRaw`), so we ensure
+    /// styled first. The added block is additive; the note is left dirty and wiped by the next pre-run
+    /// fixture rebuild. Disk-asserted, so it's independent of the org-graph / INDEX-DB caveat.
+    func testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock() throws {
+        let uuid = Self.idZotero
+        let bodyBefore = rawMarkdown(inItemDir: uuid) ?? ""
+        XCTAssertFalse(bodyBefore.isEmpty, "should read the Zotero note off disk")
+        XCTAssertFalse(bodyBefore.contains("block: reader-page"),
+                       "the Zotero fixture note should start without a reader-page block")
+
+        // The durable link to paste — resolves under the embedded scratch Reader corpus. `page` present
+        // → the paster classifies it as a `.readerPage` block.
+        let link = "archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&page=2"
+
+        func blockOnDisk() -> Bool { (rawMarkdown(inItemDir: uuid) ?? "").contains("block: reader-page") }
+
+        // One paste attempt: (re)select the target, ensure STYLED mode, seed the pasteboard, place a
+        // caret, fire the trigger, then flush the editor write-back to disk by selecting another item
+        // (select() flushes the outgoing editor inline — W7-S6) and poll disk.
+        func attempt(_ trigger: () -> Void) -> Bool {
+            selectItem(uuid: uuid)
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+            _ = pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty }
+
+            // Ensure styled: in RAW mode the editor shows the literal `zotero://select…` header source;
+            // that never appears in styled mode (it renders as a chip). Toggle back to styled if raw.
+            if ((editor.value as? String) ?? "").contains("zotero://select") {
+                rawToggle.click()
+                _ = pollUntil(timeout: 5) { !(((editor.value as? String) ?? "").contains("zotero://select")) }
+            }
+
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            XCTAssertTrue(pb.setString(link, forType: .string), "should seed the pasteboard with the link")
+
+            _ = setEditorSelection(location: 0, length: 0)   // defined caret at the start
+            trigger()
+
+            var ok = pollUntil(timeout: 4) { blockOnDisk() }
+            if !ok {
+                selectItem(uuid: Self.idPlain)               // flush idZotero's pending write-back
+                ok = pollUntil(timeout: 6) { blockOnDisk() }
+            }
+            return ok
+        }
+
+        // Primary: ⌘⇧V. Fallback: the Edit-menu item (title-located, Reader-harness parity).
+        var wrote = attempt { app.activate(); app.typeKey("v", modifierFlags: [.command, .shift]) }
+        if !wrote {
+            wrote = attempt {
+                let editMenu = app.menuBars.menuBarItems["Edit"]
+                if editMenu.waitForExistence(timeout: 5) {
+                    editMenu.click()
+                    let item = app.menuItems["Paste as Source Block(s)"]
+                    if item.waitForExistence(timeout: 3) { item.click() }
+                }
+            }
+        }
+
+        XCTAssertTrue(wrote, "⌘⇧V / Edit ▸ Paste as Source Block(s) should insert a reader-page block")
+        let bodyAfter = rawMarkdown(inItemDir: uuid) ?? ""
+        XCTAssertTrue(bodyAfter.contains("block: reader-page"),
+                      "the note should carry a reader-page provenance block after the paste")
+        XCTAssertTrue(bodyAfter.contains("archivereader://reveal?root=\(Self.corpusRootGUID)"),
+                      "the pasted block should preserve the durable reader link")
+        // The pre-existing zotero-item block must survive (paste is additive, not a replace).
+        XCTAssertTrue(bodyAfter.contains("block: zotero-item"),
+                      "the paste must be additive — the note's original zotero-item block should remain")
     }
 
     /// G9 — Create an extract from a note selection (Extract ▸ Create Extract, ⌘⌥E). Selecting text in a
