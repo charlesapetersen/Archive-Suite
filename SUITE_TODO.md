@@ -257,7 +257,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   contract (write-once-per-run on MainActor, happens-before child tasks); L4 cache previous JPEG in Anthropic +
   Gemini batch loops. Build clean 0 warnings. | files: `OCR/BatchOCR.swift`, `OCR/OCRProcessor+ReviewFlows.swift`,
   `OCR/OCRProcessor.swift` | S | low
-- [x] **Reader GUI test harness (XCUITest)** — W7.1–W7.5 shipped. XCUITest target + accessibilityIdentifiers + fixture-root override + make-gui-fixture.sh + initial test suite (12 tests: table, tag cloud, sort, filter, preview, viewer, degrade). | L | med
+- [x] **Reader GUI test harness (XCUITest)** — W7.1–W7.5 shipped (target + accessibilityIdentifiers + fixture-root override + make-gui-fixture.sh + suite). **W7.6 (fixup) — all 14 tests now EXECUTE and PASS** (were 13/14 skipping): fixed the sandbox↔Spotlight fixture load (DEBUG off-Spotlight directory enumeration, since NSMetadataQuery returns nothing for a temporary-exception path), UITest↔owner shared-UserDefaults isolation (no view-state restore/persist in test mode — was inheriting the owner's live filter AND clobbering their settings), the tag-cloud element-type query + row/header click hittability, and marked the UI-test classes `@MainActor` (test-target warnings 171→32). PDFView content panes aren't XCUITest-queryable (framework limit) — asserted via observable chrome instead. | L | med
 
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 **Done:**

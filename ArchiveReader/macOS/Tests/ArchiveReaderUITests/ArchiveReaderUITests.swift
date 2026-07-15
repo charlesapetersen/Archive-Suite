@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor   // XCUIApplication / XCUIElement are main-actor-isolated in the Swift 6 SDK
 final class ArchiveReaderUITests: XCTestCase {
 
     private var app: XCUIApplication!

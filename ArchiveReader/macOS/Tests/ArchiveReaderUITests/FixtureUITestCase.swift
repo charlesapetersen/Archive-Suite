@@ -7,6 +7,9 @@ import Darwin   // getpwuid / getuid — resolve the REAL home from the password
 /// fixture at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`.
 /// If the fixture directory is absent, every test in the subclass is skipped
 /// (the fixture is built by `scripts/make-gui-fixture.sh`).
+/// `@MainActor` because XCUIApplication / XCUIElement are main-actor-isolated in the Swift 6 SDK;
+/// UI tests drive the UI and belong on the main actor. Subclasses inherit this isolation.
+@MainActor
 class FixtureUITestCase: XCTestCase {
 
     /// Absolute path to the pre-built GUI fixture, resolved against the REAL home.
@@ -49,13 +52,15 @@ class FixtureUITestCase: XCTestCase {
         app = XCUIApplication()
         app.launchArguments += ["-ARUITestRootPath", Self.fixturePath]
         app.launch()
+        app.activate()   // bring to front so row/header clicks are hittable even if another app had focus
 
         // Wait for the main window + table to appear and populate.
         let mainWindow = app.windows["Archive Reader"]
         XCTAssertTrue(mainWindow.waitForExistence(timeout: 10), "Main window should appear")
         XCTAssertTrue(table.waitForExistence(timeout: 10), "Table should appear")
 
-        // Give Spotlight + NSMetadataQuery time to deliver results.
+        // The fixture loads synchronously off disk (DEBUG `-ARUITestRootPath` path), so rows are
+        // present almost immediately; still give a brief settle window.
         waitForRows(minimum: 1, timeout: 15)
     }
 
@@ -76,6 +81,29 @@ class FixtureUITestCase: XCTestCase {
 
     /// The number of visible rows in the table.
     var rowCount: Int { table.tableRows.count }
+
+    /// Click a table row robustly. XCUITest reports a valid on-screen element as "not hittable" when
+    /// another app briefly holds window-server focus (e.g. someone is using the Mac while the suite
+    /// runs), so bring the app forward and wait for the row to become hittable before clicking, with
+    /// a coordinate tap as a last resort. Returns the row element.
+    @discardableResult
+    func clickRow(_ index: Int, timeout: TimeInterval = 10) -> XCUIElement {
+        app.activate()
+        let row = table.tableRows.element(boundBy: index)
+        _ = row.waitForExistence(timeout: timeout)
+        let deadline = Date().addingTimeInterval(timeout)
+        while !row.isHittable, Date() < deadline {
+            app.activate()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        if row.isHittable {
+            row.click()
+        } else {
+            // Fallback: tap near the row's left edge by coordinate (still exercises selection).
+            row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
+        }
+        return row
+    }
 
     /// Type a string into a text field identified by its accessibility ID.
     func typeInField(_ id: String, text: String) {

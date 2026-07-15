@@ -17,25 +17,17 @@ final class NavigationUITests: FixtureUITestCase {
     // MARK: - Tag cloud (regression: no date tokens)
 
     func testTagCloudShowsSubjectsNotDateTokens() throws {
-        // Open the tag cloud panel via toolbar button.
+        // Open the tag cloud panel via toolbar button. Its visibility is @AppStorage (shared
+        // UserDefaults), so toggle up to twice until tags are actually shown rather than assuming
+        // it starts hidden.
         let tagCloudButton = app.buttons["ar.toolbar.tagCloud"]
         XCTAssertTrue(tagCloudButton.waitForExistence(timeout: 5))
-        tagCloudButton.click()
-
-        // The tag cloud container should appear.
-        let tagCloud = app.groups["ar.tagCloud"]
-        if !tagCloud.waitForExistence(timeout: 5) {
-            // Some SwiftUI versions expose it differently — try scrollViews.
-            let alt = app.scrollViews["ar.tagCloud"]
-            XCTAssertTrue(alt.waitForExistence(timeout: 3), "Tag cloud panel should appear")
+        let tagTexts = app.buttons.matching(identifier: "ar.tagCloud.tag")
+        for _ in 0..<2 where tagTexts.count == 0 {
+            tagCloudButton.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         }
-
-        // Collect all tag-cloud tag labels. They have id "ar.tagCloud.tag".
-        let tagTexts = app.staticTexts.matching(identifier: "ar.tagCloud.tag")
-        // Wait a moment for the cloud to render.
-        if tagTexts.count == 0 {
-            RunLoop.current.run(until: Date().addingTimeInterval(2))
-        }
+        XCTAssertGreaterThan(tagTexts.count, 0, "Tag cloud panel should appear with tags")
 
         // Date-facet tokens that MUST NOT appear in the cloud.
         let dateFacetPatterns = [
@@ -51,9 +43,11 @@ final class NavigationUITests: FixtureUITestCase {
             }
         }
 
-        // Subject tokens that SHOULD appear.
+        // Subject tokens that SHOULD appear. NOTE: "Budget Policy" is deliberately NOT here — it lives
+        // only on fixture file 00009, which has no Read/Unread tag, so the library predicate
+        // (kMDItemUserTags == Read || Unread) never surfaces it (matching production behavior).
         let expectedSubjects = ["Jerry Brown", "Economics", "Medieval Records",
-                                "DP chapters", "Budget Policy", "Education Policy"]
+                                "DP chapters", "Education Policy"]
         let allLabels = (0..<tagTexts.count).map { tagTexts.element(boundBy: $0).label }
         for subject in expectedSubjects {
             XCTAssertTrue(allLabels.contains(subject),
@@ -99,24 +93,23 @@ final class NavigationUITests: FixtureUITestCase {
     func testTagCloudPanelToggles() throws {
         let button = app.buttons["ar.toolbar.tagCloud"]
         XCTAssertTrue(button.waitForExistence(timeout: 5))
+        func tagCount() -> Int { app.buttons.matching(identifier: "ar.tagCloud.tag").count }
 
-        // Tag cloud is hidden by default (@AppStorage default = false).
-        // Open it.
-        button.click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-
-        // Should find tag-cloud tags or the container.
-        let tagTexts = app.staticTexts.matching(identifier: "ar.tagCloud.tag")
-        RunLoop.current.run(until: Date().addingTimeInterval(1))
-        let countWhenOpen = tagTexts.count
-        XCTAssertGreaterThan(countWhenOpen, 0, "Tag cloud should show tags when open")
+        // The panel's visibility is @AppStorage — its initial state is whatever the shared
+        // UserDefaults holds, so don't assume "hidden by default". Toggle up to twice until the
+        // cloud is OPEN (tags visible), then assert tags show; closing hides them.
+        for _ in 0..<2 where tagCount() == 0 {
+            button.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+        }
+        XCTAssertGreaterThan(tagCount(), 0, "Tag cloud should show tags when open")
 
         // Close it.
         button.click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
 
         // Tags should no longer be visible.
-        let countWhenClosed = app.staticTexts.matching(identifier: "ar.tagCloud.tag").count
+        let countWhenClosed = tagCount()
         XCTAssertEqual(countWhenClosed, 0, "Tag cloud tags should disappear when panel is closed")
     }
 
@@ -141,34 +134,22 @@ final class NavigationUITests: FixtureUITestCase {
     func testHeaderClickChangesSort() throws {
         // Wait for enough rows to make sort order meaningful.
         waitForRows(minimum: 5, timeout: 10)
+        app.activate()
 
-        // Capture the first row's label before sort.
-        let firstRowBefore = table.tableRows.element(boundBy: 0)
-        let labelBefore = firstRowBefore.staticTexts.firstMatch.label
+        // Click the "File name" column header to sort by name. An NSTableHeaderView header is exposed
+        // as a static text or button but is frequently reported "not hittable" for a plain .click(),
+        // so tap it by coordinate. The assertion is that the interaction is handled and rows remain
+        // (we can't assert an exact order without knowing the default sort).
+        let header = table.staticTexts["File name"].exists
+            ? table.staticTexts["File name"]
+            : table.buttons["File name"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5), "File name column header should be reachable")
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // sort ascending
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // reverse direction
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
 
-        // Click the "File name" column header to sort by name.
-        let nameHeader = table.staticTexts["File name"]
-        if nameHeader.exists {
-            nameHeader.click()
-            RunLoop.current.run(until: Date().addingTimeInterval(1))
-
-            // Click again to reverse the sort direction.
-            nameHeader.click()
-            RunLoop.current.run(until: Date().addingTimeInterval(1))
-
-            let firstRowAfter = table.tableRows.element(boundBy: 0)
-            let labelAfter = firstRowAfter.staticTexts.firstMatch.label
-            // After two clicks (sort ascending then descending), the order likely changed
-            // vs. the default chronological sort. We can't assert the exact order without
-            // knowing the default, but the test validates the click interaction doesn't crash.
-            // The real assertion is that the table still has rows (didn't break).
-            XCTAssertGreaterThanOrEqual(rowCount, 5, "Table should still have rows after sort")
-        } else {
-            // Column header may be accessible via a button.
-            let nameButton = table.buttons["File name"]
-            XCTAssertTrue(nameButton.exists, "File name column header should be reachable")
-            nameButton.click()
-        }
+        XCTAssertGreaterThanOrEqual(rowCount, 5, "Table should still have rows after header-click sort")
     }
 
     // MARK: - Name filter reduces rows

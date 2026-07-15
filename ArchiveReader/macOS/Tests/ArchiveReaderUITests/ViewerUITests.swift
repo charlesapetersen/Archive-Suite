@@ -9,10 +9,8 @@ final class ViewerUITests: FixtureUITestCase {
     func testPreviewOpensAndDismisses() throws {
         waitForRows(minimum: 3, timeout: 10)
 
-        // Select the first row by clicking it.
-        let firstRow = table.tableRows.element(boundBy: 0)
-        XCTAssertTrue(firstRow.exists, "First row should exist")
-        firstRow.click()
+        // Select the first row by clicking it (robust to transient focus loss).
+        clickRow(0)
 
         // Open preview via the toolbar button.
         let previewButton = app.buttons["ar.toolbar.preview"]
@@ -41,8 +39,7 @@ final class ViewerUITests: FixtureUITestCase {
         waitForRows(minimum: 3, timeout: 10)
 
         // Select a standard 2-page PDF (file 1–6 from fixture are real PDFs).
-        let firstRow = table.tableRows.element(boundBy: 0)
-        firstRow.click()
+        clickRow(0)
 
         let previewButton = app.buttons["ar.toolbar.preview"]
         previewButton.click()
@@ -50,17 +47,15 @@ final class ViewerUITests: FixtureUITestCase {
         let doneButton = app.buttons["ar.preview.done"]
         XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
 
-        // For a standard 2-page PDF, the text pane should exist (not "no text").
-        // If this is a standard PDF with OCR text, we should see the text pane.
-        // The "no text" label only appears for single-page / no-text-layer PDFs.
-        // We can't guarantee which file is first (depends on sort), so just verify
-        // the preview infrastructure exists.
-        let textPane = app.otherElements["ar.preview.textPane"]
-        let noText = app.staticTexts["ar.preview.noText"]
-
-        // One of these should exist.
-        XCTAssertTrue(textPane.exists || noText.exists,
-            "Preview should show either a text pane or a 'no text' indicator")
+        // The preview should offer to open the full viewer — proof a document actually loaded into
+        // the sheet (beyond just the sheet chrome appearing).
+        XCTAssertTrue(app.buttons["ar.preview.open"].exists,
+            "Preview should show an Open-in-Viewer button for the loaded document")
+        // NOTE: the content panes are PDFView-backed (`ar.preview.imagePane`/`ar.preview.textPane`) or a
+        // SwiftUI "no text" view. A PDFView does NOT expose its accessibilityIdentifier to XCUITest, so
+        // asserting on the text-pane element directly is not reliable — the Open button above is the
+        // queryable proof the document loaded. (The no-text-layer/degrade paths ARE asserted in
+        // testNoTextLayerPDFShowsBanner / testNonPDFImageDegrades.)
 
         doneButton.click()
     }
@@ -70,8 +65,7 @@ final class ViewerUITests: FixtureUITestCase {
     func testDocumentViewerOpens() throws {
         waitForRows(minimum: 3, timeout: 10)
 
-        let firstRow = table.tableRows.element(boundBy: 0)
-        firstRow.click()
+        clickRow(0)
 
         // Open via ⌘O (Open Document menu command).
         pressKey("o", modifiers: .command)
@@ -79,17 +73,14 @@ final class ViewerUITests: FixtureUITestCase {
         // A second window should appear — the document viewer.
         RunLoop.current.run(until: Date().addingTimeInterval(2))
 
-        let windows = app.windows
-        // We should have at least 2 windows (nav + viewer).
-        XCTAssertGreaterThanOrEqual(windows.count, 2,
+        // We should have at least 2 windows (nav + viewer) — the observable proof ⌘O opened the
+        // document viewer for the selected row.
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2,
             "Opening a document should create a second window")
-
-        // The viewer should have a text pane or a format banner.
-        let textPane = app.otherElements["ar.doc.textPane"]
-        let formatBanner = app.staticTexts["ar.doc.formatBanner"]
-        let noText = app.staticTexts["ar.doc.noText"]
-        XCTAssertTrue(textPane.exists || formatBanner.exists || noText.exists,
-            "Document viewer should show content elements")
+        // NOTE: the viewer's main content pane is PDFView-backed (`ar.doc.textPane`) whenever the doc
+        // has a text layer, and a PDFView does not expose its accessibilityIdentifier to XCUITest, so
+        // we don't assert on it here. The SwiftUI degrade paths (`ar.doc.formatBanner` / `ar.doc.noText`)
+        // ARE queryable and are asserted in testNoTextLayerPDFShowsBanner / testNonPDFImageDegrades.
 
         // Close the viewer window (⌘W closes the front window).
         pressKey("w", modifiers: .command)
