@@ -34,10 +34,34 @@ override; readiness gates on a seeded row.
   gate on a concrete seeded row) but the probe's queryability — flagged UNVERIFIED at W8-S7 — needs a fix
   (bump the frame / adjust the a11y wrapping) before any FTS/relevance check relies on it.
 - **REMAINING (W8-S8 is oversized — recommend re-split; see plan Session Log / Morning Review):** G5 (paste →
-  source block), G7 (replicate), G8 (delete-last-instance, Tier-2), G9 (create-extract) under XCUITest;
+  source block), G7 (replicate), G8 (delete-last-instance, Tier-2) under XCUITest;
   G4/G6/G10/G11 in cliclick; G2/G6/G11 owner-eye docs. G5/G6 exercise the reader-page **source-block chip** —
   confirm its durable-link/thumbnail render (against the ungranted scratch corpus root) idles under the drive
-  before relying on those checks.
+  before relying on those checks. (G9 landed in pass 2, below.)
+
+## GUI harness (W8-S8 pass 2): G9 create-extract green — first use of the DEBUG selection seam (2026-07-15)
+
+Added **G9** (`NotesGUITests.testG9_CreateExtractFromSelectionWritesExtractItem`), the first check to drive
+the W8-S7 §3.3 DEBUG editor selection seam. Flow: select the plain note → set a non-empty selection via the
+hidden strip (`an.editor.test.selectionInput` "0,8" → `an.editor.test.select`) → **Extract ▸ Create Extract
+(⌘⌥E)** → assert a NEW `items/<uuid>/<Title>.md` lands with `kind: extract` and a `note-passage` block linking
+back to the source note (`archivenotes://open?id=<idPlain>`). Passes live (~18 s, no hang); the model path was
+already unit-covered by `ExtractCommandTests`, so this is the end-to-end UI proof. G1 + G3 + SmokeUITest still
+green in the same run; 189 XCTest + Swift-Testing suites green; 0 new warnings. Notes-only → Reader/Processor
+parity holds.
+
+- **STRIP SIZING (fixed) — the DEBUG UITest control strip was `.frame(height: 14).font(.caption2)`,** which
+  the W8-S7 notes flagged as an unverified XCUITest hit-testing hazard. Raised to `.frame(height: 28)` (dropped
+  `.caption2`); XCUITest now reliably focuses the field + clicks the buttons. DEBUG- and
+  `-ANUITestStorePath`-gated, so a normal run never shows it and Release omits it entirely (no product change).
+- **FINDING — the XCUITest *runner* has READ-ONLY access to `/Users/`.** The RW temporary-exception
+  entitlement is on the app-under-test, NOT the `ArchiveNotesUITests` runner, so a test can read the fixture
+  to assert but **cannot delete the items it creates** (proven: a G1/G9-created dir has mtime = its creation
+  time and survives `tearDown`, so `removeItem` silently no-ops). Consequence: create-checks (G1, G9) leave
+  their new item on disk within a run; the fixture is rebuilt externally by `make-notes-fixture.sh` before each
+  run (mirroring the Reader harness), and every assertion tolerates a dirty fixture by subtracting a pre-test
+  `itemDirs()` snapshot — so leftovers never change a result. (The earlier "best-effort cleanup / Route-B is
+  RW" comment was wrong for the runner and was removed.)
 
 ## Zotero client tested over the REAL transport (in-process HTTP stub); attachment-kind reconciled (W8-S5, 2026-07-14)
 

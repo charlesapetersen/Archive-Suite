@@ -68,6 +68,16 @@ class NotesFixtureUITestCase: XCTestCase {
         app = nil
     }
 
+    // MARK: - Fixture lifecycle
+    //
+    // The scratch fixture is (re)built EXTERNALLY by `scripts/make-notes-fixture.sh` before each GUI run
+    // (the session/daemon that runs this suite does so) — mirroring the Reader harness, which likewise
+    // assumes a pre-built fixture. The UITest *runner* is granted only READ of `/Users/` (the RW
+    // temporary-exception entitlement is on the app-under-test, NOT the runner), so a test CANNOT delete
+    // the items it creates. Creating checks (G1 note, G9 extract) therefore leave their new item behind
+    // within a run; every assertion tolerates that by subtracting a pre-test `itemDirs()` snapshot, so a
+    // dirty fixture never changes a result. The next pre-run rebuild returns the fixture to 4 items.
+
     // MARK: - Elements
 
     /// The virtualized item table (the AppKit `NSTableView`, id `an.table`; the SwiftUI wrapper carries
@@ -171,12 +181,46 @@ class NotesFixtureUITestCase: XCTestCase {
         _ = idx
         return seenClose ? bodyLines.joined(separator: "\n") : text
     }
+
+    /// The full raw `.md` text (front-matter + body) of the first note file inside `items/<dir>`, or nil.
+    /// Unlike `noteBody`, this keeps the YAML front-matter so a check can assert on `kind:` etc.
+    func rawMarkdown(inItemDir dir: String) -> String? {
+        let d = itemsDir + "/" + dir
+        guard let md = ((try? FileManager.default.contentsOfDirectory(atPath: d)) ?? [])
+            .first(where: { $0.hasSuffix(".md") }) else { return nil }
+        return try? String(contentsOfFile: d + "/" + md, encoding: .utf8)
+    }
+
+    // MARK: - DEBUG editor test seam (W8-S7 §3.3; drives the styled NSTextView XCUITest can't focus)
+
+    /// Set the editor's selected range via the hidden DEBUG control strip
+    /// (`an.editor.test.selectionInput` + `an.editor.test.select`) — XCUITest can't reliably place a
+    /// caret selection inside the styled NSTextView, so the strip drives it through `testBox`. Returns
+    /// false if the strip isn't present/hittable (which would itself be the finding to fix).
+    @discardableResult
+    func setEditorSelection(location: Int, length: Int, timeout: TimeInterval = 10) -> Bool {
+        let field = app.descendants(matching: .any)["an.editor.test.selectionInput"]
+        let button = app.descendants(matching: .any)["an.editor.test.select"]
+        guard field.waitForExistence(timeout: timeout),
+              button.waitForExistence(timeout: timeout) else { return false }
+        _ = pollUntil(timeout: timeout) { app.activate(); return field.isHittable }
+        guard field.isHittable else { return false }
+        field.click()
+        field.typeText("\(location),\(length)")
+        // Clicking the button ends editing in the field (commits the binding via focus-loss) BEFORE the
+        // button action reads `testSelectionInput`, so no explicit commit keystroke is needed.
+        guard button.isHittable else { return false }
+        button.click()
+        return true
+    }
 }
 
-/// Per-wave GUI checks (08-testing §3.7). This session (W8-S8, pass 1) lands the two most robust
-/// within-Notes, disk-assertable checks — G1 (create) and G3 (raw toggle) — on the live XCUITest
-/// harness. G5/G7/G8/G9 (pasteboard / folder-graph / extract) and the cliclick checks (G4/G6/G10/G11)
-/// land in subsequent passes (W8-S8 is oversized — see the plan Session Log + Morning Review).
+/// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
+/// Session Log + Morning Review): pass 1 = G1 (create) + G3 (raw toggle); this pass adds G9 (create
+/// extract from a note selection), which exercises the DEBUG selection seam (`an.editor.test.select`)
+/// for the first time. Still to land: G5 (paste→source block) + G7/G8 (folder replicate / delete-last-
+/// instance, which need the org-graph folders loaded — mind the INDEX-DB caveat) under XCUITest, and
+/// the cliclick checks G4/G6/G10/G11.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -210,8 +254,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertEqual(newDirs.count, 1, "exactly one new item directory should appear on disk")
         if let dir = newDirs.first {
             XCTAssertFalse(mdFiles(inItemDir: dir).isEmpty, "the new item directory should contain a .md file")
-            // Best-effort cleanup so repeated runs against one fixture stay stable (Route-B is RW).
-            try? FileManager.default.removeItem(atPath: itemsDir + "/" + dir)
+            // (Left on disk — the runner can't delete it; wiped by the next pre-run fixture rebuild.)
         }
     }
 
@@ -268,5 +311,64 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "raw/styled toggle must preserve the note body content (whitespace may canonicalize)")
         XCTAssertEqual(bodyAfter?.contains("**bold**"), true, "the bold source must survive the round-trip")
         XCTAssertEqual(bodyAfter?.contains("# Plain Note"), true, "the heading source must survive the round-trip")
+    }
+
+    /// G9 — Create an extract from a note selection (Extract ▸ Create Extract, ⌘⌥E). Selecting text in a
+    /// note and minting an extract must write a NEW `kind: extract` item whose body carries a
+    /// `note-passage` provenance block linking back to the source note (00-overview §7; W7-S2). The
+    /// model path is already unit-covered (`ExtractCommandTests`); this drives it end-to-end through the
+    /// live UI. Uses the DEBUG selection seam (`an.editor.test.select`) because XCUITest can't reliably
+    /// place a caret selection in the styled NSTextView. Disk-asserted (like G1); the source note is the
+    /// plain note (a real `.note`, so the extract-from-note gate passes). The new extract item is left on
+    /// disk (the runner can't delete under `/Users/`) and wiped by the next pre-run fixture rebuild — the
+    /// assertion tolerates a dirty fixture by subtracting the pre-test `itemDirs()` snapshot.
+    func testG9_CreateExtractFromSelectionWritesExtractItem() throws {
+        let before = itemDirs()
+        XCTAssertGreaterThanOrEqual(before.count, 4, "fixture should have its seeded notes")
+
+        // Select the plain note so the editor loads a NOTE body (you extract *from* a note).
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty },
+                      "the note body should load into the editor before selecting text")
+
+        // Non-empty selection over the first rendered block (the heading text is well over 8 chars, so
+        // this stays inside a single source block). Drives the styled text view via the DEBUG strip.
+        XCTAssertTrue(setEditorSelection(location: 0, length: 8),
+                      "the DEBUG selection strip must be drivable (an.editor.test.selectionInput/.select)")
+
+        // A new item dir counts as "the extract" once its `.md` is on disk with `kind: extract`
+        // (NoteStore.create writes atomically, so this never races a partial file).
+        func newExtractDirs() -> [String] {
+            itemDirs().subtracting(before).filter { (rawMarkdown(inItemDir: $0) ?? "").contains("kind: extract") }
+        }
+
+        // Trigger Create Extract: ⌘⌥E (the Extract-menu shortcut), with the menu click as a fallback.
+        app.activate()
+        app.typeKey("e", modifierFlags: [.command, .option])
+        var created = pollUntil(timeout: 8) { !newExtractDirs().isEmpty }
+        if !created {
+            let extractMenu = app.menuBars.menuBarItems["Extract"]
+            if extractMenu.waitForExistence(timeout: 5) {
+                extractMenu.click()
+                let item = app.menuItems["Create Extract"]
+                if item.waitForExistence(timeout: 3) { item.click() }
+            }
+            created = pollUntil(timeout: 10) { !newExtractDirs().isEmpty }
+        }
+
+        let newDirs = newExtractDirs()
+        XCTAssertTrue(created, "Create Extract (⌘⌥E / Extract menu) should mint a kind: extract item")
+        XCTAssertEqual(newDirs.count, 1, "exactly one new extract item directory should appear on disk")
+        if let dir = newDirs.first {
+            let md = rawMarkdown(inItemDir: dir) ?? ""
+            XCTAssertTrue(md.contains("kind: extract"),
+                          "the new item's front matter should declare kind: extract")
+            XCTAssertTrue(md.contains("block: note-passage"),
+                          "the extract body should carry a note-passage provenance block")
+            XCTAssertTrue(md.contains("archivenotes://open?id=\(Self.idPlain)"),
+                          "the note-passage block should link back to the source note \(Self.idPlain)")
+            // (Left on disk — the runner can't delete it; wiped by the next pre-run fixture rebuild.)
+        }
     }
 }

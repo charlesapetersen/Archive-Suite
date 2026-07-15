@@ -160,8 +160,10 @@ struct NoteEditorPane: View {
                 }
                 .accessibilityIdentifier("an.editor.test.select")
             }
-            .frame(height: 14)
-            .font(.caption2)
+            // Height/font kept generous enough that XCUITest reliably hit-tests + focuses these controls
+            // (a 14 pt / .caption2 strip is a known XCUITest hit-testing hazard — W8-S8 §G9). DEBUG- and
+            // `-ANUITestStorePath`-gated, so a normal run never shows it and Release omits it entirely.
+            .frame(height: 28)
         }
     }
 
