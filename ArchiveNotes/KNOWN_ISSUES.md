@@ -3,6 +3,40 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness (W8-S8 pass 4): G7 replicate + G8 delete-last-instance green — INDEX-DB seam unblocks the folder graph (2026-07-15) — Tier-2
+
+Added **G7** (`NotesGUITests.testG7_ReplicateItemIntoFolderAddsMembership`) and **G8**
+(`…testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes`). Both drive the folder-organization graph
+(replication / the §3.6 delete-last-instance guard) end-to-end and assert on the fixture's
+`organization.json` + `items/`. Pass live in the full suite (G1/G3/G5/G7/G8/G9 + SmokeUITest, **TEST EXECUTE
+SUCCEEDED**); 189 XCTest + Swift-Testing green; 0 new warnings. Notes-only → Reader/Processor parity holds.
+Tier-2 (file-writing + data-loss): adversarial self-review + scratch functional run + post-run file-safety
+check (real Store absent, `notesStoreRootBookmark` not persisted, real `notes-index-v1.sqlite3` untouched at
+its pre-run mtime, all writes confined to the scratch `AN-GUI-Fixture`).
+
+- **RESOLVED — the pass-3 INDEX-DB blocker.** New DEBUG seam `NotesModel.indexDatabaseURL(inAppSupport:)`:
+  under `-ANUITestStorePath` the app opens a dedicated `notes-index-uitest.sqlite3` (container Application
+  Support) that is **reset on every launch** (`resetUITestIndexDatabase` deletes the `.sqlite3`/`-wal`/`-shm`
+  triple + ensures the dir). So the container index no longer shadows the fixture: the fresh DB has zero
+  folders → `OrganizationStore.load` falls back to the fixture's `organization.json` → the Reading/Ideas
+  folders + the replicated item load deterministically. Distinct filename keeps the owner's real
+  `notes-index-v1.sqlite3` untouched (verified); DEBUG-only + launch-arg-gated → compiled out of Release and
+  never runs on a normal launch. The index is a rebuildable cache, so resetting it loses nothing.
+- **FIXED (a11y bug, latent) — a container `.accessibilityIdentifier` was shadowing the controls inside it.**
+  `LocationsInspector` set `.accessibilityIdentifier("an.detail.locations")` on its enclosing `VStack`; on
+  macOS SwiftUI that id **propagates to every descendant AX element**, so the folder-row Remove button
+  (intended id `an.locations.remove`) reported `an.detail.locations` instead and was unreachable to XCUITest
+  (the W8-S7-"confirmed" id was in fact dead). Moved the section marker onto the header row only; the per-row
+  button id now resolves. **Same shape still latent on `an.detail.header` / `an.detail.metadata`** (their
+  child elements also report the container id) — harmless today because no check queries those children, but a
+  future check that needs one must relocate the marker the same way.
+- **G8 confirms the recoverable-delete contract under the sandbox:** Cancel leaves the note on disk + its
+  membership intact; Delete Note moves `items/<uuid>` out via `FileManager.trashItem` (system Trash,
+  recoverable) — verified working even with only the Route-B temporary-exception grant.
+- **REMAINING (W8-S8 still open):** the cliclick checks G4 (paste image) / G6 (reveal → Reader) / G10
+  (jump-to-source) / G11 (Zotero chip open) in `gui-drive-notes.sh`; G2/G6/G11 owner-eye docs; and the
+  `an.status.indexReady` probe queryability fix (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8.
+
 ## GUI harness live (W8-S8 pass 1): first XCUITest checks green (G1, G3) + FIXED a main-thread editor loop the drive surfaced (2026-07-15)
 
 W8-S8 (GUI-on) began driving the shipped Notes UI under XCUITest. First two per-wave checks are green live

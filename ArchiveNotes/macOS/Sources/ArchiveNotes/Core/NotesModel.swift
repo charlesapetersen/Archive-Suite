@@ -150,11 +150,46 @@ final class NotesModel: ObservableObject {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveNotes", isDirectory: true)
-        let index = NotesIndex(url: appSupport.appendingPathComponent("notes-index-v1.sqlite3"))
+        let index = NotesIndex(url: Self.indexDatabaseURL(inAppSupport: appSupport))
         self.init(organization: OrganizationStore(index: index),
                   index: index,
                   rootStore: RootFolderStore())
     }
+
+    /// The content-index database URL. Normally `notes-index-v1.sqlite3` in Application Support (the
+    /// app *container* when sandboxed). Under XCUITest (`-ANUITestStorePath`), a dedicated
+    /// `notes-index-uitest.sqlite3` that is RESET on every launch — so a persisted organization graph
+    /// can never shadow the fixture's `organization.json` across GUI runs. `OrganizationStore.load`
+    /// reads the folder graph DB-first and consults `organization.json` only when the DB has zero
+    /// folders (see its `load(storeRoot:)`); a stale container DB from a prior run would otherwise hide
+    /// the fixture's folders/replication (the state the W8-S8 G7/G8 checks assert on). The index is a
+    /// rebuildable cache — resetting it loses nothing — and the distinct filename keeps the owner's real
+    /// `notes-index-v1.sqlite3` untouched. DEBUG-only: the override is compiled out of Release, so the
+    /// shipping app can only ever open `notes-index-v1.sqlite3`.
+    private static func indexDatabaseURL(inAppSupport appSupport: URL) -> URL {
+#if DEBUG
+        if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            let uitestURL = appSupport.appendingPathComponent("notes-index-uitest.sqlite3")
+            resetUITestIndexDatabase(at: uitestURL)
+            return uitestURL
+        }
+#endif
+        return appSupport.appendingPathComponent("notes-index-v1.sqlite3")
+    }
+
+#if DEBUG
+    /// Delete the UITest index DB (plus its `-wal`/`-shm` sidecars) and ensure its parent directory
+    /// exists, so each XCUITest launch opens a fresh, empty index. Only ever touches the
+    /// `notes-index-uitest.sqlite3` triple — never the real `notes-index-v1.sqlite3`, never the store,
+    /// never a corpus. Errors are non-fatal (a missing file is the desired post-state anyway).
+    private static func resetUITestIndexDatabase(at url: URL) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        for suffix in ["", "-wal", "-shm"] {
+            try? fm.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+        }
+    }
+#endif
 
     private init(organization: OrganizationStore, index: NotesIndex, rootStore: RootFolderStore) {
         self.organization = organization

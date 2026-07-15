@@ -42,6 +42,10 @@ class NotesFixtureUITestCase: XCTestCase {
     static let idExtract = "44444444-4444-4444-4444-444444444444"  // the extract with a note-passage block
     // The embedded scratch Reader corpus root GUID (durable links resolve under it).
     static let corpusRootGUID = "c07b0700-2000-4000-8000-000000000002"
+    // Fixed demo-folder UUIDs (match make-notes-fixture.sh organization.json). Reading holds idPlain
+    // + idReader; Ideas holds idReader + idZotero (idReader is the replicated item).
+    static let folderReading = "f1f1f1f1-0000-0000-0000-0000000000f1"
+    static let folderIdeas   = "f2f2f2f2-0000-0000-0000-0000000000f2"
 
     var app: XCUIApplication!
 
@@ -196,6 +200,28 @@ class NotesFixtureUITestCase: XCTestCase {
         return try? String(contentsOfFile: d + "/" + md, encoding: .utf8)
     }
 
+    /// Parse `<fixture>/organization.json` into the set of `[folderId, itemId]` membership pairs (each a
+    /// 2-element array so it's `Hashable`), or nil if the file can't be read/parsed. The app rewrites
+    /// this file atomically on every membership change (`OrganizationStore.exportOrganization`), so it's
+    /// the durable on-disk source of truth the folder-graph checks (G7 replicate / G8 delete) assert on.
+    /// Parses the JSON (not a substring match) because `OrganizationFile.export` re-serializes it.
+    /// UUID strings are **lowercased** so comparisons are case-insensitive: the fixture builder writes
+    /// lowercase UUIDs, but once the app rewrites the file (via `OrganizationFile.export`) they come back
+    /// UPPERCASE (Swift's `UUID.uuidString`); a UUID is case-insensitive, so normalize both here.
+    func organizationMemberships() -> Set<[String]>? {
+        let path = Self.fixturePath + "/organization.json"
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let arr = obj["memberships"] as? [[String: Any]] else { return nil }
+        var pairs = Set<[String]>()
+        for m in arr {
+            if let f = m["folderId"] as? String, let i = m["itemId"] as? String {
+                pairs.insert([f.lowercased(), i.lowercased()])
+            }
+        }
+        return pairs
+    }
+
     // MARK: - DEBUG editor test seam (W8-S7 §3.3; drives the styled NSTextView XCUITest can't focus)
 
     /// Set the editor's selected range via the hidden DEBUG control strip
@@ -222,15 +248,16 @@ class NotesFixtureUITestCase: XCTestCase {
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
 /// Session Log + Morning Review): pass 1 = G1 (create) + G3 (raw toggle); pass 2 = G9 (create extract
-/// from a note selection, first use of the DEBUG selection seam `an.editor.test.select`); this pass
-/// adds G5 (paste archive links as a source block via ⌘⇧V). Still to land: G7/G8 (folder replicate /
-/// delete-last-instance) under XCUITest — these need the org-graph folders loaded, which is blocked by
+/// from a note selection, first use of the DEBUG selection seam `an.editor.test.select`); pass 3 = G5
+/// (paste archive links as a source block via ⌘⇧V); this pass = G7 (folder replicate) + G8
+/// (delete-last-instance, Tier-2). G7/G8 needed the org-graph folders loaded, which had been blocked by
 /// the INDEX-DB caveat: the org graph loads DB-first from the app *container's* `notes-index-v1.sqlite3`
-/// (survives across launches, never reset), so the fixture's `organization.json` is shadowed unless the
-/// app launches against a fresh container. Making them deterministic needs a DEBUG seam that redirects
-/// the index DB into the fixture under `-ANUITestStorePath` (so the container is never polluted and the
-/// fixture's `organization.json` loads fresh) — recorded for the next session. Then the cliclick checks
-/// G4/G6/G10/G11.
+/// (survives across launches, never reset), so the fixture's `organization.json` was shadowed. RESOLVED
+/// this pass by the DEBUG index-DB seam `NotesModel.indexDatabaseURL(inAppSupport:)`: under
+/// `-ANUITestStorePath` the app opens a dedicated `notes-index-uitest.sqlite3` reset on every launch, so
+/// the fixture's `organization.json` loads fresh (the owner's real DB is untouched — distinct filename).
+/// Still to land (cliclick pass): G4 (paste image), G6 (reveal → Reader), G10 (jump-to-source),
+/// G11 (Zotero chip open); plus fixing the `an.status.indexReady` probe queryability.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -459,5 +486,110 @@ final class NotesGUITests: NotesFixtureUITestCase {
                           "the note-passage block should link back to the source note \(Self.idPlain)")
             // (Left on disk — the runner can't delete it; wiped by the next pre-run fixture rebuild.)
         }
+    }
+
+    /// G7 — Replicate an item into another folder (row context menu ▸ **Add to Folder ▸ <name>**).
+    /// Replication is the DevonThink "one file, many folders" model: adding a membership leaves every
+    /// existing one intact (`NotesNavigationModel.replicate` → `OrganizationStore.addMembership`, which
+    /// rewrites `organization.json` atomically). Target = the plain note (`idPlain`, sole member of
+    /// "Reading"); replicate it into "Ideas" → it becomes a member of BOTH. Disk-asserted on
+    /// `organization.json`. Deterministic because the DEBUG index-DB seam (`-ANUITestStorePath`, W8-S8:
+    /// `NotesModel.indexDatabaseURL`) resets the container index each launch, so the fixture's
+    /// `organization.json` loads fresh and its folder graph is present. `idPlain` is not the G8 delete
+    /// target, so the two folder-graph checks don't interact even though both mutate `organization.json`.
+    func testG7_ReplicateItemIntoFolderAddsMembership() throws {
+        guard let before = organizationMemberships() else {
+            return XCTFail("should read the fixture organization.json")
+        }
+        XCTAssertTrue(before.contains([Self.folderReading, Self.idPlain]),
+                      "fixture: the plain note should start as a member of Reading")
+        let targetPair = [Self.folderIdeas, Self.idPlain]
+        func replicated() -> Bool { (organizationMemberships() ?? []).contains(targetPair) }
+
+        let row = selectItem(uuid: Self.idPlain)
+
+        // Right-click the row → Add to Folder ▸ Ideas. `Add` replicates (Move would drop the source).
+        // The `Ideas` item is scoped to the Add submenu so it can't collide with Move's `Ideas`.
+        func attempt() -> Bool {
+            app.activate()
+            _ = pollUntil(timeout: 8) { app.activate(); return row.isHittable }
+            row.rightClick()
+            let add = app.menuItems["Add to Folder"]
+            guard add.waitForExistence(timeout: 5) else { return false }
+            add.hover()   // open the submenu
+            var ideas = add.menuItems["Ideas"]
+            if !ideas.waitForExistence(timeout: 3) {
+                ideas = app.menuItems["Ideas"]   // fallback: only Add's submenu is open, so unambiguous
+                _ = ideas.waitForExistence(timeout: 2)
+            }
+            guard ideas.exists else { return false }
+            ideas.click()
+            return pollUntil(timeout: 5) { replicated() }
+        }
+
+        var ok = attempt()
+        if !ok { ok = attempt() }
+        XCTAssertTrue(ok, "Add to Folder ▸ Ideas should replicate the note into Ideas")
+
+        let after = organizationMemberships() ?? []
+        XCTAssertTrue(after.contains(targetPair),
+                      "the note should now be a member of Ideas (replicated)")
+        XCTAssertTrue(after.contains([Self.folderReading, Self.idPlain]),
+                      "replication must KEEP the original Reading membership (add, not move)")
+    }
+
+    /// G8 — Delete-last-instance guard (00-overview §3.6, **Tier-2**, data-loss). Removing an item from
+    /// its ONLY folder must not silently delete it: `NotesNavigationModel.removeMembership` returns
+    /// `.wasLastInstance` WITHOUT mutating, and the view raises a mandatory confirmation. **Cancel** keeps
+    /// the note on disk (and its membership); only **Delete Note** moves it to the Trash
+    /// (`NoteStore.delete` → `FileManager.trashItem`, recoverable — never `removeItem`). Driven entirely
+    /// through a11y ids: `an.locations.remove` (Locations inspector) →
+    /// `an.dialog.deleteLastInstance.{cancel,confirm}`.
+    ///
+    /// Target = the Zotero note (`idZotero`, a real `kind: note`), the sole member of "Ideas". No check
+    /// after G8 depends on it (G9 extracts from `idPlain`), so trashing it in the confirm leg is safe;
+    /// the next pre-run fixture rebuild restores it. Needs the folder graph loaded (DEBUG index-DB seam).
+    func testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes() throws {
+        XCTAssertTrue(itemDirs().contains(Self.idZotero), "fixture: the Zotero note should exist on disk")
+        guard let before = organizationMemberships() else {
+            return XCTFail("should read the fixture organization.json")
+        }
+        XCTAssertTrue(before.contains([Self.folderIdeas, Self.idZotero]),
+                      "fixture: the Zotero note should start as a member of Ideas")
+        XCTAssertEqual(before.filter { $0[1] == Self.idZotero }.count, 1,
+                       "fixture: the Zotero note must be a SOLE membership (the delete-last-instance case)")
+
+        selectItem(uuid: Self.idZotero)
+
+        // Sole membership → the Locations inspector shows exactly one Remove control (unambiguous id).
+        let remove = app.descendants(matching: .any)["an.locations.remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 10), "Locations ▸ Remove should be present")
+
+        // --- Cancel leg: the confirmation must appear, and cancelling must NOT delete the note. ---
+        _ = pollUntil(timeout: 8) { app.activate(); return remove.isHittable }
+        remove.click()
+        let cancel = app.descendants(matching: .any)["an.dialog.deleteLastInstance.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 8),
+                      "removing the last instance must raise the confirmation dialog")
+        cancel.click()
+        _ = pollUntil(timeout: 3) { !cancel.exists }
+        XCTAssertTrue(itemDirs().contains(Self.idZotero), "Cancel must NOT delete the note")
+        XCTAssertTrue((organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero]),
+                      "Cancel must leave the membership intact")
+
+        // --- Confirm leg: Delete moves the note out of items/ (to the Trash) + drops the membership. ---
+        let remove2 = app.descendants(matching: .any)["an.locations.remove"]
+        XCTAssertTrue(remove2.waitForExistence(timeout: 8), "Remove should still be present after Cancel")
+        _ = pollUntil(timeout: 8) { app.activate(); return remove2.isHittable }
+        remove2.click()
+        let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 8), "the confirmation dialog should appear again")
+        confirm.click()
+
+        let trashed = pollUntil(timeout: 15) { !itemDirs().contains(Self.idZotero) }
+        XCTAssertTrue(trashed,
+                      "Delete Note must move the item out of items/ (to the Trash); items = \(itemDirs())")
+        XCTAssertFalse((organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero]),
+                       "Delete Note must drop the last membership from organization.json")
     }
 }

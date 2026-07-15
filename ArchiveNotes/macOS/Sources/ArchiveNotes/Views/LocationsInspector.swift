@@ -19,6 +19,12 @@ struct LocationsInspector: View {
                                        : (folders.isEmpty ? "Locations" : "Location"))
                     .font(.caption).foregroundStyle(.secondary)
             }
+            // Section marker goes on the HEADER row, NOT the enclosing VStack: an
+            // `.accessibilityIdentifier` on a container propagates to every descendant AX element
+            // (macOS SwiftUI), which would shadow the per-row `an.locations.remove` button id and make
+            // it unreachable to XCUITest (W8-S8 G8). Keeping it here marks the section without clobbering
+            // the controls inside it.
+            .accessibilityIdentifier("an.detail.locations")
             if folders.isEmpty {
                 Text("Not in any folder — reachable under All Notes.")
                     .font(.caption).foregroundStyle(.tertiary)
@@ -42,6 +48,5 @@ struct LocationsInspector: View {
                 }
             }
         }
-        .accessibilityIdentifier("an.detail.locations")
     }
 }
