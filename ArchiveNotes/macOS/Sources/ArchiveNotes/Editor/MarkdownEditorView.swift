@@ -121,6 +121,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                passageSummaries: passageSummaries)
             textView.textStorage?.setAttributedString(styled)
         }
+        context.coordinator.lastAppliedMarkdown = markdown
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -157,6 +158,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         let wantRaw = isRaw
         if coordinator.currentIsRaw != wantRaw {
             coordinator.switchMode(to: wantRaw)
+            // switchMode already re-rendered the content in the new representation; record it so the
+            // apply guard below doesn't redundantly re-render (which could restart the update loop).
+            coordinator.lastAppliedMarkdown = markdown
         }
         if coordinator.currentFontSize != fontSize {
             coordinator.currentFontSize = fontSize
@@ -165,25 +169,28 @@ struct MarkdownEditorView: NSViewRepresentable {
             coordinator.formattingContext?.fontSize = fontSize
         }
 
-        // Freeze-during-edit: don't clobber the text storage while the user is typing.
+        // Freeze-during-edit: don't clobber the text storage while the user is typing. Re-apply only
+        // when the SOURCE Markdown actually changed — compare against the last-applied source, NOT the
+        // rendered `textView.string` (which in styled mode never equals the raw Markdown, so the old
+        // guard re-applied on every pass; the ensuing selection-change → @Published formatting-state
+        // mutation re-invalidated the view, pinning the main thread at 100% while an unfocused styled
+        // note was shown — W8-S8 spindump). Gating on the source makes updateNSView idempotent.
         let isEditing = textView.window?.firstResponder === textView
-        if !isEditing {
-            let current = textView.string
-            if current != markdown {
-                coordinator.isApplyingProgrammaticChange = true
-                if wantRaw {
-                    textView.string = markdown
-                } else {
-                    let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
-                                                       assetStore: coordinator.assetStore,
-                                                       onRevealBlock: coordinator.onRevealBlock,
-                                                       onPreviewBlock: coordinator.onPreviewBlock,
-                                                       onJumpBlock: coordinator.onJumpBlock,
-                                                       passageSummaries: coordinator.passageSummaries)
-                    textView.textStorage?.setAttributedString(styled)
-                }
-                coordinator.isApplyingProgrammaticChange = false
+        if !isEditing, coordinator.lastAppliedMarkdown != markdown {
+            coordinator.isApplyingProgrammaticChange = true
+            if wantRaw {
+                textView.string = markdown
+            } else {
+                let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
+                                                   assetStore: coordinator.assetStore,
+                                                   onRevealBlock: coordinator.onRevealBlock,
+                                                   onPreviewBlock: coordinator.onPreviewBlock,
+                                                   onJumpBlock: coordinator.onJumpBlock,
+                                                   passageSummaries: coordinator.passageSummaries)
+                textView.textStorage?.setAttributedString(styled)
             }
+            coordinator.isApplyingProgrammaticChange = false
+            coordinator.lastAppliedMarkdown = markdown
         }
 
         // W7-S3 jump-to-source: scroll to the requested block once (per token). The content above has
@@ -216,6 +223,10 @@ struct MarkdownEditorView: NSViewRepresentable {
         var isApplyingProgrammaticChange = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
+        /// The source Markdown last pushed into the text view by makeNSView/updateNSView/switchMode.
+        /// The re-apply guard compares against THIS (the source), not the rendered `textView.string`,
+        /// so updateNSView is idempotent for an unchanged note (see the guard in updateNSView).
+        var lastAppliedMarkdown: String?
         private var serializeDebounce: Task<Void, Never>?
 
         init(_ parent: MarkdownEditorView) {

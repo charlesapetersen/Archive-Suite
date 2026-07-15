@@ -3,6 +3,42 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness live (W8-S8 pass 1): first XCUITest checks green (G1, G3) + FIXED a main-thread editor loop the drive surfaced (2026-07-15)
+
+W8-S8 (GUI-on) began driving the shipped Notes UI under XCUITest. First two per-wave checks are green live
+(`NotesGUITests`, ~30 s, no hang): **G1** create-a-note (⌘N → a new `items/<uuid>/<Title>.md` appears on
+disk) and **G3** raw-Markdown toggle (`an.editor.rawToggle` → the literal `**bold**`/`# ` source shows in raw
+mode, hidden in styled; round-trip preserves the note body). Base class `NotesFixtureUITestCase` (mirrors
+Reader's `FixtureUITestCase`) launches against the scratch `AN-GUI-Fixture` via the DEBUG `-ANUITestStorePath`
+override; readiness gates on a seeded row.
+
+- **FIXED (real bug, Tier-1) — `MarkdownEditorView` pinned the main thread at 100% CPU whenever a styled note
+  was shown without the editor focused.** Selecting a note (row click; editor not first responder) made
+  `updateNSView` re-apply the styled text on every SwiftUI pass, because its guard compared the *rendered*
+  `textView.string` to the *raw* `markdown` — which never match in styled mode. Each re-apply fired a
+  selection-change → `Coordinator.textViewDidChangeSelection` → `FormattingContext.updateState()` mutating an
+  `@Published` value *during* the view update → SwiftUI re-invalidation → `updateNSView` again → infinite loop
+  (XCUITest-captured spindump: main thread 501/501 samples in exactly this cycle; also emitted the "Modifying
+  state during view update" runtime issue each turn). Fix: gate the re-apply on the last-applied SOURCE
+  markdown (`coordinator.lastAppliedMarkdown`), not the rendered string, so `updateNSView` is idempotent;
+  `makeNSView`/`switchMode` record the applied source. This spun in **normal use** too (a user reading a note
+  without clicking into the editor), not just under test. 189 XCTest + all Swift-Testing suites green (incl.
+  `EditorBindingTests`, `MarkdownBridgeTests`, `FormattingActionTests`), 0 new warnings.
+- **OBSERVATION (minor, flagged) — a raw↔styled toggle canonicalizes the note body's whitespace on disk.**
+  `switchMode` flushes a write-back and the Markdown serializer collapses the blank line after an ATX heading
+  and drops the trailing newline (semantically identical — no content lost). A view-only toggle thus rewrites
+  the note's own `.md` (mtime churn) with no edit. Not data loss and within Notes' own-store write rights
+  (never the corpus), but worth revisiting (skip the write when `serialize(storage) == parent.markdown`).
+- **OBSERVATION — the `an.status.indexReady` probe (W8-S7 §3.4) did not resolve as a readiness gate under
+  XCUITest** (1×1 clear-color a11y element; value stayed empty across a 30 s poll). Non-blocking (the tests
+  gate on a concrete seeded row) but the probe's queryability — flagged UNVERIFIED at W8-S7 — needs a fix
+  (bump the frame / adjust the a11y wrapping) before any FTS/relevance check relies on it.
+- **REMAINING (W8-S8 is oversized — recommend re-split; see plan Session Log / Morning Review):** G5 (paste →
+  source block), G7 (replicate), G8 (delete-last-instance, Tier-2), G9 (create-extract) under XCUITest;
+  G4/G6/G10/G11 in cliclick; G2/G6/G11 owner-eye docs. G5/G6 exercise the reader-page **source-block chip** —
+  confirm its durable-link/thumbnail render (against the ungranted scratch corpus root) idles under the drive
+  before relying on those checks.
+
 ## Zotero client tested over the REAL transport (in-process HTTP stub); attachment-kind reconciled (W8-S5, 2026-07-14)
 
 W8-S5 added `ZoteroLocalServerTests` (plan §1.8, 5 tests, all green, no network egress). Unlike the W5-S2

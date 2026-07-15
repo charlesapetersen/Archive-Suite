@@ -105,7 +105,9 @@ write_item() {
   cat > "$dir/$filename"
 }
 
-# (1) Plain note ---------------------------------------------------------------
+# (1) Plain note (no source blocks; carries plain Markdown — heading + bold — so the GUI
+#     raw/styled toggle check G3 can tell raw from styled by the literal `**`/`#` source without
+#     needing a source-block chip, whose durable-link/thumbnail render is a separate check) ---------
 write_item "$ID_PLAIN" "My First Note.md" <<EOF
 ---
 schema: 1
@@ -117,7 +119,9 @@ roundup: false
 created: $CREATED
 modified: $CREATED
 ---
-A plain note with no source blocks. Hello, world.
+# Plain Note
+
+A plain note with **bold** text and no source blocks.
 EOF
 
 # (2) Reader-page source-block note -------------------------------------------
