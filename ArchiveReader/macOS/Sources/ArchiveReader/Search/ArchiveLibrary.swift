@@ -1,6 +1,9 @@
 import Foundation
 import Combine
 import ArchiveCore
+#if DEBUG
+import UniformTypeIdentifiers   // fixture loader only (see loadFixtureSynchronously)
+#endif
 
 /// Discovers the tagged-PDF universe via Spotlight (`NSMetadataQuery`) and keeps it live-updated.
 ///
@@ -54,6 +57,20 @@ final class ArchiveLibrary: ObservableObject {
     /// v1 passes the user-granted archive root.
     func start(scope: URL?) {
         query.stop()
+#if DEBUG
+        // XCUITest fixture path: when launched with `-ARUITestRootPath`, discover the fixture by
+        // enumerating it off disk instead of via Spotlight. NSMetadataQuery returns NOTHING for a
+        // temporary-exception path in a sandboxed process (the Route-B entitlement grants POSIX I/O,
+        // not Spotlight query visibility), so the live query below finds no rows under the fixture
+        // root. Deterministic, read-only, and compiled out of Release entirely.
+        if let scope, UserDefaults.standard.string(forKey: "ARUITestRootPath") != nil {
+            files = []
+            pending.removeAll(); settleTimer?.invalidate(); settleTimer = nil
+            isGathering = true
+            loadFixtureSynchronously(root: scope)
+            return
+        }
+#endif
         if let scope {
             query.searchScopes = [scope]
             scopeDescription = scope.lastPathComponent
@@ -66,6 +83,41 @@ final class ArchiveLibrary: ObservableObject {
         isGathering = true
         query.start()
     }
+
+#if DEBUG
+    /// Load the XCUITest fixture by enumerating `root` and reading Finder tags straight off disk,
+    /// mirroring the production predicate (a file appears iff it carries a Read or Unread tag). Used
+    /// only when the app is launched with `-ARUITestRootPath` (see `start(scope:)`), because a
+    /// sandboxed `NSMetadataQuery` returns no results for the temporary-exception fixture path. This
+    /// is a synchronous, read-only snapshot (the fixture is static during a test); no Spotlight, no
+    /// disk writes. Compiled out of Release.
+    private func loadFixtureSynchronously(root: URL) {
+        scopeDescription = root.lastPathComponent
+        let keys: [URLResourceKey] = [.contentTypeKey, .contentModificationDateKey, .isRegularFileKey]
+        let enumerator = FileManager.default.enumerator(
+            at: root, includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        var out: [ArchiveFile] = []
+        while let url = enumerator?.nextObject() as? URL {
+            let rv = try? url.resourceValues(forKeys: Set(keys))
+            guard rv?.isRegularFile == true else { continue }
+            guard case let .success(tagNames, labelNumber) = TagReading.read(url) else { continue }
+            let isTracked = tagNames.contains {
+                $0.caseInsensitiveCompare(ReadState.read.rawValue) == .orderedSame ||
+                $0.caseInsensitiveCompare(ReadState.unread.rawValue) == .orderedSame
+            }
+            guard isTracked else { continue }
+            out.append(ArchiveFile(
+                url: url,
+                name: url.lastPathComponent,
+                fileType: Self.shortType(uti: rv?.contentType?.identifier, url: url),
+                tags: DocumentTags.parse(raw: tagNames, labelNumber: labelNumber),
+                contentModified: rv?.contentModificationDate))
+        }
+        files = out
+        isGathering = false
+    }
+#endif
 
     /// Reflect a batch of *verified* `TagWriter` results in the model immediately (so rows leave a
     /// filtered view at once) and pin them against Spotlight's index lag until it catches up. Pass only

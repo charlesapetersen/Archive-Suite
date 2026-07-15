@@ -407,7 +407,19 @@ final class NavigationModel: ObservableObject {
     private struct ViewState: Codable { var filter: LibraryFilter; var sort: [ARSortDescriptor]; var scopeID: UUID? }
     private let viewStateKey = "ar.viewState"
 
+#if DEBUG
+    /// True when the app was launched for UI testing (`-ARUITestRootPath` set). The UITest build
+    /// shares its bundle ID — and therefore its sandbox UserDefaults container — with the owner's
+    /// real Archive Reader. So view-state (filter/sort/scope) must NOT be restored (it would inherit
+    /// the owner's live filter, e.g. a `read=unread` filter that hides the whole fixture → 0 rows)
+    /// nor persisted (it would clobber the owner's saved view-state). Tests start from clean defaults.
+    private var isUITestMode: Bool { UserDefaults.standard.string(forKey: "ARUITestRootPath") != nil }
+#endif
+
     private func persistViewState() {
+#if DEBUG
+        if isUITestMode { return }   // never write the owner's shared view-state during a UI test
+#endif
         // Never persist .relevance — it's transient (active only while a query is live).
         let persistedSort = sort.first?.field == .relevance ? LibrarySort.default : sort
         if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: persistedSort, scopeID: scope?.id)) {
@@ -415,6 +427,9 @@ final class NavigationModel: ObservableObject {
         }
     }
     private func restoreViewState() {
+#if DEBUG
+        if isUITestMode { return }   // clean defaults for deterministic tests; don't inherit owner state
+#endif
         guard let d = UserDefaults.standard.data(forKey: viewStateKey),
               let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
         var f = s.filter
