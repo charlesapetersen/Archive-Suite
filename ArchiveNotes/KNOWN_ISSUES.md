@@ -3,6 +3,34 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness (W8-S8 pass 5): G4 paste-image green — the last un-GUI-verified file-WRITE path — via a DEBUG paste seam (2026-07-15) — Tier-2
+
+Added **G4** (`NotesGUITests.testG4_PasteImageWritesAssetAndInlineReference`): pasting an image into a note
+writes `items/<uuid>/assets/pasted-….png` AND an `![](assets/pasted-…)` inline reference into the note's
+`.md`. This drives W3-S4's image-paste handler (`EditorTextView.tryPasteImage`) end-to-end through W7-S5's
+item-scoped `ItemAssetStore` — the **last un-GUI-verified file-WRITE path** in Notes. Passes live in the full
+suite (G1/G3/G4/G5/G7/G8/G9 + SmokeUITest, **TEST SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green;
+Release build clean (seam compiled out); 0 new warnings. Tier-2 (real byte write): adversarial self-review +
+scratch functional run + post-run file-safety (asset + reference confined to the scratch `AN-GUI-Fixture`;
+real `Store` **absent**; `notesStoreRootBookmark` not persisted).
+
+- **⌘V routing into the styled NSTextView is NOT XCUITest-drivable → drove the paste through a DEBUG seam.**
+  A first attempt fired a real `⌘V` after `editor.click()`; it fell through to the DEFAULT `super.paste`
+  (no `pasted-…` asset written, only the load/flush round-trip bumped `modified`), i.e. either the text view
+  wasn't first responder or the app didn't consume the pasteboard image. This is the **same documented weak
+  spot** the selection seam (G9) already works around. Added a DEBUG-only seam
+  `EditorTextView.uiTestPasteImage()` → invokes the **real** `tryPasteImage(from: NSPasteboard.general)` (asset
+  write + attachment insert + serialize run verbatim; nothing stubbed), surfaced via the hidden control-strip
+  button `an.editor.test.pasteImage` (→ `EditorTestBox.pasteImage` → coordinator `uiTestPasteImage` +
+  `flushWriteBack`). Only the ⌘V **gesture routing** is bypassed — that gesture is **owner-eye** (like G2's
+  typing). All additions are `#if DEBUG` and compile out of Release (verified by a Release build).
+- **Plan reconciliation:** the plan lists G4 as a *cliclick* check; it's implemented as a disk-asserted
+  XCUITest instead (deterministic, no pointer geometry) — parity with how G5/G9 (also "special-handling"
+  checks) were done. Logged in `.maintenance/ARCHIVE_NOTES_PROGRESS.md`.
+- **REMAINING (W8-S8 still open):** G6 (reveal → Reader) / G10 (jump-to-source) / G11 (Zotero chip open);
+  G2/G6/G11 owner-eye docs in the harness README; and the `an.status.indexReady` probe queryability fix
+  (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8.
+
 ## GUI harness (W8-S8 pass 4): G7 replicate + G8 delete-last-instance green — INDEX-DB seam unblocks the folder graph (2026-07-15) — Tier-2
 
 Added **G7** (`NotesGUITests.testG7_ReplicateItemIntoFolderAddsMembership`) and **G8**
@@ -33,9 +61,9 @@ its pre-run mtime, all writes confined to the scratch `AN-GUI-Fixture`).
 - **G8 confirms the recoverable-delete contract under the sandbox:** Cancel leaves the note on disk + its
   membership intact; Delete Note moves `items/<uuid>` out via `FileManager.trashItem` (system Trash,
   recoverable) — verified working even with only the Route-B temporary-exception grant.
-- **REMAINING (W8-S8 still open):** the cliclick checks G4 (paste image) / G6 (reveal → Reader) / G10
-  (jump-to-source) / G11 (Zotero chip open) in `gui-drive-notes.sh`; G2/G6/G11 owner-eye docs; and the
-  `an.status.indexReady` probe queryability fix (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8.
+- **REMAINING (W8-S8 still open):** the checks G6 (reveal → Reader) / G10 (jump-to-source) / G11 (Zotero
+  chip open); G2/G6/G11 owner-eye docs; and the `an.status.indexReady` probe queryability fix (below, pass 1).
+  Only then tick W8-S8 + flip SUITE_TODO W8. **(G4 done — pass 5, above.)**
 
 ## GUI harness live (W8-S8 pass 1): first XCUITest checks green (G1, G3) + FIXED a main-thread editor loop the drive surfaced (2026-07-15)
 

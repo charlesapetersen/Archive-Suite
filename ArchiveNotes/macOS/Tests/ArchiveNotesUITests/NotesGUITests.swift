@@ -222,6 +222,35 @@ class NotesFixtureUITestCase: XCTestCase {
         return pairs
     }
 
+    /// The `assets/<name>` file names inside a given `items/<uuid>` directory (G4 asserts the pasted
+    /// image lands here). Missing `assets/` → empty.
+    func assetFiles(inItemDir dir: String) -> [String] {
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: itemsDir + "/" + dir + "/assets")) ?? []
+        return entries.filter { !$0.hasPrefix(".") }
+    }
+
+    // MARK: - Image helper (G4 seeds the pasteboard with real PNG bytes)
+
+    /// Build a small but valid PNG entirely off-screen via `NSBitmapImageRep` — no `lockFocus` and no
+    /// window server, so it's safe in the UITest runner. The image-paste path only needs valid `.png`
+    /// bytes on the pasteboard (`EditorTextView.tryPasteImage` reads `.png` verbatim); the fill just
+    /// gives `InlineImageAttachment.downsampledThumbnail` real pixels.
+    static func makePNGData(width: Int = 8, height: Int = 8) -> Data? {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ) else { return nil }
+        if let ctx = NSGraphicsContext(bitmapImageRep: rep) {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = ctx
+            NSColor.systemBlue.setFill()
+            NSRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)).fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        return rep.representation(using: .png, properties: [:])
+    }
+
     // MARK: - DEBUG editor test seam (W8-S7 §3.3; drives the styled NSTextView XCUITest can't focus)
 
     /// Set the editor's selected range via the hidden DEBUG control strip
@@ -244,6 +273,22 @@ class NotesFixtureUITestCase: XCTestCase {
         button.click()
         return true
     }
+
+    /// Trigger the DEBUG image-paste seam (`an.editor.test.pasteImage`), which drives the editor's REAL
+    /// `tryPasteImage` from `NSPasteboard.general` (asset write + attachment insert + serialize) without
+    /// ⌘V / field-editor focus — XCUITest can't reliably focus the styled NSTextView and route a paste to
+    /// it (same reason the selection seam exists; the ⌘V gesture itself is owner-eye). Seed the pasteboard
+    /// with PNG bytes BEFORE calling. Returns false if the strip button isn't present/hittable (itself the
+    /// finding to fix).
+    @discardableResult
+    func pasteImageViaSeam(timeout: TimeInterval = 10) -> Bool {
+        let button = app.descendants(matching: .any)["an.editor.test.pasteImage"]
+        guard button.waitForExistence(timeout: timeout) else { return false }
+        _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
+        guard button.isHittable else { return false }
+        button.click()
+        return true
+    }
 }
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
@@ -256,8 +301,10 @@ class NotesFixtureUITestCase: XCTestCase {
 /// this pass by the DEBUG index-DB seam `NotesModel.indexDatabaseURL(inAppSupport:)`: under
 /// `-ANUITestStorePath` the app opens a dedicated `notes-index-uitest.sqlite3` reset on every launch, so
 /// the fixture's `organization.json` loads fresh (the owner's real DB is untouched — distinct filename).
-/// Still to land (cliclick pass): G4 (paste image), G6 (reveal → Reader), G10 (jump-to-source),
-/// G11 (Zotero chip open); plus fixing the `an.status.indexReady` probe queryability.
+/// this pass = G4 (paste image → the item's `assets/` + an inline `![](…)` reference, Tier-2 — the last
+/// un-GUI-verified file-WRITE path). Still to land (cliclick / NSWorkspace-spy pass): G6 (reveal →
+/// Reader), G10 (jump-to-source), G11 (Zotero chip open); plus fixing the `an.status.indexReady` probe
+/// queryability.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -348,6 +395,69 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "raw/styled toggle must preserve the note body content (whitespace may canonicalize)")
         XCTAssertEqual(bodyAfter?.contains("**bold**"), true, "the bold source must survive the round-trip")
         XCTAssertEqual(bodyAfter?.contains("# Plain Note"), true, "the heading source must survive the round-trip")
+    }
+
+    /// G4 — Paste an image → the item's `assets/pasted-….png` is written AND an `![](assets/pasted-…)`
+    /// inline-image reference lands in the note's on-disk `.md`. This is the last un-GUI-verified
+    /// file-WRITE path in Notes: it drives W3-S4's image-paste handler (`EditorTextView.tryPasteImage`)
+    /// end-to-end through W7-S5's item-scoped `ItemAssetStore` (**Tier-2** — a real byte write into the
+    /// item). Disk-asserted (like G1/G9); the plan lists G4 as a cliclick check, but a disk-asserted
+    /// XCUITest is deterministic and needs no pointer geometry — the reconciliation is logged in the plan.
+    ///
+    /// Drives the paste through the DEBUG seam `an.editor.test.pasteImage` (→ `EditorTextView.uiTestPasteImage`
+    /// → the real `tryPasteImage(from: NSPasteboard.general)`), NOT a live ⌘V: XCUITest can't reliably focus
+    /// the styled NSTextView and route a paste keystroke to it — the same documented weak spot the selection
+    /// seam (G9) works around (an earlier real-⌘V attempt fell through to the default paste and wrote no
+    /// asset). The seam runs the production asset-write + attachment-insert + serialize path verbatim; only
+    /// the ⌘V gesture routing is bypassed (that gesture is owner-eye, like G2's typing).
+    ///
+    /// Target = the plain note (`idPlain`, no chip; nothing else asserts its body — G7/G8/G9 assert the
+    /// folder graph / structure). Selecting it retargets the `ItemAssetStore` to idPlain (W7-S5). `addAsset`
+    /// reserves the name synchronously and persists bytes on a background `Task` (the asset file appears
+    /// shortly after); the coordinator flushes the `![](…)` write-back so the reference is on disk at once.
+    /// A before-snapshot of `assets/` tolerates a dirty fixture. The mutated note is wiped by the next rebuild.
+    func testG4_PasteImageWritesAssetAndInlineReference() throws {
+        let uuid = Self.idPlain
+        guard let png = Self.makePNGData() else {
+            return XCTFail("should build PNG bytes for the pasteboard")
+        }
+
+        let assetsBefore = Set(assetFiles(inItemDir: uuid))
+        func newPastedAsset() -> String? {
+            Set(assetFiles(inItemDir: uuid)).subtracting(assetsBefore)
+                .first { $0.hasPrefix("pasted-") && $0.hasSuffix(".png") }
+        }
+        func referenceOnDisk() -> Bool { (rawMarkdown(inItemDir: uuid) ?? "").contains("](assets/pasted-") }
+
+        // Select the plain note so the editor loads its body AND the ItemAssetStore is retargeted to it
+        // (W7-S5, keyed to nav.selectedItemID) — the paste writes into THIS item's assets/.
+        selectItem(uuid: uuid)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty },
+                      "the note body should load before pasting")
+
+        // Ensure STYLED mode: the image inserts + serializes as `![](…)` in styled mode (raw shows the
+        // monospaced literal source). idPlain loads styled by default; toggle back if a prior check left
+        // it raw (detected via the literal `**bold**` the fixture carries only in raw mode).
+        if ((editor.value as? String) ?? "").contains("**bold**") {
+            rawToggle.click()
+            _ = pollUntil(timeout: 5) { !(((editor.value as? String) ?? "").contains("**bold**")) }
+        }
+
+        // Seed the pasteboard with PNG bytes (settable cross-process from the runner), then fire the seam.
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        XCTAssertTrue(pb.setData(png, forType: .png), "should seed the pasteboard with PNG bytes")
+        XCTAssertTrue(pasteImageViaSeam(),
+                      "the DEBUG image-paste seam must be drivable (an.editor.test.pasteImage)")
+
+        // The `![](…)` reference is flushed synchronously by the coordinator; the asset bytes land on a
+        // background Task shortly after. Poll both on disk.
+        XCTAssertTrue(pollUntil(timeout: 10) { newPastedAsset() != nil },
+                      "an assets/pasted-….png file should be written into the item")
+        XCTAssertTrue(pollUntil(timeout: 10) { referenceOnDisk() },
+                      "the note .md should gain an ![](assets/pasted-…) inline-image reference")
+        // (Left on disk — the runner can't delete under /Users/; wiped by the next pre-run fixture rebuild.)
     }
 
     /// G5 — Paste archive links as a source block (Edit ▸ Paste as Source Block(s), ⌘⇧V). Seeds the

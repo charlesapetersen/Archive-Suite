@@ -159,6 +159,8 @@ struct NoteEditorPane: View {
                     }
                 }
                 .accessibilityIdentifier("an.editor.test.select")
+                Button("pasteImage") { testBox.pasteImage?() }
+                    .accessibilityIdentifier("an.editor.test.pasteImage")
             }
             // Height/font kept generous enough that XCUITest reliably hit-tests + focuses these controls
             // (a 14 pt / .caption2 strip is a known XCUITest hit-testing hazard — W8-S8 §G9). DEBUG- and

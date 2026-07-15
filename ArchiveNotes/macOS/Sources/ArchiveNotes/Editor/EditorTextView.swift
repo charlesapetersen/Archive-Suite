@@ -413,5 +413,16 @@ final class EditorTextView: NSTextView {
         let len = min(max(length, 0), total - loc)
         return NSRange(location: loc, length: len)
     }
+
+    /// Drive the REAL image-paste path (`tryPasteImage`) from the general pasteboard, bypassing ⌘V and
+    /// field-editor focus (same rationale as the text seams: XCUITest can't reliably focus this styled
+    /// NSTextView and route a paste to it). The UITest seeds `NSPasteboard.general` with PNG bytes
+    /// cross-process, then triggers this; the production asset-write → attachment-insert → serialize path
+    /// runs verbatim (nothing here is stubbed). Returns whether an image was handled. Used by the
+    /// paste-image GUI check (G4). The ⌘V user-gesture routing itself is owner-eye (like G2's typing).
+    @discardableResult
+    func uiTestPasteImage() -> Bool {
+        return tryPasteImage(from: NSPasteboard.general)
+    }
 #endif
 }

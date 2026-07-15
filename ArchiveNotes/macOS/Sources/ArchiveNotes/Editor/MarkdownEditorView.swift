@@ -21,6 +21,7 @@ final class EditorTestBox {
     var replaceMarkdown: ((String) -> Void)?
     var insertMarkdown: ((String) -> Void)?
     var setSelection: ((Int, Int) -> Void)?
+    var pasteImage: (() -> Void)?
     init() {}
 }
 #endif
@@ -99,6 +100,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.setSelection = { [weak coordinator = context.coordinator] loc, len in
             coordinator?.uiTestSetSelection(loc, len)
+        }
+        testBox?.pasteImage = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestPasteImage()
         }
 #endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
@@ -438,6 +442,17 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// Set the editor selection to a clamped range (supports the extract-from-selection check, G9).
         func uiTestSetSelection(_ location: Int, _ length: Int) {
             textView?.uiTestSetSelection(location: location, length: length)
+        }
+
+        /// Drive the real image-paste path from the general pasteboard (G4) without ⌘V focus routing, then
+        /// flush so the `![](…)` inline reference is on disk immediately (the asset bytes persist on a
+        /// background task, so the file lands shortly after). Returns whether an image was handled.
+        @discardableResult
+        func uiTestPasteImage() -> Bool {
+            guard let textView else { return false }
+            let handled = textView.uiTestPasteImage()
+            if handled { flushWriteBack() }
+            return handled
         }
 
         /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same
