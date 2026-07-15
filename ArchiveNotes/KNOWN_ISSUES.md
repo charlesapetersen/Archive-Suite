@@ -3,6 +3,38 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness (W8-S8 pass 6): G10 jump-to-source green — chip button confirmed NOT XCUITest-hittable → DEBUG jump seam (2026-07-15) — Tier-2
+
+Added **G10** (`NotesGUITests.testG10_JumpToSourceSelectsSourceNoteInNoteWindow`): firing an extract's
+`note-passage` chip "Jump to Source" navigates to the linked source note. Single-window design: the Note
+window's **fixed** `windowKind` is `.note`, so it owns the jump to a `.note` source *regardless of its kind
+filter* — so the check shows BOTH kinds in the Note window (`an.filter.kind` → "Both"), selects the extract
+(editor loads "Moore says…"), fires the jump, and observes the SAME editor reload the source note's body
+("Moore on Intel…"). Those two phrases are unique per item, so the transition proves the source note was
+selected + loaded. Passes live in the full suite (G1/G3/G4/G5/G7/G8/G9/**G10** + SmokeUITest, **TEST EXECUTE
+SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean (seam compiled out); 0 new warnings.
+
+- **CONFIRMED: the chip's on-screen button `an.chip.jump` is NOT in the XCUITest accessibility tree** (a first
+  attempt clicking it timed out at `waitForExistence`). The chip is a TextKit-2 attachment-view-provider
+  subview (`BlockHeaderChipView` inside `BlockHeaderAttachment.viewProvider`); such subviews aren't hit-testable
+  by XCUITest (same class of limit as PDFView content panes in the Reader harness). This is exactly why the
+  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest.
+- **Drove the jump through a DEBUG seam** (same plan-blessed precedent as G4/G9): `EditorTextView.uiTestJumpFirstPassage()`
+  scans the text storage for the first note-passage `BlockHeaderAttachment` and fires its **real `onJump`
+  callback with the real `SourceAnchor`** — the identical closure + anchor the chip button's `jumpClicked`
+  invokes (→ `NoteEditorPane.onJumpBlock` → `NotesModel.openItem` → cross-window `NotePassageResolve.openAction`
+  → select+load). Only the button-CLICK gesture is bypassed; the literal chip click is **owner-eye** (like G2's
+  typing). Surfaced via hidden control-strip button `an.editor.test.jump` (→ `EditorTestBox.jumpFirstPassage`
+  → coordinator `uiTestJumpFirstPassage`). All additions `#if DEBUG`, compiled out of Release (verified).
+  Read-only navigation (no write-back, no store/corpus write).
+- **Future (low-pri, owner-eye today):** making the chip buttons (`an.chip.{jump,reveal,preview,zoteroOpen}`)
+  XCUITest-hittable would also help VoiceOver — may not be possible for TextKit-2 attachment subviews; not
+  attempted this pass. Logged to Morning Review.
+- **REMAINING (W8-S8 still open — oversized, recommend re-split):** G6 (reveal → Reader) + G11 (Zotero chip
+  open), both needing a DEBUG `NSWorkspace.open` spy (assert the dispatched URL; real external launch owner-eye);
+  the `an.status.indexReady` probe queryability fix; G2/G6/G11 owner-eye docs in the harness README. Only then
+  tick W8-S8 + flip SUITE_TODO W8.
+
 ## GUI harness (W8-S8 pass 5): G4 paste-image green — the last un-GUI-verified file-WRITE path — via a DEBUG paste seam (2026-07-15) — Tier-2
 
 Added **G4** (`NotesGUITests.testG4_PasteImageWritesAssetAndInlineReference`): pasting an image into a note

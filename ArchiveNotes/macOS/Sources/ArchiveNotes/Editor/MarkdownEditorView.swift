@@ -22,6 +22,7 @@ final class EditorTestBox {
     var insertMarkdown: ((String) -> Void)?
     var setSelection: ((Int, Int) -> Void)?
     var pasteImage: (() -> Void)?
+    var jumpFirstPassage: (() -> Void)?
     init() {}
 }
 #endif
@@ -103,6 +104,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.pasteImage = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestPasteImage()
+        }
+        testBox?.jumpFirstPassage = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestJumpFirstPassage()
         }
 #endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
@@ -453,6 +457,14 @@ struct MarkdownEditorView: NSViewRepresentable {
             let handled = textView.uiTestPasteImage()
             if handled { flushWriteBack() }
             return handled
+        }
+
+        /// Fire the first note-passage chip's Jump-to-Source callback (G10) — read-only navigation, so no
+        /// write-back. Bypasses only the un-hit-testable chip-button gesture; the anchor's real `onJump`
+        /// (→ `NotesModel.openItem`) runs verbatim. Returns whether a note-passage chip was found.
+        @discardableResult
+        func uiTestJumpFirstPassage() -> Bool {
+            return textView?.uiTestJumpFirstPassage() ?? false
         }
 
         /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same

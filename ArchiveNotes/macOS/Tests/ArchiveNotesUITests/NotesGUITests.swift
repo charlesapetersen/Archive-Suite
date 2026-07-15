@@ -289,6 +289,21 @@ class NotesFixtureUITestCase: XCTestCase {
         button.click()
         return true
     }
+
+    /// Trigger the DEBUG jump-to-source seam (`an.editor.test.jump`), which fires the first note-passage
+    /// chip's REAL `onJump` callback (→ `NotesModel.openItem` → cross-window select) without a chip-button
+    /// click — the chip button (`an.chip.jump`) is a TextKit-2 attachment-view-provider subview XCUITest
+    /// can't hit-test (same weak spot as the selection/paste seams; the literal click is owner-eye).
+    /// Returns false if the strip button isn't present/hittable (itself the finding to fix). Used by G10.
+    @discardableResult
+    func jumpFirstPassageViaSeam(timeout: TimeInterval = 10) -> Bool {
+        let button = app.descendants(matching: .any)["an.editor.test.jump"]
+        guard button.waitForExistence(timeout: timeout) else { return false }
+        _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
+        guard button.isHittable else { return false }
+        button.click()
+        return true
+    }
 }
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
@@ -301,10 +316,11 @@ class NotesFixtureUITestCase: XCTestCase {
 /// this pass by the DEBUG index-DB seam `NotesModel.indexDatabaseURL(inAppSupport:)`: under
 /// `-ANUITestStorePath` the app opens a dedicated `notes-index-uitest.sqlite3` reset on every launch, so
 /// the fixture's `organization.json` loads fresh (the owner's real DB is untouched — distinct filename).
-/// this pass = G4 (paste image → the item's `assets/` + an inline `![](…)` reference, Tier-2 — the last
-/// un-GUI-verified file-WRITE path). Still to land (cliclick / NSWorkspace-spy pass): G6 (reveal →
-/// Reader), G10 (jump-to-source), G11 (Zotero chip open); plus fixing the `an.status.indexReady` probe
-/// queryability.
+/// pass 5 = G4 (paste image → the item's `assets/` + an inline `![](…)` reference, Tier-2 — the last
+/// un-GUI-verified file-WRITE path). this pass = G10 (jump-to-source): click a note-passage chip's
+/// "Jump to Source" (`an.chip.jump`) → the featuring window selects the source note. Still to land
+/// (NSWorkspace-spy / owner-eye pass): G6 (reveal → Reader), G11 (Zotero chip open); plus fixing the
+/// `an.status.indexReady` probe queryability.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -701,5 +717,91 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "Delete Note must move the item out of items/ (to the Trash); items = \(itemDirs())")
         XCTAssertFalse((organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero]),
                        "Delete Note must drop the last membership from organization.json")
+    }
+
+    /// G10 — Jump-to-source (W7-S3, 00-overview §7). An extract's `note-passage` provenance chip carries
+    /// a "Jump to Source" action; firing it must navigate to the linked source note. NOTE: the on-screen
+    /// chip button (`an.chip.jump`) is a TextKit-2 attachment-view-provider subview that XCUITest can't
+    /// hit-test (confirmed this pass — it never resolves in the a11y tree), so this drives the SAME
+    /// `onJump` callback with the SAME anchor through a DEBUG seam (`an.editor.test.jump`), exactly as
+    /// G4/G9 handle the un-drivable paste/selection gestures; the literal chip CLICK is owner-eye (G2).
+    /// The jump is a cross-window `NotesModel.openItem` signal: `NotePassageResolve.openAction` routes it
+    /// to the window whose FIXED `windowKind` matches the target's kind. The source `idReader` is a
+    /// `kind: note`, so the **Note window** (windowKind `.note`) owns the select+scroll — regardless of
+    /// its current kind FILTER. That lets this run single-window: show BOTH kinds in the Note window so the
+    /// extract is selectable *here*, click its chip, and observe THIS window select the source note.
+    ///
+    /// Observed via the window's editor content (deterministic, no cross-window disambiguation): selecting
+    /// the extract loads the extract body ("Moore says he and Noyce…"); after the jump the same editor
+    /// loads the source note's body ("Moore on Intel's early egalitarian culture.") — the two phrases are
+    /// unique to each item, so the transition proves the source note was selected and its body loaded. The
+    /// scroll-to-`#block-0` offset itself isn't XCUITest-observable (unit-covered by
+    /// `NotePassageResolveTests.scrollRange`; visual scroll position is owner-eye). Read-only w.r.t. the
+    /// store (no writes), so no file-safety surface beyond the shared scratch-fixture launch.
+    func testG10_JumpToSourceSelectsSourceNoteInNoteWindow() throws {
+        // Scope to the Note window explicitly: the Extracts window may also be open (state restoration),
+        // and both would carry an `an.editor.text` / `an.filter.kind`. The source note is a `.note`, so it
+        // only ever appears in THIS window's list anyway, but scoping keeps the editor query unambiguous.
+        let win = app.windows["Archive Notes"]
+        XCTAssertTrue(win.waitForExistence(timeout: 10), "the Note window should exist")
+        let ed = win.textViews["an.editor.text"]
+
+        // Show BOTH kinds so the extract is selectable in the (note-featuring) window. The kind control is
+        // a SwiftUI segmented Picker (`an.filter.kind`, segments Notes/Extracts/Both); drive the "Both"
+        // segment as an element, falling back to a coordinate tap on the rightmost third if the segments
+        // aren't individually exposed. "Both" is unique to this control (the tag-combine picker is All/Any).
+        XCTAssertTrue(setKind(to: "Both", in: win), "should switch the kind filter to Both")
+
+        // The extract row now appears; select it → the editor loads the extract body + renders the
+        // note-passage chip (which carries the Jump-to-Source button).
+        let extractCell = win.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+        XCTAssertTrue(extractCell.waitForExistence(timeout: 20),
+                      "the extract row should appear once Both kinds are shown")
+        _ = pollUntil(timeout: 10) { app.activate(); return extractCell.isHittable }
+        if extractCell.isHittable { extractCell.click() }
+        else { extractCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
+        XCTAssertTrue(pollUntil(timeout: 12) { ((ed.value as? String) ?? "").contains("Moore says") },
+                      "selecting the extract should load its body into the editor")
+
+        // Fire the note-passage chip's "Jump to Source" via the DEBUG seam (`an.editor.test.jump`). The
+        // chip's on-screen NSButton (`an.chip.jump`) is a TextKit-2 attachment-view-provider subview that
+        // XCUITest can't hit-test (confirmed this pass — `an.chip.jump` never resolves), so — exactly as
+        // G4/G9 do for the un-drivable paste/selection gestures — the seam invokes the SAME `onJump`
+        // callback with the SAME anchor the button's `jumpClicked` would (only the click gesture is
+        // bypassed; the literal chip click is owner-eye, like G2's typing). This runs the real
+        // openItem → cross-window `openAction` → select+load path.
+        XCTAssertTrue(jumpFirstPassageViaSeam(),
+                      "the DEBUG jump seam must be drivable (an.editor.test.jump)")
+
+        // The Note window selects the source note (idReader) and its editor loads the source body. That
+        // body text is unique to idReader ("Moore on Intel…", vs the extract's "Moore says…"), so its
+        // appearance in the SAME editor proves the jump selected the source note and loaded it.
+        XCTAssertTrue(pollUntil(timeout: 15) { ((ed.value as? String) ?? "").contains("Moore on Intel") },
+                      "Jump to Source should select the source note and load its body into the editor")
+    }
+
+    // MARK: - G10 helper
+
+    /// Switch the kind segmented control (`an.filter.kind`) to the named segment ("Notes"/"Extracts"/
+    /// "Both"), scoped to `win`. Tries the segment as a button / radio button / any labeled descendant,
+    /// then a coordinate tap positioned by segment index (Notes=0, Extracts=1, Both=2 of 3) as a fallback
+    /// for when the segments aren't individually queryable. Returns false only if the control is absent.
+    @discardableResult
+    private func setKind(to segment: String, in win: XCUIElement) -> Bool {
+        let control = win.descendants(matching: .any)["an.filter.kind"]
+        guard control.waitForExistence(timeout: 10) else { return false }
+        let candidates = [control.buttons[segment], control.radioButtons[segment],
+                          control.descendants(matching: .any)[segment]]
+        for el in candidates where el.waitForExistence(timeout: 2) {
+            _ = pollUntil(timeout: 4) { app.activate(); return el.isHittable }
+            if el.isHittable { el.click(); return true }
+        }
+        // Coordinate fallback: tap the center of the segment's slot (index/2, 3 segments).
+        let index = ["Notes": 0, "Extracts": 1, "Both": 2][segment] ?? 2
+        let dx = (Double(index) + 0.5) / 3.0
+        control.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).tap()
+        return true
     }
 }

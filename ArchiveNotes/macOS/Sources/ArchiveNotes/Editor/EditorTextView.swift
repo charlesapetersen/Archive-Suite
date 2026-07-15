@@ -424,5 +424,25 @@ final class EditorTextView: NSTextView {
     func uiTestPasteImage() -> Bool {
         return tryPasteImage(from: NSPasteboard.general)
     }
+
+    /// Fire the "Jump to Source" action of the FIRST note-passage block chip in the document — via the
+    /// SAME `onJump` callback the chip button's `jumpClicked` invokes, with the SAME `SourceAnchor`.
+    /// Only the button-CLICK gesture is bypassed: the chip is a TextKit-2 attachment-view-provider
+    /// subview XCUITest can't hit-test (the literal click is owner-eye, like G2's typing), so the
+    /// jump-to-source GUI check (G10) drives the anchor's callback directly. Returns whether a
+    /// note-passage chip was found + fired. Compiled out of Release.
+    @discardableResult
+    func uiTestJumpFirstPassage() -> Bool {
+        guard let storage = textStorage else { return false }
+        var fired = false
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
+            guard let chip = value as? BlockHeaderAttachment,
+                  chip.sourceBox.anchor.notePassageTarget != nil else { return }
+            chip.onJump?(chip.sourceBox.anchor)
+            fired = true
+            stop.pointee = true
+        }
+        return fired
+    }
 #endif
 }
