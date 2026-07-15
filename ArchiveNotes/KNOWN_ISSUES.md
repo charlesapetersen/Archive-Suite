@@ -180,8 +180,9 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   windows editing the **same** note and pasting the same-named image in the same second have independent
   `reserved` sets, so the second write is refused by the no-overwrite guard (safe — no clobber — but that
   paste shows a placeholder); a shared name authority would need a single store, which can't serve two
-  windows' differing selections. GUI drive of a live paste is deferred with the rest of W7 (Notes has no
-  scratch-store launch override until **W8-S7** — driving the live app would write the owner's real store).
+  windows' differing selections. GUI drive of a live paste is deferred to **W8-S8** (the scratch-store launch
+  override now exists and is proven — **W8-S7** validated it: `SmokeUITest` LAUNCHES the app under XCUITest
+  against the `-ANUITestStorePath` scratch fixture, in-memory-only, without touching the owner's real store).
 - **GUI drive of load/autosave deferred (GUI paused).** The load-on-select + autosave-on-switch behavior
   is proven at the model layer (`NoteBodyEditorModelTests` incl. the cross-item race + generation guard;
   `NotesModelBodyTests` round-trip/reindex/front-matter-preservation), but not yet driven in a live window.
