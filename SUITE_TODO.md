@@ -268,7 +268,8 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   check (toggle + status line) deferred → Morning Review (Processor GUI launch = blocking login-Keychain prompt).
 
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
-- [ ] **Remove the phone "Finish" button** _(owner decision 2026-07-15 — "get rid of it")_ — the phone's **Finish**
+- [x] **Remove the phone "Finish" button** _(owner decision 2026-07-15 — "get rid of it"; premise found STALE —
+  already done, reconciled 2026-07-16 `W12-finish-button`)_ — the phone's **Finish**
   (`CaptureViewModel.finishSession()` → `MacClient.sessionComplete()` → `POST /session/complete`) is near-useless
   and actively misleading: the Mac handler (`CaptureServer.swift` ~L242) only sets a status string and returns OK —
   it does **not** start finalize, so the operator must still click **Finish session** on the Mac. **End segment**
@@ -277,6 +278,20 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   harmless no-op) so an older/unupdated companion still works — do NOT change the protocol in the same pass.
   | files: ArchiveCapture/ui/CaptureScreen.kt + capture/CaptureViewModel.kt,
   ArchiveCaptureiOS/UI/CaptureScreen.swift + Capture/CaptureViewModel.swift | S | low | none
+  — **ALREADY DONE (stale premise, like recent-years/de-dup).** The phone **Finish button + its `finishSession()`→
+  `sessionComplete()` UI call are already gone from BOTH companions** — removed in `ce55511` ("Live capture: End
+  segment is the only 'done' action"). Verified in-tree 2026-07-16: neither `CaptureScreen.swift` nor
+  `CaptureScreen.kt` has a Finish button (both only expose **End segment** = `finishDocumentSegment()` →
+  `segmentComplete(...)`, the segment signal — NOT `sessionComplete`); a full-tree grep finds **zero callers of
+  `sessionComplete()`** in either companion's UI/Capture/Net; both UIs even carry a "there is no separate Finish"
+  comment. The Mac's `POST /session/complete` route is intact (`CaptureServer.swift:284`), as the item requires.
+  So the actionable scope (remove the button + its UI call, keep the Mac route) is fully satisfied — no code change.
+  **Residual (OUT OF SCOPE this pass → Morning Review):** `sessionComplete()` survives as **dead protocol surface**
+  in the Net/ transport layer (the `SegmentTransport` protocol + `MacClient`/`DriveRelayTransport`/`FileRelayTransport`
+  impls, both companions). Removing it would touch the **frozen** `RelayObjectFormat` wire contract
+  (`encodeSessionComplete` + the `sessionCompleteMatchesGolden` test) and the maintain-only cloud path, i.e. it
+  **"changes the protocol"** — which the item explicitly forbids "in the same pass." Left as an optional future
+  protocol-cleanup pass (owner-gated). Doc-only reconciliation (Tier-1, no build needed — tree == `a624ccf`).
 - [ ] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15; premise corrected 2026-07-16)_ —
   **both companions are currently at 6** (iOS `Array(ys.prefix(6))` in `CaptureViewModel.swift`; Android `.take(6)`
   in `Prefs.kt` — `f1d2263` unified iOS 5→6). Owner wants **5**: change iOS `prefix(6)`→`prefix(5)` AND Android
