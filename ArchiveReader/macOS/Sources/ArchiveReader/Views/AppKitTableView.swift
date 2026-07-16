@@ -296,41 +296,42 @@ struct AppKitTableView: NSViewRepresentable {
                 }
 
             case "name":
+                let nameLine = NSMutableAttributedString()
                 if let color = file.color {
-                    let as_ = NSMutableAttributedString()
                     let dotColor: NSColor = color == .box ? .systemRed : .systemPurple
-                    as_.append(NSAttributedString(string: "● ", attributes: [
+                    nameLine.append(NSAttributedString(string: "● ", attributes: [
                         .foregroundColor: dotColor,
                         .font: NSFont.systemFont(ofSize: currentFontSize * 0.7),
                     ]))
-                    as_.append(NSAttributedString(string: file.name, attributes: [
-                        .foregroundColor: NSColor.labelColor,
-                        .font: regularFont,
-                    ]))
-                    if parent.model.isDuplicatedName(file.name) {
-                        let folder = DuplicateNames.disambiguator(for: file.url)
-                        as_.append(NSAttributedString(string: "  ⌕ \(folder)", attributes: [
-                            .foregroundColor: NSColor.secondaryLabelColor,
-                            .font: NSFont.systemFont(ofSize: currentFontSize * 0.85),
-                        ]))
-                    }
-                    tf.attributedStringValue = as_
-                } else if parent.model.isDuplicatedName(file.name) {
-                    let as_ = NSMutableAttributedString()
-                    as_.append(NSAttributedString(string: file.name, attributes: [
-                        .foregroundColor: NSColor.labelColor,
-                        .font: regularFont,
-                    ]))
+                }
+                nameLine.append(NSAttributedString(string: file.name, attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: regularFont,
+                ]))
+                if parent.model.isDuplicatedName(file.name) {
                     let folder = DuplicateNames.disambiguator(for: file.url)
-                    as_.append(NSAttributedString(string: "  ⌕ \(folder)", attributes: [
+                    nameLine.append(NSAttributedString(string: "  ⌕ \(folder)", attributes: [
                         .foregroundColor: NSColor.secondaryLabelColor,
                         .font: NSFont.systemFont(ofSize: currentFontSize * 0.85),
                     ]))
-                    tf.attributedStringValue = as_
-                } else {
-                    tf.stringValue = file.name
                 }
-                tf.lineBreakMode = .byTruncatingMiddle
+                if let segs = parent.model.searchSnippet(for: file.url.path) {
+                    // Full-text search hit: add a dimmed keyword-in-context OCR excerpt beneath the name
+                    // (usesAutomaticRowHeights grows the row). Per-line paragraph styles keep the name
+                    // middle-truncated (extension visible) and the excerpt tail-truncated.
+                    let nameStyle = NSMutableParagraphStyle()
+                    nameStyle.lineBreakMode = .byTruncatingMiddle
+                    nameLine.addAttribute(.paragraphStyle, value: nameStyle,
+                                          range: NSRange(location: 0, length: nameLine.length))
+                    nameLine.append(NSAttributedString(string: "\n"))
+                    nameLine.append(Self.snippetLine(segs, baseSize: currentFontSize))
+                    tf.maximumNumberOfLines = 2
+                    tf.lineBreakMode = .byTruncatingTail
+                } else {
+                    tf.maximumNumberOfLines = 1   // reset: this cell may have been a 2-line hit before reuse
+                    tf.lineBreakMode = .byTruncatingMiddle
+                }
+                tf.attributedStringValue = nameLine
 
             case "type":
                 tf.stringValue = file.fileType
@@ -350,6 +351,31 @@ struct AppKitTableView: NSViewRepresentable {
             }
 
             return cell
+        }
+
+        /// The dimmed keyword-in-context second line for a full-text hit: matched OCR terms emphasised
+        /// (bold + a faint yellow wash) against secondary-color context. All-adaptive colors so it reads
+        /// in light and dark mode; the whole line tail-truncates.
+        static func snippetLine(_ segments: [SearchSnippet.Segment], baseSize: CGFloat) -> NSAttributedString {
+            let size = max(9, baseSize * 0.85)
+            let base = NSFont.systemFont(ofSize: size)
+            let bold = NSFont.boldSystemFont(ofSize: size)
+            let style = NSMutableParagraphStyle()
+            style.lineBreakMode = .byTruncatingTail
+            let out = NSMutableAttributedString()
+            for seg in segments {
+                var attrs: [NSAttributedString.Key: Any] = [.paragraphStyle: style]
+                if seg.isMatch {
+                    attrs[.font] = bold
+                    attrs[.foregroundColor] = NSColor.labelColor
+                    attrs[.backgroundColor] = NSColor.systemYellow.withAlphaComponent(0.30)
+                } else {
+                    attrs[.font] = base
+                    attrs[.foregroundColor] = NSColor.secondaryLabelColor
+                }
+                out.append(NSAttributedString(string: seg.text, attributes: attrs))
+            }
+            return out
         }
 
         // MARK: NSTableViewDelegate

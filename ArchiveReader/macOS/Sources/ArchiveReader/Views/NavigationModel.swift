@@ -61,6 +61,10 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var smartFolderCounts: [UUID: Int] = [:]   // D2: files matching each saved search
     @Published private(set) var ftsPaths: Set<String>?      // nil = no full-text query active
     private var ftsRank: [String: Int]?    // bm25 position map (0 = best); nil = no ranked query
+    /// Marked keyword-in-context OCR excerpt (see `SearchSnippet`) per matching path, for the
+    /// top-ranked hits of the active full-text query. Empty when no query is active. The list reads it
+    /// via `searchSnippet(for:)` to render a preview line under matching rows.
+    @Published private(set) var ftsSnippets: [String: String] = [:]
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
@@ -245,6 +249,7 @@ final class NavigationModel: ObservableObject {
         ftsGeneration += 1
         ftsPaths = nil
         ftsRank = nil
+        ftsSnippets = [:]
         if sort.first?.field == .relevance { sort = LibrarySort.default }
         if doRecompute { recompute() }
     }
@@ -481,17 +486,29 @@ final class NavigationModel: ObservableObject {
         }
         Task { [weak self] in
             guard let self else { return }
-            let ranked: [String]? = q.isEmpty ? nil : await self.indexer.search(q)
+            let result: ContentIndex.RankedSearch? = q.isEmpty ? nil : await self.indexer.searchRanked(q)
             guard generation == self.ftsGeneration else { return }   // superseded by a newer search
-            if let ranked {
-                self.ftsPaths = Set(ranked)
-                self.ftsRank = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($1, $0) })
+            if let result {
+                self.ftsPaths = Set(result.paths)
+                self.ftsRank = Dictionary(uniqueKeysWithValues: result.paths.enumerated().map { ($1, $0) })
+                self.ftsSnippets = result.snippets
             } else {
                 self.ftsPaths = nil
                 self.ftsRank = nil
+                self.ftsSnippets = [:]
             }
             self.recompute()
         }
+    }
+
+    /// Highlight segments for the active query's keyword-in-context snippet of `path`, or `nil` when
+    /// there is no active full-text query, no snippet for the path (a deep hit past the snippet cap, or
+    /// an empty-body doc), or the snippet carries no highlighted match. The list cell renders the
+    /// returned runs as a dimmed second line under the file name.
+    func searchSnippet(for path: String) -> [SearchSnippet.Segment]? {
+        guard ftsPaths != nil, let raw = ftsSnippets[path], !raw.isEmpty else { return nil }
+        let segments = SearchSnippet.segments(from: raw)
+        return SearchSnippet.hasMatch(segments) ? segments : nil
     }
 
     /// Re-run any active full-text search after an index pass completes (Part B: search-during-index
@@ -728,6 +745,7 @@ final class NavigationModel: ObservableObject {
             fullTextQuery = ""
             ftsPaths = nil
             ftsRank = nil
+            ftsSnippets = [:]
             if sort.first?.field == .relevance { sort = LibrarySort.default }
             ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
                                  // (which passes the `generation == ftsGeneration` guard) can't repopulate
