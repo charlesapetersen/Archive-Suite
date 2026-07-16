@@ -113,8 +113,7 @@ struct GeminiClient {
             }
         }
         // Status-based classification even when the body is empty/non-JSON (gateway/CDN 5xx often are).
-        if statusCode == 503 || statusCode == 529 { return "Model in high use. Try again later." }
-        if statusCode == 429 { return "Rate limit exceeded. Try again later." }
+        if let msg = transientStatusMessage(statusCode) { return msg }
         return "API error (\(statusCode))"
     }
 

@@ -633,7 +633,7 @@ struct GeminiBatchClient: Sendable {
 
     /// Cancel a running batch.
     func cancelBatch(batchName: String) async {
-        guard let url = URL(string: "\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return }
+        guard let url = try? makeBatchURL("\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         _ = try? await NetworkSession.data(for: request)

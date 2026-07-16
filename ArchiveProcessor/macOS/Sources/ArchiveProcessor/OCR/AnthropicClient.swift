@@ -104,8 +104,7 @@ struct AnthropicClient {
             }
         }
         let fallbackCode = apiType.isEmpty ? "\(statusCode)" : apiType
-        if statusCode == 529 || statusCode == 503 { return ("Model in high use. Try again later.", fallbackCode) }
-        if statusCode == 429 { return ("Rate limit exceeded. Try again later.", fallbackCode) }
+        if let msg = transientStatusMessage(statusCode) { return (msg, fallbackCode) }
         return ("API error (\(statusCode))", "\(statusCode)")
     }
 }
