@@ -18,9 +18,10 @@
 
 ### Tagging Enhancements
 - **Tag suggestions from nearby documents** — use surrounding document context to improve tag accuracy
-- **Hierarchical tags** — support nested tag structures (e.g., Politics > Elections > Presidential)
 - **Tag editing UI** — edit applied tags directly in the file pane without reprocessing
 - **Bulk tag operations** — apply/remove tags across multiple files at once
+  _(Hierarchical/nested tags removed 2026-07-15 — owner: out of scope; the flat Finder-tag vocabulary in
+  `SPEC/tag-format.md` stays the contract.)_
 
 ### Document Processing
 - **Handwriting recognition mode** — specialized prompts and processing for handwritten documents
@@ -29,19 +30,21 @@
 - **Newspaper/periodical layout analysis** — handle multi-column layouts, headlines, captions
 
 ### Collection Management
-- **Nested collection hierarchy** — support sub-collections (Box > Folder > Document)
 - **Collection-level metadata** — assign metadata to entire collections, not just individual documents
+  _(Nested collection hierarchy (Box > Folder > Document) removed 2026-07-15 — owner: out of scope.)_
 
 ## Lower Priority
 
 ### Performance & Scale
-- **Incremental processing** — process only new/changed files in a directory
+- → **Incremental processing** — process only new/changed files in a directory. **Promoted to the near-term
+  queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
 - **Distributed batch processing** — split large jobs across multiple API keys for faster throughput
 - **Memory-efficient streaming** — stream batch results instead of loading all into memory
 
 ### UI Enhancements
-- **Dark mode optimization** — ensure all custom views render correctly in dark mode
-- **Global keyboard shortcuts** — main-window shortcuts for start-processing / switch-provider (review and tag-card dialogs already have full keyboard navigation)
+- → **Dark mode optimization + global keyboard shortcuts** — **promoted to the near-term queue** (owner,
+  2026-07-15) as one item in [`SUITE_TODO.md`](../SUITE_TODO.md): main-window shortcuts for start-processing /
+  switch-provider (review + tag-card dialogs already have full keyboard nav) + a dark-mode render audit.
 
 ### API & Extensibility
 - **First-class OpenAI/GPT-4o provider** — a native OpenAI provider (an OpenAI-compatible gateway already ships for custom/proxied endpoints)
@@ -51,8 +54,9 @@
 - **Apple Shortcuts integration** — expose processing actions via Shortcuts app
 
 ### Data & Analytics
-- **Processing history** — track all processing runs with timestamps, settings, and results
-- **Cost tracking** — cumulative cost reporting across all processing runs
+- → **Processing history + cost tracking** — **promoted to the near-term queue** (owner, 2026-07-15) as one item
+  in [`SUITE_TODO.md`](../SUITE_TODO.md): persist each run (timestamp/settings/results) + its **actual** cost and
+  surface a history view.
 - **Accuracy metrics** — compare OCR results against ground truth files for benchmarking
 - **Tag frequency analysis** — show most common tags, date distributions, subject clusters
 
@@ -135,60 +139,44 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
 - ~~**Central `DefaultsKey` constants for the ~35 @AppStorage keys (flagship).**~~ **DONE** (2026-07-04):
   `Models/DefaultsKeys.swift` now defines all 37 durable-settings keys once and every `@AppStorage` / `forKey:`
   call site references it; values verified byte-identical to the originals so saved settings are preserved.
-- **Shared provider text-completion client.** `TagGenerator` and `CollectionSegmenter` duplicate ~85 lines of
+- → **Shared provider text-completion client.** `TagGenerator` and `CollectionSegmenter` duplicate ~85 lines of
   callLLM/callGateway/callAnthropic/callGemini/callMistralChat (differ only by max_tokens; already drifted on
-  the Mistral signature). Extract one shared text client taking a maxTokens param.
+  the Mistral signature). Extract one shared text client taking a maxTokens param. **Promoted to the near-term
+  queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
 - **Shared finalize/organize helpers.** startProcessing / resumeRun / resumeBatch each duplicate the
   "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
   `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
 - **Unify the box/folder color-retag logic** across applyReviewEdits / updateClassification /
   applyDocumentReviewEdits (three copies that have slightly drifted — confirm the intended behavior first).
-- **Smaller de-dups:** shared `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor);
+- → **Smaller de-dups:** shared `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor);
   `ThinkingLevel.budgetTokens` + the Anthropic max_tokens bump (4 clients — budgets differ by call type);
   a shared transient-status friendly-message helper (4 OCR clients); one `acceptedImageExtensions` constant
   (3 files); shared `englishMonthNames` / `monthTag` (LiveCaptureProcessor + OCRProcessor); a segment-JSON
   schema builder (2 sites); OCRResult `.with(...)` copy helpers; `GatewayConfig.fromDefaults()` (3 views); a
   `liveProcessingMode` enum instead of "stage"/"live" magic strings; LLMRotationDetector.rotate →
-  ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder.
-- **Value decision:** the recent-years cap differs between the companions (iOS 5, Android 6) — pick one.
+  ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder. **Promoted as one "de-dup sweep" item to
+  the near-term queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
+- ✅ **Value decision — recent-years cap:** the companions differed (iOS 5, Android 6). **Owner decided 2026-07-15:
+  cap at 5** (change Android 6→5). Now a near-term item in [`SUITE_TODO.md`](../SUITE_TODO.md).
 
-### Shared `ArchiveCore` Swift package — DRY the tag/PDF model across both apps (deferred)
-Moved here from the near-term queue (`SUITE_TODO.md` §P3) on 2026-07-08 — owner: not near-term. Both apps are
-coupled by the tag/PDF + relay contracts (`SPEC/tag-format.md`, `SPEC/relay-object-format.md`); the SPECs keep
-the *docs* in sync, but the *code* — Reader's read/parse model + `TagWriter`, Processor's `MacOSTagger` — can
-still drift. An `ArchiveCore` SPM package (UI-free) would share it; Reader keeps `Core/` UI-free specifically
-for this. Two stages (sequence before the — also deferred — de-nest, since both churn `project.yml` paths):
-- **3a — read-only shared model (safe, high value).** Create `ArchiveCore/` (SPM, no UI imports); move
-  Reader's read-side `Core/` types in (`DocumentTags` + facet parsing, `PDFFormatStatus`, `TagSimilarity`,
-  `DuplicateNames`, `FileLink`, `CopyTextCleaner`, `DocumentRuns`, pure `LibraryFilter`/`LibrarySort`); point
-  Processor at the same tag/facet + PDF/classification vocabulary; both `project.yml` add it as a local
-  package dependency; move relevant tests in. **No behavior change.** Risk: med (module boundaries,
-  `internal`→`public`, XcodeGen local-package wiring). Verify: both build; Reader tests green; write-surface
-  lint green.
-- **3b — unified audited write path (HIGH risk, deferred behind 3a).** Reconcile Reader's `TagWriter`
-  (delta-based, trustworthy-read guard, verify-after-write, inverse-delta undo) with Processor's `MacOSTagger`
-  (`stampUnread`, color labels, batch) into ONE audited writer, preserving both guarantees (Reader Prime
-  Directive; Processor Tier-2). Gate: full multi-agent adversarial review + property/integration tests on
-  **scratch copies only**, both apps. The SPEC contracts + 3a already capture most of the value.
+### Shared `ArchiveCore` Swift package — ✅ SHIPPED (W0, 2026-07)
+Both stages shipped in the W0 refactor (`49c0162`–`b90800f`) — this is done, kept here only as a record:
+- ✅ **3a — read-only shared model.** `packages/ArchiveCore/` (SPM, UI-free) holds the shared read model —
+  `DocumentTags` + facet parsing, `PDFFormatStatus`, `TagSimilarity`, `DuplicateNames`, `FileLink`,
+  `CopyTextCleaner`, links/thumbnails; both apps depend on it via local-package wiring in each `project.yml`.
+- ✅ **3b — unified audited write path.** `ArchiveCore/Tags/TagWrite.swift`'s `CoordinatedTagWriter` unifies the
+  audited write surface (trustworthy-read guard §3, verify-by-re-read multiset+label §8, inverse-delta undo);
+  Reader's `TagWriter` and Processor's `MacOSTagger` both delegate to it, so the safety-critical tag code can no
+  longer drift. The Reader Prime Directive + Processor Tier-2 guarantees are preserved.
 
-### Live Capture output-folder control (in the Live Capture pane)
-Motivated 2026-07-06 during the Android walkthrough: a Process-live **Finish session** wrote the finalized
-collections to **`~/Downloads/`** with **no visible way to choose where** — the operator had to hunt for
-the output. Add an explicit **output-folder picker in the Live Capture pane** (the tagging-mode dropdown +
-output folder already live in the Process Files view — mirror that here) so live-captured collections go
-where the user wants. Show the current destination on the pane; default sensibly (last-used, or a
-dedicated "Archive Processor" folder rather than Downloads). Per the settings-UX convention, give it a `?`
-help popover and gray it out when irrelevant. Confirm whether live finalize currently reuses the Process
-Files `outputDirectory` or has its own — and unify if it makes sense.
+### → Live Capture output-folder control — PROMOTED (owner, 2026-07-15)
+Now a near-term item in [`SUITE_TODO.md`](../SUITE_TODO.md). (Motivated 2026-07-06: Process-live **Finish
+session** wrote finalized collections to `~/Downloads/` with no way to choose; add an output-folder picker in
+the Live Capture pane mirroring the Process-Files controls.)
 
-### Decide the phone "Finish" button's purpose — currently near-useless
-Found 2026-07-06: the phone capture screen has **"End segment"** (finishes the current document — essential)
-and **"Finish"** (`CaptureViewModel.finishSession()` → `MacClient.sessionComplete()` → `POST
-/session/complete`). But the Mac handler (`CaptureServer.swift:242-244`) does **only** one thing on
-receipt: sets `statusMessage = "Session complete — ready to process."` and returns OK. It does **not**
-start the finalize flow (rotation review → collection naming → output) — the operator must still go to the
-Mac and click **Finish session**. So the phone "Finish" is a weak "I'm done capturing" nudge, easily
-mistaken for actually finishing. **Decision:** either (a) make phone "Finish" actually initiate/enable the
-Mac's finalize flow (let the operator wrap up from the phone without walking to the Mac — most useful), or
-(b) relabel it (e.g. "Tell Mac I'm done") so it's not mistaken for finalizing, or (c) remove it. Keep both
-companions in sync.
+### ✅ Phone "Finish" button — DECIDED 2026-07-15: remove it
+Found 2026-07-06 that the phone "Finish" (`CaptureViewModel.finishSession()` → `POST /session/complete`) is
+near-useless and misleading — the Mac handler only sets a status string, it does **not** start finalize.
+**Owner decided 2026-07-15: option (c) — remove the button** from both companions (keep the harmless Mac
+`/session/complete` route so older companions still work). Now a near-term item in
+[`SUITE_TODO.md`](../SUITE_TODO.md). **End segment** stays the phone's only "done" action.

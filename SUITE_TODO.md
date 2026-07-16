@@ -163,6 +163,59 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   files (verify at impl): OCR/PDFToImageConverter.swift, OCR/PDFGenerator.swift (generate + mergeDocumentPDFs),
   OCR/OCRProcessor+OCR.swift (performOCRCall, convertPDFInputs), OCR/OCRProcessor+Pipeline.swift (startProcessing),
   Views/OCRView.swift (intake + mode toggle), SPEC/tag-format.md | M | med | none
+- [ ] **De-dup sweep from the 2026-07-04 maintainability audit** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
+  small, mechanical, **behavior-preserving** consolidations, each provable by build + existing tests: shared
+  `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor); `ThinkingLevel.budgetTokens` + the
+  Anthropic max_tokens bump (4 clients — budgets differ **by call type**, so KEEP that difference); a shared
+  transient-status friendly-message helper (4 OCR clients); ONE `acceptedImageExtensions` constant (3 files);
+  shared `englishMonthNames`/`monthTag` (LiveCaptureProcessor + OCRProcessor); a segment-JSON schema builder
+  (2 sites); `OCRResult.with(...)` copy helpers; `GatewayConfig.fromDefaults()` (3 views); a `liveProcessingMode`
+  **enum** instead of "stage"/"live" magic strings; `LLMRotationDetector.rotate` → `ImageEncoding.rotate`;
+  Gemini `cancelBatch` via the shared URL builder. One focused pass (or a few); prove equivalence, 0 new
+  warnings. **Tier-1** (touches no write path). | files: OCR/*, Capture/LiveCaptureProcessor.swift, Views/* | M | low | none
+- [ ] **Shared provider text-completion client** _(promoted 2026-07-15)_ — `TagGenerator` + `CollectionSegmenter`
+  duplicate ~85 lines of callLLM/callGateway/callAnthropic/callGemini/callMistralChat differing only by
+  max_tokens — and they have **already drifted on the Mistral signature**, so reconcile deliberately; don't
+  blind-merge. Extract ONE shared text client taking a `maxTokens` param. **Tier-1** (no file writes; verify tags
+  + segments still generate identically on a scratch run).
+  | files: Tagging/TagGenerator.swift, Tagging/CollectionSegmenter.swift | S–M | low | none
+- [ ] **Live Capture output-folder picker** _(promoted 2026-07-15)_ — Process-live **Finish session** currently
+  writes finalized collections to **`~/Downloads/`** with no visible way to choose (found 2026-07-06 in the
+  Android walkthrough — the operator had to hunt for the output). Add an explicit output-folder picker to the Live
+  Capture pane (mirror the Process-Files tagging-mode + output-folder controls), show the current destination on
+  the pane, default sensibly (last-used, or a dedicated "Archive Processor" folder — **not** Downloads), `?` help
+  popover, gray out when irrelevant. First confirm whether live finalize reuses the Process-Files
+  `outputDirectory` or has its own — unify if sensible. **Tier-2** (changes where irreplaceable output lands).
+  | files: Views/LiveCaptureView.swift, Capture/LiveCaptureProcessor.swift, Models/DefaultsKeys.swift | M | med | none
+- [ ] **Cost tracking + processing history** _(promoted 2026-07-15)_ — persist each run's **actual** cost plus a
+  run log (timestamp, provider/model, file count, results/failures) and surface a simple history view.
+  `CostEstimator` already does the per-model math for *estimates*; this records **actuals** and accumulates them.
+  Writes only its own store (Application Support / UserDefaults) — **never** the corpus. **Tier-1**.
+  | files: Models/CostEstimator.swift, Models/DefaultsKeys.swift, Views/ToolsView.swift (or a new history view) | M | low | none
+- [ ] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15)_ — (a) main-window shortcuts for
+  start-processing / switch-provider (the review + tag-card dialogs already have full keyboard nav); follow the
+  Reader's convention that **the menu bar is the single source of shortcuts**. (b) audit that custom views render
+  correctly in **dark mode**. Both small, Tier-1, and GUI-verifiable now the harness runs.
+  | files: Views/OCRView.swift, Views/* (dark-mode audit), a Commands scene | S | low | none
+- [ ] **Incremental processing (skip already-processed files)** _(promoted 2026-07-15)_ — re-running a directory
+  should process only new/changed files instead of redoing everything (matters at 150k scale). Choose the skip key
+  deliberately (an existing output PDF at the destination + source mtime) and **fail safe: when in doubt, PROCESS**
+  — never silently skip a file that needed processing. **Tier-2** (a wrong skip = silently missing output).
+  | files: OCR/OCRProcessor+Pipeline.swift, Views/OCRView.swift | M | med | none
+
+### Capture companions (Android + iOS) — owner decisions 2026-07-15
+- [ ] **Remove the phone "Finish" button** _(owner decision 2026-07-15 — "get rid of it")_ — the phone's **Finish**
+  (`CaptureViewModel.finishSession()` → `MacClient.sessionComplete()` → `POST /session/complete`) is near-useless
+  and actively misleading: the Mac handler (`CaptureServer.swift` ~L242) only sets a status string and returns OK —
+  it does **not** start finalize, so the operator must still click **Finish session** on the Mac. **End segment**
+  stays the phone's only "done" action; the Mac's Finish session stays the finalize trigger. Remove the button +
+  its call from **both** companions (keep them in sync). **Leave the Mac's `/session/complete` route in place** (a
+  harmless no-op) so an older/unupdated companion still works — do NOT change the protocol in the same pass.
+  | files: ArchiveCapture/ui/CaptureScreen.kt + capture/CaptureViewModel.kt,
+  ArchiveCaptureiOS/UI/CaptureScreen.swift + Capture/CaptureViewModel.swift | S | low | none
+- [ ] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15)_ — the recent-years list differs
+  (iOS 5, Android 6). **Pick 5**: change Android 6→5 so both match.
+  | files: ArchiveCapture (recent-years list), ArchiveCaptureiOS (recent-years list) | S | low | none
 
 ### Archive Reader — layout & panels
 - [x] **Adjustable + collapsible side panels** — `PanelDivider` (drag-to-resize, 140–350 / 160–400
@@ -208,6 +261,14 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   docs are open in the viewer, search across all of them. Likely via PDFKit (`PDFDocument.findString` / `PDFView`
   selection). Read-only, no writes → Tier-1. | files (verify at impl): Views/DocumentWindowView.swift,
   Views/PDFPaneView.swift, Core/DocumentViewerModel.swift | M | low | none
+- [ ] **Full-text search snippet previews (keyword-in-context)** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
+  show a `snippet()`-style **keyword-in-context** excerpt for each search hit (the matched OCR text with the query
+  term highlighted) so results are scannable without opening each doc. FTS5 has `snippet()` **built in** and the
+  content index **already stores the OCR `body`**, so this is a **search-UI addition, not an indexing change** —
+  it layers on the shipped bm25 relevance ranking (and is distinct from the in-viewer find above: this is the
+  corpus/library search). Read-only, no writes → **Tier-1**. Was deferred out of the `index-parallelization` plan
+  (owner, 2026-07-09), which shipped ranking but explicitly not previews. | files (verify at impl):
+  Search/ContentIndex.swift, Views/NavigationModel.swift, Views/NavigationWindowView.swift | M | low | none
 
 ### Archive Reader — sort & smart folders
 - [x] **Drop the top-bar Sort button; sort via column headers** — removed the toolbar Sort menu; primary

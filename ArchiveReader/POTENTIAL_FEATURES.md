@@ -33,11 +33,9 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
 ## Medium priority
 - **Controlled subject vocabulary (optional)** — restrict subject tags to an allowed list (near-duplicate
   detection via `TagSimilarity` and corpus-wide bulk rename already shipped).
-- **Full-text search snippet previews** — show a `snippet()`-style keyword-in-context excerpt for each
-  hit (the matched OCR text with the query term highlighted), so results are scannable without opening
-  each doc. Deferred out of the `index-parallelization` plan, which ships bm25 *relevance ranking* but
-  **not** previews (owner, 2026-07-09). Depends on the content index already storing the OCR `body`
-  (it does), so this is a search-UI addition, not an indexing change.
+- → **Full-text search snippet previews** — **promoted to the near-term queue** (owner, 2026-07-15); the live
+  item now lives in [`SUITE_TODO.md`](../SUITE_TODO.md) → *Archive Reader — search*. (Keyword-in-context excerpt
+  per hit via FTS5 `snippet()`; the index already stores the OCR `body`, so it's a search-UI addition.)
 - **Fuzzy OCR text search** — tolerate typos / near-matches in full-text search (FTS5 prefix/`NEAR`,
   a trigram tokenizer, or an edit-distance layer over candidates), so a misspelled query still finds
   the document. Deferred by owner (2026-07-09); would coordinate with the bm25 ranking in the
@@ -48,10 +46,13 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
   policy, cloud-side tag-durability verification. (v1 assumes local disk.)
 - **Creation-date mirror** for native Finder chronological browsing (1678–2262 only; a bonus, never
   the sort key).
-- **IIIF manifest / EAD / Dublin Core export**; Zotero / Tropy integration.
+- Zotero / Tropy integration. _(IIIF manifest / EAD / Dublin Core export removed 2026-07-15 — owner: out of scope.)_
 
-## Archive Suite convergence
-- Extract the UI-free `Core/` into a shared **`ArchiveCore`** Swift package used by both apps
-  (unifies the safety-critical tag code so Processor and Reader can never drift).
-- Monorepo (`Archive Suite/`) with a shared `bootstrap.sh` and version tag; distribute as two apps or
-  one app with Process/Read modes. See [CLAUDE.md](CLAUDE.md) → Archive Suite.
+## Archive Suite convergence — ✅ SHIPPED (W0, 2026-07)
+- ✅ **Shared `ArchiveCore` Swift package** — the UI-free tag/PDF model AND the unified audited writer both
+  shipped in the W0 refactor: `packages/ArchiveCore/` holds the read model (`DocumentTags`, `PDFFormatStatus`,
+  `TagSimilarity`, `DuplicateNames`, `FileLink`, `CopyTextCleaner`, links/thumbnails) plus `Tags/TagWrite.swift`'s
+  `CoordinatedTagWriter` (trustworthy-read guard + verify-by-re-read); both apps delegate to it, so the
+  safety-critical tag code can no longer drift.
+- ✅ **Monorepo** — `Archive Suite/` now houses `ArchiveProcessor/`, `ArchiveReader/`, `ArchiveNotes/`,
+  `packages/ArchiveCore/`, a shared `launch.sh`, and `suite-v*` release tags. See [CLAUDE.md](CLAUDE.md) → Archive Suite.
