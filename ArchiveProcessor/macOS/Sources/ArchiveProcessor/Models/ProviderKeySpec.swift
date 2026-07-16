@@ -67,6 +67,30 @@ struct ProviderKeySpec: Identifiable, Sendable {
         validate: { await KeyValidator.validateMistral(key: $0) }
     )
 
+    // ⚠️ W13.oai-2: deep links + on-screen steps mirror the live 2026 OpenAI sign-up flow — re-verify
+    // wording/URLs (and capture screenshots) in the keyed/owner tail before shipping, per the type doc
+    // comment above. Unlike Gemini/Mistral, the OpenAI *API* has no free tier: a key needs prepaid
+    // credits (or a saved card) before a paid run works — GET /v1/models still validates the key itself.
+    static let openai = ProviderKeySpec(
+        provider: .openai,
+        account: LLMProvider.openai.rawValue,
+        blurb: "Archive Processor can also use OpenAI (ChatGPT) to read your archive photos. You'll make your own key so you control cost and privacy. OpenAI's API has no free tier, so you'll add a small amount of prepaid credit — any charges go to OpenAI, never to this app.",
+        signInURL: URL(string: "https://platform.openai.com/api-keys")!,
+        billingURL: URL(string: "https://platform.openai.com/settings/organization/billing/overview")!,
+        privacyURL: URL(string: "https://platform.openai.com/docs/guides/your-data")!,
+        steps: [
+            "Sign in at platform.openai.com (create an account if you don't have one).",
+            "Open “Billing” and add a payment method or a little prepaid credit — the API won't run without it.",
+            "Open “API keys” → “Create new secret key”, then COPY IT NOW — it's shown only once (it starts with “sk-”).",
+            "Come back here and paste it below."
+        ],
+        costNote: "Pay-as-you-go — no free tier. Add a small prepaid amount to start; you're billed by OpenAI for what you use, not by this app.",
+        privacyNote: "OpenAI does not use data sent through the API to train its models by default. API inputs may be retained briefly (about 30 days) for abuse monitoring, then deleted; zero-retention is available to eligible accounts on request.",
+        cardNote: "Have a payment method ready — the OpenAI API needs billing set up (a card or prepaid credit) before it will run.",
+        keyPrecheck: { $0.hasPrefix("sk-") && $0.count >= 20 && !$0.contains(" ") },
+        validate: { await KeyValidator.validateOpenAI(key: $0) }
+    )
+
     /// The providers offered in the guided wizard (Anthropic remains available via manual key entry).
-    static let onboardable: [ProviderKeySpec] = [.gemini, .mistral]
+    static let onboardable: [ProviderKeySpec] = [.gemini, .mistral, .openai]
 }

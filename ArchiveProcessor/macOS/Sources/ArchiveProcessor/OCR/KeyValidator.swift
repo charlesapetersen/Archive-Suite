@@ -106,6 +106,35 @@ enum KeyValidator {
         }
     }
 
+    // MARK: - OpenAI
+
+    /// Cheap auth check: GET /v1/models with a Bearer token (no generation cost). Note this endpoint
+    /// returns 200 for a *valid* key even when the account has no credits/billing — OpenAI's API has no
+    /// free tier, so a "works" here means the key authenticates, not that a paid run will succeed; the
+    /// live 2-image OCR smoke (keyed/owner tail) is what surfaces an insufficient-quota account, the same
+    /// division of labor as Mistral's `validateMistral` + `classifySampleOCR`.
+    static func validateOpenAI(key: String) async -> KeyStatus {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .invalidKey }
+        guard let url = URL(string: "https://api.openai.com/v1/models") else { return .unknown("bad-url") }
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(trimmed)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return .providerBusy }
+            switch http.statusCode {
+            case 200: return .works
+            case 401, 403: return .invalidKey
+            case 429: return .rateLimited
+            case 500...599: return .providerBusy
+            default: return .unknown("HTTP \(http.statusCode)")
+            }
+        } catch {
+            return .offline
+        }
+    }
+
     /// Map an OCR-pipeline error (from the end-to-end sample test) to a status. `errorCode` is the
     /// provider HTTP status string the OCR clients already surface; used to catch plan/billing on Mistral.
     static func classifySampleOCR(errorCode: String?, errorMessage: String?) -> KeyStatus {

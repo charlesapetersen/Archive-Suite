@@ -94,6 +94,7 @@ struct ContentView: View {
         let hasAnyKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) != nil
             || KeychainHelper.load(account: LLMProvider.mistral.rawValue) != nil
             || KeychainHelper.load(account: LLMProvider.anthropic.rawValue) != nil
+            || KeychainHelper.load(account: LLMProvider.openai.rawValue) != nil
             || KeychainHelper.load(account: "Gateway") != nil
         if !hasAnyKey { showKeyOnboarding = true }
     }

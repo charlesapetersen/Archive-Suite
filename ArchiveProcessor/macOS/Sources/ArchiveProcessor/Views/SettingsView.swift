@@ -80,6 +80,7 @@ struct SettingsView: View {
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
     @State private var mistralKey = ""
+    @State private var openaiKey = ""
     @State private var gatewayKey = ""
     @State private var showKeyWizard = false
     @State private var showManageModels = false
@@ -204,6 +205,7 @@ struct SettingsView: View {
         anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
         geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
         mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
+        openaiKey = KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? ""
         gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
     }
 
@@ -351,16 +353,17 @@ struct SettingsView: View {
     @ViewBuilder private var apiKeySection: some View {
         Section {
             Button { showKeyWizard = true } label: {
-                Label("Set up keys (guided) — Gemini & Mistral", systemImage: "wand.and.stars")
+                Label("Set up keys (guided) — Gemini, Mistral & OpenAI", systemImage: "wand.and.stars")
             }
             keyField("Anthropic", account: LLMProvider.anthropic.rawValue, text: $anthropicKey)
             keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
             keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
+            keyField("OpenAI", account: LLMProvider.openai.rawValue, text: $openaiKey)
             if useGateway { keyField("Gateway", account: "Gateway", text: $gatewayKey) }
         } header: {
             HStack {
                 Text("API Keys")
-                HelpButton(text: "New here? Tap “Set up keys (guided)” to create your own free Gemini or Mistral key step by step, with a live check that it works. Or paste a key directly below. Each key is stored securely in the macOS Keychain; you only need one provider.")
+                HelpButton(text: "New here? Tap “Set up keys (guided)” to create your own Gemini, Mistral, or OpenAI key step by step, with a live check that it works. Gemini and Mistral have free tiers; OpenAI is pay-as-you-go. Or paste a key directly below. Each key is stored securely in the macOS Keychain; you only need one provider.")
             }
         }
         .sheet(isPresented: $showKeyWizard) {
