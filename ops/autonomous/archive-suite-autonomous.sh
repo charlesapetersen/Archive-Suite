@@ -44,6 +44,13 @@ MAXRUN="${AUTONOMOUS_MAXRUN:-10800}"      # OUTER wall-clock backstop (3 h). The
 BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
 EFFORT="${AUTONOMOUS_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
 
+# Idle backoff — the loop's answer to "nothing is happening". $INTERVAL is the cadence while the run is
+# PRODUCTIVE; a cycle that advances nothing doubles the gap up to $MAXBACKOFF, and $IDLE_STOP of unbroken
+# no-progress parks the run + stops the daemon. Any progress resets to $INTERVAL instantly. Rationale + the
+# two waste modes this closes: ops/autonomous/README.md "Idle backoff" (added 2026-07-16).
+MAXBACKOFF="${AUTONOMOUS_MAXBACKOFF:-1800}"  # ceiling on the idle gap (30 min)
+IDLE_STOP="${AUTONOMOUS_IDLE_STOP:-21600}"   # 6 h of zero progress -> park + stop (0 disables the auto-stop)
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -84,6 +91,104 @@ DENY=(
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# ===== Idle backoff (2026-07-16) — see ops/autonomous/README.md "Idle backoff" =====
+# The loop used to fire every $INTERVAL unconditionally and only ever stop on `RUN STATUS: COMPLETE`, which
+# a session sets ONLY after finishing the LAST "[ ]" item. So a run whose queue is non-empty but every item
+# is BLOCKED (owner-gated / GUI-gated / deliberately skipped) had no terminal state and spun forever. Two
+# real waste modes, both observed 2026-07-16:
+#   A. usage window exhausted -> claude fast-fails rc=1 in ~3s -> ~40 pointless spawns/hour for hours.
+#   B. nothing actionable -> a FULL session (reads a 250KB plan + SUITE_TODO + git log, up to $BUDGET) burns
+#      real tokens to re-reach "nothing to do", every 90s.
+# Fix: any cycle that ADVANCES NOTHING doubles the gap ($INTERVAL -> $MAXBACKOFF); any progress resets it.
+#
+# "Progress" is DERIVED, never self-reported — the session can't forget to set a flag, and a model that
+# wrongly believes it worked can't lie its way out of the backoff. A cycle counts as progress iff the work
+# fingerprint below actually moved (independent of exit code — see the verdict block in tick() for why rc is
+# deliberately NOT part of this).
+#
+# The fingerprint hashes the DECISION SURFACE a fresh session reads to choose work: the repo tip, the plan's
+# RUN STATUS + WORK QUEUE, and the GUI gate. Session Log / Morning Review / E2E findings are EXCLUDED ON
+# PURPOSE: a no-op session still appends its reasoning there, and hashing that churn would reset the backoff
+# every single cycle and silently restore the old spin.
+work_fingerprint() {
+  {
+    git -C "$REPO" rev-parse HEAD 2>/dev/null || echo no-head
+    grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null || echo no-status
+    awk '/^## WORK QUEUE/{f=1;print;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null
+    cat "$STATE/gui-mode" 2>/dev/null || echo no-gui
+  } | shasum -a 256 2>/dev/null | cut -d' ' -f1
+}
+
+# NOTE (why the fingerprint is an ACCELERATOR, not a gate): it is tempting to SKIP the session outright while
+# the fingerprint is unchanged ("a fresh session would provably reach the same conclusion — don't pay for
+# it"). That is WRONG and was rejected on evidence: on 2026-07-16 the 09:34 session concluded "nothing
+# autonomously actionable", then at 10:40 — same HEAD, same queue, same gui-mode, i.e. an IDENTICAL
+# fingerprint — a session found real work and shipped the code-signing fix (496d202) plus the segment-json
+# de-dup. These sessions are NONDETERMINISTIC, so "same inputs => same conclusion" does not hold. A skip-gate
+# would have suppressed that work indefinitely. So an unchanged fingerprint only means "keep backing off"
+# (still retrying, just rarely); a CHANGED one is a positive signal to retry NOW.
+BACKOFF="$INTERVAL"
+IDLE_SINCE="$STATE/idle.since"
+# Clear the idle stamp at every daemon startup so the two halves of the state machine share a lifetime:
+# BACKOFF is in-memory (dies with the process), so idle.since must too — otherwise a stale stamp from a
+# PRIOR run makes the first no-progress cycle compute a huge idle age and PARK on cycle 1, turning the
+# owner's re-arm (an explicit "try again" signal) into a single retry. Arming a run always buys a full
+# $IDLE_STOP window. (Confirmed-HIGH review finding, 2026-07-16 — see README "Idle backoff".)
+rm -f "$IDLE_SINCE" 2>/dev/null || true
+
+note_progress() {   # something moved -> back to the productive cadence
+  [ "$BACKOFF" != "$INTERVAL" ] && log "progress — backoff reset to ${INTERVAL}s."
+  BACKOFF="$INTERVAL"; rm -f "$IDLE_SINCE" 2>/dev/null || true
+}
+
+# Sleep out the current $BACKOFF, but WAKE EARLY the moment the decision surface changes. This is the other
+# half of "accelerator, not gate": backing off is what stops the waste, but the owner arming an item or
+# flipping gui-mode must not then sit through a 30-minute nap — that flip is exactly what unblocked the
+# 2026-07-15 run. Without this the backoff is a pure latency tax on the owner's own unblocking action.
+# Poll cost is trivial (one rev-parse + one hash per step) and bounded to a 30s granularity.
+backoff_sleep() {
+  local fp0 waited=0 step
+  fp0="$(work_fingerprint)"
+  step="$BACKOFF"; [ "$step" -gt 30 ] && step=30
+  while [ "$waited" -lt "$BACKOFF" ]; do
+    sleep "$step"; waited=$(( waited + step ))
+    if [ "$(work_fingerprint)" != "$fp0" ]; then
+      log "decision surface changed during backoff (commit / queue edit / GUI flip) — retrying now."
+      note_progress; return 0
+    fi
+  done
+}
+
+# Park the run: no progress for $IDLE_STOP. Everything left is blocked on the owner, so stop cleanly and say
+# so LOUDLY (log + Desktop file + notification) rather than idle forever holding a caffeinate assertion.
+# Deliberately does NOT rewrite RUN STATUS: the plan stays IN_PROGRESS so a plain re-arm resumes with no
+# edit, and the EXIT trap still fires the taskport security reminder.
+park_run() {
+  local hrs=$(( IDLE_STOP / 3600 ))
+  local m="Archive Suite autonomous run PARKED: ${hrs}h with no progress — every remaining queue item looks blocked on you (owner/GUI-gated). Nothing was lost; the plan is intact. Check:  ./ops/autonomous/arm.sh status   then re-arm with:  ./ops/autonomous/arm.sh"
+  rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a re-arm could trip over
+  log "!!!!!!!!!!!! PARKED: no progress for ${IDLE_STOP}s — stopping. $m"
+  { echo "[$(date '+%F %T')] $m"; } > "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
+  osascript -e 'display notification "Run parked — no progress for hours; every item looks blocked on you. See ARCHIVE-SUITE-RUN-PARKED.txt on your Desktop." with title "Archive Suite: autonomous run parked" sound name "Basso"' >/dev/null 2>&1 || true
+  launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
+}
+
+# Returns 9 when the run has been idle past $IDLE_STOP (caller stops the loop); 0 to keep going.
+note_no_progress() {
+  local now idle since
+  now=$(date +%s)
+  # Re-stamp on anything non-numeric (missing, empty, or a truncated write) — a bad stamp must never wedge
+  # the arithmetic below, and re-stamping only ever DELAYS the park (fails safe: never an early auto-stop).
+  since=$(cat "$IDLE_SINCE" 2>/dev/null)
+  case "$since" in ''|*[!0-9]*) since="$now"; echo "$now" > "$IDLE_SINCE" 2>/dev/null || true ;; esac
+  idle=$(( now - since ))
+  BACKOFF=$(( BACKOFF * 2 ))
+  [ "$BACKOFF" -gt "$MAXBACKOFF" ] && BACKOFF="$MAXBACKOFF"
+  if [ "$IDLE_STOP" -gt 0 ] && [ "$idle" -ge "$IDLE_STOP" ]; then park_run; return 9; fi
+  log "no progress (idle ${idle}s) — next attempt in ${BACKOFF}s."
+  return 0
+}
 
 # Housekeeping — GC the daemon's OWN spent worktrees + branches so they don't pile up for the owner.
 # Runs in the daemon loop BETWEEN sessions. SAFETY is structural, in layers (this survived an adversarial
@@ -285,6 +390,10 @@ tick() {
     log "stale lock (${age}s) — taking over."
   fi
 
+  # 3b. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
+  #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.
+  local fp_before; fp_before="$(work_fingerprint)"
+
   # 4. Acquire the lock + heartbeat it for the child's lifetime, so overlapping cycles/sessions skip.
   touch "$LOCK"
   local ppid=$$
@@ -342,6 +451,22 @@ tick() {
       | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
   fi
 
+  # Progress verdict — DERIVED, not self-reported (see the idle-backoff block above): progress is the
+  # decision surface actually MOVING, independent of exit code. Deliberately NOT gated on rc==0: a session
+  # that ships a commit and is THEN killed (budget cap / watchdog) or exits nonzero still advanced the run,
+  # and must reset the backoff — gating on rc==0 would let a run that keeps committing-then-dying march to a
+  # false park. The failure side needs no rc check either: a usage-limit fast-fail (rc=1, ~3s) can't move
+  # the fingerprint, so it falls through to no-progress on its own. Evaluated HERE — before housekeeping +
+  # compact-plan — so neither the worktree GC nor a Session-Log compaction is mistaken for the run advancing.
+  local fp_after; fp_after="$(work_fingerprint)"
+  local verdict=0
+  if [ -n "$fp_after" ] && [ "$fp_after" != "$fp_before" ]; then
+    note_progress
+  else
+    log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
+    note_no_progress || verdict=9
+  fi
+
   kill "$hb" 2>/dev/null || true
   rm -f "$LOCK" 2>/dev/null || true
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
@@ -352,12 +477,16 @@ tick() {
   if [ -x "$HOME/.local/bin/compact-plan.sh" ]; then
     "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1 || true
   fi
-  return 0
+  return "$verdict"
 }
 
+# The gap is $BACKOFF (not a flat $INTERVAL): it IS $INTERVAL while the run is productive, doubles toward
+# $MAXBACKOFF once cycles stop advancing anything, and is cut short the moment the decision surface changes.
+# rc 9 = terminal (RUN STATUS: COMPLETE, or parked after $IDLE_STOP of no progress) -> fall out of the loop
+# and let the EXIT trap fire the taskport security reminder.
 while true; do
   tick; rc=$?
   [ "$rc" = "9" ] && break
-  sleep "$INTERVAL"
+  backoff_sleep
 done
 log "=== daemon down (pid $$) ==="

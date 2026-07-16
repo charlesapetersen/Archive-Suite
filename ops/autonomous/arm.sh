@@ -38,6 +38,24 @@ am_state() { automationmodetool 2>/dev/null | grep -qi 'requires.*authentication
 status() {
   echo "== daemon process =="
   pgrep -fl archive-suite-autonomous.sh || echo "  (not running)"
+  echo "== run state =="
+  # Distinguish PARKED (daemon auto-stopped after a long idle stretch — blocked on you, nothing lost) from a
+  # crash, and show whether a live daemon is backing off. All derived from files the daemon writes; read-only.
+  local since idle
+  since=$(cat "$STATE/idle.since" 2>/dev/null)
+  if pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
+    case "$since" in
+      ''|*[!0-9]*) echo "  running, productive (last cycle advanced the run)" ;;
+      *) idle=$(( $(date +%s) - since ))
+         echo "  running, BACKING OFF (idle ${idle}s — sessions finding no actionable work; retrying, widening the gap)" ;;
+    esac
+  elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
+    echo "  PARKED — auto-stopped after a long no-progress stretch; every queue item looks blocked on you."
+    echo "  Nothing lost, plan intact. Unblock (e.g. '$0 gui on') then re-arm: '$0'."
+    [ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && echo "  see: ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt"
+  else
+    echo "  stopped (normal stop, or the launching session closed — not parked). Re-arm with '$0'."
+  fi
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
   echo "== GUI mode =="

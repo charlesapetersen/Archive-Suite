@@ -65,9 +65,49 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.archivesuite.autonom
 tail -f ~/.local/state/archive-autonomous/daemon.log            # cadence + rc of each resume
 tail -f ~/.local/state/archive-autonomous/last-session.log      # the most recent resume's transcript
 pkill -f archive-suite-autonomous.sh                            # stop the detached daemon
-launchctl bootout gui/$(id -u)/com.archivesuite.autonomous      # stop the LaunchAgent (also auto at COMPLETE)
+launchctl bootout gui/$(id -u)/com.archivesuite.autonomous      # stop the LaunchAgent (also auto at COMPLETE/park)
 ```
-The daemon self-terminates when the plan's `RUN STATUS:` line reads `COMPLETE`.
+`./arm.sh status` shows a **run state** line — *productive* / *backing off (idle Ns)* / *PARKED* / *stopped* —
+so a parked run is never mistaken for a crash. The daemon self-terminates when the plan's `RUN STATUS:` line
+reads `COMPLETE`, **or** when it parks (see below).
+
+## Idle backoff + auto-park (added 2026-07-16)
+
+**The problem it fixes.** The loop used to fire every `INTERVAL` (90 s) unconditionally and only ever stop on
+`RUN STATUS: COMPLETE` — which a session sets *only* after finishing the **last** `[ ]` item. So a run whose
+queue was non-empty but every remaining item was **blocked** (owner-gated / GUI-gated / deliberately skipped)
+had no terminal state and spun forever. Two real waste modes, both observed 2026-07-16:
+- **A — usage window exhausted:** `claude` fast-fails `rc=1` in ~3 s → ~40 pointless spawns/hour for hours.
+- **B — nothing actionable:** a *full* session (reads a ~250 KB plan + `SUITE_TODO` + `git log`, up to
+  `--max-budget-usd`) burns real tokens to re-reach "nothing to do", every 90 s.
+
+**The mechanism.** Any cycle that **advances nothing** doubles the gap (`INTERVAL` → `MAXBACKOFF`, default
+30 min); any progress resets it to `INTERVAL`; `IDLE_STOP` (default 6 h) of *unbroken* no-progress **parks**
+the run — a clean stop with a loud, owner-visible signal (`daemon.log` + `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`
++ a notification). Park deliberately leaves `RUN STATUS: IN_PROGRESS`, so a plain re-arm resumes with no edit.
+
+**Progress is *derived*, never self-reported.** A cycle counts as progress iff a **work fingerprint** moved —
+`sha256(git HEAD + plan '^RUN STATUS:' line + plan '## WORK QUEUE' section + the gui-mode file)`. The model
+can't forget to set a flag, and a session that *believes* it worked can't lie past an unchanged fingerprint.
+Exit code does **not** gate it: a session that ships a commit then gets killed (budget/watchdog) still moved
+the fingerprint and resets the backoff; a usage fast-fail can't move it and falls through to no-progress.
+- **Excluded on purpose:** the plan's `## Session Log` / `## Morning Review` / `## E2E findings`. A no-op
+  session still appends its reasoning there, so hashing that churn would reset the backoff every cycle and
+  silently restore the old spin. `SUITE_TODO.md` is tracked, so it rides in `git HEAD`.
+- **Accelerator, not gate.** It is tempting to *skip* firing while the fingerprint is unchanged. That was
+  **rejected on evidence:** on 2026-07-16 a 09:34 session concluded "nothing actionable", then at 10:40 —
+  identical HEAD, queue, and gui-mode — a session found real work and shipped the code-signing fix
+  (`496d202`). Sessions are **nondeterministic**, so "same inputs ⇒ same conclusion" is false; the fingerprint
+  only *accelerates* retries (an unchanged one → keep backing off; a changed one → retry now, via an
+  interruptible `backoff_sleep` that wakes early the instant the owner arms an item or flips gui-mode).
+- **Idle clock shares the daemon's lifetime.** `idle.since` is cleared at every startup (and on park), so a
+  stale stamp from a prior run can't make a fresh daemon park on cycle 1 — an owner re-arm always buys a full
+  `IDLE_STOP` window. *(Confirmed-HIGH finding from the change's own adversarial review.)*
+
+Knobs (env-overridable): `AUTONOMOUS_MAXBACKOFF`, `AUTONOMOUS_IDLE_STOP` (0 disables the auto-park). Built
+Tier-2: a 17-assertion prove-the-mechanism harness (runs the real daemon against a stub `claude` in a
+sandboxed `HOME`/`STATE`/`REPO`, covering both waste modes, progress-reset, queue-edit early-wake, the
+stale-stamp regression, rc≠0-with-commit, and the `COMPLETE` path) + an adversarial review.
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12
 
