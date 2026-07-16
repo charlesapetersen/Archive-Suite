@@ -292,10 +292,14 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   (`encodeSessionComplete` + the `sessionCompleteMatchesGolden` test) and the maintain-only cloud path, i.e. it
   **"changes the protocol"** — which the item explicitly forbids "in the same pass." Left as an optional future
   protocol-cleanup pass (owner-gated). Doc-only reconciliation (Tier-1, no build needed — tree == `a624ccf`).
-- [ ] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15; premise corrected 2026-07-16)_ —
-  **both companions are currently at 6** (iOS `Array(ys.prefix(6))` in `CaptureViewModel.swift`; Android `.take(6)`
-  in `Prefs.kt` — `f1d2263` unified iOS 5→6). Owner wants **5**: change iOS `prefix(6)`→`prefix(5)` AND Android
-  `take(6)`→`take(5)`. (The original "iOS 5, Android 6" premise is stale — they're both 6 now.) Build-verifiable.
+- [x] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15; SHIPPED 2026-07-16)_ — both
+  companions now cap the recent-years quick-chip list at **5** (was 6): iOS `Array(ys.prefix(5))`
+  (`CaptureViewModel.noteYear`) + comment; Android `.take(5)` (`Prefs.noteYear`) + `max 5` doc comment. Kept in
+  sync. Migration-safe (a previously-stored 6th year is truncated on the next `noteYear`; it is only a UI
+  convenience list — no tag/corpus write, so Tier-1). **Verified:** iOS `xcodebuild` **BUILD SUCCEEDED** + Android
+  `./gradlew :app:assembleDebug` **BUILD SUCCESSFUL**, no new warnings; no unit test asserts the cap. Visual
+  chip-count check (needs seeding ≥6 recent years then opening the tag sheet on device/emulator — an
+  E2E-harness-level drive, disproportionate for a one-line display cap) → Morning Review.
   | files: ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift (recentYears), ArchiveCapture/.../data/Prefs.kt (recentYears) | S | low | none
 
 ### Archive Reader — layout & panels

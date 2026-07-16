@@ -29,12 +29,12 @@ class Prefs(context: Context) {
             .remove("mode").remove("account").apply()
     }
 
-    /** Recent years, most-recent first (max 6). Months are intentionally NOT tracked (no recency bias). */
+    /** Recent years, most-recent first (max 5). Months are intentionally NOT tracked (no recency bias). */
     fun recentYears(): List<Int> =
         (sp.getString("recentYears", "") ?: "").split(",").mapNotNull { it.toIntOrNull() }
 
     fun noteYear(year: Int) {
-        val list = (listOf(year) + recentYears()).distinct().take(6)
+        val list = (listOf(year) + recentYears()).distinct().take(5)
         sp.edit().putString("recentYears", list.joinToString(",")).apply()
     }
 }

@@ -156,9 +156,9 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   builder (2 sites); OCRResult `.with(...)` copy helpers; LLMRotationDetector.rotate → ImageEncoding.rotate;
   Gemini cancelBatch via the shared URL builder. **The REMAINDER is the near-term "de-dup sweep" item** in
   [`SUITE_TODO.md`](../SUITE_TODO.md) (re-scoped 2026-07-16).
-- ✅ **Value decision — recent-years cap:** `f1d2263` unified BOTH companions at **6** (iOS was 5→6). **Owner
-  decided 2026-07-15: cap at 5** — so both need 6→5 (iOS `prefix(6)`, Android `take(6)`). Now a near-term item in
-  [`SUITE_TODO.md`](../SUITE_TODO.md) (premise corrected 2026-07-16 — the old "iOS 5, Android 6" note was stale).
+- ✅ **Value decision — recent-years cap: SHIPPED 2026-07-16.** `f1d2263` had unified BOTH companions at **6**
+  (iOS was 5→6); per the **owner's 2026-07-15 decision to cap at 5**, both are now **5** (iOS `prefix(5)`, Android
+  `take(5)`) — shipped as the SUITE_TODO Wave-12 "Cap recent years at 5" item.
 
 ### Shared `ArchiveCore` Swift package — ✅ SHIPPED (W0, 2026-07)
 Both stages shipped in the W0 refactor (`49c0162`–`b90800f`) — this is done, kept here only as a record:
