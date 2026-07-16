@@ -196,4 +196,42 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(ocrField.waitForExistence(timeout: 5),
             "OCR search field should be reachable")
     }
+
+    // MARK: - Full-text search snippet previews (W12-fts-snippet)
+
+    /// OCR-searching a body-only term surfaces a keyword-in-context snippet line under matching rows.
+    /// "California" appears in the fixture OCR bodies (9/11 docs — the "Edmund Brown Collection, USC
+    /// Special Collections" scans) but NOT in any filename ("NNNNN IMG — Brown"), so a table static
+    /// text whose value contains it can ONLY be the rendered snippet line — a content-based assertion
+    /// that the preview renders end-to-end (ContentIndex.searchRanked → ftsSnippets → the name cell).
+    func testOCRSearchShowsKeywordInContextSnippet() throws {
+        waitForRows(minimum: 3, timeout: 10)
+
+        // Focus + type a known body term into the OCR search field.
+        let ocrField = app.textFields["ar.filter.ocr"]
+        if !ocrField.exists {
+            pressKey("f", modifiers: [.command, .option])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        XCTAssertTrue(ocrField.waitForExistence(timeout: 5), "OCR search field should exist")
+        ocrField.click()
+        ocrField.typeText("California")
+
+        // The full-text search must at least execute (the clear button appears once a query is active).
+        XCTAssertTrue(app.buttons["ar.filter.ocrClear"].waitForExistence(timeout: 10),
+            "Full-text search should become active (clear button visible)")
+
+        // The content index builds asynchronously after launch, so poll generously. Success = a table
+        // static text whose value contains the searched BODY term — only possible via the snippet line,
+        // since no fixture filename contains "California".
+        let snippetPredicate = NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                                           "california", "california")
+        let snippet = table.staticTexts.matching(snippetPredicate).firstMatch
+        XCTAssertTrue(snippet.waitForExistence(timeout: 45),
+            "A keyword-in-context snippet containing the body term 'California' should render under a "
+            + "matching row (the term is in no filename, so it can only come from the OCR preview line)")
+
+        // The OCR query should have filtered the list to a matching subset of the fixture.
+        XCTAssertGreaterThanOrEqual(rowCount, 1, "OCR search should keep at least one matching row")
+    }
 }

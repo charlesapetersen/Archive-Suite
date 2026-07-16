@@ -352,7 +352,8 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   next-prev / cross-doc jump) → Morning Review (GUI off). | files: Core/DocumentFind.swift,
   Views/DocumentViewerModel.swift, Views/PDFPaneView.swift, Views/DocumentWindowView.swift,
   ArchiveReaderCommands.swift | M | low | done
-- [ ] **Full-text search snippet previews (keyword-in-context)** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
+- [x] **Full-text search snippet previews (keyword-in-context)** _(promoted from POTENTIAL_FEATURES 2026-07-15;
+  SHIPPED 2026-07-16 — `80725d3` core, `d797ea8` UI)_ —
   show a `snippet()`-style **keyword-in-context** excerpt for each search hit (the matched OCR text with the query
   term highlighted) so results are scannable without opening each doc. FTS5 has `snippet()` **built in** and the
   content index **already stores the OCR `body`**, so this is a **search-UI addition, not an indexing change** —
@@ -360,6 +361,18 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   corpus/library search). Read-only, no writes → **Tier-1**. Was deferred out of the `index-parallelization` plan
   (owner, 2026-07-09), which shipped ranking but explicitly not previews. | files (verify at impl):
   Search/ContentIndex.swift, Views/NavigationModel.swift, Views/NavigationWindowView.swift | M | low | none
+  — **DONE:** `ContentIndex.searchRanked(query,snippetLimit)` returns every bm25-ordered match path (unchanged
+  filtering surface) **plus** bounded FTS5 `snippet()` KWIC previews for the top hits — `snippet()` reads each
+  doc body, so a `path IN (…)` filter caps the work at the top N rather than every match at 150k scale (an
+  `ORDER BY bm25 … LIMIT` would still evaluate `snippet()` for every scanned row). New pure `Search/SearchSnippet.swift`
+  (STX/ETX marker vocabulary shared by the SQL builder + the UI; robust segment parser). `NavigationModel` stores
+  per-path snippets (`ftsSnippets`, cleared at every reset site) + `searchSnippet(for:)`; the AppKit list name cell
+  grows to a dimmed 2nd keyword-in-context line for a hit (matched terms bold + faint adaptive-yellow wash) via the
+  existing `usesAutomaticRowHeights`. **Tier-1** verified: 15 new unit tests (`SearchSnippetTests` + `ContentIndexTests`)
+  green; build clean, no new warnings; **GUI-verified** by a new fixture XCUITest (`testOCRSearchShowsKeywordInContextSnippet`,
+  **TEST SUCCEEDED**) that OCR-searches a body-only term ("California", in 9/11 fixture bodies, in no filename) and
+  asserts the snippet line renders end-to-end. (Pre-existing env-only unit failure `DeepLinkTests.testRevealAndSelectNoRoot`
+  — owner's real `archiveRootBookmark` in the shared unit-target UserDefaults — is unrelated → Morning Review.)
 
 ### Archive Reader — sort & smart folders
 - [x] **Drop the top-bar Sort button; sort via column headers** — removed the toolbar Sort menu; primary
