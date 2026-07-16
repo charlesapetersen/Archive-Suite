@@ -176,40 +176,46 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   functional test `scripts/test-multipage-reocr.sh` (`MultiPageReOCRTestDriver`, 11/11 PASS incl. the
   input-overwrite guard); merge-safety regression still green; build clean, 0 new warnings. GUI visual check
   (toggle render / drop-zone flip) deferred → Morning Review (launch-time Keychain prompt blocks it unattended).
-- [ ] **De-dup sweep from the 2026-07-04 maintainability audit** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
-  small, mechanical, **behavior-preserving** consolidations, each provable by build + existing tests: shared
-  `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor); `ThinkingLevel.budgetTokens` + the
-  Anthropic max_tokens bump (4 clients — budgets differ **by call type**, so KEEP that difference); a shared
-  transient-status friendly-message helper (4 OCR clients); ONE `acceptedImageExtensions` constant (3 files);
-  shared `englishMonthNames`/`monthTag` (LiveCaptureProcessor + OCRProcessor); a segment-JSON schema builder
-  (2 sites); `OCRResult.with(...)` copy helpers; `GatewayConfig.fromDefaults()` (3 views); a `liveProcessingMode`
-  **enum** instead of "stage"/"live" magic strings; `LLMRotationDetector.rotate` → `ImageEncoding.rotate`;
-  Gemini `cancelBatch` via the shared URL builder. One focused pass (or a few); prove equivalence, 0 new
-  warnings. **Tier-1** (touches no write path). | files: OCR/*, Capture/LiveCaptureProcessor.swift, Views/* | M | low | none
-- [ ] **Shared provider text-completion client** _(promoted 2026-07-15)_ — `TagGenerator` + `CollectionSegmenter`
-  duplicate ~85 lines of callLLM/callGateway/callAnthropic/callGemini/callMistralChat differing only by
-  max_tokens — and they have **already drifted on the Mistral signature**, so reconcile deliberately; don't
-  blind-merge. Extract ONE shared text client taking a `maxTokens` param. **Tier-1** (no file writes; verify tags
-  + segments still generate identically on a scratch run).
-  | files: Tagging/TagGenerator.swift, Tagging/CollectionSegmenter.swift | S–M | low | none
-- [ ] **Live Capture output-folder picker** _(promoted 2026-07-15)_ — Process-live **Finish session** currently
-  writes finalized collections to **`~/Downloads/`** with no visible way to choose (found 2026-07-06 in the
-  Android walkthrough — the operator had to hunt for the output). Add an explicit output-folder picker to the Live
-  Capture pane (mirror the Process-Files tagging-mode + output-folder controls), show the current destination on
-  the pane, default sensibly (last-used, or a dedicated "Archive Processor" folder — **not** Downloads), `?` help
-  popover, gray out when irrelevant. First confirm whether live finalize reuses the Process-Files
-  `outputDirectory` or has its own — unify if sensible. **Tier-2** (changes where irreplaceable output lands).
-  | files: Views/LiveCaptureView.swift, Capture/LiveCaptureProcessor.swift, Models/DefaultsKeys.swift | M | med | none
+- [ ] **De-dup sweep from the 2026-07-04 maintainability audit — REMAINDER ONLY** _(promoted 2026-07-15;
+  re-scoped 2026-07-16 after finding suite-v1.2.0 already did most of it)_. **`f1d2263` (suite-v1.2.0) ALREADY
+  SHIPPED 5 of the listed consolidations — do NOT redo:** `highestLeadingNumber` (→ `Capture/CollectionNumbering.swift`),
+  `monthTag`/`englishMonthNames` (→ `GeneratedTags`), `acceptedImageExtensions` (→ `ImageEncoding`),
+  `GatewayConfig.fromDefaults()`, `liveProcessingMode` **enum**. **GENUINE REMAINDER (~6, verified still duplicated
+  in-tree 2026-07-16):** a shared transient-status friendly-message helper (4 OCR clients); a segment-JSON schema
+  builder (2 sites); `OCRResult.with(...)` copy helpers; `LLMRotationDetector.rotate` → `ImageEncoding.rotate`
+  (`LLMRotationDetector.swift:150` still a private copy — its own comment says "mirrors ImageEncoding.rotate");
+  `ThinkingLevel.budgetTokens` + the Anthropic max_tokens bump (4 clients — `thinkingBudget` is 1024/4000,
+  512/2000, and two `budget` vars, i.e. budgets differ **by call type**, so KEEP that difference — this one is
+  request-body-affecting if mis-merged); Gemini `cancelBatch` via the shared URL builder.
+  ⚠️ **VERIFICATION CONSTRAINT:** the Processor has **no unit-test target** and its only functional test needs an
+  OCR API key (deleted W4.0.a) — so "prove equivalence" here = build-green + byte-identical diff inspection; the
+  `budgetTokens` sub-item (request-body-affecting) should be done in a keyed/owner session, not guessed unattended.
+  **Tier-1** (touches no write path). | files: OCR/*, Capture/LiveCaptureProcessor.swift, Views/* | M | low | none
+- [x] **Shared provider text-completion client** — **ALREADY SHIPPED `f1d2263` (suite-v1.2.0), before the
+  2026-07-15 promotion re-listed it.** `OCR/LLMTextClient.swift` is the shared text-completion client;
+  `TagGenerator` + `CollectionSegmenter` both delegate to it, each keeping its own `maxTokens`/timeout so request
+  bodies stay byte-identical (the Mistral-signature drift was reconciled deliberately, not blind-merged).
+  Verified in-tree 2026-07-16 (file present; both callers reference it). Promoted-in-error 2026-07-15 (`1ee659c`) —
+  the POTENTIAL_FEATURES source entry was stale.
+  | files: Tagging/TagGenerator.swift, Tagging/CollectionSegmenter.swift, OCR/LLMTextClient.swift | done
+- [x] **Live Capture output-folder picker** — **ALREADY SHIPPED `782dfdd` (suite-v1.2.0), before the 2026-07-15
+  promotion re-listed it.** LiveCaptureView has the picker (`chooseOutputFolder()` + NSOpenPanel), a "Choose…"
+  button, the current-destination "Output folder" row, a `?` HelpButton, and gray-out in Stage-for-later mode —
+  unified on the SAME `DefaultsKeys.outputDirectory` as Process Files (one source of truth). Verified in-tree
+  2026-07-16. Promoted-in-error 2026-07-15 (`1ee659c`). **Residual (owner):** the owner's promoted wish said the
+  default should be "not Downloads"; the shipped default is Downloads-if-unset (visible + changeable via the
+  picker). Whether to change the default (and to what — last-used vs a dedicated folder) is an owner call →
+  Morning Review. | files: Views/LiveCaptureView.swift | done
 - [ ] **Cost tracking + processing history** _(promoted 2026-07-15)_ — persist each run's **actual** cost plus a
   run log (timestamp, provider/model, file count, results/failures) and surface a simple history view.
   `CostEstimator` already does the per-model math for *estimates*; this records **actuals** and accumulates them.
   Writes only its own store (Application Support / UserDefaults) — **never** the corpus. **Tier-1**.
   | files: Models/CostEstimator.swift, Models/DefaultsKeys.swift, Views/ToolsView.swift (or a new history view) | M | low | none
-- [ ] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15)_ — (a) main-window shortcuts for
-  start-processing / switch-provider (the review + tag-card dialogs already have full keyboard nav); follow the
-  Reader's convention that **the menu bar is the single source of shortcuts**. (b) audit that custom views render
-  correctly in **dark mode**. Both small, Tier-1, and GUI-verifiable now the harness runs.
-  | files: Views/OCRView.swift, Views/* (dark-mode audit), a Commands scene | S | low | none
+- [ ] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15; re-scoped 2026-07-16)_ — (a)
+  main-window shortcuts for start-processing / switch-provider: **ALREADY SHIPPED `b1fc5d4` (suite-v1.2.0)** —
+  only verify coverage is complete against the Reader's "menu bar = single source of shortcuts" convention. (b)
+  **REMAINING:** audit that custom views render correctly in **dark mode**. Small, Tier-1, GUI-verifiable now the
+  harness runs. | files: Views/OCRView.swift, Views/* (dark-mode audit), a Commands scene | S | low | none
 - [ ] **Incremental processing (skip already-processed files)** _(promoted 2026-07-15)_ — re-running a directory
   should process only new/changed files instead of redoing everything (matters at 150k scale). Choose the skip key
   deliberately (an existing output PDF at the destination + source mtime) and **fail safe: when in doubt, PROCESS**
@@ -226,9 +232,11 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   harmless no-op) so an older/unupdated companion still works — do NOT change the protocol in the same pass.
   | files: ArchiveCapture/ui/CaptureScreen.kt + capture/CaptureViewModel.kt,
   ArchiveCaptureiOS/UI/CaptureScreen.swift + Capture/CaptureViewModel.swift | S | low | none
-- [ ] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15)_ — the recent-years list differs
-  (iOS 5, Android 6). **Pick 5**: change Android 6→5 so both match.
-  | files: ArchiveCapture (recent-years list), ArchiveCaptureiOS (recent-years list) | S | low | none
+- [ ] **Cap recent years at 5 (both companions)** _(owner decision 2026-07-15; premise corrected 2026-07-16)_ —
+  **both companions are currently at 6** (iOS `Array(ys.prefix(6))` in `CaptureViewModel.swift`; Android `.take(6)`
+  in `Prefs.kt` — `f1d2263` unified iOS 5→6). Owner wants **5**: change iOS `prefix(6)`→`prefix(5)` AND Android
+  `take(6)`→`take(5)`. (The original "iOS 5, Android 6" premise is stale — they're both 6 now.) Build-verifiable.
+  | files: ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift (recentYears), ArchiveCapture/.../data/Prefs.kt (recentYears) | S | low | none
 
 ### Archive Reader — layout & panels
 - [x] **Adjustable + collapsible side panels** — `PanelDivider` (drag-to-resize, 140–350 / 160–400

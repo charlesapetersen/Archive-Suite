@@ -139,25 +139,26 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
 - ~~**Central `DefaultsKey` constants for the ~35 @AppStorage keys (flagship).**~~ **DONE** (2026-07-04):
   `Models/DefaultsKeys.swift` now defines all 37 durable-settings keys once and every `@AppStorage` / `forKey:`
   call site references it; values verified byte-identical to the originals so saved settings are preserved.
-- → **Shared provider text-completion client.** `TagGenerator` and `CollectionSegmenter` duplicate ~85 lines of
-  callLLM/callGateway/callAnthropic/callGemini/callMistralChat (differ only by max_tokens; already drifted on
-  the Mistral signature). Extract one shared text client taking a maxTokens param. **Promoted to the near-term
-  queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
+- ✅ **Shared provider text-completion client — SHIPPED `f1d2263` (suite-v1.2.0).** `OCR/LLMTextClient.swift` is the
+  shared text-completion client; `TagGenerator` + `CollectionSegmenter` both delegate to it, each keeping its own
+  maxTokens so request bodies stay byte-identical (the Mistral-signature drift was reconciled, not blind-merged).
+  This shipped BEFORE the 2026-07-15 promotion re-listed it in error; SUITE_TODO reconciled `[x]` 2026-07-16.
 - **Shared finalize/organize helpers.** startProcessing / resumeRun / resumeBatch each duplicate the
   "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
   `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
 - **Unify the box/folder color-retag logic** across applyReviewEdits / updateClassification /
   applyDocumentReviewEdits (three copies that have slightly drifted — confirm the intended behavior first).
-- → **Smaller de-dups:** shared `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor);
-  `ThinkingLevel.budgetTokens` + the Anthropic max_tokens bump (4 clients — budgets differ by call type);
-  a shared transient-status friendly-message helper (4 OCR clients); one `acceptedImageExtensions` constant
-  (3 files); shared `englishMonthNames` / `monthTag` (LiveCaptureProcessor + OCRProcessor); a segment-JSON
-  schema builder (2 sites); OCRResult `.with(...)` copy helpers; `GatewayConfig.fromDefaults()` (3 views); a
-  `liveProcessingMode` enum instead of "stage"/"live" magic strings; LLMRotationDetector.rotate →
-  ImageEncoding.rotate; Gemini cancelBatch via the shared URL builder. **Promoted as one "de-dup sweep" item to
-  the near-term queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
-- ✅ **Value decision — recent-years cap:** the companions differed (iOS 5, Android 6). **Owner decided 2026-07-15:
-  cap at 5** (change Android 6→5). Now a near-term item in [`SUITE_TODO.md`](../SUITE_TODO.md).
+- ◐ **Smaller de-dups — PARTIALLY SHIPPED `f1d2263` (suite-v1.2.0).** Already done in f1d2263 (do NOT redo):
+  `highestLeadingNumber` (→ `Capture/CollectionNumbering.swift`), `monthTag`/`englishMonthNames` (→ `GeneratedTags`),
+  `acceptedImageExtensions` (→ `ImageEncoding`), `GatewayConfig.fromDefaults()`, `liveProcessingMode` enum.
+  REMAINING (~6): a shared transient-status friendly-message helper (4 OCR clients); `ThinkingLevel.budgetTokens`
+  + the Anthropic max_tokens bump (4 clients — budgets differ by call type, KEEP that); a segment-JSON schema
+  builder (2 sites); OCRResult `.with(...)` copy helpers; LLMRotationDetector.rotate → ImageEncoding.rotate;
+  Gemini cancelBatch via the shared URL builder. **The REMAINDER is the near-term "de-dup sweep" item** in
+  [`SUITE_TODO.md`](../SUITE_TODO.md) (re-scoped 2026-07-16).
+- ✅ **Value decision — recent-years cap:** `f1d2263` unified BOTH companions at **6** (iOS was 5→6). **Owner
+  decided 2026-07-15: cap at 5** — so both need 6→5 (iOS `prefix(6)`, Android `take(6)`). Now a near-term item in
+  [`SUITE_TODO.md`](../SUITE_TODO.md) (premise corrected 2026-07-16 — the old "iOS 5, Android 6" note was stale).
 
 ### Shared `ArchiveCore` Swift package — ✅ SHIPPED (W0, 2026-07)
 Both stages shipped in the W0 refactor (`49c0162`–`b90800f`) — this is done, kept here only as a record:
@@ -169,10 +170,11 @@ Both stages shipped in the W0 refactor (`49c0162`–`b90800f`) — this is done,
   Reader's `TagWriter` and Processor's `MacOSTagger` both delegate to it, so the safety-critical tag code can no
   longer drift. The Reader Prime Directive + Processor Tier-2 guarantees are preserved.
 
-### → Live Capture output-folder control — PROMOTED (owner, 2026-07-15)
-Now a near-term item in [`SUITE_TODO.md`](../SUITE_TODO.md). (Motivated 2026-07-06: Process-live **Finish
-session** wrote finalized collections to `~/Downloads/` with no way to choose; add an output-folder picker in
-the Live Capture pane mirroring the Process-Files controls.)
+### ✅ Live Capture output-folder control — SHIPPED `782dfdd` (suite-v1.2.0)
+LiveCaptureView has the picker (`chooseOutputFolder()` + NSOpenPanel), Choose button, current-destination row,
+`?` help, and gray-out — unified on `DefaultsKeys.outputDirectory` (same as Process Files). This shipped BEFORE
+the 2026-07-15 promotion re-listed it in error; SUITE_TODO reconciled `[x]` 2026-07-16. (Residual owner call: the
+shipped default is Downloads-if-unset; the promoted wish said "not Downloads" — deferred to the owner.)
 
 ### ✅ Phone "Finish" button — DECIDED 2026-07-15: remove it
 Found 2026-07-06 that the phone "Finish" (`CaptureViewModel.finishSession()` → `POST /session/complete`) is
