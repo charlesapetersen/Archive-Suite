@@ -22,6 +22,8 @@ BIN="$HOME/.local/bin"
 CLAUDE="$BIN/claude"
 DAEMON_SRC="$REPO/ops/autonomous/archive-suite-autonomous.sh"
 DAEMON_DST="$BIN/archive-suite-autonomous.sh"
+COMPACT_SRC="$REPO/ops/autonomous/compact-plan.sh"
+COMPACT_DST="$BIN/compact-plan.sh"
 PROMPT_SRC="$REPO/ops/autonomous/resume-prompt.txt"
 PLAN="$REPO/.maintenance/AUTONOMOUS_PLAN.md"
 LOG="$STATE/daemon.log"
@@ -144,8 +146,9 @@ mkdir -p "$BIN" "$STATE"
 
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"
+install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan Session-Log compactor (daemon calls it between cycles)
 cp "$PROMPT_SRC" "$STATE/resume-prompt.txt"
-echo "installed: daemon -> $DAEMON_DST ; resume prompt -> $STATE/"
+echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt -> $STATE/"
 
 # 3. don't double-launch
 if pgrep -f archive-suite-autonomous.sh >/dev/null; then

@@ -345,6 +345,13 @@ tick() {
   kill "$hb" 2>/dev/null || true
   rm -f "$LOCK" 2>/dev/null || true
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
+  # Keep the durable plan small: archive old Session Log entries so the plan a fresh session reads doesn't
+  # inflate startup cost unbounded. Runs HERE — between cycles, lock released, NO session active — so it can
+  # never race a session's Session Log append. Self-gating (no-op under its trigger); failure never breaks
+  # the loop (the compactor bails leaving the plan untouched; the `|| true` swallows any error anyway).
+  if [ -x "$HOME/.local/bin/compact-plan.sh" ]; then
+    "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1 || true
+  fi
   return 0
 }
 
