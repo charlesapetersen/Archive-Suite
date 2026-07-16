@@ -245,7 +245,8 @@ writes against the real corpus — always a copy.
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
 - `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset split + zoom to defaults
-- `⌘C` copy verbatim · `⌘⇧C` copy cleaned-for-prose (intelligent) · `⌘F` find in document
+- `⌘C` copy verbatim · `⌘⇧C` copy cleaned-for-prose (intelligent)
+- `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
 - `⌘,` Options (both windows)
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
@@ -377,9 +378,14 @@ Views/
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I).
   OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).
-  DocumentViewerModel.swift   Loads the selection; page cycling; focused-pane zoom; plain + intelligent copy.
-  DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom, focus border.
-  PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection/find).
+  DocumentViewerModel.swift   Loads the selection; page cycling; focused-pane zoom; plain + intelligent copy;
+                              in-viewer find state (⌘F) — scans open docs, drives FindNavigator, applies matches.
+  DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom, focus border, ⌘F find bar
+                              (highlight-all + next/prev ⌘G/⇧⌘G + "N of M" across open docs).
+  PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection; find
+                              highlight reapplied on rebuild, like zoom).
+  (Core/)DocumentFind.swift   Pure FindNavigator (match list + wrap cursor) + DocumentFindScanner (per-pane
+                              findString counts). Backs the ⌘F in-viewer find; unit-tested (DocumentFindTests).
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```

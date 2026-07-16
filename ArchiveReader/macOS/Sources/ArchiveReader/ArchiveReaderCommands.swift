@@ -148,6 +148,10 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(doc == nil)
             Button("Find…") { doc?.showingFind = true }
                 .keyboardShortcut("f", modifiers: .command).disabled(doc == nil)
+            Button("Find Next") { doc?.showingFind = true; doc?.findNext() }
+                .keyboardShortcut("g", modifiers: .command).disabled(doc == nil)
+            Button("Find Previous") { doc?.showingFind = true; doc?.findPrevious() }
+                .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(doc == nil)
             Divider()
             Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(doc == nil)
             Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(doc == nil)

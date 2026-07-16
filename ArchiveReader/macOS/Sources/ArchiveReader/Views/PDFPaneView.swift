@@ -16,6 +16,8 @@ final class PDFPaneController {
     private let persists: Bool         // false → fit-to-pane default, no UserDefaults writes (preview mode)
     private var savedScale: CGFloat?   // nil = fit-to-pane; else an explicit scale factor
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
+    private var findQuery = ""         // active find query to highlight on this pane ("" = none)
+    private var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
 
     init(key: String, persists: Bool = true) {
         self.key = key
@@ -68,6 +70,7 @@ final class PDFPaneController {
         v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
         #endif
         scrollToTop()
+        applyFind()   // re-highlight matches (+ re-select the current one) on the freshly-built view
     }
 
     /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
@@ -99,12 +102,41 @@ final class PDFPaneController {
         return s
     }
 
-    func findAndSelect(_ query: String) {
-        guard let v = pdfView, let doc = v.document, !query.isEmpty else { return }
-        if let match = doc.findString(query, withOptions: [.caseInsensitive]).first {
-            v.setCurrentSelection(match, animate: true)
-            v.scrollSelectionToVisible(nil)
+    /// Set this pane's find target: the query to highlight, and which of this pane's matches (if any) is
+    /// the current selection to scroll to. Stored (not applied) so a rebuilt PDFView re-applies it via
+    /// `applyToView` — highlights then survive page cycling, exactly like the persisted zoom.
+    func setFindTarget(query: String, currentIndex: Int?) {
+        findQuery = query
+        findCurrentIndex = currentIndex
+    }
+
+    /// Highlight every match of the stored query on this pane's page and, when this pane owns the current
+    /// match, select + scroll to it (otherwise just clear the transient selection). An empty query clears
+    /// all find highlighting. Read-only — never mutates the document.
+    func applyFind() {
+        guard let v = pdfView else { return }
+        guard !findQuery.isEmpty, let doc = v.document else {
+            v.highlightedSelections = nil
+            v.clearSelection()
+            return
         }
+        let matches = doc.findString(findQuery, withOptions: [.caseInsensitive])
+        for m in matches { m.color = .systemYellow.withAlphaComponent(0.5) }
+        v.highlightedSelections = matches.isEmpty ? nil : matches
+        if let i = findCurrentIndex, matches.indices.contains(i) {
+            v.setCurrentSelection(matches[i], animate: true)
+            v.scrollSelectionToVisible(nil)
+        } else {
+            v.clearSelection()
+        }
+    }
+
+    /// Clear any find highlight + selection on this pane (query reset to none).
+    func clearFind() {
+        findQuery = ""
+        findCurrentIndex = nil
+        pdfView?.highlightedSelections = nil
+        pdfView?.clearSelection()
     }
 }
 

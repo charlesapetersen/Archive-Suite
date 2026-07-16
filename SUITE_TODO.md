@@ -255,12 +255,18 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `ftsGeneration` token handles superseded queries. `.onSubmit` removed (debounce handles it); clear
   button still calls explicitly for instant feedback. 191 tests green, 0 new warnings.
   | files: Views/NavigationWindowView.swift, Views/NavigationModel.swift | done
-- [ ] **In-viewer find, scoped to the open PDF(s)** _(owner-requested 2026-07-14)_ — a ⌘F find bar in the
-  document viewer that searches ONLY the PDF(s) currently open in the viewer, NOT the corpus/library FTS (that's
-  the as-you-type OCR search above). Match-highlight + next/prev navigation within the document; when multiple
-  docs are open in the viewer, search across all of them. Likely via PDFKit (`PDFDocument.findString` / `PDFView`
-  selection). Read-only, no writes → Tier-1. | files (verify at impl): Views/DocumentWindowView.swift,
-  Views/PDFPaneView.swift, Core/DocumentViewerModel.swift | M | low | none
+- [x] **In-viewer find, scoped to the open PDF(s)** _(owner-requested 2026-07-14)_ — ⌘F find bar over the
+  open PDF(s): highlights ALL matches (yellow), next/prev navigation (⌘G / ⇧⌘G, wrapping) with a global
+  "N of M" count, and searches ACROSS every open document (both panes = page 0 + page 1) — not the corpus
+  FTS. New `Core/DocumentFind.swift`: pure `FindNavigator` (reading-order match list + wrap cursor) +
+  `DocumentFindScanner` (per-pane match counts via `PDFDocument.findString`). `PDFPaneController` grows
+  find-highlight state reapplied on every view rebuild (mirrors the persisted-zoom pattern), so highlights
+  survive page cycling; cross-document jumps set the pane target then change `index` so the rebuild applies
+  it with no timing race. 10 new unit tests (`DocumentFindTests`, incl. a synthesized text-PDF scanner
+  check); build clean 0 new warnings. Read-only → Tier-1. Live GUI drive (highlight render / scroll /
+  next-prev / cross-doc jump) → Morning Review (GUI off). | files: Core/DocumentFind.swift,
+  Views/DocumentViewerModel.swift, Views/PDFPaneView.swift, Views/DocumentWindowView.swift,
+  ArchiveReaderCommands.swift | M | low | done
 - [ ] **Full-text search snippet previews (keyword-in-context)** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
   show a `snippet()`-style **keyword-in-context** excerpt for each search hit (the matched OCR text with the query
   term highlighted) so results are scannable without opening each doc. FTS5 has `snippet()` **built in** and the

@@ -10,7 +10,6 @@ struct DocumentWindowView: View {
     @StateObject private var model = DocumentViewerModel()
 
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
-    @State private var findText = ""
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
     @State private var docWindow: NSWindow?
@@ -124,18 +123,34 @@ struct DocumentWindowView: View {
         .accessibilityIdentifier("ar.doc.formatBanner")
     }
 
+    /// ⌘F find bar: searches the open PDF(s) — every document currently open in the viewer, across both
+    /// panes — highlights all matches, and steps through them with ⌃/⌄ (⌘G / ⇧⌘G). "N of M" is the global
+    /// position across all open documents.
     private var findBar: some View {
-        HStack {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Find in document…", text: $findText)
+            TextField("Find in open document(s)…", text: $model.findQuery)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 260)
                 .focused($findFocused)
-                .onSubmit { model.find(findText) }
+                .onSubmit { model.findNext() }
                 .accessibilityIdentifier("ar.doc.findField")
-            Button("Find") { model.find(findText) }
-            Button("Done") { model.showingFind = false; findText = "" }
+            Button { model.findPrevious() } label: { Image(systemName: "chevron.up") }
+                .help("Previous match (⇧⌘G)")
+                .disabled(model.findQuery.isEmpty)
+                .accessibilityIdentifier("ar.doc.findPrev")
+            Button { model.findNext() } label: { Image(systemName: "chevron.down") }
+                .help("Next match (⌘G)")
+                .disabled(model.findQuery.isEmpty)
+                .accessibilityIdentifier("ar.doc.findNext")
+            Text(model.findStatusText)
+                .foregroundStyle(.secondary)
+                .font(.callout)
+                .frame(minWidth: 72, alignment: .leading)
+                .accessibilityIdentifier("ar.doc.findCount")
             Spacer()
+            Button("Done") { model.endFind() }
+                .keyboardShortcut(.cancelAction)
         }
         .padding(8)
     }
