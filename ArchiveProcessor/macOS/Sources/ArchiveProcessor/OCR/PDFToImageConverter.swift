@@ -18,7 +18,35 @@ struct PDFToImageConverter {
     private static func renderFirstPage(of pdfURL: URL) -> URL? {
         guard let document = PDFDocument(url: pdfURL),
               let page = document.page(at: 0) else { return nil }
+        return renderPageToJPEG(page)
+    }
 
+    /// Render EVERY page of a PDF to a temporary JPEG, preserving page order. Used by the
+    /// "re-OCR multi-page PDF" mode, which OCRs each page image then rebuilds an alternating
+    /// image / OCR-text PDF. Returns nil if the PDF can't be opened or has no pages, and nil
+    /// (fail-loud — never a partial set) if ANY page fails to render, so the caller can't
+    /// silently drop an archival page in this no-undo output path. The caller owns the returned
+    /// temp files and must delete them.
+    static func renderAllPages(of pdfURL: URL) -> [URL]? {
+        guard let document = PDFDocument(url: pdfURL) else { return nil }
+        let count = document.pageCount
+        guard count > 0 else { return nil }
+
+        var urls: [URL] = []
+        urls.reserveCapacity(count)
+        for i in 0..<count {
+            guard let page = document.page(at: i), let jpegURL = renderPageToJPEG(page) else {
+                for u in urls { try? FileManager.default.removeItem(at: u) }
+                return nil
+            }
+            urls.append(jpegURL)
+        }
+        return urls
+    }
+
+    /// Render one PDF page to a temporary JPEG in the temp directory.
+    /// Returns the URL of the temporary JPEG, or nil on failure.
+    private static func renderPageToJPEG(_ page: PDFPage) -> URL? {
         // Size to the VISIBLE page — the media box is unrotated, so swap W/H when the page's /Rotate
         // is 90/270; otherwise a rotated scan renders with the wrong aspect and gets clipped.
         let pageRect = page.bounds(for: .mediaBox)

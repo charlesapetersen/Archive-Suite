@@ -31,6 +31,7 @@ enum DefaultsKeys {
     // Input & processing
     static let batchMode = "batchMode"
     static let preOCRedInput = "preOCRedInput"
+    static let reOCRMultiPagePDF = "reOCRMultiPagePDF"
     static let ocrWorkerCount = "ocrWorkerCount"
     static let imageResolutionPercent = "imageResolutionPercent"
     static let standardImageSizeMB = "standardImageSizeMB"
