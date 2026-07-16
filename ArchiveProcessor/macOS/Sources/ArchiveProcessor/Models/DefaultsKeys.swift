@@ -76,6 +76,9 @@ enum DefaultsKeys {
     // Processing profiles (named snapshots of the durable processing settings; JSON-encoded [ProcessingProfile])
     static let processingProfiles = "processingProfiles"
 
+    // Processing history (bounded log of completed Process-Files runs; JSON-encoded [ProcessingRun])
+    static let processingHistory = "processingHistory"
+
     // One-time migration flags
     static let contextRemovedMigratedV1 = "contextRemovedMigratedV1"
     static let rotationDefaultMigratedV1 = "rotationDefaultMigratedV1"
