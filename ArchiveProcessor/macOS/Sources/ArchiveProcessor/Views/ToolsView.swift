@@ -23,6 +23,8 @@ struct ToolsView: View {
     @State private var resolutionTestImage: URL?
     @State private var isRunningResolutionTest = false
 
+    @State private var showHistory = false
+
     @State private var showModelSelectionSheet = false
     @State private var showModelTestDropSheet = false
     @State private var showModelTestResults = false
@@ -75,6 +77,14 @@ struct ToolsView: View {
                     disabled: apiKey.isEmpty || isRunningResolutionTest
                 ) { showResolutionDropSheet = true }
 
+                toolCard(
+                    title: "Processing History",
+                    systemImage: "clock.arrow.circlepath",
+                    detail: "Review past Process Files runs — provider/model, file counts, and each run's estimated cost. No API key needed.",
+                    buttonTitle: "View History…",
+                    disabled: false
+                ) { showHistory = true }
+
                 if apiKey.isEmpty {
                     Label("Set an API key in Settings (⌘,) to run these.", systemImage: "key")
                         .font(.caption).foregroundStyle(.orange)
@@ -92,6 +102,9 @@ struct ToolsView: View {
         // selectedModelId_<provider>, which isn't observed here — reopening the tab still refreshes it.)
         .onChange(of: selectedProvider) { _, _ in reloadModelAndKey() }
         .onChange(of: useGateway) { _, _ in reloadModelAndKey() }
+        .sheet(isPresented: $showHistory) {
+            ProcessingHistoryView(onDismiss: { showHistory = false })
+        }
         .sheet(isPresented: $showResolutionDropSheet) {
             ResolutionDropSheet { url in
                 showResolutionDropSheet = false
