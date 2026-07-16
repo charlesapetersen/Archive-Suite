@@ -191,6 +191,18 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   OCR API key (deleted W4.0.a) — so "prove equivalence" here = build-green + byte-identical diff inspection; the
   `budgetTokens` sub-item (request-body-affecting) should be done in a keyed/owner session, not guessed unattended.
   **Tier-1** (touches no write path). | files: OCR/*, Capture/LiveCaptureProcessor.swift, Views/* | M | low | none
+  — **W12-dedup progress 2026-07-16 — 4 of 6 shipped** (byte-identical, Tier-1, build-clean, no new warnings):
+  (1) `LLMRotationDetector.rotate` → shared `ImageEncoding.rotate` `af8cf66`; (2) shared
+  `OCRErrorMessages.transientStatusMessage(_:)` across all 4 clients' `parseErrorResponse` + (3) Gemini
+  `cancelBatch` via `makeBatchURL` `6c52dd4`; (4) `OCRResult.with(classification:rotationDegrees:)` copy helper —
+  7 review/retry re-creations, preserves errorCode (the W9.1 footgun) `94d4ef6`. **⏸️ 2 REMAINING are
+  OWNER/KEYED — Wave-12 SKIP (do NOT attempt unattended):** (5) **segment-JSON sidecar builder** — actually a
+  **file-WRITE format ⇒ Tier-2, NOT Tier-1 as stated above**; the 2 impls (`OCRProcessor.writeSegmentJSON`
+  OCRProcessor+Tagging.swift:740 + `LiveCaptureProcessor.writeSegmentJSON` LiveCaptureProcessor.swift:658) are
+  **NOT identical** (OCRProcessor adds `box_label`/`folder_label` `format` overrides the Live path lacks), so a
+  shared builder must parameterize that divergence and be proven byte-identical by a **scratch functional
+  diff-test** before touching the persisted `.json` sidecar. (6) **`ThinkingLevel.budgetTokens`** — request-body
+  -affecting (512/2000 vs 1024/4000 differ by call type) → keyed/owner session per the constraint. See Morning Review.
 - [x] **Shared provider text-completion client** — **ALREADY SHIPPED `f1d2263` (suite-v1.2.0), before the
   2026-07-15 promotion re-listed it.** `OCR/LLMTextClient.swift` is the shared text-completion client;
   `TagGenerator` + `CollectionSegmenter` both delegate to it, each keeping its own `maxTokens`/timeout so request
