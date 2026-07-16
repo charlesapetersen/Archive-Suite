@@ -3,6 +3,32 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness (W8-S8 pass 7): G6 reveal → Reader + G11 Zotero chip open green — one `NSWorkspace.open` spy serves both (2026-07-15) — Tier-2
+
+Added **G6** (`testG6_RevealSourceBlockDispatchesReaderDeepLink`) + **G11** (`testG11_ZoteroChipDispatchesSelectLink`):
+a reader-page source block's "Reveal in Reader" dispatches the correct `archivereader://reveal?root=<corpus GUID>&rel=sample.pdf&…`
+deep link, and a Zotero source block's "Open in Zotero" dispatches `zotero://select/library/items/ABCD1234`. Both pass
+live in the full suite (G1/G3/G4/G5/**G6**/G7/G8/G9/G10/**G11** + SmokeUITest, **TEST EXECUTE SUCCEEDED**, 11/11, 0
+failures; ~13 s each); 189 XCTest + Swift-Testing green; **Release build clean (all seams compiled out)**; 0 new warnings.
+
+- **New shared choke-point `openExternalURL(_:)`** (`Core/WorkspaceOpen.swift`) that the three external-URL sites now
+  route through (`NoteEditorPane` reveal closure, `BlockHeaderChipView.openZoteroClicked`, `ZoteroChipView.open`).
+  In Release and a normal DEBUG run it calls `NSWorkspace.shared.open` exactly as before; **only** under a UITest
+  launch (`-ANUITestStorePath`) the DEBUG `WorkspaceOpenSpy` **records** the URL and skips the real open — so the
+  harness asserts the dispatched URL WITHOUT launching Reader/Zotero (Zotero may not even be installed on the run
+  machine). The spy branch is `#if DEBUG` + launch-arg-gated (verified compiled out by a Release build).
+- **Chip buttons `an.chip.reveal` / `an.chip.zoteroOpen` are NOT XCUITest-hittable** (same TextKit-2 attachment-view
+  limit confirmed for `an.chip.jump` in pass 6), so — as with G4/G9/G10 — DEBUG seams fire the real callbacks:
+  `EditorTextView.uiTestRevealFirstSource()` (fires the reader-page chip's real `onReveal` → `openExternalURL`) and
+  `uiTestOpenFirstZotero()` (runs the real zotero-open dispatch). The harness reads the dispatched URL back from a
+  visible control-strip static text `an.editor.test.lastOpenedURL` (deliberately NOT a 1×1 hidden element — that's
+  the `an.status.indexReady` queryability hazard). Only the button CLICK gesture is bypassed; the **real
+  Reader/Zotero launch stays owner-eye** (like G2's typing).
+- File-safe (read-only dispatch, no store/corpus writes): post-run the real `Store` is **absent**, real
+  `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture.
+- **REMAINING (W8-S8 still open — oversized, recommend re-split):** the `an.status.indexReady` probe queryability fix;
+  the G2/G6/G11 owner-eye harness docs. Only then tick W8-S8 + flip SUITE_TODO W8.
+
 ## GUI harness (W8-S8 pass 6): G10 jump-to-source green — chip button confirmed NOT XCUITest-hittable → DEBUG jump seam (2026-07-15) — Tier-2
 
 Added **G10** (`NotesGUITests.testG10_JumpToSourceSelectsSourceNoteInNoteWindow`): firing an extract's

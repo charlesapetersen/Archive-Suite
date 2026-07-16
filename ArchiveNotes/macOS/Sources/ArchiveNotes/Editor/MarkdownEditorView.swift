@@ -23,6 +23,8 @@ final class EditorTestBox {
     var setSelection: ((Int, Int) -> Void)?
     var pasteImage: (() -> Void)?
     var jumpFirstPassage: (() -> Void)?
+    var revealFirstSource: (() -> Void)?
+    var openFirstZotero: (() -> Void)?
     init() {}
 }
 #endif
@@ -107,6 +109,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.jumpFirstPassage = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestJumpFirstPassage()
+        }
+        testBox?.revealFirstSource = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestRevealFirstSource()
+        }
+        testBox?.openFirstZotero = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestOpenFirstZotero()
         }
 #endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
@@ -465,6 +473,22 @@ struct MarkdownEditorView: NSViewRepresentable {
         @discardableResult
         func uiTestJumpFirstPassage() -> Bool {
             return textView?.uiTestJumpFirstPassage() ?? false
+        }
+
+        /// Fire the first reader-page chip's Reveal-in-Reader callback (G6) — read-only dispatch, so no
+        /// write-back. Bypasses only the un-hit-testable chip-button gesture; the anchor's real `onReveal`
+        /// (→ `openExternalURL`) runs verbatim. Returns whether a reveal-able source chip was found.
+        @discardableResult
+        func uiTestRevealFirstSource() -> Bool {
+            return textView?.uiTestRevealFirstSource() ?? false
+        }
+
+        /// Fire the first Zotero chip's Open-in-Zotero path (G11) — read-only dispatch, so no write-back.
+        /// Bypasses only the un-hit-testable chip-button gesture; the same `openExternalURL` dispatch runs.
+        /// Returns whether a Zotero chip was found.
+        @discardableResult
+        func uiTestOpenFirstZotero() -> Bool {
+            return textView?.uiTestOpenFirstZotero() ?? false
         }
 
         /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same

@@ -63,13 +63,15 @@ struct ZoteroChipView: View {
         .accessibilityIdentifier(presentation.accessibilityID)
     }
 
+    @MainActor
     private func open() {
         if let onOpen {
             onOpen(ref)
             return
         }
         if let url = URL(string: ref.selectLink) {
-            NSWorkspace.shared.open(url)
+            // Shared choke-point: records under a UITest launch (G11), opens for real otherwise.
+            openExternalURL(url)
         }
     }
 }

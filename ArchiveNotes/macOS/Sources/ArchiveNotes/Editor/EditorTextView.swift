@@ -444,5 +444,46 @@ final class EditorTextView: NSTextView {
         }
         return fired
     }
+
+    /// Fire the "Reveal in Reader" action of the FIRST reader-page source-block chip — via the SAME
+    /// `onReveal` callback the chip button's `revealClicked` invokes, with the SAME `SourceAnchor`
+    /// (which routes to `openExternalURL` → the `WorkspaceOpenSpy` in a UITest run). Matches a reader
+    /// source chip (`link != nil`) but never a note-passage chip (`notePassageTarget == nil`). Only the
+    /// button CLICK is bypassed: the chip is a TextKit-2 attachment-view-provider subview XCUITest can't
+    /// hit-test (the literal click is owner-eye, like G2), so the reveal GUI check (G6) drives the
+    /// anchor's callback directly. Returns whether a reveal-able source chip was found + fired.
+    @discardableResult
+    func uiTestRevealFirstSource() -> Bool {
+        guard let storage = textStorage else { return false }
+        var fired = false
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
+            guard let chip = value as? BlockHeaderAttachment,
+                  chip.sourceBox.anchor.link != nil,
+                  chip.sourceBox.anchor.notePassageTarget == nil else { return }
+            chip.onReveal?(chip.sourceBox.anchor)
+            fired = true
+            stop.pointee = true
+        }
+        return fired
+    }
+
+    /// Fire the "Open in Zotero" action of the FIRST Zotero source-block chip, running the SAME open
+    /// path `openZoteroClicked` does (`openExternalURL` → the `WorkspaceOpenSpy` in a UITest run). Only
+    /// the button CLICK is bypassed (owner-eye, like G2). Returns whether a Zotero chip was found +
+    /// fired. Used by the Zotero-chip GUI check (G11).
+    @discardableResult
+    func uiTestOpenFirstZotero() -> Bool {
+        guard let storage = textStorage else { return false }
+        var fired = false
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
+            guard let chip = value as? BlockHeaderAttachment,
+                  let select = chip.sourceBox.anchor.zoteroSelect,
+                  let url = URL(string: select) else { return }
+            openExternalURL(url)
+            fired = true
+            stop.pointee = true
+        }
+        return fired
+    }
 #endif
 }

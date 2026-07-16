@@ -304,6 +304,63 @@ class NotesFixtureUITestCase: XCTestCase {
         button.click()
         return true
     }
+
+    /// Trigger the DEBUG reveal seam (`an.editor.test.reveal`), which fires the first reader-page chip's
+    /// REAL `onReveal` callback (→ `openExternalURL`) without a chip-button click — the chip button
+    /// (`an.chip.reveal`) is a TextKit-2 attachment subview XCUITest can't hit-test (owner-eye, like G2).
+    /// The button action also re-reads the `WorkspaceOpenSpy` into `an.editor.test.lastOpenedURL`. Used by
+    /// G6. Returns false if the strip button isn't present/hittable (itself the finding to fix).
+    @discardableResult
+    func revealFirstSourceViaSeam(timeout: TimeInterval = 10) -> Bool {
+        return clickStripButton("an.editor.test.reveal", timeout: timeout)
+    }
+
+    /// Trigger the DEBUG Zotero-open seam (`an.editor.test.zoteroOpen`), which runs the first Zotero
+    /// chip's REAL open path (→ `openExternalURL`) without a chip-button click. The action re-reads the
+    /// `WorkspaceOpenSpy` into `an.editor.test.lastOpenedURL`. Used by G11. Returns false if the strip
+    /// button isn't present/hittable.
+    @discardableResult
+    func openFirstZoteroViaSeam(timeout: TimeInterval = 10) -> Bool {
+        return clickStripButton("an.editor.test.zoteroOpen", timeout: timeout)
+    }
+
+    /// Click a hidden control-strip button by identifier, bringing the app forward + waiting for
+    /// hittability first (shared by the reveal/zotero seam triggers).
+    private func clickStripButton(_ id: String, timeout: TimeInterval) -> Bool {
+        let button = app.descendants(matching: .any)[id]
+        guard button.waitForExistence(timeout: timeout) else { return false }
+        _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
+        guard button.isHittable else { return false }
+        button.click()
+        return true
+    }
+
+    /// Read back the last external URL the app dispatched (the `an.editor.test.lastOpenedURL` static text
+    /// the reveal/zotero seams populate from `WorkspaceOpenSpy`), polling until it starts with
+    /// `expectedPrefix`. Returns the final observed value (empty/"-" if nothing dispatched). G6/G11.
+    func lastOpenedURL(startingWith expectedPrefix: String, timeout: TimeInterval = 12) -> String {
+        let el = app.descendants(matching: .any)["an.editor.test.lastOpenedURL"]
+        _ = el.waitForExistence(timeout: min(timeout, 8))
+        var seen = ""
+        _ = pollUntil(timeout: timeout) {
+            let v = (el.value as? String) ?? ""
+            seen = v.isEmpty ? el.label : v
+            return seen.hasPrefix(expectedPrefix)
+        }
+        return seen
+    }
+
+    /// Ensure the editor is in STYLED mode: block-chip seams (G6/G11) scan the text storage for
+    /// `BlockHeaderAttachment`, which exists only in styled mode (raw mode shows the literal
+    /// `<!-- block: -->` source). Notes load styled by default; this is a safety net.
+    func ensureStyled(timeout: TimeInterval = 6) {
+        guard ((editor.value as? String) ?? "").contains("<!-- block:") else { return }
+        if rawToggle.waitForExistence(timeout: 5) {
+            _ = pollUntil(timeout: 4) { app.activate(); return rawToggle.isHittable }
+            if rawToggle.isHittable { rawToggle.click() }
+        }
+        _ = pollUntil(timeout: timeout) { !(((editor.value as? String) ?? "").contains("<!-- block:")) }
+    }
 }
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
@@ -317,10 +374,13 @@ class NotesFixtureUITestCase: XCTestCase {
 /// `-ANUITestStorePath` the app opens a dedicated `notes-index-uitest.sqlite3` reset on every launch, so
 /// the fixture's `organization.json` loads fresh (the owner's real DB is untouched — distinct filename).
 /// pass 5 = G4 (paste image → the item's `assets/` + an inline `![](…)` reference, Tier-2 — the last
-/// un-GUI-verified file-WRITE path). this pass = G10 (jump-to-source): click a note-passage chip's
-/// "Jump to Source" (`an.chip.jump`) → the featuring window selects the source note. Still to land
-/// (NSWorkspace-spy / owner-eye pass): G6 (reveal → Reader), G11 (Zotero chip open); plus fixing the
-/// `an.status.indexReady` probe queryability.
+/// un-GUI-verified file-WRITE path). pass 6 = G10 (jump-to-source): click a note-passage chip's
+/// "Jump to Source" (`an.chip.jump`) → the featuring window selects the source note. this pass = G6
+/// (reveal → Reader) + G11 (Zotero chip open): both dispatch an external URL through the DEBUG
+/// `WorkspaceOpenSpy` (`openExternalURL`) — the seams fire the un-hit-testable chip buttons' REAL
+/// callbacks and the harness reads the dispatched URL back via `an.editor.test.lastOpenedURL`; the real
+/// Reader/Zotero launch stays owner-eye. Remaining to complete W8-S8: fix the `an.status.indexReady`
+/// probe queryability + the harness README owner-eye notes (G2/G6/G11).
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
@@ -803,5 +863,54 @@ final class NotesGUITests: NotesFixtureUITestCase {
         let dx = (Double(index) + 0.5) / 3.0
         control.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).tap()
         return true
+    }
+
+    // MARK: - G6 / G11 — external-URL dispatch (NSWorkspace-open spy)
+
+    /// G6 — a reader-page source block's "Reveal in Reader" dispatches the correct
+    /// `archivereader://reveal?…` deep link. The REAL Reader launch + row selection is owner-eye (and
+    /// the chip's `an.chip.reveal` button is a TextKit-2 attachment-view-provider subview XCUITest can't
+    /// hit-test — same limit as G10's jump), so this drives the SAME `onReveal` callback with the SAME
+    /// anchor via the DEBUG seam (`an.editor.test.reveal`) and asserts the dispatched URL through the
+    /// `WorkspaceOpenSpy` read-back (`an.editor.test.lastOpenedURL`). Under `-ANUITestStorePath` the open
+    /// is RECORDED, not dispatched, so no external app launches. Read-only w.r.t. the store.
+    func testG6_RevealSourceBlockDispatchesReaderDeepLink() throws {
+        // The reader-page note (idReader) is a kind:note → present in the default Note window list.
+        _ = selectItem(uuid: Self.idReader)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
+        ensureStyled()
+        // Its body is unique ("egalitarian culture"); wait until it loads so the reader-page chip is present.
+        XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("egalitarian culture") },
+                      "selecting the reader-page note should load its body (chip present)")
+
+        XCTAssertTrue(revealFirstSourceViaSeam(),
+                      "the reveal seam must be drivable (an.editor.test.reveal)")
+
+        let url = lastOpenedURL(startingWith: "archivereader://reveal")
+        XCTAssertTrue(url.hasPrefix("archivereader://reveal?root=\(Self.corpusRootGUID)"),
+                      "Reveal should dispatch the reader deep link for the corpus root; got \(url)")
+        XCTAssertTrue(url.contains("rel=sample.pdf"),
+                      "the deep link should carry the source rel path; got \(url)")
+    }
+
+    /// G11 — a Zotero source block's "Open in Zotero" dispatches the correct `zotero://select/…` link.
+    /// The REAL Zotero launch is owner-eye (Zotero may not be installed on the run machine; the chip's
+    /// `an.chip.zoteroOpen` is likewise an un-hit-testable attachment subview), so this drives the SAME
+    /// open path via the DEBUG seam (`an.editor.test.zoteroOpen`) and asserts the dispatched URL through
+    /// the `WorkspaceOpenSpy` read-back. Under `-ANUITestStorePath` the open is RECORDED, not dispatched.
+    func testG11_ZoteroChipDispatchesSelectLink() throws {
+        // The Zotero note (idZotero) is a kind:note → present in the default Note window list.
+        _ = selectItem(uuid: Self.idZotero)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
+        ensureStyled()
+        XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("Lovelace") },
+                      "selecting the Zotero note should load its body (chip present)")
+
+        XCTAssertTrue(openFirstZoteroViaSeam(),
+                      "the zotero seam must be drivable (an.editor.test.zoteroOpen)")
+
+        let url = lastOpenedURL(startingWith: "zotero://select")
+        XCTAssertEqual(url, "zotero://select/library/items/ABCD1234",
+                       "Open in Zotero should dispatch the item's select link; got \(url)")
     }
 }

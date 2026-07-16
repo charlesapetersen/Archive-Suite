@@ -273,6 +273,7 @@ final class BlockHeaderChipView: NSView {
     @objc private func openZoteroClicked() {
         guard let select = box.anchor.zoteroSelect,
               let url = URL(string: select) else { return }
-        NSWorkspace.shared.open(url)
+        // Shared choke-point: records under a UITest launch (G11), opens for real otherwise.
+        openExternalURL(url)
     }
 }

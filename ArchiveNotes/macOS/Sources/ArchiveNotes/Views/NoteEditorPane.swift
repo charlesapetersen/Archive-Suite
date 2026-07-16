@@ -40,6 +40,9 @@ struct NoteEditorPane: View {
     @State private var testBox = EditorTestBox()
     @State private var testCommitInput = ""
     @State private var testSelectionInput = ""
+    /// The last external URL the app dispatched via `openExternalURL`, surfaced for the G6/G11 checks to
+    /// read back (the reveal/zotero seams fire synchronously, so the button action re-reads the spy).
+    @State private var testLastOpened = ""
 #endif
 
     var body: some View {
@@ -104,7 +107,10 @@ struct NoteEditorPane: View {
             flushBox: flushBox,
             onRevealBlock: { anchor in
                 guard let link = anchor.link, let url = URL(string: link) else { return }
-                NSWorkspace.shared.open(url)
+                // Dispatch through the shared choke-point (records under a UITest launch for G6; opens
+                // for real otherwise). The chip's reveal action fires on the main thread; assumeIsolated
+                // satisfies the @Sendable callback without an async hop (mirrors onJumpBlock).
+                MainActor.assumeIsolated { openExternalURL(url) }
             },
             onPreviewBlock: { [weak previewPopover] anchor, anchorView in
                 previewPopover?.show(for: anchor, relativeTo: anchorView)
@@ -163,6 +169,21 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.test.pasteImage")
                 Button("jump") { testBox.jumpFirstPassage?() }
                     .accessibilityIdentifier("an.editor.test.jump")
+                Button("reveal") {
+                    testBox.revealFirstSource?()
+                    testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
+                }
+                .accessibilityIdentifier("an.editor.test.reveal")
+                Button("zoteroOpen") {
+                    testBox.openFirstZotero?()
+                    testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
+                }
+                .accessibilityIdentifier("an.editor.test.zoteroOpen")
+                // Read-back of the last external URL dispatched (G6/G11). A visible static text (not a
+                // 1×1 hidden element — the `an.status.indexReady` probe's queryability hazard) so XCUITest
+                // resolves it; "-" keeps the element present before the first dispatch.
+                Text(testLastOpened.isEmpty ? "-" : testLastOpened)
+                    .accessibilityIdentifier("an.editor.test.lastOpenedURL")
             }
             // Height/font kept generous enough that XCUITest reliably hit-tests + focuses these controls
             // (a 14 pt / .caption2 strip is a known XCUITest hit-testing hazard — W8-S8 §G9). DEBUG- and
