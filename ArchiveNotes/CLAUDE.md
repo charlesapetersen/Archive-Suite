@@ -26,12 +26,13 @@ this file is authoritative for Notes‑specific work.
 - **Build:** `cd ArchiveNotes/macOS && xcodegen generate && xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`
 - **Run:** `./launch.sh notes` from the repo root, or `cd ArchiveNotes && ./launch.sh`.
 - **Test:** `./test-smoke.sh notes` from the repo root, or `cd ArchiveNotes && ./test-smoke.sh`.
-- **GUI harness (W8-S7, in progress):** `scripts/make-notes-fixture.sh` builds a SCRATCH store at
+- **GUI harness (W8-S7/S8, complete):** `scripts/make-notes-fixture.sh` builds a SCRATCH store at
   `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (notes + reader-page/Zotero/extract items,
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
-  library (scratch-only; reads tags to assert, never drives the store picker). Running the `ArchiveNotesUITests`
-  scheme is GUI-gated (deferred to W8-S8).
+  library (scratch-only; reads tags to assert, never drives the store picker). The `ArchiveNotesUITests`
+  XCUITest suite (G0–G11) runs GUI-on. **README + check catalog + the owner-eye checks (G2 typing, G6/G11
+  external launch, chip-button clicks): [`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md).**
 - **Durable-link E2E + safety (W8-S9):** `scripts/e2e-durable-links.sh` is a build-free filesystem proof
   that a `reader-page` link survives a computer move (same GUID, new absolute path → still resolves;
   guarded teardown); `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.

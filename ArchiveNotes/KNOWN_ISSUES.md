@@ -3,6 +3,33 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI harness (W8-S8b, W8 COMPLETE): index-ready probe now XCUITest-queryable + owner-eye harness README (2026-07-15) — Tier-2
+
+Closes the two remaining W8-S8 items → **Wave 8 (Notes tests + GUI harness) COMPLETE, SUITE_TODO W8 flipped.**
+
+- **`an.status.indexReady` probe queryability — FIXED.** It was a 1×1 `Color.clear` + `allowsHitTesting(false)`
+  a11y element that XCUITest could not resolve (its value stayed empty across a 30 s poll — pass-1 observation).
+  Root cause: a zero-size, clear, non-hittable view produces no resolvable a11y element with a readable value,
+  and `waitForIndexReady` read **only** `.value` (whereas the working `lastOpenedURL` helper falls back to
+  `.label`). Now (`NotesBrowserView.indexReadyProbe`) it is a normally-rendered `Text` **gated to the UITest
+  harness** (`#if DEBUG` + `-ANUITestStorePath`, mirroring the control strip — a normal DEBUG run and Release
+  carry NO probe at all, strictly cleaner than the old always-present clear element). It sits in
+  `.background(...)` behind the opaque 3-pane content, so it is occluded (never visible) yet stays in the a11y
+  tree; its `accessibilityValue` carries the bare generation token (empty until settle) and the label mirrors
+  it (`building` → `ready:<gen>`), and the helper accepts either. New **G0**
+  (`testG0_IndexReadyProbeResolvesAfterInitialBuild`) asserts the probe both exists and flips to a non-empty
+  token once the initial index build settles — so a later FTS/relevance check can safely gate on it.
+- **Owner-eye harness README shipped** — `ArchiveNotes/scripts/GUI-HARNESS.md`: how to run the suite, the full
+  G0–G11 catalog (auto vs owner-eye), and the exact human steps for the checks XCUITest can't fully assert
+  (**G2** typing into the styled NSTextView, **G6/G11** the real Reader/Zotero launch, and the un-hit-testable
+  **chip-button click** gestures). Linked from `ArchiveNotes/CLAUDE.md`.
+- **Verified live GUI-on:** full `ArchiveNotesUITests` suite **TEST EXECUTE SUCCEEDED — 13/13** (G0 + G1/G3/G4/
+  G5/G6/G7/G8/G9/G10/G11 + SmokeUITest), 0 failures; `build-for-testing` clean, **0 new warnings**; Release build
+  proves the DEBUG probe compiles out (`#else` → `EmptyView`). **Tier-2 gate met:** adversarial self-review
+  (display-only a11y element, no write path, no normal-run/Release behavior change) + live scratch functional
+  run + post-run file-safety (real `Store` **absent**, `notesStoreRootBookmark` not persisted, real
+  `notes-index-v1.sqlite3` untouched — UITest used `notes-index-uitest.sqlite3`, writes confined to `AN-GUI-Fixture`).
+
 ## GUI harness (W8-S8 pass 7): G6 reveal → Reader + G11 Zotero chip open green — one `NSWorkspace.open` spy serves both (2026-07-15) — Tier-2
 
 Added **G6** (`testG6_RevealSourceBlockDispatchesReaderDeepLink`) + **G11** (`testG11_ZoteroChipDispatchesSelectLink`):
@@ -26,8 +53,8 @@ failures; ~13 s each); 189 XCTest + Swift-Testing green; **Release build clean (
   Reader/Zotero launch stays owner-eye** (like G2's typing).
 - File-safe (read-only dispatch, no store/corpus writes): post-run the real `Store` is **absent**, real
   `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture.
-- **REMAINING (W8-S8 still open — oversized, recommend re-split):** the `an.status.indexReady` probe queryability fix;
-  the G2/G6/G11 owner-eye harness docs. Only then tick W8-S8 + flip SUITE_TODO W8.
+- **RESOLVED (W8-S8b, above):** the `an.status.indexReady` probe queryability fix + the G2/G6/G11 owner-eye
+  harness docs both landed → **W8-S8 complete, SUITE_TODO W8 flipped.**
 
 ## GUI harness (W8-S8 pass 6): G10 jump-to-source green — chip button confirmed NOT XCUITest-hittable → DEBUG jump seam (2026-07-15) — Tier-2
 

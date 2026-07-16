@@ -84,10 +84,13 @@ before any Notes-specific work.
   (S1 `27d3952` → S2 `70bfd1e` → S3 `c37f175` → S4 `92f84f4` → S5 `3d46c0d` → S6 `598d2f2` → S7 dates & quality UI)
 - [x] **W7** extracts (snapshot + provenance, blocks→notes, jump-to-source) — `07-extracts.md` — Tier-1
   (S1 `f5efe60` → S2 `71ca1db` → S3 `50920ce` → S4 `c8c93ee` → S5 `328bff3` → S6 app-quit/window-close autosave flush)
-- [ ] **W8** tests + XCUITest/cliclick GUI harness (scratch corpus) — `08-testing-and-gui-verification.md` — Tier-1
+- [x] **W8** tests + XCUITest/cliclick GUI harness (scratch corpus) — `08-testing-and-gui-verification.md` — Tier-1/2
   (S1 `0f164ed` → S2 `6ef2244` → S3 `3aa27e2` → S4 `6f22159` → S5 `2a412c9` → S6 `6ce10a6` →
-  S7 GUI-harness scaffold `98a4afc`–`a0b91d4` + **live `SmokeUITest` verified (GUI-on)** → S9 durable-link E2E + `GUI_SAFETY.md`)
-  — **remaining: S8 GUI checks (per-wave check list) are GUI-gated; box stays `[ ]` until they run.** (W8-S7 DONE — the harness builds, signs, and LAUNCHES under XCUITest against the scratch fixture; file-safe.)
+  S7 GUI-harness scaffold `98a4afc`–`0e7472c` → S8 per-wave GUI checks `f79e279`–`267ca8d` +
+  S8b probe-queryability + owner-eye README → S9 durable-link E2E `17a2d27`/`7d2dcb8` + `GUI_SAFETY.md`)
+  — **W8 COMPLETE (GUI-on):** full `ArchiveNotesUITests` suite (G0–G11 + Smoke) **13/13 TEST EXECUTE SUCCEEDED**;
+  the `an.status.indexReady` probe is now XCUITest-queryable (G0); owner-eye checks (G2/G6/G11 + chip clicks)
+  documented in `ArchiveNotes/scripts/GUI-HARNESS.md`. **Completes Archive Notes (Wave 11 / W0–W8).**
 - [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**; unified suite storage path — Tier-2, separately gated
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified

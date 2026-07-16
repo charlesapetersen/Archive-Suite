@@ -96,8 +96,8 @@ class NotesFixtureUITestCase: XCTestCase {
         return byID.exists ? byID : app.tables.firstMatch
     }
 
-    /// The hidden index-ready probe (§3.4). A 1×1 clear a11y element; its value is the generation token
-    /// once the initial build settles.
+    /// The index-ready probe (§3.4), present only under the UITest harness. A UITest-gated `Text`
+    /// (occluded behind the panes); its value/label carry the generation token once the build settles.
     var indexReadyProbe: XCUIElement { app.descendants(matching: .any)["an.status.indexReady"] }
 
     /// The main editor NSTextView (id `an.editor.text`). Its `.value` is the current editor string —
@@ -122,13 +122,16 @@ class NotesFixtureUITestCase: XCTestCase {
         return condition()
     }
 
-    /// Wait until the index-ready probe publishes a non-empty generation token.
+    /// Wait until the index-ready probe publishes the settled completion token. The probe carries the
+    /// bare generation token in its `accessibilityValue` (empty before settle) and mirrors it in the
+    /// label (`building` → `ready:<gen>`); some SwiftUI static-text elements surface their string via
+    /// `.label` not `.value` (cf. `lastOpenedURL`), so accept either signal (W8-S8b probe fix).
     @discardableResult
     func waitForIndexReady(timeout: TimeInterval) -> Bool {
         _ = indexReadyProbe.waitForExistence(timeout: min(timeout, 10))
         return pollUntil(timeout: timeout) {
             if let v = indexReadyProbe.value as? String, !v.isEmpty { return true }
-            return false
+            return indexReadyProbe.label.hasPrefix("ready:")
         }
     }
 
@@ -379,10 +382,23 @@ class NotesFixtureUITestCase: XCTestCase {
 /// (reveal → Reader) + G11 (Zotero chip open): both dispatch an external URL through the DEBUG
 /// `WorkspaceOpenSpy` (`openExternalURL`) — the seams fire the un-hit-testable chip buttons' REAL
 /// callbacks and the harness reads the dispatched URL back via `an.editor.test.lastOpenedURL`; the real
-/// Reader/Zotero launch stays owner-eye. Remaining to complete W8-S8: fix the `an.status.indexReady`
-/// probe queryability + the harness README owner-eye notes (G2/G6/G11).
+/// Reader/Zotero launch stays owner-eye. W8-S8b completes the wave: G0 asserts the (now UITest-gated,
+/// queryable) `an.status.indexReady` probe resolves, and the owner-eye checks (G2 typing, G6/G11
+/// external launch, chip-button clicks) are documented in `ArchiveNotes/scripts/GUI-HARNESS.md`.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
+
+    /// G0 — The `an.status.indexReady` probe is XCUITest-queryable and publishes the settled
+    /// completion token (W8-S8b). Was a 1×1 `Color.clear` that never resolved — its value stayed empty
+    /// across a 30 s poll (KNOWN_ISSUES pass-1). Now a UITest-gated `Text`; this asserts it both exists
+    /// in the a11y tree and flips to a non-empty token once the initial index build settles, so a later
+    /// FTS/relevance check can safely gate on it.
+    func testG0_IndexReadyProbeResolvesAfterInitialBuild() throws {
+        XCTAssertTrue(indexReadyProbe.waitForExistence(timeout: 10),
+                      "the an.status.indexReady probe should be present in the accessibility tree")
+        XCTAssertTrue(waitForIndexReady(timeout: 30),
+                      "the probe should publish the completion token once the initial index build settles")
+    }
 
     /// G1 — Create a note (⌘N / the New menu) → a new `items/<uuid>/<Title>.md` appears on disk.
     func testG1_CreateNoteWritesNewItemFile() throws {

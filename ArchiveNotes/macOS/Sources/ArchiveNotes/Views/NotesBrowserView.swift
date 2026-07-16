@@ -109,18 +109,37 @@ struct NotesBrowserView: View {
         }
     }
 
-    /// A zero-footprint, visually-invisible accessibility probe the XCUITest harness polls (08-testing
-    /// §3.4): its `accessibilityValue` is empty until the initial index build settles, then the
-    /// completion token. Kept in the a11y tree (never `.accessibilityHidden`) and non-interactive so it
-    /// resolves for tests without affecting users. The live poll runs under W8-S8 (GUI on).
+#if DEBUG
+    /// XCUITest index-ready signal (08-testing §3.4). Present ONLY under the UITest harness
+    /// (`-ANUITestStorePath`), mirroring `NoteEditorPane`'s control strip — a normal DEBUG run and
+    /// Release carry no probe at all. Sits in `.background(...)` behind the opaque 3-pane content, so it
+    /// is occluded (never visible to the user) yet stays in the accessibility tree.
+    ///
+    /// Its `accessibilityValue` is empty until the initial index build settles, then the completion
+    /// token; the label mirrors the same state (`building` → `ready:<gen>`) so the harness can read
+    /// either. Was a 1×1 `Color.clear` + `allowsHitTesting(false)` that XCUITest could NOT resolve —
+    /// its value stayed empty across a 30 s poll (W8-S8). A normally-rendered `Text` with a stable,
+    /// non-empty label reliably enters the a11y tree.
+    @ViewBuilder
     private var indexReadyProbe: some View {
-        Color.clear
-            .frame(width: 1, height: 1)
-            .allowsHitTesting(false)
-            .accessibilityElement()
-            .accessibilityIdentifier("an.status.indexReady")
-            .accessibilityValue(model.isIndexReady ? String(model.indexGeneration) : "")
+        if Self.isUITestHarness {
+            Text(verbatim: model.isIndexReady ? "ready:\(model.indexGeneration)" : "building")
+                .accessibilityIdentifier("an.status.indexReady")
+                .accessibilityValue(model.isIndexReady ? String(model.indexGeneration) : "")
+                .frame(height: 16)
+        }
     }
+
+    /// True when launched by the UITest harness (`-ANUITestStorePath`), mirroring the
+    /// `NoteEditorPane` / `RootFolderStore` / `NotesTagProjector` gate.
+    private static var isUITestHarness: Bool {
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
+        return false
+    }
+#else
+    /// Release / non-UITest builds carry no probe (the harness is DEBUG-only).
+    private var indexReadyProbe: some View { EmptyView() }
+#endif
 
     private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }
 
