@@ -233,11 +233,22 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `$0`/no-key/no-GUI headless self-test `scripts/test-processing-history.sh` (`ProcessingHistoryTestDriver`, 19/19 PASS,
   against a THROWAWAY UserDefaults suite — never the operator's real history). Visual GUI check deferred (launch-time
   Keychain prompt blocks the Processor GUI unattended) → Morning Review.
-- [ ] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15; re-scoped 2026-07-16)_ — (a)
-  main-window shortcuts for start-processing / switch-provider: **ALREADY SHIPPED `b1fc5d4` (suite-v1.2.0)** —
-  only verify coverage is complete against the Reader's "menu bar = single source of shortcuts" convention. (b)
-  **REMAINING:** audit that custom views render correctly in **dark mode**. Small, Tier-1, GUI-verifiable now the
-  harness runs. | files: Views/OCRView.swift, Views/* (dark-mode audit), a Commands scene | S | low | none
+- [x] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15; re-scoped 2026-07-16; VERIFIED 2026-07-16)_ —
+  Tier-1 audit; **no code change needed** (both sub-items already correct in-tree — churning clean code would be worse).
+  **(a) Shortcut coverage — complete & correct:** `Views/ProcessingCommands.swift` exposes the two main-window
+  commands (⌘R Start Processing, ⌘⌥P Cycle Provider) as a menu-bar `CommandMenu` = the single source (key
+  equivalents shown; routes via `NotificationCenter` → MainActor observers with a `TextEditingGuard` so a shortcut
+  never steals a keystroke). Every OTHER `.keyboardShortcut` in the app is a `.defaultAction`/`.cancelAction`/⌘Return
+  **scoped to a modal sheet** (correctly NOT global menu commands) — matches the Reader's "menu bar = single source"
+  convention. **(b) Dark-mode — static audit clean:** all chrome uses adaptive `Color(nsColor: .controlBackgroundColor
+  / .windowBackgroundColor / .textBackgroundColor)`; text uses `.primary`/`.secondary`/`.tertiary` + adaptive accents;
+  `white`/`black` literals appear ONLY for document/paper rendering (thumbnail/PDF-output/OCR-test canvases — must
+  stay), modal scrims (`black.opacity(…)` — intentional dimming), and glyphs/text on dark scrims or saturated colored
+  badges; the one AppKit token field sets `drawsBackground = false` (the adaptive pattern). No custom `Color` palette/
+  extension, no named-image chrome (`Image(systemName:)` only), no forced `.preferredColorScheme` / `NSApp.appearance`
+  / `window.backgroundColor` override. **Human visual dark-mode spot-check deferred → Morning Review** (the Processor
+  GUI can't launch unattended — blocking login-Keychain prompt; no Processor XCUITest harness). | files (audited):
+  Views/* (all), Views/ProcessingCommands.swift | S | low | none | done
 - [ ] **Incremental processing (skip already-processed files)** _(promoted 2026-07-15)_ — re-running a directory
   should process only new/changed files instead of redoing everything (matters at 150k scale). Choose the skip key
   deliberately (an existing output PDF at the destination + source mtime) and **fail safe: when in doubt, PROCESS**
