@@ -205,6 +205,136 @@ extension OCRProcessor {
             }
         }
     }
+
+    /// The "re-OCR multi-page PDF" mode: for each input PDF, render EVERY page to an image, OCR each
+    /// page image with the LLM, then rebuild ONE output PDF whose pages alternate image, OCR-text,
+    /// image, OCR-text, … (each source page → its image page + a selectable OCR-text page). Distinct
+    /// from `preOCRedInput`, which extracts the existing embedded text layer instead of re-OCRing the
+    /// rendered page. This mode is a pure document transform: it writes only the output PDF and applies
+    /// NO Finder tags (tagging/segmentation integration is a deliberate follow-up). The output never
+    /// overwrites the input — `uniqueOutputURL` reserves a non-colliding path (`name (2).pdf` when the
+    /// output directory coincides with the input's).
+    ///
+    /// `ocrOverride` is a $0/key-free TEST SEAM (mirrors `MergeSafetyTestDriver`'s injected writer):
+    /// when set, it supplies each page's `OCRResult` in place of the live network call, so the whole
+    /// render→generate→merge assembly is covered headlessly. Production passes nil.
+    func performMultiPagePDFReOCR(
+        files: [URL],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        outputDirectory: URL,
+        customPrompt: String? = nil,
+        gatewayConfig: GatewayConfig? = nil,
+        ocrOverride: (@Sendable (URL) async -> OCRResult)? = nil
+    ) async {
+        let total = files.count
+        guard total > 0 else { return }
+        let pdfMB = Self.pdfImageMB
+        let txtCols = Self.textColumns
+        let gatewayName = currentGateway?.displayName
+
+        for (index, pdfURL) in files.enumerated() {
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            jobs[index].status = .processing
+            statusMessage = "Rendering \(pdfURL.lastPathComponent)…"
+
+            // 1. Render every page to a temp JPEG. nil = render failure; renderAllPages fails loud
+            //    (no partial set) so we never silently drop an archival page.
+            guard let pageImages = PDFToImageConverter.renderAllPages(of: pdfURL), !pageImages.isEmpty else {
+                jobs[index].status = .failed
+                if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
+                statusMessage = "Could not render \(pdfURL.lastPathComponent)."
+                progress = Double(index + 1) / Double(total)
+                continue
+            }
+
+            // 2. OCR each page image in order (sequential; the prior page's text is carried as light
+            //    continuation context, matching the single-image pipeline).
+            var pageResults: [OCRResult] = []
+            pageResults.reserveCapacity(pageImages.count)
+            for (p, img) in pageImages.enumerated() {
+                if Task.isCancelled {
+                    for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                    cleanupTempFiles()
+                    return
+                }
+                statusMessage = "OCR \(pdfURL.lastPathComponent) — page \(p + 1)/\(pageImages.count)…"
+                let result: OCRResult
+                if let ocrOverride {
+                    result = await ocrOverride(img)
+                } else {
+                    result = await Self.performOCRCall(
+                        imageURL: img, provider: provider, model: model,
+                        thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        previousText: pageResults.last?.text, previousImageURL: nil,
+                        customPrompt: customPrompt, gatewayConfig: gatewayConfig
+                    )
+                }
+                pageResults.append(result)
+                progress = (Double(index) + Double(p + 1) / Double(pageImages.count)) / Double(total)
+            }
+
+            // 3+4. Build a per-page (image + text) PDF for each page, then merge them into ONE
+            //    alternating output PDF — off the main actor (CPU-heavy; matches the standard path's
+            //    M3 detach). mergeDocumentPDFs interleaves each source's [image, text] pages, so the
+            //    result is image1, text1, image2, text2, …. uniqueOutputURL guards against clobbering
+            //    the input PDF or another output from this run.
+            let baseName = pdfURL.deletingPathExtension().lastPathComponent
+            let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: pdfURL)
+            let originalName = pdfURL.lastPathComponent
+            let pageWork: [(image: URL, result: OCRResult)] = Array(zip(pageImages, pageResults))
+            let genModel = model
+            let ok: Bool = await Task.detached(priority: .utility) {
+                let gen = PDFGenerator()
+                let fm = FileManager.default
+                var perPagePDFs: [URL] = []
+                defer { for u in perPagePDFs { try? fm.removeItem(at: u) } }
+                do {
+                    for page in pageWork {
+                        let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
+                        try gen.generate(imageURL: page.image, result: page.result, model: genModel,
+                                         outputURL: tmp, originalFileName: originalName,
+                                         gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                        perPagePDFs.append(tmp)
+                    }
+                    try gen.mergeDocumentPDFs(sourcePDFs: perPagePDFs, outputURL: outputURL)
+                    return true
+                } catch {
+                    os_log(.error, "multi-page re-OCR PDF write failed for %{public}@: %{public}@",
+                           originalName, error.localizedDescription)
+                    return false
+                }
+            }.value
+
+            // Page-image temps are consumed either way.
+            for u in pageImages { try? FileManager.default.removeItem(at: u) }
+
+            if ok {
+                // Map by the original source URL so downstream consumers (log, view-text) find it. Only
+                // set on a confirmed write — never a phantom entry pointing at a nonexistent file.
+                outputURLMap[pdfURL] = outputURL
+                let combinedText = pageResults.compactMap { $0.text }.joined(separator: "\n\n")
+                jobs[index].result = OCRResult(
+                    text: combinedText.isEmpty ? nil : combinedText,
+                    classification: pageResults.first?.classification,
+                    errorMessage: combinedText.isEmpty ? "No text returned by model." : nil,
+                    errorCode: nil
+                )
+                jobs[index].classification = pageResults.first?.classification
+                jobs[index].status = .succeeded
+                failedFiles.removeAll { $0 == pdfURL.lastPathComponent }
+            } else {
+                jobs[index].status = .failed
+                if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
+            }
+            progress = Double(index + 1) / Double(total)
+            statusMessage = "Processed \(index + 1)/\(total) PDF\(total == 1 ? "" : "s")…"
+        }
+        cleanupTempFiles()
+    }
+
     /// A per-run output URL for `sourceURL` that never silently overwrites a DIFFERENT source's output.
     /// Two inputs sharing a base filename (common with per-folder archive numbering — e.g. two 00001.jpg
     /// from different boxes) would otherwise both map to <dir>/<base>.pdf and clobber each other, losing

@@ -919,6 +919,7 @@ extension OCRProcessor {
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
         preOCRedInput: Bool = false,
+        reOCRMultiPagePDF: Bool = false,
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil
     ) async {
@@ -939,7 +940,20 @@ extension OCRProcessor {
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
 
-        if preOCRedInput {
+        if reOCRMultiPagePDF {
+            // --- Multi-page PDF re-OCR path: render every page → OCR each page image → rebuild ONE
+            //     output PDF alternating image/OCR-text. A pure transform (no tagging/segmentation). ---
+            await performMultiPagePDFReOCR(
+                files: files,
+                provider: provider,
+                model: model,
+                thinkingLevel: thinkingLevel,
+                apiKey: apiKey,
+                outputDirectory: outputDirectory,
+                customPrompt: segmentationContext.customPrompt,
+                gatewayConfig: gatewayConfig
+            )
+        } else if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
             await performPreOCRedProcessing(
                 files: files,
