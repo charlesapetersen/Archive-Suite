@@ -114,6 +114,14 @@ Processor emits **one PDF per input image**, same base filename (`PDFGenerator`)
 - **Page 2** — the OCR text as **real selectable text**, on a single dynamically-tall page (no
   overflow to page 3).
 
+> **Interleaved multi-page variant.** A single output PDF may **alternate image, OCR-text, image,
+> OCR-text, …** — each source page contributing its image page followed by its page-2-format OCR-text
+> page. This is produced by merged multi-page documents (`PDFGenerator.mergeDocumentPDFs`) and by the
+> Processor's **"Re-OCR multi-page PDF"** mode (renders each page of an input PDF, re-OCRs the page
+> image, and rebuilds one interleaved PDF). It is **not** a format break: every (image, text) pair
+> follows the page-1/page-2 contract above, and the "consumers must not hard-assume 2 pages" clause
+> below already covers it. Consumers read OCR text off **every** text page, not just page 2.
+
 **Page-2 header** (built by `PDFGenerator.makeTextPage`, lines 212–224; parsed by both
 Processor `OCR/PDFTextExtractor.swift` and Reader `Search/PDFTextExtractor.swift`):
 

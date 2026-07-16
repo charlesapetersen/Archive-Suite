@@ -13,6 +13,7 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
+    @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
@@ -346,10 +347,14 @@ struct OCRView: View {
                                 Text(mode.displayName).tag(mode.rawValue)
                             }
                         }
-                        Text(taggingMode.detail).font(.caption2).foregroundStyle(.tertiary)
+                        Text(reOCRMultiPagePDF
+                             ? "Not applied in “Re-OCR multi-page PDF” mode — it only rebuilds the alternating image/OCR-text PDF."
+                             : taggingMode.detail)
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
                     .padding(4)
                 }
+                .disabled(reOCRMultiPagePDF)
 
 
                 // Cost estimate
@@ -582,10 +587,10 @@ struct OCRView: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6]))
                 .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.5))
             VStack(spacing: 12) {
-                Image(systemName: preOCRedInput ? "doc.text" : "photo.stack")
+                Image(systemName: (preOCRedInput || reOCRMultiPagePDF) ? "doc.text" : "photo.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
-                Text(preOCRedInput ? "Drop PDFs here" : "Drop images here")
+                Text((preOCRedInput || reOCRMultiPagePDF) ? "Drop PDFs here" : "Drop images here")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Text("or use Add Files…")
@@ -904,10 +909,10 @@ struct OCRView: View {
 
     private func isImageFile(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
-        // Mode-aware: pre-OCRed input ingests PDFs; image mode accepts only the documented image
-        // formats (JPEG/PNG/TIFF/HEIC) — so a wrong-type file is rejected at the door instead of
-        // entering the pipeline and failing later.
-        return preOCRedInput ? (ext == "pdf") : ImageEncoding.acceptedImageExtensions.contains(ext)
+        // Mode-aware: the PDF-input modes (pre-OCRed input; multi-page re-OCR) ingest PDFs; image
+        // mode accepts only the documented image formats (JPEG/PNG/TIFF/HEIC) — so a wrong-type file
+        // is rejected at the door instead of entering the pipeline and failing later.
+        return (preOCRedInput || reOCRMultiPagePDF) ? (ext == "pdf") : ImageEncoding.acceptedImageExtensions.contains(ext)
     }
 
     private func resumePendingBatch() {
@@ -1003,6 +1008,7 @@ struct OCRView: View {
                 confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
                 reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
+                reOCRMultiPagePDF: reOCRMultiPagePDF,
                 segmentationContext: context,
                 gatewayConfig: gateway
             )

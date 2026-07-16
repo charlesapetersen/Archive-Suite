@@ -149,7 +149,7 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   full-width). Threaded through OCRProcessor, SessionProcessingConfig, LiveCaptureProcessor (Codable-safe
   with `decodeIfPresent` fallback). Build clean 0 new warnings. Tier-2 APPROVE (7/7 vectors). 7 synthetic
   tests green. GUI-verify deferred: verify on a real multi-column newspaper scan → Morning Review. | done
-- [ ] **Multi-page PDF → per-page LLM OCR → single alternating image/OCR-text PDF** _(owner-requested 2026-07-15)_
+- [x] **Multi-page PDF → per-page LLM OCR → single alternating image/OCR-text PDF** _(owner-requested 2026-07-15; SHIPPED — new "Re-OCR multi-page PDF" Process-Files mode)_
   — a NEW Process-Files mode: accept an existing **multi-page PDF**, render EACH page to an image, send each
   page-image to the LLM for OCR (re-OCR the page images — distinct from the existing `preOCRedInput` mode, which
   only extracts the embedded text layer), and output ONE PDF whose pages **alternate image, OCR-text, image,
@@ -166,6 +166,16 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   files (verify at impl): OCR/PDFToImageConverter.swift, OCR/PDFGenerator.swift (generate + mergeDocumentPDFs),
   OCR/OCRProcessor+OCR.swift (performOCRCall, convertPDFInputs), OCR/OCRProcessor+Pipeline.swift (startProcessing),
   Views/OCRView.swift (intake + mode toggle), SPEC/tag-format.md | M | med | none
+  — **DONE:** `DefaultsKeys.reOCRMultiPagePDF` + `ProcessingProfileStore`; `PDFToImageConverter.renderAllPages`
+  (fail-loud, no partial set); `OCRProcessor.performMultiPagePDFReOCR` (render all pages → per-page OCR via
+  `performOCRCall` → `PDFGenerator.generate` per page → `mergeDocumentPDFs` into ONE alternating image/OCR-text
+  PDF), branched in `startProcessing` BEFORE `preOCRedInput`; a pure transform (no Finder tags — output never
+  overwrites the input via `uniqueOutputURL`). Settings toggle (mutually exclusive with pre-OCRed; disables
+  batch + separate-image export), Process-Files "Drop PDFs here" intake + PDF accept-gate + grayed Tagging box.
+  SPEC §2-page-structure interleaved-variant note added. **Tier-2:** adversarial self-review + `$0`/key-free
+  functional test `scripts/test-multipage-reocr.sh` (`MultiPageReOCRTestDriver`, 11/11 PASS incl. the
+  input-overwrite guard); merge-safety regression still green; build clean, 0 new warnings. GUI visual check
+  (toggle render / drop-zone flip) deferred → Morning Review (launch-time Keychain prompt blocks it unattended).
 - [ ] **De-dup sweep from the 2026-07-04 maintainability audit** _(promoted from POTENTIAL_FEATURES 2026-07-15)_ —
   small, mechanical, **behavior-preserving** consolidations, each provable by build + existing tests: shared
   `highestLeadingNumber(in:)` (CollectionSegmenter + LiveCaptureProcessor); `ThinkingLevel.budgetTokens` + the
