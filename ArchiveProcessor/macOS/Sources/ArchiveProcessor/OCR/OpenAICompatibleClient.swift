@@ -6,6 +6,15 @@ struct OpenAICompatibleClient {
     let apiKey: String
     let modelID: String
 
+    /// Token-limit parameter name. OpenAI **reasoning** models (o-series / GPT-5 family) require
+    /// `max_completion_tokens` and reject the legacy `max_tokens`; every other model — and every
+    /// OpenAI-compatible gateway — still takes `max_tokens`. Defaults to `max_tokens`, so the existing
+    /// gateway callers build a byte-identical request. // VERIFY families when finalizing the OpenAI list.
+    var maxTokensParam: String = "max_tokens"
+    /// Optional OpenAI `reasoning_effort` ("low"/"medium"/"high"), sent only when non-nil (reasoning
+    /// models only). The `ThinkingLevel` → `reasoning_effort` mapping is wired in W13.oai-2; nil here.
+    var reasoningEffort: String? = nil
+
     private var chatEndpoint: URL? {
         let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
         return URL(string: "\(base)/chat/completions")
@@ -33,11 +42,12 @@ struct OpenAICompatibleClient {
         ])
         contentParts.append(["type": "text", "text": prompt])
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": modelID,
-            "messages": [["role": "user", "content": contentParts]],
-            "max_tokens": 8192
+            "messages": [["role": "user", "content": contentParts]]
         ]
+        body[maxTokensParam] = 8192
+        if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
 
         let (data, response) = try await sendRequest(body: body, timeoutInterval: 120)
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
@@ -59,11 +69,12 @@ struct OpenAICompatibleClient {
     }
 
     func textCompletion(prompt: String, maxTokens: Int = 512) async throws -> String {
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": modelID,
-            "messages": [["role": "user", "content": prompt]],
-            "max_tokens": maxTokens
+            "messages": [["role": "user", "content": prompt]]
         ]
+        body[maxTokensParam] = maxTokens
+        if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
 
         let (data, _) = try await sendRequest(body: body, timeoutInterval: 120)
 
@@ -103,5 +114,30 @@ struct OpenAICompatibleClient {
             if let message = json["message"] as? String { return message }
         }
         return "API error (\(statusCode))"
+    }
+}
+
+// MARK: - Native OpenAI provider
+
+extension OpenAICompatibleClient {
+    /// The native OpenAI API base URL used by the first-class `.openai` provider (distinct from the
+    /// user-supplied gateway base URL). A custom gateway base URL still covers Azure OpenAI / proxies.
+    /// // VERIFY this stays current at build time.
+    static let openAIBaseURL = "https://api.openai.com/v1"
+
+    /// Build a client for the first-class `.openai` provider, applying the model-family param adapter
+    /// (OpenAI plan, Design decision 3): OpenAI **reasoning** models (o-series / GPT-5 family) require
+    /// `max_completion_tokens` instead of `max_tokens` (and reject `temperature`, which this client never
+    /// sends). Keyed off `model.supportsThinking`, which the built-in `openaiModels` list sets `true`
+    /// only for those reasoning families. `reasoningEffort` is left nil here — the `ThinkingLevel` →
+    /// `reasoning_effort` value mapping lands in W13.oai-2.
+    static func openAI(model: LLMModel, apiKey: String, reasoningEffort: String? = nil) -> OpenAICompatibleClient {
+        OpenAICompatibleClient(
+            baseURL: openAIBaseURL,
+            apiKey: apiKey,
+            modelID: model.id,
+            maxTokensParam: model.supportsThinking ? "max_completion_tokens" : "max_tokens",
+            reasoningEffort: reasoningEffort
+        )
     }
 }
