@@ -176,6 +176,58 @@ actor ContentIndex {
         return paths
     }
 
+    /// A ranked full-text result: **every** matching path (bm25 order, best first) plus keyword-in-context
+    /// `snippet()` previews for the top-ranked matches. `Sendable` so it crosses the actor boundary.
+    struct RankedSearch: Sendable {
+        /// All matching paths, best match first — the caller intersects this with tag facets and uses
+        /// the order for `.relevance` sorting, so it must NOT be truncated (a bound here would drop hits).
+        let paths: [String]
+        /// Marked KWIC snippet (see `SearchSnippet`) per path, for the top `snippetLimit` matches only.
+        /// Absent for deeper matches (rows past the limit simply show no preview — a graceful degrade).
+        let snippets: [String: String]
+    }
+
+    /// Full-text search returning both the complete ranked path list (as `search`) and bounded
+    /// keyword-in-context snippets. Snippet extraction reads each matched document's body, so it is
+    /// deliberately capped at the top `snippetLimit` hits: a broad query at 150k scale computes a
+    /// fragment for a few hundred rows, not for every match. (See `snippetMap` — FTS5 evaluates a
+    /// `snippet()` in the SELECT list once per output row, so the `path IN (…)` filter is what actually
+    /// bounds the work; an `ORDER BY bm25 … LIMIT` would still evaluate it for every scanned row.)
+    func searchRanked(_ query: String, snippetLimit: Int = 300) -> RankedSearch {
+        let paths = search(query)
+        guard !paths.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
+        let top = Array(paths.prefix(max(0, snippetLimit)))
+        return RankedSearch(paths: paths, snippets: snippetMap(query: query, paths: top))
+    }
+
+    /// KWIC `snippet()` of the **body** column (index 0) for each of `paths`, keyed by path. Runs one
+    /// MATCH query filtered by `path IN (…)` so `snippet()` (which reads the stored body) is evaluated
+    /// only for these rows, not for the whole match set. Empty snippets (e.g. an image-only doc with no
+    /// body text) are dropped. Terms are wrapped in `SearchSnippet` marks for the UI to emphasise.
+    private func snippetMap(query: String, paths: [String]) -> [String: String] {
+        let match = ftsMatchExpression(query)
+        guard !match.isEmpty, !paths.isEmpty else { return [:] }
+        let placeholders = Array(repeating: "?", count: paths.count).joined(separator: ",")
+        let sql = "SELECT path, snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND path IN (\(placeholders));"
+        guard let stmt = prepare(sql) else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        // Placeholder order: 1–4 = snippet marks/ellipsis/tokens, 5 = MATCH expr, 6… = the paths.
+        bindText(stmt, 1, SearchSnippet.openMark)
+        bindText(stmt, 2, SearchSnippet.closeMark)
+        bindText(stmt, 3, SearchSnippet.ellipsis)
+        sqlite3_bind_int(stmt, 4, Int32(SearchSnippet.tokenCount))
+        bindText(stmt, 5, match)
+        for (i, p) in paths.enumerated() { bindText(stmt, Int32(6 + i), p) }
+        var out: [String: String] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let pc = sqlite3_column_text(stmt, 0) else { continue }
+            let path = String(cString: pc)
+            let snip = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            if !snip.isEmpty { out[path] = snip }
+        }
+        return out
+    }
+
     /// The stored `Classification:` value for a file (nil if absent/unindexed). Uses the path-indexed
     /// files table for the lookup, then reads the value from the FTS row by rowid.
     func classification(for path: String) -> String? {

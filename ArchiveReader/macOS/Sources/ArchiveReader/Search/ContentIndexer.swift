@@ -169,6 +169,14 @@ final class ContentIndexer: ObservableObject {
         return await index.search(query)
     }
 
+    /// Full-text search → every matching path (bm25 order) plus bounded keyword-in-context snippets
+    /// for the top hits (see `ContentIndex.searchRanked`), so a broad query doesn't compute a fragment
+    /// for every match at corpus scale.
+    func searchRanked(_ query: String, snippetLimit: Int = 300) async -> ContentIndex.RankedSearch {
+        try? await index.open()
+        return await index.searchRanked(query, snippetLimit: snippetLimit)
+    }
+
     /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.
     func classifications(for paths: [String]) async -> [String: String] {
         try? await index.open()

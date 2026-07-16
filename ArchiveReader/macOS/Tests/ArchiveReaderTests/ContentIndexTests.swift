@@ -288,6 +288,76 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    // MARK: - Ranked search + keyword-in-context snippets
+
+    /// searchRanked returns the same complete bm25-ordered paths as `search`, plus a KWIC body snippet
+    /// per hit with the matched term wrapped in SearchSnippet marks.
+    func testSearchRankedSnippetsHighlightMatch() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil,
+                             body: "The Senate debated the defense budget for many hours that evening.")
+        try await idx.upsert(path: "/b.pdf", mtime: 1, name: "b", classification: nil,
+                             body: "A letter about the harvest and the weather.")
+        let ranked = await idx.searchRanked("budget")
+        let plain = await idx.search("budget")
+        XCTAssertEqual(ranked.paths, ["/a.pdf"])                     // same as search()
+        XCTAssertEqual(ranked.paths, plain)
+        let snip = try XCTUnwrap(ranked.snippets["/a.pdf"])
+        // The matched term is wrapped for the UI to emphasise; the surrounding OCR text is present.
+        XCTAssertTrue(snip.contains("\(SearchSnippet.openMark)budget\(SearchSnippet.closeMark)"),
+                      "matched term should be marked; got: \(snip.debugDescription)")
+        let segs = SearchSnippet.segments(from: snip)
+        XCTAssertTrue(SearchSnippet.hasMatch(segs))
+        XCTAssertEqual(segs.first(where: { $0.isMatch })?.text.lowercased(), "budget")
+        await idx.close()
+    }
+
+    /// No match → empty paths AND empty snippets (no crash).
+    func testSearchRankedNoMatch() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil, body: "hello world")
+        let ranked = await idx.searchRanked("nonexistentterm")
+        XCTAssertTrue(ranked.paths.isEmpty)
+        XCTAssertTrue(ranked.snippets.isEmpty)
+        await idx.close()
+    }
+
+    /// An image-only doc (empty body) that matches on name/classification yields a path but NO snippet
+    /// entry (empty snippets are dropped, so the UI shows the row without a preview line).
+    func testSearchRankedEmptyBodyHasNoSnippet() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/scan.pdf", mtime: 1, name: "budget scan", classification: nil,
+                             body: "", pageCount: 3, hasText: false, readable: true)
+        let ranked = await idx.searchRanked("budget")
+        XCTAssertEqual(ranked.paths, ["/scan.pdf"])          // matches on the name column
+        XCTAssertNil(ranked.snippets["/scan.pdf"])           // empty body → no KWIC preview
+        await idx.close()
+    }
+
+    /// paths is complete (every match, uncapped) while snippets are bounded to snippetLimit — a broad
+    /// query must not drop matches from filtering, but must not compute a fragment for every row.
+    func testSearchRankedSnippetsAreBoundedButPathsAreComplete() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        let n = 50
+        for i in 0..<n {
+            try await idx.upsert(path: "/f\(i).pdf", mtime: 1, name: "f\(i)", classification: nil,
+                                 body: "the shared commonterm appears in document number \(i)")
+        }
+        let ranked = await idx.searchRanked("commonterm", snippetLimit: 10)
+        XCTAssertEqual(ranked.paths.count, n)                 // every match — filtering must be complete
+        XCTAssertEqual(ranked.snippets.count, 10)             // snippets bounded to the top 10
+        // Every path that HAS a snippet is one of the returned matches, and its snippet marks the term.
+        for (path, snip) in ranked.snippets {
+            XCTAssertTrue(ranked.paths.contains(path))
+            XCTAssertTrue(snip.contains(SearchSnippet.openMark))
+        }
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")
