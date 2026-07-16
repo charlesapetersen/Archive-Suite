@@ -115,12 +115,49 @@ reasoning-capable models `supportsThinking: true` and wire `reasoning_effort`.
   default model / cost (and a note that a custom base URL covers **Azure OpenAI** / proxies). Update docs.
 - **Phase 4 (optional) — OpenAI Batch API** as a 4th `BatchOCR` struct for the discounted batch path.
 
+## Daemon build plan (bounded sessions — what's unattended vs. what needs a key/owner)
+
+**The point of this section:** the plan's *verification* needs a real OpenAI key (a live OCR test), which an
+unattended daemon cannot obtain — but **all of the code is buildable + self-reviewable at $0 with no key**,
+because it reuses `OpenAICompatibleClient` (already proven against OpenAI's wire format) and only *adds* an
+append-only `LLMProvider` case + switch arms. So the daemon **writes and build-verifies the code**, keeps the
+change strictly **additive + opt-in (never changes the default provider)**, and **flags the one live OCR test to
+the keyed/owner tail** — it does not skip the whole item. **One session per sub-task, top-to-bottom.** SUITE_TODO
+tracks these as `W13.oai-1…3`.
+
+Daemon-buildable (unattended, $0, no key, no GUI — build clean, no new warnings, self-review):
+- **`W13.oai-1` — native provider wiring (Phase 1).** Append `case openai = "OpenAI"` to `LLMProvider`
+  (**append-only** — statically verify the rawValue string + case order are unchanged for existing cases;
+  this is the persisted SHARED HOTSPOT), add `LLMModel.openaiModels`, and route `.openai` through the reused
+  `OpenAICompatibleClient` at the ~6–8 switch sites (OCR select, text/tagging, cost/estimate/batch selection,
+  rotation → `nil` in v1 like `.mistral`) + the **model-family param adapter** (Design decision 3:
+  `max_completion_tokens` vs `max_tokens`, drop `temperature`, `reasoning_effort` for reasoning models).
+  **⚠️ Do NOT ship live pricing/model-IDs blind** — leave the built-in list + `CostEstimator` numbers as clearly
+  marked `// VERIFY against live OpenAI pricing` placeholders and flag "verify model IDs + per-1M pricing" to
+  Morning Review; a wrong price is a silent estimator bug. Build clean, 0 new warnings.
+- **`W13.oai-2` — onboarding + validation + cost (Phase 2).** `ProviderKeySpec.openai` (+ add to `onboardable`),
+  `KeyValidator.validateOpenAI` (cheap `GET /v1/models` Bearer → 401/403 invalidKey, 429 rateLimited, 5xx
+  providerBusy), the `ThinkingLevel → reasoning_effort` mapping, and the `CostEstimator` OpenAI rows (still
+  placeholder-priced per the note above). `KeychainHelper` account = `LLMProvider.openai.rawValue`. Build-verifiable.
+- **`W13.oai-3` — gateway preset + docs (Phase 3).** A one-click "OpenAI" gateway preset (prefill base URL /
+  default model / cost; note a custom base URL covers Azure OpenAI / proxies), and the doc updates. Build-verifiable.
+
+Keyed / owner tail (NOT daemon-buildable — flag to Morning Review, do not guess):
+- **Live functional OCR test** (Phase 0's real deliverable) — with a real OpenAI key from the owner, run the
+  2-image `test-smoke.sh`-style pipeline through both the **gateway** (`api.openai.com/v1`) and the **native
+  `.openai`** provider; assert a PDF + extracted text. This is the item's only real verification gate.
+- **Final model-ID + pricing verification** against OpenAI's live pricing page (replaces the placeholders).
+- **Phase 4 — OpenAI Batch API** (4th `BatchOCR` struct); build-verifiable but its functional proof needs a key.
+
 ## Verification & tiering
 
 - **Tier-1 + a live functional OCR test** with a real OpenAI key: run the smoke pipeline (or
   `test-smoke.sh`-style 2-image run) end-to-end through the native provider and assert a PDF + extracted
   text. No file-writing/tag/SPEC change, so no adversarial (Tier-2) gate required — but the persisted
-  `LLMProvider` enum is a **SHARED HOTSPOT**, so coordinate the enum append and keep it append-only.
+  `LLMProvider` enum is a **SHARED HOTSPOT**, so coordinate the enum append and keep it append-only. The
+  daemon-buildable sessions (`W13.oai-1…3`) satisfy Tier-1 (build clean / no new warnings / self-review +
+  the static append-only check); **the live OCR test is the keyed/owner tail** and does not block landing the
+  build-verified code (kept additive + opt-in so an untested provider changes nothing until selected).
 - **Cost:** request an OpenAI key from the owner before the paid run; estimate first; use the cheapest
   capable `*-mini` vision model and the smallest input that proves the path.
 

@@ -1,20 +1,16 @@
 # Archive Notes — Master Plan & Architecture (00 / overview)
 
-> **Status: PROPOSED** (planning, 2026-07-10). A third native macOS app for Archive Suite, to be built
-> carefully over a long unattended/autonomous run. This file is the **spine**: vision, locked design
-> decisions, the complete data model + on-disk format + front-matter schema, the shared-contract (SPEC)
-> delta, the durable-link/URL-scheme spec, the ArchiveCore decision, risk/tier policy, and the **wave
-> index** that the per-wave plan files (`01`–`08`) expand. Read this before any wave.
+> **Status: SHIPPED (W0–W8, 2026-07).** Archive Notes is built; the per-wave execution plans (`00a`, `01`–`08`)
+> **shipped and were deleted** (git history keeps them). **This file is RETAINED** — not as an execution plan
+> but as the **authoritative interface contract + architecture record** for the app: §2 locked design decisions,
+> §5 front-matter schema, and **§16 Interface Contract** are cited by [`ArchiveNotes/CLAUDE.md`](../../ArchiveNotes/CLAUDE.md)
+> (e.g. §16.1/§16.3/§16.4) and must stay in sync with it. (A future cleanup pass may fold §16 into
+> `ArchiveNotes/CLAUDE.md` or promote it to `SPEC/` and then delete this file — tracked in `SUITE_TODO.md`.)
 >
-> Companion wave plans (this folder):
-> - `01-scaffolding-and-core.md` — third-app scaffold + ArchiveCore package + app skeleton/3-pane shell.
-> - `02-storage-model-and-index.md` — note/extract store, front-matter I/O, virtual folders + replication, SQLite FTS5 index.
-> - `03-rich-text-markdown-editor.md` — WYSIWYG editor over Markdown (+ raw toggle), inline images/paste.
-> - `04-sources-and-cross-app-linking.md` — source blocks, page thumbnails, Reader URL scheme + Copy Archive Link + reveal, durable links.
-> - `05-zotero-integration.md` — Zotero local API / Better BibTeX metadata + citations + chips.
-> - `06-viewers-search-replication.md` — note & extract 3-pane viewers, search/filter/sort, replication UI, templates, dates & quality UI.
-> - `07-extracts.md` — extract creation (snapshot + provenance), extract data model, jump-to-source.
-> - `08-testing-and-gui-verification.md` — unit tests, GUI/XCUITest harness, smoke gate, scratch-corpus safety.
+> The shipped, now-deleted wave plans (for orientation only — read the code + `ArchiveNotes/CLAUDE.md` for current truth):
+> - `00a` ArchiveCore extraction · `01` scaffold + 3-pane shell · `02` store/front-matter/virtual-folders/FTS5 ·
+>   `03` WYSIWYG editor · `04` sources + cross-app links · `05` Zotero · `06` viewers/search/replication/templates ·
+>   `07` extracts · `08` tests + GUI harness. All landed; see `SUITE_TODO.md` Wave W0–W8 records + git log.
 
 ---
 
@@ -399,10 +395,12 @@ Differences for Notes (`02`):
 
 ---
 
-## 13. Wave index (→ bounded autonomous sessions)
+## 13. Wave index (→ bounded autonomous sessions) — ALL SHIPPED (record only)
 
-Each wave is one plan file and decomposes into bounded sub-tasks (one per fresh autonomous session). Ordering
-respects dependencies. "GUI" = drive the app to verify; "Tier" per §12.
+**Every wave below shipped (W0–W8) and its plan file was deleted** (git history keeps them). The table is kept
+as an at-a-glance record of what the app is; for current truth read the code + [`ArchiveNotes/CLAUDE.md`](../../ArchiveNotes/CLAUDE.md)
+and the W0–W8 `[x]` records in [`SUITE_TODO.md`](../../SUITE_TODO.md). The **`(later)`** row is the one open,
+separately-gated follow-on. "Tier" per §12.
 
 | Wave | Plan | Goal | Depends on | Tier |
 |------|------|------|-----------|------|

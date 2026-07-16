@@ -30,23 +30,25 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- `local-agent-cli-provider.md` — **PROPOSED** (Processor): drive OCR/tagging through a locally installed,
-  subscription-authenticated CLI — **Claude Code + Gemini CLI + OpenAI Codex CLI**, all first-class — for
-  enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. No key stored; auth lives in each
-  CLI's login. Additive `localAgent` config sibling to the gateway (append-only, keeps resume-critical
-  snapshots unchanged). Tier-2. Claude path validated on-machine 2026-07-10.
-- `openai-chatgpt-provider.md` — **PROPOSED** (Processor): add OpenAI/ChatGPT as a first-class provider via
-  (1) the **standard API** (native `LLMProvider.openai`, BYO OpenAI API key) and (2) an **OpenAI gateway
-  preset** (turnkey config over the existing OpenAI-compatible gateway). Reuses `OpenAICompatibleClient`
-  (already speaks OpenAI's format). The **API-key** counterpart to the CLI plan's subscription path. Tier-1
-  + live OCR test.
-- **`archive-notes/`** — **PROPOSED** (NEW APP): a third native macOS app, **Archive Notes** —
-  provenance-first note-taking from archival PDFs (via Reader) + Zotero, at 100k-note / 2M-word scale.
-  Markdown+assets files (title=filename, UUID-folder identity), YAML front-matter metadata (no tag
-  pollution), purely-virtual folders + replication, WYSIWYG-over-Markdown editor, durable cross-app links
-  (root-marker + relative path; `archivereader://reveal` + `archivenotes://open`), extracts, templates.
-  Master plan + 8 wave plans live in `execution-plans/archive-notes/` (`00-overview.md` §16 = the
-  **authoritative interface contract**). Built over a long unattended run. See the **Archive Notes** queue below.
+- `openai-chatgpt-provider.md` — **READY (daemon-buildable), Processor**: add OpenAI/ChatGPT as a first-class
+  provider via (1) the **standard API** (native `LLMProvider.openai`, BYO OpenAI API key) and (2) an **OpenAI
+  gateway preset** over the existing OpenAI-compatible gateway. Reuses `OpenAICompatibleClient` (already speaks
+  OpenAI's format), so the code is build-verifiable at $0; the enum append stays append-only + opt-in. Tier-1.
+  The plan now carries a **Daemon build plan** splitting it into `W13.oai-1…3` (unattended, no key) + a keyed
+  live-OCR-test tail. → queued in the **Provider expansion (Wave 13)** section below.
+- `local-agent-cli-provider.md` — **READY (daemon-buildable), Processor**: drive OCR/tagging through a locally
+  installed, subscription-authenticated CLI — **Claude Code + Gemini CLI + OpenAI Codex CLI**, all first-class —
+  for enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. Additive `localAgent` config sibling to
+  the gateway (append-only, keeps resume-critical snapshots unchanged). Tier-2, but the whole gate is satisfiable
+  **unattended** via a committed fake-CLI harness ($0). The plan now carries a **Daemon build plan** splitting it
+  into `W13.cli-1…4` (unattended) + a keyed/entitlement tail (gemini/codex install; real-CLI live smoke — blocked
+  inside a Claude Code session by the nested-session guard). Claude path validated on-machine 2026-07-10.
+  → queued in **Provider expansion (Wave 13)** below.
+- ~~`archive-notes/` (00a, 01–08)~~ — **SHIPPED** (NEW APP: Archive Notes, W0–W8). The per-wave plans were
+  **deleted on ship** (git history keeps them). `execution-plans/archive-notes/00-overview.md` is **RETAINED** as
+  the authoritative interface contract (§2 locked decisions, §5 front-matter schema, **§16 Interface Contract**
+  cited by `ArchiveNotes/CLAUDE.md`). Cleanup item: fold §16 into `ArchiveNotes/CLAUDE.md` or promote to `SPEC/`,
+  then delete — see **Suite doc hygiene** below.
 - ~~`index-parallelization.md`~~ — **SHIPPED** (parallel+batched index build + bm25 ranked search +
   search-during-index refresh). Plan deleted.
 - ~~`index-pruning.md`~~ — **SHIPPED** (gated content-index pruning). Plan deleted.
@@ -56,9 +58,116 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
-## Archive Notes — NEW APP (planned 2026-07-10; `execution-plans/archive-notes/`)
-Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). Each wave maps to
-one or more bounded autonomous sessions (sub-tasks listed inside each wave file). DevonThink informs **only**
+## Provider expansion — Wave 13 (Processor; daemon-buildable) — queued 2026-07-16
+The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
+can build them: each sub-task below is **unattended, $0, no key, no GUI** (build clean + fake-CLI/unit tests +
+self-review), with the live-key verification split out to a **keyed/owner tail** (below) that is flagged to
+Morning Review, NOT skipped. Do top-to-bottom, one bounded sub-task per session. **OpenAI first (Tier-1, smaller,
+reuses the existing OpenAI-format client), then CLI (Tier-2).** New provider changes stay **additive + opt-in** —
+never flip the default provider until the keyed live test passes. Legend as above.
+
+**OpenAI / ChatGPT provider** (`execution-plans/openai-chatgpt-provider.md`; Tier-1; SHARED HOTSPOT = the
+persisted `LLMProvider` enum, append-only):
+- [ ] **W13.oai-1 — native provider wiring.** Append `case openai` to `LLMProvider` (append-only), add
+  `LLMModel.openaiModels` + the model-family param adapter (`max_completion_tokens`/no-`temperature`/
+  `reasoning_effort`), route `.openai` through the reused `OpenAICompatibleClient` at the ~6–8 switch sites.
+  ⚠️ Model IDs + pricing = clearly-marked `// VERIFY` placeholders (a wrong price is a silent estimator bug →
+  Morning Review). | files: Models/ProviderModels.swift, OCR/OCRProcessor+OCR.swift, OCR/LLMTextClient.swift,
+  OCR/LLMRotationDetector.swift, Models/KeychainHelper.swift | M | low | none
+- [ ] **W13.oai-2 — onboarding + validation + cost.** `ProviderKeySpec.openai` (+ `onboardable`),
+  `KeyValidator.validateOpenAI` (`GET /v1/models`), `ThinkingLevel → reasoning_effort`, `CostEstimator` rows
+  (placeholder-priced per above). | files: Models/ProviderKeySpec.swift, OCR/KeyValidator.swift, Models/CostEstimator.swift | S | low | none
+- [ ] **W13.oai-3 — gateway "OpenAI" preset + docs.** One-click preset prefilling base URL/model/cost (note:
+  custom base URL covers Azure OpenAI / proxies); update CLAUDE.md provider list + README. | files: Views/SettingsView.swift, docs | S | low | none
+
+**Local Agent CLI provider** (`execution-plans/local-agent-cli-provider.md`; Tier-2; fake-CLI harness makes the
+whole gate unattended-satisfiable at $0):
+- [ ] **W13.cli-1 — client + config + additive threading.** `OCR/LocalAgentClient.swift` (ocr + textCompletion)
+  + `Models/LocalAgentConfig.swift` (append-only) + thread `localAgent: LocalAgentConfig?` (default nil) beside
+  `gatewayConfig`. Tests: committed **fake-CLI** stub (canned JSON) + the **resume-safety decode** test (a
+  pre-change run snapshot still decodes, `localAgent` absent→nil). Tier-2, satisfiable unattended. | M | med | none
+- [ ] **W13.cli-2 — validator + Settings.** `OCR/LocalAgentValidator.swift` (`cliNotFound`/`cliNotLoggedIn`/
+  `cliEntitlementMissing`) + Settings controls (`useLocalAgent` XOR `useGateway`, tool picker, path, model,
+  additive DefaultsKeys, `?` help + gray-out). Detect+Verify live round-trip → GUI/Morning Review. | M | low | none
+- [ ] **W13.cli-3 — wizard + cost pane + pacing.** `LocalAgentSpec` (claude + gemini specs), cost pane
+  "Included in your subscription" branch, low concurrency cap (1–2) + usage-window handling. | S | low | none
+- [ ] **W13.cli-4 — pipeline wiring.** Prefer `localAgent` at the construction sites; skip batch + LLM-rotation
+  when active; extend `test-smoke.sh` to run the **fake-CLI** path (skip gracefully when no real CLI). | M | med | none
+
+**Keyed / owner tail (NOT daemon-buildable — flag to Morning Review, do not attempt unattended):** OpenAI live
+2-image OCR smoke through gateway + native `.openai` (owner supplies a key) and final model-ID/pricing
+verification; CLI `gemini`+`codex` install + entitlement confirmation (Phase 0) and the real-CLI live OCR smoke
+(the `claude` path can't run inside a Claude Code session — nested-session guard); OpenAI Batch API (Phase 4) +
+CLI persistent-`stream-json` perf (Phase 4). Land the build-verified code first; these gate final "shipped".
+
+## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
+Actionable open items pulled from the three `KNOWN_ISSUES.md` + the Processor streaming-residuals review, ordered
+by value. **Android straggler is first (HIGH).** Each notes what's daemon-buildable vs. the keyed/GUI verify tail.
+Legend as above.
+- [ ] **W14.1 — Android/iOS straggler: never finalize a partial segment [HIGH]** _(Processor KNOWN_ISSUES →
+  "Per-capture streaming — residual refinements" #1; focus path: Android + LAN)._ The data-loss guard already
+  ships (a straggler is never deleted), but a page still un-UPLOADED when `segment/complete` arrives is **not
+  auto-filed** — it lingers unfiled in the Captured pane. **Fix (both companions, kept in sync):** the phone
+  **defers `sendSegmentComplete`** (and `finishSession`'s `/session/complete`) until **every page of the segment
+  is confirmed `UPLOADED`** — record a pending-complete group, flush it when its last page hits `UPLOADED` from
+  BOTH the upload-success path and the auto-retry path. So the Mac never finalizes a partial segment. **Tier-2**
+  (Capture/Net, phone↔Mac protocol — no wire-format change: this is send-*timing*, not a new field). Daemon-buildable:
+  Android `./gradlew :app:assembleDebug` + iOS `xcodebuild` build-clean + adversarial self-review of the
+  defer/flush logic on both companions. **Keyed/owner verify tail:** the on-device / emulator E2E
+  (`scripts/e2e-phone-mac.sh`, needs a Gemini key + the `ap_test` emulator; XCUITest admin-prompt caveat) →
+  Morning Review. | files: ArchiveCapture/capture/CaptureViewModel.kt, ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift | M | med | none(build)/owner(E2E)
+- [ ] **W14.2 — Reader write-target identity re-verification (Safety §6) [MED]** _(Reader KNOWN_ISSUES →
+  "Deferred hardening")._ `TagWriter.mutate` writes to whatever file currently occupies the URL; a Finder
+  move/replace between Spotlight discovery and the write could apply the delta to the wrong file's tags. **Fix:**
+  capture a stable identity (security-scoped bookmark / `fileResourceIdentifierKey`) at discovery and **re-verify
+  the resolved URL's identity inside the `NSFileCoordinator` block before writing** — abort on mismatch. **Do NOT
+  request `.documentIdentifierKey`** (it mutates on read). **Tier-2** (TagWriter). Fully daemon-buildable +
+  unit-testable on scratch copies (extend the existing 191-test suite; never the real corpus). | files:
+  packages/ArchiveCore/.../Tags/TagWrite.swift, ArchiveReader Core/TagWriter.swift | M | med | none
+- [ ] **W14.3 — Notes: extract-paste imports inline-image BYTES [MED]** _(Notes KNOWN_ISSUES → "Extracts
+  create/copy-paste follow-ups")._ The copy side embeds image bytes and Create/Append persist them, but the live
+  extract-editor **paste** handler still inserts image *references* without importing the payload's bytes into the
+  extract's own `assets/` (and rewriting refs on name collision) — so a live copy→paste renders missing-asset
+  placeholders until re-saved via Create/Append. **Fix:** in `MarkdownEditorView.handlePassagePaste` →
+  `ExtractBuilder.pastedExtractMarkdown`, import the `com.archivenotes.passage` payload bytes into the extract's
+  `assets/` (reuse `ItemAssetStore` reserve→write; no-overwrite guard) and rewrite refs on collision. Store +
+  payload bytes both already exist. **Tier-1/2** (writes to the Notes store — scratch-testable). Daemon-buildable +
+  unit-testable (`ExtractBuilder`/`ItemAssetStore` tests); GUI copy→paste drive → Morning Review. | files:
+  ArchiveNotes/.../Editor/MarkdownEditorView.swift, Core/ExtractBuilder.swift | M | low | none
+- [ ] **W14.4 — Notes W7 polish cluster [LOW]** _(Notes KNOWN_ISSUES → W7-S2/S3/S4 follow-ups)._ Small, mostly
+  independent: (a) **trivial warning** — `Core/NotePassageSource.swift:118` "conditional cast … always succeeds"
+  (pure daemon fix, no GUI); (b) programmatic **window-raise + select** on Create-Extract and on Jump-to-Source
+  (select+scroll already works; only `orderFront`/focus is missing — needs a shared open-request channel; GUI
+  verify); (c) chip **reactive title** refresh (today refreshes only on re-style); (d) per-window **Sources column**
+  visibility (today always present). Do (a) standalone now; (b)–(d) build-verifiable, GUI drive → Morning Review.
+  **Tier-1.** | files: ArchiveNotes/.../Core/NotePassageSource.swift, NotesModel.swift, Views/* | S | low | none
+- [ ] **W14.5 — Processor legacy staging-manifest rotation review [LOW, do last]** _(Processor KNOWN_ISSUES #1;
+  cannot recur for current-build sessions — only legacy manifests restore `staged` without `retained`)._ Fix
+  option 1 (cleanest per the write-up): on legacy-manifest recovery, **drop those segments from
+  `staged`/`finalizedGroups`** so they re-process from scratch (re-OCR + re-tag → proper `retained`), giving a
+  complete rotation review. **Do NOT** naively "show all staged pages" — regenerating a legacy page seeded at 0°
+  would *un-rotate* an auto-rotated page (strictly worse). **Verify needs a legacy manifest + an OCR key to
+  reprocess → keyed/owner**; the recovery-branch code change is build-verifiable. LOW value. | files:
+  Capture/LiveCaptureProcessor.swift (loadStagingManifest / finishSession) | S | low | owner(verify)
+
+**Parked — explicitly NOT a Wave-14 work item:** Processor cloud/relay **post-finalize reclassify → duplicate
+output** (A11, MED, Drive-milestone) lives entirely in the **Google-Drive relay path**, which is **ON HOLD /
+maintain-only** (see §Project focus). Leave parked until the Drive milestone is un-held; do not build it unattended.
+
+## Suite doc hygiene (owner / small) — 2026-07-16
+- [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
+  `SPEC/`, then delete the plan.** The per-wave Notes plans shipped + were deleted; `00-overview.md` is retained
+  only because §2/§5/§16 are still cited by `ArchiveNotes/CLAUDE.md`. Doc-only; Tier-1. | S | low | none
+- **Owner note (not a daemon item):** 4 stray sibling worktrees (`suite-wt-20260714-174815-…`,
+  `-20260714-224217-…`, `-20260715-002837-…`, `-20260715-194019-…`) are **merged to origin/main but hold
+  uncommitted WIP** (Notes GUI-test-harness scratch files) — the daemon flagged them "manual review." Salvage or
+  discard by hand, then `git worktree remove`. The `~/Documents/GPT/archive-suite-processor-fixes` worktree is a
+  different agent's (Codex) — leave it.
+
+## Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained)
+Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). **All waves shipped;
+the per-wave plans (`00a`, `01`–`08`) were deleted on ship** (git history + the W0–W8 `[x]` records below are the
+account); only `00-overview.md` is retained as the authoritative interface contract. DevonThink informs **only**
 the 3-pane browsing shell — everything else (note appearance, link/provenance UI, replication semantics) is
 purpose-built for the historian's provenance-first workflow. **Owner decision points (early):** (a) **R13d** —
 the `ArchiveSuite` *exclusion* effect is deferred to the later behavior/data follow-on (see `00 §2` call-out).

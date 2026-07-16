@@ -196,12 +196,50 @@ this machine; both are entitlement-gated, see Risks):
 - **Cost pane** — the returned `usage` + `total_cost_usd`, plus `--max-budget-usd`, feed the
   "drawn from subscription" estimate.
 
+## Daemon build plan (bounded sessions — what's unattended vs. what needs a key/owner)
+
+**The point of this section:** an unattended daemon cannot install a CLI, obtain an entitlement, or launch
+`claude` from inside its own Claude Code session (the `CLAUDECODE` nested-session guard). But **almost all of
+the code is buildable + testable at $0 with no key and no GUI** via the fake-CLI harness. So the plan splits
+cleanly into daemon-buildable sessions and a small keyed/owner verification tail. **Do the sessions top-to-bottom,
+one per fresh session; each is a bounded, checkpoint-committable unit.** SUITE_TODO tracks these as `W13.cli-1…4`.
+
+Daemon-buildable (unattended, $0, no key, no GUI — build clean + fake-CLI unit tests + self-review):
+- **`W13.cli-1` — client + config + additive threading (Phase 1).** `OCR/LocalAgentClient.swift` (the two
+  methods) + `Models/LocalAgentConfig.swift` (append-only; SHARED-HOTSPOT discipline) + thread the companion
+  `localAgent: LocalAgentConfig?` (default `nil`) beside `gatewayConfig` per Design decision 2. Tests: a **fake
+  CLI** (a committed shell stub echoing canned JSON — same spirit as the FileRelay stand-in) drives
+  `LocalAgentClient` deterministically; **plus the resume-safety test** — a run snapshot serialized *before* this
+  change still decodes with `localAgent` absent → `nil`. **Tier-2** (OCR core + resume snapshot), but the whole
+  gate is satisfiable unattended (byte-level decode test + fake-CLI functional test). Build clean, 0 new warnings.
+- **`W13.cli-2` — validator + Settings (Phase 2a).** `OCR/LocalAgentValidator.swift` (`cliNotFound` /
+  `cliNotLoggedIn` / `cliEntitlementMissing` + reuse `.rateLimited`/`.offline`/`.providerBusy`; plain-English,
+  never raw stderr) + the Settings controls (`useLocalAgent` mutually exclusive with `useGateway`, tool picker,
+  path override, model field, additive `DefaultsKeys`, `?` help + gray-out per the settings-UX convention).
+  Build-verifiable; the **Detect+Verify live round-trip and the visual gray-out are GUI/owner → Morning Review.**
+- **`W13.cli-3` — wizard + cost pane + pacing (Phase 2b).** `LocalAgentSpec` analog carrying the `claude` +
+  `gemini` specs, cost-pane "Included in your subscription — usage limits apply" branch, and the dedicated
+  low concurrency cap (1–2) + usage-window handling (bypasses the `NetworkSession` HTTP limiter). Build-verifiable.
+- **`W13.cli-4` — pipeline wiring (Phase 3, code half).** Prefer `localAgent` at the ~3–4 construction sites;
+  **skip batch + LLM-rotation when active** (same as gateway). Extend `test-smoke.sh` to exercise this path via
+  the **fake CLI** (and to *skip* gracefully when no real CLI is detected). Build clean; fake-CLI e2e green.
+
+Keyed / owner tail (NOT daemon-buildable — flag to Morning Review, do not guess):
+- **Phase 0 for `gemini` + `codex`** — install + confirm entitlement (Gemini needs *Code Assist*/API, not the
+  chat-app tier; Codex needs the workspace admin to enable "Sign in with ChatGPT"). Owner/device.
+- **Real-CLI live OCR smoke** — the `claude` path is validated (2026-07-10) but a *live* end-to-end run must be
+  driven **outside** a Claude Code session (the nested-session guard) → owner/keyed session, or after the CLIs
+  above are entitled.
+- **Phase 4 (optional perf)** — persistent `stream-json` session. Deferred; own follow-up when perf matters.
+
 ## Verification & tiering
 
 - **Tier-2.** Touches the OCR core and the run-config snapshot that crash-resume decodes. The additive
   design keeps the snapshot encoding unchanged, so the focused functional test is: **an in-flight run
   started before the upgrade still resumes** (decodes cleanly with the new `localAgent` field absent). The
-  fake-CLI harness makes `LocalAgentClient` deterministically testable at $0.
+  fake-CLI harness makes `LocalAgentClient` deterministically testable at $0 — so the Tier-2 gate is fully
+  satisfiable **unattended** for `W13.cli-1…4` (adversarial self-review of the threading + decode + fake-CLI
+  functional test); only the real-CLI live smoke is deferred to the keyed/owner tail above.
 - **Tier-1** every commit as usual (build clean / no new warnings / self-review).
 
 ## Risks & unknowns
