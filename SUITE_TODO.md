@@ -249,11 +249,23 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   / `window.backgroundColor` override. **Human visual dark-mode spot-check deferred → Morning Review** (the Processor
   GUI can't launch unattended — blocking login-Keychain prompt; no Processor XCUITest harness). | files (audited):
   Views/* (all), Views/ProcessingCommands.swift | S | low | none | done
-- [ ] **Incremental processing (skip already-processed files)** _(promoted 2026-07-15)_ — re-running a directory
-  should process only new/changed files instead of redoing everything (matters at 150k scale). Choose the skip key
-  deliberately (an existing output PDF at the destination + source mtime) and **fail safe: when in doubt, PROCESS**
-  — never silently skip a file that needed processing. **Tier-2** (a wrong skip = silently missing output).
-  | files: OCR/OCRProcessor+Pipeline.swift, Views/OCRView.swift | M | med | none
+- [x] **Incremental processing (skip already-processed files)** _(promoted 2026-07-15; SHIPPED 2026-07-16)_ —
+  re-running a directory now processes only new/changed files instead of redoing everything (matters at 150k scale).
+  Skip key = the owner-specified one: an existing `<output>/<base>.pdf` whose mtime is no older than the source.
+  **Fail safe: when in doubt, PROCESS** — never silently skip a file that needed processing. **Tier-2** (a wrong
+  skip = silently missing output). | files: OCR/OCRProcessor+Pipeline.swift, Views/OCRView.swift | M | med | none
+  — **DONE:** new pure `OCR/IncrementalSkip.swift` (`partition(inputs:outputDirectory:)`) is the safety-critical
+  decision core; skips a source ONLY when its base name is unique among inputs, the candidate `<out>/<base>.pdf`
+  is a distinct file (not the source itself), exists as a regular file, both mtimes are readable, and source
+  mtime ≤ output mtime — every ambiguity falls through to PROCESS. Opt-in toggle `DefaultsKeys.skipAlreadyProcessed`
+  (default OFF, Settings ▸ Input & Processing; also a `ProcessingProfile` key). Filtered at the top of
+  `startProcessing` and confined to plain per-file output (skipped for Live Capture pre-grouped handoffs,
+  collection-organized, and merged runs, where an output can't be attributed to one source — a safe no-op there);
+  the skipped count is surfaced in the completion status, and an all-skipped run finishes with a clear
+  "nothing to do". **Tier-2 verified** (no-key Processor): headless `$0` `scripts/test-incremental-skip.sh`
+  (`IncrementalSkipTestDriver`, INCREMENTAL_SKIP_TEST=1) — **13/13 PASS** across every fail-safe branch,
+  mktemp-isolated (never the corpus) — plus adversarial diff review + build clean, 0 new warnings. GUI visual
+  check (toggle + status line) deferred → Morning Review (Processor GUI launch = blocking login-Keychain prompt).
 
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
 - [ ] **Remove the phone "Finish" button** _(owner decision 2026-07-15 — "get rid of it")_ — the phone's **Finish**

@@ -14,6 +14,7 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
+    @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
@@ -1009,6 +1010,7 @@ struct OCRView: View {
                 reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
                 reOCRMultiPagePDF: reOCRMultiPagePDF,
+                skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,
                 gatewayConfig: gateway
             )

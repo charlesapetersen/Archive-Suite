@@ -48,6 +48,7 @@ struct SettingsView: View {
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
+    @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
     @AppStorage(DefaultsKeys.standardImageSizeMB) private var standardImageSizeMB: Double = 3.0
@@ -426,6 +427,12 @@ struct SettingsView: View {
                 }
             }
             .disabled(useGateway || preOCRedInput || reOCRMultiPagePDF)
+            Toggle(isOn: $skipAlreadyProcessed) {
+                HStack {
+                    Text("Skip already-processed files")
+                    HelpButton(text: "On a re-run, skip any input whose output PDF already exists in the output folder and is no older than the source — so re-running a directory only processes new or changed files (helpful at large scale). Fails safe: whenever anything is ambiguous (a base name shared by two inputs, an unreadable modification date, or a source changed since its output) it processes the file rather than risk a silent miss. Applies to plain per-file output only — it is ignored for collection-organized or merged runs, where an output can't be reliably matched back to one source.")
+                }
+            }
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Image resolution")

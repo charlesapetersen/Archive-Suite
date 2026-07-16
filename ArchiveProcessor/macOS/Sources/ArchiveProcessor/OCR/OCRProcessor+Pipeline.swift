@@ -961,10 +961,34 @@ extension OCRProcessor {
         reviewDocumentSegmentation: Bool = false,
         preOCRedInput: Bool = false,
         reOCRMultiPagePDF: Bool = false,
+        skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil
     ) async {
         guard !files.isEmpty else { return }
+
+        // Incremental processing: drop inputs whose output PDF already exists at the destination and is
+        // no older than the source (the owner-specified skip key). Confined to plain per-file output —
+        // NOT a Live Capture pre-grouped handoff (its file count must match the boundary arrays), and
+        // NOT collection-organized or merged runs (there the output isn't a stable top-level
+        // <out>/<base>.pdf, so the check can't reliably attribute an output to a source). In every other
+        // mode this is a safe no-op. IncrementalSkip is conservative: any ambiguity → PROCESS, so a
+        // re-run can never silently miss a file that needed output.
+        var files = files
+        var incrementalSkipped = 0
+        if skipAlreadyProcessed && preGroupedBoundaries.isEmpty
+            && !enableCollectionSegmentation && !mergeDocuments {
+            let decision = IncrementalSkip.partition(inputs: files, outputDirectory: outputDirectory)
+            incrementalSkipped = decision.skipped.count
+            files = decision.toProcess
+            guard !files.isEmpty else {
+                jobs = []; failedFiles = []; segments = []; collectionSegments = []
+                progress = 1.0
+                statusMessage = "All \(incrementalSkipped) file(s) already processed — nothing to do."
+                return
+            }
+        }
+
         isProcessing = true
         failedFiles = []
         segments = []
@@ -1242,6 +1266,9 @@ extension OCRProcessor {
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        if incrementalSkipped > 0 {
+            statusMessage += " \(incrementalSkipped) already-processed skipped."
+        }
         if enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
         }

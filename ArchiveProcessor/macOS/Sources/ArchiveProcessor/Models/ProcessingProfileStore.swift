@@ -82,6 +82,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.batchMode, def: .bool(false)),
         .init(key: DefaultsKeys.preOCRedInput, def: .bool(false)),
         .init(key: DefaultsKeys.reOCRMultiPagePDF, def: .bool(false)),
+        .init(key: DefaultsKeys.skipAlreadyProcessed, def: .bool(false)),
         .init(key: DefaultsKeys.ocrWorkerCount, def: .int(4)),
         .init(key: DefaultsKeys.imageResolutionPercent, def: .double(100)),
         .init(key: DefaultsKeys.standardImageSizeMB, def: .double(3.0)),
