@@ -1,0 +1,234 @@
+# Archive Notes — Gap-Closure Execution Plan (post-ship reconciliation)
+
+**Status: PROPOSED** · Created 2026-07-16 · Owner: (unassigned)
+
+This plan closes the deltas found by a complete plan-vs-build review of the Archive Notes plan set
+(`execution-plans/archive-notes/00-overview.md` + `00a` + `01`–`08`) against the shipped source under
+`ArchiveNotes/macOS/`. Waves W0–W8 are all marked `[x]` in `SUITE_TODO.md`; the review confirmed the
+build is **substantially complete and data-safe** (all five tag-safety invariants, the delete-last-instance
+guard, atomic writes, and autosave/flush are clean), but a set of deliverables that the plans promised —
+and that the checkboxes imply shipped — are **absent, partial, or built-but-unwired**. Nothing here is a
+data-safety defect; the largest items are *dead library code that never got its UI entry point*.
+
+Severity legend: **HIGH** (headline feature unreachable) · **MED** (real feature/tooling gap) ·
+**LOW** (polish/coverage/cosmetic) · **DOC** (tracker/doc hygiene).
+
+---
+
+## Summary of gaps by phase
+
+| Phase | Theme | Items | Top severity |
+|---|---|---|---|
+| A | Doc & tracker reconciliation | A1–A10 | DOC |
+| B | Wire the built-but-dead features | B1–B7 | HIGH |
+| C | Safety-net & regression tooling | C1–C5 | MED (functional) |
+| D | Secondary UI affordances & polish | D1–D12 | LOW–MED |
+| E | Verification review (confirm A–D actually shipped + wired) | E1–E4 | — |
+
+Recommended order: **A** (cheap, clears the "docs move with the code" debt and stops the checkboxes from
+lying) → **B** (restores the headline value that's already 90% built) → **C** (re-arms the guards that keep
+the corpus safe) → **D** (polish, as budget allows) → **E** (verify every closed item is real, then retire
+this plan). Each item is independently shippable in its own worktree per the repo loop; Tier per item below.
+
+---
+
+## Phase A — Doc & tracker reconciliation (DOC; do first, one commit each or batched)
+
+**A1. Write `ArchiveNotes/README.md`.** — planned in `01` S5 Files + layout sketch; never existed.
+- *Files:* NEW `ArchiveNotes/README.md`. *Steps:* mirror `ArchiveReader/README.md` / `ArchiveProcessor/README.md` (what the app is, build/run via `./launch.sh notes` + `bootstrap.sh`, pointer to `CLAUDE.md`/`GUI_SAFETY.md`). *Verify:* prose review; links resolve. *Tier-1. Done:* file exists; matches peer-app README shape.
+
+**A2. Add Archive Notes to the root `README.md`.** — root README currently has zero mention of Notes (describes a two-app suite).
+- *Files:* `README.md`. *Steps:* add the third app to the suite intro + any app list/table. *Verify:* prose review. *Tier-1.*
+
+**A3. Decide & resolve `ArchiveNotes/AGENTS.md`.** — planned in `01` S5 Files; absent. Peers have one; root `AGENTS.md:5` routes readers to `ArchiveNotes/CLAUDE.md` instead (worked around).
+- *Files:* NEW `ArchiveNotes/AGENTS.md` **or** an explicit note in `CLAUDE.md`/root `AGENTS.md` folding the lane in. *Steps:* either create the app-local lane doc like the peers, or record the decision to keep it in root `AGENTS.md` and fix the plan's expectation. *Verify:* the routing in root `AGENTS.md` matches reality. *Tier-1.*
+
+**A4. Complete the SPEC `ArchiveSuite` marker delta.** — `01` S5/§6: the facet-table row landed (`SPEC/tag-format.md:71`), but the dedicated prose section and the change-protocol relaxation note did not.
+- *Files:* `SPEC/tag-format.md`. *Steps:* add the "### Suite membership marker (`ArchiveSuite`)" section (Class / Cardinality / Parse-order / **Deferred: not consumed by Reader/Processor in run 1**); add the additive/read-only exception note to "Divergence risk & change protocol" (~line 205) explaining why this landed without a three-way change. *Verify:* delta is strictly additive; no existing rule altered. **Tier-2** (SPEC change — adversarial prose review).
+
+**A5. Shipped execution plans — DONE (`78e9b46`).** The per-wave plans (`00a`, `01`–`08`) were pruned on ship; only `00-overview.md` is retained (the authoritative interface contract) alongside this plan.
+- *Remaining verify (folds into E4):* confirm nothing in `SUITE_TODO.md`/docs points at a deleted plan file, and that `00-overview.md` + `09-gap-closure.md` are the only files left under `execution-plans/archive-notes/`. *Tier-1.*
+
+**A6. Fix stale `SUITE_TODO.md` entries.** — W1's "S5 docs" reads shipped despite A1–A4; line ~485 has a stale "ArchiveCore extraction … deferred, 2026-07-08" contradicting W0 `[x]`.
+- *Files:* `SUITE_TODO.md`. *Steps:* correct the W1 docs note to cite what actually shipped (and reference this plan for the remainder); remove the stale deferred line; add an index entry for this plan. *Verify:* every `[x]` matches reality. *Tier-1.*
+
+**A7. Refresh both apps' `CLAUDE.md` Implementation Maps for the ArchiveCore move (W0 doc-sync).** — `ArchiveReader/CLAUDE.md:~324` still lists `DocumentTags`/`TagReading`/`TagEditing`/`PDFFormatStatus` under `Core/` ("package-ready → future ArchiveCore"); `ArchiveProcessor/CLAUDE.md:~251` hotspot list stops at "the two `project.yml` files."
+- *Files:* `ArchiveReader/CLAUDE.md`, `ArchiveProcessor/CLAUDE.md`. *Steps:* move the shared types to an ArchiveCore section; add the "TagWriter/MacOSTagger delegates to `ArchiveCore.CoordinatedTagWriter`" safety note; list the `packages/ArchiveCore` build lane. *Verify:* maps match the tree. *Tier-1.*
+
+**A8. Add `ArchiveNotes/SMOKE_TEST.md`.** — `08` S9 Files lists it; Reader has one, Notes doesn't (purpose currently served by the `test-smoke.sh` header + `CLAUDE.md` + `GUI_SAFETY.md`).
+- *Files:* NEW `ArchiveNotes/SMOKE_TEST.md`. *Steps:* mirror `ArchiveReader/SMOKE_TEST.md`, cross-referencing `GUI_SAFETY.md` and the scratch-only rule. *Verify:* cross-refs resolve. *Tier-1.*
+
+**A9. Drop `@testable` from `DocumentTagsTests`.** — `01` S1 Verify required plain `import ArchiveCore` (types are `public`); `packages/ArchiveCore/Tests/ArchiveCoreTests/DocumentTagsTests.swift:2` still uses `@testable`.
+- *Files:* that test. *Steps:* change to `import ArchiveCore`; `swift test` still green. *Verify:* package tests pass. *Tier-1.*
+
+**A10. Confirm doc-sync hook covers `packages/`.** — the W0 plan asked to prove the doc-sync backstop fires for a package outside both app dirs; `.claude/hooks/docsync-*.sh` contain no `packages/ArchiveCore` reference.
+- *Files:* `.claude/hooks/docsync-*.sh` (+ their config). *Steps:* verify/extend scope so a `packages/ArchiveCore` code change without a doc touch is caught. *Verify:* a dry-run trips the hook. **Tier-2** (autonomous-setup change — prove the mechanism before install).
+
+---
+
+## Phase B — Wire the built-but-dead features (the high-value core)
+
+These are the review's headline finding: substantial, well-tested subsystems that ship in the binary but
+have **no UI entry point**, so a `[x]` overstates them. Most of the work is wiring, not new subsystems.
+
+**B1. Zotero auto-fill action — fetch + confirmation sheet + write.** — **HIGH** — `05` S3/S4/D.5.
+`ZoteroClient.fetchCSL`/`fetchCitation`, `ZoteroAutoFillModel`, `AutoFillPlan` are complete and tested but
+never called outside tests; there is no menu command and zero `.sheet(` in `Sources/`.
+- *Files:* `ArchiveNotes/.../ArchiveNotesCommands.swift`, `.../Editor/EditorFormatting.swift`, `.../Zotero/ZoteroAutoFillModel.swift`, a new confirmation sheet view, `.../Views/NoteEditorPane.swift`.
+- *Steps:* add `Note ▸ Auto-fill from Zotero` (and/or a chip button) that resolves the focused/attached `ZoteroRef` → `client.fetchCSL` → builds `AutoFillPlan` → presents a `ZoteroAutoFillModel`-backed confirmation sheet (fill-empty policy) → saves via the audited store path. Route citation through `fetchCitation(styleID:)` so `zoteroCSLStyleID` (D2) takes effect.
+- *Verify:* with a stub transport (as in `ZoteroLocalServerTests`), the command fetches, the sheet shows the diff, Confirm writes front-matter, Cancel is a no-op; Zotero-down degrades gracefully. **Tier-2** (writes note front-matter). *Done:* `ZoteroAutoFillModel` reachable from the UI; `zoteroCSLStyleID` observably affects output.
+
+**B2. Note-level Zotero citation chips + an attach-at-note-level path.** — **HIGH/MED** — `05` S4/D.5.
+`ZoteroChipView` is defined and presentation-tested but never instantiated, and nothing in production writes
+`item.zotero`.
+- *Files:* `.../Zotero/ZoteroChipView.swift`, `.../Views/NoteMetadataInspector.swift` (or `LocationsInspector`), `.../Editor/EditorFormatting.swift`.
+- *Steps:* render `ZoteroChipView` for `selectedItem.zotero` in the inspector; add an "attach at note level" path (extend "Attach Zotero Link…" or a new inspector affordance) that populates `item.zotero` via `mutateItem`. Feed the clipboard-detect dedup the note's existing links (fixes the empty-`attachedLinks` banner, D-item).
+- *Verify:* attaching a ref shows a note-level chip; the chip's spinner/⚠︎ states exercise via stub. **Tier-2** (front-matter write). *Done:* S4 "chips clickable at note **and** block level" met.
+
+**B3. Add note retitle + tag editing.** — **MED** — overview §16.1. No `setTitle`/`setTags` exist; the
+metadata inspector edits only date/quality; the table tags column is read-only and its comment falsely
+claims editing lives in the inspector.
+- *Files:* `.../Core/NotesModel.swift` (+`mutateItem`), `.../Views/NoteMetadataInspector.swift`, `.../Views/NotesTableView.swift` (comment), optionally `.../Views/NotesContextMenu.swift`.
+- *Steps:* add `setTitle(_:to:)` and `setTags(_:to:)` on `NotesModel` routed through the audited `mutateItem` path; `setTitle` triggers the store's title→filename re-sync; `setTags` must run the front-matter write **and** `NotesTagProjector` so Finder tags stay in sync (Tier-2 write seam). Add a title field + a tag editor to the inspector; correct the `NotesTableView` comment.
+- *Verify:* rename persists + renames the `.md`; tag edits update front-matter *and* the projected Finder tags with all safety invariants (assert on a scratch store). **Tier-2** (tag projection + rename). *Done:* a note can be retitled and re-tagged in-app; `NotesTagProjectorSafetyTests`-style assertions extended.
+
+**B4. Wire page-thumbnail rendering end-to-end.** — **MED** — `04` S2/S4/S6. `PDFThumbnailer` +
+`ThumbnailImageCache` are built/tested but never instantiated; Reader passes `thumbnailer: nil` at every
+`ArchiveLinkWriter` site, and Notes has no render-on-demand fallback on paste.
+- *Files (Reader):* `ArchiveReader/.../Core/ArchiveLinkWriter.swift`, `.../Views/NavigationModel.swift:~1028`, `.../Views/DocumentViewerModel.swift:~220`. *Files (Notes):* `.../Editor/MarkdownEditorView.swift` (`handleSourceBlockPaste`), `.../Views/ThumbnailImageCache.swift`.
+- *Steps:* instantiate a shared `PDFThumbnailer` in Reader and pass it to `ArchiveLinkWriter.pageLink` (populate `thumbPNGBase64`) — including the batch "Copy Archive Link(s)" path, which currently hardcodes `nil`. In Notes, when a pasted page-entry has `thumbnailData == nil`, resolve within granted scope and render via `PDFThumbnailer`, else skip (as planned).
+- *Verify:* the W8 acceptance "paste from Reader → source block with a live thumbnail" passes; cache LRU/eviction exercised. **Tier-2** (spans both apps + the Reader copy path). *Done:* pasted page-links show a rendered thumbnail; `PDFThumbnailer` has a production caller.
+
+**B5. Consume `archivenotes://open` to select/raise the note.** — **MED** — `04` S5. `NotesDeepLinkRouter.pendingOpen`
+is published but nothing observes it, so an external `archivenotes://open?id=<uuid>` activates the app
+without selecting the note.
+- *Files:* `.../Links/NotesDeepLinkRouter.swift`, `.../ArchiveNotesApp.swift`, `.../Views/NotesBrowserView.swift` (or the nav model).
+- *Steps:* add a consumer that observes `pendingOpen`, selects the id in the list, raises the Notes window, then `clearPending`. Reuse the W7 `NotesModel.openItem` jump channel if convenient, but drive it from the router.
+- *Verify:* `open "archivenotes://open?id=<known-uuid>"` selects the item (fixture-based). **Tier-1** (read/navigation only). *Done:* the plan's inbound-link GUI criterion + the Scrivener round-trip target are met.
+
+**B6. Embed image bytes on the extract command path.** — **MED** — `07` S1/S2. `EditorFormatting.makeNotePassageSource`
+passes `assetStore: nil` though `ItemAssetStore` (W7-S5) shipped, so ⌘⌥E Create-Extract / Append copy the
+`![](assets/…)` reference without the bytes → dangling image refs in the new extract.
+- *Files:* `.../Editor/EditorFormatting.swift` (`FormattingContext`, `makeNotePassageSource`), `.../Views/NoteEditorPane.swift:~249` (has the store).
+- *Steps:* thread the source note's `ItemAssetStore` into `FormattingContext` and on into `makeNotePassageSource` so the builder's byte-copy runs (the copy→paste path already does this correctly).
+- *Verify:* a menu-created extract from a passage with an inline image has its own `assets/` copy (snapshot-independent, D7); source never mutated. **Tier-1** (uses audited store; no new write surface). *Done:* image passages via the menu embed bytes.
+
+**B7. Wire guided root re-grant.** — **MED** — overview G1. `ReaderLinkResolver.grantAndResolve` is
+code-complete and tested but only tests call it; when a source's root has moved, the preview popover only
+tells the user to open Reader.
+- *Files:* `.../Views/ReaderPreviewPopover.swift`, `.../Links/ReaderLinkResolver.swift`, `.../Links/ReaderRootStore.swift`.
+- *Steps:* on `needsRootGrant`/`renamedCandidate`, offer an in-app folder-picker that calls `grantAndResolve` (GUID-verified), persists the security-scoped bookmark, and retries resolution.
+- *Verify:* moving a fixture root then choosing it re-resolves the link; wrong-folder is rejected. **Tier-2** (security-scoped bookmark grant). *Done:* a moved source can be re-granted without leaving Notes.
+
+---
+
+## Phase C — Safety-net & regression tooling (MED/functional; re-arms the guards)
+
+**C1. Add the `archivecore` smoke/regression step.** — **MED (functional)** — `00a` S1. The 100 ArchiveCore
+tests run only via a manual `swift test`; nothing in the gate runs them.
+- *Files:* root `test-smoke.sh`. *Steps:* add an `archivecore` case running `swift test` in `packages/ArchiveCore`; include it in `all` (before the apps that depend on it). *Verify:* `./test-smoke.sh archivecore` passes; `all` runs it. *Tier-1.*
+
+**C2. Create the Processor write-surface lint.** — **MED (functional)** — `00a` S5. No
+`ArchiveProcessor/scripts/lint-write-surface.sh` exists.
+- *Files:* NEW `ArchiveProcessor/scripts/lint-write-surface.sh`. *Steps:* mirror Reader's; ban `setResourceValue(s)`/`setxattr` over `ArchiveProcessor/macOS/Sources`, allow-list `PDFDocument.write` in `PDFGenerator.swift`/`mergeDocumentPDFs`. *Verify:* clean on current tree; trips on a planted violation. **Tier-2** (guards the irreplaceable-data write path).
+
+**C3. Extend the write-surface / UI-import lint to ArchiveCore (and run it on Notes).** — **MED (functional)** —
+`00a` S3 + `08` §1.3. The Reader lint scans only Reader; it never scans `packages/ArchiveCore` and has no
+`import SwiftUI|AppKit` guard — which is why `packages/ArchiveCore/.../Thumbnails/PDFThumbnailer.swift:4`
+imports AppKit into the UI-free Core uncaught. The Notes sources were also never linted.
+- *Files:* `ArchiveReader/scripts/lint-write-surface.sh` (or a shared lint), a Notes lint invocation.
+- *Steps:* scan `Sources/ArchiveCore` — write API only in `TagWrite.swift`, and **no** `import SwiftUI|AppKit`; add a Notes scan. Then decide `PDFThumbnailer`'s AppKit dependency: either move it behind a Core-safe boundary / into an app target (see §16.7 deviation) or carve a documented exception.
+- *Verify:* lint flags the current `PDFThumbnailer` AppKit import (then the chosen fix clears it); Notes scan clean. **Tier-2.**
+
+**C4. Scope the Notes smoke gate to unit tests.** — **MED** — `08` §2. `ArchiveNotes/test-smoke.sh` runs
+`xcodebuild test -scheme ArchiveNotes` without `-only-testing:ArchiveNotesTests`, so the GUI target is built
+and (if the fixture is present) driven by the "free" gate.
+- *Files:* `ArchiveNotes/test-smoke.sh`. *Steps:* add `-only-testing:ArchiveNotesTests`; keep the GUI target opt-in. *Verify:* the smoke run no longer invokes `ArchiveNotesUITests`. *Tier-1.*
+
+**C5. (Optional) Fix the tag-projector concurrent lost-update race.** — **LOW-MED (documented)** — `08` S2 /
+`KNOWN_ISSUES.md`. Two concurrent same-file projections can drop a subject; not currently triggered because
+the projector isn't driven concurrently. Only worth doing if B3 (or any future feature) can enqueue
+concurrent projections for one item.
+- *Files:* `.../Core/NotesTagProjector.swift`. *Steps:* serialize per-item projection (e.g., an item-keyed actor/queue) so the read-modify-write is atomic; restore the plan's `concurrentProjectionsNeverCorrupt` "loses nothing" assertion. *Verify:* the strengthened concurrency test passes on a scratch store. **Tier-2.** *Done:* KNOWN_ISSUES entry closed.
+
+---
+
+## Phase D — Secondary UI affordances & polish (LOW–MED; as budget allows)
+
+Each is small and independently shippable; Tier-1 unless noted.
+
+- **D1. Folder move/reorder & drag-to-reparent UI** (MED) — `06` S2. Wire `.onMove` (sibling reorder) + folder-onto-folder drop → `model.moveFolder` (cycle-guard exists). *Files:* `.../Views/NotesFolderTreeView.swift`.
+- **D2. Flesh out the item-row context menu** (LOW-MED) — `06` S3. Add Open / Reveal in Finder / New from Template / Set Quality ▸ / Delete… (Copy Archive Link stays W4). *Files:* `.../Views/NotesContextMenu.swift`.
+- **D3. Template body editing in-app** (LOW-MED) — `06` S6. Route template selection through `NoteStore` template load/save into `NoteEditorPane`. *Files:* `.../Views/TemplatesManagerView.swift`.
+- **D4. Quality quick-edit** (LOW) — `06` S7. Add the inline borderless quality `Menu` (None + 5–1) to the list/detail cell and a context-menu "Set Quality ▸". *Files:* `.../Views/QualityControl.swift`, `NotesTableView.swift`.
+- **D5. Raise/select a newly created extract** (LOW-MED) — `07` S2. `createExtract` returns an id; raise `NotesWindowID.extracts` and select it. *Files:* `.../Editor/EditorFormatting.swift`, `.../Core/NotesModel.swift`.
+- **D6. `roundup` date field: UI or removal** (LOW-MED) — overview/`06`–`07`. Field persists + round-trips but has no UI and is always `false`. Either add the "round to year / circa" affordance in the date inspector or remove the field + its codec handling. *Files:* `.../Views/NoteMetadataInspector.swift`, `.../Store/Item.swift`, `FrontMatterCodec.swift`.
+- **D7. Raw→styled parse-failure banner / stay-in-raw** (LOW) — `03` §6. Detect a genuine parse failure in `switchMode` and surface the non-destructive banner instead of degrading silently. *Files:* `.../Editor/MarkdownEditorView.swift`.
+- **D8. Empty-state UI** (LOW) — overview G2. Add an empty state for an empty note list / empty folder. *Files:* `.../Views/NotesBrowserView.swift`.
+- **D9. Smart-folder live match-count badge** (LOW) — `06` S2/S3. Compute the count for smart rows (search already exists). *Files:* `.../Core/NotesFolderNode.swift`, `NotesFolderTreeView.swift`.
+- **D10. Extract inspector provenance summary** (LOW) — `07` S4. Detail-pane list of distinct source notes + counts (aggregate count column already exists). *Files:* `.../Views/NoteMetadataInspector.swift` / a new inspector section.
+- **D11. Editor large-paste off-main parse** (LOW-MED perf) — `03` S6. `MarkdownBridge` is `@MainActor` and `insertLargeTextAsync` parses inside `MainActor.run`; either make the parse produce a Sendable AST off-main (as designed) or drop the "pure nonisolated" header claim + stale comment. *Files:* `.../Editor/MarkdownBridge.swift`, `EditorTextView.swift`.
+- **D12. Small correctness/coverage/cosmetic** (LOW): block-header chip thumbnail render (`03` §8); ordered-list renumber-from-first (`03`); focus-on-appear focus-token (`03` §1); drop move-vs-copy cursor + AppKit drop reliability (`06` §5); wrap Trash delete in `NSFileCoordinator` (`06` §5 — intent already met); extract paste degradation status string (`07` §5); e2e-durable-links.sh step-5 negative parity (`08` §4.5); delete vestigial `NoteBody`/`NoteBlock` dead types (`03`); add `nestedListMixed` + debounce/snapshot unit tests (`03`/`06`). Retire or extract the `SearchGeneration` helper (`02`) and add the filename↔front-matter divergence log line (`02`).
+
+---
+
+## Phase E — Verification review (do LAST; gates deleting this plan)
+
+**Why this phase exists:** this plan was only necessary because the W0–W8 checkboxes overstated completion —
+whole subsystems were marked shipped while their UI entry point was never wired. Do not repeat that mistake
+on the fixes. When Phases A–D are done, run a dedicated verification pass that *proves* each closed item is
+real end-to-end **before** flipping any checkbox. Follow the paced method in `REVIEW.md` (one subsystem per
+session, refute-verify — **never** one giant fan-out).
+
+**E1. Re-run the plan-vs-build gap analysis on every A–D item.** Use the same method that produced this plan
+(a reviewer per affected area; **open the source and confirm behavior, not filename existence**). For each
+Phase B/C item specifically, prove there is a **production caller** — grep each type/view/command referenced
+outside `Tests/` — so nothing regressed back into "built but dead." *Verify:* each A–D item is CONFIRMED,
+with `file:line` evidence. *Done:* a written pass/fail per item; any FAIL loops back to its phase.
+
+**E2. Drive the wired features at runtime.** For B1–B7 and the Phase D UI items, actually exercise them in
+the running app (or via `ArchiveNotesUITests` / `scripts/gui-drive-notes.sh` + the `an.editor.test.*` DEBUG
+seams against the **scratch fixture only**): auto-fill writes front-matter; note-level chips render; a note
+retitles/re-tags and the Finder-tag projection follows; a pasted page-link shows a thumbnail;
+`archivenotes://open?id=…` selects the note; a menu-created extract embeds its image bytes; a moved source
+re-grants in-app. Anything needing a human (real Zotero/Reader install) is owner-eye — flag it, don't claim
+it. *Done:* each behavior observed, not inferred.
+
+**E3. Prove the safety-net actually bites.** Confirm the new guards fail on a planted violation, not just
+pass on the clean tree: `./test-smoke.sh archivecore` runs and is in `all`; the Processor lint trips on a
+planted `setResourceValue`; the ArchiveCore lint trips on an `import AppKit` in Core; the Notes smoke gate no
+longer builds/invokes the UI target. Then re-run `./test-smoke.sh all` + `swift test` (packages + apps) —
+all green, **no new warnings** — and re-assert the tag-safety invariants + delete-last-instance guard on a
+scratch store. *Done:* guards demonstrably bite; whole suite green.
+
+**E4. Prove docs/tracker match reality, then retire this plan.** Verify Phase A landed: both READMEs +
+`ArchiveNotes/AGENTS.md` + `SMOKE_TEST.md` exist and read right; the SPEC marker section is complete; the
+shipped plans are deleted; no `SUITE_TODO.md` checkbox or `CLAUDE.md` Implementation Map contradicts the
+tree; the doc-sync hook covers `packages/`. **Only after E1–E4 all pass:** flip the `SUITE_TODO.md`
+"W9 (gap-closure)" checkbox to `[x]` (cite commits) and `git rm execution-plans/archive-notes/09-gap-closure.md`
+in the same commit — the docs move with the code. *Tier per the items reviewed (SPEC/write-seam items stay Tier-2).*
+
+---
+
+## Explicitly out of scope (plan-stated deferrals — NOT gaps)
+
+Recorded here so a future reviewer doesn't re-flag them: Reader/Processor *consuming* the `ArchiveSuite`
+marker + corpus back-fill (D4); Processor stamping the marker; mirroring date/quality into Finder tags; a
+single merged unified-writer signature; unifying the page-2 header *builder*; a shared suite-wide storage
+path; page-within-merged-PDF scroll navigation; editor tables/footnotes/task-lists/strikethrough/HTML and
+undo-across-raw-toggle; per-block stable GUIDs and the reverse "N extracts derive from this note" index;
+Scrivener round-trip confirmation; extract re-snapshot/refresh; author inheritance; `zotero://open-pdf`
+page-anchored links; Zotero write-back; multi-root Reader; Universal-Clipboard cross-Mac confirmation
+(owner-eye, W8); and the GUI checks documented as owner-eye in `scripts/GUI-HARNESS.md` (G2 typing gesture,
+G6 real Reader launch, G11 real Zotero launch, chip-button click gestures — all with their dispatch
+auto-asserted via spies/DEBUG seams).
+
+## Deviations to record (done differently, functionally sound — no work required)
+
+`CoordinatedTagWriter` shared across all three apps (vs. `02` §10 "don't share in run 1"); `NotesFilter`
+dates as `Int?` not `SortDate?` (`SortDate` never created, §16.3); `Item.sortDate` reimplements the SPEC
+formula under a parity test rather than calling `ArchiveCore.DocumentTags.sortDate`; `PDFThumbnailer` placed
+in ArchiveCore (§16.7 said app target — see C3); source-block UI realized as an editor chip attachment +
+`ReaderPreviewPopover` rather than a standalone `SourceBlockView`; unit suites use swift-testing `@Test`
+rather than the sketched XCTest; and the `FolderGraph→OrganizationStore` / `SmartQuery→VFolder.queryJSON`
+renames (authorized by overview §16).
