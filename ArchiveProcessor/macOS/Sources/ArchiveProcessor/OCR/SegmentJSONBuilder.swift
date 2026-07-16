@@ -51,4 +51,14 @@ enum SegmentJSONBuilder {
 
         return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
     }
+
+    /// The box/folder label `format` override the Process-Files path applies to a label segment, or
+    /// `nil` for a plain document. Preserves the original precedence — the inline code ran
+    /// `if isBox { … }` then `if isFolder { … }`, so a segment flagged both resolved to `folder_label`
+    /// (the later assignment won).
+    static func labelFormatOverride(isBox: Bool, isFolder: Bool) -> String? {
+        if isFolder { return "folder_label" }
+        if isBox { return "box_label" }
+        return nil
+    }
 }
