@@ -654,27 +654,10 @@ final class LiveCaptureProcessor: ObservableObject {
                              pagesComplete: pagesComplete)
     }
 
-    /// Mirrors `OCRProcessor.writeSegmentJSON`: a metadata sidecar with the OCR body + fields.
+    /// Writes the metadata sidecar (OCR body + fields) via the shared `SegmentJSONBuilder`. This path
+    /// is documents-only, so it passes no box/folder label format override.
     nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags, to jsonURL: URL) {
-        var bodyParts: [String] = []
-        for (i, u) in pageURLs.enumerated() {
-            let t = i < texts.count ? texts[i] : ""
-            bodyParts.append("[Image: \(u.lastPathComponent)]")
-            if !t.isEmpty { bodyParts.append(t) }
-        }
-        var dict: [String: Any] = [:]
-        if let d = tags.machineDate { dict["date"] = d }
-        dict["date_uncertain"] = tags.dateUncertain
-        dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
-        if let v = tags.format { dict["format"] = v }
-        if let v = tags.authorName { dict["author_name"] = v }
-        if let v = tags.recipientName { dict["recipient_name"] = v }
-        if let v = tags.authorLocation { dict["author_location"] = v }
-        if let v = tags.recipientLocation { dict["recipient_location"] = v }
-        if let v = tags.publicationName { dict["publication_name"] = v }
-        dict["files"] = pageURLs.map { $0.lastPathComponent }
-        dict["body"] = bodyParts.joined(separator: "\n\n")
-        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else { return }
+        guard let data = SegmentJSONBuilder.buildData(fileURLs: pageURLs, texts: texts, tags: tags) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
 

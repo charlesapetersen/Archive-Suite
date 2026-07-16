@@ -748,39 +748,11 @@ extension OCRProcessor {
             jsonURL = outputDirectory.appendingPathComponent(baseName + ".json")
         }
 
-        // Build body text with image markers
-        var bodyParts: [String] = []
-        for (i, url) in segment.pdfURLs.enumerated() {
-            let text = i < segment.texts.count ? segment.texts[i] : ""
-            bodyParts.append("[Image: \(url.lastPathComponent)]")
-            if !text.isEmpty {
-                bodyParts.append(text)
-            }
-        }
-        let bodyText = bodyParts.joined(separator: "\n\n")
-
-        // Build JSON dictionary
-        var dict: [String: Any] = [:]
-        if let date = tags.machineDate {
-            dict["date"] = date
-        }
-        dict["date_uncertain"] = tags.dateUncertain
-        dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
-
-        if let v = tags.format { dict["format"] = v }
-        if let v = tags.authorName { dict["author_name"] = v }
-        if let v = tags.recipientName { dict["recipient_name"] = v }
-        if let v = tags.authorLocation { dict["author_location"] = v }
-        if let v = tags.recipientLocation { dict["recipient_location"] = v }
-        if let v = tags.publicationName { dict["publication_name"] = v }
-
-        if segment.isBox { dict["format"] = "box_label" }
-        if segment.isFolder { dict["format"] = "folder_label" }
-
-        dict["files"] = segment.pdfURLs.map { $0.lastPathComponent }
-        dict["body"] = bodyText
-
-        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else { return }
+        // Body + fields come from the shared SegmentJSONBuilder; this path adds the box/folder label
+        // format override. The sidecar-URL computation above and the atomic write below are unchanged.
+        let formatOverride = SegmentJSONBuilder.labelFormatOverride(isBox: segment.isBox, isFolder: segment.isFolder)
+        guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
+                                                      tags: tags, formatOverride: formatOverride) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
     /// Merge multi-page document segments into single PDFs.

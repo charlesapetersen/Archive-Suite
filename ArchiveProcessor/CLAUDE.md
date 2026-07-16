@@ -398,6 +398,9 @@ OCR/                           OCR pipeline + provider clients:
   PDFTextExtractor.swift       Read OCR text + classification back out of existing PDFs.
   PDFToImageConverter.swift    Render PDF pages to JPEGs for OCR input.
   SampleOCRTester.swift        One-off sample-OCR test helper.
+  SegmentJSONBuilder.swift     Pure shared builder for the per-segment `.json` metadata sidecar (body +
+                               fields, optional box/folder format override). Both Process-Files and Live
+                               writeSegmentJSON delegate to it; callers own the URL + atomic disk write.
 Tagging/                       Finder-tag writing + segmentation (Tier-2 — writes irreplaceable data):
   MacOSTagger.swift            Writes Finder tags (subjects/date/priority/color + trailing Unread).
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
