@@ -101,6 +101,58 @@ struct RunHistorySnapshot {
     }
 }
 
+extension RunHistorySnapshot {
+    /// Build a history snapshot for a RESUMED non-batch run from its persisted manifest plus the few
+    /// runtime knobs the manifest does not store (rotation mode + image-scale are live `@AppStorage`; the
+    /// upstream gateway family drives image-token math). `fileCount` is the WHOLE run: resume never
+    /// re-charges files already completed, but the recorded cost is the full run's estimate, matching the
+    /// pre-run pane the operator saw. Tagging is keyed off the live mode (the manifest predates a
+    /// persisted `TaggingMode`), mirroring how the pre-run estimator reads `taggingMode.llmTags`.
+    init(resuming run: OCRProcessor.PendingRun, taggingMode: TaggingMode,
+         rotationMode: RotationMode, imageScale: Double, imageTokenProvider: LLMProvider?) {
+        self.init(
+            startedAt: run.startedAt,
+            provider: run.provider,
+            gatewayConfig: run.gatewayConfig,
+            imageTokenProvider: run.gatewayConfig != nil ? imageTokenProvider : nil,
+            model: run.model,
+            batchMode: false,
+            enableTagging: taggingMode.llmTags,
+            enableCollectionSegmentation: run.enableCollectionSegmentation,
+            preOCRedInput: run.preOCRedInput,
+            reOCRMultiPagePDF: false,
+            sendPreviousImage: run.sendPreviousImage,
+            contextCharCount: run.previousTextCharCount,
+            imageScale: imageScale,
+            rotationMode: rotationMode,
+            fileCount: run.fileURLs.count
+        )
+    }
+
+    /// Build a history snapshot for a RESUMED batch run from its persisted manifest plus the live
+    /// image-scale + rotation mode. A batch run is never a gateway run (the gateway path forces
+    /// `batchMode = false`) and carries no previous-text context, so those inputs are fixed.
+    init(resuming batch: OCRProcessor.PendingBatch, rotationMode: RotationMode, imageScale: Double) {
+        self.init(
+            startedAt: batch.submittedAt,
+            provider: batch.provider,
+            gatewayConfig: nil,
+            imageTokenProvider: nil,
+            model: batch.model,
+            batchMode: true,
+            enableTagging: batch.taggingMode.llmTags,
+            enableCollectionSegmentation: batch.enableCollectionSegmentation,
+            preOCRedInput: false,
+            reOCRMultiPagePDF: false,
+            sendPreviousImage: batch.sendPreviousImage,
+            contextCharCount: 0,
+            imageScale: imageScale,
+            rotationMode: rotationMode,
+            fileCount: batch.fileURLs.count
+        )
+    }
+}
+
 /// Durable, bounded log of completed Process-Files runs (JSON in UserDefaults; never the corpus).
 /// Mirrors `ProcessingProfileStore`'s storage shape.
 final class ProcessingHistoryStore: ObservableObject, @unchecked Sendable {

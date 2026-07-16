@@ -151,6 +151,33 @@ extension OCRProcessor {
     private static func deletePendingRun() {
         try? FileManager.default.removeItem(at: pendingRunURL)
     }
+
+    // MARK: - Processing history (cost + run log)
+
+    /// The upstream provider family a gateway run bills against — drives the estimator's image-token math.
+    /// Read from the SAME `@AppStorage` key the pre-run cost pane uses, so a recorded gateway run's cost
+    /// matches what the operator saw. Only meaningful while a gateway is active.
+    static func gatewayUpstreamProviderFromDefaults() -> LLMProvider {
+        LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.gatewayUpstreamProvider) ?? "") ?? .anthropic
+    }
+
+    /// Live image-size-target fraction (0–1) from the resolution `@AppStorage`, defaulting to full size
+    /// when unset. Used by the resume paths' history snapshots — the run manifest doesn't persist scale,
+    /// so this reads the live setting (which resume already applies to the run itself).
+    static func liveImageScaleFraction() -> Double {
+        let pct = (UserDefaults.standard.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double) ?? 100
+        return max(0.01, min(1.0, pct / 100.0))
+    }
+
+    /// Record the just-completed Process-Files run in the persistent history (estimator-derived cost +
+    /// provider/model + file counts), then clear the in-memory snapshot so it can't be double-logged.
+    /// A no-op when no snapshot was captured (e.g. a cancelled run cleared it, or an unexpected path).
+    /// Called only from genuine success tails, never on cancel/interruption.
+    func recordRunHistory(succeeded: Int) {
+        guard let snapshot = activeRunHistory else { return }
+        ProcessingHistoryStore.shared.record(snapshot.makeRun(succeeded: succeeded))
+        activeRunHistory = nil
+    }
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
     /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
@@ -278,6 +305,10 @@ extension OCRProcessor {
         for i in jobs.indices { jobs[i].status = .processing }
         progress = 0
         statusMessage = "Resuming batch…"
+
+        // History snapshot for the resumed batch (see RunHistorySnapshot.init(resuming batch:…)).
+        activeRunHistory = RunHistorySnapshot(
+            resuming: pending, rotationMode: rotationMode, imageScale: Self.liveImageScaleFraction())
 
         activeBatch = BatchContext(
             batchId: pending.batchId, apiKey: apiKey,
@@ -412,6 +443,7 @@ extension OCRProcessor {
         isProcessing = false
         progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
+        recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -457,6 +489,13 @@ extension OCRProcessor {
 
         // Restore the pending run tracker for incremental saves
         activePendingRun = pending
+
+        // History snapshot for the resumed run (see RunHistorySnapshot.init(resuming:…)). rotation + image
+        // scale are the live settings this resume already applies; the gateway family is read from defaults.
+        activeRunHistory = RunHistorySnapshot(
+            resuming: pending, taggingMode: taggingMode, rotationMode: rotationMode,
+            imageScale: Self.liveImageScaleFraction(),
+            imageTokenProvider: Self.gatewayUpstreamProviderFromDefaults())
 
         let segmentationContext = SegmentationContext(
             previousTextCharCount: pending.previousTextCharCount,
@@ -576,6 +615,7 @@ extension OCRProcessor {
                 isProcessing = false
                 progress = 1.0
                 let succeeded = jobs.filter { $0.status == .succeeded }.count
+                recordRunHistory(succeeded: succeeded)
                 statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
                 postCompletionNotification()
                 return
@@ -712,6 +752,7 @@ extension OCRProcessor {
         isProcessing = false
         progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
+        recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -939,6 +980,28 @@ extension OCRProcessor {
         currentGateway = gatewayConfig
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
+
+        // Snapshot this run's parameters for the processing-history log. Captured here (not at the tail)
+        // because several completion paths clear other run state first; `enableTagging`/`sendPreviousImage`
+        // mirror the pre-run cost pane's inputs (`taggingMode.llmTags`, the context-gated flag) so the
+        // recorded cost equals what the operator saw. `batchMode` reflects whether batch ACTUALLY runs.
+        activeRunHistory = RunHistorySnapshot(
+            startedAt: Date(),
+            provider: provider,
+            gatewayConfig: gatewayConfig,
+            imageTokenProvider: gatewayConfig != nil ? Self.gatewayUpstreamProviderFromDefaults() : nil,
+            model: model,
+            batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil,
+            enableTagging: taggingMode.llmTags,
+            enableCollectionSegmentation: enableCollectionSegmentation,
+            preOCRedInput: preOCRedInput,
+            reOCRMultiPagePDF: reOCRMultiPagePDF,
+            sendPreviousImage: segmentationContext.sendPreviousImage,
+            contextCharCount: segmentationContext.previousTextCharCount,
+            imageScale: segmentationContext.imageScale,
+            rotationMode: rotationMode,
+            fileCount: files.count
+        )
 
         if reOCRMultiPagePDF {
             // --- Multi-page PDF re-OCR path: render every page → OCR each page image → rebuild ONE
@@ -1177,6 +1240,7 @@ extension OCRProcessor {
         isProcessing = false
         progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
         let succeeded = jobs.filter { $0.status == .succeeded }.count
+        recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
         if enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."

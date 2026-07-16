@@ -365,6 +365,12 @@ class OCRProcessor: ObservableObject {
     /// Tracks the active non-batch run for incremental saves. Nil when not running.
     var activePendingRun: PendingRun?
 
+    /// In-memory snapshot of the CURRENT Process-Files run's parameters, captured at run start so the
+    /// completion tail can log an accurate history entry (cost + counts) even on the paths that clear
+    /// `activePendingRun` before the tail. Nil when not running; NEVER persisted (the history log itself
+    /// lives in `ProcessingHistoryStore`). See `Models/ProcessingHistory.swift`.
+    var activeRunHistory: RunHistorySnapshot?
+
 
 
     @Published var pendingRunInfo: String?
