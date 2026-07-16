@@ -146,6 +146,23 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   full-width). Threaded through OCRProcessor, SessionProcessingConfig, LiveCaptureProcessor (Codable-safe
   with `decodeIfPresent` fallback). Build clean 0 new warnings. Tier-2 APPROVE (7/7 vectors). 7 synthetic
   tests green. GUI-verify deferred: verify on a real multi-column newspaper scan → Morning Review. | done
+- [ ] **Multi-page PDF → per-page LLM OCR → single alternating image/OCR-text PDF** _(owner-requested 2026-07-15)_
+  — a NEW Process-Files mode: accept an existing **multi-page PDF**, render EACH page to an image, send each
+  page-image to the LLM for OCR (re-OCR the page images — distinct from the existing `preOCRedInput` mode, which
+  only extracts the embedded text layer), and output ONE PDF whose pages **alternate image, OCR-text, image,
+  OCR-text, …** (each source page → its image page + a selectable OCR-text page). **Mostly assembles from
+  existing primitives:** `PDFGenerator.mergeDocumentPDFs` already interleaves image1,text1,image2,text2,…;
+  `OCRProcessor.performOCRCall` is already per-single-image; `PDFGenerator.generate` builds the per-page
+  image+text unit. **New bits:** a "render ALL pages" variant of `PDFToImageConverter` (today hard-codes
+  `page(at: 0)`); a pipeline branch in `OCRProcessor.startProcessing` / `convertPDFInputs` that fans one input
+  PDF into N page-jobs then reuses generate+merge; a mode toggle beside `preOCRedInput` (+ a `DefaultsKeys` entry)
+  in `OCRView.swift`. **Tier-2** (PDF-writing output — adversarial review + scratch-copy functional test, NEVER
+  the real corpus). SPEC: add a short note to `SPEC/tag-format.md` §2-page structure (the interleaved shape
+  already matches multi-page-document output + is covered by the "consumers must not hard-assume 2 pages" clause,
+  so it's a coordinated Processor+Reader+SPEC clarification, not a format break). |
+  files (verify at impl): OCR/PDFToImageConverter.swift, OCR/PDFGenerator.swift (generate + mergeDocumentPDFs),
+  OCR/OCRProcessor+OCR.swift (performOCRCall, convertPDFInputs), OCR/OCRProcessor+Pipeline.swift (startProcessing),
+  Views/OCRView.swift (intake + mode toggle), SPEC/tag-format.md | M | med | none
 
 ### Archive Reader — layout & panels
 - [x] **Adjustable + collapsible side panels** — `PanelDivider` (drag-to-resize, 140–350 / 160–400
