@@ -53,6 +53,19 @@ if [ -n "${pid:-}" ] && [ "$relaunch" = 0 ]; then
   echo "✓ Already running the current build — brought to the front."
 else
   [ -n "${pid:-}" ] && { pkill -x ArchiveProcessor 2>/dev/null; sleep 0.6; }
+  # Stable code signature so the macOS Keychain "Always Allow" for the API key persists across rebuilds.
+  # Ad-hoc rebuilds each get a NEW identity → the Keychain re-prompts every build (blocks unattended runs);
+  # re-signing with the stable local dev cert (ops/autonomous/ensure-signing.sh) gives one persistent
+  # Designated Requirement. No-op + non-fatal if the cert is absent (falls back to ad-hoc = prior behavior).
+  # --preserve-metadata keeps the sandbox/network entitlements + flags intact (verified: identical after).
+  DEV_CERT="Archive Suite Dev"
+  if security find-identity -p codesigning 2>/dev/null | grep -q "$DEV_CERT"; then
+    if codesign --force --preserve-metadata=entitlements,requirements,flags,runtime --sign "$DEV_CERT" "$APP" >/dev/null 2>&1; then
+      echo "✓ Re-signed with stable dev identity ($DEV_CERT) — one Keychain 'Always Allow' now sticks across rebuilds."
+    else
+      echo "⚠ Stable re-sign failed — launching ad-hoc (Keychain may re-prompt)."
+    fi
+  fi
   open "$APP"
   echo "✓ Launched: $APP"
 fi

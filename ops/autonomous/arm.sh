@@ -150,6 +150,11 @@ install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan Session-Log compactor (dae
 cp "$PROMPT_SRC" "$STATE/resume-prompt.txt"
 echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt -> $STATE/"
 
+# 2b. ensure a stable local code-signing identity exists so Debug builds re-sign stably and the macOS
+#     Keychain stops re-prompting for the API key every rebuild (see ArchiveProcessor/launch.sh).
+#     Idempotent + non-fatal — a missing cert just means builds fall back to ad-hoc (the old behavior).
+bash "$REPO/ops/autonomous/ensure-signing.sh" || echo "arm: ensure-signing failed (non-fatal; ad-hoc fallback)"
+
 # 3. don't double-launch
 if pgrep -f archive-suite-autonomous.sh >/dev/null; then
   echo "daemon ALREADY running — not launching a second one:"
