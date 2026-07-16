@@ -317,6 +317,17 @@ struct OCRResult: Codable {
         self.errorMessage = errorMessage
         self.errorCode = errorCode
     }
+
+    /// A copy of this result with a new classification and/or rotation, **preserving** `text`,
+    /// `errorMessage`, and `errorCode`. The review / retry / rotation flows re-derive only the
+    /// classification or the rotation; routing them through one initializer stops each from re-typing
+    /// all five fields — which is how `errorCode` got silently dropped before (W9.1). (Sites that
+    /// intentionally *reset* `errorCode` to nil on a fresh success rebuild keep their explicit init and
+    /// deliberately don't use this.)
+    func with(classification: DocumentClassification?, rotationDegrees: Int) -> OCRResult {
+        OCRResult(text: text, classification: classification, rotationDegrees: rotationDegrees,
+                  errorMessage: errorMessage, errorCode: errorCode)
+    }
 }
 
 // MARK: - Live Processing Mode

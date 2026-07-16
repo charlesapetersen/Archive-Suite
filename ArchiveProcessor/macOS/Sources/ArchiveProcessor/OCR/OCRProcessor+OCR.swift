@@ -1071,13 +1071,7 @@ extension OCRProcessor {
     /// a correction was found; otherwise return the result unchanged.
     private nonisolated static func mergeRotation(into result: OCRResult, correction: Int?) -> OCRResult {
         guard result.text != nil, let rot = correction else { return result }
-        return OCRResult(
-            text: result.text,
-            classification: result.classification,
-            rotationDegrees: rot,
-            errorMessage: result.errorMessage,
-            errorCode: result.errorCode
-        )
+        return result.with(classification: result.classification, rotationDegrees: rot)
     }
     private func isRetryableError(_ result: OCRResult?) -> Bool {
         guard let result = result, result.text == nil else { return false }

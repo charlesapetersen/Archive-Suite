@@ -32,9 +32,7 @@ extension OCRProcessor {
             }
             jobs[i].classification = cls
             if let r = jobs[i].result {
-                jobs[i].result = OCRResult(text: r.text, classification: cls,
-                                           rotationDegrees: r.rotationDegrees,
-                                           errorMessage: r.errorMessage, errorCode: r.errorCode)
+                jobs[i].result = r.with(classification: cls, rotationDegrees: r.rotationDegrees)
             }
         }
     }
@@ -150,12 +148,9 @@ extension OCRProcessor {
                 let newClassification = item.classification
                 jobs[item.fileIndex].classification = newClassification
                 if let existingResult = jobs[item.fileIndex].result {
-                    jobs[item.fileIndex].result = OCRResult(
-                        text: existingResult.text,
+                    jobs[item.fileIndex].result = existingResult.with(
                         classification: newClassification,
-                        rotationDegrees: existingResult.rotationDegrees,
-                        errorMessage: existingResult.errorMessage,
-                        errorCode: existingResult.errorCode
+                        rotationDegrees: existingResult.rotationDegrees
                     )
                 }
 
@@ -298,12 +293,9 @@ extension OCRProcessor {
         let oldClassification = jobs[index].classification
         jobs[index].classification = newClassification
         if let existingResult = jobs[index].result {
-            jobs[index].result = OCRResult(
-                text: existingResult.text,
+            jobs[index].result = existingResult.with(
                 classification: newClassification,
-                rotationDegrees: existingResult.rotationDegrees,
-                errorMessage: existingResult.errorMessage,
-                errorCode: existingResult.errorCode
+                rotationDegrees: existingResult.rotationDegrees
             )
         }
         // Update tags on the output file
@@ -363,12 +355,9 @@ extension OCRProcessor {
             let newRot = item.rotationDegrees
             let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
             guard newRot != oldRot, let existingResult = jobs[item.fileIndex].result else { continue }
-            jobs[item.fileIndex].result = OCRResult(
-                text: existingResult.text,
+            jobs[item.fileIndex].result = existingResult.with(
                 classification: existingResult.classification,
-                rotationDegrees: newRot,
-                errorMessage: existingResult.errorMessage,
-                errorCode: existingResult.errorCode
+                rotationDegrees: newRot
             )
             if let result = jobs[item.fileIndex].result,
                let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
@@ -450,12 +439,9 @@ extension OCRProcessor {
             let newCls = item.classification
             jobs[item.fileIndex].classification = newCls
             if let existingResult = jobs[item.fileIndex].result {
-                jobs[item.fileIndex].result = OCRResult(
-                    text: existingResult.text,
+                jobs[item.fileIndex].result = existingResult.with(
                     classification: newCls,
-                    rotationDegrees: existingResult.rotationDegrees,
-                    errorMessage: existingResult.errorMessage,
-                    errorCode: existingResult.errorCode
+                    rotationDegrees: existingResult.rotationDegrees
                 )
             }
         }
@@ -572,12 +558,9 @@ extension OCRProcessor {
 
             jobs[item.fileIndex].classification = newClassification
             if let existingResult = jobs[item.fileIndex].result {
-                jobs[item.fileIndex].result = OCRResult(
-                    text: existingResult.text,
+                jobs[item.fileIndex].result = existingResult.with(
                     classification: newClassification,
-                    rotationDegrees: item.rotationDegrees,
-                    errorMessage: existingResult.errorMessage,
-                    errorCode: existingResult.errorCode
+                    rotationDegrees: item.rotationDegrees
                 )
             }
 
