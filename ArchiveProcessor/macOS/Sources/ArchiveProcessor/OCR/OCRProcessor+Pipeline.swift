@@ -927,6 +927,8 @@ extension OCRProcessor {
                     for singleId in batch.batchId.components(separatedBy: ",") {
                         await client.cancelBatch(batchName: singleId)
                     }
+                case .openai:
+                    break   // Unreachable: OpenAI has no batch path in v1 (`supportsBatch == false`), so no server-side batch to cancel.
                 }
             }
         }

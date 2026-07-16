@@ -28,6 +28,9 @@ enum LLMTextClient {
             return try await callGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, timeout: timeout)
         case .mistral:
             return try await callMistralChat(prompt: prompt, apiKey: apiKey, maxTokens: maxTokens, timeout: timeout)
+        case .openai:
+            let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey)
+            return try await client.textCompletion(prompt: prompt, maxTokens: maxTokens)
         }
     }
 

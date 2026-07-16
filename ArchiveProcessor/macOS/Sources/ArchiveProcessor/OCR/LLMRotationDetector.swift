@@ -69,6 +69,7 @@ enum LLMRotationDetector {
         case .gemini: letter = await askGemini(images: images, apiKey: apiKey)
         case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
         case .mistral: letter = nil
+        case .openai: letter = nil   // v1: no LLM rotation path (gated out at the guard above) → local Vision fallback
         }
         guard let ch = letter?.uppercased().first, let idx = labels.firstIndex(of: String(ch)) else { return nil }
         return order[idx]

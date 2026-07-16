@@ -374,6 +374,8 @@ extension OCRProcessor {
                     response = try await classifyCallGemini(prompt: prompt, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
                 case .mistral:
                     response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
+                case .openai:
+                    response = try await classifyCallOpenAI(prompt: prompt, model: model, apiKey: apiKey)
                 }
             }
             let (classification, _, _) = OCRPrompt.parseResponse(response)
@@ -445,6 +447,10 @@ extension OCRProcessor {
               let content = message["content"] as? String else { return "" }
         return content
     }
+    private nonisolated func classifyCallOpenAI(prompt: String, model: LLMModel, apiKey: String) async throws -> String {
+        let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey)
+        return try await client.textCompletion(prompt: prompt, maxTokens: 64)
+    }
     func performBatchOCR(
         fileURLs: [URL],
         originalFiles: [URL],
@@ -482,6 +488,11 @@ extension OCRProcessor {
             case .gemini:
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
                 batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
+            case .openai:
+                // Unreachable: `supportsBatch == false` gates OpenAI out of the batch path (Pipeline
+                // `batchMode && provider.supportsBatch`). Defensive arm keeps the switch exhaustive;
+                // Phase 4 adds a real OpenAIBatchClient. The throw is caught below → jobs marked failed.
+                throw OCRError.networkError("OpenAI batch is not supported in this version")
             }
         } catch {
             statusMessage = "Batch submission failed: \(error.localizedDescription)"
@@ -658,6 +669,11 @@ extension OCRProcessor {
                         }
                         batchComplete = true
                     }
+
+                case .openai:
+                    // Unreachable: OpenAI never enters the batch path (`supportsBatch == false`, and
+                    // submitBatch throws for it). Keeps the switch exhaustive; Phase 4 adds a real poll.
+                    batchComplete = true
                 }
                 consecutiveErrors = 0   // this poll cycle completed without throwing
             } catch {
@@ -1031,6 +1047,9 @@ extension OCRProcessor {
                 case .mistral:
                     let client = MistralClient(apiKey: apiKey, model: model)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
+                case .openai:
+                    let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 }
             }
         } catch {

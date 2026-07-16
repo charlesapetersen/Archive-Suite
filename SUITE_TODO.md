@@ -68,12 +68,20 @@ never flip the default provider until the keyed live test passes. Legend as abov
 
 **OpenAI / ChatGPT provider** (`execution-plans/openai-chatgpt-provider.md`; Tier-1; SHARED HOTSPOT = the
 persisted `LLMProvider` enum, append-only):
-- [ ] **W13.oai-1 — native provider wiring.** Append `case openai` to `LLMProvider` (append-only), add
+- [x] **W13.oai-1 — native provider wiring.** Append `case openai` to `LLMProvider` (append-only), add
   `LLMModel.openaiModels` + the model-family param adapter (`max_completion_tokens`/no-`temperature`/
   `reasoning_effort`), route `.openai` through the reused `OpenAICompatibleClient` at the ~6–8 switch sites.
   ⚠️ Model IDs + pricing = clearly-marked `// VERIFY` placeholders (a wrong price is a silent estimator bug →
   Morning Review). | files: Models/ProviderModels.swift, OCR/OCRProcessor+OCR.swift, OCR/LLMTextClient.swift,
   OCR/LLMRotationDetector.swift, Models/KeychainHelper.swift | M | low | none
+  — ✅ shipped: `.openai = "OpenAI"` appended; `openaiModels` (all IDs/pricing `// VERIFY`); param adapter
+  (`OpenAICompatibleClient.openAI(model:apiKey:)` → `max_completion_tokens` for reasoning models, gateway path
+  byte-identical); `.openai` arms added to all **12** exhaustive `LLMProvider` switches (OCR/classify/text route
+  via the factory; batch/cancel/rotation defensive-`nil` since `supportsBatch=false`; CostEstimator image-tokens
+  placeholder + rotation `nil`). Additive + opt-in — default provider unchanged. KeychainHelper needed no change
+  (account = `provider.rawValue`). Build clean, 0 new warnings. **Live OCR + model-ID/pricing verification =
+  keyed/owner tail → Morning Review** (Processor has no unit target; smoke needs a live key). ProviderKeySpec /
+  onboarding / validation / CostEstimator rows = W13.oai-2; gateway preset + docs = W13.oai-3.
 - [ ] **W13.oai-2 — onboarding + validation + cost.** `ProviderKeySpec.openai` (+ `onboardable`),
   `KeyValidator.validateOpenAI` (`GET /v1/models`), `ThinkingLevel → reasoning_effort`, `CostEstimator` rows
   (placeholder-priced per above). | files: Models/ProviderKeySpec.swift, OCR/KeyValidator.swift, Models/CostEstimator.swift | S | low | none

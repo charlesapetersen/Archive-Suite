@@ -103,6 +103,7 @@ struct OCRView: View {
         case .anthropic: builtIn = LLMModel.anthropicModels
         case .gemini: builtIn = LLMModel.geminiModels
         case .mistral: builtIn = LLMModel.mistralModels
+        case .openai: builtIn = LLMModel.openaiModels
         }
         return builtIn + customModelStore.allCustomModels.filter { $0.provider == selectedProvider }
     }

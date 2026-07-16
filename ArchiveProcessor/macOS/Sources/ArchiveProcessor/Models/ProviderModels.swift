@@ -12,6 +12,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     case anthropic = "Anthropic"
     case gemini = "Gemini"
     case mistral = "Mistral"
+    case openai = "OpenAI"   // append-only (persisted rawValue) — never reorder/rename existing cases
 
     var id: String { rawValue }
 
@@ -21,6 +22,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: builtIn = LLMModel.anthropicModels
         case .gemini: builtIn = LLMModel.geminiModels
         case .mistral: builtIn = LLMModel.mistralModels
+        case .openai: builtIn = LLMModel.openaiModels
         }
         let custom = CustomModelStore.shared.models(for: self)
         return builtIn + custom
@@ -29,6 +31,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     var supportsBatch: Bool {
         switch self {
         case .anthropic, .gemini, .mistral: return true
+        case .openai: return false   // OpenAI Batch API is Phase 4 — skipped in v1 (same as the gateway path)
         }
     }
 }
@@ -283,6 +286,55 @@ struct LLMModel: Identifiable, Hashable, Codable {
             inputCostPer1M: 1.0,
             outputCostPer1M: 1.0,
             batchDiscount: 0.5
+        ),
+    ]
+
+    // ⚠️ W13.oai-1 PLACEHOLDERS — model IDs AND per-1M pricing are NOT yet verified against OpenAI's
+    // live pricing. A wrong price is a silent cost-estimator bug, so these are re-verified in the
+    // keyed/owner tail (Morning Review) before the live OCR test; do not treat as authoritative.
+    // `supportsThinking: true` marks the reasoning families (o-series / GPT-5) that require
+    // `max_completion_tokens` — see `OpenAICompatibleClient.openAI(model:apiKey:)`. First entry is the
+    // default OCR model (a cheap capable vision model, analogous to Gemini Flash-Lite). // VERIFY all.
+    static let openaiModels: [LLMModel] = [
+        LLMModel(
+            id: "gpt-4o-mini",                 // VERIFY id + pricing
+            displayName: "GPT-4o mini",
+            provider: .openai,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0.15,              // VERIFY
+            outputCostPer1M: 0.60,             // VERIFY
+            batchDiscount: 0.5                 // VERIFY (OpenAI Batch API ~50%; batch skipped in v1)
+        ),
+        LLMModel(
+            id: "gpt-4o",                       // VERIFY id + pricing
+            displayName: "GPT-4o",
+            provider: .openai,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 2.50,              // VERIFY
+            outputCostPer1M: 10.0,             // VERIFY
+            batchDiscount: 0.5                 // VERIFY
+        ),
+        LLMModel(
+            id: "gpt-4.1-mini",                 // VERIFY id + pricing
+            displayName: "GPT-4.1 mini",
+            provider: .openai,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0.40,              // VERIFY
+            outputCostPer1M: 1.60,             // VERIFY
+            batchDiscount: 0.5                 // VERIFY
+        ),
+        LLMModel(
+            id: "gpt-5",                        // VERIFY id + pricing (reasoning → max_completion_tokens)
+            displayName: "GPT-5",
+            provider: .openai,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 1.25,              // VERIFY
+            outputCostPer1M: 10.0,             // VERIFY
+            batchDiscount: 0.5                 // VERIFY
         ),
     ]
 }

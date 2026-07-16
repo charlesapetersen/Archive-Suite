@@ -37,6 +37,7 @@ struct CostEstimator {
         case .gemini: return 40_000
         case .anthropic: return 6_000
         case .mistral: return 1_000
+        case .openai: return 1_500   // VERIFY: OpenAI per-image token estimate (W13.oai-1 placeholder) — refine with live pricing
         }
     }
 
@@ -70,6 +71,7 @@ struct CostEstimator {
         case .gemini: return (0.0375, 0.15)     // gemini-2.5-flash-lite
         case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
+        case .openai: return nil                // v1: no LLM rotation path for OpenAI → local Vision (free)
         }
     }
 
