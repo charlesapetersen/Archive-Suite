@@ -49,17 +49,23 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
   * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
     adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
   * Build must be clean with NO new warnings; run the touched app's smoke test.
-  * CHECKPOINT as you go — this is what bounds redo if you're interrupted (usage cutoff / watchdog kill). At
-    each natural, self-contained, build-GREEN milestone (a new component that compiles; a sub-feature whose
-    tests pass), `git pull --rebase origin main` then commit + push it right away, tagging the item, e.g.
-    `feat(notes): W4-S7 (checkpoint 1/N) — <what landed>`. These intermediate commits are mid-feature: they do
-    NOT flip the SUITE_TODO checkbox (only the final commit does — STEP 4). A small one-commit item needs no
-    interim checkpoint; a larger multi-part item should push each part as it goes green (green = compiles with
-    no errors; a warning a later checkpoint resolves is OK, a persistent new warning is not). NEVER push a
-    commit that doesn't build — a checkpoint the next session continues from must be sound. A Tier-2 checkpoint
-    (Capture/·Net/, file-writing tag/output, finalize/manifest, the tag/PDF SPEC) still needs its FULL Tier-2
-    gate — adversarial self-review + a scratch-copy functional test — BEFORE you push it; checkpointing never
-    lowers the Tier-2 bar to a bare compile.
+  * CHECKPOINT as you go — this is what bounds redo if you're interrupted (usage cutoff / watchdog kill), so
+    keep the distance between checkpoints SHORT: on a kill you lose only what you wrote since your last push,
+    so push OFTEN. Checkpoint at the SMALLEST self-contained build-GREEN unit — a single new file/type that
+    compiles, one test (or test group) that passes, one helper wired in — NOT only at big "whole sub-feature
+    done" milestones. Concretely: whenever you have a meaningful chunk of uncommitted work AND the build is
+    green, `git pull --rebase origin main` then commit + push it right away, BEFORE starting the next chunk,
+    tagging the item, e.g. `feat(notes): W4-S7 (checkpoint 1/N) — <what landed>`. Err toward more, smaller
+    checkpoints: a green HALF of a sub-feature is worth pushing — don't hold it hoping to land the whole thing
+    in one commit. These intermediate commits are mid-feature: they do NOT flip the SUITE_TODO checkbox (only
+    the final commit does — STEP 4). A genuinely small one-commit item needs no interim checkpoint. Green =
+    compiles with no errors (a warning a later checkpoint resolves is OK, a persistent new warning is not).
+    NEVER push a commit that doesn't build — a checkpoint the next session continues from must be sound; that
+    is the ONE hard floor on checkpoint size (you can't push half-written code that won't compile), so
+    structure the work so it reaches green early and often. A Tier-2 checkpoint (Capture/·Net/, file-writing
+    tag/output, finalize/manifest, the tag/PDF SPEC) still needs its FULL Tier-2 gate — adversarial
+    self-review + a scratch-copy functional test — BEFORE you push it; checkpointing never lowers the Tier-2
+    bar to a bare compile.
 
 STEP 3.5 — GUI-VERIFY — **gated by the GUI-mode flag (STEP 1).**
   **If GUI mode is `off`:** do NOT open any app window — no `./launch.sh`, no `open`, no whole-scheme
