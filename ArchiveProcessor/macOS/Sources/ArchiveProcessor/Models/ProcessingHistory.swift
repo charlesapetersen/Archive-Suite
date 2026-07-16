@@ -164,7 +164,14 @@ final class ProcessingHistoryStore: ObservableObject, @unchecked Sendable {
     /// Cap so the log can't grow without bound; the oldest runs drop off once exceeded.
     static let maxRuns = 200
 
-    private init() { load() }
+    /// Backing store. Production uses `.standard`; the headless self-test injects a throwaway suite so it
+    /// never touches the operator's real history (see `ProcessingHistoryTestDriver`).
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        load()
+    }
 
     /// Append a finished run (newest-first) and persist. Trims to `maxRuns`.
     func record(_ run: ProcessingRun) {
@@ -187,11 +194,11 @@ final class ProcessingHistoryStore: ObservableObject, @unchecked Sendable {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(runs) else { return }
-        UserDefaults.standard.set(data, forKey: DefaultsKeys.processingHistory)
+        defaults.set(data, forKey: DefaultsKeys.processingHistory)
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: DefaultsKeys.processingHistory),
+        guard let data = defaults.data(forKey: DefaultsKeys.processingHistory),
               let decoded = try? JSONDecoder().decode([ProcessingRun].self, from: data) else { return }
         runs = decoded
     }

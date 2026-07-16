@@ -218,11 +218,21 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   default should be "not Downloads"; the shipped default is Downloads-if-unset (visible + changeable via the
   picker). Whether to change the default (and to what — last-used vs a dedicated folder) is an owner call →
   Morning Review. | files: Views/LiveCaptureView.swift | done
-- [ ] **Cost tracking + processing history** _(promoted 2026-07-15)_ — persist each run's **actual** cost plus a
-  run log (timestamp, provider/model, file count, results/failures) and surface a simple history view.
+- [x] **Cost tracking + processing history** _(promoted 2026-07-15; SHIPPED 2026-07-16)_ — persist each run's **actual**
+  cost plus a run log (timestamp, provider/model, file count, results/failures) and surface a simple history view.
   `CostEstimator` already does the per-model math for *estimates*; this records **actuals** and accumulates them.
   Writes only its own store (Application Support / UserDefaults) — **never** the corpus. **Tier-1**.
   | files: Models/CostEstimator.swift, Models/DefaultsKeys.swift, Views/ToolsView.swift (or a new history view) | M | low | none
+  — **SHIPPED:** `Models/ProcessingHistory.swift` — `ProcessingRun` + in-memory `RunHistorySnapshot` (params captured at
+  run start; cost = the SAME `CostEstimator` math the pre-run pane shows, applied to what ACTUALLY ran — no provider
+  returns per-call token usage) + bounded (200) `ProcessingHistoryStore` (JSON in UserDefaults, never the corpus).
+  `OCRProcessor` records at EVERY genuine completion tail (startProcessing + resumeRun pre-OCRed/standard + resumeBatch;
+  resume snapshots rebuilt from the persisted manifest + live rotation/scale); cancel/interrupt paths never record.
+  `Views/ProcessingHistoryView.swift` — a Tools-tab sheet (per-run provider·model/mode/counts/cost, summary totals,
+  confirm-gated Clear; cost footnoted as an estimate, not billed). **Tier-1** verified: build clean, 0 new warnings +
+  `$0`/no-key/no-GUI headless self-test `scripts/test-processing-history.sh` (`ProcessingHistoryTestDriver`, 19/19 PASS,
+  against a THROWAWAY UserDefaults suite — never the operator's real history). Visual GUI check deferred (launch-time
+  Keychain prompt blocks the Processor GUI unattended) → Morning Review.
 - [ ] **Global keyboard shortcuts + dark-mode pass** _(promoted 2026-07-15; re-scoped 2026-07-16)_ — (a)
   main-window shortcuts for start-processing / switch-provider: **ALREADY SHIPPED `b1fc5d4` (suite-v1.2.0)** —
   only verify coverage is complete against the Reader's "menu bar = single source of shortcuts" convention. (b)

@@ -39,6 +39,7 @@ struct ContentView: View {
             MergeSafetyTestDriver.runIfRequested()           // $0 merged-doc tag-transfer safety test (env-gated)
             ManifestPersistenceTestDriver.runIfRequested()   // $0 completedDocGroups manifest round-trip (env-gated)
             MultiPageReOCRTestDriver.runIfRequested()        // $0 multi-page PDF re-OCR assembly + overwrite guard (env-gated)
+            ProcessingHistoryTestDriver.runIfRequested()     // $0 cost/run-log record + bounded-persist self-test (env-gated)
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {
