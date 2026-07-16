@@ -40,6 +40,7 @@ struct ContentView: View {
             ManifestPersistenceTestDriver.runIfRequested()   // $0 completedDocGroups manifest round-trip (env-gated)
             MultiPageReOCRTestDriver.runIfRequested()        // $0 multi-page PDF re-OCR assembly + overwrite guard (env-gated)
             ProcessingHistoryTestDriver.runIfRequested()     // $0 cost/run-log record + bounded-persist self-test (env-gated)
+            IncrementalSkipTestDriver.runIfRequested()       // $0 incremental-processing skip-decision self-test (env-gated)
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {
