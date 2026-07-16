@@ -139,30 +139,11 @@ enum LLMRotationDetector {
 
         var out: [Int: String] = [:]
         for degrees in [0, 90, 180, 270] {
-            guard let rotated = rotate(base, byDegreesClockwise: degrees),
+            guard let rotated = ImageEncoding.rotate(base, byDegreesClockwise: degrees),
                   let jpeg = jpegBase64(rotated) else { return nil }
             out[degrees] = jpeg
         }
         return out
-    }
-
-    /// Rotate a CGImage clockwise by 0/90/180/270 (mirrors ImageEncoding.rotate(_:byDegreesClockwise:)).
-    private static func rotate(_ image: CGImage, byDegreesClockwise degrees: Int) -> CGImage? {
-        if degrees % 360 == 0 { return image }
-        let w = image.width, h = image.height
-        let radians = -Double(degrees) * .pi / 180.0
-        let swap = degrees == 90 || degrees == 270
-        let newW = swap ? h : w
-        let newH = swap ? w : h
-        let space = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = space.numberOfComponents == 1 ? CGImageAlphaInfo.none.rawValue : CGImageAlphaInfo.noneSkipLast.rawValue
-        guard let ctx = CGContext(data: nil, width: newW, height: newH, bitsPerComponent: 8,
-                                  bytesPerRow: 0, space: space, bitmapInfo: bitmapInfo) else { return nil }
-        ctx.translateBy(x: CGFloat(newW) / 2, y: CGFloat(newH) / 2)
-        ctx.rotate(by: radians)
-        ctx.translateBy(x: -CGFloat(w) / 2, y: -CGFloat(h) / 2)
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        return ctx.makeImage()
     }
 
     private static func jpegBase64(_ image: CGImage) -> String? {
