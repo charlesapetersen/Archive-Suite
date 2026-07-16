@@ -1048,7 +1048,7 @@ extension OCRProcessor {
                     let client = MistralClient(apiKey: apiKey, model: model)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
                 case .openai:
-                    let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey)
+                    let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 }
             }

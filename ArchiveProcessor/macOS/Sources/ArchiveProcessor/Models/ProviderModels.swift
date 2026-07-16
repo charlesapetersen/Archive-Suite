@@ -42,6 +42,18 @@ enum ThinkingLevel: String, CaseIterable, Identifiable, Codable {
     case low = "Low"
     case high = "High"
     var id: String { rawValue }
+
+    /// OpenAI `reasoning_effort` value for this level (o-series / GPT-5 reasoning models). The app's
+    /// two-level Low/High control maps to OpenAI's low/high; OpenAI's own "medium" default is used when
+    /// no level is chosen (nil). Sent ONLY on reasoning-capable models — the
+    /// `OpenAICompatibleClient.openAI(model:apiKey:thinkingLevel:)` factory gates this on
+    /// `model.supportsThinking`, since non-reasoning OpenAI models reject `reasoning_effort`.
+    var openAIReasoningEffort: String {
+        switch self {
+        case .low: return "low"
+        case .high: return "high"
+        }
+    }
 }
 
 // MARK: - Document Classification

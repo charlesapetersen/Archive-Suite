@@ -12,7 +12,8 @@ struct OpenAICompatibleClient {
     /// gateway callers build a byte-identical request. // VERIFY families when finalizing the OpenAI list.
     var maxTokensParam: String = "max_tokens"
     /// Optional OpenAI `reasoning_effort` ("low"/"medium"/"high"), sent only when non-nil (reasoning
-    /// models only). The `ThinkingLevel` → `reasoning_effort` mapping is wired in W13.oai-2; nil here.
+    /// models only). Set by the `openAI(model:apiKey:thinkingLevel:)` factory from the caller's
+    /// `ThinkingLevel` (see `ThinkingLevel.openAIReasoningEffort`); left nil for gateway callers.
     var reasoningEffort: String? = nil
 
     private var chatEndpoint: URL? {
@@ -129,15 +130,19 @@ extension OpenAICompatibleClient {
     /// (OpenAI plan, Design decision 3): OpenAI **reasoning** models (o-series / GPT-5 family) require
     /// `max_completion_tokens` instead of `max_tokens` (and reject `temperature`, which this client never
     /// sends). Keyed off `model.supportsThinking`, which the built-in `openaiModels` list sets `true`
-    /// only for those reasoning families. `reasoningEffort` is left nil here — the `ThinkingLevel` →
-    /// `reasoning_effort` value mapping lands in W13.oai-2.
-    static func openAI(model: LLMModel, apiKey: String, reasoningEffort: String? = nil) -> OpenAICompatibleClient {
+    /// only for those reasoning families.
+    ///
+    /// `reasoning_effort` (W13.oai-2) is likewise gated on `supportsThinking`: it is sent ONLY for
+    /// reasoning models — non-reasoning models (gpt-4o etc.) reject the parameter — and only when the
+    /// caller passes a `thinkingLevel` (otherwise OpenAI's own "medium" default applies). The
+    /// `ThinkingLevel → reasoning_effort` string mapping lives on `ThinkingLevel.openAIReasoningEffort`.
+    static func openAI(model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel? = nil) -> OpenAICompatibleClient {
         OpenAICompatibleClient(
             baseURL: openAIBaseURL,
             apiKey: apiKey,
             modelID: model.id,
             maxTokensParam: model.supportsThinking ? "max_completion_tokens" : "max_tokens",
-            reasoningEffort: reasoningEffort
+            reasoningEffort: model.supportsThinking ? thinkingLevel?.openAIReasoningEffort : nil
         )
     }
 }
