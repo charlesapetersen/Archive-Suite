@@ -234,4 +234,59 @@ final class TagWriterTests: XCTestCase {
         XCTAssertThrowsError(try results[2].result.get())          // missing file surfaces as failure
         XCTAssertTrue(Set(try readTags(a)).contains("Reviewed"))
     }
+
+    // MARK: §6 Write-target identity re-verification (adapter seam)
+
+    func testApplyWithMatchingIdentityWrites() throws {
+        let url = try makeFile("id-ok.pdf", tags: ["Unread", "Jerry Brown"])
+        let identity = try XCTUnwrap(FileIdentity.capture(url))
+        _ = try TagWriter.apply(TagDelta(add: ["Economics"]), to: url, expecting: identity)
+        XCTAssertTrue(Set(try readTags(url)).isSuperset(of: ["Unread", "Jerry Brown", "Economics"]))
+    }
+
+    /// The core §6 safety guarantee through the Reader adapter: a DIFFERENT file placed at the same
+    /// path since selection aborts the write with .identityMismatch, and the replacement is untouched.
+    func testApplyWithMismatchedIdentityAbortsAndLeavesReplacementUntouched() throws {
+        let name = "id-moved.pdf"
+        let original = try makeFile(name, tags: ["Unread"])
+        let originalIdentity = try XCTUnwrap(FileIdentity.capture(original))
+
+        try FileManager.default.removeItem(at: original)               // simulate Finder move-away…
+        let replacement = try makeFile(name, tags: ["Untouched"])      // …and a different file at the path
+        XCTAssertFalse(try XCTUnwrap(FileIdentity.capture(replacement)).matches(originalIdentity))
+
+        XCTAssertThrowsError(try TagWriter.apply(TagDelta(add: ["Reviewed"]), to: replacement, expecting: originalIdentity)) { error in
+            guard case TagWriteError.identityMismatch = error else {
+                return XCTFail("expected .identityMismatch, got \(error)")
+            }
+        }
+        XCTAssertEqual(Set(try readTags(replacement)), ["Untouched"])  // aborted write changed nothing
+    }
+
+    func testSetReadStateWithMismatchedIdentityAborts() throws {
+        let name = "id-read.pdf"
+        let original = try makeFile(name, tags: ["Unread"])
+        let originalIdentity = try XCTUnwrap(FileIdentity.capture(original))
+        try FileManager.default.removeItem(at: original)
+        let replacement = try makeFile(name, tags: ["Unread"])        // same tags, different file
+
+        XCTAssertThrowsError(try TagWriter.setReadState(.read, on: replacement, expecting: originalIdentity)) { error in
+            guard case TagWriteError.identityMismatch = error else {
+                return XCTFail("expected .identityMismatch, got \(error)")
+            }
+        }
+        XCTAssertEqual(Set(try readTags(replacement)), ["Unread"])    // not swapped to Read
+    }
+
+    /// Backward compatibility: without `expecting:`, the adapter behaves exactly as before (no §6
+    /// check) — so existing call sites are unaffected until they opt in.
+    func testApplyWithoutIdentitySkipsCheckAndWrites() throws {
+        let name = "id-nocheck.pdf"
+        let original = try makeFile(name, tags: ["Unread"])
+        _ = try XCTUnwrap(FileIdentity.capture(original))
+        try FileManager.default.removeItem(at: original)
+        let replacement = try makeFile(name, tags: ["Untouched"])
+        _ = try TagWriter.apply(TagDelta(add: ["Reviewed"]), to: replacement)   // no expecting:
+        XCTAssertTrue(Set(try readTags(replacement)).isSuperset(of: ["Untouched", "Reviewed"]))
+    }
 }
