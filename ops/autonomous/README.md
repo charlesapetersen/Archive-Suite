@@ -105,9 +105,52 @@ the fingerprint and resets the backoff; a usage fast-fail can't move it and fall
   `IDLE_STOP` window. *(Confirmed-HIGH finding from the change's own adversarial review.)*
 
 Knobs (env-overridable): `AUTONOMOUS_MAXBACKOFF`, `AUTONOMOUS_IDLE_STOP` (0 disables the auto-park). Built
-Tier-2: a 17-assertion prove-the-mechanism harness (runs the real daemon against a stub `claude` in a
-sandboxed `HOME`/`STATE`/`REPO`, covering both waste modes, progress-reset, queue-edit early-wake, the
-stale-stamp regression, rc≠0-with-commit, and the `COMPLETE` path) + an adversarial review.
+Tier-2: proven by `ops/autonomous/tests/prove-daemon.sh` (below) + an adversarial review.
+
+## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
+
+**Remote alerting (WS6).** Every "park + alert" path also POSTs to an endpoint you configure, because a
+Desktop file + a local notification are useless to an owner who is away — exactly when an unattended run
+needs them. Fires on: **park** (idle or low-disk) and the **taskport-still-open** security exit.
+
+```bash
+# ~/.local/state/archive-autonomous/alert.env   (zero-setup option: a private ntfy topic)
+ALERT_URL="https://ntfy.sh/<your-long-random-topic>"
+# ALERT_AUTH="Bearer <token>"      # optional; sent as an Authorization header
+```
+Unconfigured ⇒ silent no-op. Any webhook accepting a POST body works; `--max-time` bounds it so a dead
+network can never hang the loop, and a failed alert is logged but never fatal.
+
+> **Put it in `alert.env`, NOT `$STATE/env`** — load-bearing, not style. `$STATE/env` is the **child's**
+> environment (the daemon re-sources it under `set -a` to hand `PATH`/`OCR_KEY` to `claude -p`), so anything
+> there is inherited by **every session** — an LLM agent with `Bash`+`WebFetch` whose `curl`/`wget` deny-list
+> exists precisely so it *cannot* phone out. `alert.env` is sourced once at startup **without** `set -a`, so
+> the credential stays a non-exported, daemon-only shell var. A misplaced `ALERT_*` in `$STATE/env` is
+> additionally stripped of its export attribute before the child spawns (defence in depth) — but alerts raised
+> before the first session (e.g. a low-disk park) still wouldn't fire, so use `alert.env`.
+
+**Disk guard (WS2).** A full disk fails *every* build, so an unguarded long run just burns sessions failing to
+compile and never says why. Before launching, the daemon checks free space on `$REPO`'s volume; below
+`AUTONOMOUS_MINFREE_MB` (default **10 GB**) it first runs housekeeping to reclaim (spent worktrees + their
+`build/DD` are usually where the gigabytes went), re-checks, and only then **parks + alerts**. An unreadable
+`df` reading **fails open** — a broken check must never stop a healthy run. The check sits *after* the
+"another engine active" skip on purpose: housekeeping's safety argument assumes no session is live, and
+`git worktree remove` does **not** refuse a worktree whose only content is gitignored (i.e. `build/DD`) —
+so GCing a live engine's worktree mid-build is otherwise real.
+
+## Regression suite — `ops/autonomous/tests/prove-daemon.sh`
+
+Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every
+host-touching command (`security`/`osascript`/`launchctl`/`caffeinate`/`curl`/`df`) stubbed — it cannot reach
+your Desktop, the real repo, launchd, or the network. **41 assertions**: both idle waste modes, backoff
+doubling + cap, progress-reset, queue-edit early-wake, the stale-`idle.since` cycle-1-park regression,
+rc≠0-with-commit, the `COMPLETE` path, the disk guard (park / fail-open / self-heal / engine-busy
+reentrancy), and alerting (no-op-when-unset, argv word-splitting, and that the alert credential never reaches
+the session env). **Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
+
+```bash
+ops/autonomous/tests/prove-daemon.sh          # ~3 min, $0, no network
+```
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12
 

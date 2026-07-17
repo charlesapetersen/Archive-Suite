@@ -88,6 +88,31 @@ backstop; per-change Tier-2 review.
   regression that per-change review misses over 50+ unreviewed commits.
 - *Verify:* seed a failing test → gate goes red → parks+alerts; green → advances the cadence marker.
 
+### WS11 — Recurring paced whole-project code review *(owner-requested 2026-07-16)*
+WS7 catches *regressions* (red build/test); it cannot catch **design/quality drift** accumulating across 50+
+commits that nobody reviews for two weeks. So the run must also **re-review the codebase on a cadence**.
+- **Method — the paced one, non-negotiable:** `REVIEW.md`'s lean review — **ONE unit per session** (~6 finders
+  + refute-by-default verify, ~20 agents). **Never a whole-project fan-out in one session** — that blows a
+  usage window (the lesson `REVIEW.md` exists to record). The 10 canonical units + their paths live in
+  `REVIEW.md`; unit 7 (iOS companion) stays **skipped** per the ON-HOLD scope.
+- **Cadence:** one review unit per N hours / every Nth session (tunable, e.g. ~1–2/day) so review **interleaves
+  with feature work instead of starving it**. Same cadence-marker mechanism as WS7.
+- **Cycling + delta-aware priority (the real change):** today's `.maintenance/REVIEW_PROGRESS.md` is a
+  **one-pass** sweep — units get marked done and the sweep ends. Make it **recur**: record each unit's
+  **last-reviewed sha**, and each tick pick the unit with the most changes since that sha
+  (`git log <last-sha>..HEAD -- <unit paths>`); if nothing changed anywhere, re-review the **oldest**. Over two
+  weeks, reviewing *what actually changed* is what matters — not round-robin over untouched code.
+- **Findings → action, not prose:** confirmed (refute-verified) findings are appended as **fix items** to the
+  work queue + `KNOWN_ISSUES.md` (the existing `W3.f1–f6` pattern); refuted ones are dropped. The unit's report
+  persists under `.maintenance/review/`.
+- **Guardrail:** a review session is **read-only** — it files findings, it does **not** freelance fixes. Fixes
+  are separate queued items, so a review can't ship an unreviewed risky change. High-severity findings on
+  irreversible paths route to the WS10 hold queue.
+- **Interaction with WS4:** review units are inherently multi-pass; the attempt cap must not mis-flag them as
+  mis-sized (the resume prompt already treats "multi-pass loop" as do-ONE-pass-then-stop).
+- *Verify:* seed a change in one unit's paths → that unit is picked next; a unit with no changes is
+  deprioritized; a confirmed finding lands as a queued fix item; progress/sha markers advance.
+
 ---
 
 ## Coherence & scope over 14 days
@@ -116,9 +141,16 @@ backstop; per-change Tier-2 review.
 ---
 
 ## Ordering
-Survival (WS1–WS4) → observability/safety-net (WS5–WS7) → coherence/scope (WS8–WS10). WS5 surfaces WS7's
-result but both ship incrementally. Each lands as its own reviewed+proven commit; the long run is armed only
-after all are in and a dry-run cycle looks clean.
+Survival (WS1–WS4) → observability/safety-net (WS5–WS7, WS11) → coherence/scope (WS8–WS10). **WS6 comes first
+in practice** — WS2/WS4/WS7/WS11 all end in "park **+ alert**", which is meaningless while the only alert is a
+local notification an away-owner never sees. WS5 surfaces WS7/WS11 results but both ship incrementally. Each
+lands as its own reviewed+proven commit; the long run is armed only after all are in and a dry-run cycle looks
+clean.
+
+## Progress
+- [x] **WS6** alert core + **WS2** disk guard — shipped 2026-07-16 (see the commit; harness-proven, reviewed).
+- [ ] WS4 attempt cap · WS1 crash-restart posture · WS11 recurring review · WS7 health gate · WS5 STATUS digest
+      · WS8 Morning-Review rotation · WS9 dep gating · WS10 hold queue.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).

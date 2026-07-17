@@ -51,6 +51,11 @@ EFFORT="${AUTONOMOUS_EFFORT:-max}"        # reasoning effort for every resume se
 MAXBACKOFF="${AUTONOMOUS_MAXBACKOFF:-1800}"  # ceiling on the idle gap (30 min)
 IDLE_STOP="${AUTONOMOUS_IDLE_STOP:-21600}"   # 6 h of zero progress -> park + stop (0 disables the auto-stop)
 
+# Disk guard (WS2) — a full disk fails EVERY build, so without this a long run just burns sessions failing to
+# compile and never says why. Checked BEFORE launching a session; tries housekeeping to reclaim first, then
+# parks + alerts. Fail-OPEN on an unreadable reading (a broken check must never stop a healthy run).
+MINFREE_MB="${AUTONOMOUS_MINFREE_MB:-10240}" # park below this much free space on $REPO's volume (10 GB)
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -91,6 +96,85 @@ DENY=(
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# Alert config lives in its OWN file, sourced WITHOUT `set -a`, and that is load-bearing — NOT style.
+# $STATE/env is the CHILD's environment: tick() re-sources it under allexport to hand PATH/OCR_KEY to
+# `claude -p`. Anything placed there is inherited by every session — and a session is an LLM agent with Bash
+# + WebFetch whose curl/wget deny-list exists precisely so it CANNOT phone out. Handing it the operator's
+# alert endpoint/credential would defeat that (env is readable; WebFetch is a sufficient exfil channel, and
+# repo content it reads over a 2-week run is a prompt-injection surface). Keeping ALERT_* as plain
+# NON-exported shell vars means notify() (same shell) sees them and the child never does.
+# Also deliberately does NOT source $STATE/env here: that file may set PATH, and this runs before the
+# `caffeinate` launch below — a PATH without /usr/bin would silently fail to keep the Mac awake.
+[ -f "$STATE/alert.env" ] && . "$STATE/alert.env"
+
+# ===== Remote alerting (WS6) — reach an owner who is NOT at the machine =====
+# Everything else the daemon does on a blocking event (a Desktop file + an osascript notification) is useless
+# to an owner who is away, which is exactly when an unattended run needs them. Every "park + alert" path
+# routes through here. Deliberately GENERIC (a plain POST) so no service is baked in: ntfy.sh works with zero
+# setup ($STATE/alert.env: ALERT_URL="https://ntfy.sh/<your-private-topic>"), and any webhook that accepts a
+# POST body will do; ALERT_AUTH is sent as an Authorization header if set. Config belongs in alert.env, NOT
+# $STATE/env — see the sourcing note above (env is the CHILD's, alert.env is the daemon's).
+#   * NO-OP when unconfigured (ALERT_URL unset) — the daemon must run fine without it.
+#   * NEVER fatal, and --max-time so a dead network can never hang the loop.
+#   * NEVER logs $ALERT_URL / $ALERT_AUTH (the URL itself is the secret for ntfy-style topics) — title only.
+# NOTE: `curl` is in the DENY list for `claude -p` SESSIONS, not for this daemon loop; the loop is plain bash
+# and may call it. That asymmetry is intentional: sessions must not phone out, the operator's daemon must.
+notify() {
+  local title msg
+  # Strip CR/LF: $title becomes an HTTP header value, and curl does NOT reject embedded newlines — it emits
+  # them as extra real headers (verified). Callers pass free-ish text, so sanitise at the boundary.
+  title=$(printf '%s' "$1" | tr -d '\r\n')
+  msg="$2"
+  [ -n "${ALERT_URL:-}" ] || return 0
+  # ARRAY, not a string — same lesson the ALLOW/DENY arrays above record: a header value contains spaces, so
+  # it MUST be exactly one argv element. The tempting `${ALERT_AUTH:+-H "Authorization: $ALERT_AUTH"}` is
+  # broken: the quotes inside a :+ expansion are literal, and it collapses to ONE malformed argv (verified on
+  # bash 3.2), which curl rejects. Seeded non-empty so "${args[@]}" is safe under `set -u` on macOS bash 3.2
+  # (an empty array there is an "unbound variable" error).
+  local -a args=(-fsS --max-time 15 -X POST -H "Title: $title")
+  [ -n "${ALERT_AUTH:-}" ] && args+=(-H "Authorization: $ALERT_AUTH")
+  # Body via STDIN, never as an argv value: curl treats a LEADING '@' in --data-binary as "read this file",
+  # and '@-' means "read stdin" — which, from a nohup'd daemon whose stdin is an idle TTY, hangs FOREVER and
+  # is NOT bounded by --max-time (verified). No current caller starts with '@', but this is a generic sink for
+  # every future workstream's alerts, so make it structurally impossible: the arg is always the literal '@-'
+  # and stdin is a printf that closes immediately.
+  args+=(--data-binary @- "$ALERT_URL")
+  if printf '%s' "$msg" | curl "${args[@]}" >/dev/null 2>&1; then
+    log "alert sent: $title"
+  else
+    log "alert FAILED (non-fatal, continuing): $title"
+  fi
+  return 0
+}
+
+# ---- Disk guard (WS2) ----
+# macOS/BSD `df -m` column 4 = Available MB. Quoted: $REPO contains a space. Everything the run writes lives
+# on this one volume ($REPO + its ../suite-wt-* worktrees + their build/DD), so one check is honest here.
+# Any unparseable output (empty, wrapped long-device-name line, a suffix, negative) trips the numeric guard
+# below and FAILS OPEN — a broken check must never stop a healthy run.
+free_mb() { df -m "$REPO" 2>/dev/null | awk 'NR==2 {print $4}'; }
+
+# 0 = enough space (or unknown -> fail open). 1 = genuinely low even after reclaiming.
+# Publishes the deciding figure in $LAST_FREE_MB so the caller's alert can't disagree with the decision (or
+# render an empty number) by re-measuring.
+LAST_FREE_MB="?"
+disk_ok() {
+  local f; f="$(free_mb)"
+  case "$f" in ''|*[!0-9]*) return 0 ;; esac              # unreadable -> fail OPEN, never block a good run
+  LAST_FREE_MB="$f"
+  [ "$f" -ge "$MINFREE_MB" ] && return 0
+  # Self-heal before giving up: housekeeping GCs spent worktrees AND their per-worktree build/DD, which is
+  # usually where the gigabytes went. Purely local. Safe to call HERE only because the caller has already
+  # established that no other engine is active — see the note at tick() step 3b.
+  log "low disk: ${f}MB free (< ${MINFREE_MB}MB) — running housekeeping to reclaim…"
+  housekeeping
+  f="$(free_mb)"
+  case "$f" in ''|*[!0-9]*) return 0 ;; esac
+  LAST_FREE_MB="$f"
+  [ "$f" -ge "$MINFREE_MB" ] && { log "disk reclaimed: ${f}MB free — continuing."; return 0; }
+  return 1
+}
 
 # ===== Idle backoff (2026-07-16) — see ops/autonomous/README.md "Idle backoff" =====
 # The loop used to fire every $INTERVAL unconditionally and only ever stop on `RUN STATUS: COMPLETE`, which
@@ -160,17 +244,25 @@ backoff_sleep() {
   done
 }
 
-# Park the run: no progress for $IDLE_STOP. Everything left is blocked on the owner, so stop cleanly and say
-# so LOUDLY (log + Desktop file + notification) rather than idle forever holding a caffeinate assertion.
-# Deliberately does NOT rewrite RUN STATUS: the plan stays IN_PROGRESS so a plain re-arm resumes with no
-# edit, and the EXIT trap still fires the taskport security reminder.
+# Park the run: stop cleanly and say so LOUDLY (log + Desktop file + local notification + REMOTE alert)
+# rather than idle forever holding a caffeinate assertion. Callers: the idle path (no progress for
+# $IDLE_STOP) and the disk guard (WS2) — hence the reason/message parameters rather than a hardcoded idle
+# message. Deliberately does NOT rewrite RUN STATUS: the plan stays IN_PROGRESS so a plain re-arm resumes
+# with no edit, and the EXIT trap still fires the taskport security reminder.
+#   $1 = short reason (log + notification title)   $2 = the owner-facing message
 park_run() {
-  local hrs=$(( IDLE_STOP / 3600 ))
-  local m="Archive Suite autonomous run PARKED: ${hrs}h with no progress — every remaining queue item looks blocked on you (owner/GUI-gated). Nothing was lost; the plan is intact. Check:  ./ops/autonomous/arm.sh status   then re-arm with:  ./ops/autonomous/arm.sh"
+  local reason="$1" m="$2"
   rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a re-arm could trip over
-  log "!!!!!!!!!!!! PARKED: no progress for ${IDLE_STOP}s — stopping. $m"
+  log "!!!!!!!!!!!! PARKED ($reason) — stopping. $m"
   { echo "[$(date '+%F %T')] $m"; } > "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
-  osascript -e 'display notification "Run parked — no progress for hours; every item looks blocked on you. See ARCHIVE-SUITE-RUN-PARKED.txt on your Desktop." with title "Archive Suite: autonomous run parked" sound name "Basso"' >/dev/null 2>&1 || true
+  notify "Archive Suite: run parked ($reason)" "$m"
+  # $reason goes in as an argv PARAMETER, never interpolated into the script text: a double quote in it would
+  # otherwise close the AppleScript string and the rest would EXECUTE (`do shell script …` — verified RCE).
+  # Today's callers are fixed text + numbers, but one future caller surfacing a build error or a path is all
+  # it would take, so make it structurally impossible.
+  osascript -e 'on run argv
+display notification ("Run parked: " & (item 1 of argv) & ". See ARCHIVE-SUITE-RUN-PARKED.txt on your Desktop.") with title "Archive Suite: autonomous run parked" sound name "Basso"
+end run' "$reason" >/dev/null 2>&1 || true
   launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
 }
 
@@ -185,7 +277,12 @@ note_no_progress() {
   idle=$(( now - since ))
   BACKOFF=$(( BACKOFF * 2 ))
   [ "$BACKOFF" -gt "$MAXBACKOFF" ] && BACKOFF="$MAXBACKOFF"
-  if [ "$IDLE_STOP" -gt 0 ] && [ "$idle" -ge "$IDLE_STOP" ]; then park_run; return 9; fi
+  if [ "$IDLE_STOP" -gt 0 ] && [ "$idle" -ge "$IDLE_STOP" ]; then
+    local hrs=$(( IDLE_STOP / 3600 ))
+    park_run "no progress for ${hrs}h" \
+      "Archive Suite autonomous run PARKED: ${hrs}h with no progress — every remaining queue item looks blocked on you (owner/GUI-gated). Nothing was lost; the plan is intact. Check:  ./ops/autonomous/arm.sh status   then re-arm with:  ./ops/autonomous/arm.sh"
+    return 9
+  fi
   log "no progress (idle ${idle}s) — next attempt in ${BACKOFF}s."
   return 0
 }
@@ -251,6 +348,7 @@ remind_revert_taskport() {
   local bk="$STATE/taskport-rule.backup.plist"
   local m="Autonomous run has EXITED but taskport debugger auth is STILL 'allow' (password-free). REVERT it:  sudo security authorizationdb write system.privilege.taskport < $bk"
   log "!!!!!!!!!!!! SECURITY REMINDER: $m"
+  notify "Archive Suite: REVERT security setting" "$m"   # WS6 — an away owner must hear about a standing exposure
   { echo "[$(date '+%F %T')] Archive Suite autonomous run exited."; echo; echo "$m"; } > "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" 2>/dev/null || true
   osascript -e 'display notification "taskport auth is still password-free — REVERT it (see REVERT-TASKPORT-SECURITY.txt on your Desktop)." with title "Archive Suite: revert security setting" sound name "Basso"' >/dev/null 2>&1 || true
 }
@@ -390,7 +488,19 @@ tick() {
     log "stale lock (${age}s) — taking over."
   fi
 
-  # 3b. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
+  # 3b. Disk guard (WS2). Placed AFTER the step-3 "another engine active" check ON PURPOSE, not for tidiness:
+  #     disk_ok() calls housekeeping() to try to reclaim, and housekeeping's whole safety argument rests on
+  #     running BETWEEN sessions with no session active. Checking earlier would let this engine GC another,
+  #     live engine's worktree mid-build — and `git worktree remove` (no --force) does NOT refuse a worktree
+  #     whose only content is gitignored, which is exactly what build/DD is (verified). Still before the
+  #     lock/launch, so we never start a session we already know cannot build.
+  if ! disk_ok; then
+    park_run "low disk (${LAST_FREE_MB}MB free)" \
+      "Archive Suite autonomous run PARKED — LOW DISK: only ${LAST_FREE_MB}MB free on the repo volume (need ${MINFREE_MB}MB). Every build would fail, so the run stopped instead of burning sessions. Free some space (per-worktree build/DD is usually the culprit), then re-arm:  ./ops/autonomous/arm.sh"
+    return 9
+  fi
+
+  # 3c. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
   #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.
   local fp_before; fp_before="$(work_fingerprint)"
 
@@ -403,6 +513,11 @@ tick() {
   # 5. Optional per-project env hook (e.g. a test API key) into the child env, without ever printing it.
   #    Archive Suite: $STATE/ocr-key.env holds `OCR_KEY=…` for the E2E (absent by default -> Keychain fallback).
   set -a; [ -f "$STATE/env" ] && . "$STATE/env"; [ -f "$STATE/ocr-key.env" ] && . "$STATE/ocr-key.env"; set +a
+  # Defence in depth (WS6): alert config belongs in $STATE/alert.env, but if an operator puts ALERT_* in
+  # $STATE/env by mistake, the `set -a` above just marked them for export and the session would inherit the
+  # alert credential. Strip the export attribute only — notify() (this shell) keeps the value, the child
+  # cannot see it. Mirrors the CLAUDE*-scrub rationale below.
+  export -n ALERT_URL ALERT_AUTH 2>/dev/null || true
 
   log "launching fresh resume session (backstop ${MAXRUN}s, budget \$$BUDGET, health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
