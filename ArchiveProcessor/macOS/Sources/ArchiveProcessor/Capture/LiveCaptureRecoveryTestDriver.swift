@@ -11,6 +11,9 @@ import AppKit
 ///   3. Numbering ALWAYS continues from the folder's existing max, so a retry / same-name never overwrites
 ///      an already-filed file.
 ///   4. `CaptureSession.trashOrRemove` moves a file to the Trash instead of hard-deleting it (recoverable).
+///   5. Legacy staging-manifest migration (KNOWN_ISSUES #1) drops a re-processable segment (sources present →
+///      stale output deleted so resume regenerates it) but KEEPS one whose source is gone (never deletes
+///      output it can no longer rebuild).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -99,6 +102,33 @@ enum LiveCaptureRecoveryTestDriver {
         let secondNumbered = fm.fileExists(atPath: out6.appendingPathComponent("00002 Reuse.pdf").path)
         check("retry into a populated folder does NOT overwrite the first file", firstStillThere)
         check("retry continues numbering at 00002 (no collision)", secondNumbered && retry.filedGroupIds.contains("E2"))
+
+        // --- Test 7 (KNOWN_ISSUES #1): legacy staging-manifest migration DROPS a re-processable segment
+        // (all sources present → delete its stale staged output so resume can regenerate it → a complete
+        // rotation review) but KEEPS one whose source is gone (can't regenerate → preserve today's staged
+        // output; NEVER delete output we can no longer rebuild). ---
+        let legDir = tmp.appendingPathComponent("legacy", isDirectory: true)
+        try? fm.createDirectory(at: legDir, withIntermediateDirectories: true)
+        // L1: re-processable (its source still exists) — stale staged output = pdf + image + json.
+        let l1pdf = legDir.appendingPathComponent("L1.pdf"); try? Data("l1".utf8).write(to: l1pdf)
+        let l1img = legDir.appendingPathComponent("L1.jpg"); try? Data("l1i".utf8).write(to: l1img)
+        let l1json = legDir.appendingPathComponent("L1.json"); try? Data("{}".utf8).write(to: l1json)
+        let l1 = LiveCaptureProcessor.StagedSegment(groupId: "L1", type: CaptureGroupType.document.rawValue,
+            collectionKey: "L1", order: 0, pdfURLs: [l1pdf], imageURLs: [l1img], jsonURL: l1json,
+            boxLabelText: nil, pagesComplete: nil)
+        // L2: NOT re-processable (source gone) — its stale staged output must be PRESERVED.
+        let l2pdf = legDir.appendingPathComponent("L2.pdf"); try? Data("l2".utf8).write(to: l2pdf)
+        let l2 = LiveCaptureProcessor.StagedSegment(groupId: "L2", type: CaptureGroupType.document.rawValue,
+            collectionKey: "L2", order: 1, pdfURLs: [l2pdf], imageURLs: [], jsonURL: nil,
+            boxLabelText: nil, pagesComplete: nil)
+        let present: Set<String> = ["L1"]   // L1's sources are all on disk; L2's are gone
+        let mig = LiveCaptureProcessor.migrateLegacyManifestSegments([l1, l2]) { present.contains($0) }
+        check("legacy migration KEEPS the un-reprocessable segment (source gone)", mig.keep.map(\.groupId) == ["L2"])
+        check("legacy migration DROPS the re-processable segment (source present)", !mig.keep.contains { $0.groupId == "L1" })
+        check("dropped segment's stale output is DELETED (pdf+image+json)",
+              !fm.fileExists(atPath: l1pdf.path) && !fm.fileExists(atPath: l1img.path) && !fm.fileExists(atPath: l1json.path))
+        check("kept segment's output is PRESERVED (never delete unrecoverable output)", fm.fileExists(atPath: l2pdf.path))
+        check("deleted list reports exactly the dropped segment's 3 files", Set(mig.deleted) == Set([l1pdf, l1img, l1json]))
 
         // --- Test 4: trashOrRemove sends a file to the Trash (leaves its original path), not a hard rm. ---
         let victim = tmp.appendingPathComponent("victim.txt")

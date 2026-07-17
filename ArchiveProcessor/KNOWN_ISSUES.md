@@ -214,7 +214,29 @@ doesn't exist — so the real page images stayed in the output dir, unmoved and 
 
 ## 1. Live "Process live" rotation review skips segments restored from a legacy staging manifest
 
-**Status:** deferred (2026-07-03). Low impact, no data loss, transitional. Does NOT recur for
+**Status:** ✅ **FIXED in code 2026-07-17 (W14.5 — Fix option 1).** `LiveCaptureProcessor.loadStagingManifest()`
+now migrates a legacy manifest instead of restoring it verbatim: via the new
+`migrateLegacyManifestSegments(_:sourcesPresent:)`, each legacy segment **whose source photos all still exist**
+is DROPPED (its stale staged output deleted) so the existing `activate()` resume path re-processes it from
+scratch (re-OCR + re-tag → a proper `retained` entry → the end-of-session rotation review now includes it);
+the manifest is then rewritten in the current `StagingManifest` format so recovery is idempotent (a crash
+before re-finalize won't re-enter the legacy branch). This is exactly Fix option 1 below (cleanest correctness),
+and deliberately NOT the "show all staged pages" non-fix (which would regenerate at 0° and un-rotate an
+auto-rotated page). **Data-safety guard (Recovery Core Directive):** a legacy segment whose source is *gone*
+(e.g. the operator hit Clear before recovering) is KEPT as-is — staged, un-reviewable, filed exactly as today —
+because we must never delete regenerable output we can no longer rebuild; the raw sources always remain in the
+visible backup folder, so a dropped-but-not-yet-reprocessed segment is fully recoverable. **Tier-2 gate met
+unattended:** build clean (0 new warnings) + `LiveCaptureRecoveryTestDriver` ($0, no OCR) asserts the drop /
+keep / delete-stale / preserve-unrecoverable behavior (ALL PASS) + adversarial self-review. **Deferred to owner
+(Morning Review):** the full end-to-end verify — stage a session with a real legacy build, recover, Process,
+Finish with "Review rotation" on, and confirm every page (incl. the former legacy segments) appears — needs a
+legacy manifest + an OCR key to actually reprocess. The "Related, milder" `resolvedGroupIds` sub-issue below is
+already independently resolved (it IS persisted + restored now — `CaptureSession.swift`), which is what lets the
+resume path re-finalize a dropped document without re-popping its tag card unnecessarily.
+
+The original analysis (kept for context; superseded by the fix above):
+
+**Original status:** deferred (2026-07-03). Low impact, no data loss, transitional. Does NOT recur for
 sessions created by the current build.
 
 **Symptom (as reported):** After recovering an unprocessed live session and clicking *Process*, the

@@ -198,13 +198,26 @@ final class LiveCaptureProcessor: ObservableObject {
         guard let data = try? Data(contentsOf: url) else { return }
         let decoder = JSONDecoder()
         var restored: [StagedSegment] = []
+        var didMigrateLegacy = false
         if let manifest = try? decoder.decode(StagingManifest.self, from: data) {
             restored = manifest.staged
             for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
         } else if let legacy = try? decoder.decode([StagedSegment].self, from: data) {
-            restored = legacy   // legacy manifest (pre-rotation-review): no retained inputs
+            // Legacy manifest (bare [StagedSegment], no `retained`): DROP each re-processable segment so the
+            // resume path below regenerates it (→ proper `retained` → a COMPLETE rotation review); KEEP any
+            // whose sources are gone (can't regenerate). See migrateLegacyManifestSegments (KNOWN_ISSUES #1).
+            didMigrateLegacy = true
+            let legacyIds = Set(legacy.map(\.groupId))
+            let presentGroupIds: Set<String> = Set(
+                session.groups
+                    .filter { legacyIds.contains($0.id) }
+                    .compactMap { g -> String? in
+                        let urls = g.photos.map(\.url)
+                        return (!urls.isEmpty && urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }) ? g.id : nil
+                    })
+            let (keep, _) = Self.migrateLegacyManifestSegments(legacy) { presentGroupIds.contains($0) }
+            restored = keep
         }
-        guard !restored.isEmpty else { return }
         staged = restored
         for s in restored {
             finalizedGroups.insert(s.groupId)
@@ -219,6 +232,10 @@ final class LiveCaptureProcessor: ObservableObject {
         if let lastBox = restored.filter({ $0.type == CaptureGroupType.box.rawValue }).max(by: { $0.order < $1.order }) {
             currentCollectionKey = lastBox.groupId
         }
+        // A migrated legacy manifest is rewritten in the CURRENT format so a crash before any dropped segment
+        // re-finalizes doesn't re-enter this branch (idempotent recovery); dropped segments re-process via the
+        // normal resume path in `activate()`.
+        if didMigrateLegacy { persistManifest() }
     }
 
     /// Re-run OCR for a set of segments, then re-finalize them. Defaults to the full failed set (the bulk
@@ -1144,6 +1161,37 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         let o = executePlans(mapped)
         return (o.movedFiles, o.failedMoves, o.filedGroupIds, o.allFiled)
+    }
+
+    /// Legacy staging-manifest migration (KNOWN_ISSUES #1 — "rotation review skips legacy-manifest segments").
+    /// A **legacy** manifest is the bare `[StagedSegment]` array written before per-segment `retained` inputs
+    /// were persisted (pre-`c0312f4`): it restores `staged` but carries **no** `retained`, so `finishSession`
+    /// — which builds the rotation review from `retained.values` — would silently EXCLUDE those segments from
+    /// the review. We can't safely regenerate a legacy segment in place (its original `rotationDegrees` is
+    /// gone; seeding 0° would UN-rotate an auto-rotated page — strictly worse), so instead we DROP each such
+    /// segment and let the normal resume path re-process it from scratch (re-OCR + re-tag → a proper
+    /// `retained` → a COMPLETE rotation review).
+    ///
+    /// SAFETY (Recovery Core Directive): only drop a segment we can actually re-process — one whose source
+    /// photos ALL still exist (`sourcesPresent(groupId)`). If any source is gone (e.g. the operator hit Clear
+    /// before recovering), KEEP the legacy segment as-is (staged, un-reviewable — today's behavior) rather
+    /// than delete regenerable output we can no longer rebuild. A dropped segment's stale staged output is
+    /// deleted here so it isn't orphaned on disk; the raw sources stay in the visible backup folder, so a
+    /// dropped-then-not-yet-reprocessed segment is always recoverable. Returns the segments to KEEP (restore
+    /// into `staged`) plus the output files actually deleted (so the $0 self-test can assert on-disk effects).
+    nonisolated static func migrateLegacyManifestSegments(
+        _ legacy: [StagedSegment], sourcesPresent: (String) -> Bool
+    ) -> (keep: [StagedSegment], deleted: [URL]) {
+        let fm = FileManager.default
+        var keep: [StagedSegment] = []
+        var deleted: [URL] = []
+        for s in legacy {
+            guard sourcesPresent(s.groupId) else { keep.append(s); continue }   // no sources → can't regen → keep
+            for u in s.pdfURLs where fm.fileExists(atPath: u.path) { try? fm.removeItem(at: u); deleted.append(u) }
+            for u in s.imageURLs where fm.fileExists(atPath: u.path) { try? fm.removeItem(at: u); deleted.append(u) }
+            if let j = s.jsonURL, fm.fileExists(atPath: j.path) { try? fm.removeItem(at: j); deleted.append(j) }
+        }
+        return (keep, deleted)
     }
 
     /// Move `src` to `dest`, reporting the outcome so the caller can tell a real failure (output stuck in

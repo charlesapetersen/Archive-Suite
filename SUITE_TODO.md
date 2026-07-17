@@ -284,14 +284,19 @@ Legend as above.
   column, Extracts shows it), wired through `NotesTableView`/`ColumnPickerHeaderView`. +7 unit tests; full Notes
   unit suite 709 green (520 swift-testing + 189 XCTest), build clean 0 new warnings. **Tier-1.** **Live GUI drive
   → Morning Review:** window raise/focus (b), cross-window chip recolor (c), two-window column visibility (d).
-- [ ] **W14.5 — Processor legacy staging-manifest rotation review [LOW, do last]** _(Processor KNOWN_ISSUES #1;
-  cannot recur for current-build sessions — only legacy manifests restore `staged` without `retained`)._ Fix
-  option 1 (cleanest per the write-up): on legacy-manifest recovery, **drop those segments from
-  `staged`/`finalizedGroups`** so they re-process from scratch (re-OCR + re-tag → proper `retained`), giving a
-  complete rotation review. **Do NOT** naively "show all staged pages" — regenerating a legacy page seeded at 0°
-  would *un-rotate* an auto-rotated page (strictly worse). **Verify needs a legacy manifest + an OCR key to
-  reprocess → keyed/owner**; the recovery-branch code change is build-verifiable. LOW value. | files:
-  Capture/LiveCaptureProcessor.swift (loadStagingManifest / finishSession) | S | low | owner(verify)
+- [x] **W14.5 — Processor legacy staging-manifest rotation review [LOW, do last]** ✅ COMPLETE 2026-07-17
+  (Processor KNOWN_ISSUES #1). Fix option 1 shipped: `loadStagingManifest()` now migrates a legacy manifest
+  (bare `[StagedSegment]`, no `retained`) via new `migrateLegacyManifestSegments(_:sourcesPresent:)` — it
+  DROPS each legacy segment whose source photos all still exist (deleting its stale staged output) so the
+  existing resume path re-processes it from scratch (re-OCR + re-tag → proper `retained` → a COMPLETE rotation
+  review), then rewrites the manifest in current format (idempotent). **Data safety (Recovery Core Directive):**
+  a legacy segment whose source is gone is KEPT as-is (today's behavior) — we never delete regenerable output we
+  can no longer rebuild; raw sources always stay in the backup folder. Tier-2 met unattended: build clean, 0 new
+  warnings; +5 scratch checks in `LiveCaptureRecoveryTestDriver` (drop-reprocessable / keep-unreprocessable /
+  delete-stale-output / preserve-unrecoverable) → **ALL PASS ($0, no OCR)** + adversarial self-review (confirmed
+  `session.groups` is computed from `session.photos`, so dropped segments' pages are guaranteed present to
+  re-OCR). **Full E2E verify (legacy manifest + OCR key to actually reprocess) → keyed/owner → Morning Review.**
+  | files: Capture/LiveCaptureProcessor.swift, Capture/LiveCaptureRecoveryTestDriver.swift | S | low | owner(verify)
 
 **Parked — explicitly NOT a Wave-14 work item:** Processor cloud/relay **post-finalize reclassify → duplicate
 output** (A11, MED, Drive-milestone) lives entirely in the **Google-Drive relay path**, which is **ON HOLD /
