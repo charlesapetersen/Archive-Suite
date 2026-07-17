@@ -289,4 +289,44 @@ final class TagWriterTests: XCTestCase {
         _ = try TagWriter.apply(TagDelta(add: ["Reviewed"]), to: replacement)   // no expecting:
         XCTAssertTrue(Set(try readTags(replacement)).isSuperset(of: ["Untouched", "Reviewed"]))
     }
+
+    /// The §6-capable group overload (`apply(_:to:[(url,identity)])`, used by the corpus-wide rename
+    /// path): each file is independent — one replaced under its path since capture aborts as
+    /// `.identityMismatch` while its neighbours (a matched identity, and a nil-identity file that opts
+    /// out) still apply. Results are 1:1 and in order.
+    func testBatchApplyWithPerFileIdentityIsolatesMismatch() throws {
+        let ok = try makeFile("batch-ok.pdf", tags: ["Unread"])
+        let okIdentity = try XCTUnwrap(FileIdentity.capture(ok))
+
+        let swapName = "batch-swap.pdf"
+        let swapOriginal = try makeFile(swapName, tags: ["Unread"])
+        let swapIdentity = try XCTUnwrap(FileIdentity.capture(swapOriginal))
+        try FileManager.default.removeItem(at: swapOriginal)              // Finder move-away…
+        let swapReplacement = try makeFile(swapName, tags: ["Untouched"]) // …different file, same path
+
+        let optOut = try makeFile("batch-optout.pdf", tags: ["Unread"])   // nil identity → no §6 check
+
+        let results = TagWriter.apply(
+            TagDelta(add: ["Reviewed"]),
+            to: [(url: ok, identity: okIdentity),
+                 (url: swapReplacement, identity: swapIdentity),
+                 (url: optOut, identity: nil)]
+        )
+
+        XCTAssertEqual(results.count, 3)                                  // 1:1, order preserved
+        XCTAssertEqual(results[0].url, ok)
+        XCTAssertNoThrow(try results[0].result.get())                     // matched identity → wrote
+        XCTAssertTrue(Set(try readTags(ok)).contains("Reviewed"))
+
+        XCTAssertEqual(results[1].url, swapReplacement)
+        XCTAssertThrowsError(try results[1].result.get()) { error in      // mismatch → aborted, isolated
+            guard case TagWriteError.identityMismatch = error else {
+                return XCTFail("expected .identityMismatch, got \(error)")
+            }
+        }
+        XCTAssertEqual(Set(try readTags(swapReplacement)), ["Untouched"]) // replacement untouched
+
+        XCTAssertNoThrow(try results[2].result.get())                     // nil identity → skipped, wrote
+        XCTAssertTrue(Set(try readTags(optOut)).contains("Reviewed"))
+    }
 }

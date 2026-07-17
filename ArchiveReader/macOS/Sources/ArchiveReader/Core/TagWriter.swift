@@ -60,10 +60,23 @@ enum TagWriter {
 
     /// Apply the same delta to a group of files. Each file is an INDEPENDENT, idempotent unit — never
     /// all-or-nothing. Returns a per-file Result so the caller can surface partial failures.
-    /// (No §6 identity check on this path — group edits that want it call the single-file `apply`
-    /// with a per-file `expecting:` once callers capture identity at selection.)
+    /// (No §6 identity check on this path — group edits that want it use the `to items:` overload below,
+    /// passing a per-file `FileIdentity` captured at selection/edit.)
     static func apply(_ delta: TagDelta, to urls: [URL]) -> [(url: URL, result: Result<TagWriteResult, Error>)] {
         urls.map { url in (url, Result { try apply(delta, to: url) }) }
+    }
+
+    /// Group apply WITH per-file §6 identity re-verification — the identity-carrying sibling of the
+    /// `to urls:` overload above, for the group/batch call sites (e.g. corpus-wide tag rename). Each
+    /// `(url, identity)` pair is an INDEPENDENT, idempotent unit (never all-or-nothing): the file is
+    /// tagged only if the resolved write target still matches the captured `identity`; a `nil` identity
+    /// skips the check for that file, exactly like the single-file default. An identity mismatch surfaces
+    /// as `.failure(TagWriteError.identityMismatch)` for that one file while the rest still apply. The
+    /// returned array is 1:1 and in the same order as `items`.
+    static func apply(_ delta: TagDelta,
+                      to items: [(url: URL, identity: FileIdentity?)]
+    ) -> [(url: URL, result: Result<TagWriteResult, Error>)] {
+        items.map { item in (item.url, Result { try apply(delta, to: item.url, expecting: item.identity) }) }
     }
 
     /// Fast-path triage: set Read/Unread by swapping the existing token.

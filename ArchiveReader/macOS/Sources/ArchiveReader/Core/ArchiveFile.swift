@@ -34,3 +34,14 @@ extension ArchiveFile: Hashable {
     // url-only hash stays valid: value-equal files share a url, so they share a hash (collisions OK).
     func hash(into hasher: inout Hasher) { hasher.combine(url) }
 }
+
+extension ArchiveFile {
+    /// Capture this file's on-disk identity ON DEMAND, for a §6 write-target re-verification
+    /// (`TagWriter.apply(_:to:expecting:)` / `setReadState(_:on:expecting:)`). Deliberately a method,
+    /// NOT a stored property: capturing identity is a per-file `stat` (I/O), so it is taken lazily ONLY
+    /// for the handful of files actually being edited — never eagerly at library discovery, which would
+    /// regress the "no per-file I/O" fast path this row model is built around (see the `tags` doc above).
+    /// Returns `nil` when the file has no resolvable identity (missing, or a volume that vends none) →
+    /// the caller then passes no §6 check for that file, exactly as `expecting: nil` does by default.
+    func liveIdentity() -> FileIdentity? { FileIdentity.capture(url) }
+}
