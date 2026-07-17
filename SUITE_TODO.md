@@ -45,6 +45,16 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `devonthink-import.md` — **PLANNING (Archive Notes; HIGH-risk, Tier-2 + reconciliation gate)**: import the
+  owner's personal **DEVONthink 3** database (`Test Files/…/Devonthink database for export.dtBase2`, 7.6 GB,
+  ~40k rtf/rtfd/txt notes+excerpts) into Archive Notes, losslessly. 3-stage offline pipeline (JXA extract →
+  frozen JSON manifest → pure transform → materialize a **fresh** store) + a stop-on-flag verification gate.
+  Owner decisions locked (2026-07-17): text notes+excerpts incl. embedded images; archival `file://` →
+  durable `archivereader://` Reader links; **primary + additional dates**; pointer-notes → a **Related-notes**
+  section. Net-new Notes work: multi-date model (per-date timeline index rows) + Related-notes. Correctness
+  core = replicants (shared `uuid` → memberships) vs near-duplicates (different `uuid` → date consolidation),
+  and the link-conversion contract (nothing survives as `file://`/`zotero://`/`x-devonthink-item://`; only
+  internet URLs stay `://`). See §9 open decisions + §8 owner prerequisites (a Reader root over Archival Photos).
 - ~~`autonomous-2wk-hardening.md`~~ — **SHIPPED 2026-07-16/17** (all 12 workstreams; see the DONE rollup above
   + `ops/autonomous/README.md` for the mechanisms, and `ops/autonomous/tests/prove-*.sh` for the proofs). Plan
   deleted per the "delete a shipped plan" convention — git history keeps the detailed Progress log.
@@ -300,6 +310,17 @@ Legend as above.
 **Parked — explicitly NOT a Wave-14 work item:** Processor cloud/relay **post-finalize reclassify → duplicate
 output** (A11, MED, Drive-milestone) lives entirely in the **Google-Drive relay path**, which is **ON HOLD /
 maintain-only** (see §Project focus). Leave parked until the Drive milestone is un-held; do not build it unattended.
+
+## Archive Notes — DEVONthink import (owner, 2026-07-17)
+- [ ] **Import the personal DEVONthink database into Archive Notes** — plan
+  `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3
+  "Meritocracy Project" DB (~40k notes+excerpts) into Archive Notes: 3-stage offline pipeline (JXA extract →
+  frozen JSON manifest → pure transform → materialize a **fresh** store) + a stop-on-flag reconciliation
+  gate. Delivers net-new Notes features (multi-date primary+additional with per-date timeline rows;
+  Related-notes section) and a deletable import toolchain. **Owner prerequisites (§8):** a Reader root over
+  `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
+  decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
+  + corpus-safety
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
 - [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
