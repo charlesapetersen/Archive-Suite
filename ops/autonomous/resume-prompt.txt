@@ -44,6 +44,17 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
 
 STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
   loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
+  DEPENDENCY GATING (WS9): an item may name a prerequisite as `(blocked-on: <tag>[, <tag>…])` in its line —
+  do NOT pick it until EVERY listed prerequisite item is `[x]`. Run `ops/autonomous/next-queue-item.sh`: it
+  prints each "[ ]" WORK QUEUE item in priority order as `ok<TAB><tag><TAB>text` or
+  `blocked:<unmet-tags><TAB><tag><TAB>text`, resolving each `(blocked-on:)` against checkbox state across the
+  plan + `SUITE_TODO.md` (a missing prerequisite counts as unmet → blocked, so an out-of-order run can't
+  happen). Exit 0 = at least one `ok` item; exit 4 = "[ ]" items exist but ALL are dependency-blocked; exit 3
+  = no "[ ]" items. Pick the first `ok` item that is ALSO not GUI-gated / hold-queue (below); skip a `blocked:`
+  item exactly like a GUI-off one — leave it for a later session once its prerequisite lands. If every `ok`
+  item is GUI/hold-gated, or the script reports all-blocked (exit 4) / empty (exit 3), there is nothing
+  autonomously actionable — STOP (the idle backoff/park handles it). (Authoring note: a prerequisite `<tag>` is
+  the prereq item's leading tag — the first token after its checkbox, e.g. `W15.a`; keep it distinctive.)
   NEVER auto-pick a HOLD-QUEUE item (WS10). The plan's "## HOLD QUEUE (owner-gated)" section — and any item
   tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
   (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything

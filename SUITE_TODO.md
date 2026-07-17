@@ -13,17 +13,18 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 
 ## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)
 
-- [ ] **Autonomous 2-week unattended hardening** — `execution-plans/autonomous-2wk-hardening.md` — **needs:
-  owner + interactive** (Tier-2 self-modification of `ops/autonomous/*` — do NOT drain via the unattended
-  daemon; supervised sessions only, each adversarially reviewed + prove-the-mechanism'd before install). L.
-  Ten workstreams gating a long run: **WS1** crash-restart posture (launchd KeepAlive; keychain-under-launchd
-  check; keep-alive checklist — reboot-survival out of scope) · **WS2** disk-space guard (park+alert on low
-  free space) · **WS3** dirty/abandoned-worktree reclamation (safe, no unpushed-work loss) · **WS4** per-item
-  attempt cap (park a mis-sized item after N tries) · **WS5** auto-generated `STATUS.md` check-in digest ·
-  **WS6** remote push alerts (park/blocker/failed-gate/security) · **WS7** periodic full build+test+coherence
-  health gate (park on red) · **WS8** Morning-Review triage/rotation (it's 1,655 lines) · **WS9** `blocked-on`
-  dependency gating in work-selection · **WS10** needs-owner hold queue for irreversible/corpus-writing work.
+- [x] **Autonomous 2-week unattended hardening** — `execution-plans/autonomous-2wk-hardening.md` — **DONE
+  2026-07-16/17** (supervised sessions, each adversarially reviewed + prove-the-mechanism'd before install).
+  All workstreams shipped: **WS1** crash-restart posture (launchd KeepAlive; reboot-survival out of scope) ·
+  **WS2** disk-space guard (park+alert on low free) · **WS3** worktree reclamation (safe, no unpushed-work
+  loss) · **WS4** per-item attempt cap (park a mis-sized item) · **WS5** `STATUS.md` check-in digest · **WS6**
+  remote push alerts · **WS7** periodic build+test+coherence health gate (park on red) · **WS8** Morning-Review
+  rotation (`compact-plan.sh` Pass 2) · **WS9** `blocked-on` dependency gating (`next-queue-item.sh`) · **WS10**
+  needs-owner hold queue · **WS11** paced whole-project review cadence (`next-review-unit.sh`) · **WS12**
+  keychain partition-list fix. Each with a committed regression harness (`ops/autonomous/tests/prove-*.sh`).
   Out of scope (owner): reboot/auto-login, cumulative-cost ceiling.
+  **Owner actions to start a long run (standing, not blocking):** run `./ops/autonomous/fix-keychain-access.sh`
+  once, then `./ops/autonomous/arm.sh keepalive` (the run is currently DOWN).
 
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 
@@ -44,11 +45,9 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- `autonomous-2wk-hardening.md` — **⭐ TOP PRIORITY, owner+interactive** (see the pinned block above): ten
-  workstreams to make a ~2-week unattended daemon run feasible (durability/disk/worktree-GC/attempt-cap +
-  STATUS digest/alerts/health-gate + Morning-Review rotation/dep-gating/hold-queue). Each Tier-2 self-mod of
-  `ops/autonomous/*` — supervised sessions only, reviewed + prove-the-mechanism'd before install; NOT drained
-  by the unattended daemon.
+- ~~`autonomous-2wk-hardening.md`~~ — **SHIPPED 2026-07-16/17** (all 12 workstreams; see the DONE rollup above
+  + `ops/autonomous/README.md` for the mechanisms, and `ops/autonomous/tests/prove-*.sh` for the proofs). Plan
+  deleted per the "delete a shipped plan" convention — git history keeps the detailed Progress log.
 - ~~`openai-chatgpt-provider.md`~~ — **SHIPPED (Processor, W13.oai-1/2/3)**: OpenAI/ChatGPT as a first-class
   provider — (1) native `LLMProvider.openai` (model list + param-family adapter + onboarding/validation/cost,
   routed through the reused `OpenAICompatibleClient`) and (2) a one-click **OpenAI gateway preset**. All

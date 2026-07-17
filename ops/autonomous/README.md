@@ -405,3 +405,25 @@ byte-identical before replacing**, keep a `.bak`, bail leaving the plan untouche
 idempotent (no-op under trigger). Pass 1 is wrapped in a subshell so its no-op `exit` can't skip Pass 2. Both
 run *after* the work fingerprint is sampled and the Morning Review / Session Log sections are excluded from it,
 so a rotation is **never** miscounted as the run advancing. Proven by `tests/prove-compact.sh`.
+
+## Dependency gating — `(blocked-on: …)` (`next-queue-item.sh`, WS9)
+
+Accumulating dependent work must run in ORDER. A WORK QUEUE item can name a prerequisite in its line:
+
+```
+- [ ] **W15.b — wire the pane** (blocked-on: W15.a) — needs the model type W15.a adds first.
+- [ ] **W15.c — polish** (blocked-on: W15.a, W15.b) — after both.
+```
+
+`ops/autonomous/next-queue-item.sh` resolves this DETERMINISTICALLY (same philosophy as the idle-backoff
+fingerprint — don't trust the model to grep): it prints each `[ ]` WORK QUEUE item in priority order as
+`ok<TAB><tag><TAB>text` or `blocked:<unmet-tags><TAB><tag><TAB>text`, deciding each `(blocked-on: T…)` against
+checkbox state across the plan **and** `SUITE_TODO.md`. A prerequisite `T` is satisfied iff some checkbox line
+whose leading tag is `T` is `[x]` and none is `[ ]`; a **missing** `T` counts as unmet (blocked + visible), so
+a typo can't cause an out-of-order run. Exit codes: `0` = ≥1 actionable item, `4` = items exist but ALL are
+dependency-blocked, `3` = empty queue. Resume-prompt **STEP 2** runs it and picks the first `ok` item that
+isn't also GUI-/hold-gated; when everything actionable is blocked the run simply parks (the idle backoff
+handles a fully-blocked queue as a clean terminal state — no daemon change needed). A tag is an item's leading
+token after its checkbox (`W15.a`, `W3.f1`, `W13.oai-1`); keep prerequisite tags distinctive. Proven by
+`tests/prove-dep-gating.sh` (chains, satisfied/missing/circular prerequisites, multi-prereq, cross-tracker,
+tag-parse).
