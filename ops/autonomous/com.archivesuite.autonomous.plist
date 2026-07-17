@@ -15,12 +15,18 @@
   <key>RunAtLoad</key>
   <true/>
 
-  <!-- Only restart if it dies unexpectedly; a clean exit (plan COMPLETE) stays stopped. -->
+  <!-- KeepAlive=true: the ONLY thing that stops the daemon is a `launchctl bootout` — which every INTENTIONAL
+       stop performs (park_run, plan COMPLETE, and `arm.sh stop`). Any OTHER death (crash, OOM, a stray
+       SIGTERM/SIGKILL) leaves the job registered, so launchd relaunches it. Deliberately NOT
+       {SuccessfulExit:false}: the daemon traps SIGTERM/INT and exits 0, so a stray TERM would look
+       "successful" and NOT restart — exactly the death observed 2026-07-17 (daemon TERMed mid-session,
+       nothing restarted it). KeepAlive=true makes any bootout-less death restart, closing that gap. -->
   <key>KeepAlive</key>
-  <dict>
-    <key>SuccessfulExit</key>
-    <false/>
-  </dict>
+  <true/>
+
+  <!-- Don't hammer on a startup crash-loop: wait 60s between (re)launches. -->
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
 
   <key>StandardOutPath</key>
   <string>/Users/<user>/.local/state/archive-autonomous/launchd.out.log</string>

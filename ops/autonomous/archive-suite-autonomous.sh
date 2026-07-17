@@ -309,6 +309,11 @@ backoff_sleep() {
 park_run() {
   local reason="$1" m="$2"
   rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a re-arm could trip over
+  # Release the engine lock HERE, not in the caller's post-verdict cleanup: under `keepalive` (WS1) the
+  # `launchctl bootout` below SIGTERMs THIS process the instant it's called (verified), so everything textually
+  # after it — including tick()'s `rm -f "$LOCK"` — never runs. Without this, an idle/attempt-cap park (both
+  # hold the lock) would leave a fresh lock, and a re-arm within $STALE (25 min) would no-op "engine busy".
+  rm -f "$LOCK" 2>/dev/null || true
   log "!!!!!!!!!!!! PARKED ($reason) — stopping. $m"
   { echo "[$(date '+%F %T')] $m"; } > "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
   notify "Archive Suite: run parked ($reason)" "$m"

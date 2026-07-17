@@ -7,9 +7,12 @@
 # re-derived from README.md again.
 #
 # Run from the PRIMARY checkout:
-#   ./ops/autonomous/arm.sh            # install + verify prereqs + launch + confirm first cycle
-#   ./ops/autonomous/arm.sh status     # show daemon state + RUN STATUS + recent log (read-only)
-#   ./ops/autonomous/arm.sh stop       # stop the detached daemon
+#   ./ops/autonomous/arm.sh            # install + verify prereqs + launch DETACHED (nohup; no crash-restart)
+#   ./ops/autonomous/arm.sh keepalive  # same, but under launchd KeepAlive — a CRASH/kill auto-restarts (WS1).
+#                                      #   Best for a long unattended run. Survives a daemon crash, NOT a
+#                                      #   logout/reboot. GUI-verify (gui on) is better under plain `arm`.
+#   ./ops/autonomous/arm.sh status     # show daemon state + supervisor + RUN STATUS + recent log (read-only)
+#   ./ops/autonomous/arm.sh stop       # stop it (boots out the launchd job first, then kills the process)
 #
 # Prereqs it enforces (and explains if missing): claude CLI outside ~/Desktop (launchd/TCC),
 # the daemon script + resume prompt present, an L0 plan whose RUN STATUS is IN_PROGRESS with
@@ -27,6 +30,10 @@ COMPACT_DST="$BIN/compact-plan.sh"
 PROMPT_SRC="$REPO/ops/autonomous/resume-prompt.txt"
 PLAN="$REPO/.maintenance/AUTONOMOUS_PLAN.md"
 LOG="$STATE/daemon.log"
+JOB="com.archivesuite.autonomous"                        # launchd label (matches the .plist + the daemon's $JOB)
+PLIST_SRC="$REPO/ops/autonomous/com.archivesuite.autonomous.plist"
+PLIST_DST="$HOME/Library/LaunchAgents/$JOB.plist"
+GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd domain for the LaunchAgent
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
 # taskport = the debugger right XCUITest needs; 'allow' = password-free. Set on `gui on`, reverted on `gui off`.
@@ -38,6 +45,18 @@ am_state() { automationmodetool 2>/dev/null | grep -qi 'requires.*authentication
 status() {
   echo "== daemon process =="
   pgrep -fl archive-suite-autonomous.sh || echo "  (not running)"
+  # WS1: is it launchd-managed (crash-restart) or plain nohup (no restart)?
+  if launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
+    echo "  supervisor: launchd KeepAlive (crash-restart ON) — stop with '$0 stop'"
+    # Job loaded but no process = relaunching, or crash-looping (throttled 60s). Surface it — otherwise a
+    # crash-loop reads identical to healthy here.
+    if ! pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
+      lec=$(launchctl print "$GUI_DOMAIN/$JOB" 2>/dev/null | awk -F'= ' '/last exit code/{gsub(/[^0-9-]/,"",$2); print $2; exit}')
+      echo "  ⚠ job loaded but NO process right now — relaunching, or crash-looping (last exit ${lec:-?}; see $STATE/launchd.err.log)"
+    fi
+  else
+    echo "  supervisor: nohup / none (a crash will NOT restart; '$0 keepalive' for crash-restart)"
+  fi
   echo "== run state =="
   # Distinguish PARKED (daemon auto-stopped after a long idle stretch — blocked on you, nothing lost) from a
   # crash, and show whether a live daemon is backing off. All derived from files the daemon writes; read-only.
@@ -89,14 +108,19 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 case "${1:-arm}" in
   status) status; exit 0 ;;
   stop)
-    # Kill the daemon loop AND any resume session it spawned. A bare `claude -p` child is NOT matched by the
-    # script-name pgrep (its cmdline is the prompt text), so killing only the loop orphans it — reparented to
-    # init, still running off possibly-stale state (the repeated-orphan bug). Match sessions by the resume
+    # bootout FIRST — under `keepalive` (launchd KeepAlive=true) a plain pkill would just be relaunched, so we
+    # must remove the launchd job before killing anything. Harmless no-op if the run is the plain nohup mode
+    # (no such job). THEN pkill the loop + any resume session it spawned: a bare `claude -p` child is NOT
+    # matched by the script-name pgrep (its cmdline is the prompt text), so killing only the loop orphans it
+    # (reparented to init, running off stale state — the repeated-orphan bug); match sessions by the resume
     # prompt's distinctive phrase. Neither pattern matches arm.sh itself or an interactive Claude session.
+    booted=0; launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null && { booted=1; echo "launchd job booted out."; }
     k=0
     pkill -f 'archive-suite-autonomous\.sh' && k=1
     pkill -f 'autonomous maintenance session for the Archive Suite' && k=1
-    [ "$k" = 1 ] && echo "daemon + any resume session stopped." || echo "daemon was not running."
+    if [ "$k" = 1 ]; then echo "daemon + any resume session stopped."
+    elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
+    else echo "daemon was not running."; fi
     exit 0 ;;
   gui)
     # GUI-mode flag: each resume session reads $STATE/gui-mode to decide whether to drive/verify GUI (see the
@@ -170,8 +194,9 @@ case "${1:-arm}" in
       *) fail "usage: $0 gui on|off|status" ;;
     esac
     exit 0 ;;
-  arm) : ;;
-  *) fail "unknown command '${1}'. Use: arm | status | stop | gui on|off|status" ;;
+  arm)       MODE=nohup ;;
+  keepalive) MODE=keepalive ;;   # WS1: run under launchd with KeepAlive so a crash/kill auto-restarts
+  *) fail "unknown command '${1}'. Use: arm | keepalive | status | stop | gui on|off|status" ;;
 esac
 
 # ---- arm ----
@@ -193,10 +218,15 @@ echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prom
 #     Idempotent + non-fatal — a missing cert just means builds fall back to ad-hoc (the old behavior).
 bash "$REPO/ops/autonomous/ensure-signing.sh" || echo "arm: ensure-signing failed (non-fatal; ad-hoc fallback)"
 
-# 3. don't double-launch
-if pgrep -f archive-suite-autonomous.sh >/dev/null; then
-  echo "daemon ALREADY running — not launching a second one:"
-  pgrep -fl archive-suite-autonomous.sh
+# 3. don't double-launch. Check the process AND the launchd job UNCONDITIONALLY (not only in keepalive mode):
+#    a keepalive job can be registered but momentarily process-down (crash/throttle window), and arming plain
+#    `arm.sh` then would miss it via pgrep and start a SECOND nohup sibling that park's self-bootout can't
+#    stop. Checking the job regardless catches that cross-mode collision.
+if pgrep -f archive-suite-autonomous.sh >/dev/null \
+   || launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
+  echo "daemon ALREADY running (or launchd job loaded) — not launching a second one:"
+  pgrep -fl archive-suite-autonomous.sh || echo "  (process down but job loaded — launchd will relaunch)"
+  echo "  To switch modes or restart: '$0 stop' first, then '$0 [keepalive]'."
   echo; status; exit 0
 fi
 
@@ -216,9 +246,27 @@ EOF
 fi
 echo "plan status OK: $st"
 
-# 5. launch detached (macOS has no setsid; subshell + nohup survives this shell returning)
-( nohup "$DAEMON_DST" >"$STATE/nohup.out" 2>&1 & )
-echo "launched (detached)."
+# 5. launch — nohup (default) or launchd KeepAlive (crash-restart; WS1)
+if [ "$MODE" = keepalive ]; then
+  # Install the LaunchAgent + (re)bootstrap it. RunAtLoad launches the daemon; KeepAlive=true relaunches it
+  # on any bootout-less death (crash/OOM/stray signal). `arm.sh stop`, park, and plan-COMPLETE all bootout,
+  # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
+  # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). GUI-verify (gui on) is
+  # best under plain `arm` (nohup) where the daemon inherits the terminal's TCC grants; a LaunchAgent may not.
+  plutil -lint "$PLIST_SRC" >/dev/null || fail "plist is malformed: $PLIST_SRC"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  install -m 644 "$PLIST_SRC" "$PLIST_DST"
+  launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null || true   # clear any stale registration first
+  if launchctl bootstrap "$GUI_DOMAIN" "$PLIST_DST"; then
+    echo "launched (launchd KeepAlive; plist -> $PLIST_DST)."
+  else
+    fail "launchctl bootstrap failed — check: launchctl print $GUI_DOMAIN/$JOB"
+  fi
+else
+  # macOS has no setsid; subshell + nohup survives this shell returning (reparented to init).
+  ( nohup "$DAEMON_DST" >"$STATE/nohup.out" 2>&1 & )
+  echo "launched (detached nohup — no crash-restart; use '$0 keepalive' for a long unattended run)."
+fi
 
 # 6. verify the first cycle actually started (bounded poll — no unbounded wait)
 ok=""

@@ -30,7 +30,8 @@ context compaction, and session restarts. Standing principles: memory `autonomou
 `~/Desktop`, daemon + resume prompt present, an L0 plan whose `RUN STATUS` is `IN_PROGRESS` with unchecked
 `[ ]` items), installs the latest committed copies to the runtime location, refuses to double-launch, warns
 with the exact fix if the plan is stale-`COMPLETE`, launches detached, and confirms the first cycle started.
-Also `arm.sh status` (read-only) and `arm.sh stop`. The manual steps below are what it automates.
+Also `arm.sh keepalive` (crash-restart under launchd — see below), `arm.sh status` (read-only), and
+`arm.sh stop`. The manual steps below are what it automates.
 
 The committed copies here are the source of truth; install to the runtime location:
 
@@ -51,22 +52,29 @@ just start it again from your next session. All state is durable in the plan + `
 and the next start continues the queue. **We deliberately do NOT chase reboot/close durability** — the
 detached, session-scoped run is the normal behavior, not a stopgap.
 
-**Optional — reboot-durable (rarely needed, NOT the default).** Only if you specifically want the run to
-survive a reboot or the launching session closing, arm the LaunchAgent (may log `Operation not permitted`
-until you grant **Full Disk Access** to `/bin/bash` in System Settings → Privacy). Normal use does not need it:
-```bash
-cp ops/autonomous/com.archivesuite.autonomous.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.archivesuite.autonomous.plist
-```
+**Crash-restart — `./ops/autonomous/arm.sh keepalive` (WS1, 2026-07-17; recommended for a long unattended
+run).** Same install/verify as `arm`, but runs the daemon under a launchd LaunchAgent with **`KeepAlive=true`**
+so a **crash / OOM / stray kill auto-restarts** it — motivated by a real 2026-07-17 death where the daemon was
+TERMed mid-session and nothing brought it back. The model is simple: **the only thing that stops it is a
+`launchctl bootout`**, which every intentional stop performs (`arm.sh stop`, park, plan-COMPLETE); any other
+death leaves the job registered, so launchd relaunches (throttled to 60s). Proven on-machine by
+`tests/prove-keepalive.sh`.
+- **Survives a daemon crash, NOT a logout/reboot** — a LaunchAgent only loads at GUI login (reboot-survival is
+  deliberately out of scope; it'd need auto-login, defeated by FileVault anyway — see "don't reboot" below).
+- **GUI-verify (gui on) is better under plain `arm`** (nohup), where the daemon inherits the launching
+  terminal's TCC (Accessibility/Screen-Recording) grant; a LaunchAgent may not.
+- May log `Operation not permitted` until `/bin/bash` has **Full Disk Access** (System Settings → Privacy).
 
 ## Stop / status
 
 ```bash
 tail -f ~/.local/state/archive-autonomous/daemon.log            # cadence + rc of each resume
 tail -f ~/.local/state/archive-autonomous/last-session.log      # the most recent resume's transcript
-pkill -f archive-suite-autonomous.sh                            # stop the detached daemon
-launchctl bootout gui/$(id -u)/com.archivesuite.autonomous      # stop the LaunchAgent (also auto at COMPLETE/park)
+./ops/autonomous/arm.sh stop                                    # STOP either mode (boots out the launchd job, THEN kills)
 ```
+`arm.sh stop` is the right stopper in both modes: under `keepalive` a bare `pkill` would just be relaunched by
+launchd, so `stop` boots out the job first. (`arm.sh status` shows the **supervisor**: launchd KeepAlive vs
+nohup.)
 `./arm.sh status` shows a **run state** line — *productive* / *backing off (idle Ns)* / *PARKED* / *stopped* —
 so a parked run is never mistaken for a crash. The daemon self-terminates when the plan's `RUN STATUS:` line
 reads `COMPLETE`, **or** when it parks (see below).
@@ -178,7 +186,10 @@ session env), and the WS4 attempt cap (park-at-cap / completion-reset / stale-co
 **Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
 
 ```bash
-ops/autonomous/tests/prove-daemon.sh          # ~3 min, $0, no network
+ops/autonomous/tests/prove-daemon.sh          # ~3 min, $0, no network — the daemon-loop logic (51 assertions)
+ops/autonomous/tests/prove-keepalive.sh        # WS1 launchd half: a THROWAWAY LaunchAgent proves KeepAlive
+                                               # restarts on kill-9 + bootout stays dead (can't run under the
+                                               # bash-only harness). Run interactively; auto-cleans.
 ```
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12
