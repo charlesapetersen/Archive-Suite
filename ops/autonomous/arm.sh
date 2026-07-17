@@ -101,6 +101,11 @@ status() {
   fi
   echo "== recent daemon.log =="
   tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
+  echo "== digest (WS5) =="
+  # The rich one-screen digest — generated fresh here, and the daemon writes it to $STATE/STATUS.md each cycle.
+  if [ -x "$REPO/ops/autonomous/status-digest.sh" ]; then
+    "$REPO/ops/autonomous/status-digest.sh" 2>/dev/null | sed 's/^/  /' || echo "  (digest unavailable)"
+  fi
 }
 
 fail() { echo "ERROR: $*" >&2; exit 1; }

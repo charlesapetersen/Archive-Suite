@@ -97,6 +97,8 @@ esac
 exit "\$rc"
 STUB
 chmod +x "$T/claude"
+# WS5 status-digest stub — the daemon should write its stdout to $STATE/STATUS.md each cycle + on park.
+printf '#!/bin/sh\necho "STATUS-DIGEST-OK parked=${STATUS_PARKED:-no}"\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
 launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
@@ -105,11 +107,12 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" \
   AUTONOMOUS_GATE_EVERY="${GATE_EVERY:-0}" AUTONOMOUS_GATE_CMD="${GATE_CMD:-/bin/false}" AUTONOMOUS_GATE_MAXRUN="${GATE_MAXRUN:-60}" \
   AUTONOMOUS_GATE_MAX_TIMEOUTS="${GATE_MAX_TIMEOUTS:-2}" \
+  AUTONOMOUS_STATUS_CMD="${STATUS_CMD:-$T/status-stub.sh}" \
   AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
   echo $!
 }
-reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts"; }
+reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md"; }
 stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; pkill -f provetest 2>/dev/null; }
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
@@ -369,6 +372,19 @@ echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo deadbeefdeadbeefdeadbeefdeadbeefdeadbeef > "$STATE/last-gate"   # seed AFTER reset (see [25])
 P=$(GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0); sleep 8; stop "$P"; L="$STATE/daemon.log"
 grep -q 'health gate DUE' "$L" && ok "bad last-gate sha -> gate ran (fail-open)" || bad "bad sha silently skipped the gate"
+
+# ================= WS5 STATUS digest =================
+echo "[27] WS5 — the daemon writes \$STATE/STATUS.md each cycle (and on park)"
+echo "1:no" > "$CTRL"; write_plan; dfset 999999
+L=$(run_daemon 0 6)
+[ -s "$STATE/STATUS.md" ] && ok "STATUS.md written" || bad "STATUS.md not written"
+grep -q 'STATUS-DIGEST-OK' "$STATE/STATUS.md" 2>/dev/null && ok "digest content present" || bad "digest content missing"
+
+echo "[27b] WS5 — STATUS.md is refreshed on PARK, and the park flag reaches the digest (not stale 'running')"
+echo "1:no" > "$CTRL"; write_plan; dfset 999999; rm -f "$STATE/STATUS.md"
+L=$(run_daemon 5 22)
+grep -q 'PARKED' "$L" && [ -s "$STATE/STATUS.md" ] && ok "STATUS.md refreshed at park" || bad "STATUS.md not refreshed on park"
+grep -qE 'parked=.*(progress|blocked)' "$STATE/STATUS.md" 2>/dev/null && ok "park flag passed to the digest" || bad "park flag not passed ($(cat "$STATE/STATUS.md" 2>/dev/null | tr -d '\n'))"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

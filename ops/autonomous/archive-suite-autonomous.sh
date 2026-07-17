@@ -77,6 +77,10 @@ GATE_CMD="${AUTONOMOUS_GATE_CMD:-$REPO/ops/autonomous/health-gate.sh}"   # overr
 GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-1800}"      # wall-clock cap on the gate (30 min); a hang -> kill + SKIP
 GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts before PARK (a persistent hang)
 
+# STATUS digest (WS5) — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a
+# 5-second read (run state, backlog, commits/day, disk, last gate, owner-needed). Overridable (harness stub).
+STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -123,6 +127,16 @@ DENY=(
 
 mkdir -p "$STATE"
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# WS5 — regenerate the one-screen $STATE/STATUS.md digest. Cheap (greps + git log + df), read-only, never
+# fatal. Called at each cycle's tail and on park (so a parked STATUS reflects the park). Written to a temp
+# then mv'd so a concurrent reader never sees a half-written file.
+write_status() {   # $1 (optional) = a park reason -> STATUS.md shows PARKED even though this process is still
+                   # alive (park_run calls this BEFORE its bootout, so the digest's pgrep check would else lie).
+  [ -x "$STATUS_CMD" ] || return 0
+  STATUS_PARKED="${1:-}" "$STATUS_CMD" > "$STATE/STATUS.md.tmp" 2>/dev/null && mv -f "$STATE/STATUS.md.tmp" "$STATE/STATUS.md" 2>/dev/null || rm -f "$STATE/STATUS.md.tmp" 2>/dev/null
+  return 0
+}
 
 # Alert config lives in its OWN file, sourced WITHOUT `set -a`, and that is load-bearing — NOT style.
 # $STATE/env is the CHILD's environment: tick() re-sources it under allexport to hand PATH/OCR_KEY to
@@ -334,6 +348,7 @@ park_run() {
   log "!!!!!!!!!!!! PARKED ($reason) — stopping. $m"
   { echo "[$(date '+%F %T')] $m"; } > "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
   notify "Archive Suite: run parked ($reason)" "$m"
+  write_status "$reason"   # refresh the digest so STATUS.md shows PARKED (flag: this process is still alive)
   # $reason goes in as an argv PARAMETER, never interpolated into the script text: a double quote in it would
   # otherwise close the AppleScript string and the rest would EXECUTE (`do shell script …` — verified RCE).
   # Today's callers are fixed text + numbers, but one future caller surfacing a build error or a path is all
@@ -775,6 +790,9 @@ tick() {
   if [ -x "$HOME/.local/bin/compact-plan.sh" ]; then
     "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1 || true
   fi
+  # WS5 — refresh the digest at the cycle tail, EXCEPT when the cycle parked (verdict 9): park_run already
+  # wrote a PARKED digest (with the flag), and an unflagged tail write here would clobber it back to "running".
+  [ "$verdict" = 9 ] || write_status
   return "$verdict"
 }
 

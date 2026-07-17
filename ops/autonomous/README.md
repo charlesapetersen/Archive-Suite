@@ -148,6 +148,13 @@ paid Processor OCR smoke.
   `xcodebuild test` doesn't prompt for the debugger. Run `ops/autonomous/health-gate.sh` yourself once to
   confirm it's green + prompt-free before arming a long run.
 
+**STATUS digest (WS5, 2026-07-17) — the check-in surface.** `ops/autonomous/status-digest.sh` prints a
+one-screen summary — run state, PLAN status, HEAD + commits/24h, backlog (SUITE_TODO / WORK QUEUE / hold),
+last health-gate, review coverage, disk, worktrees, and a **NEEDS YOU** section (park, taskport-still-open,
+keychain-not-fixed, hold-queue items, Morning-Review head). The daemon rewrites `$STATE/STATUS.md` from it
+every cycle + on park, and `arm.sh status` runs it. Read-only, non-fatal, degrades gracefully. Check in with:
+`cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/status-digest.sh`).
+
 ## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
 
 **Remote alerting (WS6).** Every "park + alert" path also POSTs to an endpoint you configure, because a
@@ -201,14 +208,14 @@ re-created item gets a fresh, empty partition list). `arm.sh status` shows wheth
 
 Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every
 host-touching command (`security`/`osascript`/`launchctl`/`caffeinate`/`curl`/`df`) stubbed — it cannot reach
-your Desktop, the real repo, launchd, or the network. **68 assertions**: both idle waste modes, backoff
+your Desktop, the real repo, launchd, or the network. **72 assertions**: both idle waste modes, backoff
 doubling + cap, progress-reset, queue-edit early-wake, the stale-`idle.since` cycle-1-park regression,
 rc≠0-with-commit, the `COMPLETE` path, the disk guard (park / fail-open / self-heal / engine-busy
 reentrancy), alerting (no-op-when-unset, argv word-splitting, and that the alert credential never reaches the
 session env), the WS4 attempt cap (park-at-cap / completion-reset / stale-count-cleared-at-startup), and the
 WS7 health gate (green-records-non-terminal / reproducible-red-parks-after-a-retry / flaky-red-recovers /
 single-hang-skips / persistent-hangs-escalate-to-park / not-due / bad-sha-fails-open — with a STUB gate; the
-real `health-gate.sh` is proven by running it).
+real `health-gate.sh` is proven by running it), and WS5 (the daemon writes STATUS.md each cycle + on park).
 **Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
 
 ```bash

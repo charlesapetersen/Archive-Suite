@@ -197,7 +197,12 @@ clean.
       +wait-reap the killed gate); **`arm.sh stop` now kills an in-flight gate** (was orphaning the xcodebuild
       tree); **DeepLink env-test skipped** (would have RED'd every gate — KNOWN_ISSUES entry) + coherence made
       warn-only. Proven: `prove-daemon.sh` (68 assertions) + a real `health-gate.sh` run (green + prompt-free).
-- [ ] WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating.
+- [x] **WS5** STATUS digest — shipped 2026-07-17. `status-digest.sh` prints a one-screen check-in (run state,
+      PLAN, HEAD/commits-24h, backlog, gate result, review coverage, disk, worktrees, **NEEDS-YOU**); the
+      daemon rewrites `$STATE/STATUS.md` each cycle + on park, and `arm.sh status` runs it. Read-only,
+      degrades gracefully, non-fatal write. Proven: `prove-daemon.sh` (71) + a real run against this repo
+      (correctly flagged the pending keychain fix + Morning-Review entries).
+- [ ] WS8 Morning-Review rotation · WS9 dep gating.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).
