@@ -50,12 +50,18 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   (seen: a 0.07s suite took 448s under contention). Run one build/test at a time.
 
 ## Deferred hardening (from the 2026-07-05 code review)
-- **Write-target identity re-verification (Safety §6, low severity):** `TagWriter.mutate` writes to
-  whatever file currently occupies the URL. If a file is moved/replaced in Finder between Spotlight
-  discovery and the write, the delta could apply to the wrong file's tags. v1 assumes stable local
-  files (owner-confirmed). Full fix = capture a stable identity (security-scoped bookmark /
-  `fileResourceIdentifierKey`) at discovery and re-verify inside the coordination block before
-  writing. Tracked for a future hardening pass; do NOT request `.documentIdentifierKey` (it mutates).
+- **Write-target identity re-verification (Safety §6, low severity) — MECHANISM SHIPPED 2026-07-17
+  (`838b456`+`d393ff3`, W14.2); call-site wiring remains.** The concern: a tag write applies to whatever
+  file currently occupies the URL, so a Finder move/replace between Spotlight discovery and the write
+  could tag the wrong file. **Now available:** `CoordinatedTagWriter.write(_:expectedIdentity:)` +
+  `FileIdentity` (backed by `fileResourceIdentifier`, compared via `isEqual:` — **never**
+  `.documentIdentifierKey`, which mutates on read) re-verify the resolved URL's identity **inside the
+  `NSFileCoordinator` block** and abort with `.identityMismatch` on a moved/replaced file; the Reader
+  `TagWriter.apply`/`setReadState` adapter exposes an opt-in `expecting:` param (fully unit-tested on
+  scratch copies). **Still open (W14.2-fu):** no live call site passes an identity yet, so production
+  writes are unchanged — capture the identity lazily at edit/selection time (never at bulk discovery —
+  per-file I/O would regress the `ArchiveFile` fast path) and thread it through the `NavigationModel`
+  call sites to arm the guard.
 
 ## @Published willSet timing (fixed 2026-07-05 — GUI-caught)
 - A Combine subscription on a nested `@Published` (`library.$files`) fires in **willSet**, *before* the

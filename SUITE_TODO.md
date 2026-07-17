@@ -233,14 +233,23 @@ Legend as above.
   button that once sent it was removed; "Finish session" is a Mac-side backstop). Adversarial refutation (independent
   read of both companion trees) could not break the gate on either side. KNOWN_ISSUES #1 marked FIXED-in-code to
   match #2/#3/#4. **Keyed/owner tail unchanged:** on-device/emulator E2E (`scripts/e2e-phone-mac.sh`) → Morning Review.
-- [ ] **W14.2 — Reader write-target identity re-verification (Safety §6) [MED]** _(Reader KNOWN_ISSUES →
-  "Deferred hardening")._ `TagWriter.mutate` writes to whatever file currently occupies the URL; a Finder
-  move/replace between Spotlight discovery and the write could apply the delta to the wrong file's tags. **Fix:**
-  capture a stable identity (security-scoped bookmark / `fileResourceIdentifierKey`) at discovery and **re-verify
-  the resolved URL's identity inside the `NSFileCoordinator` block before writing** — abort on mismatch. **Do NOT
-  request `.documentIdentifierKey`** (it mutates on read). **Tier-2** (TagWriter). Fully daemon-buildable +
-  unit-testable on scratch copies (extend the existing 191-test suite; never the real corpus). | files:
-  packages/ArchiveCore/.../Tags/TagWrite.swift, ArchiveReader Core/TagWriter.swift | M | med | none
+- [x] **W14.2 — Reader write-target identity re-verification (Safety §6) [MED]** — shipped `838b456` (primitive)
+  + `d393ff3` (Reader adapter). Added opaque `FileIdentity` (backed by `fileResourceIdentifier`, compared via
+  `isEqual:` — **never** `.documentIdentifierKey`, which mutates on read) + an opt-in `expectedIdentity:` param on
+  `CoordinatedTagWriter.write` that **re-verifies the resolved URL's identity inside the `NSFileCoordinator` block
+  before any write and aborts with `.identityMismatch`** on a moved/replaced file; threaded `expecting:` through the
+  Reader `TagWriter.apply`/`setReadState` adapter (default nil = behavior-preserving). Tier-2 gate met unattended:
+  build clean, 0 new warnings; +8 scratch-copy tests (4 primitive + 4 adapter; the deterministic safety case =
+  a *different* file at the same path → abort + replacement untouched) — ArchiveCore 100 green (stable ×3),
+  ArchiveReaderTests 23 green. **Follow-up (armed below):** wire capture-at-selection at live call sites so the
+  mechanism is armed in production — see "W14.2-fu". | M | med | none
+- [ ] **W14.2-fu — Arm §6 identity check at live Reader call sites [MED, follow-on to W14.2]** — the `FileIdentity`/
+  `expecting:` mechanism (W14.2) is available + tested but **no caller passes an identity yet**, so production writes
+  are unchanged. Capture the file's `FileIdentity` **lazily at edit/selection time** (NOT at bulk NSMetadataQuery
+  discovery — that would add per-file I/O across the whole corpus, regressing the `ArchiveFile` "no per-file I/O"
+  fast path) and thread it into the 6 `NavigationModel` `TagWriter.apply`/`setReadState` call sites (incl. a
+  per-file identity variant for the group/batch path). **Tier-2** (TagWriter call sites). | files: ArchiveReader
+  Views/NavigationModel.swift, Core/ArchiveFile.swift, Core/TagWriter.swift (batch overload) | M | med | W14.2
 - [ ] **W14.3 — Notes: extract-paste imports inline-image BYTES [MED]** _(Notes KNOWN_ISSUES → "Extracts
   create/copy-paste follow-ups")._ The copy side embeds image bytes and Create/Append persist them, but the live
   extract-editor **paste** handler still inserts image *references* without importing the payload's bytes into the

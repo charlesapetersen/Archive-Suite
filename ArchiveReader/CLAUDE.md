@@ -144,7 +144,11 @@ add {"1981"}`. All of the following hold for every delta.
    `kMDItemUserTags` (lossy/stale). A **no-op delta writes nothing** (no mod-date churn).
 6. **Do not request `.documentIdentifierKey`** on read (it can *assign & persist* an identifier —
    a mutation). Use security-scoped bookmarks + re-verify the resolved URL's identity before writing
-   (guards against writing to the wrong file after a Finder move).
+   (guards against writing to the wrong file after a Finder move). *Mechanism (W14.2):*
+   `CoordinatedTagWriter.write(_:expectedIdentity:)` + `FileIdentity` (backed by `fileResourceIdentifier`,
+   `isEqual:`-compared) re-verify identity inside the coordination block and abort with `.identityMismatch`
+   on mismatch; `TagWriter.apply`/`setReadState` expose an opt-in `expecting:` param. Arming it at live
+   call sites (capture lazily at selection, never at bulk discovery) is the open follow-up W14.2-fu.
 7. **Color label:** write `.labelNumberKey` **only** when the delta explicitly changes color
    (box/folder). Otherwise never write it; read before/after and restore only on unintended drift.
 8. **Verify by re-read.** Assert the resulting tag **multiset** equals `(old − remove) ∪ add`
