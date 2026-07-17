@@ -243,13 +243,21 @@ Legend as above.
   a *different* file at the same path → abort + replacement untouched) — ArchiveCore 100 green (stable ×3),
   ArchiveReaderTests 23 green. **Follow-up (armed below):** wire capture-at-selection at live call sites so the
   mechanism is armed in production — see "W14.2-fu". | M | med | none
-- [ ] **W14.2-fu — Arm §6 identity check at live Reader call sites [MED, follow-on to W14.2]** — the `FileIdentity`/
-  `expecting:` mechanism (W14.2) is available + tested but **no caller passes an identity yet**, so production writes
-  are unchanged. Capture the file's `FileIdentity` **lazily at edit/selection time** (NOT at bulk NSMetadataQuery
-  discovery — that would add per-file I/O across the whole corpus, regressing the `ArchiveFile` "no per-file I/O"
-  fast path) and thread it into the 6 `NavigationModel` `TagWriter.apply`/`setReadState` call sites (incl. a
-  per-file identity variant for the group/batch path). **Tier-2** (TagWriter call sites). | files: ArchiveReader
-  Views/NavigationModel.swift, Core/ArchiveFile.swift, Core/TagWriter.swift (batch overload) | M | med | W14.2
+- [x] **W14.2-fu — Arm §6 identity check at live Reader call sites [MED, follow-on to W14.2]** — shipped
+  `1a7c6cb` (checkpoint: `ArchiveFile.liveIdentity()` on-demand capture + the identity-carrying
+  `TagWriter.apply(_:to:[(url,identity)])` batch overload + a scratch-copy test) + this commit (arming +
+  docs). All **6** `NavigationModel` `TagWriter.apply`/`setReadState` call sites — `mark`, group edit
+  (⌘I), inline edit/read-state, corpus-wide rename (via the batch overload), and **undo** — now capture
+  the file's `FileIdentity` **lazily at edit time** (via `liveIdentity()`, never at bulk discovery, so the
+  `ArchiveFile` "no per-file I/O" fast path is untouched) and pass it through `expecting:`. Undo re-verifies
+  against the identity captured at the ORIGINAL edit (undo stack now carries per-write identity), so a file
+  swapped under its path between edit and undo is skipped, not mis-tagged. **Tier-2 gate met unattended:**
+  build clean, 0 new warnings; behavior-preserving threading (identical accounting) + the §6 write-path is
+  fully unit-tested on scratch copies (existing 3 §6 adapter tests + the new batch test) + adversarial
+  self-review; ArchiveReaderTests 199/200 (the 1 failure is the pre-existing `DeepLinkTests.testRevealAndSelectNoRoot`
+  env flake, unrelated). No visible UI effect (invisible safety guard, only fires on a file swap), so no
+  GUI drive; an optional live regression smoke on a scratch corpus → Morning Review. | files: ArchiveReader
+  Views/NavigationModel.swift, Core/ArchiveFile.swift, Core/TagWriter.swift | done
 - [ ] **W14.3 — Notes: extract-paste imports inline-image BYTES [MED]** _(Notes KNOWN_ISSUES → "Extracts
   create/copy-paste follow-ups")._ The copy side embeds image bytes and Create/Append persist them, but the live
   extract-editor **paste** handler still inserts image *references* without importing the payload's bytes into the

@@ -50,18 +50,22 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   (seen: a 0.07s suite took 448s under contention). Run one build/test at a time.
 
 ## Deferred hardening (from the 2026-07-05 code review)
-- **Write-target identity re-verification (Safety §6, low severity) — MECHANISM SHIPPED 2026-07-17
-  (`838b456`+`d393ff3`, W14.2); call-site wiring remains.** The concern: a tag write applies to whatever
-  file currently occupies the URL, so a Finder move/replace between Spotlight discovery and the write
-  could tag the wrong file. **Now available:** `CoordinatedTagWriter.write(_:expectedIdentity:)` +
-  `FileIdentity` (backed by `fileResourceIdentifier`, compared via `isEqual:` — **never**
+- **Write-target identity re-verification (Safety §6, low severity) — FIXED 2026-07-17 (mechanism
+  `838b456`+`d393ff3`, W14.2; armed at live call sites `1a7c6cb`+W14.2-fu).** The concern: a tag write
+  applies to whatever file currently occupies the URL, so a Finder move/replace between Spotlight
+  discovery and the write could tag the wrong file. **Mechanism:** `CoordinatedTagWriter.write(_:expectedIdentity:)`
+  + `FileIdentity` (backed by `fileResourceIdentifier`, compared via `isEqual:` — **never**
   `.documentIdentifierKey`, which mutates on read) re-verify the resolved URL's identity **inside the
   `NSFileCoordinator` block** and abort with `.identityMismatch` on a moved/replaced file; the Reader
   `TagWriter.apply`/`setReadState` adapter exposes an opt-in `expecting:` param (fully unit-tested on
-  scratch copies). **Still open (W14.2-fu):** no live call site passes an identity yet, so production
-  writes are unchanged — capture the identity lazily at edit/selection time (never at bulk discovery —
-  per-file I/O would regress the `ArchiveFile` fast path) and thread it through the `NavigationModel`
-  call sites to arm the guard.
+  scratch copies). **Armed (W14.2-fu):** every `NavigationModel` write call site — `mark`, group/inline
+  edits, corpus-wide rename, and undo — now captures the file's `FileIdentity` **lazily at edit time**
+  (via `ArchiveFile.liveIdentity()`, never at bulk discovery, so the "no per-file I/O" fast path is
+  preserved) and passes it through `expecting:`; undo re-verifies against the identity captured at the
+  ORIGINAL edit, so a file swapped under its path between edit and undo is skipped rather than mis-tagged.
+  The group/rename path uses the identity-carrying `TagWriter.apply(_:to:[(url,identity)])` batch overload.
+  A `nil` identity (file with no resolvable id) transparently skips the check for that file. Guard active
+  in production; failures surface as "could not update/edit" without altering any other file.
 
 ## @Published willSet timing (fixed 2026-07-05 — GUI-caught)
 - A Combine subscription on a nested `@Published` (`library.$files`) fires in **willSet**, *before* the

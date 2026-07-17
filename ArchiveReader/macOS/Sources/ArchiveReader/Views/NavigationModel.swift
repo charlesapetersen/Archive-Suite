@@ -81,7 +81,12 @@ final class NavigationModel: ObservableObject {
     private var pendingRevealPage: Int?
     private var pendingRevealSettledMisses = 0
 
-    private var undoStack: [[TagWriteResult]] = []
+    /// One undoable tag write plus the `FileIdentity` captured at the edit. Undo re-verifies §6 against
+    /// this identity, so a file replaced under its path BETWEEN the edit and the undo aborts rather than
+    /// re-tagging a different file. `identity` is nil when the file had no resolvable identity at edit
+    /// time — undo then simply skips the §6 check, exactly as the forward write did.
+    private struct UndoEntry { let result: TagWriteResult; let identity: FileIdentity? }
+    private var undoStack: [[UndoEntry]] = []
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -765,16 +770,17 @@ final class NavigationModel: ObservableObject {
     // MARK: Tag actions (all via TagWriter)
 
     func mark(_ target: ReadState) {
-        let urls = selectedFiles.map(\.url)
-        guard !urls.isEmpty else { return }
-        var batch: [TagWriteResult] = []
+        let files = selectedFiles
+        guard !files.isEmpty else { return }
+        var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
         var failures = 0
-        for url in urls {
+        for f in files {
+            let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
             do {
-                let r = try TagWriter.setReadState(target, on: url)
+                let r = try TagWriter.setReadState(target, on: f.url, expecting: identity)
                 verified.append(r)               // verified ground truth (incl. no-op) — safe to display
-                if !r.isNoOp { batch.append(r) }  // only real changes go on the undo stack
+                if !r.isNoOp { batch.append(UndoEntry(result: r, identity: identity)) }  // real changes → undo
             } catch { failures += 1 }
         }
         // Only verified (non-throwing) writes move a row — a failed write keeps the Spotlight value and
@@ -791,10 +797,14 @@ final class NavigationModel: ObservableObject {
         guard let batch = undoStack.popLast() else { return }
         undoDepth = undoStack.count
         var verified: [TagWriteResult] = []
-        for r in batch {
+        for entry in batch {
             // Undo = inverse delta applied to a FRESH read (§9), preserving any concurrent third-party
             // edit. Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
-            if let rr = try? TagWriter.apply(r.inverse, to: r.url) { verified.append(rr) }
+            // §6: re-verify against the identity captured at the ORIGINAL edit so undo never re-tags a
+            // file swapped under this path since then (a mismatch throws → try? skips just that file).
+            if let rr = try? TagWriter.apply(entry.result.inverse, to: entry.result.url, expecting: entry.identity) {
+                verified.append(rr)
+            }
         }
         library.applyVerifiedWrites(verified)
         statusMessage = "Undid \(verified.count) change\(verified.count == 1 ? "" : "s")."
@@ -866,16 +876,17 @@ final class NavigationModel: ObservableObject {
     func applyEdit(_ op: TagEditOp) {
         let files = selectedFiles
         guard !files.isEmpty else { return }
-        var batch: [TagWriteResult] = []
+        var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
         var failures = 0
         for f in files {
             let delta = TagEditing.delta(for: op, given: f.tags)
             if delta.isEmpty { continue }
+            let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
             do {
-                let r = try TagWriter.apply(delta, to: f.url)
+                let r = try TagWriter.apply(delta, to: f.url, expecting: identity)
                 verified.append(r)
-                if !r.isNoOp { batch.append(r) }
+                if !r.isNoOp { batch.append(UndoEntry(result: r, identity: identity)) }
             } catch { failures += 1 }
         }
         library.applyVerifiedWrites(verified)   // one O(N+M) overlay pass (was per-file O(N*M))
@@ -908,15 +919,21 @@ final class NavigationModel: ObservableObject {
         guard !old.isEmpty, !new.isEmpty, new != old else { return }
         let affected = library.files.filter { $0.subjects.contains(old) }
         guard !affected.isEmpty else { statusMessage = "No files carry the tag “\(old)”."; announce(statusMessage); return }
-        var batch: [TagWriteResult] = []
+        var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
         var failures = 0
-        for f in affected {
-            do {
-                let r = try TagWriter.apply(TagDelta(add: [new], remove: [old]), to: f.url)
+        // Group/batch path: capture each affected file's identity lazily (§6), then apply through the
+        // identity-carrying batch overload — a file replaced under its path since capture aborts as a
+        // per-file failure while the rest of the rename still applies. Results are 1:1/in-order with `items`.
+        let items = affected.map { (url: $0.url, identity: $0.liveIdentity()) }
+        for (i, outcome) in TagWriter.apply(TagDelta(add: [new], remove: [old]), to: items).enumerated() {
+            switch outcome.result {
+            case .success(let r):
                 verified.append(r)
-                if !r.isNoOp { batch.append(r) }
-            } catch { failures += 1 }
+                if !r.isNoOp { batch.append(UndoEntry(result: r, identity: items[i].identity)) }
+            case .failure:
+                failures += 1
+            }
         }
         library.applyVerifiedWrites(verified)
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }   // ONE grouped undo
@@ -944,7 +961,8 @@ final class NavigationModel: ObservableObject {
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
-        do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true)) }
+        let identity = file.liveIdentity()   // §6: capture lazily at edit time
+        do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true, expecting: identity), identity: identity) }
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
     }
 
@@ -962,14 +980,15 @@ final class NavigationModel: ObservableObject {
 
     private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) {
         guard !delta.isEmpty else { return }
-        do { reflect(try TagWriter.apply(delta, to: file.url)) }
+        let identity = file.liveIdentity()   // §6: capture lazily at edit time
+        do { reflect(try TagWriter.apply(delta, to: file.url, expecting: identity), identity: identity) }
         catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage) }
     }
 
     /// Reflect one verified inline write in the display (overlay) and push it as its own undo step.
-    private func reflect(_ r: TagWriteResult) {
+    private func reflect(_ r: TagWriteResult, identity: FileIdentity?) {
         library.applyVerifiedWrites([r])
-        if !r.isNoOp { undoStack.append([r]); undoDepth = undoStack.count }
+        if !r.isNoOp { undoStack.append([UndoEntry(result: r, identity: identity)]); undoDepth = undoStack.count }
     }
 
     /// Library data-quality snapshot (for the health popover).
