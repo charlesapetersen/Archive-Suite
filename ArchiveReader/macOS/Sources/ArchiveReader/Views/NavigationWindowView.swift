@@ -331,26 +331,18 @@ struct NavigationWindowView: View {
     }
     private var subjectFilterField: some View {
         HStack(spacing: 4) {
-            // NOTE: selected-tag chips currently render as separate buttons beside the add-field. This is
-            // BUG-3 (see ArchiveReader/KNOWN_ISSUES.md): when the bar is near the window width, each chip's
-            // width tips the content column past the window and the root HStack re-centers, shifting the
-            // file table left. The proper fix is a token-field redesign (selected tags as tokens INSIDE the
-            // add-field, which adds no bar width) — tracked as a follow-up; left as-is here.
-            ForEach(Array(model.filter.subjects).sorted(), id: \.self) { subj in
-                Button {
-                    model.filter.subjects.remove(subj)
-                } label: {
-                    Label(subj, systemImage: "xmark.circle.fill").labelStyle(.titleAndIcon)
-                }
-                .controlSize(.small)
-                .help("Remove this tag filter")
-            }
-            TagFilterField(placeholder: "Add tag filter…", suggestions: tagSuggestions,
-                           focusToken: tagFilterFocusToken) { tag in
-                model.filter.subjects.insert(tag)
-            }
-            .frame(width: 160)
-            .help("Filter by tag — type to autocomplete existing tags; Return adds it")
+            // Selected tag filters are TOKENS INSIDE this field (not chips beside it). Besides matching the
+            // way the control reads, this is the BUG-3 fix: a bounded, compressible token field means adding
+            // filters adds no width to the filter bar, so the content column can't be pushed past the window
+            // and the file table no longer shifts left. See SubjectFilterTokenField + KNOWN_ISSUES.md.
+            SubjectFilterTokenField(
+                subjects: $model.filter.subjects,
+                suggestions: tagSuggestions,
+                placeholder: "Filter by tag…",
+                focusToken: tagFilterFocusToken
+            )
+            .frame(width: 220)
+            .help("Filter by tag — type to autocomplete existing tags; Return adds it; select a token and press ⌫ to remove")
             if model.filter.subjects.count > 1 {
                 Picker("Match", selection: $model.filter.subjectCombine) {
                     Text("All").tag(SubjectCombine.all)
