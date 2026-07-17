@@ -356,6 +356,12 @@ class OCRProcessor: ObservableObject {
         /// live @AppStorage. Optional for backward-compat: a manifest written before this field decodes as
         /// nil and resume falls back to the live setting. NOT part of `runFingerprint` (a runtime knob).
         var exportOriginals: Bool? = nil
+        /// The Local Agent (subscription-auth CLI) backend this run started with, or nil when the run
+        /// uses an API key / gateway (the normal case). Additive + optional so a manifest written
+        /// before this feature decodes byte-for-byte unchanged (absent → nil) and crash-resume of an
+        /// in-flight run is untouched (Design decision 2 of the local-agent plan). Trailing/defaulted,
+        /// exactly like the back-compat fields above. NOT part of `runFingerprint` (a runtime backend).
+        var localAgent: LocalAgentConfig? = nil
     }
 
 

@@ -26,6 +26,11 @@ struct SessionProcessingConfig {
     var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
     var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
     var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
+    /// The Local Agent (subscription-auth CLI) backend for this live session, or nil when using an
+    /// API key / gateway. Threaded alongside `gateway` (Design decision 2 of the local-agent plan);
+    /// populated from settings + preferred at the construction sites in a later checkpoint. Default
+    /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
+    var localAgent: LocalAgentConfig? = nil
 
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults() -> SessionProcessingConfig {
