@@ -45,6 +45,10 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
 
+    // Local Agent CLI backend (persisted; mutually exclusive with the gateway)
+    @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+
     // Initialized from persisted state in init()
     @State private var selectedModel: LLMModel
     @State private var apiKey: String
@@ -360,7 +364,22 @@ struct OCRView: View {
 
 
                 // Cost estimate
-                if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
+                if useLocalAgent && !droppedFiles.isEmpty {
+                    GroupBox("Cost Estimate") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "infinity.circle").foregroundStyle(.secondary)
+                                Text("Included in your subscription — usage limits apply.")
+                                Spacer()
+                            }
+                            Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It runs at a low concurrency (1–2), so expect it to be slower than a metered API.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 2)
+                        }
+                        .padding(4)
+                    }
+                } else if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
                         Text("Enter model pricing in Gateway Configuration above to see cost estimates.")
                             .font(.caption)

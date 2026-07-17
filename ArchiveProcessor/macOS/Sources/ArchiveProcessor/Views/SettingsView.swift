@@ -229,8 +229,9 @@ struct SettingsView: View {
             Text("~\(String(format: "%.2g", standardImageSizeMB)) MB each")
                 .font(.caption2).foregroundStyle(.secondary)
 
-            let model = useGateway ? gatewayModel : selectedModel
-            if let model {
+            if useLocalAgent {
+                localAgentCostPane
+            } else if let model = useGateway ? gatewayModel : selectedModel {
                 let est = CostEstimator.estimate(
                     fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
@@ -279,6 +280,29 @@ struct SettingsView: View {
         .padding(14)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// Cost/pacing summary for the Local Agent CLI backend. There is no per-token dollar figure (the CLI
+    /// draws on the user's subscription), so surface that — the plan's "Included in your subscription —
+    /// usage limits apply" branch — plus the usage-window + low-concurrency pacing reality instead.
+    @ViewBuilder private var localAgentCostPane: some View {
+        Divider().padding(.vertical, 2)
+        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "infinity.circle").foregroundStyle(.secondary)
+            Text("Included in your subscription — usage limits apply.").font(.caption)
+        }
+        Text("The \(localAgentTool.displayName) CLI uses your existing subscription login, so there's no per-page charge. Hit your plan's usage window and the app paces automatically, then resumes when it resets.")
+            .font(.caption2).foregroundStyle(.secondary)
+
+        Divider().padding(.vertical, 2)
+        Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("Runs one CLI agent turn per page, capped at a low concurrency (1–2) so it never hammers your subscription — expect it to be slower than a metered API.")
+            .font(.caption2).foregroundStyle(.secondary)
+
+        Spacer()
+        Text("No API cost; time varies with the CLI, content & your plan's limits.")
+            .font(.caption2).foregroundStyle(.tertiary)
     }
 
     private func costRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
