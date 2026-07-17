@@ -200,9 +200,36 @@ clean.
 - [x] **WS5** STATUS digest — shipped 2026-07-17. `status-digest.sh` prints a one-screen check-in (run state,
       PLAN, HEAD/commits-24h, backlog, gate result, review coverage, disk, worktrees, **NEEDS-YOU**); the
       daemon rewrites `$STATE/STATUS.md` each cycle + on park, and `arm.sh status` runs it. Read-only,
-      degrades gracefully, non-fatal write. Proven: `prove-daemon.sh` (71) + a real run against this repo
+      degrades gracefully, non-fatal write. Proven: `prove-daemon.sh` (72) + a real run against this repo
       (correctly flagged the pending keychain fix + Morning-Review entries).
-- [ ] WS8 Morning-Review rotation · WS9 dep gating.
+- [x] **WS8** Morning-Review rotation — shipped 2026-07-17. `compact-plan.sh` gained a "Pass 2" that rotates
+      the newest-first `## Morning Review` section: keep the newest `MR_KEEP=15` `**[date]` entries inline,
+      archive the older tail to `AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md` (recoverable — never deleted). Same
+      safety contract as the Session-Log pass (region-bounded, validate pre-region byte-identical + anchors
+      survive before replacing, `.bak`, idempotent, trigger-gated at 25). Pass 1 is wrapped in a subshell so
+      its no-op `exit` can't skip Pass 2. Daemon already invokes it between cycles (excluded from the work
+      fingerprint → a rotation is never counted as progress).
+      **Two Tier-2 adversarial rounds hardened it before ship.** Round 1 (HIGH+2 MED): (HIGH) the first draft
+      split via `wc`/`sed` line-ranges and silently dropped the final line of a plan with no trailing newline →
+      rewrote the split as a SINGLE awk pass keyed on the entry ordinal (newline-immune) + a line-CONSERVATION
+      assertion (kept+dropped==original) that aborts on any bug; (MED) unchecked archive append → guarded +
+      moved BEFORE the `mv` on BOTH passes. Round 2 caught that the Round-1 date-anchored delimiter was itself
+      broken THREE ways — a BSD-awk `-v` backslash-stripping bug (unanchored → over-count), too tight for real
+      headers (`**[2026-07-14, GUI-ON session]` / `**[HISTORICAL …]` / `**[owner …]` → under-count), and still
+      over-counting date-shaped body lines. Final fix: detect a header STRUCTURALLY — a column-0 `**[` line
+      whose PREVIOUS line is blank — with ALL regexes as awk-program literals (never `-v`). Matches every real
+      header shape, rejects mid-body `**[` lines (no tear), and a non-blank-preceded header merely merges into
+      the entry above (safe). Round 2 verdict CLEAN (prior findings confirmed closed); its three residual LOWs
+      are all conservation-safe: the mid-body-`## ` region truncation was FIXED (region-end now also requires a
+      blank-preceding line), and the two format-drift limits (a blank-then-`**[` inside one entry body; a
+      section with no blank-separated headers) are documented as an authoring-contract note (no byte loss — the
+      archive is the recovery point). Proven: `prove-compact.sh` (46 assertions — both passes, subshell
+      contract, idempotency, section byte-identity, no-newline, trailing-section, archive-failure rollback, the
+      structural Case G with date+qualifier / non-date / mid-body-date-shaped headers + boundary pinning, and a
+      mid-body-`## ` no-truncation case) + a dry-run on a COPY of the real plan (3,136 → 1,473 lines, 31 → 15
+      headers, all other sections byte-identical, every archived header present in the archive, conservation
+      clean; real plan never mutated — dry-run used a copy).
+- [ ] WS9 dep gating.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).

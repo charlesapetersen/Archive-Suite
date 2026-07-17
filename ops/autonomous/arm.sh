@@ -217,7 +217,7 @@ mkdir -p "$BIN" "$STATE"
 
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"
-install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan Session-Log compactor (daemon calls it between cycles)
+install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan compactor: Session Log + Morning Review (daemon calls it between cycles)
 cp "$PROMPT_SRC" "$STATE/resume-prompt.txt"
 echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt -> $STATE/"
 

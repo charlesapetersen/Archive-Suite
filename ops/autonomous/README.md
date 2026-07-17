@@ -385,3 +385,23 @@ shared `origin/main` ref) so it can't hang the loop; never touches the primary c
   `_terminate_tree`, which TERM+KILLs claude's whole descendant tree (snapshotted up-front, with a detached
   KILL backstop). (The parent's `trap 'exit 0' TERM INT` still doesn't reap the backgrounded child on a TERM to
   the daemon itself — minor, and `arm.sh stop` covers it by pkill-matching the subshells.)
+
+## Plan compaction — keep the durable plan small (`compact-plan.sh`)
+
+Every fresh session reads the whole plan to orient, so any section that grows unbounded silently inflates the
+per-session startup cost. `compact-plan.sh` runs **between cycles** (lock released, no session active — it can
+never race a session's append) and trims two growing sections back, archiving the overflow to recoverable
+files (the plan is gitignored, so `.bak` + the archives are the recovery points, not git):
+
+- **Pass 1 — `## Session Log`** (chronological, oldest-first): keep the last `KEEP=12` entries, archive older
+  ones to `AUTONOMOUS_SESSION_LOG_ARCHIVE.md` (trigger: >40 entries).
+- **Pass 2 — `## Morning Review`** (WS8, 2026-07-17; **newest-first** — each session prepends a `**[date]`
+  entry at the top): keep the newest `MR_KEEP=15` entries inline, archive the older tail to
+  `AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md` (trigger: >25 entries). Halved a real 3,136-line plan to 1,473.
+
+Both passes are **safe by construction**: region-bounded (never touch DIRECTIVES / RESUME / WORK QUEUE / RUN
+STATUS), they build the result in a temp file and **validate every live anchor survives + the pre-region is
+byte-identical before replacing**, keep a `.bak`, bail leaving the plan untouched on any anomaly, and are
+idempotent (no-op under trigger). Pass 1 is wrapped in a subshell so its no-op `exit` can't skip Pass 2. Both
+run *after* the work fingerprint is sampled and the Morning Review / Session Log sections are excluded from it,
+so a rotation is **never** miscounted as the run advancing. Proven by `tests/prove-compact.sh`.
