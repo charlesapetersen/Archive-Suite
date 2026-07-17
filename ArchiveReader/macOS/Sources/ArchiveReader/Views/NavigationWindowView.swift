@@ -331,6 +331,11 @@ struct NavigationWindowView: View {
     }
     private var subjectFilterField: some View {
         HStack(spacing: 4) {
+            // NOTE: selected-tag chips currently render as separate buttons beside the add-field. This is
+            // BUG-3 (see ArchiveReader/KNOWN_ISSUES.md): when the bar is near the window width, each chip's
+            // width tips the content column past the window and the root HStack re-centers, shifting the
+            // file table left. The proper fix is a token-field redesign (selected tags as tokens INSIDE the
+            // add-field, which adds no bar width) — tracked as a follow-up; left as-is here.
             ForEach(Array(model.filter.subjects).sorted(), id: \.self) { subj in
                 Button {
                     model.filter.subjects.remove(subj)

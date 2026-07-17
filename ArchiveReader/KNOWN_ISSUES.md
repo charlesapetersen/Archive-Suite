@@ -2,6 +2,27 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## GUI-pass regressions in the AppKit nav table + tag filter (2026-07-16 — owner GUI re-test)
+An interactive GUI pass surfaced three display/interaction bugs in shipped Reader features. Two fixed, one deferred:
+- **FTS snippet previews never rendered (FIXED).** The keyword-in-context excerpt line under a search hit was
+  clipped: the AppKit name-column `NSTextField` (a `labelWithString:` field) stayed single-line
+  (`usesSingleLineMode`/`wraps = false`), so the appended second line + `\n` never grew the row under
+  `usesAutomaticRowHeights`. Fix: in the snippet branch, put the field into the same multi-line-capable state the
+  tags cell (`TagTokenCellView`) uses, and reset it in the non-hit branch (cells are reused). `AppKitTableView.swift`.
+- **Column-header click sort was dead (FIXED).** `sortDescriptorsDidChange` is an `NSTableViewDataSource`
+  callback, but it was implemented on the `Coordinator` (only the table's *delegate*); the
+  `NSTableViewDiffableDataSource` is the real `dataSource` and never forwarded it. Fix: a
+  `SortableDiffableDataSource` subclass implements + forwards it — **and the method MUST be `@objc`**: an optional
+  @objc-protocol method added on a *subclass* is not auto-exposed to the Obj-C runtime, so `respondsToSelector:`
+  returned false and AppKit never called it (build was clean; only runtime/GUI surfaced it). `AppKitTableView.swift`.
+- **Selected-tag filter chips shift the file table left (OPEN → token-field redesign planned).** The chips render
+  as separate buttons beside the "Add tag filter…" field in a single-row filter bar that already sits near the
+  window width; each added chip's width tips the content column past the window, so the root `HStack` re-centers
+  and drags the file table left. Two container attempts (a horizontal `ScrollView` capped at 260 pt; a wrapping
+  `FlowLayout`) each traded one glitch for another (eager 260 pt gap / vertical pile-up). The correct fix is to
+  render selected tags as **tokens inside the filter field** (owner's stated expectation), which adds no bar width
+  and fixes the shift by construction. Deferred as a focused follow-up. `Views/NavigationWindowView.swift`.
+
 ## Verified facts to rely on (2026-07-04)
 - Writing `.tagNamesKey` while keeping the color-name token (`Red`/`Purple`) and **not** touching
   `.labelNumberKey` **preserved** `labelNumber` (tested on a Red-labeled scratch copy, local APFS).

@@ -99,8 +99,15 @@ struct AppKitTableView: NSViewRepresentable {
         coordinator.tableView = tableView
         coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
-        let dataSource = NSTableViewDiffableDataSource<Int, ArchiveFile.ID>(tableView: tableView) { tv, column, row, itemID in
+        let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
             coordinator.makeCell(tableView: tv, column: column, row: row, itemID: itemID)
+        }
+        // Header-click sorting: `sortDescriptorsDidChange` is an NSTableViewDataSource callback, so it
+        // must live on the DATA SOURCE (the diffable source is the real dataSource) — not the coordinator,
+        // which is only the table's delegate — or header clicks never reach the model. The subclass
+        // forwards it to the coordinator here.
+        dataSource.onSortDescriptorsChange = { [weak coordinator] descriptors in
+            coordinator?.applyHeaderSort(descriptors)
         }
         coordinator.dataSource = dataSource
         tableView.delegate = coordinator
@@ -325,10 +332,22 @@ struct AppKitTableView: NSViewRepresentable {
                                           range: NSRange(location: 0, length: nameLine.length))
                     nameLine.append(NSAttributedString(string: "\n"))
                     nameLine.append(Self.snippetLine(segs, baseSize: currentFontSize))
+                    // Put the field into the same multi-line-capable state the tags cell (TagTokenCellView)
+                    // needs, so `usesAutomaticRowHeights` actually grows the row. A `labelWithString:` field
+                    // is single-line by default (`usesSingleLineMode`/`wraps=false`), so the appended second
+                    // line + "\n" was being clipped and the row never grew — the snippet was invisible.
+                    tf.usesSingleLineMode = false
+                    (tf.cell as? NSTextFieldCell)?.wraps = true
+                    (tf.cell as? NSTextFieldCell)?.isScrollable = false
+                    tf.setContentCompressionResistancePriority(.required, for: .vertical)
                     tf.maximumNumberOfLines = 2
                     tf.lineBreakMode = .byTruncatingTail
                 } else {
-                    tf.maximumNumberOfLines = 1   // reset: this cell may have been a 2-line hit before reuse
+                    // Reset to single-line: cells are reused, so a row that was a 2-line hit may now
+                    // render a non-hit row.
+                    tf.usesSingleLineMode = true
+                    (tf.cell as? NSTextFieldCell)?.wraps = false
+                    tf.maximumNumberOfLines = 1
                     tf.lineBreakMode = .byTruncatingMiddle
                 }
                 tf.attributedStringValue = nameLine
@@ -393,14 +412,17 @@ struct AppKitTableView: NSViewRepresentable {
             parent.selection = newSel
         }
 
-        func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        /// Applies a header-click sort to the model. Invoked from `SortableDiffableDataSource`'s forwarded
+        /// `sortDescriptorsDidChange` (that callback must live on the data source, not the delegate). The
+        /// `isSortingFromModel` guard stops the model→table push (updateNSView) from feeding back.
+        func applyHeaderSort(_ descriptors: [NSSortDescriptor]) {
             guard !isSortingFromModel else { return }
-            let descriptors = tableView.sortDescriptors.compactMap { sd -> ARSortDescriptor? in
+            let descs = descriptors.compactMap { sd -> ARSortDescriptor? in
                 guard let key = sd.key, let field = SortField(rawValue: key) else { return nil }
                 return ARSortDescriptor(field: field, ascending: sd.ascending)
             }
-            if !descriptors.isEmpty {
-                parent.model.sort = descriptors
+            if !descs.isEmpty {
+                parent.model.sort = descs
             }
         }
 
@@ -467,6 +489,23 @@ struct AppKitTableView: NSViewRepresentable {
             let edited = (tf.objectValue as? [String]) ?? []
             parent.model.commitSubjectEdit(from: base, to: edited, for: file)
         }
+    }
+}
+
+// MARK: - Sortable diffable data source
+
+/// `NSTableViewDiffableDataSource` does not forward `sortDescriptorsDidChange` (an NSTableViewDataSource
+/// callback), and since the diffable source IS the table's `dataSource`, a header-click sort would be
+/// dropped. This subclass implements the callback and forwards it to `onSortDescriptorsChange`.
+@MainActor
+final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, ArchiveFile.ID> {
+    var onSortDescriptorsChange: (([NSSortDescriptor]) -> Void)?
+    // `@objc` is REQUIRED: this OPTIONAL NSTableViewDataSource method is added on a SUBCLASS (the
+    // protocol conformance is inherited from NSTableViewDiffableDataSource), so Swift does NOT auto-infer
+    // @objc for it. Without @objc the Obj-C runtime's `respondsToSelector:` returns false and AppKit never
+    // calls it — which left header-click sorting dead even though the method existed.
+    @objc func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        onSortDescriptorsChange?(tableView.sortDescriptors)
     }
 }
 
