@@ -267,12 +267,18 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   a page stream to segment). So: multi-page PDF dropped → auto re-OCR; keep `preOCRedInput` as the separate
   tagging-pipeline path (single-page/image input); retire the manual "Re-OCR multi-page PDF" Settings toggle.
   **Tier-2** (PDF output). | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
-- [ ] **Reader tag-filter → token field (selected tags INSIDE the box) [fixes the BUG-3 pane shift].** Selected
-  subject filters render as separate buttons beside the "Add tag filter…" field, so each chip's width tips the
-  content column past the window and shifts the file table left (ArchiveReader/KNOWN_ISSUES 2026-07-16; two container
-  attempts failed). Redesign `subjectFilterField` as a single token field (tags as removable tokens inside a
-  bounded/scrolling field, typing adds) so tags add no bar width → shift fixed by construction + matches owner
-  expectation. | files: ArchiveReader Views/NavigationWindowView.swift, reuse SubjectTokenField/NSTokenField | M | low | none
+- [x] **Reader tag-filter → token field (selected tags INSIDE the box) [BUG-3 pane shift] — SHIPPED `b5a5a01`,
+  owner-verified 2026-07-16 ("no longer pushes the left margin, all is good").** Selected subject filters used to
+  render as separate buttons beside the "Add tag filter…" combo box, so each chip's width tipped the content column
+  past the window and the root `HStack` re-centered, dragging the file table left. Two container attempts failed
+  (a capped horizontal `ScrollView` reserved its max eagerly → overflowed on the FIRST chip; a wrapping
+  `FlowLayout` got squeezed to ~one chip wide and piled vertically). Fix: new `Views/SubjectFilterTokenField.swift`
+  — an `NSTokenField` whose tokens ARE the filters, bounded (220 pt), single-line, horizontally scrolling, with LOW
+  horizontal compression resistance, so adding filters adds **zero** width to the bar → shift fixed by
+  construction, and tags live in the box as the owner expected. Replaced/deleted the `TagFilterField` combo box
+  (its only call site). Build clean; Reader units 194/195 (the 1 failure is the pre-existing env-only
+  `DeepLinkTests.testRevealAndSelectNoRoot`). | files: Views/SubjectFilterTokenField.swift (new),
+  Views/NavigationWindowView.swift, Views/TagFilterField.swift (deleted) | done
 - **Processing History view — KEEP (owner-confirmed 2026-07-16).** The Tools-tab history view (W12-cost, promoted
   from POTENTIAL_FEATURES 2026-07-15; records actual run cost + a run log, writes only its own store) stays. No action.
 
@@ -294,18 +300,34 @@ Owner went through the owner-only queue. Recorded here so none of it gets re-sur
   (`ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula`), and sort order is display-only (never
   written to a corpus → no file-safety stakes) — so this is a **low-priority** de-dup, below the W9 Notes
   gap-closure. Tier-1. | files: packages/ArchiveCore (new combiner), ArchiveNotes Store/Item.swift | S | low | none
-- **Owner decision pending — `sessionComplete()` dead protocol surface.** ~30 lines of unreachable code in both
-  companions' `SegmentTransport`/`MacClient`/`DriveRelayTransport`/`FileRelayTransport` (nothing calls it; the
-  Mac's `/session/complete` route stays as a harmless no-op for older phones). **Recommendation: close as
-  "won't do — parked"** — removing it means editing the *frozen* `RelayObjectFormat` wire contract
-  (`encodeSessionComplete` + `sessionCompleteMatchesGolden`) and the on-hold Drive path for zero functional gain.
-  Revisit only if the Drive milestone is un-held and `RelayObjectFormat` is already being edited.
-- **Owner decision pending — R13d, the `ArchiveSuite` exclusion.** Notes *stamps* the marker on its own files, but
-  **nothing consumes it**: no Reader filtering, no Processor stamping, no corpus back-fill — so the owner's
-  requested "exclude non-suite files" effect **does not function today**. Activating it needs the deferred
-  convergence wave (see the `(later)` behavior/data follow-on below). Decision: accept the deferral, or promote
-  convergence. Note the catch: back-fill **writes tags to the real corpus** — the highest-risk operation in the
-  Suite, so it warrants its own gated wave rather than being rushed.
+- **CLOSED — `sessionComplete()` dead protocol surface: WON'T DO, PARKED (owner 2026-07-16).** ~30 lines of
+  unreachable code in both companions' `SegmentTransport`/`MacClient`/`DriveRelayTransport`/`FileRelayTransport`
+  (nothing calls it; the Mac's `/session/complete` route stays as a harmless no-op for older phones). Removing it
+  would mean editing the *frozen* `RelayObjectFormat` wire contract (`encodeSessionComplete` +
+  `sessionCompleteMatchesGolden`) and the on-hold Drive path for zero functional gain. **Do not re-raise** unless
+  the Drive milestone is un-held AND `RelayObjectFormat` is already being edited for another reason.
+- [ ] **R13d REVERSED — remove `ArchiveSuite` stamping from Notes; drop the exclusion feature entirely
+  (owner decision 2026-07-16: "Forget about excluding other tagged files. Notes should no longer tag things as
+  ArchiveSuite").** The marker was only ever written, never consumed (no Reader filtering / Processor stamping /
+  back-fill), so the whole feature goes rather than getting finished. Scope:
+  - Stop stamping: drop `suiteMarker` from the managed vocabulary (`ArchiveNotes/Core/NotesTagVocabulary.swift:11`
+    → `ArchiveSuiteMarker.tagName`) so `NotesTagProjector` neither adds **nor removes** it; the marker-filter in
+    `Core/ItemSummaryDisplay.swift:39-43` then becomes dead and can go too.
+  - **⚠️ Decide the projector semantics deliberately — this is the Tier-2 trap.** `NotesTagProjector` *manages*
+    its token set: if the marker stays "managed" but merely "not desired", the next projection **strips
+    `ArchiveSuite` from the owner's existing note files** (a real tag WRITE). Removing it from the managed set
+    instead leaves existing stamps in place, inert. Default = **leave existing stamps alone** (no corpus write);
+    only strip them if the owner explicitly asks. Whichever is chosen, prove it with a scratch-copy test.
+  - Retire the now-unused marker surface: `packages/ArchiveCore/Sources/ArchiveCore/ArchiveSuiteMarker.swift`
+    (check `Links/RootMarker.swift` — the root marker is a *separate* durable-link concern and must survive).
+  - **SPEC** (`SPEC/tag-format.md:71`, the "Suite marker" row) — the tag/PDF contract is the **highest-risk shared
+    surface**: update it in the SAME commit as the code. This also **inverts W9 Phase A's "finish the SPEC
+    `ArchiveSuite` marker section"** — that sub-task is now "remove it".
+  - Drop the `(later)` behavior/data follow-on's marker half (Reader hides `ArchiveSuite` / corpus back-fill /
+    Processor stamping) — see that item below.
+  **Tier-2** (tag-write path + the shared SPEC): adversarial review + a scratch-copy functional test; NEVER the
+  real corpus. | files: ArchiveNotes Core/{NotesTagVocabulary,NotesTagProjector,ItemSummaryDisplay}.swift,
+  packages/ArchiveCore/ArchiveSuiteMarker.swift, SPEC/tag-format.md | M | med | none
 
 ## Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). **All waves shipped;
@@ -361,7 +383,12 @@ before any Notes-specific work.
     large-paste parse + minor coverage/cosmetic. Tier-1.
   - **Phase E — verification review:** re-run the plan-vs-build gap analysis + drive the features at runtime to
     prove every A–D item is actually done + **wired** (not "built but dead" again) before flipping this checkbox.
-- [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**; unified suite storage path — Tier-2, separately gated
+- [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): **unified suite storage path** — Tier-2, separately gated.
+  - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
+    (owner 2026-07-16).** The whole `ArchiveSuite` marker/exclusion feature is reversed: Notes stops stamping it
+    (see the "R13d REVERSED" item above) and nothing will consume it, so there is nothing to hide, back-fill, or
+    stamp. This also removes the only reason for a corpus-wide tag back-fill — the Suite's single
+    highest-risk operation. Do not re-propose it.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no

@@ -15,13 +15,21 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   `SortableDiffableDataSource` subclass implements + forwards it — **and the method MUST be `@objc`**: an optional
   @objc-protocol method added on a *subclass* is not auto-exposed to the Obj-C runtime, so `respondsToSelector:`
   returned false and AppKit never called it (build was clean; only runtime/GUI surfaced it). `AppKitTableView.swift`.
-- **Selected-tag filter chips shift the file table left (OPEN → token-field redesign planned).** The chips render
-  as separate buttons beside the "Add tag filter…" field in a single-row filter bar that already sits near the
-  window width; each added chip's width tips the content column past the window, so the root `HStack` re-centers
-  and drags the file table left. Two container attempts (a horizontal `ScrollView` capped at 260 pt; a wrapping
-  `FlowLayout`) each traded one glitch for another (eager 260 pt gap / vertical pile-up). The correct fix is to
-  render selected tags as **tokens inside the filter field** (owner's stated expectation), which adds no bar width
-  and fixes the shift by construction. Deferred as a focused follow-up. `Views/NavigationWindowView.swift`.
+- **Selected-tag filter chips shifted the file table left (FIXED `b5a5a01`, owner-verified 2026-07-16).** The chips
+  rendered as separate buttons beside the "Add tag filter…" field in a single-row filter bar that already sits near
+  the window width; each added chip's width tipped the content column past the window, so the root `HStack`
+  re-centered and dragged the file table left.
+  **Two container fixes failed — the instructive part:** a horizontal `ScrollView` capped at 260 pt *reserved* its
+  max eagerly (a scroll viewport's width is the width proposed to it, independent of content), so it overflowed on
+  the **first** chip — worse than the original; a wrapping `FlowLayout` then got compressed to ~one chip wide and
+  piled the tags up vertically. Both attempts were tuning a container's width; the bug was that **any**
+  content-sized chip row inflates a bar that has no slack.
+  **Fix (by construction, not by tuning):** `Views/SubjectFilterTokenField.swift` — an `NSTokenField` whose tokens
+  ARE the selected filters, bounded (220 pt), single-line, horizontally scrolling, with LOW horizontal compression
+  resistance. Tags live *inside* the field, so adding a filter adds **zero** width to the bar and the column can't
+  be pushed past the window. Replaced the `TagFilterField` combo box (deleted; that was its only call site).
+  **Lesson:** when a layout bug is "container X inflates its parent", moving the content *inside* an
+  already-bounded control beats resizing the container.
 
 ## Verified facts to rely on (2026-07-04)
 - Writing `.tagNamesKey` while keeping the color-name token (`Red`/`Purple`) and **not** touching
