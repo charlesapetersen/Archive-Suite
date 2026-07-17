@@ -190,6 +190,8 @@ ops/autonomous/tests/prove-daemon.sh          # ~3 min, $0, no network — the d
 ops/autonomous/tests/prove-keepalive.sh        # WS1 launchd half: a THROWAWAY LaunchAgent proves KeepAlive
                                                # restarts on kill-9 + bootout stays dead (can't run under the
                                                # bash-only harness). Run interactively; auto-cleans.
+ops/autonomous/tests/prove-review-cadence.sh   # WS11 review picker: delta-aware unit choice, cooldown,
+                                               # record-resets, never-reviewed coverage, iOS skipped ($0).
 ```
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12

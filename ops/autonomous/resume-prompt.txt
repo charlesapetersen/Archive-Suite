@@ -20,6 +20,28 @@ STEP 1 — RECOVER STATE (always, first):
   `./ops/autonomous/arm.sh gui on|off` — do NOT change it yourself.
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
+STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
+  * `none due …` (exit 3) → skip this step; go to STEP 2.
+  * `UNIT=… PATHS=… …` → a paced re-review is DUE, and THAT is your ONE item this session (do NOT also pick a
+    queue item). It is a normal item: it flows through the SAME steps as anything else — STEP 3 makes your
+    fresh WORKTREE, STEP 4 commits **and pushes**, STEP 5/6 record + stop. Do NOT edit or commit in the
+    primary checkout. Its item-specific actions:
+      - In your worktree, run the `lean-review` skill on that ONE unit (unit + PATHS; dimensions per REVIEW.md).
+        REVIEW.md's method: ONE unit, ~6 finders + refute-verify. NEVER a whole-project fan-out (blows a window).
+      - READ-ONLY: a review FILES findings, it does NOT fix them. For each CONFIRMED (refute-verified) finding,
+        append a `[ ]` fix item to SUITE_TODO.md / KNOWN_ISSUES.md (the `W3.f1…` pattern) — these tracked edits
+        are your STEP-4 commit+push. A HIGH finding on an irreversible path (Capture/Net/finalize,
+        TagWriter/file-safety, the tag/PDF SPEC) → the **needs-owner HOLD queue** (WS10), flagged, NOT
+        auto-fixed. No code fixes in a review session.
+      - The report file + the cadence stamp are gitignored state in the PRIMARY checkout — write them by
+        ABSOLUTE path (like the plan), NOT in your worktree: report → `<REPO>/.maintenance/review/<unit>.md`;
+        then in STEP 5 run `ops/autonomous/next-review-unit.sh --record "<unit>"` so the cadence advances.
+  WS4 interaction (accurate): a review session commits fix-ITEMS (new `[ ]`), not a completion (`[x]`), so the
+  WS4 attempt-cap counts it as ONE no-completion session. It's cadence-gated (≤ ~1 per AUTONOMOUS_REVIEW_EVERY
+  commits) and feature work between reviews resets the streak, so a review can't trip the cap on its own — but
+  if the run is ALREADY near the cap on a genuinely stuck item, a review could be the session that trips the
+  (correct) park; that's acceptable.
+
 STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
   loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
   If GUI mode is `off`, SKIP items that RUN the GUI: Notes **W8-S8** (GUI checks) + Reader **W7.6** (both need a

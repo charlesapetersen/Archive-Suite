@@ -169,8 +169,15 @@ clean.
       2026-07-17 death (daemon TERMed mid-session, nothing restarted it). Proven by `tests/prove-keepalive.sh`
       (throwaway LaunchAgent: RunAtLoad→start, kill-9→relaunch, bootout→stays dead). Reboot-survival out of
       scope; GUI-verify still best under plain `arm` (nohup, TCC-inherited).
-- [ ] WS11 recurring review · WS7 health gate · WS5 STATUS digest · WS8 Morning-Review rotation
-      · WS9 dep gating · WS10 hold queue.
+- [x] **WS11** recurring paced review — shipped 2026-07-17. `next-review-unit.sh` (cadence-gated unit picker;
+      per-unit last-reviewed shas in a gitignored TSV) + resume-prompt STEP 2.0 (read-only `lean-review` on the
+      due unit → findings become queued fixes / hold-queue, then `--record`, all via a worktree + push).
+      REVIEW.md's one-unit-per-session method — never a whole-project fan-out. Its review found **3 HIGHs**,
+      all fixed + regression-tested: **two-tier pick** (never-reviewed units win in risk/table order, so a
+      low-churn high-risk unit like Net isn't starved), **fail-open on a stale/invalid sha** (treat as
+      never-reviewed, never a silent-0 stall), and **STEP 2.0 routes through a worktree + push** (no
+      commit-in-primary). Proven by `tests/prove-review-cadence.sh` (12 assertions incl. those 3).
+- [ ] WS7 health gate · WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating · WS10 hold queue.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).

@@ -85,6 +85,27 @@ It fans out 6 dimension finders → refute-verifies each finding → returns
 Because the unit list is durable (this file) and progress is persisted, the review survives usage cutoffs,
 context compaction, and session restarts — the next session just continues at the next unfinished unit.
 
+## Recurring cadence for a long unattended run (WS11, 2026-07-17)
+
+`REVIEW_PROGRESS.md` above is a **one-pass** sweep (each unit → done, sweep ends). For a multi-week unattended
+run the review must instead **recur and follow the churn** — re-review whatever code actually changed. The
+autonomous daemon does this automatically:
+
+- **`ops/autonomous/next-review-unit.sh`** is the deterministic picker. It tracks a **last-reviewed sha per
+  unit** in `.maintenance/review/last-reviewed.tsv` (gitignored, primary-checkout — like the plan), and each
+  time it's asked, names the unit with the most **unreviewed commits touching its paths**
+  (`git rev-list <last-sha>..HEAD -- <paths>`; never-reviewed units sort first for initial coverage). It's
+  **cadence-gated** (`AUTONOMOUS_REVIEW_EVERY`, default 20 commits since the last review of *any* unit) so
+  review interleaves with feature work instead of starving it. `--status` shows every unit's backlog;
+  `--record <unit>` stamps it reviewed at HEAD.
+- The daemon's resume prompt (STEP 2.0) runs it every session: if a review is **due**, that session *is* the
+  review — `lean-review` on the one named unit (read-only), confirmed findings appended as `[ ]` fix items
+  (HIGH-on-irreversible → the needs-owner hold queue), then `--record` + commit. Proven by
+  `ops/autonomous/tests/prove-review-cadence.sh`.
+
+The unit table above stays the single source of truth; the picker embeds the same units (iOS still skipped)
+and carries a "keep in sync" note.
+
 ## Guardrails
 
 Findings that touch a no-undo path (`Capture/`·`Net/`, file-writing tag/output, finalize, actor isolation,
