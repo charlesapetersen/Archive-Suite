@@ -11,6 +11,20 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)
+
+- [ ] **Autonomous 2-week unattended hardening** — `execution-plans/autonomous-2wk-hardening.md` — **needs:
+  owner + interactive** (Tier-2 self-modification of `ops/autonomous/*` — do NOT drain via the unattended
+  daemon; supervised sessions only, each adversarially reviewed + prove-the-mechanism'd before install). L.
+  Ten workstreams gating a long run: **WS1** crash-restart posture (launchd KeepAlive; keychain-under-launchd
+  check; keep-alive checklist — reboot-survival out of scope) · **WS2** disk-space guard (park+alert on low
+  free space) · **WS3** dirty/abandoned-worktree reclamation (safe, no unpushed-work loss) · **WS4** per-item
+  attempt cap (park a mis-sized item after N tries) · **WS5** auto-generated `STATUS.md` check-in digest ·
+  **WS6** remote push alerts (park/blocker/failed-gate/security) · **WS7** periodic full build+test+coherence
+  health gate (park on red) · **WS8** Morning-Review triage/rotation (it's 1,655 lines) · **WS9** `blocked-on`
+  dependency gating in work-selection · **WS10** needs-owner hold queue for irreversible/corpus-writing work.
+  Out of scope (owner): reboot/auto-login, cumulative-cost ceiling.
+
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 
 **Focus now:** the **wired (USB) + wireless (LAN/Wi-Fi) phone↔Mac transmission** path and the **Android**
@@ -30,6 +44,11 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `autonomous-2wk-hardening.md` — **⭐ TOP PRIORITY, owner+interactive** (see the pinned block above): ten
+  workstreams to make a ~2-week unattended daemon run feasible (durability/disk/worktree-GC/attempt-cap +
+  STATUS digest/alerts/health-gate + Morning-Review rotation/dep-gating/hold-queue). Each Tier-2 self-mod of
+  `ops/autonomous/*` — supervised sessions only, reviewed + prove-the-mechanism'd before install; NOT drained
+  by the unattended daemon.
 - ~~`openai-chatgpt-provider.md`~~ — **SHIPPED (Processor, W13.oai-1/2/3)**: OpenAI/ChatGPT as a first-class
   provider — (1) native `LLMProvider.openai` (model list + param-family adapter + onboarding/validation/cost,
   routed through the reused `OpenAICompatibleClient`) and (2) a one-click **OpenAI gateway preset**. All

@@ -1,0 +1,125 @@
+# Execution plan — Autonomous 2-week unattended hardening (pre-flight)
+
+**Goal.** Make a **~2-week unattended daemon run** feasible: survive that long without silently dying,
+wedging, filling the disk, drifting, or leaving the owner unreachable — and let the owner check in and be
+alerted without reading 15 files. This is the **pre-flight checklist for a long run**, authored 2026-07-16
+after a full review of the daemon setup.
+
+**Who executes this.** Supervised / **interactive** sessions — NOT the unattended daemon. Every item here is
+a **Tier-2** change to the autonomous infrastructure itself (`ops/autonomous/*`, resume prompt, plan format),
+so per the change-discipline each gets an **adversarial review + a prove-the-mechanism harness** (run the real
+daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, the pattern used for the idle-backoff
+change) **before install**. The daemon rewriting its own guardrails while running unattended is precisely the
+failure mode to avoid — do this work first, then arm the long run.
+
+**Already in place (foundation — not repeated here):** self-resume off the durable L0 plan; idle backoff +
+auto-park when nothing is actionable (2026-07-16, `ffd2165`); the two health watchdogs (wall-clock + event
+heartbeat/liveness); merged-and-clean worktree GC; `compact-plan.sh` (Session-Log trimming); the doc-sync
+backstop; per-change Tier-2 review.
+
+**Owner inputs to collect before/while building:**
+- **Push endpoint + token** for remote alerts (Pushover / ntfy / email-webhook) → into `$STATE/env` (WS6).
+- **Liveness posture decision** (WS1): launchd KeepAlive for crash-restart? keep-logged-in + defer-OS-updates
+  for the 2 weeks? (Auto-login for reboot-survival is **not recommended** — security tradeoff, and defeated by
+  FileVault anyway; plan is "don't reboot".)
+- **Confirm the 2-week checklist itself** is authored and dependency-ordered (WS9 consumes this).
+
+---
+
+## Survival — would sink the run (do first)
+
+### WS1 — Durability & crash-restart posture
+- **launchd KeepAlive** (`com.archivesuite.autonomous.plist`, already in `ops/autonomous/`, currently NOT
+  installed): install so a *crash* of the daemon bash process (OOM/bug/stray kill) auto-restarts it — the one
+  real gap vs the current `nohup` loop (which is already reparented to `init`, so it survives its launching
+  terminal closing, but a crash ends the run silently). Park must still stop cleanly under KeepAlive
+  (`launchctl bootout` on park unloads the job so KeepAlive won't relaunch — verify).
+- **Keychain-under-launchd check (blocker for WS6/health too):** a launchd-loaded agent has a different
+  keychain context than a terminal launch — re-verify the `security find-generic-password` reads in
+  `test-smoke.sh`/E2E succeed non-interactively under launchd (they were just granted for the GUI-session
+  context). If not, fold in the env-key path (below).
+- **Keep-alive checklist** (doc, in README): stay logged in; defer macOS updates for the window; plugged in;
+  `caffeinate` already asserted by the daemon. Honest note that unattended **reboot** survival is not
+  achievable with FileVault / without auto-login — so the posture is "don't reboot."
+- *Verify:* kill the daemon pid → KeepAlive restarts it; park → stays down; a login-cycle test if feasible.
+
+### WS2 — Disk-space guard
+- In the daemon loop, before launching a session, `df` the repo volume; if free space < threshold (e.g. 10 GB
+  or 5%), **park + alert** instead of building (a full disk fails every build → silent cascading failure).
+- Also prune `build/DD` for worktrees already removed, and cap `last-session.log` retention (already 2).
+- *Verify:* stub a low-free-space reading → daemon parks+alerts, does not launch a session.
+
+### WS3 — Dirty / abandoned worktree reclamation
+- Extend `housekeeping()` to reclaim worktrees left by watchdog-killed sessions (currently only merged+clean
+  are GC'd; dirty ones accumulate — ~6 strays already). **Safety-critical, mirrors the existing housekeeping
+  review:** only touch a `wt/*` worktree that is (a) not the active session's, (b) idle beyond an age
+  threshold, (c) whose branch tip is pushed/merged; **stash or copy any uncommitted delta to a recovery area
+  before removal — NEVER lose unpushed work** (default to leaving it if in doubt).
+- *Verify:* adversarial review of the data-loss surface + a harness with dirty/active/merged fixtures.
+
+### WS4 — Per-item attempt cap
+- Track sessions spent per item-tag (a counter file, or derived from Session Log). After N (default 3)
+  sessions on the same tag with **no FINAL commit**, mark the item `[blocked: mis-sized]`, skip it, alert —
+  so a hard/mis-sized item can't burn days of budget while committing empty "progress" checkpoints (the
+  backoff can't catch this: checkpoints move the fingerprint).
+- *Verify:* stub a never-completing item → capped + flagged + skipped after N.
+
+---
+
+## Observability & safety-net — makes "unattended" actually safe
+
+### WS5 — `STATUS.md` digest (the check-in surface)
+- A generator the daemon runs each cycle (like `compact-plan`) writing a one-screen `STATUS.md`: run state
+  (productive / backing-off / parked), backlog depth (done / in-flight / blocked), commits/day + last commit,
+  disk free, last health-gate result (WS7), worktree count, and the current **owner-needed** items. Turns a
+  15-command check-in into a 5-second read.
+- *Verify:* generated file matches reality across a few daemon states.
+
+### WS6 — Remote alerting
+- The daemon (bash — the tool deny-list constrains only `claude -p` sessions, not the loop itself, so it can
+  `curl`) sends a push on: **park**, a **newly-flagged blocker/needs-owner**, a **failed health gate**, or the
+  **taskport-still-open** security exit. Endpoint/token from `$STATE/env` (owner input). No-op if unset.
+- *Verify:* fire each trigger against a test endpoint; confirm no secret is logged.
+
+### WS7 — Periodic health / regression gate
+- Every N commits or N hours, run a full gate: clean build of all 3 apps (no new warnings) + `./test-smoke.sh
+  all` + Reader/Notes unit suites + a tracker-coherence check (no `[x]` item lacking its completing commit; no
+  orphaned `execution-plans/`). On **red → park + alert** with the failing output. Catches a compounding
+  regression that per-change review misses over 50+ unreviewed commits.
+- *Verify:* seed a failing test → gate goes red → parks+alerts; green → advances the cadence marker.
+
+---
+
+## Coherence & scope over 14 days
+
+### WS8 — Morning Review triage / rotation
+- Extend `compact-plan.sh` to also bound the `## Morning Review` section (already **1,655 lines**; read every
+  startup, so it inflates per-session cost and becomes an unreadable wall unattended): keep a small
+  **OPEN / needs-owner** head inline, archive resolved/stale notes to the archive file. Same careful
+  region-bounded editing as the Session-Log path.
+- *Verify:* resolved notes archived, open ones retained, plan shrinks, no cross-section corruption.
+
+### WS9 — `blocked-on` dependency gating
+- Add an optional `(blocked-on: <tag>)` to the plan item format; resume-prompt STEP 2 skips an item whose
+  prerequisite tag isn't `[x]` yet and picks the next **unblocked** one — so accumulating dependent work is
+  done in order instead of stalling or running out of sequence. Protocol change (resume-prompt + plan format);
+  no daemon-code change, but treat as Tier-2 (it changes work selection).
+- *Verify:* a plan with a blocked chain → sessions pick only unblocked items, in dependency order.
+
+### WS10 — needs-owner hold queue
+- A dedicated plan section for **irreversible / highest-blast-radius** work — Tier-3 releases, SPEC /
+  `tag-format` changes, anything **corpus-writing**, DMG/publish. Resume-prompt: **never auto-execute** from
+  the hold queue; only surface it to Morning Review / `STATUS.md`. Keeps the riskiest work human-gated for the
+  whole unattended window (the corpus-safety directive matters most when no one is watching).
+- *Verify:* an item in the hold section is never picked by STEP 2; it appears in the digest.
+
+---
+
+## Ordering
+Survival (WS1–WS4) → observability/safety-net (WS5–WS7) → coherence/scope (WS8–WS10). WS5 surfaces WS7's
+result but both ship incrementally. Each lands as its own reviewed+proven commit; the long run is armed only
+after all are in and a dry-run cycle looks clean.
+
+## Out of scope (owner calls, 2026-07-16)
+- **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).
+- **Cumulative cost ceiling** — declined; per-session `--max-budget-usd` stays the only budget guard.
