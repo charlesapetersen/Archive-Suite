@@ -57,6 +57,10 @@ struct MarkdownEditorView: NSViewRepresentable {
     var onJumpBlock: (@Sendable (SourceAnchor) -> Void)?
     /// W7-S3 — live item summaries used to resolve a note-passage chip's current title + missing state.
     var passageSummaries: [ItemSummary] = []
+    /// W14.4(c) — the source `NotesModel.itemsGeneration` at render time. When it changes, a styled
+    /// document that carries note-passage chips is re-styled so the chips pick up renamed/deleted
+    /// source titles reactively (not only on the next open/select/raw-toggle/paste).
+    var passageGeneration: Int = 0
     /// W7-S3 — a pending jump-to-source scroll (nil = none). When its token changes, the editor scrolls
     /// the current content to the block's range (or the top when the ordinal is stale / absent).
     var scrollRequest: EditorScrollRequest?
@@ -68,6 +72,10 @@ struct MarkdownEditorView: NSViewRepresentable {
     /// controls can drive the editor (commit / insert / select) without field-editor focus.
     var testBox: EditorTestBox?
 #endif
+
+    /// The note-passage block-kind rawValue (`Block.Kind.notePassage`); its presence in the serialized
+    /// Markdown is a cheap gate for the W14.4(c) reactive chip refresh (skip re-styling plain notes).
+    private static let notePassageMarker = "note-passage"
 
     @MainActor
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -138,6 +146,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.textStorage?.setAttributedString(styled)
         }
         context.coordinator.lastAppliedMarkdown = markdown
+        context.coordinator.lastPassageGeneration = passageGeneration
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -177,6 +186,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             // switchMode already re-rendered the content in the new representation; record it so the
             // apply guard below doesn't redundantly re-render (which could restart the update loop).
             coordinator.lastAppliedMarkdown = markdown
+            coordinator.lastPassageGeneration = passageGeneration
         }
         if coordinator.currentFontSize != fontSize {
             coordinator.currentFontSize = fontSize
@@ -192,11 +202,21 @@ struct MarkdownEditorView: NSViewRepresentable {
         // mutation re-invalidated the view, pinning the main thread at 100% while an unfocused styled
         // note was shown — W8-S8 spindump). Gating on the source makes updateNSView idempotent.
         let isEditing = textView.window?.firstResponder === textView
-        if !isEditing, coordinator.lastAppliedMarkdown != markdown {
+        let markdownChanged = coordinator.lastAppliedMarkdown != markdown
+        // W14.4(c): a rename/delete of a *referenced source note* changes provenance-chip live titles
+        // without touching THIS note's Markdown, so the markdown guard above never fires. Re-style
+        // (styled mode only) when the shared item set changed so chips show current titles — cheap-
+        // gated to documents that actually carry note-passage chips, so a plain note never re-styles
+        // on unrelated list changes. Scroll is preserved so a reader who isn't editing stays put.
+        let passageChanged = !wantRaw && !markdownChanged
+            && coordinator.lastPassageGeneration != passageGeneration
+            && markdown.contains(Self.notePassageMarker)
+        if !isEditing, markdownChanged || passageChanged {
             coordinator.isApplyingProgrammaticChange = true
             if wantRaw {
                 textView.string = markdown
             } else {
+                let savedOrigin = passageChanged ? scrollView.contentView.bounds.origin : nil
                 let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
                                                    assetStore: coordinator.assetStore,
                                                    onRevealBlock: coordinator.onRevealBlock,
@@ -204,9 +224,16 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                    onJumpBlock: coordinator.onJumpBlock,
                                                    passageSummaries: coordinator.passageSummaries)
                 textView.textStorage?.setAttributedString(styled)
+                if let savedOrigin {
+                    // A chip-label refresh barely changes layout — restore the prior scroll offset so
+                    // the reactive re-style is invisible to a reader who isn't editing the extract.
+                    scrollView.contentView.scroll(to: savedOrigin)
+                    scrollView.reflectScrolledClipView(scrollView.contentView)
+                }
             }
             coordinator.isApplyingProgrammaticChange = false
             coordinator.lastAppliedMarkdown = markdown
+            coordinator.lastPassageGeneration = passageGeneration
         }
 
         // W7-S3 jump-to-source: scroll to the requested block once (per token). The content above has
@@ -243,6 +270,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// The re-apply guard compares against THIS (the source), not the rendered `textView.string`,
         /// so updateNSView is idempotent for an unchanged note (see the guard in updateNSView).
         var lastAppliedMarkdown: String?
+        /// The `passageGeneration` at the last (re)style. Compared in updateNSView so a shared-item-set
+        /// change re-styles a chip-bearing document exactly once (W14.4 c).
+        var lastPassageGeneration: Int = 0
         private var serializeDebounce: Task<Void, Never>?
 
         init(_ parent: MarkdownEditorView) {

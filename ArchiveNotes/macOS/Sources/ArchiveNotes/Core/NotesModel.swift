@@ -35,6 +35,12 @@ final class NotesModel: ObservableObject {
     /// refreshable via `reloadItems()`.
     @Published private(set) var allItems: [ItemSummary] = []
 
+    /// Bumped on every `replaceItems` (create/rename/delete/reindex). A cheap O(1) signal the extract
+    /// editor uses to re-resolve provenance-chip live titles when the shared item set changes, without
+    /// diffing the whole list — so a source-note rename recolors chips reactively, not only on the next
+    /// re-style (W14.4 c). Monotonic; wraps harmlessly (`&+`) since only inequality is compared.
+    @Published private(set) var itemsGeneration = 0
+
     // MARK: Templates (W6-S6)
 
     /// Every template on disk (id / name / kind), shared by both windows. Loaded on bootstrap and
@@ -237,6 +243,7 @@ final class NotesModel: ObservableObject {
     /// navigation model recomputes its `displayed` list.
     func replaceItems(_ items: [ItemSummary]) {
         allItems = items
+        itemsGeneration &+= 1
     }
 
     // MARK: Initial index build + ready signal (§3.4)

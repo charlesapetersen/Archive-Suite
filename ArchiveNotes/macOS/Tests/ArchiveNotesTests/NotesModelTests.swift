@@ -24,6 +24,24 @@ struct NotesModelTests {
     }
     private func topLevelNames(_ model: NotesModel) -> [String] { model.normalTree.map(\.name) }
 
+    // MARK: itemsGeneration (W14.4 c — reactive provenance-chip refresh signal)
+
+    @Test func replaceItemsBumpsItemsGeneration() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+
+        // The extract editor gates its reactive chip re-style on inequality of this counter, so every
+        // replaceItems (create/rename/delete/reindex) must advance it — even an identical set, so a
+        // rename that leaves the summary count unchanged still prompts a chip re-resolve.
+        let g0 = model.itemsGeneration
+        model.replaceItems([])
+        let g1 = model.itemsGeneration
+        model.replaceItems([])
+        let g2 = model.itemsGeneration
+        #expect(g1 != g0)
+        #expect(g2 != g1)
+    }
+
     // MARK: create
 
     @Test func createFolderAppearsInTree() async throws {

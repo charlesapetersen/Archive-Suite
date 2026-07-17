@@ -123,6 +123,7 @@ struct NoteEditorPane: View {
                 MainActor.assumeIsolated { model.openItem(id: target.id, block: target.block) }
             },
             passageSummaries: nav.model.allItems,   // resolve chip live titles / missing state
+            passageGeneration: nav.model.itemsGeneration,   // reactive chip-title refresh (W14.4 c)
             scrollRequest: scrollRequest,
             onScrollOutcome: { hitExact in
                 // Runs inside updateNSView — defer state mutation out of the view-update pass.
