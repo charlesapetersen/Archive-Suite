@@ -105,7 +105,10 @@ struct NotesTagProjectorSafetyTests {
             if let e = error as? TagWriteError {
                 switch e {
                 case .unreadable, .coordinationFailed: break
-                case .verificationFailed: Issue.record("unexpected verificationFailed on unreadable input")
+                // .identityMismatch (Safety §6, added W14.2) cannot arise here — the projector passes no
+                // expectedIdentity — so treat it, like verificationFailed, as an unexpected error.
+                case .verificationFailed, .identityMismatch:
+                    Issue.record("unexpected \(e) on unreadable input")
                 }
             }
         }
