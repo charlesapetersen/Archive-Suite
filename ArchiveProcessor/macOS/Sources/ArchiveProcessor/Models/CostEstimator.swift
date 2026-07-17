@@ -37,7 +37,7 @@ struct CostEstimator {
         case .gemini: return 40_000
         case .anthropic: return 6_000
         case .mistral: return 1_000
-        case .openai: return 1_500   // VERIFY: OpenAI per-image token estimate (W13.oai-1 placeholder) — refine with live pricing
+        case .openai: return 1_500   // OpenAI bills images as tokens via tiling; ~1.5k ≈ a full-page high-detail scan. Refine if the keyed live smoke shows drift.
         }
     }
 

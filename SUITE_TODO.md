@@ -115,8 +115,11 @@ whole gate unattended-satisfiable at $0):
   when active; extend `test-smoke.sh` to run the **fake-CLI** path (skip gracefully when no real CLI). | M | med | none
 
 **Keyed / owner tail (NOT daemon-buildable — flag to Morning Review, do not attempt unattended):** OpenAI live
-2-image OCR smoke through gateway + native `.openai` (owner supplies a key) and final model-ID/pricing
-verification; CLI `gemini`+`codex` install + entitlement confirmation (Phase 0) and the real-CLI live OCR smoke
+2-image OCR smoke through gateway + native `.openai` (owner supplies a key). _(Model-ID + pricing `// VERIFY`
+placeholders RESOLVED 2026-07-16: `openaiModels` replaced with the current GPT-5 generation (gpt-5-nano/-mini/
+5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench source; live-key OCR smoke remains the final ID
+confirmation.)_
+CLI `gemini`+`codex` install + entitlement confirmation (Phase 0) and the real-CLI live OCR smoke
 (the `claude` path can't run inside a Claude Code session — nested-session guard); OpenAI Batch API (Phase 4) +
 CLI persistent-`stream-json` perf (Phase 4). Land the build-verified code first; these gate final "shipped".
 

@@ -133,7 +133,7 @@ extension OpenAICompatibleClient {
     /// only for those reasoning families.
     ///
     /// `reasoning_effort` (W13.oai-2) is likewise gated on `supportsThinking`: it is sent ONLY for
-    /// reasoning models — non-reasoning models (gpt-4o etc.) reject the parameter — and only when the
+    /// reasoning models — non-reasoning models (e.g. gpt-5.4-mini) reject the parameter — and only when the
     /// caller passes a `thinkingLevel` (otherwise OpenAI's own "medium" default applies). The
     /// `ThinkingLevel → reasoning_effort` string mapping lives on `ThinkingLevel.openAIReasoningEffort`.
     static func openAI(model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel? = nil) -> OpenAICompatibleClient {

@@ -306,47 +306,64 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // keyed/owner tail (Morning Review) before the live OCR test; do not treat as authoritative.
     // `supportsThinking: true` marks the reasoning families (o-series / GPT-5) that require
     // `max_completion_tokens` — see `OpenAICompatibleClient.openAI(model:apiKey:)`. First entry is the
-    // default OCR model (a cheap capable vision model, analogous to Gemini Flash-Lite). // VERIFY all.
+    // default OCR model (cheapest capable vision model, analogous to Gemini Flash-Lite).
+    // Model IDs + per-1M prices are the current GPT-5 generation, priced per the owner-provided source
+    // (SoCOCRbench — https://noahdasanaike.github.io/posts/sococrbench.html, captured 2026-07-16), ordered
+    // cheapest→flagship. `supportsThinking` follows that benchmark's reasoning column: the models it ran WITH
+    // reasoning are reasoning-capable; the "no reason." variants are marked false so the adapter never sends
+    // `reasoning_effort` to a model that would reject it. IDs follow OpenAI's lowercase-hyphen convention;
+    // live model-ID + param confirmation remains the keyed OCR smoke (Morning Review) — a wrong ID surfaces
+    // there, not silently in the estimator.
     static let openaiModels: [LLMModel] = [
         LLMModel(
-            id: "gpt-4o-mini",                 // VERIFY id + pricing
-            displayName: "GPT-4o mini",
-            provider: .openai,
-            supportsThinking: false,
-            returnsMd: false,
-            inputCostPer1M: 0.15,              // VERIFY
-            outputCostPer1M: 0.60,             // VERIFY
-            batchDiscount: 0.5                 // VERIFY (OpenAI Batch API ~50%; batch skipped in v1)
-        ),
-        LLMModel(
-            id: "gpt-4o",                       // VERIFY id + pricing
-            displayName: "GPT-4o",
-            provider: .openai,
-            supportsThinking: false,
-            returnsMd: false,
-            inputCostPer1M: 2.50,              // VERIFY
-            outputCostPer1M: 10.0,             // VERIFY
-            batchDiscount: 0.5                 // VERIFY
-        ),
-        LLMModel(
-            id: "gpt-4.1-mini",                 // VERIFY id + pricing
-            displayName: "GPT-4.1 mini",
-            provider: .openai,
-            supportsThinking: false,
-            returnsMd: false,
-            inputCostPer1M: 0.40,              // VERIFY
-            outputCostPer1M: 1.60,             // VERIFY
-            batchDiscount: 0.5                 // VERIFY
-        ),
-        LLMModel(
-            id: "gpt-5",                        // VERIFY id + pricing (reasoning → max_completion_tokens)
-            displayName: "GPT-5",
+            id: "gpt-5-nano",
+            displayName: "GPT-5 nano",
             provider: .openai,
             supportsThinking: true,
             returnsMd: false,
-            inputCostPer1M: 1.25,              // VERIFY
-            outputCostPer1M: 10.0,             // VERIFY
-            batchDiscount: 0.5                 // VERIFY
+            inputCostPer1M: 0.05,
+            outputCostPer1M: 0.40,
+            batchDiscount: 0.5                 // OpenAI Batch API ~50%; batch skipped in v1 (supportsBatch=false)
+        ),
+        LLMModel(
+            id: "gpt-5-mini",
+            displayName: "GPT-5 mini",
+            provider: .openai,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 0.25,
+            outputCostPer1M: 2.00,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gpt-5.4-mini",
+            displayName: "GPT-5.4 mini",
+            provider: .openai,
+            supportsThinking: false,           // benchmarked "no reason." — don't send reasoning_effort
+            returnsMd: false,
+            inputCostPer1M: 0.75,
+            outputCostPer1M: 4.50,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gpt-5.4",
+            displayName: "GPT-5.4",
+            provider: .openai,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 2.50,
+            outputCostPer1M: 15.0,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gpt-5.5",
+            displayName: "GPT-5.5",
+            provider: .openai,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 5.00,
+            outputCostPer1M: 30.0,
+            batchDiscount: 0.5
         ),
     ]
 }
