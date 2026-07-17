@@ -60,6 +60,26 @@ status() {
   runstatus || echo "  (no plan at $PLAN)"
   echo "== GUI mode =="
   echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)  |  UI-automation: $(am_state)   (toggle: $0 gui on|off)"
+  echo "== keychain =="
+  # The daemon's test-smoke gate reads the OCR key via /usr/bin/security, which re-prompts until the item's
+  # partition list includes Apple's tool partitions. fix-keychain-access.sh sets that + drops this marker
+  # (which records the accounts it fixed). Reading item ATTRIBUTES (no -w) never prompts, so we can also flag
+  # a provider key that's present but NOT in the marker — e.g. one added after the fix was last run.
+  local kmark="$STATE/keychain-partition-fixed" ksvc="com.archiveprocessor.app" klc="$HOME/Library/Keychains/login.keychain-db"
+  if [ -f "$kmark" ]; then
+    local fixed; fixed="$(cat "$kmark" 2>/dev/null)"
+    echo "  partition-list fix applied ($fixed)"
+    local newkeys=""
+    for a in Gemini Anthropic Mistral OpenAI Gateway; do
+      if security find-generic-password -s "$ksvc" -a "$a" "$klc" >/dev/null 2>&1 && ! printf '%s' "$fixed" | grep -qw "$a"; then
+        newkeys="$newkeys $a"
+      fi
+    done
+    [ -n "$newkeys" ] && echo "  ⚠ new key(s) not yet fixed:$newkeys — re-run ./ops/autonomous/fix-keychain-access.sh"
+  else
+    echo "  ⚠ partition-list fix NOT applied — the daemon may wake you with 'security wants to use your keychain'."
+    echo "    Run once:  ./ops/autonomous/fix-keychain-access.sh   (then re-run after rotating/adding any API key)"
+  fi
   echo "== recent daemon.log =="
   tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
 }

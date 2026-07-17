@@ -138,6 +138,24 @@ compile and never says why. Before launching, the daemon checks free space on `$
 `git worktree remove` does **not** refuse a worktree whose only content is gitignored (i.e. `build/DD`) —
 so GCing a live engine's worktree mid-build is otherwise real.
 
+## Keychain: stop the "security wants to use your keychain login" prompt (WS12, 2026-07-17)
+
+The Tier-1 gate `ArchiveProcessor/test-smoke.sh` reads the Gemini OCR key with `security find-generic-password
+-w` — so the requester is **/usr/bin/security**, not the app. The stable-signing fix
+(`processor-keychain-stable-signing`) is about the *app's* code identity and does nothing for the CLI. And
+clicking **"Always Allow"** never fixes it: that edits the item's legacy **ACL**, whereas a command-line
+tool's prompt-free access is gated by the newer **partition list**. So `security` re-prompts on every
+productive session and wakes you.
+
+**Fix — run once (needs your login password, so it can't be in the daemon):**
+```bash
+./ops/autonomous/fix-keychain-access.sh    # adds apple:,apple-tool: to each key item's partition list
+```
+Then launch the app once (`./launch.sh processor`) and click **Always Allow** if *it* prompts, to confirm the
+app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
+re-created item gets a fresh, empty partition list). `arm.sh status` shows whether the fix is applied.
+(Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
+
 ## Regression suite — `ops/autonomous/tests/prove-daemon.sh`
 
 Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every

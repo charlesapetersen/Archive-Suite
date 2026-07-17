@@ -138,6 +138,18 @@ commits that nobody reviews for two weeks. So the run must also **re-review the 
   whole unattended window (the corpus-safety directive matters most when no one is watching).
 - *Verify:* an item in the hold section is never picked by STEP 2; it appears in the digest.
 
+### WS12 — Keychain partition-list fix *(added 2026-07-17 — the owner was woken twice by this)*
+The daemon's Tier-1 gate `test-smoke.sh` reads the Gemini key via `security find-generic-password -w`, so the
+requester is **/usr/bin/security**, not the app — the stable-signing fix (`496d202`) can't touch it. And
+"Always Allow" never stuck because it edits the item's **ACL**, while a CLI tool's prompt-free access is
+gated by the newer **partition list**. Fix: `ops/autonomous/fix-keychain-access.sh` adds `apple:,apple-tool:`
+to each key item's partition list so `/usr/bin/security` reads without prompting.
+- **Owner-run, one-time** (needs the login password → cannot live in the unattended daemon). Re-run after
+  rotating a key (a re-created item gets a fresh, empty partition list). `arm.sh status` prints a reminder.
+- Owner chose this over env-key injection (2026-07-17) to **keep keys in the Keychain** — no plaintext file.
+- *Verify (manual):* run it → a daemon test-smoke cycle no longer prompts; then launch the app once to
+  confirm the app still reads its key under the new partition list.
+
 ---
 
 ## Ordering
@@ -148,7 +160,8 @@ lands as its own reviewed+proven commit; the long run is armed only after all ar
 clean.
 
 ## Progress
-- [x] **WS6** alert core + **WS2** disk guard — shipped 2026-07-16 (see the commit; harness-proven, reviewed).
+- [x] **WS6** alert core + **WS2** disk guard — shipped 2026-07-16 (harness-proven, reviewed).
+- [x] **WS12** keychain partition-list fix — shipped 2026-07-17 (owner-run helper; **owner runs it once**).
 - [ ] WS4 attempt cap · WS1 crash-restart posture · WS11 recurring review · WS7 health gate · WS5 STATUS digest
       · WS8 Morning-Review rotation · WS9 dep gating · WS10 hold queue.
 
