@@ -125,10 +125,48 @@ struct ExtractBuilder {
     /// §5): the payload's segments as note-passage blocks, run through the extracts-reference-notes-only
     /// coercion, serialized to the on-disk `<!-- block: -->` form so `MarkdownBridge.parse` renders the
     /// chip + body identically to a saved-then-reloaded extract. Empty when the payload has no segments.
+    ///
+    /// This pure variant inserts the image *references* only. The live paste handler must instead use
+    /// `pastedExtractMarkdown(from:importingAssetsVia:)` so the payload's inline-image BYTES are copied
+    /// into the extract's own `assets/` — otherwise a pasted image dangles as a missing-asset placeholder.
     nonisolated static func pastedExtractMarkdown(from payload: NotesPassagePayload) -> String {
-        let blocks = coercedToNotesOnly(passageBlocks(from: payload).map { $0.block })
-        guard !blocks.isEmpty else { return "" }
-        return BlockParser.serialize(leadingText: nil, blocks: blocks)
+        serializedExtractBody(passageBlocks(from: payload).map { $0.block })
+    }
+
+    /// Extract-paste body markdown that ALSO imports each segment's inline-image bytes into the target
+    /// extract's own `assets/` (07-extracts §5 — the paste analogue of `persist(_:into:)`). For every
+    /// pending asset, `importAsset(bytes, bareName)` reserves+writes a copy (no-overwrite guard) and
+    /// returns the stored `assets/<name>` ref; when the store disambiguated a name-collision
+    /// (`stored != assets/<bare>`) the block markdown ref is rewritten to the stored name so the inserted
+    /// text points at the file that actually landed. A nil return (import failed / no target item) leaves
+    /// that one ref at the original name — a missing-asset placeholder, never a crash — without aborting
+    /// the rest of the paste. `@MainActor` because the production importer (`ItemAssetStore.addAsset`) is
+    /// main-actor-isolated.
+    @MainActor
+    static func pastedExtractMarkdown(from payload: NotesPassagePayload,
+                                      importingAssetsVia importAsset: (Data, String) -> String?) -> String {
+        let imported: [Block] = passageBlocks(from: payload).map { passage in
+            var block = passage.block
+            for (name, bytes) in passage.pendingAssets {
+                let bare = (name as NSString).lastPathComponent
+                guard let stored = importAsset(bytes, bare) else { continue }
+                let originalRef = "assets/\(bare)"
+                if stored != originalRef {
+                    block.markdown = block.markdown
+                        .replacingOccurrences(of: "](\(originalRef))", with: "](\(stored))")
+                }
+            }
+            return block
+        }
+        return serializedExtractBody(imported)
+    }
+
+    /// Shared tail for both `pastedExtractMarkdown` overloads: coerce to the extracts-reference-notes-only
+    /// invariant, then serialize to the on-disk block form; "" when nothing survives coercion.
+    nonisolated private static func serializedExtractBody(_ blocks: [Block]) -> String {
+        let coerced = coercedToNotesOnly(blocks)
+        guard !coerced.isEmpty else { return "" }
+        return BlockParser.serialize(leadingText: nil, blocks: coerced)
     }
 
     // MARK: - Extract-references-notes-only invariant (the single choke-point, §Risks)

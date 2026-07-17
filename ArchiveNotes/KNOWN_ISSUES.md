@@ -445,17 +445,22 @@ W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands 
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
 paste in an extract editor → note-passage blocks). Model + codec paths are unit-tested; conscious gaps:
 
-- **Inline-image BYTES: copy side now embeds them (W7-S5); extract-paste byte import still a follow-up.**
+- **Inline-image BYTES: copy + Create/Append + extract-paste all import them now (W7-S5 + W14.3, FIXED).**
   With W7-S5's `ItemAssetStore` wired into `NoteEditorPane`, the **copy** path
-  (`copyPassageIfNote` → `EditorPassageSource(assetStore:)`) now resolves + snapshots the passage's inline-
-  image *bytes* (not just the `assets/<name>` refs) into the `com.archivenotes.passage` payload. The
-  Create/Append *commands* already persist those bytes into the new extract's `assets/` (proven by
-  `ExtractBuilder` create/append asset tests). **Remaining gap:** the live extract-editor *paste* handler
-  (`MarkdownEditorView.handlePassagePaste` → `ExtractBuilder.pastedExtractMarkdown`) inserts the passage
-  markdown with image *references* but does not yet import the payload's bytes into the extract's own
-  `assets/` (and rewrite the refs on name collision) — so a live copy→paste into an extract renders those
-  images as missing-asset placeholders until saved via Create/Append. Closing this is a focused follow-up
-  on the paste handler (the store + payload bytes are now both present); best confirmed under GUI drive.
+  (`copyPassageIfNote` → `EditorPassageSource(assetStore:)`) resolves + snapshots the passage's inline-image
+  *bytes* (not just the `assets/<name>` refs) into the `com.archivenotes.passage` payload, and the
+  Create/Append *commands* persist those bytes into the new extract's `assets/` (proven by `ExtractBuilder`
+  create/append asset tests). **W14.3 closes the last gap** — the live extract-editor *paste* handler
+  (`MarkdownEditorView.handlePassagePaste`) now copies the payload's bytes into the extract's own `assets/`
+  too: a new `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` overload imports each segment's
+  bytes via `ItemAssetStore.addAsset` (reserve→write, no-overwrite guard) and rewrites the `](assets/…)` refs
+  when a name collision disambiguates, so a copy→paste into an extract is self-contained. Verified on scratch
+  stores (`ExtractBuilderTests`: byte-on-disk, no-clobber disambiguation, nil-import resilience). **Residual
+  (→ Morning Review, minor, not data loss):** (1) because `ItemAssetStore` writes bytes on a background task,
+  the just-pasted images can render as missing-asset placeholders until the extract is reloaded (identical to
+  the single-image paste path); (2) two selected blocks referencing the *same* source image import as two
+  copies (consistent with the audited Create/Append `persist`); (3) the end-to-end **GUI copy→paste drive**
+  still wants a live confirm.
 - **Create-Extract doesn't auto-raise + select the new extract in the Extracts window (GUI, deferred).**
   The extract is created, filed into the Extracts home folder, and appears in the Extracts window's list
   immediately (both windows observe `allItems`), but the two windows hold independent

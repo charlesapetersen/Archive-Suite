@@ -407,7 +407,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         func handlePassagePaste() -> Bool {
             guard let textView, !currentIsRaw, formattingContext?.currentItemKind == .extract,
                   let payload = PassagePasteboard.read() else { return false }
-            let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload)
+            // Copy the payload's inline-image BYTES into THIS extract's own assets/ (reserve→write,
+            // no-overwrite guard) and rewrite refs on collision, so pasted images persist instead of
+            // dangling as missing-asset placeholders. Writes go only through the audited ItemAssetStore.
+            let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, bare in
+                try? assetStore?.addAsset(data, preferredName: bare)
+            }
             guard !markdown.isEmpty else { return false }
             let attributed = MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
                                                   assetStore: assetStore,

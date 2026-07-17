@@ -258,7 +258,7 @@ Legend as above.
   env flake, unrelated). No visible UI effect (invisible safety guard, only fires on a file swap), so no
   GUI drive; an optional live regression smoke on a scratch corpus → Morning Review. | files: ArchiveReader
   Views/NavigationModel.swift, Core/ArchiveFile.swift, Core/TagWriter.swift | done
-- [ ] **W14.3 — Notes: extract-paste imports inline-image BYTES [MED]** _(Notes KNOWN_ISSUES → "Extracts
+- [x] **W14.3 — Notes: extract-paste imports inline-image BYTES [MED]** _(Notes KNOWN_ISSUES → "Extracts
   create/copy-paste follow-ups")._ The copy side embeds image bytes and Create/Append persist them, but the live
   extract-editor **paste** handler still inserts image *references* without importing the payload's bytes into the
   extract's own `assets/` (and rewriting refs on name collision) — so a live copy→paste renders missing-asset
@@ -267,7 +267,12 @@ Legend as above.
   `assets/` (reuse `ItemAssetStore` reserve→write; no-overwrite guard) and rewrite refs on collision. Store +
   payload bytes both already exist. **Tier-1/2** (writes to the Notes store — scratch-testable). Daemon-buildable +
   unit-testable (`ExtractBuilder`/`ItemAssetStore` tests); GUI copy→paste drive → Morning Review. | files:
-  ArchiveNotes/.../Editor/MarkdownEditorView.swift, Core/ExtractBuilder.swift | M | low | none
+  ArchiveNotes/.../Editor/MarkdownEditorView.swift, Core/ExtractBuilder.swift | done — new
+  `pastedExtractMarkdown(from:importingAssetsVia:)` overload imports each segment's bytes into the extract's own
+  `assets/` via `ItemAssetStore.addAsset` (reserve→write, no-overwrite guard) + rewrites `](assets/…)` refs on
+  collision; `handlePassagePaste` wires it in. +3 scratch Tier-2 tests (byte-on-disk, no-clobber disambiguation,
+  nil-import resilience); full ArchiveNotesTests green (189 XCTest + 513 swift-testing). Also unbroke the Notes
+  test bundle (`67f8938`: W14.2's new `TagWriteError.identityMismatch`). GUI copy→paste drive → Morning Review.
 - [ ] **W14.4 — Notes W7 polish cluster [LOW]** _(Notes KNOWN_ISSUES → W7-S2/S3/S4 follow-ups)._ Small, mostly
   independent: (a) **trivial warning** — `Core/NotePassageSource.swift:118` "conditional cast … always succeeds"
   (pure daemon fix, no GUI); (b) programmatic **window-raise + select** on Create-Extract and on Jump-to-Source

@@ -141,7 +141,9 @@ macOS/Sources/ArchiveNotes/
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle,
                                    extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1);
-                                   passagePayload (copy side) + pastedExtractMarkdown (paste side) (W7-S2)
+                                   passagePayload (copy side) + pastedExtractMarkdown (paste side) (W7-S2);
+                                   pastedExtractMarkdown(from:importingAssetsVia:) imports paste bytes into
+                                   the extract's assets/ + rewrites refs on collision (W14.3)
     NotePassageSource.swift        NotePassageBlockMap (pure chip-delimited block-ordinal map, shared with
                                    the S3 jump-to-source side) + EditorPassageSource (the live
                                    PassageSelectionSource over a value snapshot of the editor text —

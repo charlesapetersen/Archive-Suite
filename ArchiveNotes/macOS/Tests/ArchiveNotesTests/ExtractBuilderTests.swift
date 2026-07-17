@@ -297,6 +297,77 @@ struct ExtractBuilderTests {
         #expect(reloaded.blocks[0].source?.notePassageTarget?.id
                 != reloaded.blocks[1].source?.notePassageTarget?.id)
     }
+
+    // MARK: - Extract-paste inline-image byte import (W14.3)
+
+    /// The extract host must exist (its assets/ dir is the paste target). Returns a scratch NoteStore, a
+    /// created extract Item, and an ItemAssetStore aimed at it — the production paste-import wiring.
+    private func pasteFixture() async throws -> (store: NoteStore, tmp: URL, extractID: UUID, assets: ItemAssetStore) {
+        let (store, tmp) = try scratch()
+        let extract = try await ExtractBuilder(store: store, now: { Date(timeIntervalSince1970: 1000) })
+            .createExtract(from: ExtractBuilder.passageBlocks(from: NotesPassagePayload(
+                sourceNoteId: UUID(), sourceTitle: "Host", sourceDateDisplay: "1968",
+                segments: [.init(sourceBlockIndex: 0, markdown: "seed\n")])))
+        let assets = ItemAssetStore(store: store, root: store.rootURL, itemID: extract.id)
+        return (store, tmp, extract.id, assets)
+    }
+
+    @Test("extract-paste imports the payload's inline-image bytes into the extract's own assets/ (no collision → ref unchanged)")
+    func pasteImportsBytesNoCollision() async throws {
+        let f = try await pasteFixture(); defer { cleanup(f.tmp) }
+        let bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x0D])
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0, markdown: "![q](assets/q.png)\n", assetPNGs: ["q.png": bytes])])
+
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, bare in
+            try? f.assets.addAsset(data, preferredName: bare)
+        }
+        await f.assets.awaitPendingWrites()
+
+        #expect(markdown.contains("](assets/q.png)"))    // no collision → original ref preserved
+        let dir = await f.store.assetsDir(f.extractID)
+        #expect(try Data(contentsOf: dir.appendingPathComponent("q.png")) == bytes)  // bytes landed, self-contained
+    }
+
+    @Test("extract-paste disambiguates a name collision: bytes land at the new name, ref is rewritten, existing file untouched")
+    func pasteRewritesRefOnCollision() async throws {
+        let f = try await pasteFixture(); defer { cleanup(f.tmp) }
+        // A same-named asset already lives in the extract (an earlier paste) — the new paste MUST NOT clobber it.
+        let existing = Data("OLD".utf8)
+        _ = try await f.store.importAsset(existing, preferredName: "p.png", into: f.extractID)
+        let pasted = Data("NEW".utf8)
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 2, markdown: "see ![p](assets/p.png)\n", assetPNGs: ["p.png": pasted])])
+
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, bare in
+            try? f.assets.addAsset(data, preferredName: bare)
+        }
+        await f.assets.awaitPendingWrites()
+
+        #expect(markdown.contains("](assets/p-1.png)"))  // rewritten to the disambiguated name
+        #expect(!markdown.contains("](assets/p.png)"))
+        let dir = await f.store.assetsDir(f.extractID)
+        #expect(try Data(contentsOf: dir.appendingPathComponent("p-1.png")) == pasted)   // new bytes at new name
+        #expect(try Data(contentsOf: dir.appendingPathComponent("p.png")) == existing)   // pre-existing bytes untouched
+    }
+
+    @Test("importingAssetsVia rewrites only collided refs; a nil (failed) import leaves that ref as-is — no crash")
+    func pasteRewriteLogicAndNilResilience() {
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0,
+                             markdown: "![a](assets/a.png) then ![b](assets/b.png)\n",
+                             assetPNGs: ["a.png": Data([1]), "b.png": Data([2])])])
+        // a.png "collides" → stored as a-1.png; b.png import "fails" (nil) → its ref is preserved verbatim.
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { _, bare in
+            bare == "a.png" ? "assets/a-1.png" : nil
+        }
+        #expect(markdown.contains("](assets/a-1.png)"))  // collided ref rewritten
+        #expect(!markdown.contains("](assets/a.png)"))
+        #expect(markdown.contains("](assets/b.png)"))    // failed import → original ref left dangling, not dropped
+    }
 }
 
 // MARK: - Extract-references-notes-only invariant
