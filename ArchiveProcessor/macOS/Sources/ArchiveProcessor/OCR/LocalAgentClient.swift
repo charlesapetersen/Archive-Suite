@@ -24,6 +24,11 @@ struct LocalAgentClient: Sendable {
     /// generous ceiling; text completion is prompt-only and quicker.
     static let ocrTimeout: TimeInterval = 240
     static let textTimeout: TimeInterval = 120
+    /// A `probe()` verification round-trip is prompt-only, but still pays CLI cold-start + one turn, so
+    /// it gets a middle ceiling — long enough for a slow first launch, short enough to feel responsive.
+    static let probeTimeout: TimeInterval = 60
+    private static let probePrompt =
+        "Reply with only the two words: PROBE OK. Do not use any tools or add any other text."
 
     /// Appended to the CLI's own system prompt (where supported) so the agent emits ONLY the
     /// classification/rotation/transcription in `OCRPrompt`'s format — no preamble or tool chatter.
@@ -101,6 +106,39 @@ struct LocalAgentClient: Sendable {
             return trimmed
         case .failure(_, let message):
             throw OCRError.networkError(message)
+        }
+    }
+
+    // MARK: - Validation probe (used by LocalAgentValidator)
+
+    /// Structured result of a minimal round-trip that confirms the CLI is installed AND signed in,
+    /// WITHOUT spending a real OCR call. Carries only a friendly message + a stable code (never raw
+    /// stderr) so `LocalAgentValidator` can map it to a user-facing status.
+    struct ProbeOutcome: Sendable {
+        /// True ⇒ the CLI produced a normal response (installed, runnable, and authenticated).
+        let ok: Bool
+        /// Stable failure code (see `exitErrorCode`); nil on success.
+        let code: String?
+        /// Friendly one-line message (never raw stderr); nil on success.
+        let message: String?
+    }
+
+    /// One tiny prompt-only round-trip through the SAME spawn path OCR uses, to verify the CLI is
+    /// reachable and signed in. Cheaper than an OCR call (no image, trivial prompt) and never throws.
+    /// The binary is resolved exactly like `ocr`/`textCompletion` (override → standard paths, never
+    /// `$PATH`); an unresolved binary reports `cli_not_found` instead of probing.
+    func probe() async -> ProbeOutcome {
+        guard let binary = Self.resolveBinaryPath(tool: config.tool, override: config.binaryPath) else {
+            return ProbeOutcome(ok: false, code: "cli_not_found",
+                                message: "The \(config.tool.displayName) CLI was not found.")
+        }
+        let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
+                                    prompt: Self.probePrompt, timeout: Self.probeTimeout)
+        switch run {
+        case .success:
+            return ProbeOutcome(ok: true, code: nil, message: nil)
+        case .failure(let code, let message):
+            return ProbeOutcome(ok: false, code: code, message: message)
         }
     }
 
@@ -206,6 +244,16 @@ struct LocalAgentClient: Sendable {
         let s = stderr.lowercased()
         if s.contains("not logged in") || s.contains("please log in") || s.contains("authenticate")
             || s.contains("unauthenticated") || s.contains("sign in") { return "cli_not_logged_in" }
+        // Signed in, but this account/seat isn't AUTHORIZED to use the CLI (e.g. a Gemini chat-app tier
+        // with no Code Assist/API entitlement, or a Claude Team/Enterprise seat without Claude Code
+        // enabled). Distinct from not-logged-in: the fix is an entitlement/admin change, not a login.
+        // Checked after login (a not-signed-in state is more common + more actionable) and before the
+        // rate check. `gemini`/`codex` phrasing is VERIFY (Phase 0 pending); `claude` needs no such gate.
+        if s.contains("not entitled") || s.contains("no access to") || s.contains("does not have access")
+            || s.contains("not authorized to use") || s.contains("code assist")
+            || s.contains("subscription required") || s.contains("not enabled for")
+            || s.contains("isn't enabled") || s.contains("workspace admin") || s.contains("enterprise admin")
+            || s.contains("upgrade your plan") || s.contains("requires a paid plan") { return "cli_entitlement_missing" }
         if s.contains("limit") || s.contains("quota") || s.contains("rate") { return "cli_rate_limited" }
         return "cli_exit_\(exitCode)"
     }
@@ -214,6 +262,10 @@ struct LocalAgentClient: Sendable {
         switch exitErrorCode(stderr: stderr, exitCode: exitCode) {
         case "cli_not_logged_in":
             return "Not signed in to the \(tool.displayName) CLI. Run its login command, then retry."
+        case "cli_entitlement_missing":
+            return "Your account isn't authorized to use the \(tool.displayName) CLI. It needs the right " +
+                   "entitlement (a Gemini Code Assist/API license, or Claude Code enabled on your seat) — " +
+                   "ask your admin, or use a personal subscription."
         case "cli_rate_limited":
             return "\(tool.displayName) usage limit reached. Try again later."
         default:

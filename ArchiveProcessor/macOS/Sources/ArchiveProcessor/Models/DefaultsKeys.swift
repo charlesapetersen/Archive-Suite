@@ -28,6 +28,13 @@ enum DefaultsKeys {
     static let gatewayOutputCost = "gatewayOutputCost"
     static let gatewayUpstreamProvider = "gatewayUpstreamProvider"
 
+    // Local Agent CLI backend (a locally installed, subscription-authenticated CLI — no API key).
+    // Additive + opt-in; mutually exclusive with useGateway (the XOR is enforced in SettingsView).
+    static let useLocalAgent = "useLocalAgent"
+    static let localAgentTool = "localAgentTool"           // LocalAgentTool rawValue (claude/gemini/codex)
+    static let localAgentBinaryPath = "localAgentBinaryPath" // optional absolute path override (blank ⇒ auto-detect)
+    static let localAgentModel = "localAgentModel"         // optional model override (blank ⇒ CLI default)
+
     // Input & processing
     static let batchMode = "batchMode"
     static let preOCRedInput = "preOCRedInput"

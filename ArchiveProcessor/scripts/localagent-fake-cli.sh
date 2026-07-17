@@ -10,7 +10,9 @@
 #   echostdin  success JSON whose .result reports how many stdin bytes it received               exit 0
 #   garbage    non-JSON stdout (tests the client's bad-response handling)                        exit 0
 #   fail       generic error on stderr                                                          exit 3
-#   notlogged  a "not logged in" error on stderr                                                exit 1
+#   notlogged  a "not logged in" error on stderr (client → cli_not_logged_in)                   exit 1
+#   entitlement a signed-in-but-not-authorized error (client → cli_entitlement_missing)         exit 1
+#   ratelimited a usage-limit error on stderr (client → cli_rate_limited)                        exit 1
 #   timeout    sleeps well past any test timeout (tests the client's SIGTERM/SIGKILL path)      exit 0
 mode="${LOCALAGENT_FAKE_MODE:-ok}"
 
@@ -32,6 +34,12 @@ case "$mode" in
     exit 3 ;;
   notlogged)
     echo "Error: Not logged in. Please run the login command and try again." >&2
+    exit 1 ;;
+  entitlement)
+    echo "Error: your account does not have access to this CLI. Ask your workspace admin to enable it." >&2
+    exit 1 ;;
+  ratelimited)
+    echo "Error: usage limit reached. Please try again later." >&2
     exit 1 ;;
   timeout)
     sleep 30
