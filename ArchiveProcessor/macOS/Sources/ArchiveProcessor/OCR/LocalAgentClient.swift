@@ -37,6 +37,22 @@ struct LocalAgentClient: Sendable {
         "the rotation tag line, and the transcription, exactly in the format the user message specifies. " +
         "Do not add any preamble, explanation, apology, or commentary about tools."
 
+    /// Dedicated concurrency ceiling for Local Agent CLI model calls. The subprocess path does NOT flow
+    /// through `NetworkSession`'s HTTP `RequestLimiter`, so without this a wide OCR task group could
+    /// spawn a swarm of `claude`/`gemini` children at once against a *personal subscription*. This caps
+    /// the number of simultaneous CLI model calls at the top of the supported 1…2 range; the finer
+    /// per-run 1-vs-2 choice (`LocalAgentConfig.effectiveConcurrencyCap`) rides the OCR task-group width
+    /// (wired in W13.cli-4). Reuses the same cancellation-aware limiter the HTTP path uses — a separate
+    /// instance, so the two backends never share slots.
+    private static let concurrencyLimiter = RequestLimiter(limit: 2)
+
+    /// When a CLI reports a usage-window limit with a parseable reset time, the moment it frees up — so a
+    /// bulk OCR run can pace to the subscription window instead of hammering it, and the UI can say when
+    /// it recovers. The CLI-side analog of `NetworkSession.lastRateLimitedAt` (subprocess calls bypass
+    /// that HTTP path's `Retry-After` handling). Write-mostly; the OCR loop consumes it in W13.cli-4.
+    /// `nil` ⇒ no reset time is currently known.
+    nonisolated(unsafe) static var lastUsageWindowResetAt: Date?
+
     init(config: LocalAgentConfig) { self.config = config }
 
     // MARK: - Public seam (mirrors OpenAICompatibleClient)
@@ -173,6 +189,20 @@ struct LocalAgentClient: Sendable {
 
     private static func invoke(binary: String, tool: LocalAgentTool, modelOverride: String?,
                                prompt: String, timeout: TimeInterval) async -> InvokeOutcome {
+        // Dedicated low ceiling — the subprocess path bypasses NetworkSession's HTTP limiter, so pace it
+        // here so a wide OCR task group never spawns a swarm of CLI children against a personal
+        // subscription. `spawnAndClassify` never throws, so a plain acquire → body → release is balanced
+        // (including under cancellation: `acquire()` is cancellation-aware and `runAsync` always resumes).
+        await concurrencyLimiter.acquire()
+        let outcome = await spawnAndClassify(binary: binary, tool: tool, modelOverride: modelOverride,
+                                             prompt: prompt, timeout: timeout)
+        await concurrencyLimiter.release()
+        return outcome
+    }
+
+    /// The actual spawn + classify, run while holding a `concurrencyLimiter` slot.
+    private static func spawnAndClassify(binary: String, tool: LocalAgentTool, modelOverride: String?,
+                                         prompt: String, timeout: TimeInterval) async -> InvokeOutcome {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
         let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout)
 
@@ -183,7 +213,13 @@ struct LocalAgentClient: Sendable {
             return .failure(code: "cli_spawn_failed", message: "Could not launch the \(tool.displayName) CLI.")
         }
         if cli.exitCode != 0 {
-            return .failure(code: exitErrorCode(stderr: cli.stderr, exitCode: cli.exitCode),
+            let code = exitErrorCode(stderr: cli.stderr, exitCode: cli.exitCode)
+            // Record a parseable usage-window reset so a bulk run can pace to it (W13.cli-4) and the
+            // message can say when the subscription frees up.
+            if code == "cli_rate_limited" {
+                lastUsageWindowResetAt = parseUsageWindowReset(fromStderr: cli.stderr, now: Date())
+            }
+            return .failure(code: code,
                             message: friendlyExitMessage(tool: tool, stderr: cli.stderr, exitCode: cli.exitCode))
         }
         guard let text = extractText(tool: tool, stdout: cli.stdout), !text.isEmpty else {
@@ -267,7 +303,11 @@ struct LocalAgentClient: Sendable {
                    "entitlement (a Gemini Code Assist/API license, or Claude Code enabled on your seat) — " +
                    "ask your admin, or use a personal subscription."
         case "cli_rate_limited":
-            return "\(tool.displayName) usage limit reached. Try again later."
+            let now = Date()
+            if let reset = parseUsageWindowReset(fromStderr: stderr, now: now) {
+                return "\(tool.displayName) usage limit reached — resets \(usageWindowHint(for: reset, now: now)). The app paces to your subscription window and retries."
+            }
+            return "\(tool.displayName) usage limit reached. The app paces to your subscription window and retries."
         default:
             return "The \(tool.displayName) CLI failed (exit \(exitCode))."
         }
@@ -275,6 +315,117 @@ struct LocalAgentClient: Sendable {
 
     private static func failure(code: String, message: String) -> OCRResult {
         OCRResult(text: nil, classification: nil, errorMessage: message, errorCode: code)
+    }
+
+    // MARK: - Usage-window pacing (pure; unit-tested by scripts/localagent-pacing-test.swift)
+
+    /// Extract when a subscription usage window resets from a CLI's rate-limit message, so a bulk OCR
+    /// run can pace to that window (W13.cli-4) instead of hammering it, and the message can say when the
+    /// subscription frees up. Subprocess calls bypass `NetworkSession`'s HTTP `Retry-After` handling, so
+    /// this is the CLI-side analog. Pure + deterministic given `now`/`calendar` (the standalone pacing
+    /// test asserts exact instants). Recognizes the common phrasings, else returns nil (the caller still
+    /// knows it is rate-limited from the `cli_rate_limited` code):
+    ///   • relative — "try again in 45 minutes", "retry after 30s", "resets in 2h 13m", "in about 3 hours"
+    ///   • bare Retry-After seconds — "retry after 120"
+    ///   • absolute local clock time (Claude Code's form) — "resets 3pm", "resets at 10:59pm",
+    ///     "resets at 15:00" → the NEXT occurrence of that clock time at/after `now`.
+    ///
+    /// A relative "wait" duration is only parsed after an explicit wait-trigger ("resets in", "try again
+    /// in", …) so a WINDOW size like "5-hour limit reached, resets 3pm" is read as the absolute 3pm, not
+    /// "5 hours from now". `.current` in production uses the user's locale/timezone (matching how the CLI
+    /// prints the reset); the test injects a fixed UTC calendar.
+    static func parseUsageWindowReset(fromStderr stderr: String, now: Date,
+                                      calendar: Calendar = .current) -> Date? {
+        let s = stderr.lowercased()
+        if let secs = relativeResetSeconds(in: s), secs > 0 {
+            return now.addingTimeInterval(secs)
+        }
+        if let (hour, minute) = absoluteResetClock(in: s) {
+            return nextOccurrence(hour: hour, minute: minute, at: now, calendar: calendar)
+        }
+        return nil
+    }
+
+    /// A short human phrase for when a usage window frees up ("around 3:15 PM"), for the friendly
+    /// rate-limit message. Pure; `now` reserved for future same-day/next-day wording. English-only, like
+    /// the app's other status text (`en_US_POSIX` ⇒ deterministic "h:mm a").
+    static func usageWindowHint(for reset: Date, now: Date, calendar: Calendar = .current) -> String {
+        let fmt = DateFormatter()
+        fmt.calendar = calendar
+        fmt.timeZone = calendar.timeZone
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "h:mm a"
+        return "around \(fmt.string(from: reset))"
+    }
+
+    /// Wait-triggers that legitimately precede a relative reset duration (so a window *size* isn't read
+    /// as a wait). Order-independent; the earliest match anchors the scan.
+    private static let relativeResetTriggers = [
+        "resets in", "reset in", "resetting in", "try again in", "retry in", "retry after",
+        "available again in", "available in", "again in", "back in", "wait about", "in about",
+    ]
+
+    /// Sum of duration tokens that appear AFTER the earliest wait-trigger, in seconds (nil if none).
+    private static func relativeResetSeconds(in s: String) -> Double? {
+        var anchor: String.Index?
+        for t in relativeResetTriggers {
+            if let r = s.range(of: t), anchor == nil || r.upperBound < anchor! { anchor = r.upperBound }
+        }
+        guard let start = anchor else { return nil }
+        let tail = String(s[start...])
+        let ns = tail as NSString
+        let full = NSRange(location: 0, length: ns.length)
+
+        // Compound / single units: "2h 13m", "45 minutes", "30s", "1 day".
+        var total = 0.0
+        var matched = false
+        if let re = try? NSRegularExpression(pattern: #"(\d+)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s|days?|d)\b"#) {
+            for match in re.matches(in: tail, range: full) {
+                guard let n = Double(ns.substring(with: match.range(at: 1))) else { continue }
+                switch ns.substring(with: match.range(at: 2)).first {
+                case "h": total += n * 3600; matched = true
+                case "m": total += n * 60;   matched = true
+                case "s": total += n;        matched = true
+                case "d": total += n * 86400; matched = true
+                default:  break
+                }
+            }
+        }
+        if matched { return total }
+
+        // Bare number right after the trigger ⇒ HTTP-style Retry-After delta seconds ("retry after 120").
+        if let re = try? NSRegularExpression(pattern: #"^\s*(\d+)\b"#),
+           let m = re.firstMatch(in: tail, range: full),
+           let n = Double(ns.substring(with: m.range(at: 1))) {
+            return n
+        }
+        return nil
+    }
+
+    /// Parse an absolute reset clock time ("resets 3pm" / "reset at 10:59pm" / "resets at 15:00").
+    private static func absoluteResetClock(in s: String) -> (hour: Int, minute: Int)? {
+        guard let re = try? NSRegularExpression(
+            pattern: #"(?:reset(?:s|ting)?|again|available|back)\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#)
+        else { return nil }
+        let ns = s as NSString
+        guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
+              var hour = Int(ns.substring(with: m.range(at: 1))) else { return nil }
+        let minute = m.range(at: 2).location != NSNotFound ? (Int(ns.substring(with: m.range(at: 2))) ?? 0) : 0
+        let ampm = m.range(at: 3).location != NSNotFound ? ns.substring(with: m.range(at: 3)) : ""
+        if ampm == "pm" && hour < 12 { hour += 12 }
+        if ampm == "am" && hour == 12 { hour = 0 }
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        return (hour, minute)
+    }
+
+    /// The next wall-clock occurrence of `hour:minute` at or after `now` (today if still ahead, else
+    /// tomorrow) — a usage window that "resets 3pm" means the upcoming 3pm.
+    private static func nextOccurrence(hour: Int, minute: Int, at now: Date, calendar: Calendar) -> Date? {
+        var comps = calendar.dateComponents([.year, .month, .day], from: now)
+        comps.hour = hour; comps.minute = minute; comps.second = 0
+        guard let candidate = calendar.date(from: comps) else { return nil }
+        if candidate > now { return candidate }
+        return calendar.date(byAdding: .day, value: 1, to: candidate)
     }
 
     // MARK: - Subprocess plumbing (pure Foundation; no shell)
