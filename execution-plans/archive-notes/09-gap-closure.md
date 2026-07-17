@@ -13,15 +13,28 @@ data-safety defect; the largest items are *dead library code that never got its 
 Severity legend: **HIGH** (headline feature unreachable) · **MED** (real feature/tooling gap) ·
 **LOW** (polish/coverage/cosmetic) · **DOC** (tracker/doc hygiene).
 
+**Addendum — 2026-07-17 spec-vs-build pass.** Everything above (A1–A10, B1–B7, C1–C5, D1–D12) came from a
+*plan-vs-build* review (the internal wave plans `00a`/`01`–`08` vs the shipped source). A follow-up
+*spec-vs-build* pass — comparing the **original Archive Notes product spec** against the build — found four
+deltas the plan-vs-build pass could not see, because they are spec intent that never entered the wave plans:
+**A11** (author/date/quality → Finder-tags durability reconciliation), **B8** (manual author editing — notes
+**and** extracts), **B9** (outbound *Copy Link to Note/Extract* — the Scrivener round-trip originator), and
+**C6** (a 100k-note / 2M-word scale-acceptance harness). They are folded into their phases below and verified
+under Phase E like every other item. Most other original-spec items were **already tracked** here — page
+thumbnails (B4), note-level Zotero attach/citation/auto-fill (B1/B2), round-ups (D6), template body editing
+(D3), title/tag editing (B3), extract image bytes on the menu path (B6), guided root re-grant (B7), inbound
+`archivenotes://open` (B5) — or are plan-stated deferrals (quick-preview *page* navigation = the
+"page-within-merged-PDF scroll navigation" deferral in the out-of-scope list); those are **not** re-flagged.
+
 ---
 
 ## Summary of gaps by phase
 
 | Phase | Theme | Items | Top severity |
 |---|---|---|---|
-| A | Doc & tracker reconciliation | A1–A10 | DOC |
-| B | Wire the built-but-dead features | B1–B7 | HIGH |
-| C | Safety-net & regression tooling | C1–C5 | MED (functional) |
+| A | Doc & tracker reconciliation | A1–A11 | DOC |
+| B | Wire the built-but-dead features | B1–B9 | HIGH |
+| C | Safety-net & regression tooling | C1–C6 | MED (functional) |
 | D | Secondary UI affordances & polish | D1–D12 | LOW–MED |
 | E | Verification review (confirm A–D actually shipped + wired) | E1–E4 | — |
 
@@ -64,6 +77,22 @@ this plan). Each item is independently shippable in its own worktree per the rep
 **A10. Confirm doc-sync hook covers `packages/`.** — the W0 plan asked to prove the doc-sync backstop fires for a package outside both app dirs; `.claude/hooks/docsync-*.sh` contain no `packages/ArchiveCore` reference.
 - *Files:* `.claude/hooks/docsync-*.sh` (+ their config). *Steps:* verify/extend scope so a `packages/ArchiveCore` code change without a doc touch is caught. *Verify:* a dry-run trips the hook. **Tier-2** (autonomous-setup change — prove the mechanism before install).
 
+**A11. Reconcile the original spec's "author/date/quality → macOS Finder tags" durability intent.** — **DOC**
+(spec-vs-build). The original spec's durability section says "other metadata, e.g. **author and date**, should
+go in macOS tags," and its tags section wants a **quality** ordering "akin to the priority tag in Reader …
+**not** a regular tag" — and Reader's priority *is* a projected Finder tag. The build instead keeps `authors`,
+`date`, and `quality` in the note's `.md` YAML **front-matter** (durable plain text) and projects **only
+subjects** to Finder tags. The plan's out-of-scope list already defers "mirroring date/quality into Finder
+tags" but **omits author** and doesn't cite the original-spec rationale, so a future spec reviewer will re-flag it.
+- *Files:* this plan (out-of-scope/deferrals section) + optionally `ArchiveNotes/CLAUDE.md` / `SPEC/tag-format.md`.
+- *Steps:* record the deliberate deviation — front-matter (not Finder tags) carries author/date/quality, which
+  still satisfies "durable against this program no longer being developed" via plain-text YAML in the `.md` —
+  **and** get the owner decision on whether to *additionally* mirror author/date/quality to Finder tags for
+  cross-app (Reader/Processor) parity. Extend the deferral entry to name **author** explicitly and reference
+  the original-spec clauses. *Verify:* the deferral record matches the original spec's language; no code change
+  unless the owner opts to mirror (then it becomes a **Tier-2** tag-projection change routed through
+  `NotesTagProjector`, with the five tag-safety invariants). *Tier-1 (doc).*
+
 ---
 
 ## Phase B — Wire the built-but-dead features (the high-value core)
@@ -104,7 +133,7 @@ is published but nothing observes it, so an external `archivenotes://open?id=<uu
 without selecting the note.
 - *Files:* `.../Links/NotesDeepLinkRouter.swift`, `.../ArchiveNotesApp.swift`, `.../Views/NotesBrowserView.swift` (or the nav model).
 - *Steps:* add a consumer that observes `pendingOpen`, selects the id in the list, raises the Notes window, then `clearPending`. Reuse the W7 `NotesModel.openItem` jump channel if convenient, but drive it from the router.
-- *Verify:* `open "archivenotes://open?id=<known-uuid>"` selects the item (fixture-based). **Tier-1** (read/navigation only). *Done:* the plan's inbound-link GUI criterion + the Scrivener round-trip target are met.
+- *Verify:* `open "archivenotes://open?id=<known-uuid>"` selects the item (fixture-based). **Tier-1** (read/navigation only). *Done:* the plan's inbound-link GUI criterion is met. **(The full Scrivener round-trip also needs B9 — the outbound Copy-Link that originates the URL; B5 alone is only the inbound half.)**
 
 **B6. Embed image bytes on the extract command path.** — **MED** — `07` S1/S2. `EditorFormatting.makeNotePassageSource`
 passes `assetStore: nil` though `ItemAssetStore` (W7-S5) shipped, so ⌘⌥E Create-Extract / Append copy the
@@ -119,6 +148,43 @@ tells the user to open Reader.
 - *Files:* `.../Views/ReaderPreviewPopover.swift`, `.../Links/ReaderLinkResolver.swift`, `.../Links/ReaderRootStore.swift`.
 - *Steps:* on `needsRootGrant`/`renamedCandidate`, offer an in-app folder-picker that calls `grantAndResolve` (GUID-verified), persists the security-scoped bookmark, and retries resolution.
 - *Verify:* moving a fixture root then choosing it re-resolves the link; wrong-folder is rejected. **Tier-2** (security-scoped bookmark grant). *Done:* a moved source can be re-granted without leaving Notes.
+
+**B8. Manual author editing (notes *and* extracts).** — **MED** — (spec-vs-build). The original spec lists
+author as a first-class field on both a note ("a single file with an **author**, title, and date") and an
+extract ("the extract has its own title, date, and **author**"). `Item.authors: [String]` is stored,
+front-matter-round-tripped (`FrontMatterCodec`), and FTS-indexed (`NotesIndex` authors column, bm25 weight 4),
+but the **only** writer is `ZoteroAutoFillModel` — which is itself dead (see **B1**) *and* only applies to
+Zotero-tracked documents. There is **no** way to set an author on a note/extract that isn't in Zotero:
+`NoteMetadataInspector` edits only date + quality, and `NotesModel` exposes `setDate`/`setQuality`/`setBody`
+but no `setAuthors`. Neither B1 (Zotero auto-fill) nor B3 (retitle + tags) covers **manual** author entry.
+- *Files:* `.../Core/NotesModel.swift` (+`mutateItem`), `.../Views/NoteMetadataInspector.swift`.
+- *Steps:* add `NotesModel.setAuthors(_:for:)` routed through the audited `mutateItem` path (load-fresh →
+  atomic `.md` save → one-row re-index → publish); add an authors editor (multi-value/line field) to the
+  inspector alongside date/quality. Authors stay **front-matter only** (not projected to Finder tags unless
+  A11's owner decision says otherwise). Works for both windows (notes and extracts share the `Item` model).
+- *Verify:* setting/clearing authors persists to front-matter and updates the FTS `authors` column (assert on a
+  scratch store); an extract's author edit never mutates its source note. **Tier-1** (front-matter only; no new
+  Finder-tag write surface). *Done:* a note **and** an extract can have their author set in-app without Zotero.
+
+**B9. Outbound "Copy Link to Note/Extract" — the Scrivener round-trip originator.** — **HIGH (for interop)** —
+(spec-vs-build). The original spec's word-processor interop requires the user to "insert hyperlinks in the word
+processor that link to specific notes or extracts, so they can click and go straight to the note in Notes."
+Nothing in production copies a note's/extract's *own* durable link to the pasteboard: `DurableLink.notesOpen(id:block:).url`
+is minted only to embed an extract's provenance anchor (`Store/SourceAnchor+NotePassage.swift:25`) and is parsed
+**inbound** (`Links/NotesDeepLinkRouter.swift`); `NotesContextMenu`/`ArchiveNotesCommands` have no copy-link
+action; a grep for `Copy Link` / `Copy Archive Link` / `copyArchiveLink` outside `Tests/` returns none. **B5
+(consume `archivenotes://open`) is only the *inbound* half — without B9 the user can never originate the link,
+so B5's "Scrivener round-trip target … met" Done criterion is unreachable on its own.** (D2's parenthetical
+"(Copy Archive Link stays W4)" refers to copying the *Reader* source link off a source block, **not** minting a
+note's own `archivenotes://` link — a different feature; grep confirms no such Notes-side action exists.)
+- *Files:* `.../Views/NotesContextMenu.swift`, `.../ArchiveNotesCommands.swift`, `.../Core/NotesModel.swift` (helper).
+- *Steps:* add a "Copy Link" affordance (item-row context menu + a `Note`/`Extract` menu command) that, for the
+  selected item, writes `DurableLink.notesOpen(id:block:).url.absoluteString` as a plain-text (`.string`)
+  pasteboard item (mirroring Reader's `copyLinks()` idiom) so it pastes into Scrivener as a clickable
+  `archivenotes://open?id=…` hyperlink. GUID-based / path-independent → durable across computers.
+- *Verify:* Copy Link on a fixture item puts the correct `archivenotes://open?id=<uuid>` URL on the pasteboard;
+  pasting it back and opening it selects/raises that item (round-trips with **B5**). **Tier-1** (read/pasteboard
+  only). *Done:* the outbound half of the Scrivener round-trip exists; update **B5**'s Done to require B9.
 
 ---
 
@@ -150,6 +216,25 @@ and (if the fixture is present) driven by the "free" gate.
 the projector isn't driven concurrently. Only worth doing if B3 (or any future feature) can enqueue
 concurrent projections for one item.
 - *Files:* `.../Core/NotesTagProjector.swift`. *Steps:* serialize per-item projection (e.g., an item-keyed actor/queue) so the read-modify-write is atomic; restore the plan's `concurrentProjectionsNeverCorrupt` "loses nothing" assertion. *Verify:* the strengthened concurrency test passes on a scratch store. **Tier-2.** *Done:* KNOWN_ISSUES entry closed.
+
+**C6. Scale-acceptance harness — 100k notes / 2M words.** — **MED (functional)** — (spec-vs-build). The original
+spec: "operate at the scale of **100,000 notes and 2 million words** without being slow. **Build for scale from
+the beginning.**" The architecture *is* built for scale (FTS5 + bm25, WAL/`synchronous=NORMAL`/`busy_timeout`,
+DB-backed org-graph, virtualized `NSTableView`, 150ms-debounced + generation-coalesced search, incremental
+off-main indexing with mtime-skip) — but **nothing proves the target**: the only perf test, `EditorPerfTests`,
+stresses a single ~50k-word *document*, not a 100k-note *corpus*; there are no `measure`/scale tests.
+- *Files:* NEW `ArchiveNotes/macOS/Tests/ArchiveNotesTests/NotesScalePerfTests.swift` + a fixture generator in `ArchiveNotes/scripts/`.
+- *Steps:* generate a **scratch** store (mktemp/`TESTOUT` — **never the real Notes store**, per the Reader Prime
+  Directive + the never-mutate-live-app-root rule) of ~100k UUID-folder `.md` notes totalling ~2M words, then
+  assert bounded wall-times for (a) `buildIndexFromDisk` full incremental index build, (b) an FTS search
+  round-trip, (c) `allSummaries()` load + one `NotesNavigationModel.recompute()`/sort. Env-gate it (opt-in flag)
+  so `swift test` / CI aren't slowed. **Follow-up (conditional):** if `recompute()`'s in-memory
+  `NotesFilter.matches` scan + sort exceeds a frame budget at 100k on `@MainActor`, move it off-main (return a
+  `Sendable [UUID]`) — the one scale item the current in-memory-filter design leaves unproven.
+- *Verify:* the harness runs on the scratch corpus and the assertions hold (or reveal the first bottleneck); it
+  **never** touches the real store (assert the scratch-path guard). **Tier-2** (generates a large scratch
+  corpus; must honor the scratch-only guard). *Done:* the spec's 100k/2M scale target has a repeatable
+  acceptance test.
 
 ---
 
@@ -186,20 +271,23 @@ Phase B/C item specifically, prove there is a **production caller** — grep eac
 outside `Tests/` — so nothing regressed back into "built but dead." *Verify:* each A–D item is CONFIRMED,
 with `file:line` evidence. *Done:* a written pass/fail per item; any FAIL loops back to its phase.
 
-**E2. Drive the wired features at runtime.** For B1–B7 and the Phase D UI items, actually exercise them in
+**E2. Drive the wired features at runtime.** For B1–B9 and the Phase D UI items, actually exercise them in
 the running app (or via `ArchiveNotesUITests` / `scripts/gui-drive-notes.sh` + the `an.editor.test.*` DEBUG
 seams against the **scratch fixture only**): auto-fill writes front-matter; note-level chips render; a note
-retitles/re-tags and the Finder-tag projection follows; a pasted page-link shows a thumbnail;
-`archivenotes://open?id=…` selects the note; a menu-created extract embeds its image bytes; a moved source
-re-grants in-app. Anything needing a human (real Zotero/Reader install) is owner-eye — flag it, don't claim
-it. *Done:* each behavior observed, not inferred.
+retitles/re-tags and the Finder-tag projection follows; **a note *and* an extract get their author set in-app
+without Zotero, persisted to front-matter + FTS (B8)**; a pasted page-link shows a thumbnail;
+`archivenotes://open?id=…` selects the note; **Copy Link puts the item's `archivenotes://open` URL on the
+pasteboard and pasting it back selects/raises that item — the full Scrivener round-trip (B9 ⇄ B5)**; a
+menu-created extract embeds its image bytes; a moved source re-grants in-app. Anything needing a human (real
+Zotero/Reader/Scrivener install) is owner-eye — flag it, don't claim it. *Done:* each behavior observed, not inferred.
 
 **E3. Prove the safety-net actually bites.** Confirm the new guards fail on a planted violation, not just
 pass on the clean tree: `./test-smoke.sh archivecore` runs and is in `all`; the Processor lint trips on a
 planted `setResourceValue`; the ArchiveCore lint trips on an `import AppKit` in Core; the Notes smoke gate no
 longer builds/invokes the UI target. Then re-run `./test-smoke.sh all` + `swift test` (packages + apps) —
 all green, **no new warnings** — and re-assert the tag-safety invariants + delete-last-instance guard on a
-scratch store. *Done:* guards demonstrably bite; whole suite green.
+scratch store. **Confirm the C6 scale harness runs on a scratch corpus, asserts its bounded wall-times, and
+never touches the real Notes store (scratch-path guard holds).** *Done:* guards demonstrably bite; whole suite green.
 
 **E4. Prove docs/tracker match reality, then retire this plan.** Verify Phase A landed: both READMEs +
 `ArchiveNotes/AGENTS.md` + `SMOKE_TEST.md` exist and read right; the SPEC marker section is complete; the
