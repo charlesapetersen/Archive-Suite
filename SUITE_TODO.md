@@ -169,14 +169,20 @@ whole gate unattended-satisfiable at $0):
 - [ ] **W13.cli-4 — pipeline wiring.** Prefer `localAgent` at the construction sites; skip batch + LLM-rotation
   when active; extend `test-smoke.sh` to run the **fake-CLI** path (skip gracefully when no real CLI). | M | med | none
 
-**Keyed / owner tail (NOT daemon-buildable — flag to Morning Review, do not attempt unattended):** OpenAI live
-2-image OCR smoke through gateway + native `.openai` (owner supplies a key). _(Model-ID + pricing `// VERIFY`
-placeholders RESOLVED 2026-07-16: `openaiModels` replaced with the current GPT-5 generation (gpt-5-nano/-mini/
-5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench source; live-key OCR smoke remains the final ID
-confirmation.)_
-CLI `gemini`+`codex` install + entitlement confirmation (Phase 0) and the real-CLI live OCR smoke
-(the `claude` path can't run inside a Claude Code session — nested-session guard); OpenAI Batch API (Phase 4) +
-CLI persistent-`stream-json` perf (Phase 4). Land the build-verified code first; these gate final "shipped".
+**Keyed / owner tail (NOT daemon-buildable — do not attempt unattended):**
+- **⏸️ ON HOLD (owner 2026-07-16) — OpenAI live 2-image OCR smoke** through gateway + native `.openai` (needs an
+  OpenAI key). Come back to it. _(Model-ID + pricing `// VERIFY` placeholders are RESOLVED — `openaiModels` is now
+  the current GPT-5 generation (gpt-5-nano/-mini/5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench
+  source; the live-key smoke remains the final ID confirmation, but nothing is blocked on it: the provider is
+  additive + opt-in.)_
+- [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** Was buried in this
+  prose note with no checkbox, so nothing ever tracked it (owner asked for it to be a real item, 2026-07-16).
+  Install both CLIs, sign in with the enterprise/Edu accounts, and confirm each is entitled to run OCR. Gates the
+  real-CLI live OCR smoke for W13.cli-1…4 (the `claude` path additionally can't run inside a Claude Code session —
+  nested-session guard). The fake-CLI harness already covers the code path at $0, so this gates only final
+  "shipped". | S | low | owner
+- Later phases (not now): OpenAI Batch API (Phase 4) + CLI persistent-`stream-json` perf (Phase 4). Land the
+  build-verified code first; these gate final "shipped".
 
 ## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
 Actionable open items pulled from the three `KNOWN_ISSUES.md` + the Processor streaming-residuals review, ordered
@@ -236,11 +242,12 @@ maintain-only** (see §Project focus). Leave parked until the Drive milestone is
 - [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
   `SPEC/`, then delete the plan.** The per-wave Notes plans shipped + were deleted; `00-overview.md` is retained
   only because §2/§5/§16 are still cited by `ArchiveNotes/CLAUDE.md`. Doc-only; Tier-1. | S | low | none
-- **Owner note (not a daemon item):** 4 stray sibling worktrees (`suite-wt-20260714-174815-…`,
-  `-20260714-224217-…`, `-20260715-002837-…`, `-20260715-194019-…`) are **merged to origin/main but hold
-  uncommitted WIP** (Notes GUI-test-harness scratch files) — the daemon flagged them "manual review." Salvage or
-  discard by hand, then `git worktree remove`. The `~/Documents/GPT/archive-suite-processor-fixes` worktree is a
-  different agent's (Codex) — leave it.
+- **Worktree hygiene (standing rule, not a to-do).** The 4 stray `suite-wt-2026071[45]-…` worktrees this note
+  used to list are **gone** (cleaned 2026-07-16) — don't go looking for them. Standing rules: remove your own
+  worktree once your work is pushed, and **never touch a worktree you didn't create.** In particular **IGNORE the
+  Codex worktree** — `~/Documents/GPT/archive-suite-processor-fixes` (branch `wt/codex-processor-bugfixes-*`) is
+  a different agent's and routinely holds uncommitted WIP: do not clean it, remove it, salvage it, or surface it
+  to the owner as a stray. Leave it entirely alone (owner instruction 2026-07-16; also in `AGENTS.md`).
 
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)
 Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unless flagged owner-decision/Tier-2. Legend as above.
@@ -268,6 +275,37 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   expectation. | files: ArchiveReader Views/NavigationWindowView.swift, reuse SubjectTokenField/NSTokenField | M | low | none
 - **Processing History view — KEEP (owner-confirmed 2026-07-16).** The Tools-tab history view (W12-cost, promoted
   from POTENTIAL_FEATURES 2026-07-15; records actual run cost + a run log, writes only its own store) stays. No action.
+
+### Owner dispositions — Morning-Review sweep, 2026-07-16
+Owner went through the owner-only queue. Recorded here so none of it gets re-surfaced as an open ask:
+- **Environment: TCC grants (Accessibility / Screen Recording / Automation) are SET, verified live.** Sessions can
+  drive + screenshot the GUI themselves — see `AGENTS.md` → *GUI verification*. The Processor's Keychain
+  "Always Allow" is **seeded**, so its GUI launches unattended. **Stop deferring visual checks to the owner as
+  "GUI blocked"** — that claim was stale and cost the owner a lot of pointless eyeballing.
+- **DROPPED — Live Capture output-folder default** ("forget about this", owner 2026-07-16). The Downloads-if-unset
+  default stays; the picker already lets the operator change it. Not an open question.
+- **iOS is ON HOLD — read §Project focus before listing anything iOS.** The iOS Drive-relay OAuth client was
+  surfaced to the owner in error: iOS *and* the Google-Drive relay are BOTH on-hold/maintain-only. Anything in
+  `ArchiveCaptureiOS/` or the Drive path is out of scope until un-held; don't re-list it.
+- [ ] **Notes: extract a shared numeric sort-date combiner in ArchiveCore [LOW].** `Item.sortDate`
+  (`ArchiveNotes/Store/Item.swift`) re-implements the shared `*10_000/*100` formula instead of reusing
+  `ArchiveCore.DocumentTags.sortDate` (ArchiveCore exposes no `(year,month,day,decade)→Int?` combiner for Notes'
+  `date:String?`+`datePrecision` input). Drift is already caught by a value-parity test
+  (`ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula`), and sort order is display-only (never
+  written to a corpus → no file-safety stakes) — so this is a **low-priority** de-dup, below the W9 Notes
+  gap-closure. Tier-1. | files: packages/ArchiveCore (new combiner), ArchiveNotes Store/Item.swift | S | low | none
+- **Owner decision pending — `sessionComplete()` dead protocol surface.** ~30 lines of unreachable code in both
+  companions' `SegmentTransport`/`MacClient`/`DriveRelayTransport`/`FileRelayTransport` (nothing calls it; the
+  Mac's `/session/complete` route stays as a harmless no-op for older phones). **Recommendation: close as
+  "won't do — parked"** — removing it means editing the *frozen* `RelayObjectFormat` wire contract
+  (`encodeSessionComplete` + `sessionCompleteMatchesGolden`) and the on-hold Drive path for zero functional gain.
+  Revisit only if the Drive milestone is un-held and `RelayObjectFormat` is already being edited.
+- **Owner decision pending — R13d, the `ArchiveSuite` exclusion.** Notes *stamps* the marker on its own files, but
+  **nothing consumes it**: no Reader filtering, no Processor stamping, no corpus back-fill — so the owner's
+  requested "exclude non-suite files" effect **does not function today**. Activating it needs the deferred
+  convergence wave (see the `(later)` behavior/data follow-on below). Decision: accept the deferral, or promote
+  convergence. Note the catch: back-fill **writes tags to the real corpus** — the highest-risk operation in the
+  Suite, so it warrants its own gated wave rather than being rushed.
 
 ## Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). **All waves shipped;
@@ -723,5 +761,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 - [x] Remove stray `InlineTest` tag on the SCRATCH corpus — **N/A: scratch corpus (`AR-Smoke/Batch-A/00001`) no longer exists on disk** (directory empty, file cleaned up). No action needed. ✅
 
 ## Excluded (not "now": need cost / owner accounts)
-- Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Processor App-Store/Play Phase 4 (owner accounts/assets); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).
+- Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).
+- ~~Processor App-Store / Play submission (Phase 4)~~ — **DROPPED (owner 2026-07-16: "we're not doing this any
+  time soon").** Off the list entirely; don't re-surface it as an owner action item.
   - [x] **G5 — cheap Tier-1 smoke gate shipped (2026-07-07).** New Suite-root `./test-smoke.sh processor|reader|all` (mirrors `launch.sh`) → `ArchiveReader/test-smoke.sh` (build + full unit suite, **135 tests, free**) + `ArchiveProcessor/test-smoke.sh` (headless **2-image** OCR via `ProcessFilesTestDriver`, `gemini-2.5-flash-lite`, ~a few cents, `mktemp` scratch-isolated, key never printed). Distinct from the cost-heavy `scripts/test-smoke.sh` (raw per-provider calls) + `scripts/test-tier2.sh` (multi-case pipeline) above. Both verified PASS. ✅

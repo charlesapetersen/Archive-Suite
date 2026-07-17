@@ -12,6 +12,10 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
   `../suite-wt-<stamp>` only if you're not already isolated, so it's safe to run every session). Per‑worktree
   DerivedData (`-derivedDataPath ./build/DD`, already the default in each `launch.sh`) keeps parallel builds
   from colliding. **Remove your worktree once your work is pushed** so they don't pile up for the owner.
+  **Only ever touch worktrees you created.** In particular, **ignore the Codex worktree**
+  (`~/Documents/GPT/archive-suite-processor-fixes`, branch `wt/codex-processor-bugfixes-*`) — it belongs to a
+  different agent (Codex) and often carries uncommitted WIP. Never clean it up, remove it, salvage it, or
+  report it to the owner as a stray; leave it entirely alone (owner instruction 2026-07-16).
 - **After any pull/switch, `xcodegen generate`** (or the app's `bootstrap.sh`) — the `.xcodeproj` is gitignored.
 - **Stay in your lane.** A change scoped to one app touches only that subdir. Loading the *other* app is
   almost always unnecessary (see the token‑efficiency directive in [`CLAUDE.md`](CLAUDE.md)).
@@ -53,3 +57,26 @@ Run the app's tests where present (Reader has an XCTest bundle + `scripts/lint-w
 Processor has `scripts/test-smoke.sh` / `test-tier2.sh`, plus `scripts/e2e-phone-mac.sh` — the full
 phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`Net/` changes). Tag‑write
 changes are Tier‑2 (adversarial review + tests on scratch copies).
+
+### GUI verification — you can drive it yourself; don't punt it to the owner
+
+**All the TCC grants are in place (verified 2026-07-16): Screen Recording, Accessibility, and Automation** —
+plus `cliclick` at `/opt/homebrew/bin/cliclick`, and the Processor's Keychain **"Always Allow" is seeded** so
+its GUI launches unattended. Quick self-check: `screencapture -x /tmp/x.png` writes a non-empty file, and
+`osascript -e 'tell application "System Events" to return name of first process whose frontmost is true'`
+returns the frontmost app.
+
+So **a session can launch, drive, and screenshot any of the three apps itself.** Triage a GUI check before
+asking the owner for anything:
+
+| What you're verifying | How |
+|---|---|
+| A control **exists / is wired** ("is the toggle there?", "is it bound to the right key?") | **Read the code** — a grep. Never an owner question. |
+| It **renders / behaves** (layout, interaction, a bug repro) | **Drive it yourself**: `./launch.sh reader\|processor\|notes` from your worktree, `cliclick` for pointer input, `osascript` System Events for keys/menus, `screencapture` → **read the shot**. |
+| **Subjective taste** (does this look right?), an **API key**, or an **account/device** action | Genuinely owner-only — ask. |
+
+Rules while driving: point the app at a **scratch copy, never the real corpus** (choosing a folder clobbers the
+owner's root bookmark — see the Reader Core Directive), and quit the app when done
+(`osascript -e 'quit app "ArchiveReader"'`). If a check truly can't be driven, say *why* — don't assert "GUI
+blocked" as a blanket reason; that claim was stale for a long time and cost the owner a lot of pointless
+eyeballing.
