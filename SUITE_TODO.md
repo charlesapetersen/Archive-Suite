@@ -119,10 +119,16 @@ SHARED HOTSPOT = the persisted `LLMProvider` enum, append-only):
 
 **Local Agent CLI provider** (`execution-plans/local-agent-cli-provider.md`; Tier-2; fake-CLI harness makes the
 whole gate unattended-satisfiable at $0):
-- [ ] **W13.cli-1 — client + config + additive threading.** `OCR/LocalAgentClient.swift` (ocr + textCompletion)
-  + `Models/LocalAgentConfig.swift` (append-only) + thread `localAgent: LocalAgentConfig?` (default nil) beside
-  `gatewayConfig`. Tests: committed **fake-CLI** stub (canned JSON) + the **resume-safety decode** test (a
-  pre-change run snapshot still decodes, `localAgent` absent→nil). Tier-2, satisfiable unattended. | M | med | none
+- [x] **W13.cli-1 — client + config + additive threading.** `472f850` (config) + `9778572` (client) + `02471bb`
+  (threading) + `44730bc` (tests) — `Models/LocalAgentConfig.swift` (Codable/Sendable, append-only
+  `LocalAgentTool` claude/gemini/codex, no key) + `OCR/LocalAgentClient.swift` (ocr + textCompletion via
+  `Process`: no shell, prompt on stdin not argv, absolute-path binary not `$PATH`, temp-JPEG-by-path,
+  concurrent-drain + SIGTERM→SIGKILL timeout, friendly errors never raw stderr; `claude` validated, gemini/codex
+  `// VERIFY`) + `localAgent: LocalAgentConfig?` (default nil) threaded into `PendingRun` + `SessionProcessingConfig`
+  beside gateway. Tests: committed fake-CLI stub + `localagent-mechanism-test.swift` (standalone $0, **14/14 PASS
+  this session** — subprocess plumbing + resume-safety Codable semantics) + in-app `LocalAgentTestDriver` (real
+  client + real PendingRun round-trip; RUN via `test-localagent.sh` **deferred → Morning Review**, GUI-off). Tier-2
+  gate met unattended (adversarial review + headless functional proof + build clean, 0 warnings). | M | med | none
 - [ ] **W13.cli-2 — validator + Settings.** `OCR/LocalAgentValidator.swift` (`cliNotFound`/`cliNotLoggedIn`/
   `cliEntitlementMissing`) + Settings controls (`useLocalAgent` XOR `useGateway`, tool picker, path, model,
   additive DefaultsKeys, `?` help + gray-out). Detect+Verify live round-trip → GUI/Morning Review. | M | low | none
