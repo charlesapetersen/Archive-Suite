@@ -125,6 +125,29 @@ any item resets the streak. The counter (`$STATE/nocomplete.count`) is cleared a
 `idle.since`, for the same reason (a re-arm must never park on cycle 1 off a stale count). The park message
 lists the recent commits so you can see which item is stuck.
 
+**Periodic health gate (WS7, 2026-07-17).** Per-change review catches per-change bugs; a *compounding*
+regression can still hide across dozens of unreviewed commits. So every `AUTONOMOUS_GATE_EVERY` commits
+(default 30) the daemon runs `ops/autonomous/health-gate.sh` and **parks + alerts on RED**. It's deterministic
+(build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
+three apps + Reader/Notes **unit** suites + a coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the
+paid Processor OCR smoke.
+- **Unit tests via `-only-testing:<UnitBundle>`, not the whole scheme** — load-bearing: the schemes also hold
+  UITest bundles, and running a UITest pops the macOS "Enable UI Automation" prompt, which would **hang the
+  gate** (it runs synchronously in the daemon loop) and wake you. (`./test-smoke.sh reader|notes` run the full
+  scheme, so the gate does *not* use them.)
+- **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
+  deterministic and fails again (→ park), but a flaky XCTest / transient `xcodebuild` blip passes the retry
+  (→ green, no park). This is what keeps a routine flake from false-parking a multi-day run.
+- **Wall-clock capped** (`AUTONOMOUS_GATE_MAXRUN`, 30 min): a hung gate is killed and **skipped** (fail-open) —
+  a single hang is inconclusive, not a regression. But `AUTONOMOUS_GATE_MAX_TIMEOUTS` (2) consecutive hangs
+  **escalate to a park + alert** (a persistent hang — a stuck prompt, or a cap below true build time — needs
+  you), so a hang can't silently tax every cycle forever.
+- The last-GREEN sha (`$STATE/last-gate`) **persists across restarts** (the cadence tracks code churn, not
+  daemon lifetime); a missing/invalid sha fails **open** (gate due now).
+- Owner prereq for the unit-test steps: `DevToolsSecurity -enable` (one-time; already enabled here) so
+  `xcodebuild test` doesn't prompt for the debugger. Run `ops/autonomous/health-gate.sh` yourself once to
+  confirm it's green + prompt-free before arming a long run.
+
 ## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
 
 **Remote alerting (WS6).** Every "park + alert" path also POSTs to an endpoint you configure, because a
@@ -178,11 +201,14 @@ re-created item gets a fresh, empty partition list). `arm.sh status` shows wheth
 
 Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every
 host-touching command (`security`/`osascript`/`launchctl`/`caffeinate`/`curl`/`df`) stubbed — it cannot reach
-your Desktop, the real repo, launchd, or the network. **49 assertions**: both idle waste modes, backoff
+your Desktop, the real repo, launchd, or the network. **68 assertions**: both idle waste modes, backoff
 doubling + cap, progress-reset, queue-edit early-wake, the stale-`idle.since` cycle-1-park regression,
 rc≠0-with-commit, the `COMPLETE` path, the disk guard (park / fail-open / self-heal / engine-busy
 reentrancy), alerting (no-op-when-unset, argv word-splitting, and that the alert credential never reaches the
-session env), and the WS4 attempt cap (park-at-cap / completion-reset / stale-count-cleared-at-startup).
+session env), the WS4 attempt cap (park-at-cap / completion-reset / stale-count-cleared-at-startup), and the
+WS7 health gate (green-records-non-terminal / reproducible-red-parks-after-a-retry / flaky-red-recovers /
+single-hang-skips / persistent-hangs-escalate-to-park / not-due / bad-sha-fails-open — with a STUB gate; the
+real `health-gate.sh` is proven by running it).
 **Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
 
 ```bash

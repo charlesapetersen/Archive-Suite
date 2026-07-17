@@ -66,6 +66,17 @@ MINFREE_MB="${AUTONOMOUS_MINFREE_MB:-10240}" # park below this much free space o
 # genuine days-long loop. Completing ANY item resets it. 0 disables.
 MAX_NOCOMPLETE="${AUTONOMOUS_MAX_NOCOMPLETE:-6}"
 
+# Health gate (WS7) — per-change review catches per-change bugs, but a compounding regression can hide across
+# dozens of unreviewed commits over a 2-week run. Every $GATE_EVERY commits, the daemon runs a FULL gate
+# (health-gate.sh: build all 3 apps + Reader/Notes unit suites + coherence — free; PAID OCR is opt-in) and
+# PARKS + alerts on RED. Deterministic (build/test), so the DAEMON runs it directly — no session/LLM. The
+# last-green-gate sha persists across restarts (the cadence tracks code churn, not daemon lifetime); a
+# bad/missing sha fails OPEN (gate due now). 0 disables.
+GATE_EVERY="${AUTONOMOUS_GATE_EVERY:-30}"          # commits since the last GREEN gate before the next runs
+GATE_CMD="${AUTONOMOUS_GATE_CMD:-$REPO/ops/autonomous/health-gate.sh}"   # overridable (harness stubs it)
+GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-1800}"      # wall-clock cap on the gate (30 min); a hang -> kill + SKIP
+GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts before PARK (a persistent hang)
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -354,6 +365,84 @@ note_no_progress() {
   return 0
 }
 
+# Run GATE_CMD once under a wall-clock cap. Sets globals: GATE_RC = 0 (green) | 1 (red) | 2 (timeout), and
+# $glog holds its output. The cap matters because the gate runs SYNCHRONOUSLY in the daemon loop — a hang
+# (e.g. an unexpected GUI/keychain prompt on some xcodebuild path) would otherwise freeze the WHOLE daemon.
+GATE_STATE="$STATE/last-gate"; GATE_TO="$STATE/gate-timeouts"; glog="$STATE/last-gate.log"
+_run_gate_once() {
+  "$GATE_CMD" >"$glog" 2>&1 &
+  local gpid=$! waited=0
+  # Small poll granularity so a finished gate is noticed promptly (a 15s poll would make even an instant gate
+  # cost 15s); still cheap for a minutes-long real gate.
+  while kill -0 "$gpid" 2>/dev/null && [ "$waited" -lt "$GATE_MAXRUN" ]; do sleep 2; waited=$(( waited + 2 )); done
+  if kill -0 "$gpid" 2>/dev/null; then
+    _terminate_tree "$gpid"; wait "$gpid" 2>/dev/null || true   # reap so no zombie lingers
+    GATE_RC=2; return
+  fi
+  wait "$gpid"; GATE_RC=$?
+  [ "$GATE_RC" -eq 0 ] || GATE_RC=1     # normalize any nonzero exit to RED
+}
+
+# Health gate (WS7). Returns: 9 = RED/park (caller stops the loop); 10 = ran GREEN (this cycle's work);
+# 0 = not due OR inconclusive-timeout-skip (caller continues to a normal session). last-gate persists across
+# restarts; a missing/invalid sha fails OPEN (due now). Must be called only when no other engine is active.
+health_gate() {
+  [ "$GATE_EVERY" -gt 0 ] || return 0
+  local last cnt
+  last="$(cat "$GATE_STATE" 2>/dev/null)"
+  if [ -n "$last" ] && git -C "$REPO" cat-file -e "$last^{commit}" 2>/dev/null; then
+    cnt="$(git -C "$REPO" rev-list --count "$last..HEAD" 2>/dev/null || echo "$GATE_EVERY")"
+  else
+    cnt="$GATE_EVERY"     # never gated, or a stale/invalid sha -> fail OPEN (run the gate now)
+  fi
+  case "$cnt" in ''|*[!0-9]*) cnt="$GATE_EVERY" ;; esac
+  [ "$cnt" -ge "$GATE_EVERY" ] || return 0     # not due
+  [ -x "$GATE_CMD" ] || { log "health gate: GATE_CMD not executable ($GATE_CMD) — skipping (fail-open)."; return 0; }
+  log "health gate DUE ($cnt commits since last green) — running $GATE_CMD (build+test, may take minutes)…"
+  _run_gate_once
+
+  # TIMEOUT — inconclusive (a hang, not a proven regression), so do NOT park on one. But a PERSISTENT hang
+  # (a stuck prompt, GATE_MAXRUN set below true build time) would silently re-run + waste GATE_MAXRUN every
+  # cycle forever, so escalate: count consecutive timeouts and PARK + alert at $GATE_MAX_TIMEOUTS. (F2)
+  if [ "$GATE_RC" -eq 2 ]; then
+    local n; n="$(cat "$GATE_TO" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac; n=$(( n + 1 )); echo "$n" > "$GATE_TO" 2>/dev/null || true
+    if [ "$n" -ge "$GATE_MAX_TIMEOUTS" ]; then
+      rm -f "$GATE_TO" 2>/dev/null || true
+      park_run "health gate hung x$n" \
+        "Archive Suite autonomous run PARKED — the health gate TIMED OUT $n cycle(s) in a row (${GATE_MAXRUN}s cap). That's a hang, not a regression — likely a stuck build/prompt, or the cap is below true build time. Needs you: run ./ops/autonomous/health-gate.sh to see where it wedges. Last tail:
+$(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
+      return 9
+    fi
+    log "health gate TIMED OUT after ${GATE_MAXRUN}s (${n}/${GATE_MAX_TIMEOUTS}) — killed + SKIPPED (inconclusive). Check $glog."
+    return 0
+  fi
+  rm -f "$GATE_TO" 2>/dev/null || true     # a conclusive result (green/red) resets the timeout streak
+
+  if [ "$GATE_RC" -eq 0 ]; then
+    git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
+    log "health gate GREEN @ $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null)."
+    return 10
+  fi
+
+  # RED — RETRY ONCE before parking (F1). A real compounding regression is deterministic and fails the retry
+  # too; a flaky XCTest / transient xcodebuild-infra blip ("Lost connection to test manager", a one-off
+  # xcodegen hiccup) passes it. Retrying strictly cuts false-parks without hiding a real regression.
+  log "health gate RED — retrying ONCE before parking (guards against a flaky test / transient xcodebuild error)…"
+  _run_gate_once
+  if [ "$GATE_RC" -eq 0 ]; then
+    git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
+    log "health gate GREEN on retry — the first failure was transient (not parking)."
+    return 10
+  fi
+  if [ "$GATE_RC" -eq 2 ]; then
+    log "health gate timed out on retry — SKIPPING (inconclusive, not parking)."; return 0
+  fi
+  park_run "health gate RED (x2)" \
+    "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row (a reproducible build/test regression the per-change reviews missed). The daemon stopped so it doesn't pile more commits on a broken tree. Fix it (run ./ops/autonomous/health-gate.sh to reproduce), then re-arm. Failing tail:
+$(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -25)"
+  return 9
+}
+
 # Housekeeping — GC the daemon's OWN spent worktrees + branches so they don't pile up for the owner.
 # Runs in the daemon loop BETWEEN sessions. SAFETY is structural, in layers (this survived an adversarial
 # Tier-2 review — see ops/autonomous/README.md "housekeeping"):
@@ -578,6 +667,18 @@ tick() {
       "Archive Suite autonomous run PARKED — LOW DISK: only ${LAST_FREE_MB}MB free on the repo volume (need ${MINFREE_MB}MB). Every build would fail, so the run stopped instead of burning sessions. Free some space (per-worktree build/DD is usually the culprit), then re-arm:  ./ops/autonomous/arm.sh"
     return 9
   fi
+
+  # 3b'. Health gate (WS7) — periodic full build+test+coherence, when due. Placed here (after the engine-busy
+  #      skip, before the lock/session) for the same reason as the disk guard: it runs synchronously and must
+  #      be the sole active engine. RED -> park (return 9). GREEN -> it WAS this cycle's work: mark progress
+  #      (so the idle backoff doesn't count the gate cycle as idle) and end the cycle. Not due -> fall through.
+  #      NOTE: unlike the instantaneous disk guard, the gate holds NO lock for up to GATE_MAXRUN and builds in
+  #      the primary checkout. That's safe because only ONE daemon runs (launchd single-instance + arm.sh's
+  #      double-launch guard) and interactive sessions don't consult engine.lock; a concurrent second daemon
+  #      is the only overlap risk, which those guards already preclude.
+  health_gate; local hg=$?
+  [ "$hg" = 9 ] && return 9
+  if [ "$hg" = 10 ]; then note_progress; return 0; fi
 
   # 3c. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
   #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.

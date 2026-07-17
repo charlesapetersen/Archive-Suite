@@ -118,6 +118,9 @@ case "${1:-arm}" in
     k=0
     pkill -f 'archive-suite-autonomous\.sh' && k=1
     pkill -f 'autonomous maintenance session for the Archive Suite' && k=1
+    # WS7: a health gate in flight is `bash health-gate.sh` -> xcodebuild — matched by NEITHER pattern above
+    # (same bare-child orphan class we fixed for sessions), so kill it too, else `stop` leaves a build running.
+    pkill -f 'ops/autonomous/health-gate\.sh' 2>/dev/null && { k=1; echo "in-flight health gate stopped."; }
     if [ "$k" = 1 ]; then echo "daemon + any resume session stopped."
     elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
     else echo "daemon was not running."; fi

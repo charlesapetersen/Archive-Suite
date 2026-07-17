@@ -184,7 +184,20 @@ clean.
       attempt; not a hard boundary — a child script could still reach hdiutil), so the prompt rule (leave
       release work for the owner) is the primary control. Also added a daemon **source-guard** (dogfood fix:
       sourcing it to inspect $DENY previously ran the loop + spent budget).
-- [ ] WS7 health gate · WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating.
+- [x] **WS7** periodic health gate — shipped 2026-07-17. `health-gate.sh` (build all 3 apps + Reader/Notes
+      UNIT suites + coherence — FREE; paid OCR opt-in via `AUTONOMOUS_GATE_OCR=1`) + the daemon runs it
+      DIRECTLY (deterministic, no session) every `AUTONOMOUS_GATE_EVERY` commits, PARKS + alerts on RED. Unit
+      tests are `-only-testing:<UnitBundle>` (NOT the whole scheme) — load-bearing: running a UITest pops the
+      UI-automation prompt, which would hang the synchronous gate + wake the owner (found by dogfooding). The
+      gate is wall-clock-capped (`GATE_MAXRUN`); a hang → kill + SKIP (never false-park). last-gate sha
+      persists across restarts; bad/missing sha fails OPEN. Its review found no data-loss/hang but a
+      MED-leaning-HIGH + 3 more, all fixed: **retry-once before parking** (a flaky test / transient xcodebuild
+      blip no longer false-parks — only a reproducible 2nd failure parks); **persistent-timeout escalation**
+      (a single hang skips, but N consecutive hangs park + alert instead of silently taxing every cycle;
+      +wait-reap the killed gate); **`arm.sh stop` now kills an in-flight gate** (was orphaning the xcodebuild
+      tree); **DeepLink env-test skipped** (would have RED'd every gate — KNOWN_ISSUES entry) + coherence made
+      warn-only. Proven: `prove-daemon.sh` (68 assertions) + a real `health-gate.sh` run (green + prompt-free).
+- [ ] WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).

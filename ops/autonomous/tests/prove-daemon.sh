@@ -102,11 +102,14 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
   AUTONOMOUS_STATE="$STATE" AUTONOMOUS_CLAUDE="$T/claude" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=8 AUTONOMOUS_IDLE_STOP="$1" \
-  AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" AUTONOMOUS_HB_POLL=1 \
+  AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" \
+  AUTONOMOUS_GATE_EVERY="${GATE_EVERY:-0}" AUTONOMOUS_GATE_CMD="${GATE_CMD:-/bin/false}" AUTONOMOUS_GATE_MAXRUN="${GATE_MAXRUN:-60}" \
+  AUTONOMOUS_GATE_MAX_TIMEOUTS="${GATE_MAX_TIMEOUTS:-2}" \
+  AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
   echo $!
 }
-reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count"; }
+reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts"; }
 stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; pkill -f provetest 2>/dev/null; }
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
@@ -300,6 +303,72 @@ echo 10 > "$STATE/nocomplete.count"      # stale, well over the cap
 P=$(MAXNC=5 launch 0); sleep 4; stop "$P"; L="$STATE/daemon.log"
 grep -q 'PARKED (no item completed' "$L" && bad "parked off a stale count (startup didn't clear it)" || ok "stale count cleared at startup"
 grep -q 'attempt streak 1/5' "$L" && ok "streak restarted from 1" || bad "did not restart from 1"
+
+# ================= WS7 health gate =================
+# Stub gates (no real builds): green exits 0, red prints + exits 1, hang sleeps forever, flaky fails once
+# then passes (via a counter file — exercises the WS7 retry-once).
+printf '#!/bin/sh\necho "gate ok"\nexit 0\n' > "$T/gate-green.sh"; chmod +x "$T/gate-green.sh"
+printf '#!/bin/sh\necho "BUILD FAILED: boom in Reader"\nexit 1\n' > "$T/gate-red.sh"; chmod +x "$T/gate-red.sh"
+printf '#!/bin/sh\nsleep 999\n' > "$T/gate-hang.sh"; chmod +x "$T/gate-hang.sh"
+cat > "$T/gate-flaky.sh" <<FLAKY
+#!/bin/sh
+c="$T/flaky.count"; n=\$(cat "\$c" 2>/dev/null || echo 0); n=\$((n+1)); echo "\$n" > "\$c"
+[ "\$n" -ge 2 ] && { echo "green on attempt \$n"; exit 0; }
+echo "Lost connection to test manager (transient) attempt \$n"; exit 1
+FLAKY
+chmod +x "$T/gate-flaky.sh"
+
+echo "[22] WS7 — a DUE gate that passes is GREEN: runs, records last-gate, and is NON-terminal (run continues)"
+echo "1:no" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-green.sh" run_daemon 0 8)
+grep -q 'health gate GREEN' "$L" && ok "gate ran green" || bad "gate did not run/pass"
+[ -s "$STATE/last-gate" ] && ok "recorded last-gate sha" || bad "last-gate not recorded"
+grep -q 'launching fresh' "$L" && ok "green gate is non-terminal — daemon continued to normal work" || bad "daemon stopped after a green gate"
+
+echo "[23] WS7 — a REPRODUCIBLE failure (red twice) parks + alerts; does NOT launch a session"
+printf 'ALERT_URL="https://example.invalid/GATETOKEN9"\n' > "$STATE/alert.env"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red.sh" run_daemon 0 8)
+grep -q 'retrying ONCE' "$L" && ok "retried once before parking" || bad "did not retry before parking"
+grep -q 'PARKED (health gate RED (x2)' "$L" && ok "parked only after a reproducible 2nd failure" || bad "did not park on x2 red"
+grep -q 'GATETOKEN9' "$CURLLOG" && ok "alerted the owner" || bad "no alert on red gate"
+[ "$(grep -c 'launching fresh' "$L")" = 0 ] && ok "no session launched (gate gates the cycle)" || bad "launched a session despite red gate"
+rm -f "$STATE/alert.env"
+
+echo "[23b] WS7 — a FLAKY failure (red once, then green) must NOT park (F1 retry-once)"
+rm -f "$T/flaky.count"; echo "0:no" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-flaky.sh" run_daemon 0 8)
+grep -q 'GREEN on retry' "$L" && ok "transient failure recovered on retry -> green" || bad "flaky failure not recovered"
+grep -q 'PARKED (health gate' "$L" && bad "PARKED on a flaky (transient) failure" || ok "did not park a healthy run on a flaky test"
+
+echo "[24] WS7 — a single gate TIMEOUT is killed + SKIPPED (inconclusive; must NOT park a healthy run)"
+echo "0:no" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=9 run_daemon 0 8)
+grep -q 'health gate TIMED OUT' "$L" && ok "timed out + killed" || bad "did not time out a hung gate"
+grep -q 'PARKED (health gate' "$L" && bad "PARKED on a single hang (should skip)" || ok "did not park on a single hang (inconclusive)"
+pgrep -f gate-hang >/dev/null && { bad "hung gate process leaked"; pkill -f gate-hang; } || ok "hung gate process was killed"
+
+echo "[24b] WS7 — PERSISTENT timeouts escalate: park + alert after GATE_MAX_TIMEOUTS consecutive hangs"
+printf 'ALERT_URL="https://example.invalid/HANGTOKEN7"\n' > "$STATE/alert.env"
+echo "0:no" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=2 run_daemon 0 14)
+grep -q 'PARKED (health gate hung' "$L" && ok "parked after repeated hangs" || bad "did not escalate persistent hangs to a park"
+grep -q 'HANGTOKEN7' "$CURLLOG" && ok "alerted the owner about the hang" || bad "no alert on persistent hang"
+pkill -f gate-hang 2>/dev/null; rm -f "$STATE/alert.env"
+
+echo "[25] WS7 — NOT due (few commits since last gate) -> no gate, normal session runs"
+# Manual launch pattern: seed last-gate AFTER reset_state (run_daemon would wipe it).
+echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+git -C "$REPO" rev-parse HEAD > "$STATE/last-gate"    # just gated at HEAD -> 0 commits since
+P=$(GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0); sleep 6; stop "$P"; L="$STATE/daemon.log"
+grep -q 'health gate DUE' "$L" && bad "ran a gate when not due" || ok "skipped the gate (not due)"
+grep -q 'launching fresh' "$L" && ok "normal session ran instead" || bad "no session ran"
+
+echo "[26] WS7 — bad/stale last-gate sha FAILS OPEN (gate due), not a silent skip"
+echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo deadbeefdeadbeefdeadbeefdeadbeefdeadbeef > "$STATE/last-gate"   # seed AFTER reset (see [25])
+P=$(GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0); sleep 8; stop "$P"; L="$STATE/daemon.log"
+grep -q 'health gate DUE' "$L" && ok "bad last-gate sha -> gate ran (fail-open)" || bad "bad sha silently skipped the gate"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="
