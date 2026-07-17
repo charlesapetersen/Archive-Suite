@@ -45,6 +45,11 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
+    // Local Agent CLI backend (opt-in; mutually exclusive with the gateway — see `backendMode`).
+    @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath: String = ""
+    @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel: String = ""
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
@@ -82,6 +87,8 @@ struct SettingsView: View {
     @State private var mistralKey = ""
     @State private var openaiKey = ""
     @State private var gatewayKey = ""
+    @State private var localAgentStatus = ""       // Detect & Verify result message (empty = not yet run)
+    @State private var localAgentChecking = false
     @State private var showKeyWizard = false
     @State private var showManageModels = false
     // Cloud-relay Google sign-in (transport = cloud). The secret lives in the Keychain, not @AppStorage.
@@ -278,17 +285,32 @@ struct SettingsView: View {
         }
     }
 
+    /// The three mutually-exclusive OCR backends, surfaced as ONE picker over the two persisted flags
+    /// (`useGateway` / `useLocalAgent`). Centralizing the XOR in this Binding means no downstream code
+    /// path can ever observe both flags true (the setter always writes both).
+    private enum OCRBackendMode: Hashable { case direct, gateway, localAgent }
+    private var backendMode: Binding<OCRBackendMode> {
+        Binding(
+            get: { useLocalAgent ? .localAgent : (useGateway ? .gateway : .direct) },
+            set: { mode in
+                useGateway = (mode == .gateway)
+                useLocalAgent = (mode == .localAgent)
+            }
+        )
+    }
+
     // MARK: Sections
 
     @ViewBuilder private var providerSection: some View {
         Section("Provider & Model") {
-            Picker(selection: $useGateway) {
-                Text("Direct API").tag(false)
-                Text("API Gateway").tag(true)
+            Picker(selection: backendMode) {
+                Text("Direct API").tag(OCRBackendMode.direct)
+                Text("API Gateway").tag(OCRBackendMode.gateway)
+                Text("Local CLI Agent").tag(OCRBackendMode.localAgent)
             } label: {
                 HStack {
-                    Text("API mode")
-                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint — enter its base URL, model ID, a display name for PDF headers, and optionally per-token pricing (used only for the cost/time estimate). Useful for self-hosted or institutional proxies.")
+                    Text("OCR backend")
+                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint (base URL, model ID, optional pricing) — useful for self-hosted or institutional proxies. Local CLI Agent runs OCR through a locally installed, signed-in CLI (Claude Code / Gemini / Codex) using your existing subscription — no API key and no per-token cost. Exactly one backend is active at a time.")
                 }
             }
 
@@ -314,6 +336,8 @@ struct SettingsView: View {
                         HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
                     }
                 }
+            } else if useLocalAgent {
+                localAgentControls
             } else {
                 Picker(selection: Binding(
                     get: { selectedProvider },
@@ -355,6 +379,50 @@ struct SettingsView: View {
                 }
                 Button("Manage custom models…") { showManageModels = true }
             }
+        }
+    }
+
+    /// Local Agent backend controls (shown when `useLocalAgent`). Persist the config; the pipeline
+    /// picks it up in the wiring checkpoint (W13.cli-4). Detect & Verify is inert until tapped.
+    @ViewBuilder private var localAgentControls: some View {
+        Picker(selection: $localAgentTool) {
+            ForEach(LocalAgentTool.allCases, id: \.self) { Text($0.displayName).tag($0) }
+        } label: {
+            HStack {
+                Text("CLI tool")
+                HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
+            }
+        }
+        TextField("CLI path (optional — auto-detected if blank)", text: $localAgentBinaryPath)
+        TextField("Model (optional — CLI default if blank)", text: $localAgentModel)
+        HStack {
+            Button {
+                runLocalAgentDetectVerify()
+            } label: {
+                Label(localAgentChecking ? "Checking…" : "Detect & Verify", systemImage: "checkmark.seal")
+            }
+            .disabled(localAgentChecking)
+            HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
+        }
+        if !localAgentStatus.isEmpty {
+            Text(localAgentStatus).font(.caption).foregroundStyle(.secondary)
+        }
+        Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+
+    /// Run detect-and-verify off the main actor and surface the plain-English result. Spawns the CLI
+    /// only on explicit user action; sends no document (a trivial prompt round-trip).
+    private func runLocalAgentDetectVerify() {
+        let config = LocalAgentConfig(tool: localAgentTool,
+                                      binaryPath: localAgentBinaryPath,
+                                      modelOverride: localAgentModel.isEmpty ? nil : localAgentModel)
+        localAgentChecking = true
+        localAgentStatus = ""
+        Task { @MainActor in
+            let status = await LocalAgentValidator.detectAndVerify(config: config)
+            localAgentStatus = status.message(tool: config.tool)
+            localAgentChecking = false
         }
     }
 

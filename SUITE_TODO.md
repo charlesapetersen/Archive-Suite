@@ -148,9 +148,22 @@ whole gate unattended-satisfiable at $0):
   this session** — subprocess plumbing + resume-safety Codable semantics) + in-app `LocalAgentTestDriver` (real
   client + real PendingRun round-trip; RUN via `test-localagent.sh` **deferred → Morning Review**, GUI-off). Tier-2
   gate met unattended (adversarial review + headless functional proof + build clean, 0 warnings). | M | med | none
-- [ ] **W13.cli-2 — validator + Settings.** `OCR/LocalAgentValidator.swift` (`cliNotFound`/`cliNotLoggedIn`/
-  `cliEntitlementMissing`) + Settings controls (`useLocalAgent` XOR `useGateway`, tool picker, path, model,
-  additive DefaultsKeys, `?` help + gray-out). Detect+Verify live round-trip → GUI/Morning Review. | M | low | none
+- [x] **W13.cli-2 — validator + Settings.** `a2be2c7` (checkpoint 1/2: validator+probe) + this commit
+  (checkpoint 2/2: Settings). `OCR/LocalAgentValidator.swift` — CLI analog of `KeyValidator`: `detectAndVerify`
+  does resolve-binary → `--version` liveness → 1-token round-trip and maps to a plain-English `Status`
+  (`cliNotFound`/`cliNotLoggedIn`/`cliEntitlementMissing` + reused `rateLimited`/`offline`/`providerBusy`);
+  pure `classify` code→Status. `LocalAgentClient` gained public `probe()`+`ProbeOutcome` (prompt-only round-trip,
+  no image ⇒ zero corpus surface) + `cli_entitlement_missing` in the shared error taxonomy (never raw stderr;
+  preserves the `fail`→`cli_exit_3`/`notlogged`→`cli_not_logged_in` invariants). Settings: a 3-way **OCR backend**
+  picker (Direct API / API Gateway / **Local CLI Agent**) over a `backendMode` binding that centralizes the
+  `useLocalAgent` XOR `useGateway` invariant; tool picker + path/model fields + a **Detect & Verify** button
+  (wired to the validator) + `?` help; additive `DefaultsKeys`. Additive + opt-in; default backend unchanged.
+  **Tier-2** gate met unattended: build clean 0 new warnings + `$0`/no-key/no-GUI `scripts/localagent-validator-test.swift`
+  (**27/27 PASS** — exhausts the code taxonomy incl. entitlement + drives the real fake CLI e2e) + adversarial
+  self-review. **Interim state (until W13.cli-4 wires the pipeline):** selecting Local Agent mode *persists* the
+  config but the pipeline still routes Direct/Gateway (config inert, same as cli-1's threaded-but-unconsumed
+  carrier). Live Detect+Verify round-trip + visual gray-out + the cost-pane "subscription" branch (cli-3) →
+  GUI/Morning Review. | M | low | none
 - [ ] **W13.cli-3 — wizard + cost pane + pacing.** `LocalAgentSpec` (claude + gemini specs), cost pane
   "Included in your subscription" branch, low concurrency cap (1–2) + usage-window handling. | S | low | none
 - [ ] **W13.cli-4 — pipeline wiring.** Prefer `localAgent` at the construction sites; skip batch + LLM-rotation
