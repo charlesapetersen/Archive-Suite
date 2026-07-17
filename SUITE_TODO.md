@@ -30,12 +30,12 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- `openai-chatgpt-provider.md` — **READY (daemon-buildable), Processor**: add OpenAI/ChatGPT as a first-class
-  provider via (1) the **standard API** (native `LLMProvider.openai`, BYO OpenAI API key) and (2) an **OpenAI
-  gateway preset** over the existing OpenAI-compatible gateway. Reuses `OpenAICompatibleClient` (already speaks
-  OpenAI's format), so the code is build-verifiable at $0; the enum append stays append-only + opt-in. Tier-1.
-  The plan now carries a **Daemon build plan** splitting it into `W13.oai-1…3` (unattended, no key) + a keyed
-  live-OCR-test tail. → queued in the **Provider expansion (Wave 13)** section below.
+- ~~`openai-chatgpt-provider.md`~~ — **SHIPPED (Processor, W13.oai-1/2/3)**: OpenAI/ChatGPT as a first-class
+  provider — (1) native `LLMProvider.openai` (model list + param-family adapter + onboarding/validation/cost,
+  routed through the reused `OpenAICompatibleClient`) and (2) a one-click **OpenAI gateway preset**. All
+  daemon-buildable sub-tasks landed (build-verified, additive + opt-in, default provider unchanged); the
+  live-key OCR smoke + OpenAI Batch API (Phase 4) remain the **keyed/owner tail** (see the keyed-tail note in
+  Wave 13 + Morning Review). **Plan deleted on ship** (git history keeps it).
 - `local-agent-cli-provider.md` — **READY (daemon-buildable), Processor**: drive OCR/tagging through a locally
   installed, subscription-authenticated CLI — **Claude Code + Gemini CLI + OpenAI Codex CLI**, all first-class —
   for enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. Additive `localAgent` config sibling to
@@ -66,8 +66,8 @@ Morning Review, NOT skipped. Do top-to-bottom, one bounded sub-task per session.
 reuses the existing OpenAI-format client), then CLI (Tier-2).** New provider changes stay **additive + opt-in** —
 never flip the default provider until the keyed live test passes. Legend as above.
 
-**OpenAI / ChatGPT provider** (`execution-plans/openai-chatgpt-provider.md`; Tier-1; SHARED HOTSPOT = the
-persisted `LLMProvider` enum, append-only):
+**OpenAI / ChatGPT provider** (plan `openai-chatgpt-provider.md` shipped + deleted W13.oai-1/2/3; Tier-1;
+SHARED HOTSPOT = the persisted `LLMProvider` enum, append-only):
 - [x] **W13.oai-1 — native provider wiring.** Append `case openai` to `LLMProvider` (append-only), add
   `LLMModel.openaiModels` + the model-family param adapter (`max_completion_tokens`/no-`temperature`/
   `reasoning_effort`), route `.openai` through the reused `OpenAICompatibleClient` at the ~6–8 switch sites.
@@ -97,8 +97,25 @@ persisted `LLMProvider` enum, append-only):
   oai-1. Additive + opt-in — default provider unchanged. Build clean, 0 new warnings; Tier-1 self-review.
   **GUI visual (Settings OpenAI row + wizard) + live OCR smoke = keyed/owner tail → Morning Review** (GUI blocked
   this run by the Keychain "Always Allow" seed still being unset under the stable dev cert).
-- [ ] **W13.oai-3 — gateway "OpenAI" preset + docs.** One-click preset prefilling base URL/model/cost (note:
+- [x] **W13.oai-3 — gateway "OpenAI" preset + docs.** One-click preset prefilling base URL/model/cost (note:
   custom base URL covers Azure OpenAI / proxies); update CLAUDE.md provider list + README. | files: Views/SettingsView.swift, docs | S | low | none
+  — ✅ shipped (code `d866924`; docs/tracker this commit): a **"Fill in OpenAI preset"** button in the
+  API-Gateway settings section (`Views/SettingsView.swift` → new `applyOpenAIGatewayPreset()`) prefills the
+  public OpenAI endpoint (`https://api.openai.com/v1`), the default model, a display name, and the `.openai`
+  cost profile — reading the model ID + pricing from the single source of truth `LLMModel.openaiModels`
+  (now the verified GPT-5 gen from `3be8c3d`), so a later pricing/ID edit flows through automatically. It fills
+  the cheapest **non-reasoning** model (`gpt-5.4-mini`): the gateway path sends plain `max_tokens`, which OpenAI
+  reasoning models reject — the param adapter lives only on the native `.openai` path — so reasoning models go
+  via Direct API. A
+  HelpButton notes a custom base URL covers **Azure OpenAI / OpenAI-compatible proxies** and that the key goes
+  in the Gateway key field. Docs in this commit: Processor **CLAUDE.md** (OpenAI added to the built-in
+  provider/model list + the preset note), **README** (4th provider row + table + preset + batch/key-field
+  accuracy), **POTENTIAL_FEATURES** (retired the first-class-OpenAI wishlist item). **Plan
+  `execution-plans/openai-chatgpt-provider.md` DELETED** — all daemon-buildable OpenAI sub-tasks (W13.oai-1/2/3)
+  shipped. Additive + opt-in; default provider unchanged. Build clean, 0 new warnings; Tier-1 self-review.
+  **Keyed/owner tail → Morning Review:** the live-key 2-image OCR smoke through gateway + native `.openai`
+  (final model-ID confirmation) + OpenAI Batch API (Phase 4); GUI visual (preset button + field fill) deferred
+  (GUI off this run).
 
 **Local Agent CLI provider** (`execution-plans/local-agent-cli-provider.md`; Tier-2; fake-CLI harness makes the
 whole gate unattended-satisfiable at $0):

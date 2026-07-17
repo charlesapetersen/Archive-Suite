@@ -1,6 +1,6 @@
 # Potential Features
 
-> Forward-looking backlog only. Items that have since shipped (custom OCR prompts, custom tag vocabularies, CSV vocabulary import, multi-page merging, Compare Models, completion notifications, redo-tagging, live-capture resume, the OpenAI-compatible gateway, the Google Drive cloud-relay transport) have been removed from this list — see README.md for what ships today.
+> Forward-looking backlog only. Items that have since shipped (custom OCR prompts, custom tag vocabularies, CSV vocabulary import, multi-page merging, Compare Models, completion notifications, redo-tagging, live-capture resume, the OpenAI-compatible gateway, the first-class OpenAI/ChatGPT provider, the Google Drive cloud-relay transport) have been removed from this list — see README.md for what ships today.
 
 ## High Priority
 
@@ -47,7 +47,6 @@
   switch-provider (review + tag-card dialogs already have full keyboard nav) + a dark-mode render audit.
 
 ### API & Extensibility
-- **First-class OpenAI/GPT-4o provider** — a native OpenAI provider (an OpenAI-compatible gateway already ships for custom/proxied endpoints)
 - **Local model support** — integrate with Ollama or llama.cpp for offline processing
 - **Plugin system** — allow custom classification and tagging plugins
 - **REST API server mode** — run Archive Processor as a headless service for automation

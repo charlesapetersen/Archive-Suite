@@ -15,15 +15,16 @@ The app has three areas, selectable at the top of the window, plus a native Sett
 
 ### Multi-Provider LLM OCR
 
-Process scanned images through any of three LLM providers:
+Process scanned images through any of four LLM providers:
 
 | Provider | Models | Thinking Mode | Batch Processing |
 |----------|--------|---------------|------------------|
 | **Anthropic** | Claude Sonnet 4.6, Claude Opus 4.6 | Low / High | Yes |
 | **Google Gemini** | 3.1 Flash Lite (default), 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite | Low / High | Yes |
 | **Mistral** | Mistral OCR 3 | — | Yes |
+| **OpenAI (ChatGPT)** | GPT-5 nano (default), GPT-5 mini, GPT-5.4 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
 
-- Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates
+- Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates — including a one-click **"Fill in OpenAI preset"** that prefills OpenAI's public endpoint, model, and pricing (a custom base URL then covers **Azure OpenAI** / proxies)
 - Switch providers and models at any time (in **Settings**)
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
@@ -33,8 +34,8 @@ Process scanned images through any of three LLM providers:
 ### Guided API-Key Setup
 
 You bring your own API keys, and the app makes that easy. A **first-run wizard** (and a **Set up keys**
-button in Settings) walks you through creating and pasting a **free** Gemini and Mistral key — both
-providers offer an OCR-capable free tier with **no credit card required**:
+button in Settings) walks you through creating and pasting a **free** Gemini or Mistral key — both
+providers offer an OCR-capable free tier with **no credit card required** — or a pay-as-you-go **OpenAI** key:
 
 - Step-by-step instructions with the exact console page to open for each provider
 - Paste-and-validate: each key is format-checked, then confirmed with a live call (a synthetic
@@ -80,7 +81,7 @@ pool — *Settings › Parallel OCR workers*, default 4.)
 
 ### Batch Processing
 
-All three providers support batch processing for lower-cost, asynchronous OCR:
+Anthropic, Gemini, and Mistral support batch processing for lower-cost, asynchronous OCR (OpenAI's Batch API is a later phase):
 
 - Toggle batch mode in the UI
 - Batch state persists to disk — survives app restarts
@@ -160,7 +161,7 @@ Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
 ### Settings window (⌘,)
 
-All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / Gateway, each in the Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
+All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / Gateway, each in the Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
 
 A **pinned pane on the right** recomputes live for 1,000 files (at your standard image size) as you change settings:
 

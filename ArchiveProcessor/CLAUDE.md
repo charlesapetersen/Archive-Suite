@@ -58,9 +58,18 @@ Dropdown menus for provider and model. The **built-in** models are those listed 
 - mistral-ocr-latest (Mistral OCR 3)
   - Note: Mistral returns markdown-formatted text
 
+**OpenAI (ChatGPT)** — first-class provider (`LLMProvider.openai`, W13.oai-1/2/3), routed through the reused `OCR/OpenAICompatibleClient.swift`; BYO OpenAI API key (Keychain account `OpenAI`).
+- gpt-5-nano (default)
+- gpt-5-mini
+- gpt-5.4-mini
+- gpt-5.4
+- gpt-5.5
+  - Note: model IDs + per-1M pricing are the current GPT-5 generation from the owner-provided SoCOCRbench source (2026-07-16), ordered cheapest→flagship; a **live-key OCR smoke** is the final ID confirmation (Morning Review). Reasoning models (nano/mini/5.4/5.5) accept `reasoning_effort` (from the Thinking level); gpt-5.4-mini does not. No batch or LLM-rotation path in v1 (like Mistral) — local Vision handles rotation; OpenAI Batch API is a later phase.
+
 ### Custom models & OpenAI-compatible gateway (shipped)
 - **Custom models:** users can add extra Anthropic/Gemini model IDs via **Manage custom models…** in Settings (`Views/ManageModelsView.swift`, persisted by `Models/ModelSelectionStore.swift`) — so the dropdowns are not limited to the built-in lists above.
 - **OpenAI-compatible gateway:** toggle **Use gateway** in Settings (`@AppStorage` `useGateway` + `gatewayBaseURL`/`gatewayModelID`, with a separate **Gateway** key in Keychain) to route OCR through any OpenAI-compatible chat-completions endpoint (self-hosted or proxied). Client: `OCR/OpenAICompatibleClient.swift` (reuses the shared `OCRPrompt.build`); config is carried as `GatewayConfig` (`Models/ProviderModels.swift`). The gateway path has **no** batch or LLM-rotation support (both are skipped when `useGateway` is on).
+  - **One-click "Fill in OpenAI preset"** (W13.oai-3): in gateway mode a preset button prefills the public OpenAI endpoint (`https://api.openai.com/v1`), a default OpenAI model, a display name, and the cost profile — reading the model ID + pricing from the single source of truth `LLMModel.openaiModels` (`applyOpenAIGatewayPreset()` in `Views/SettingsView.swift`), so a verified-pricing edit there flows through. It fills the cheapest **non-reasoning** model (the gateway sends plain `max_tokens`, which OpenAI reasoning models reject — the param adapter lives only on the native `.openai` path); GPT-5 reasoning models go through the Direct API provider. A **custom base URL covers Azure OpenAI / OpenAI-compatible proxies** (apply the preset, then edit the URL). Note: OpenAI is also a first-class **Direct API** provider (above) — the gateway preset is for Azure/proxy/self-host routing to an OpenAI-format endpoint.
 
 ### Thinking Mode
 For models that support low/high thinking, include a dropdown: Low / High.
