@@ -177,7 +177,14 @@ clean.
       low-churn high-risk unit like Net isn't starved), **fail-open on a stale/invalid sha** (treat as
       never-reviewed, never a silent-0 stall), and **STEP 2.0 routes through a worktree + push** (no
       commit-in-primary). Proven by `tests/prove-review-cadence.sh` (12 assertions incl. those 3).
-- [ ] WS7 health gate · WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating · WS10 hold queue.
+- [x] **WS10** needs-owner hold queue — shipped 2026-07-17. Resume-prompt STEP 2 never auto-picks a
+      `## HOLD QUEUE` / `[hold]` / `needs: owner` item (Tier-3 releases, SPEC/tag-format changes, corpus-writing,
+      HIGH-on-irreversible findings from WS11) — surfaces them to Morning Review/STATUS instead. Defense-in-
+      depth backstop: the deny-list blocks the DIRECT invocation of `hdiutil` + `gh release` (catches a casual
+      attempt; not a hard boundary — a child script could still reach hdiutil), so the prompt rule (leave
+      release work for the owner) is the primary control. Also added a daemon **source-guard** (dogfood fix:
+      sourcing it to inspect $DENY previously ran the loop + spent budget).
+- [ ] WS7 health gate · WS5 STATUS digest · WS8 Morning-Review rotation · WS9 dep gating.
 
 ## Out of scope (owner calls, 2026-07-16)
 - **Reboot-survival / auto-login** — declined; posture is "don't reboot" (WS1).

@@ -44,6 +44,15 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
 
 STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
   loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
+  NEVER auto-pick a HOLD-QUEUE item (WS10). The plan's "## HOLD QUEUE (owner-gated)" section — and any item
+  tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
+  (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything
+  that **writes the real corpus**, and any **HIGH review finding on an irreversible path** (Capture/Net/
+  finalize, TagWriter/file-safety) routed here by STEP 2.0. Skip them exactly like GUI-off items: surface each
+  to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue
+  (or GUI-gated), there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
+  backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
+  misread can't publish a release; but the point is to LEAVE the work for the owner, not to lean on the deny.)
   If GUI mode is `off`, SKIP items that RUN the GUI: Notes **W8-S8** (GUI checks) + Reader **W7.6** (both need a
   live XCUITest/cliclick run). **W8-S7 (GUI harness scaffold) IS allowed with GUI off** — author the XCUITest
   target / accessibility IDs / entitlements / DEBUG fixture-root / cliclick helper and verify with `xcodebuild

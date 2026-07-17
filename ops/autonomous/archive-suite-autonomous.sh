@@ -102,6 +102,12 @@ DENY=(
   "Bash(git worktree remove --force:*)" "Bash(git worktree remove -f:*)" "Bash(git branch -D:*)"
   "Bash(shutdown:*)" "Bash(reboot:*)" "Bash(halt:*)"
   "Bash(diskutil:*)" "Bash(dd:*)" "Bash(mkfs:*)" "Bash(curl:*)" "Bash(wget:*)"
+  # WS10 hold-queue backstop — a release/publish is owner-only (Tier-3), NEVER an unattended action. These
+  # block the DIRECT/casual invocation of the two release steps (hdiutil builds the DMG, `gh release`
+  # publishes it — bare + the full-path form CLAUDE.md pins). NOT a hard boundary: a session could still reach
+  # hdiutil via a child process (`bash release/build-suite-dmg.sh`) — so this is defense-in-depth; the resume
+  # prompt's hold-queue rule (LEAVE release work for the owner) is the primary control.
+  "Bash(hdiutil:*)" "Bash(gh release:*)" "Bash(/opt/homebrew/bin/gh release:*)"
 )
 
 mkdir -p "$STATE"
@@ -413,6 +419,18 @@ remind_revert_taskport() {
   { echo "[$(date '+%F %T')] Archive Suite autonomous run exited."; echo; echo "$m"; } > "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" 2>/dev/null || true
   osascript -e 'display notification "taskport auth is still password-free — REVERT it (see REVERT-TASKPORT-SECURITY.txt on your Desktop)." with title "Archive Suite: revert security setting" sound name "Basso"' >/dev/null 2>&1 || true
 }
+
+# SOURCE GUARD (placed HERE, above the traps): everything above is config + function definitions, safe to
+# source. Everything BELOW has side effects — it installs process traps, scrubs the env, spawns caffeinate,
+# and runs the loop (which launches `claude -p`). If this file is SOURCED rather than executed (e.g. a
+# maintainer `. archive-suite-autonomous.sh` to inspect $DENY/$ALLOW), stop here: do NOT install a
+# `trap 'exit 0'` in their interactive shell or fork a budget-spending run. (Dogfooded — sourcing-to-inspect
+# spent budget on 2026-07-17; the traps-in-your-shell footgun is why the guard sits before the traps.)
+if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+  echo "archive-suite-autonomous.sh sourced, not executed — config + functions loaded; daemon NOT started." >&2
+  return 0 2>/dev/null || exit 0
+fi
+
 trap remind_revert_taskport EXIT
 trap 'exit 0' TERM INT
 

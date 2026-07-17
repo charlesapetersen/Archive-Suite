@@ -235,6 +235,16 @@ in the same commit. See the plan's PRIME DIRECTIVES for the full list.
 For the paced **code-review** portion, see `REVIEW.md` (root) — one subsystem unit per session, lean
 fan-out, refute-verify; never the retired 15-finder monolith.
 
+**Needs-owner HOLD QUEUE (WS10, 2026-07-17).** The daemon **never auto-executes** irreversible / highest-
+blast-radius work: **Tier-3 releases** (DMG / `gh release` / version tags), **SPEC / `tag-format` changes**
+(the cross-app data contract), anything that **writes the real corpus**, and any **HIGH review finding on an
+irreversible path** (routed here by WS11). The resume prompt (STEP 2) skips the plan's `## HOLD QUEUE` /
+`[hold]` / `needs: owner` items and surfaces them to Morning Review + `STATUS.md`. A defense-in-depth backstop
+reinforces the soft rule: the daemon's `--disallowedTools` blocks the **direct** invocation of `hdiutil` and
+`gh release` (the two release steps) — catching a casual/accidental attempt. It's not a hard boundary (a child
+process like `bash release/build-suite-dmg.sh` could still reach `hdiutil`), so the prompt rule — *leave
+release work for the owner* — is the primary control.
+
 ## Reuse for another project (the daemon is a template)
 
 `archive-suite-autonomous.sh` is a reusable template — its top has a **PROJECT CONFIG** block. To stand up an
