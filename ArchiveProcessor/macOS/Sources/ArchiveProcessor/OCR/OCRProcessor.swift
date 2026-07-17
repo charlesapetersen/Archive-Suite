@@ -217,6 +217,10 @@ class OCRProcessor: ObservableObject {
     var currentModel: LLMModel?
     /// Gateway configuration for the current run (nil = direct API mode)
     var currentGateway: GatewayConfig?
+    /// Local Agent (subscription-auth CLI) backend for the current run, or nil when using an API key /
+    /// gateway. The instance-side mirror of the `localAgent` carrier in `PendingRun` / the run builder —
+    /// set alongside `currentGateway` and read at the client-construction sites, which prefer it when set.
+    var currentLocalAgent: LocalAgentConfig?
     var processingTask: Task<Void, Never>?
 
     /// Stored batch context for cancellation

@@ -66,4 +66,22 @@ struct LocalAgentConfig: Codable, Equatable, Sendable {
 
     /// Concurrency clamped to the safe subscription-paced range (1…2), even if a bad value was stored.
     var effectiveConcurrencyCap: Int { min(2, max(1, concurrencyCap)) }
+
+    /// Build the Local Agent config from the shared app settings, or nil when the Local Agent backend is
+    /// not the selected OCR backend. The single source of truth for `SessionProcessingConfig.fromDefaults`
+    /// (Live Capture) and `OCRView.currentLocalAgentConfig` (Process Files), mirroring
+    /// `GatewayConfig.fromDefaults`. `useLocalAgent` is the operator's explicit 3-way backend choice
+    /// (mutually exclusive with `useGateway`, enforced in Settings), so an enabled toggle ALWAYS yields a
+    /// config: the tool defaults to `.claude`, and a blank binary path means "resolve at call time from the
+    /// standard install locations" (never `$PATH`). If the CLI is missing / not signed in at call time,
+    /// `LocalAgentClient` returns a friendly failure — so an over-eager `nil`/empty guard here (as gateway
+    /// uses for its required URL/model) would wrongly silently fall back to a metered path the user didn't pick.
+    static func fromDefaults(_ d: UserDefaults = .standard) -> LocalAgentConfig? {
+        guard d.bool(forKey: DefaultsKeys.useLocalAgent) else { return nil }
+        let tool = LocalAgentTool(rawValue: d.string(forKey: DefaultsKeys.localAgentTool) ?? "") ?? .claude
+        let binaryPath = d.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? ""
+        let model = d.string(forKey: DefaultsKeys.localAgentModel) ?? ""
+        return LocalAgentConfig(tool: tool, binaryPath: binaryPath,
+                                modelOverride: model.isEmpty ? nil : model)
+    }
 }

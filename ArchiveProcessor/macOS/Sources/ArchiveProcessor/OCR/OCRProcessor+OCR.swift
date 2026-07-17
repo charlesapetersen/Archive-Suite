@@ -364,7 +364,11 @@ extension OCRProcessor {
     ) async -> DocumentClassification? {
         do {
             let response: String
-            if let gateway = currentGateway {
+            // Backend precedence (mirrors the OCR / text seams): the Local Agent CLI wins, then the
+            // gateway, then the direct provider path.
+            if let localAgent = currentLocalAgent {
+                response = try await classifyCallLocalAgent(prompt: prompt, config: localAgent)
+            } else if let gateway = currentGateway {
                 response = try await classifyCallGateway(prompt: prompt, gateway: gateway)
             } else {
                 switch provider {
@@ -387,6 +391,9 @@ extension OCRProcessor {
     private nonisolated func classifyCallGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
         let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
         return try await client.textCompletion(prompt: prompt, maxTokens: 64)
+    }
+    private nonisolated func classifyCallLocalAgent(prompt: String, config: LocalAgentConfig) async throws -> String {
+        try await LocalAgentClient(config: config).textCompletion(prompt: prompt, maxTokens: 64)
     }
     private nonisolated func classifyCallAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) async throws -> String {
         let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
@@ -1017,14 +1024,15 @@ extension OCRProcessor {
         previousImageURL: URL?,
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
         // The detected correction overrides the OCR prompt's own rotation guess.
         async let rotationCorrection = detectRotation(
             imageURL: imageURL, provider: provider, apiKey: apiKey,
-            mode: rotationModeForRun, gatewayConfig: gatewayConfig
+            mode: rotationModeForRun, gatewayConfig: gatewayConfig, localAgent: localAgent
         )
 
         // The incoming `imageScale` is the size-target slider fraction; convert to a per-file
@@ -1033,7 +1041,11 @@ extension OCRProcessor {
 
         let networkResult: OCRResult
         do {
-            if let gateway = gatewayConfig {
+            // Backend precedence: the Local Agent CLI wins, then the gateway, then the direct provider
+            // path (Settings makes useLocalAgent/useGateway mutually exclusive; the order is defensive).
+            if let localAgent {
+                networkResult = try await LocalAgentClient(config: localAgent).ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+            } else if let gateway = gatewayConfig {
                 let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
                 networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
             } else {
@@ -1068,7 +1080,8 @@ extension OCRProcessor {
         provider: LLMProvider,
         apiKey: String,
         mode: RotationMode,
-        gatewayConfig: GatewayConfig?
+        gatewayConfig: GatewayConfig?,
+        localAgent: LocalAgentConfig? = nil
     ) async -> Int? {
         switch mode {
         case .off:
@@ -1076,10 +1089,13 @@ extension OCRProcessor {
         case .localVision:
             return await RotationDetector.detectCorrection(imageURL: imageURL)
         case .llmSingle, .llmMajority:
-            if let c = await LLMRotationDetector.detectCorrection(
-                imageURL: imageURL, provider: provider, apiKey: apiKey,
-                orderings: mode.orderings, gatewayConfig: gatewayConfig
-            ) {
+            // The Local Agent CLI backend has no multi-image comparative-rotation path (same as the
+            // gateway, which LLMRotationDetector already gates out), so skip straight to local Vision.
+            if localAgent == nil,
+               let c = await LLMRotationDetector.detectCorrection(
+                   imageURL: imageURL, provider: provider, apiKey: apiKey,
+                   orderings: mode.orderings, gatewayConfig: gatewayConfig
+               ) {
                 return c
             }
             // Fall back to local Vision if the LLM path is unavailable or fails.
@@ -1147,14 +1163,16 @@ extension OCRProcessor {
         imageURL: URL, provider: LLMProvider, model: LLMModel,
         thinkingLevel: ThinkingLevel?, apiKey: String,
         imageScale: Double,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> OCRResult {
         await performOCRCall(
             imageURL: imageURL, provider: provider, model: model,
             thinkingLevel: thinkingLevel, apiKey: apiKey,
             previousText: nil, previousImageURL: nil,
             imageScale: imageScale,
-            gatewayConfig: gatewayConfig
+            gatewayConfig: gatewayConfig,
+            localAgent: localAgent
         )
     }
 }

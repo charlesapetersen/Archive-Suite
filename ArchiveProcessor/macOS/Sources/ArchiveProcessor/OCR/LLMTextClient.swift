@@ -14,9 +14,16 @@ enum LLMTextClient {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         gatewayConfig: GatewayConfig?,
+        localAgent: LocalAgentConfig? = nil,
         maxTokens: Int,
         timeout: TimeInterval
     ) async throws -> String {
+        // Backend precedence (mirrors the OCR seam + classifyViaLLM): the Local Agent CLI wins, then the
+        // gateway, then the direct provider path. Settings makes useLocalAgent/useGateway mutually
+        // exclusive, so at most one is non-nil; the explicit order is defensive.
+        if let localAgent {
+            return try await LocalAgentClient(config: localAgent).textCompletion(prompt: prompt, maxTokens: maxTokens)
+        }
         if let gateway = gatewayConfig {
             let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
             return try await client.textCompletion(prompt: prompt, maxTokens: maxTokens)
