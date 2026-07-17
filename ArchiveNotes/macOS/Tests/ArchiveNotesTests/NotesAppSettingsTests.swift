@@ -129,4 +129,38 @@ struct NotesAppSettingsTests {
         d.set("nonsense", forKey: NotesLayoutSettingsKey.noteWindowKind)
         #expect(NotesAppSettings.windowKindFilter(for: .note, from: d) == nil)   // → caller uses default
     }
+
+    // MARK: per-window hidden columns (W14.4)
+
+    @Test func windowHiddenColumnsDefaultHidesSourcesInNoteWindowOnly() {
+        let d = scratchDefaults()   // never toggled → per-window defaults apply
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["sources"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d).isEmpty)
+    }
+
+    @Test func windowHiddenColumnsRoundTripsPerWindowIndependently() {
+        let d = scratchDefaults()
+        NotesAppSettings.setWindowHiddenColumns(["tags"], for: .note, into: d)
+        NotesAppSettings.setWindowHiddenColumns(["quality", "instances"], for: .extract, into: d)
+        // Distinct keys — neither window clobbers the other.
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["quality", "instances"])
+    }
+
+    @Test func windowHiddenColumnsExplicitEmptyOverridesDefault() {
+        let d = scratchDefaults()
+        // A user un-hiding everything in the Note window persists an empty set — that means "show all",
+        // NOT "fall back to the sources-hidden default".
+        NotesAppSettings.setWindowHiddenColumns([], for: .note, into: d)
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d).isEmpty)
+    }
+
+    @Test func windowHiddenColumnsSeedFromLegacyGlobalOnFirstOpen() {
+        let d = scratchDefaults()
+        // Pre-W14.4 upgrade path: a legacy global hidden set seeds the first-open per-window default,
+        // unioned with the window default (Note window also hides the blank "sources" column).
+        NotesAppSettings.setHiddenColumns(["tags"], into: d)
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sources"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["tags"])
+    }
 }

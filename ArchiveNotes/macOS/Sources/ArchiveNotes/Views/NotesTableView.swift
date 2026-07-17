@@ -47,6 +47,7 @@ struct NotesTableView: NSViewRepresentable {
         let headerView = ColumnPickerHeaderView()
         headerView.setAccessibilityIdentifier("an.table.header")
         headerView.nonHideableColumnID = Self.titleColumnID
+        headerView.windowKind = model.windowKind   // per-window column visibility (W14.4)
         headerView.currentSort = { [weak coordinator] in coordinator?.parent.model.sort ?? NotesSort.default }
         headerView.onSetSecondarySort = { [weak coordinator] field, ascending in
             guard let c = coordinator else { return }
@@ -88,7 +89,7 @@ struct NotesTableView: NSViewRepresentable {
             tableView.addTableColumn(tc)
         }
 
-        let hidden = NotesAppSettings.hiddenColumns
+        let hidden = NotesAppSettings.windowHiddenColumns(for: model.windowKind)
         for col in tableView.tableColumns where hidden.contains(col.identifier.rawValue) {
             col.isHidden = true
         }
@@ -349,6 +350,8 @@ struct NotesTableView: NSViewRepresentable {
 @MainActor
 final class ColumnPickerHeaderView: NSTableHeaderView {
     var nonHideableColumnID: String?
+    /// The kind of the window this header belongs to — column visibility persists per window (W14.4).
+    var windowKind: Item.Kind = .note
     var onSetSecondarySort: ((NoteSortField, Bool) -> Void)?
     var onRemoveSecondarySort: (() -> Void)?
     var onResetSort: (() -> Void)?
@@ -413,9 +416,9 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
               let tv = tableView,
               let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
         col.isHidden.toggle()
-        var hidden = NotesAppSettings.hiddenColumns
+        var hidden = NotesAppSettings.windowHiddenColumns(for: windowKind)
         if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
-        NotesAppSettings.setHiddenColumns(hidden)
+        NotesAppSettings.setWindowHiddenColumns(hidden, for: windowKind)
     }
 
     @objc private func setSecondaryAsc(_ sender: NSMenuItem) {

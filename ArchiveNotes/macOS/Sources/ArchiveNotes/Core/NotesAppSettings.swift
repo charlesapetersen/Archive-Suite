@@ -17,6 +17,12 @@ enum NotesLayoutSettingsKey {
     // last kind their segmented control showed, separately.
     static let noteWindowKind = "an.noteWindow.kindFilter"
     static let extractWindowKind = "an.extractWindow.kindFilter"
+    // Per-window hidden columns (W14.4): each window remembers its own hidden-column set so the
+    // extract-only "sources" column can default hidden in the Note window (always blank there) while
+    // staying visible in the Extracts window. `hiddenColumns` above stays as the pre-W14.4 global
+    // legacy key (now read-only — it seeds a first-open per-window default).
+    static let noteWindowHiddenColumns = "an.noteWindow.hiddenColumns"
+    static let extractWindowHiddenColumns = "an.extractWindow.hiddenColumns"
 }
 
 /// Resolved, validated Notes layout/window settings. A pure value type so the resolution logic is
@@ -103,5 +109,33 @@ enum NotesAppSettings {
     }
     private static func kindKey(_ windowKind: Item.Kind) -> String {
         windowKind == .extract ? NotesLayoutSettingsKey.extractWindowKind : NotesLayoutSettingsKey.noteWindowKind
+    }
+
+    /// Item-list columns hidden in the given window (W14.4). Visibility is remembered per window
+    /// (mirrors `windowKindFilter`), so the extract-only **Sources** column defaults to hidden in the
+    /// Note window — where `sourcesText` is always blank — while staying visible in the Extracts
+    /// window. When a window's key is unset (never toggled) the per-window `defaultHiddenColumns`
+    /// apply; once the user toggles any column in the header picker, that window's explicit set is
+    /// persisted and used verbatim (an explicitly-empty set ⟹ "show all", distinct from "never set").
+    /// `from:`/`into:` injectable so the round-trip is testable against a scratch domain.
+    static func windowHiddenColumns(for windowKind: Item.Kind, from store: UserDefaults = .standard) -> Set<String> {
+        if let saved = store.stringArray(forKey: hiddenColumnsKey(windowKind)) {
+            return Set(saved)   // explicit per-window choice (an empty array = user showed everything)
+        }
+        let legacy = Set(store.stringArray(forKey: NotesLayoutSettingsKey.hiddenColumns) ?? [])
+        return defaultHiddenColumns(for: windowKind, legacy: legacy)
+    }
+    static func setWindowHiddenColumns(_ hidden: Set<String>, for windowKind: Item.Kind, into store: UserDefaults = .standard) {
+        store.set(Array(hidden).sorted(), forKey: hiddenColumnsKey(windowKind))
+    }
+    /// The hidden-column set for a freshly-opened window (no explicit per-window choice yet): the Note
+    /// window hides the always-blank "sources" column; the Extract window hides nothing. Any `legacy`
+    /// global hides (the pre-W14.4 shared key) are folded in so an upgrading user keeps prior choices.
+    static func defaultHiddenColumns(for windowKind: Item.Kind, legacy: Set<String> = []) -> Set<String> {
+        let base: Set<String> = windowKind == .extract ? [] : ["sources"]
+        return base.union(legacy)
+    }
+    private static func hiddenColumnsKey(_ windowKind: Item.Kind) -> String {
+        windowKind == .extract ? NotesLayoutSettingsKey.extractWindowHiddenColumns : NotesLayoutSettingsKey.noteWindowHiddenColumns
     }
 }
