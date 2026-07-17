@@ -293,6 +293,14 @@ struct SettingsView: View {
             }
 
             if useGateway {
+                HStack {
+                    Button {
+                        applyOpenAIGatewayPreset()
+                    } label: {
+                        Label("Fill in OpenAI preset", systemImage: "sparkles")
+                    }
+                    HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, the model to the default OpenAI vision model, a display name, and placeholder pricing. Paste your OpenAI key into the Gateway key field below. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint. (You can also pick OpenAI directly under the Direct API mode.)")
+                }
                 TextField("Gateway URL", text: $gatewayBaseURL)
                 TextField("Model ID", text: $gatewayModelID)
                 TextField("Display name (for PDF headers)", text: $gatewayDisplayName)
@@ -703,6 +711,22 @@ struct SettingsView: View {
         DriveAuth(clientId: driveClientId, clientSecret: driveClientSecret).signOut()
         driveSignedIn = false
         driveStatus = "Signed out."
+    }
+
+    /// One-click "OpenAI" gateway preset — prefills the public OpenAI endpoint plus the default OpenAI
+    /// vision model and its pricing read from the single source of truth (`LLMModel.openaiModels`), so a
+    /// verified model-ID/price change there flows through here automatically (the openaiModels values are
+    /// still `// VERIFY` placeholders pending the keyed/owner live-pricing check). A custom base URL covers
+    /// Azure OpenAI / OpenAI-compatible proxies — apply this, then edit the Gateway URL to that endpoint.
+    private func applyOpenAIGatewayPreset() {
+        gatewayBaseURL = "https://api.openai.com/v1"
+        gatewayDisplayName = "OpenAI"
+        gatewayUpstreamProvider = .openai
+        if let m = LLMModel.openaiModels.first {
+            gatewayModelID = m.id
+            gatewayInputCost = m.inputCostPer1M
+            gatewayOutputCost = m.outputCostPer1M
+        }
     }
 
     private var gatewayModel: LLMModel? {
