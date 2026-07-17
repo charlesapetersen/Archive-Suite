@@ -29,9 +29,11 @@ context compaction, and session restarts. Standing principles: memory `autonomou
 **One command (preferred): `./ops/autonomous/arm.sh`** — checks every prerequisite (claude CLI outside
 `~/Desktop`, daemon + resume prompt present, an L0 plan whose `RUN STATUS` is `IN_PROGRESS` with unchecked
 `[ ]` items), installs the latest committed copies to the runtime location, refuses to double-launch, warns
-with the exact fix if the plan is stale-`COMPLETE`, launches detached, and confirms the first cycle started.
-Also `arm.sh keepalive` (crash-restart under launchd — see below), `arm.sh status` (read-only), and
-`arm.sh stop`. The manual steps below are what it automates.
+with the exact fix if the plan is stale-`COMPLETE`, launches, and confirms the first cycle started. By
+**default (2026-07-17)** it launches under **launchd KeepAlive** (crash-restart — see below), the right
+posture for a long unattended run. `arm.sh nohup` is the opt-in detached mode; `arm.sh status` (read-only)
+and `arm.sh stop` round it out. `./ops/autonomous/arm.sh --dry-run [nohup]` previews the resolved launch
+mode without touching anything. The manual steps below are what it automates.
 
 The committed copies here are the source of truth; install to the runtime location:
 
@@ -40,30 +42,25 @@ cp ops/autonomous/archive-suite-autonomous.sh ~/.local/bin/ && chmod +x ~/.local
 cp ops/autonomous/resume-prompt.txt ~/.local/state/archive-autonomous/
 ```
 
-**How we run it — the standard, accepted setup: a detached loop under the launching session's TCC/screen
-grant.** macOS has **no `setsid`**, so use a subshell + `nohup` to detach it so it survives the launching
-command returning:
-```bash
-( nohup ~/.local/bin/archive-suite-autonomous.sh >~/.local/state/archive-autonomous/nohup.out 2>&1 & )
-```
-It runs while this login session is alive and inherits its `~/Desktop`/screen (TCC) grant — which is all we
-need. **If the terminal/session that launched it closes, the daemon stops — and that is fine, by design:**
-just start it again from your next session. All state is durable in the plan + `git`, so a stop loses nothing
-and the next start continues the queue. **We deliberately do NOT chase reboot/close durability** — the
-detached, session-scoped run is the normal behavior, not a stopgap.
-
-**Crash-restart — `./ops/autonomous/arm.sh keepalive` (WS1, 2026-07-17; recommended for a long unattended
-run).** Same install/verify as `arm`, but runs the daemon under a launchd LaunchAgent with **`KeepAlive=true`**
-so a **crash / OOM / stray kill auto-restarts** it — motivated by a real 2026-07-17 death where the daemon was
-TERMed mid-session and nothing brought it back. The model is simple: **the only thing that stops it is a
-`launchctl bootout`**, which every intentional stop performs (`arm.sh stop`, park, plan-COMPLETE); any other
-death leaves the job registered, so launchd relaunches (throttled to 60s). Proven on-machine by
-`tests/prove-keepalive.sh`.
+**Default — crash-restart under launchd (`./ops/autonomous/arm.sh`; WS1, default since 2026-07-17).** The
+daemon runs under a launchd LaunchAgent with **`KeepAlive=true`**, so a **crash / OOM / stray kill
+auto-restarts** it — motivated by a real 2026-07-17 death where the daemon was TERMed mid-session and nothing
+brought it back. The model is simple: **the only thing that stops it is a `launchctl bootout`**, which every
+intentional stop performs (`arm.sh stop`, park, plan-COMPLETE); any other death leaves the job registered, so
+launchd relaunches (throttled to 60s). Proven on-machine by `tests/prove-keepalive.sh`; the dispatch (that
+bare `arm` selects this) by `tests/prove-arm-dispatch.sh`.
 - **Survives a daemon crash, NOT a logout/reboot** — a LaunchAgent only loads at GUI login (reboot-survival is
   deliberately out of scope; it'd need auto-login, defeated by FileVault anyway — see "don't reboot" below).
-- **GUI-verify (gui on) is better under plain `arm`** (nohup), where the daemon inherits the launching
-  terminal's TCC (Accessibility/Screen-Recording) grant; a LaunchAgent may not.
 - May log `Operation not permitted` until `/bin/bash` has **Full Disk Access** (System Settings → Privacy).
+
+**Opt-in — detached nohup (`./ops/autonomous/arm.sh nohup`).** macOS has **no `setsid`**, so a subshell +
+`nohup` detaches the loop so it survives the launching command returning (equivalent to
+`( nohup ~/.local/bin/archive-suite-autonomous.sh >…/nohup.out 2>&1 & )`). It runs while this login session is
+alive and inherits its `~/Desktop`/screen (TCC) grant — so it is the better choice **when you need GUI-verify
+(`arm.sh gui on`)**: the daemon inherits the launching terminal's Accessibility/Screen-Recording grant, which
+a LaunchAgent may not. Downside: **no crash-restart** (a crash just stops it). If the launching terminal
+closes, the daemon stops — fine by design: all state is durable in the plan + `git`, so a stop loses nothing
+and the next `arm.sh` continues the queue. **We deliberately do NOT chase reboot/close durability.**
 
 ## Stop / status
 

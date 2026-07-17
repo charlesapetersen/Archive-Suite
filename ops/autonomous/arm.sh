@@ -7,10 +7,12 @@
 # re-derived from README.md again.
 #
 # Run from the PRIMARY checkout:
-#   ./ops/autonomous/arm.sh            # install + verify prereqs + launch DETACHED (nohup; no crash-restart)
-#   ./ops/autonomous/arm.sh keepalive  # same, but under launchd KeepAlive — a CRASH/kill auto-restarts (WS1).
-#                                      #   Best for a long unattended run. Survives a daemon crash, NOT a
-#                                      #   logout/reboot. GUI-verify (gui on) is better under plain `arm`.
+#   ./ops/autonomous/arm.sh            # DEFAULT: install + verify prereqs + launch under launchd KeepAlive, so
+#                                      #   a CRASH/OOM/kill auto-restarts (WS1) — best for a long unattended run.
+#                                      #   Survives a daemon crash, NOT a logout/reboot (reboot out of scope).
+#   ./ops/autonomous/arm.sh nohup      # opt-in: detached nohup, NO crash-restart. Use when you want GUI-verify
+#                                      #   (gui on): nohup inherits the launching terminal's TCC grants; a
+#                                      #   LaunchAgent may not. `keepalive` is an explicit alias for the default.
 #   ./ops/autonomous/arm.sh status     # show daemon state + supervisor + RUN STATUS + recent log (read-only)
 #   ./ops/autonomous/arm.sh stop       # stop it (boots out the launchd job first, then kills the process)
 #
@@ -110,6 +112,12 @@ status() {
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+# Optional `--dry-run` as the FIRST arg: preview the resolved launch mode + exit BEFORE any install/launch.
+# An EXPLICIT flag (NOT an ambient env var) on purpose — an env var could be exported once while iterating and
+# then silently turn a real `arm.sh` into a success-reporting no-op; a flag you have to type can't be inherited.
+DRYRUN=""
+if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
+
 case "${1:-arm}" in
   status) status; exit 0 ;;
   stop)
@@ -202,10 +210,15 @@ case "${1:-arm}" in
       *) fail "usage: $0 gui on|off|status" ;;
     esac
     exit 0 ;;
-  arm)       MODE=nohup ;;
-  keepalive) MODE=keepalive ;;   # WS1: run under launchd with KeepAlive so a crash/kill auto-restarts
-  *) fail "unknown command '${1}'. Use: arm | keepalive | status | stop | gui on|off|status" ;;
+  arm|keepalive) MODE='keepalive' ;;   # DEFAULT (2026-07-17): launchd KeepAlive so a crash/kill auto-restarts (WS1)
+  nohup)         MODE='nohup' ;;       # opt-in: detached nohup (no crash-restart) — inherits the terminal's TCC
+                                       # grants, so it's the better pick when GUI-verify (gui on) is needed
+  *) fail "unknown command '${1}'. Use: arm | nohup | keepalive | status | stop | gui on|off|status" ;;
 esac
+
+# --dry-run: report the resolved launch mode and exit BEFORE any install/launch — a loud, unmistakable line so
+# a preview is never mistaken for a real arm. (tests/prove-arm-dispatch.sh asserts the dispatch through this.)
+[ -n "$DRYRUN" ] && { echo "arm.sh --dry-run: would launch in mode '$MODE' — NOTHING installed or launched."; exit 0; }
 
 # ---- arm ----
 # 1. prerequisites (each with a fix hint)
@@ -234,7 +247,7 @@ if pgrep -f archive-suite-autonomous.sh >/dev/null \
    || launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
   echo "daemon ALREADY running (or launchd job loaded) — not launching a second one:"
   pgrep -fl archive-suite-autonomous.sh || echo "  (process down but job loaded — launchd will relaunch)"
-  echo "  To switch modes or restart: '$0 stop' first, then '$0 [keepalive]'."
+  echo "  To switch modes or restart: '$0 stop' first, then '$0' (or '$0 nohup')."
   echo; status; exit 0
 fi
 
@@ -254,26 +267,26 @@ EOF
 fi
 echo "plan status OK: $st"
 
-# 5. launch — nohup (default) or launchd KeepAlive (crash-restart; WS1)
+# 5. launch — launchd KeepAlive (DEFAULT, crash-restart; WS1) or opt-in detached nohup
 if [ "$MODE" = keepalive ]; then
   # Install the LaunchAgent + (re)bootstrap it. RunAtLoad launches the daemon; KeepAlive=true relaunches it
   # on any bootout-less death (crash/OOM/stray signal). `arm.sh stop`, park, and plan-COMPLETE all bootout,
   # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
   # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). GUI-verify (gui on) is
-  # best under plain `arm` (nohup) where the daemon inherits the terminal's TCC grants; a LaunchAgent may not.
+  # best under `arm.sh nohup` where the daemon inherits the terminal's TCC grants; a LaunchAgent may not.
   plutil -lint "$PLIST_SRC" >/dev/null || fail "plist is malformed: $PLIST_SRC"
   mkdir -p "$HOME/Library/LaunchAgents"
   install -m 644 "$PLIST_SRC" "$PLIST_DST"
   launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null || true   # clear any stale registration first
   if launchctl bootstrap "$GUI_DOMAIN" "$PLIST_DST"; then
-    echo "launched (launchd KeepAlive; plist -> $PLIST_DST)."
+    echo "launched (launchd KeepAlive [default]; plist -> $PLIST_DST) — a crash/kill auto-restarts."
   else
     fail "launchctl bootstrap failed — check: launchctl print $GUI_DOMAIN/$JOB"
   fi
 else
   # macOS has no setsid; subshell + nohup survives this shell returning (reparented to init).
   ( nohup "$DAEMON_DST" >"$STATE/nohup.out" 2>&1 & )
-  echo "launched (detached nohup — no crash-restart; use '$0 keepalive' for a long unattended run)."
+  echo "launched (detached nohup — NO crash-restart; the default '$0' uses launchd KeepAlive instead)."
 fi
 
 # 6. verify the first cycle actually started (bounded poll — no unbounded wait)

@@ -24,7 +24,9 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   keychain partition-list fix. Each with a committed regression harness (`ops/autonomous/tests/prove-*.sh`).
   Out of scope (owner): reboot/auto-login, cumulative-cost ceiling.
   **Owner actions to start a long run (standing, not blocking):** run `./ops/autonomous/fix-keychain-access.sh`
-  once, then `./ops/autonomous/arm.sh keepalive` (the run is currently DOWN).
+  once (DONE 2026-07-17: Gemini/Anthropic/Mistral partition-listed), then `./ops/autonomous/arm.sh` (the run is
+  currently DOWN; `arm.sh` now defaults to launchd KeepAlive / crash-restart — use `arm.sh nohup` only if you
+  want GUI-verify).
 
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 

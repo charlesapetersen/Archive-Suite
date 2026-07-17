@@ -17,7 +17,29 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DAEMON="${1:-$HERE/../archive-suite-autonomous.sh}"
 [ -f "$DAEMON" ] || { echo "no daemon at $DAEMON"; exit 2; }
-T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+T="$(mktemp -d)"
+# Leak-proof cleanup: every launch() records its daemon pid to $T/daemon.pids; the EXIT trap kills any that
+# are STILL the daemon (guarded by a command-name check, so a recycled pid is never killed). Without this, a
+# run interrupted BETWEEN launch() and stop() (e.g. a harness timeout) reparents its daemon to init, which
+# then spins forever against the (deleted) sandbox — a real leak observed 2026-07-17.
+reap_launched() {
+  [ -f "$T/daemon.pids" ] || return 0
+  while read -r _p; do
+    [ -n "$_p" ] || continue
+    # Guard against pid RECYCLING: only kill if the pid is STILL running the EXACT $DAEMON path this harness
+    # launched (matched literally — $DAEMON is quoted in the pattern). For the DEFAULT in-repo $DAEMON that
+    # differs from the installed real daemon (~/.local/bin/…), so a recycled pid that became the owner's real
+    # daemon won't match. CAVEAT: if you invoke this harness with $1 = the installed path, the guard degenerates
+    # to the real daemon's command line and a recycled pid COULD match it — so pass the repo copy (the default).
+    case "$(ps -p "$_p" -o command= 2>/dev/null)" in
+      *"$DAEMON"*) kill -9 "$_p" 2>/dev/null ;;
+    esac
+  done < "$T/daemon.pids"
+}
+# NOTE: no `pkill -f provetest` here — AUTONOMOUS_LABEL=provetest is an ENV var, not argv, so `pkill -f` never
+# matched the daemon anyway; reap_launched (pid-scoped) is the real reaper, and the daemon's stub children
+# (sleep/claude/caffeinate) are short-lived.
+trap 'reap_launched; rm -rf "$T"' EXIT
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
@@ -110,10 +132,10 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_STATUS_CMD="${STATUS_CMD:-$T/status-stub.sh}" \
   AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
-  echo $!
+  local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"   # record for the leak-proof EXIT reaper
 }
 reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md"; }
-stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; pkill -f provetest 2>/dev/null; }
+stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; }   # (dropped no-op `pkill -f provetest`; label is env, not argv)
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
 
