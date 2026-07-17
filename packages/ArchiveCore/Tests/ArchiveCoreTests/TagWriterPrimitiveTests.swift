@@ -131,4 +131,81 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertEqual(tags?.readState, .unread)
         XCTAssertEqual(tags?.color, .box)
     }
+
+    // MARK: §6 Write-target identity re-verification
+
+    /// Matching identity → the write proceeds normally.
+    func testIdentityMatchAllowsWrite() throws {
+        let url = try makeFile("id-match.pdf", tags: ["Unread"])
+        let identity = try XCTUnwrap(FileIdentity.capture(url))
+        let r = try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+            (current + ["Read"], label)
+        }
+        XCTAssertFalse(r.isNoOp)
+        XCTAssertTrue(multisetEqual(try readTags(url), ["Unread", "Read"]))
+    }
+
+    /// A DIFFERENT file was put at the same path since discovery → the write ABORTS with
+    /// .identityMismatch and the replacement file is left untouched (never tag the wrong file).
+    func testReplacedFileAbortsAndLeavesReplacementUntouched() throws {
+        let name = "id-swap.pdf"
+        let original = try makeFile(name, tags: ["Unread"])
+        let originalIdentity = try XCTUnwrap(FileIdentity.capture(original))
+
+        // Replace with a genuinely different file (delete → recreate ⇒ new inode ⇒ new identity).
+        try FileManager.default.removeItem(at: original)
+        let replacement = try makeFile(name, tags: ["Untouched"])
+        // Precondition guards the test itself: the replacement must have a distinct identity.
+        let replacementIdentity = try XCTUnwrap(FileIdentity.capture(replacement))
+        XCTAssertFalse(replacementIdentity.matches(originalIdentity),
+                       "test setup: delete+recreate should yield a distinct file identity")
+
+        XCTAssertThrowsError(try CoordinatedTagWriter.write(replacement, expectedIdentity: originalIdentity) { current, label in
+            (current + ["Reviewed"], label)
+        }) { error in
+            guard case TagWriteError.identityMismatch = error else {
+                return XCTFail("expected .identityMismatch, got \(error)")
+            }
+        }
+        // The aborted write changed nothing — the replacement's tags are exactly as created.
+        XCTAssertEqual(Set(try readTags(replacement)), ["Untouched"])
+    }
+
+    /// Same replace scenario but WITHOUT passing an identity → the write proceeds. The §6 check is
+    /// strictly opt-in; existing callers (nil identity) are unaffected (backward compatibility).
+    func testNilIdentitySkipsCheckAndWrites() throws {
+        let name = "id-nil.pdf"
+        let original = try makeFile(name, tags: ["Unread"])
+        _ = try XCTUnwrap(FileIdentity.capture(original))
+        try FileManager.default.removeItem(at: original)
+        let replacement = try makeFile(name, tags: ["Untouched"])
+
+        let r = try CoordinatedTagWriter.write(replacement) { current, label in
+            (current + ["Reviewed"], label)
+        }
+        XCTAssertFalse(r.isNoOp)
+        XCTAssertTrue(multisetEqual(try readTags(replacement), ["Untouched", "Reviewed"]))
+    }
+
+    // NOTE: the "captured file was fully DELETED (nothing at the path)" edge is intentionally NOT
+    // asserted here. NSFileCoordinator's behavior on a vanished path is OS-implementation-defined
+    // (it may recreate the path), so the failure surfaces nondeterministically as .identityMismatch,
+    // .unreadable, .coordinationFailed, or a raw setResourceValue error — all of which prevent a
+    // wrong-file tag, but none reliably. It is not a §6 safety scenario (no *different* file is
+    // present to mis-tag); the existing `testUnreadableFileAborts` already covers ghost-file aborts,
+    // and `testReplacedFileAborts…` covers the dangerous "different file at the same path" case.
+
+    /// FileIdentity.capture + matches semantics: same file matches itself (and is symmetric),
+    /// distinct files differ, and a nonexistent file yields nil.
+    func testFileIdentityCaptureAndMatches() throws {
+        let a = try makeFile("id-a.pdf", tags: [])
+        let b = try makeFile("id-b.pdf", tags: [])
+        let a1 = try XCTUnwrap(FileIdentity.capture(a))
+        let a2 = try XCTUnwrap(FileIdentity.capture(a))
+        let bId = try XCTUnwrap(FileIdentity.capture(b))
+        XCTAssertTrue(a1.matches(a2))     // same file, captured twice
+        XCTAssertTrue(a2.matches(a1))     // symmetric
+        XCTAssertFalse(a1.matches(bId))   // distinct files
+        XCTAssertNil(FileIdentity.capture(tempDir.appendingPathComponent("nope.pdf")))
+    }
 }

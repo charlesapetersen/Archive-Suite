@@ -13,6 +13,11 @@ import Foundation
 //   §2 fresh read INSIDE the coordinated block (no TOCTOU).
 //   §3 trustworthy-read guard — a read failure ABORTS; it is never coerced into "no tags".
 //   §5 lossless compute: the transform receives the fresh state and returns the intended state.
+//   §6 write-target identity re-verification — when the caller passes the identity captured at
+//      discovery (`expectedIdentity:`), the resolved URL's identity is re-checked INSIDE the block,
+//      just before writing; a mismatch (or a now-unresolvable target) ABORTS so a file that was
+//      moved/replaced under the same path is never tagged. Uses `fileResourceIdentifier` (a pure
+//      read), NEVER `.documentIdentifierKey` (which assigns & persists an id — a mutation).
 //   §7 label written only when the transform changes it; drift otherwise restored.
 //   §8 verify by re-read — multiset equality (order-independent) + label check.
 //   §9 inverse delta derived from the actual before/after diff.
@@ -69,6 +74,36 @@ public enum TagWriteError: Error, Sendable, Equatable {
     case unreadable(String)          // current tags could not be read — refused (Safety §3)
     case verificationFailed(String)  // post-write re-read did not match the intended result
     case coordinationFailed(String)  // NSFileCoordinator could not obtain access
+    case identityMismatch(String)    // resolved write target is not the file captured at discovery (Safety §6)
+}
+
+/// An opaque snapshot of a file's on-disk identity, captured at discovery/selection and re-verified
+/// immediately before a tag write (inside the coordination block) to guard against writing to the
+/// WRONG file after a Finder move/replace (Safety Protocol §6).
+///
+/// Backed by `URLResourceValues.fileResourceIdentifier` — a kernel-assigned token compared with
+/// `isEqual(_:)` (two identifiers are equal iff they refer to the same file-system object; not
+/// persistent across restarts, which is fine — capture and re-verify happen within one session).
+/// We deliberately use `.fileResourceIdentifierKey`, NEVER `.documentIdentifierKey`: the latter
+/// *assigns & persists* an identifier on read — a mutation forbidden by §6.
+public struct FileIdentity: @unchecked Sendable {
+    // Opaque kernel token; only ever compared via isEqual: — never inspected, decoded, or mutated.
+    // `@unchecked Sendable` is safe: the token is an immutable, value-like identity object.
+    private let token: any NSObjectProtocol
+
+    private init(token: any NSObjectProtocol) { self.token = token }
+
+    /// Capture the identity of the file currently at `url`, or `nil` if it has none — e.g. the file
+    /// does not exist, or the volume does not vend a resource identifier. A `nil` capture means the
+    /// caller cannot request identity re-verification for this file (pass `nil` → no §6 check).
+    public static func capture(_ url: URL) -> FileIdentity? {
+        guard let token = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
+        else { return nil }
+        return FileIdentity(token: token)
+    }
+
+    /// True when `other` refers to the same on-disk file-system object as this identity.
+    public func matches(_ other: FileIdentity) -> Bool { token.isEqual(other.token) }
 }
 
 /// nil and 0 both mean "no color label"; normalize so they compare equal.
@@ -82,14 +117,34 @@ public enum CoordinatedTagWriter {
     /// coordination block) and returns the intended new state, or nil for a no-op. Everything else —
     /// the trustworthy-read guard, the write, verification, drift restore, and inverse derivation —
     /// is enforced here so no caller can bypass it.
+    ///
+    /// `expectedIdentity` (Safety §6): pass the `FileIdentity` captured at discovery/selection to have
+    /// the resolved URL's identity re-verified INSIDE the coordination block before any write; a
+    /// mismatch aborts with `.identityMismatch` so a file moved/replaced under the same path is never
+    /// tagged. `nil` (the default) skips the check — behavior is unchanged for callers that don't opt in.
     public static func write(
         _ url: URL,
+        expectedIdentity: FileIdentity? = nil,
         transform: ([String], Int?) -> ([String], Int?)?
     ) throws -> TagWriteResult {
         let box = ResultBox()
         var coordError: NSError?
         NSFileCoordinator().coordinate(writingItemAt: url, options: .contentIndependentMetadataOnly, error: &coordError) { writeURL in
             do {
+                // §6 write-target identity re-verification. If the caller captured the file's identity
+                // at discovery/selection, re-read the resolved URL's identity NOW (inside coordination,
+                // just before writing) and ABORT on mismatch — the file at this path was moved/replaced,
+                // so writing here would tag a DIFFERENT file. Pure read (fileResourceIdentifier), never
+                // documentIdentifier. This runs BEFORE the fresh tag read so nothing is written on abort.
+                if let expectedIdentity {
+                    guard let current = FileIdentity.capture(writeURL) else {
+                        throw TagWriteError.identityMismatch("write target has no resolvable identity (moved or deleted since discovery)")
+                    }
+                    guard current.matches(expectedIdentity) else {
+                        throw TagWriteError.identityMismatch("write target identity changed since discovery — refusing to tag a different file")
+                    }
+                }
+
                 // §2/§3 fresh read inside coordination; a read FAILURE aborts (never treated as empty).
                 let before: [String]
                 let beforeLabel: Int?
