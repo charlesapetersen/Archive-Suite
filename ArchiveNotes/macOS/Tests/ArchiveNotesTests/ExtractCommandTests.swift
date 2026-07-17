@@ -101,6 +101,24 @@ struct ExtractCommandTests {
         #expect(onDisk.blocks[0].source?.notePassageTarget?.id != onDisk.blocks[1].source?.notePassageTarget?.id)
     }
 
+    @Test("createExtract routes the new extract through the open channel (select + raise, W14.4 b)")
+    func createPublishesOpenRequest() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try #require(await env.model.createExtract(from: source("Open me", length: 4)))
+        // The Extracts window observes pendingOpen → selects (and raises) the new extract.
+        #expect(env.model.pendingOpen?.id == id)
+        #expect(env.model.pendingOpen?.block == nil)
+    }
+
+    @Test("appendToExtract surfaces the appended-to extract via the open channel (W14.4 b)")
+    func appendPublishesOpenRequest() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try #require(await env.model.createExtract(from: source("Base", length: 4, ordinal: 0)))
+        env.model.consumeOpen()   // clear the create's request so we prove APPEND re-publishes it
+        await env.model.appendToExtract(id, from: source("More", length: 4, ordinal: 1, title: "Note B"))
+        #expect(env.model.pendingOpen?.id == id)
+    }
+
     @Test("existingExtracts lists only extracts, sorted by localized title")
     func listsExtractsSorted() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

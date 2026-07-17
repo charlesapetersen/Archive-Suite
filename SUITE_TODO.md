@@ -273,13 +273,17 @@ Legend as above.
   collision; `handlePassagePaste` wires it in. +3 scratch Tier-2 tests (byte-on-disk, no-clobber disambiguation,
   nil-import resilience); full ArchiveNotesTests green (189 XCTest + 513 swift-testing). Also unbroke the Notes
   test bundle (`67f8938`: W14.2's new `TagWriteError.identityMismatch`). GUI copy→paste drive → Morning Review.
-- [ ] **W14.4 — Notes W7 polish cluster [LOW]** _(Notes KNOWN_ISSUES → W7-S2/S3/S4 follow-ups)._ Small, mostly
-  independent: (a) **trivial warning** — `Core/NotePassageSource.swift:118` "conditional cast … always succeeds"
-  (pure daemon fix, no GUI); (b) programmatic **window-raise + select** on Create-Extract and on Jump-to-Source
-  (select+scroll already works; only `orderFront`/focus is missing — needs a shared open-request channel; GUI
-  verify); (c) chip **reactive title** refresh (today refreshes only on re-style); (d) per-window **Sources column**
-  visibility (today always present). Do (a) standalone now; (b)–(d) build-verifiable, GUI drive → Morning Review.
-  **Tier-1.** | files: ArchiveNotes/.../Core/NotePassageSource.swift, NotesModel.swift, Views/* | S | low | none
+- [x] **W14.4 — Notes W7 polish cluster [LOW]** ✅ COMPLETE 2026-07-17 (`592049a` a + `7ef833d` d + `d615589` c +
+  this commit b/docs) _(Notes KNOWN_ISSUES → W7-S2/S3/S4 follow-ups, all four addressed)._ (a) dropped the
+  always-succeeds `[NSValue]` cast in `EditorPassageSource` (warning gone); (b) `NoteEditorPane.handleOpen` now
+  fronts+focuses the featuring window (`openWindow(id:)` + `NSApp.activate`) on jump-to-source, and
+  `NotesModel.create/appendToExtract` route the new/updated extract through `openItem` so the Extracts window
+  selects (and raises) it; (c) new `NotesModel.itemsGeneration` (bumped in `replaceItems`) drives a reactive
+  chip re-style in `MarkdownEditorView` on any item-set change — gated to chip-bearing docs, scroll preserved;
+  (d) per-window `NotesAppSettings.windowHiddenColumns(for:)` (Note window hides the always-blank Sources
+  column, Extracts shows it), wired through `NotesTableView`/`ColumnPickerHeaderView`. +7 unit tests; full Notes
+  unit suite 709 green (520 swift-testing + 189 XCTest), build clean 0 new warnings. **Tier-1.** **Live GUI drive
+  → Morning Review:** window raise/focus (b), cross-window chip recolor (c), two-window column visibility (d).
 - [ ] **W14.5 — Processor legacy staging-manifest rotation review [LOW, do last]** _(Processor KNOWN_ISSUES #1;
   cannot recur for current-build sessions — only legacy manifests restore `staged` without `retained`)._ Fix
   option 1 (cleanest per the write-up): on legacy-manifest recovery, **drop those segments from

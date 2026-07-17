@@ -10,6 +10,9 @@ import ArchiveCore
 /// only — never a Finder tag, never the archival corpus.
 struct NoteEditorPane: View {
     @ObservedObject var nav: NotesNavigationModel
+    /// W14.4(b) — used to bring THIS window forward when it consumes a jump-to-source / new-extract
+    /// open request (the singleton `Window` scene fronts the existing window; it never duplicates).
+    @Environment(\.openWindow) private var openWindow
 
     @StateObject private var bodyEditor = NoteBodyEditorModel()
     @State private var isRaw = false
@@ -220,6 +223,12 @@ struct NoteEditorPane: View {
             if !nav.displayed.contains(where: { $0.id == id }) { nav.clearUserFilters() }
             nav.select(id)          // triggers the body load via the selectedItemID onChange
             jumpTarget = req        // arm the scroll; fires when loadedID reaches the target
+            // W14.4(b): bring THIS window (the one featuring the target's kind) to the front + focus it,
+            // so a jump-to-source or a freshly-created extract isn't stranded behind the initiating
+            // window. Only this window reached `.selectAndScroll` (others `.ignore`), so exactly the
+            // featuring window raises. `openWindow` fronts the singleton scene without duplicating it.
+            openWindow(id: nav.windowKind == .extract ? NotesWindowID.extracts : NotesWindowID.notes)
+            NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.async { nav.model.consumeOpen() }
         case .reportSourceMissing:
             nav.model.statusMessage = "The source note for this passage no longer exists — the extract text is preserved."

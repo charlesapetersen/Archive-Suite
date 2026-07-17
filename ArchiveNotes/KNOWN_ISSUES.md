@@ -461,12 +461,13 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   the single-image paste path); (2) two selected blocks referencing the *same* source image import as two
   copies (consistent with the audited Create/Append `persist`); (3) the end-to-end **GUI copy→paste drive**
   still wants a live confirm.
-- **Create-Extract doesn't auto-raise + select the new extract in the Extracts window (GUI, deferred).**
-  The extract is created, filed into the Extracts home folder, and appears in the Extracts window's list
-  immediately (both windows observe `allItems`), but the two windows hold independent
-  `NotesNavigationModel` selections with no cross-window "open + select id X" channel yet. Raising/
-  selecting the Extracts window on create → a GUI follow-up (needs a shared open-request on `NotesModel`
-  or `openWindow`, best verified live). Same for the Append picker (an `NSAlert` popup, model-tested).
+- ✅ **FIXED (W14.4b, 2026-07-17):** Create-Extract (and Append-to-Extract) now auto-select + raise the
+  extract in the Extracts window. `NotesModel.createExtract`/`appendToExtract` route the new/updated extract
+  through `openItem(id:)` after re-index, so the Extracts window's pane consumes the `pendingOpen`, selects
+  it, and (if open) raises itself (see the raise fix above). Note: a *closed* Extracts window is not
+  auto-opened on create (deliberate — avoids an intrusive pop-up); the extract is still selected the next
+  time that window opens. +2 model tests assert the open-request is published. **Live GUI drive → Morning
+  Review.**
 - **GUI drive deferred (GUI paused).** Not yet driven live: ⌘⌥E on a two-block selection → a two-block
   extract; copy-note → paste-into-extract → provenanced blocks; plain external paste → freeform; the
   Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
@@ -484,14 +485,17 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   "source no longer exists — extract text preserved" status; a stale ordinal → scroll-to-top +
   "source has changed" status; a renamed source → chip shows the current title. Verify with
   `cliclick` on `an.chip.jump` + a screenshot when GUI resumes.
-- **Window is selected + scrolled but not programmatically RAISED.** `openItem` reveals + scrolls the
-  source note in the window that features its kind, but does not `orderFront`/focus that window (the
-  cross-window channel W7-S2 flagged as missing now EXISTS for select+scroll; only the raise is left).
-  A GUI follow-up (best verified live).
-- **Chip live title refreshes on re-style, not reactively.** The chip resolves the source's current
-  title/date from `allItems` when the extract editor (re)styles its content (open / select / raw-toggle
-  / paste). A rename in the *other* window while the extract editor sits idle won't recolor the chip
-  until it next re-styles. Acceptable (the common path — open the extract — shows current titles).
+- ✅ **FIXED (W14.4b, 2026-07-17):** window is now programmatically RAISED. `NoteEditorPane.handleOpen`'s
+  `.selectAndScroll` branch — which runs only in the window featuring the target's kind — calls
+  `openWindow(id:)` (fronts the singleton Notes/Extracts `Window` scene, never duplicates) + `NSApp.activate`,
+  so a jump-to-source brings the source note's window forward + focuses it. **Live raise/focus GUI drive →
+  Morning Review.**
+- ✅ **FIXED (W14.4c, 2026-07-17 `d615589`):** the chip live title now refreshes reactively. `NotesModel`
+  gained an `itemsGeneration` counter (bumped on every `replaceItems`); `MarkdownEditorView.updateNSView`
+  re-styles a chip-bearing extract when that generation changes even if THIS note's markdown didn't, so a
+  rename in the *other* window recolors the chip while the extract sits idle. Gated to docs that carry a
+  note-passage chip (plain notes never re-style on unrelated changes); scroll offset preserved across the
+  refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Morning Review.**
 - **Same-window active-editing edge.** If the jump target note is being actively edited *in the same
   window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
   scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
@@ -500,9 +504,9 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
 - **Folder-scope-hidden target.** A jump clears the window's *user* filters so the row is reachable, but
   a shared *folder scope* that excludes the note is left intact; the editor still loads + scrolls the
   note (detail reads `allItems`, not the filtered list), but the list-row highlight may be absent.
-- **Pre-existing warning (not W7-S3):** `Core/NotePassageSource.swift:118` — "conditional cast from
-  '[NSValue]' to '[NSValue]' always succeeds" (W7-S2 code; surfaces on a clean compile). Trivial; fold
-  into a future W7 touch.
+- ✅ **FIXED (W14.4a, 2026-07-17 `592049a`):** `Core/NotePassageSource.swift:118` "conditional cast from
+  '[NSValue]' to '[NSValue]' always succeeds" — `textView.selectedRanges` is already `[NSValue]`, so the
+  `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile.
 
 ## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14, open)
 
@@ -519,11 +523,12 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   Extract window opens featuring extracts / Note window features notes / toggling to `both` unions /
   the Sources column shows the right count for a segmented extract — are deferred to Morning Review and
   are the natural payload for the **W8-S7** fixture-rooted XCUITest (which builds the scratch store).
-- **The "Sources" column is always present, not per-window-hidden.** It renders the count for extracts
-  and blank for notes, in *both* windows (so a notes list shows an empty column rather than adapting the
-  column set away). Per-window default column visibility would need per-window `hiddenColumns` (today a
-  single global `NotesAppSettings.hiddenColumns`); deferred as a polish item — the user can hide it via
-  the existing right-click column picker.
+- ✅ **FIXED (W14.4d, 2026-07-17 `7ef833d`):** the "Sources" column is now per-window. `NotesAppSettings`
+  gained `windowHiddenColumns(for:)`/`setWindowHiddenColumns(_:for:)` (keyed per window like
+  `windowKindFilter`), defaulting the Note window to hide the always-blank Sources column while the Extracts
+  window shows it; the header picker's toggle now persists per window. A first open seeds the default from the
+  legacy global `hiddenColumns` (upgrade-safe); an explicit empty set means "show all". +4 settings tests.
+  **Live two-window visibility GUI drive → Morning Review.**
 - **`source_count` back-fills on re-index, not instantly, for a pre-`source_count` DB.** The additive
   `ALTER TABLE` defaults existing rows to 0; a stale row shows a blank Sources cell until its mtime
   changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this

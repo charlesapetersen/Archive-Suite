@@ -92,7 +92,10 @@ macOS/Sources/ArchiveNotes/
                                    (+ index/root in the app path); @Published folder tree + scope;
                                    async create/rename/move/delete folders + selection scope (W6-S2);
                                    shared item source (allItems + reloadItems/replaceItems) for the
-                                   per-window list VMs (W6-S3); search(_:) FTS façade + createSmartFolder
+                                   per-window list VMs (W6-S3); itemsGeneration counter (bumped in replaceItems)
+                                   drives the editor's reactive provenance-chip title refresh + create/append
+                                   route the extract through openItem for select+raise (W14.4 b/c);
+                                   search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
                                    (fresh read), trashItems (recoverable Trash), deleteFolderDeletingStranded
                                    (batched), titles(for:) (W6-S5); templates — @Published templates +
@@ -132,7 +135,9 @@ macOS/Sources/ArchiveNotes/
     NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
                                    + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings;
-                                   windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4)
+                                   windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
+                                   windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
+                                   Note window defaults to hiding the always-blank Sources column (W14.4d)
     NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files;
                                    isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts

@@ -460,6 +460,9 @@ final class NotesModel: ObservableObject {
             }
             await reloadItems()
             rebuild()
+            // W14.4(b): route the new extract through the open channel so the Extracts window selects
+            // it (and, if open, raises itself) — the extract is no longer silently filed into the list.
+            openItem(id: created.id, block: nil)
             return created.id
         } catch { report(error, "create the extract"); return nil }
     }
@@ -482,6 +485,9 @@ final class NotesModel: ObservableObject {
             }
             await reloadItems()
             rebuild()
+            // W14.4(b): surface the appended-to extract in the Extracts window (select + raise-if-open),
+            // mirroring create — confirms the segment landed without hunting the list.
+            openItem(id: id, block: nil)
         } catch { report(error, "append to the extract") }
     }
 
