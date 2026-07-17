@@ -90,6 +90,7 @@ struct SettingsView: View {
     @State private var localAgentStatus = ""       // Detect & Verify result message (empty = not yet run)
     @State private var localAgentChecking = false
     @State private var showKeyWizard = false
+    @State private var showLocalAgentWizard = false
     @State private var showManageModels = false
     // Cloud-relay Google sign-in (transport = cloud). The secret lives in the Keychain, not @AppStorage.
     @State private var driveClientSecret = ""
@@ -153,6 +154,9 @@ struct SettingsView: View {
             reloadKeys()
         }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
+        .sheet(isPresented: $showLocalAgentWizard) {
+            LocalAgentWizard { showLocalAgentWizard = false }
+        }
         .alert("Save Processing Profile", isPresented: $showSaveProfileAlert) {
             TextField("Profile name", text: $newProfileName)
             Button("Save") { profileStore.saveCurrent(as: newProfileName) }
@@ -403,6 +407,10 @@ struct SettingsView: View {
             }
             .disabled(localAgentChecking)
             HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
+            Button { showLocalAgentWizard = true } label: {
+                Label("Set up (guided)…", systemImage: "wand.and.stars")
+            }
+            HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
         }
         if !localAgentStatus.isEmpty {
             Text(localAgentStatus).font(.caption).foregroundStyle(.secondary)
