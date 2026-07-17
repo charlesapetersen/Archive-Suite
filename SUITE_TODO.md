@@ -164,8 +164,21 @@ whole gate unattended-satisfiable at $0):
   config but the pipeline still routes Direct/Gateway (config inert, same as cli-1's threaded-but-unconsumed
   carrier). Live Detect+Verify round-trip + visual gray-out + the cost-pane "subscription" branch (cli-3) →
   GUI/Morning Review. | M | low | none
-- [ ] **W13.cli-3 — wizard + cost pane + pacing.** `LocalAgentSpec` (claude + gemini specs), cost pane
-  "Included in your subscription" branch, low concurrency cap (1–2) + usage-window handling. | S | low | none
+- [x] **W13.cli-3 — wizard + cost pane + pacing.** `03e65ec` (pacing) + `971c9fd` (wizard) + `584eb32`
+  (cost pane). **PACING:** `LocalAgentClient` wraps `invoke()` in a dedicated `RequestLimiter(limit: 2)` (the
+  subprocess path bypasses `NetworkSession`'s HTTP limiter) + `parseUsageWindowReset()` reads a reset instant
+  out of a CLI rate-limit message (relative / bare-Retry-After / absolute "resets 3pm", with a
+  window-size-vs-wait guard + next-occurrence rollover) into `lastUsageWindowResetAt`; the finer per-run 1–2
+  cap + OCR-loop honoring land in cli-4. **WIZARD:** `LocalAgentSpec` (claude + gemini; Codex stays on the
+  Settings tool picker) + `LocalAgentWizard` (mirrors `ProviderKeyWizard`) wired into Settings via a "Set up
+  (guided)…" button + sheet. **COST:** "Included in your subscription — usage limits apply" branch in the
+  SettingsView pinned pane + the OCRView Files-tab card (display-only — Local Agent isn't an `LLMProvider`, no
+  `CostEstimator` math change). **Tier-2 gate met unattended:** build clean 0 new warnings +
+  `scripts/localagent-pacing-test.swift` **18/18 PASS** ($0/no-key/no-GUI: parser table incl.
+  guards/rollover/nil + the `RequestLimiter(2)` ceiling holds & every acquire is released) + adversarial
+  self-review. **Keyed/GUI tail → Morning Review:** live wizard Detect+Verify + cost-pane/wizard visual (a
+  GUI launch this session hit the blocking Keychain modal — owner "Always Allow" seed still needed) +
+  install-link/wording verify. | S | low | none
 - [ ] **W13.cli-4 — pipeline wiring.** Prefer `localAgent` at the construction sites; skip batch + LLM-rotation
   when active; extend `test-smoke.sh` to run the **fake-CLI** path (skip gracefully when no real CLI). | M | med | none
 

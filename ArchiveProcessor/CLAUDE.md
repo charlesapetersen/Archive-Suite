@@ -388,6 +388,8 @@ Models/                        UI-free settings, pricing, keys, shared enums:
   DefaultsKeys.swift           Single source of truth for UserDefaults/@AppStorage key strings.
   ModelSelectionStore.swift    Shared persistence of per-provider selected model + output dir.
   ProviderKeySpec.swift        Per-provider config driving the guided key-onboarding wizard.
+  LocalAgentConfig.swift       Local Agent CLI backend selection (tool/path/model/concurrency cap); SHARED HOTSPOT (append-only; rides run snapshot).
+  LocalAgentSpec.swift         Per-CLI config driving the guided Local Agent onboarding wizard (no key; claude/gemini).
   KeychainHelper.swift         Store/read API keys in the macOS Keychain.
   CostEstimator.swift          Per-model cost math (standard vs batch) for the estimator pane.
   TimeEstimator.swift          Rough wall-clock processing-time estimate for a batch.
@@ -401,6 +403,8 @@ OCR/                           OCR pipeline + provider clients:
   ImageEncoding.swift          Shared image→JPEG downscale/encode (byte-identical across providers).
   NetworkSession.swift         Global in-flight-request limiter (the rate-limit choke point).
   KeyValidator.swift           Validate a pasted key with one cheap live call → plain-English status.
+  LocalAgentClient.swift       OCR/text via a subscription-authed CLI (claude/gemini/codex) subprocess; dedicated concurrency cap + usage-window pacing.
+  LocalAgentValidator.swift    Detect + verify a CLI is installed & signed in → plain-English Status (CLI analog of KeyValidator).
   RotationDetector.swift       Local (Vision) upright-rotation detection.
   LLMRotationDetector.swift    Vision-LLM upright-rotation detection (compares the 4 candidates).
   PDFGenerator.swift           Build the 2-page output PDF (image + dynamic-height OCR-text page).
@@ -451,6 +455,7 @@ Views/                         SwiftUI (+ AppKit where needed):
   ManualTaggingSheet·ManualSegmentTagView.swift  Sequential manual per-segment tagging.
   ManageModelsView.swift       Add/remove custom model IDs (beyond the built-in lists).
   ProviderKeyWizard.swift      Guided BYO-key onboarding wizard (driven by ProviderKeySpec).
+  LocalAgentWizard.swift       Guided Local Agent CLI onboarding wizard (no key; driven by LocalAgentSpec).
   TagInputField·KeyboardTokenField.swift  Autocompleting tag entry + its AppKit keystroke field.
   ArchiveThumbnail·ZoomableImageView.swift  Thumbnail + full-image zoom viewer.
   DropReceiver.swift           Drag-and-drop file intake.
