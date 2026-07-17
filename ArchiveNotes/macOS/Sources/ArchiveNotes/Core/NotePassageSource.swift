@@ -115,7 +115,8 @@ extension EditorPassageSource {
          assetStore: EditorAssetStore?) {
         let snapshot = (textView.textStorage?.copy() as? NSAttributedString) ?? NSAttributedString()
         let ranges: [NSRange]
-        if let values = textView.selectedRanges as? [NSValue], !values.isEmpty {
+        let values = textView.selectedRanges
+        if !values.isEmpty {
             ranges = values.map { $0.rangeValue }
         } else {
             ranges = [textView.selectedRange()]
