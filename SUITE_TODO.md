@@ -253,20 +253,21 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   OpenAI is a capable vision model, so wire `.openai` into the LLM candidate-compare rotation path + add its
   `rotationModelCost` arm, matching Anthropic/Gemini (keep local Vision as the free default; Mistral genuinely can't
   → leave nil). | files: OCR/LLMRotationDetector.swift, Models/CostEstimator.swift, OCR/OCRProcessor+OCR.swift | M | low | none
-- [ ] **Auto-route multi-page-PDF drops instead of a mode toggle (Processor) — owner-design.** Owner: dropping a
-  multi-page PDF should just do the right thing rather than flipping the "Re-OCR multi-page PDF" Settings toggle.
-  Heuristic to confirm: no/poor embedded text layer → re-OCR each page image (the new mode); good text layer →
-  extract the layer (existing `preOCRedInput`). Detect via `PDFFormatStatus`/`PDFTextExtractor`; absorb/retire the
-  manual toggle. **Tier-2** (PDF output). | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
+- [ ] **Auto-route multi-page-PDF drops to re-OCR; retire the mode toggle (Processor) — owner-clarified 2026-07-16.**
+  A dropped multi-page PDF should just run the re-OCR flow (render each page → LLM-OCR → interleaved image/OCR-text
+  PDF) automatically — **no text-layer heuristic.** Owner's rule: `preOCRedInput` exists only to send input through
+  the **tagging pipeline** (segment + tag), which is **not relevant to a multi-page PDF** (an assembled document, not
+  a page stream to segment). So: multi-page PDF dropped → auto re-OCR; keep `preOCRedInput` as the separate
+  tagging-pipeline path (single-page/image input); retire the manual "Re-OCR multi-page PDF" Settings toggle.
+  **Tier-2** (PDF output). | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
 - [ ] **Reader tag-filter → token field (selected tags INSIDE the box) [fixes the BUG-3 pane shift].** Selected
   subject filters render as separate buttons beside the "Add tag filter…" field, so each chip's width tips the
   content column past the window and shifts the file table left (ArchiveReader/KNOWN_ISSUES 2026-07-16; two container
   attempts failed). Redesign `subjectFilterField` as a single token field (tags as removable tokens inside a
   bounded/scrolling field, typing adds) so tags add no bar width → shift fixed by construction + matches owner
   expectation. | files: ArchiveReader Views/NavigationWindowView.swift, reuse SubjectTokenField/NSTokenField | M | low | none
-- **Owner decision (not yet a daemon item):** keep or remove the **Processing History** view (Tools tab, W12-cost —
-  promoted from POTENTIAL_FEATURES 2026-07-15, not a recent explicit request; records actual run cost + a run log,
-  writes only its own store). Awaiting owner call.
+- **Processing History view — KEEP (owner-confirmed 2026-07-16).** The Tools-tab history view (W12-cost, promoted
+  from POTENTIAL_FEATURES 2026-07-15; records actual run cost + a run log, writes only its own store) stays. No action.
 
 ## Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). **All waves shipped;
