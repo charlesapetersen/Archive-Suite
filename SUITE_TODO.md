@@ -212,7 +212,7 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
 Actionable open items pulled from the three `KNOWN_ISSUES.md` + the Processor streaming-residuals review, ordered
 by value. **Android straggler is first (HIGH).** Each notes what's daemon-buildable vs. the keyed/GUI verify tail.
 Legend as above.
-- [ ] **W14.1 — Android/iOS straggler: never finalize a partial segment [HIGH]** _(Processor KNOWN_ISSUES →
+- [x] **W14.1 — Android/iOS straggler: never finalize a partial segment [HIGH]** _(Processor KNOWN_ISSUES →
   "Per-capture streaming — residual refinements" #1; focus path: Android + LAN)._ The data-loss guard already
   ships (a straggler is never deleted), but a page still un-UPLOADED when `segment/complete` arrives is **not
   auto-filed** — it lingers unfiled in the Captured pane. **Fix (both companions, kept in sync):** the phone
@@ -224,6 +224,15 @@ Legend as above.
   defer/flush logic on both companions. **Keyed/owner verify tail:** the on-device / emulator E2E
   (`scripts/e2e-phone-mac.sh`, needs a Gemini key + the `ap_test` emulator; XCUITest admin-prompt caveat) →
   Morning Review. | files: ArchiveCapture/capture/CaptureViewModel.kt, ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift | M | med | none(build)/owner(E2E)
+  **✅ ALREADY SHIPPED `ce55511` (2026-07-07); verified + tracker-reconciled 2026-07-17.** The defer/flush fix
+  was already in code on BOTH companions: `endedSegments` is the pending-complete record; `trySendSegmentComplete`
+  gates on ALL pages `UPLOADED` (Android `CaptureViewModel.kt:527` / iOS `:369`) and is the ONLY caller of the
+  transport `segmentComplete(...)` — flushed from the upload-success path (Android `:622` / iOS `:456`), the
+  auto-retry loop (Android `:229` / iOS `:524`), and reconnect (`:209`/`:508`). The `session/complete` this item
+  also named is **dead code** on the phone (the transport `sessionComplete()` has no caller — the phone "Finish"
+  button that once sent it was removed; "Finish session" is a Mac-side backstop). Adversarial refutation (independent
+  read of both companion trees) could not break the gate on either side. KNOWN_ISSUES #1 marked FIXED-in-code to
+  match #2/#3/#4. **Keyed/owner tail unchanged:** on-device/emulator E2E (`scripts/e2e-phone-mac.sh`) → Morning Review.
 - [ ] **W14.2 — Reader write-target identity re-verification (Safety §6) [MED]** _(Reader KNOWN_ISSUES →
   "Deferred hardening")._ `TagWriter.mutate` writes to whatever file currently occupies the URL; a Finder
   move/replace between Spotlight discovery and the write could apply the delta to the wrong file's tags. **Fix:**

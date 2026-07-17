@@ -352,6 +352,16 @@ un-filed (straggler) page** in the backup folder + Captured pane. No page is eve
    the phone defers `sendSegmentComplete` (and `finishSession`'s `/session/complete`) until **every page of
    the segment is confirmed UPLOADED**, so the Mac never finalizes a partial segment. Both companions (record
    a pending-complete group; flush when all its pages hit UPLOADED, from the upload-success path + auto-retry).
+   **FIXED in code (`ce55511`, 2026-07-07; verified + reconciled 2026-07-17 as W14.1 — pending owner device-verify).**
+   Both companions record ended-but-unacked segments (`endedSegments`) and emit the completion signal only via
+   `trySendSegmentComplete`, which early-returns unless **every page of the group is `UPLOADED`** (Android
+   `CaptureViewModel.kt:527` / iOS `:369`) — the sole caller of the transport `segmentComplete(...)`. It's flushed
+   from the upload-success handler (Android `:622` / iOS `:456`), the 8s auto-retry loop (Android `:229` / iOS
+   `:524`), and reconnect/resume (`:209`/`:508`), so a straggler that finishes late still completes its segment.
+   The `session/complete` half is moot on the phone: the transport `sessionComplete()` has **no caller** (the phone
+   "Finish" action that once sent it was removed — End segment is the only phone-side "done"), and whole-session
+   force-completion is a Mac-side backstop. An adversarial re-read of both companion trees (2026-07-17) could not
+   break the gate. **Owner device-verify tail:** `scripts/e2e-phone-mac.sh` (Gemini key + `ap_test` emulator).
 2. **Per-page P10 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleP10` re-uploads
    only when `state == UPLOADED`. Fix: a `needsResend` flag the upload-completion handler honors. Both companions.
    **FIXED in code (B5-i — pending owner device-verify):** both companions gained a persisted `needsResend`
