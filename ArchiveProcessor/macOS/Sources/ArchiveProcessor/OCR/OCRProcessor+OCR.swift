@@ -227,6 +227,7 @@ extension OCRProcessor {
         outputDirectory: URL,
         customPrompt: String? = nil,
         gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil,
         ocrOverride: (@Sendable (URL) async -> OCRResult)? = nil
     ) async {
         let total = files.count
@@ -269,7 +270,7 @@ extension OCRProcessor {
                         imageURL: img, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: pageResults.last?.text, previousImageURL: nil,
-                        customPrompt: customPrompt, gatewayConfig: gatewayConfig
+                        customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent
                     )
                 }
                 pageResults.append(result)
@@ -740,6 +741,7 @@ extension OCRProcessor {
         // its PDF gen is off-MainActor via M3.
         let rotationMode = Self.rotationModeForRun
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         await withTaskGroup(of: (Int, URL, OCRResult).self) { group in
             var iter = entries.makeIterator()
@@ -749,7 +751,7 @@ extension OCRProcessor {
                 group.addTask {
                     let correction = await Self.detectRotation(
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
-                        mode: rotationMode, gatewayConfig: gateway
+                        mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
                     return (entry.index, entry.url, Self.mergeRotation(into: entry.result, correction: correction))
                 }
@@ -814,6 +816,7 @@ extension OCRProcessor {
     ) async {
         let total = fileURLs.count
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
         var previousText: String? = nil
         var previousImageURL: URL? = nil
 
@@ -842,7 +845,7 @@ extension OCRProcessor {
                 previousImageURL: contextImageURL,
                 customPrompt: segmentationContext.customPrompt,
                 imageScale: segmentationContext.imageScale,
-                gatewayConfig: gateway
+                gatewayConfig: gateway, localAgent: localAgent
             )
 
             // If timed out, retry once without context
@@ -858,7 +861,7 @@ extension OCRProcessor {
                     previousImageURL: nil,
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
-                    gatewayConfig: gateway
+                    gatewayConfig: gateway, localAgent: localAgent
                 )
             }
 
@@ -883,6 +886,7 @@ extension OCRProcessor {
     ) async {
         let total = fileURLs.count
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
         let concurrency = max(1, Self.ocrWorkerCount)
         var completed = 0
 
@@ -905,7 +909,7 @@ extension OCRProcessor {
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: prevImageURL,
                         customPrompt: customPrompt, imageScale: imageScale,
-                        gatewayConfig: gateway
+                        gatewayConfig: gateway, localAgent: localAgent
                     )
                     return (index, result)
                 }
@@ -933,7 +937,7 @@ extension OCRProcessor {
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: customPrompt, imageScale: imageScale,
-                            gatewayConfig: gateway
+                            gatewayConfig: gateway, localAgent: localAgent
                         )
                         return (idx, result)
                     }
@@ -1128,6 +1132,7 @@ extension OCRProcessor {
         let retryIndices = jobs.indices.filter { isRetryableError(jobs[$0].result) }
         guard !retryIndices.isEmpty else { return }
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
 
         statusMessage = "Waiting to retry \(retryIndices.count) file\(retryIndices.count == 1 ? "" : "s") (model was busy)…"
         try? await Task.sleep(for: .seconds(10))
@@ -1147,7 +1152,7 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 previousText: nil,
                 previousImageURL: nil,
-                gatewayConfig: gateway
+                gatewayConfig: gateway, localAgent: localAgent
             )
 
             // Update failed files list if retry succeeded

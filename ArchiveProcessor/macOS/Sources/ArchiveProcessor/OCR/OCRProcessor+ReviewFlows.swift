@@ -61,6 +61,7 @@ extension OCRProcessor {
             thinkingLevel: thinkingLevel,
             apiKey: apiKey,
             gatewayConfig: currentGateway,
+            localAgent: currentLocalAgent,
             onStatus: { [weak self] msg in
                 self?.statusMessage = msg
             }

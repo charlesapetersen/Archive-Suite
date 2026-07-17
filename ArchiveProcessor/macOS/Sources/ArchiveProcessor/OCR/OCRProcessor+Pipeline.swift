@@ -475,6 +475,7 @@ extension OCRProcessor {
         pdfToImageMap = [:]
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
+        currentLocalAgent = pending.localAgent
         // Restore the dual-output behavior the run was started with (see PendingRun.exportOriginals). Only
         // when the manifest persisted it — a legacy manifest (nil) keeps the live setting the caller
         // already applied (resumePendingRun).
@@ -780,6 +781,7 @@ extension OCRProcessor {
     ) async {
         let remaining = indices.count
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
 
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
@@ -804,7 +806,7 @@ extension OCRProcessor {
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: segmentationContext.customPrompt,
                             imageScale: scale,
-                            gatewayConfig: gateway
+                            gatewayConfig: gateway, localAgent: localAgent
                         )
                         return (index, result)
                     }
@@ -830,7 +832,7 @@ extension OCRProcessor {
                                 previousText: nil, previousImageURL: prevImageURL,
                                 customPrompt: segmentationContext.customPrompt,
                                 imageScale: scale,
-                                gatewayConfig: gateway
+                                gatewayConfig: gateway, localAgent: localAgent
                             )
                             return (idx, result)
                         }
@@ -859,7 +861,7 @@ extension OCRProcessor {
                     previousText: previousText, previousImageURL: contextImageURL,
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
-                    gatewayConfig: gateway
+                    gatewayConfig: gateway, localAgent: localAgent
                 )
 
                 if Self.isTimeoutError(result) {
@@ -870,7 +872,7 @@ extension OCRProcessor {
                         previousText: nil, previousImageURL: nil,
                         customPrompt: segmentationContext.customPrompt,
                         imageScale: segmentationContext.imageScale,
-                        gatewayConfig: gateway
+                        gatewayConfig: gateway, localAgent: localAgent
                     )
                 }
 
@@ -965,7 +967,8 @@ extension OCRProcessor {
         reOCRMultiPagePDF: Bool = false,
         skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async {
         guard !files.isEmpty else { return }
 
@@ -1004,6 +1007,7 @@ extension OCRProcessor {
         Self.loadStandardImageMB()
         currentModel = model
         currentGateway = gatewayConfig
+        currentLocalAgent = localAgent
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
 
@@ -1017,7 +1021,7 @@ extension OCRProcessor {
             gatewayConfig: gatewayConfig,
             imageTokenProvider: gatewayConfig != nil ? Self.gatewayUpstreamProviderFromDefaults() : nil,
             model: model,
-            batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil,
+            batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil && localAgent == nil,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
@@ -1040,7 +1044,8 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 customPrompt: segmentationContext.customPrompt,
-                gatewayConfig: gatewayConfig
+                gatewayConfig: gatewayConfig,
+                localAgent: localAgent
             )
         } else if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
@@ -1066,7 +1071,7 @@ extension OCRProcessor {
             let imageURLs = convertPDFInputs(files)
 
             // Phase 1: OCR + Classification
-            if batchMode && provider.supportsBatch {
+            if batchMode && provider.supportsBatch && localAgent == nil {
                 await performBatchOCR(
                     fileURLs: imageURLs,
                     originalFiles: files,
@@ -1106,7 +1111,8 @@ extension OCRProcessor {
                     runFingerprint: Self.runFingerprint(
                         files: files, outputDirectory: outputDirectory, taggingMode: nil,
                         enableTagging: enableTagging, batchMode: false),
-                    exportOriginals: exportOriginals
+                    exportOriginals: exportOriginals,
+                    localAgent: localAgent
                 )
                 Self.savePendingRun(activePendingRun!)
 
@@ -1355,7 +1361,7 @@ extension OCRProcessor {
         let ocrURL = imageURL ?? jobs[index].sourceURL
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
-            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway)
+            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway, localAgent: currentLocalAgent)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

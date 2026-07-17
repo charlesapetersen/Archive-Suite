@@ -325,7 +325,8 @@ final class LiveCaptureProcessor: ObservableObject {
             thinkingLevel: ov.map { $0.thinkingLevel } ?? config.thinkingLevel,
             apiKey: ov?.apiKey ?? config.apiKey,
             customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
-            imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil)
+            imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
+            localAgent: ov == nil ? config.localAgent : nil)
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
         upsertStatus(groupId: photo.groupId, type: photo.type, pageCount: pageCount,
@@ -508,13 +509,13 @@ final class LiveCaptureProcessor: ObservableObject {
             // Box/Folder → color tag (TagGenerator returns Box/Red or Folder/Purple with no LLM call).
             return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
                                                      model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
-                                                     vocabulary: [], gatewayConfig: config.gateway)
+                                                     vocabulary: [], gatewayConfig: config.gateway, localAgent: config.localAgent)
         }
         if let subs = mac?.subjects, !subs.isEmpty { return GeneratedTags(subjectTags: subs) }   // Mac-tagged → no LLM
         if config.taggingMode == .automatic {
             return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
                                                      model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
-                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.gateway)
+                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.gateway, localAgent: config.localAgent)
         }
         return GeneratedTags()   // manual mode, no Mac subjects → date/priority only
     }
@@ -663,13 +664,14 @@ final class LiveCaptureProcessor: ObservableObject {
 
     nonisolated private static func ocrTask(
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
-        apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?
+        apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
+        localAgent: LocalAgentConfig?
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
             await OCRProcessor.performOCRCall(
                 imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
-                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway)
+                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway, localAgent: localAgent)
         }
     }
 

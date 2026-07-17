@@ -45,6 +45,7 @@ struct ToolsView: View {
     }
 
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
+    private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
 
     /// Re-read the selected model (for the current provider) and the matching Keychain key. Mirrors the
     /// init's resolution so switching provider/gateway in Settings updates the Tools diagnostics live.
@@ -189,6 +190,7 @@ struct ToolsView: View {
         let scales = [10, 20, 40, 60, 80, 100]
         let provider = selectedProvider
         let gateway = currentGatewayConfig
+        let localAgent = currentLocalAgentConfig
         let model = gateway?.asLLMModel() ?? selectedModel
         let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil
         let key = apiKey
@@ -198,7 +200,7 @@ struct ToolsView: View {
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: provider, model: model,
                     thinkingLevel: thinking, apiKey: key,
-                    imageScale: Double(scale) / 100.0, gatewayConfig: gateway)
+                    imageScale: Double(scale) / 100.0, gatewayConfig: gateway, localAgent: localAgent)
                 if Task.isCancelled { break }
                 resolutionTestResults.append((scale: scale, text: result.text))
             }

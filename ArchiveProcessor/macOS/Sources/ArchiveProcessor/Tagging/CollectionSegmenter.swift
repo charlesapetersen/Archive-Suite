@@ -27,6 +27,7 @@ class CollectionSegmenter {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil,
         onStatus: @escaping (String) -> Void
     ) async -> [CollectionSegment] {
         guard !files.isEmpty else { return [] }
@@ -54,7 +55,7 @@ class CollectionSegmenter {
             let name = await extractCollectionName(
                 from: text, provider: provider, model: model,
                 thinkingLevel: thinkingLevel, apiKey: apiKey,
-                gatewayConfig: gatewayConfig
+                gatewayConfig: gatewayConfig, localAgent: localAgent
             )
             boxNames[idx] = name
             onStatus("Identified collection \(attempt + 1)/\(boxIndices.count): \(name)")
@@ -68,7 +69,7 @@ class CollectionSegmenter {
             canonicalMap = await clusterCollectionNames(
                 uniqueRawNames, provider: provider, model: model,
                 thinkingLevel: thinkingLevel, apiKey: apiKey,
-                gatewayConfig: gatewayConfig
+                gatewayConfig: gatewayConfig, localAgent: localAgent
             )
         } else {
             let single = uniqueRawNames.first ?? "Unknown"
@@ -116,7 +117,8 @@ class CollectionSegmenter {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> String {
         guard !boxText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return "Unknown"
@@ -149,7 +151,7 @@ class CollectionSegmenter {
         """
 
         do {
-            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
+            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig, localAgent: localAgent)
             let raw = response.trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -168,7 +170,8 @@ class CollectionSegmenter {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> [String: String] {
         let nameList = names.enumerated().map { "\($0.offset + 1). \"\($0.element)\"" }.joined(separator: "\n")
 
@@ -198,7 +201,7 @@ class CollectionSegmenter {
         """
 
         do {
-            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
+            let response = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig, localAgent: localAgent)
             return parseClusterResponse(response, names: names)
         } catch {
             // Fallback: use trimmed, normalized names
@@ -458,10 +461,11 @@ class CollectionSegmenter {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async throws -> String {
         try await LLMTextClient.complete(prompt: prompt, provider: provider, model: model,
                                          thinkingLevel: thinkingLevel, apiKey: apiKey,
-                                         gatewayConfig: gatewayConfig, maxTokens: 256, timeout: 60)
+                                         gatewayConfig: gatewayConfig, localAgent: localAgent, maxTokens: 256, timeout: 60)
     }
 }

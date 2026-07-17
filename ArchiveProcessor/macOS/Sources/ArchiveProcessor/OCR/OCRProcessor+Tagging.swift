@@ -292,6 +292,7 @@ extension OCRProcessor {
         }
         guard !work.isEmpty else { return }
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
         let maxConcurrent = min(6, work.count)
 
         // Fetch dates concurrently (bounded), skipping thinking, and apply each result on the main
@@ -304,7 +305,7 @@ extension OCRProcessor {
                     let date = await generator.generateDateOnly(
                         for: w.segment, nearbySegments: w.nearby,
                         provider: provider, model: model, thinkingLevel: nil,
-                        apiKey: apiKey, gatewayConfig: gateway
+                        apiKey: apiKey, gatewayConfig: gateway, localAgent: localAgent
                     )
                     return (w.idx, date)
                 }
@@ -325,7 +326,7 @@ extension OCRProcessor {
                         let date = await generator.generateDateOnly(
                             for: w.segment, nearbySegments: w.nearby,
                             provider: provider, model: model, thinkingLevel: nil,
-                            apiKey: apiKey, gatewayConfig: gateway
+                            apiKey: apiKey, gatewayConfig: gateway, localAgent: localAgent
                         )
                         return (w.idx, date)
                     }
@@ -650,6 +651,7 @@ extension OCRProcessor {
         // Capture immutable inputs for the concurrent tasks.
         let vocabulary = tagVocabulary
         let gateway = currentGateway
+        let localAgent = currentLocalAgent
         let maxConcurrent = min(6, total)
 
         // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
@@ -681,7 +683,7 @@ extension OCRProcessor {
                     let tags = await generator.generateTags(
                         for: snapshot[i], nearbySegments: nearbyBySeg[i],
                         provider: provider, model: model, thinkingLevel: nil,
-                        apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway
+                        apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
                     )
                     return (i, tags)
                 }
@@ -703,7 +705,7 @@ extension OCRProcessor {
                         let tags = await generator.generateTags(
                             for: snapshot[j], nearbySegments: nearbyBySeg[j],
                             provider: provider, model: model, thinkingLevel: nil,
-                            apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway
+                            apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
                         )
                         return (j, tags)
                     }

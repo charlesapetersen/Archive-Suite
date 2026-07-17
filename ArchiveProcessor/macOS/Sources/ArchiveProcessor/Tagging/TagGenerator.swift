@@ -12,7 +12,8 @@ class TagGenerator: ObservableObject {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         vocabulary: [String] = [],
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> GeneratedTags {
         // Box/folder: just a color tag
         if segment.isBox { return GeneratedTags(subjectTags: ["Box"], colorTag: "Red") }
@@ -71,7 +72,7 @@ class TagGenerator: ObservableObject {
         """
 
         do {
-            let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
+            let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig, localAgent: localAgent)
             return parseTagResponse(rawResponse, vocabulary: vocabulary)
         } catch {
             return GeneratedTags(dateUncertain: true)
@@ -87,7 +88,8 @@ class TagGenerator: ObservableObject {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async -> GeneratedTags {
         if segment.isBox || segment.isFolder { return GeneratedTags() }
         let text = segment.combinedText
@@ -123,7 +125,7 @@ class TagGenerator: ObservableObject {
         """
 
         do {
-            let raw = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig)
+            let raw = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig, localAgent: localAgent)
             return parseTagResponse(raw)
         } catch {
             return GeneratedTags(dateUncertain: true)
@@ -137,11 +139,12 @@ class TagGenerator: ObservableObject {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        gatewayConfig: GatewayConfig? = nil
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
     ) async throws -> String {
         try await LLMTextClient.complete(prompt: prompt, provider: provider, model: model,
                                          thinkingLevel: thinkingLevel, apiKey: apiKey,
-                                         gatewayConfig: gatewayConfig, maxTokens: 512, timeout: 120)
+                                         gatewayConfig: gatewayConfig, localAgent: localAgent, maxTokens: 512, timeout: 120)
     }
 
     private func parseTagResponse(_ raw: String, vocabulary: [String] = []) -> GeneratedTags {

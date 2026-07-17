@@ -100,6 +100,7 @@ struct OCRView: View {
     }
 
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
+    private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
 
     private var currentModels: [LLMModel] {
         let builtIn: [LLMModel]
@@ -1022,7 +1023,7 @@ struct OCRView: View {
                 thinkingLevel: !useGateway && selectedModel.supportsThinking ? selectedThinking : nil,
                 apiKey: apiKey,
                 outputDirectory: outDir,
-                batchMode: useGateway ? false : batchMode,
+                batchMode: (useGateway || useLocalAgent) ? false : batchMode,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
@@ -1032,7 +1033,8 @@ struct OCRView: View {
                 reOCRMultiPagePDF: reOCRMultiPagePDF,
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,
-                gatewayConfig: gateway
+                gatewayConfig: gateway,
+                localAgent: currentLocalAgentConfig
             )
         }
     }

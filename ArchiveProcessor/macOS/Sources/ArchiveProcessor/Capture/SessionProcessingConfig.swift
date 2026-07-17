@@ -89,7 +89,8 @@ struct SessionProcessingConfig {
             outputImageFile: (d.object(forKey: DefaultsKeys.outputImageFile) as? Bool) ?? true,
             pdfImageMB: { let p = d.double(forKey: DefaultsKeys.pdfImageSizeMB); return p > 0 ? p : 2.0 }(),
             exportedImageMB: { let e = d.double(forKey: DefaultsKeys.exportedImageSizeMB); return e > 0 ? e : 3.0 }(),
-            textColumns: { let tc = d.integer(forKey: DefaultsKeys.textColumns); return tc > 1 ? min(4, tc) : 1 }()
+            textColumns: { let tc = d.integer(forKey: DefaultsKeys.textColumns); return tc > 1 ? min(4, tc) : 1 }(),
+            localAgent: LocalAgentConfig.fromDefaults(d)
         )
     }
 
