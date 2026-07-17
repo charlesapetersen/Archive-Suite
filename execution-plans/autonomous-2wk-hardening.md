@@ -162,7 +162,9 @@ clean.
 ## Progress
 - [x] **WS6** alert core + **WS2** disk guard — shipped 2026-07-16 (harness-proven, reviewed).
 - [x] **WS12** keychain partition-list fix — shipped 2026-07-17 (owner-run helper; **owner runs it once**).
-- [ ] WS4 attempt cap · WS1 crash-restart posture · WS11 recurring review · WS7 health gate · WS5 STATUS digest
+- [x] **WS4** attempt cap — shipped 2026-07-17 (parks after `MAX_NOCOMPLETE` committed-but-no-completion
+      sessions; completion signal = top-level `[x]` count in the WORK QUEUE; harness-proven, reviewed).
+- [ ] WS1 crash-restart posture · WS11 recurring review · WS7 health gate · WS5 STATUS digest
       · WS8 Morning-Review rotation · WS9 dep gating · WS10 hold queue.
 
 ## Out of scope (owner calls, 2026-07-16)

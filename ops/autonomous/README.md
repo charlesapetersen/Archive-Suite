@@ -107,6 +107,16 @@ the fingerprint and resets the backoff; a usage fast-fail can't move it and fall
 Knobs (env-overridable): `AUTONOMOUS_MAXBACKOFF`, `AUTONOMOUS_IDLE_STOP` (0 disables the auto-park). Built
 Tier-2: proven by `ops/autonomous/tests/prove-daemon.sh` (below) + an adversarial review.
 
+**Attempt cap (WS4, 2026-07-17) — the one waste the backoff can't catch.** Backoff keys off the fingerprint
+*moving*; a mis-sized or stuck item that commits a **checkpoint** each session keeps it moving, so it reads
+as progress and loops for days burning budget. So a second guard counts **consecutive sessions that committed
+work but completed no queue item**, and parks + alerts at `AUTONOMOUS_MAX_NOCOMPLETE` (default 6; 0 disables).
+"An item completed" = the count of **top-level `[x]` checkbox items** in the plan's `## WORK QUEUE` went up
+(prose mentions of `[x]` are excluded so a session can't fake a completion by writing about one); completing
+any item resets the streak. The counter (`$STATE/nocomplete.count`) is cleared at startup alongside
+`idle.since`, for the same reason (a re-arm must never park on cycle 1 off a stale count). The park message
+lists the recent commits so you can see which item is stuck.
+
 ## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
 
 **Remote alerting (WS6).** Every "park + alert" path also POSTs to an endpoint you configure, because a
@@ -160,11 +170,12 @@ re-created item gets a fresh, empty partition list). `arm.sh status` shows wheth
 
 Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every
 host-touching command (`security`/`osascript`/`launchctl`/`caffeinate`/`curl`/`df`) stubbed — it cannot reach
-your Desktop, the real repo, launchd, or the network. **41 assertions**: both idle waste modes, backoff
+your Desktop, the real repo, launchd, or the network. **49 assertions**: both idle waste modes, backoff
 doubling + cap, progress-reset, queue-edit early-wake, the stale-`idle.since` cycle-1-park regression,
 rc≠0-with-commit, the `COMPLETE` path, the disk guard (park / fail-open / self-heal / engine-busy
-reentrancy), and alerting (no-op-when-unset, argv word-splitting, and that the alert credential never reaches
-the session env). **Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
+reentrancy), alerting (no-op-when-unset, argv word-splitting, and that the alert credential never reaches the
+session env), and the WS4 attempt cap (park-at-cap / completion-reset / stale-count-cleared-at-startup).
+**Run it before installing ANY daemon change** — every `ops/autonomous/*` edit is Tier-2:
 
 ```bash
 ops/autonomous/tests/prove-daemon.sh          # ~3 min, $0, no network

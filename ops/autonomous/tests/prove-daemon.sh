@@ -56,7 +56,9 @@ export PATH="$BIN:$PATH"
 REPO="$T/repo with space"; mkdir -p "$REPO"          # space in path: mirrors "/Users/<user>/Claude/Archive Suite"
 git -C "$REPO" init -q 2>/dev/null
 git -C "$REPO" config user.email t@t; git -C "$REPO" config user.name t
-echo seed > "$REPO/f"; git -C "$REPO" add -A; git -C "$REPO" commit -qm seed
+echo seed > "$REPO/f"
+printf -- '- [ ] todo one\n' > "$REPO/SUITE_TODO.md"   # WS4: the drain-phase tracker of record
+git -C "$REPO" add -A; git -C "$REPO" commit -qm seed
 git -C "$REPO" branch -f main 2>/dev/null; git -C "$REPO" update-ref refs/remotes/origin/main HEAD
 
 PLAN="$T/plan.md"
@@ -70,20 +72,28 @@ RUN STATUS: IN_PROGRESS — test
 ## Session Log
 (churn lives here — must NOT count as progress)
 EOF
+  printf -- '- [ ] todo one\n' > "$REPO/SUITE_TODO.md"   # reset the drain tracker between tests
 }
 write_plan
 
 STATE="$T/state"; mkdir -p "$STATE"; echo off > "$STATE/gui-mode"
-CTRL="$T/ctrl"; echo "1:no" > "$CTRL"          # stub claude behaviour: "<rc>:<commit?>"
+CTRL="$T/ctrl"; echo "1:no" > "$CTRL"          # stub claude behaviour: "<rc>:<commit?>[:<complete-item?>]"
 
 CHILDENV="$T/childenv.log"
 cat > "$T/claude" <<STUB
 #!/usr/bin/env bash
 env > "$CHILDENV"          # WS6: prove what the session actually inherits
-IFS=: read -r rc docommit < "$CTRL"
+IFS=: read -r rc docommit complete < "$CTRL"
 # Simulate a session appending its reasoning to the Session Log — pure churn, must not read as progress.
 printf '\n### session note %s\n' "\$(date +%s%N)" >> "$PLAN"
+# docommit=yes -> a CHECKPOINT commit (HEAD moves; the fingerprint moves via HEAD).
 [ "\$docommit" = yes ] && { echo "\$(date +%s%N)" > "$REPO/f"; git -C "$REPO" add -A; git -C "$REPO" commit -qm work; }
+# complete=... -> COMPLETE an item, raising completed_items (WS4). Two phases:
+#   queue = flip a plan WORK QUEUE item (wave phase);  todo = flip a SUITE_TODO.md item (Wave-12 DRAIN phase).
+case "\$complete" in
+  queue) awk '/^## Session Log/ && !d {print "- [x] completed-"NR; d=1} {print}' "$PLAN" > "$PLAN.tmp" && mv "$PLAN.tmp" "$PLAN" ;;
+  todo)  printf -- '- [x] done-%s\n' "\$(date +%s%N)" >> "$REPO/SUITE_TODO.md" ;;
+esac
 exit "\$rc"
 STUB
 chmod +x "$T/claude"
@@ -92,11 +102,11 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
   AUTONOMOUS_STATE="$STATE" AUTONOMOUS_CLAUDE="$T/claude" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=8 AUTONOMOUS_IDLE_STOP="$1" \
-  AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_HB_POLL=1 \
+  AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
   echo $!
 }
-reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count"; }
+reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count"; }
 stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; pkill -f provetest 2>/dev/null; }
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
@@ -251,6 +261,45 @@ L=$(run_daemon 0 8)
 grep -q 'running housekeeping to reclaim' "$L" && ok "attempted reclaim before giving up" || bad "no reclaim attempt"
 grep -q 'disk reclaimed' "$L" && ok "detected the reclaim and continued" || bad "did not continue after reclaim"
 grep -q 'PARKED' "$L" && bad "parked despite reclaiming enough space" || ok "did not park"
+
+# ================= WS4 per-item attempt cap =================
+echo "[14] WS4 — commits that complete NO queue item park after MAX_NOCOMPLETE (the checkpoint-loop backoff can't catch)"
+echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999      # every session commits (fingerprint moves) but never completes an item
+L=$(MAXNC=3 run_daemon 0 14)
+grep -q 'attempt streak 1/3' "$L" && ok "counts checkpoint-only sessions" || bad "no streak count"
+grep -q 'PARKED (no item completed in 3 sessions' "$L" && ok "parked at the cap with a clear reason" || bad "never parked at the cap"
+grep -q 'daemon down' "$L" && ok "loop exited cleanly" || bad "did not exit"
+
+echo "[15] WS4 — DRAIN-PHASE completion (SUITE_TODO flip, plan WORK QUEUE static) RESETS the streak (the confirmed-HIGH scenario)"
+# This is the exact case the review caught: the run's current mode completes items in SUITE_TODO.md while the
+# plan WORK QUEUE stays constant. If completion were measured off the plan WORK QUEUE alone, cc would never
+# rise and a healthy item-per-session drain would false-park after MAX_NOCOMPLETE.
+write_plan; dfset 999999; reset_state
+P=$(MAXNC=6 launch 0)
+echo "0:yes:no"   > "$CTRL"; sleep 4      # a few checkpoints (streak climbs)
+echo "0:yes:todo" > "$CTRL"; sleep 3      # complete a SUITE_TODO item (plan WORK QUEUE unchanged) -> reset
+echo "0:yes:no"   > "$CTRL"; sleep 4      # checkpoints again (streak restarts from 1)
+stop "$P"; L="$STATE/daemon.log"
+grep -q 'attempt streak reset' "$L" && ok "SUITE_TODO completion detected -> streak reset" || bad "reset not logged (drain completion missed!)"
+[ "$(grep -c 'attempt streak 1/6' "$L")" -ge 2 ] && ok "streak restarted from 1 after the reset" || bad "streak did not restart (count=$(grep -c 'attempt streak 1/6' "$L"))"
+grep -q 'PARKED (no item completed' "$L" && bad "parked despite the drain completion resetting the streak" || ok "did not park a healthy drain run"
+
+echo "[15b] WS4 — WAVE-PHASE completion (plan WORK QUEUE flip) also resets the streak"
+write_plan; dfset 999999; reset_state
+P=$(MAXNC=6 launch 0)
+echo "0:yes:no"    > "$CTRL"; sleep 4
+echo "0:yes:queue" > "$CTRL"; sleep 3     # complete a plan WORK QUEUE item -> reset
+echo "0:yes:no"    > "$CTRL"; sleep 4
+stop "$P"; L="$STATE/daemon.log"
+grep -q 'attempt streak reset' "$L" && ok "WORK QUEUE completion detected -> streak reset" || bad "reset not logged"
+grep -q 'PARKED (no item completed' "$L" && bad "parked despite a wave completion" || ok "did not park"
+
+echo "[16] WS4 — a stale nocomplete.count from a prior run must NOT park on cycle 1 (mirror the idle.since HIGH)"
+echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo 10 > "$STATE/nocomplete.count"      # stale, well over the cap
+P=$(MAXNC=5 launch 0); sleep 4; stop "$P"; L="$STATE/daemon.log"
+grep -q 'PARKED (no item completed' "$L" && bad "parked off a stale count (startup didn't clear it)" || ok "stale count cleared at startup"
+grep -q 'attempt streak 1/5' "$L" && ok "streak restarted from 1" || bad "did not restart from 1"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

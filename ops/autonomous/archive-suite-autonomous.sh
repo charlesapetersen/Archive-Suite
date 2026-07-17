@@ -56,6 +56,16 @@ IDLE_STOP="${AUTONOMOUS_IDLE_STOP:-21600}"   # 6 h of zero progress -> park + st
 # parks + alerts. Fail-OPEN on an unreadable reading (a broken check must never stop a healthy run).
 MINFREE_MB="${AUTONOMOUS_MINFREE_MB:-10240}" # park below this much free space on $REPO's volume (10 GB)
 
+# Attempt cap (WS4) — the one waste the idle backoff CANNOT catch. Backoff keys off the fingerprint moving;
+# a mis-sized or subtly-failing item that commits a CHECKPOINT each session keeps moving it (HEAD changes),
+# so it reads as "progress", never backs off, and burns budget looping on one item for days. This counts
+# consecutive sessions that committed work but completed NO item (no new `[x]` in EITHER tracker — plan WORK
+# QUEUE or SUITE_TODO.md; see completed_items). After $MAX_NOCOMPLETE such sessions it parks + alerts with the
+# recent commits so the owner sees which item.
+# Default 6 tolerates a legitimately multi-checkpoint item (e.g. W13.cli-1 was 4) while still catching a
+# genuine days-long loop. Completing ANY item resets it. 0 disables.
+MAX_NOCOMPLETE="${AUTONOMOUS_MAX_NOCOMPLETE:-6}"
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -214,16 +224,62 @@ work_fingerprint() {
 # (still retrying, just rarely); a CHANGED one is a positive signal to retry NOW.
 BACKOFF="$INTERVAL"
 IDLE_SINCE="$STATE/idle.since"
-# Clear the idle stamp at every daemon startup so the two halves of the state machine share a lifetime:
-# BACKOFF is in-memory (dies with the process), so idle.since must too — otherwise a stale stamp from a
-# PRIOR run makes the first no-progress cycle compute a huge idle age and PARK on cycle 1, turning the
-# owner's re-arm (an explicit "try again" signal) into a single retry. Arming a run always buys a full
-# $IDLE_STOP window. (Confirmed-HIGH review finding, 2026-07-16 — see README "Idle backoff".)
-rm -f "$IDLE_SINCE" 2>/dev/null || true
+NOCOMPLETE="$STATE/nocomplete.count"   # WS4: consecutive committed-but-completed-nothing sessions
+# Clear BOTH counters at every daemon startup so on-disk state shares the daemon's lifetime (BACKOFF is
+# in-memory and resets on start; these must too). Otherwise a stale stamp/count from a PRIOR run makes the
+# first cycle PARK immediately — turning the owner's re-arm (an explicit "try again" signal) into a single
+# retry. Arming a run always buys a full window. (idle.since was a confirmed-HIGH review finding, 2026-07-16;
+# nocomplete.count gets the same treatment for the same reason — see README "Idle backoff"/"Attempt cap".)
+rm -f "$IDLE_SINCE" "$NOCOMPLETE" 2>/dev/null || true
 
 note_progress() {   # something moved -> back to the productive cadence
   [ "$BACKOFF" != "$INTERVAL" ] && log "progress — backoff reset to ${INTERVAL}s."
   BACKOFF="$INTERVAL"; rm -f "$IDLE_SINCE" 2>/dev/null || true
+}
+
+# Count of COMPLETED work items the run has ticked — summed across BOTH trackers, because the run completes
+# items in DIFFERENT places depending on phase: a lettered/numbered WAVE item flips `[ ]`->`[x]` in the plan's
+# `## WORK QUEUE`, while the Wave-12 DRAIN loop (the run's CURRENT mode) flips `SUITE_TODO.md` — the tracker of
+# record (RUN STATUS: "pick the FIRST actionable SUITE_TODO `[ ]`"). Counting only the plan WORK QUEUE would
+# read a CONSTANT through the whole drain and FALSE-PARK a healthy item-per-session run after $MAX_NOCOMPLETE
+# completions — a confirmed-HIGH review finding (2026-07-17). Both files live in the primary checkout and move
+# with HEAD (kept current — the same currency the fingerprint's `rev-parse HEAD` already relies on).
+# Matches only a checkbox at a list-item position (`[-*] [x]`, any indent), NOT `[x]` in prose. Errs toward
+# COUNTING a completion: a MISSED completion would false-park (bad); a spurious one only misses a runaway,
+# which the budget cap + idle backoff still backstop. A missing SUITE_TODO.md -> that half is 0 (fail-safe).
+completed_items() {
+  local q t re='^[[:space:]]*[-*][[:space:]]+\[[xX]\]'
+  q=$(awk '/^## WORK QUEUE/{f=1;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE "$re")
+  t=$(grep -cE "$re" "$REPO/SUITE_TODO.md" 2>/dev/null)
+  case "$q" in ''|*[!0-9]*) q=0 ;; esac
+  case "$t" in ''|*[!0-9]*) t=0 ;; esac
+  echo $(( q + t ))
+}
+
+# WS4 verdict for a session that COMMITTED work (fingerprint moved). $1=completed-count before, $2=after.
+# Returns 9 when the no-completion streak hits $MAX_NOCOMPLETE (caller parks the loop); 0 to keep going.
+note_committed() {
+  local cc_before="$1" cc_after="$2" n
+  [ "$MAX_NOCOMPLETE" -gt 0 ] || return 0    # WS4 disabled -> no counting, no file, no park
+  # An item finished this session -> the run is genuinely progressing through the queue -> reset the streak.
+  if [ "$cc_after" -gt "$cc_before" ]; then
+    [ -f "$NOCOMPLETE" ] && log "item completed (done $cc_before->$cc_after across trackers) — attempt streak reset."
+    rm -f "$NOCOMPLETE" 2>/dev/null || true
+    return 0
+  fi
+  # Committed, but no item completed: a checkpoint. Count it.
+  n=$(cat "$NOCOMPLETE" 2>/dev/null); case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  n=$(( n + 1 )); echo "$n" > "$NOCOMPLETE" 2>/dev/null || true
+  if [ "$MAX_NOCOMPLETE" -gt 0 ] && [ "$n" -ge "$MAX_NOCOMPLETE" ]; then
+    local recent; recent="$(git -C "$REPO" log -5 --format='  %h %s' 2>/dev/null)"
+    rm -f "$NOCOMPLETE" 2>/dev/null || true   # don't re-park instantly on a bare re-arm without a fresh streak
+    park_run "no item completed in $n sessions" \
+      "Archive Suite autonomous run PARKED: $n sessions committed work but completed NO item (no checkbox flipped in the plan WORK QUEUE or SUITE_TODO.md) — the current item is likely mis-sized or stuck (checkpoints keep landing, but its box never flips to [x]). Split/re-scope it, or raise AUTONOMOUS_MAX_NOCOMPLETE, then re-arm. Recent commits:
+$recent"
+    return 9
+  fi
+  log "committed but no item completed — attempt streak $n/$MAX_NOCOMPLETE."
+  return 0
 }
 
 # Sleep out the current $BACKOFF, but WAKE EARLY the moment the decision surface changes. This is the other
@@ -502,7 +558,8 @@ tick() {
 
   # 3c. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
   #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.
-  local fp_before; fp_before="$(work_fingerprint)"
+  #     Also snapshot the completed-item count (WS4) to tell a checkpoint from a genuine item completion.
+  local fp_before cc_before; fp_before="$(work_fingerprint)"; cc_before="$(completed_items)"
 
   # 4. Acquire the lock + heartbeat it for the child's lifetime, so overlapping cycles/sessions skip.
   touch "$LOCK"
@@ -573,10 +630,12 @@ tick() {
   # false park. The failure side needs no rc check either: a usage-limit fast-fail (rc=1, ~3s) can't move
   # the fingerprint, so it falls through to no-progress on its own. Evaluated HERE — before housekeeping +
   # compact-plan — so neither the worktree GC nor a Session-Log compaction is mistaken for the run advancing.
-  local fp_after; fp_after="$(work_fingerprint)"
+  local fp_after cc_after; fp_after="$(work_fingerprint)"; cc_after="$(completed_items)"
   local verdict=0
   if [ -n "$fp_after" ] && [ "$fp_after" != "$fp_before" ]; then
-    note_progress
+    note_progress               # work happened -> fast cadence (independent of WS4)
+    # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item?
+    note_committed "$cc_before" "$cc_after" || verdict=9
   else
     log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
     note_no_progress || verdict=9
