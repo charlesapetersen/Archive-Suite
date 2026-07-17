@@ -108,6 +108,40 @@ if [ ${#IMGS[@]} -eq 0 ]; then no "no Test Files images found for OCR"; else
   fi
 fi
 
+# ---------- 3.5 LOCAL AGENT (fake CLI — $0, no key, no network) ----------
+# W13.cli-4: exercise the Local Agent CLI backend through the committed fake CLI so the subprocess
+# OCR/text path + the pipeline-wiring decision logic are covered unattended, with NO real CLI, key,
+# or cost. The real-CLI live OCR smoke is a separate keyed/owner step (and `claude` can't run nested
+# inside a Claude Code session — the CLAUDECODE guard), so it is SKIPPED gracefully here.
+say ""; say "[3.5] Local Agent backend (fake CLI, \$0)…"
+la_run(){  # $1=label  $2=script basename
+  if [ -f "$REPO/scripts/$2" ]; then
+    if swift "$REPO/scripts/$2" >"$TMP/$2.log" 2>&1 && grep -q '^ALL PASS' "$TMP/$2.log"; then
+      ok "$1 ($(grep -oE '[0-9]+ pass(ed)?' "$TMP/$2.log" | head -1))"
+    else
+      no "$1 — see $TMP/$2.log"; tail -8 "$TMP/$2.log" >> "$LOG"
+    fi
+  else
+    no "$1 — script $2 not found"
+  fi
+}
+la_run "wiring logic (fromDefaults + precedence + batch/rotation skip)" "localagent-wiring-test.swift"
+la_run "fake-CLI OCR round-trip + resume-safety" "localagent-mechanism-test.swift"
+# Real-CLI probe: only NOTE it (never run unattended — cost + the claude nested-session guard).
+real_cli=""
+for tool in claude gemini codex; do
+  for p in "$HOME/.local/bin/$tool" "/opt/homebrew/bin/$tool" "/usr/local/bin/$tool" "$HOME/.npm-global/bin/$tool"; do
+    [ -x "$p" ] && { real_cli="$tool ($p)"; break 2; }
+  done
+done
+if [ -n "$real_cli" ] && [ -z "${CLAUDECODE:-}" ]; then
+  say "    real CLI detected: $real_cli — live OCR smoke is a keyed/owner step (run outside this harness)"
+elif [ -n "$real_cli" ]; then
+  say "    real CLI detected ($real_cli) but running inside a Claude Code session (CLAUDECODE set) — live smoke skipped (nested-session guard)"
+else
+  say "    no real CLI on the standard paths — fake-CLI path only; real-CLI live smoke deferred (owner/Morning Review)"
+fi
+
 # ---------- 4. REPORT ----------
 say ""; say "[4/4] Result: $pass passed, $fail failed"
 rm -rf "$TMP"

@@ -136,8 +136,9 @@ SHARED HOTSPOT = the persisted `LLMProvider` enum, append-only):
   (final model-ID confirmation) + OpenAI Batch API (Phase 4); GUI visual (preset button + field fill) deferred
   (GUI off this run).
 
-**Local Agent CLI provider** (`execution-plans/local-agent-cli-provider.md`; Tier-2; fake-CLI harness makes the
-whole gate unattended-satisfiable at $0):
+**Local Agent CLI provider** (plan `execution-plans/local-agent-cli-provider.md` SHIPPED + deleted at W13.cli-4;
+Tier-2; fake-CLI harness made the whole gate unattended-satisfiable at $0 — the daemon-buildable code half
+W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
 - [x] **W13.cli-1 — client + config + additive threading.** `472f850` (config) + `9778572` (client) + `02471bb`
   (threading) + `44730bc` (tests) — `Models/LocalAgentConfig.swift` (Codable/Sendable, append-only
   `LocalAgentTool` claude/gemini/codex, no key) + `OCR/LocalAgentClient.swift` (ocr + textCompletion via
@@ -179,8 +180,18 @@ whole gate unattended-satisfiable at $0):
   self-review. **Keyed/GUI tail → Morning Review:** live wizard Detect+Verify + cost-pane/wizard visual (a
   GUI launch this session hit the blocking Keychain modal — owner "Always Allow" seed still needed) +
   install-link/wording verify. | S | low | none
-- [ ] **W13.cli-4 — pipeline wiring.** Prefer `localAgent` at the construction sites; skip batch + LLM-rotation
-  when active; extend `test-smoke.sh` to run the **fake-CLI** path (skip gracefully when no real CLI). | M | med | none
+- [x] **W13.cli-4 — pipeline wiring.** `4ee2475` (ckpt1: seams) + `23166b9` (ckpt2: thread+populate) + this
+  doc-sync commit. `LocalAgentConfig.fromDefaults` + `currentLocalAgent` mirror; client-construction seams
+  (`LLMTextClient.complete`, `performOCRCall`, `classifyViaLLM`) prefer `localAgent` (localAgent > gateway >
+  direct); threaded the companion `localAgent:` beside every `gatewayConfig` (TagGenerator, CollectionSegmenter,
+  the OCRProcessor OCR/Tagging/Pipeline/ReviewFlows sites, multi-page re-OCR, LiveCaptureProcessor, OCRView,
+  ToolsView, `SessionProcessingConfig.fromDefaults`). **Batch + LLM-rotation skipped when active** (OCRView forces
+  batchMode=false + defensive dispatch/history guards; `detectRotation` → local Vision). **Resume-safe:** the
+  production `PendingRun` persists `localAgent` and both fresh-run + resume paths restore `currentLocalAgent`
+  (self-review caught both were missing). `test-smoke.sh` gains a `[3.5]` **fake-CLI** section (runs the $0
+  standalone tests + real-CLI probe with graceful skip). Build clean, 0 new warnings; Tier-2 gate met unattended
+  (adversarial self-review + `localagent-wiring-test.swift` 18/18 + `localagent-mechanism-test.swift` 14/14).
+  Plan `execution-plans/local-agent-cli-provider.md` DELETED (shipped). **Keyed/owner tail → below.** | M | med | none
 
 **Keyed / owner tail (NOT daemon-buildable — do not attempt unattended):**
 - **⏸️ ON HOLD (owner 2026-07-16) — OpenAI live 2-image OCR smoke** through gateway + native `.openai` (needs an

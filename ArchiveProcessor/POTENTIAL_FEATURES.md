@@ -47,7 +47,7 @@
   switch-provider (review + tag-card dialogs already have full keyboard nav) + a dark-mode render audit.
 
 ### API & Extensibility
-- **Local model support** — integrate with Ollama or llama.cpp for offline processing
+- **Offline local model support** — integrate with Ollama or llama.cpp for fully offline, on-device processing. _(The subscription-authed **Local Agent CLI** backend — Claude Code / Gemini / Codex, no API key — shipped in W13.cli-1…4; this line now covers only the distinct **offline/on-device** case.)_
 - **Plugin system** — allow custom classification and tagging plugins
 - **REST API server mode** — run Archive Processor as a headless service for automation
 - **Apple Shortcuts integration** — expose processing actions via Shortcuts app

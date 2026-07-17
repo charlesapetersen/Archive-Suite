@@ -25,6 +25,7 @@ Process scanned images through any of four LLM providers:
 | **OpenAI (ChatGPT)** | GPT-5 nano (default), GPT-5 mini, GPT-5.4 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
 
 - Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates — including a one-click **"Fill in OpenAI preset"** that prefills OpenAI's public endpoint, model, and pricing (a custom base URL then covers **Azure OpenAI** / proxies)
+- Or a **Local Agent CLI backend** — for an enterprise/subscription **Claude Code**, **Gemini CLI**, or **OpenAI Codex** entitlement with **no API key**: pick *Local CLI Agent* in Settings, point it at the installed CLI, and OCR runs through your existing subscription login (a guided *Set up* wizard + *Detect & Verify* check are built in). Batch mode is skipped on this path; cost shows "Included in your subscription — usage limits apply."
 - Switch providers and models at any time (in **Settings**)
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
