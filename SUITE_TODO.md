@@ -446,13 +446,21 @@ Owner went through the owner-only queue. Recorded here so none of it gets re-sur
 - **iOS is ON HOLD — read §Project focus before listing anything iOS.** The iOS Drive-relay OAuth client was
   surfaced to the owner in error: iOS *and* the Google-Drive relay are BOTH on-hold/maintain-only. Anything in
   `ArchiveCaptureiOS/` or the Drive path is out of scope until un-held; don't re-list it.
-- [ ] **Notes: extract a shared numeric sort-date combiner in ArchiveCore [LOW].** `Item.sortDate`
+- [x] **Notes: extract a shared numeric sort-date combiner in ArchiveCore [LOW].** `Item.sortDate`
   (`ArchiveNotes/Store/Item.swift`) re-implements the shared `*10_000/*100` formula instead of reusing
   `ArchiveCore.DocumentTags.sortDate` (ArchiveCore exposes no `(year,month,day,decade)→Int?` combiner for Notes'
   `date:String?`+`datePrecision` input). Drift is already caught by a value-parity test
   (`ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula`), and sort order is display-only (never
   written to a corpus → no file-safety stakes) — so this is a **low-priority** de-dup, below the W9 Notes
   gap-closure. Tier-1. | files: packages/ArchiveCore (new combiner), ArchiveNotes Store/Item.swift | S | low | none
+  — ✅ shipped (2 commits): new `DocumentTags.sortDateKey(year:month:day:decade:)` in ArchiveCore is now the
+  single source of truth for the SPEC sort formula (`year*10_000 + month*100 + day`; decade→`decade*10_000`;
+  year wins over decade; absent month/day = 0; nil when undated). `DocumentTags.sortDate` (Reader) and
+  `Item.sortDate` (Notes — parses `date`+precision, then defers the arithmetic) both call it, so the key can
+  never drift between apps. Behavior-identical (the parity table + malformed-input nil cases preserved). +5
+  ArchiveCore combiner tests; the Notes parity tripwire + its (now-done) comment updated. Verified across all
+  three apps: ArchiveCore `swift test` 100 green, ArchiveNotes 520 unit tests green (13/13 ItemSortDateTests),
+  Reader + Processor test bundles compile clean (no new warnings). Tier-1 (display-only).
 - **CLOSED — `sessionComplete()` dead protocol surface: WON'T DO, PARKED (owner 2026-07-16).** ~30 lines of
   unreachable code in both companions' `SegmentTransport`/`MacClient`/`DriveRelayTransport`/`FileRelayTransport`
   (nothing calls it; the Mac's `/session/complete` route stays as a harmless no-op for older phones). Removing it

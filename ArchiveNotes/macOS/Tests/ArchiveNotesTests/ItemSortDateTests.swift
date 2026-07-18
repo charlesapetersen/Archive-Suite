@@ -101,13 +101,11 @@ final class ItemSortDateTests: XCTestCase {
 
     // MARK: - Cross-implementation parity guard (reconciles §1.7 `testReuseNotReimplemented`)
     //
-    // `Item.sortDate` RE-IMPLEMENTS the SPEC formula locally (over `date: String?` + precision)
-    // instead of calling `ArchiveCore.DocumentTags.sortDate` the way Reader does, so a literal
-    // "routes through the shared function" guard isn't satisfiable today. This asserts the
-    // stronger observable property instead: for the same logical date, Notes' key MUST equal the
-    // shared ArchiveCore key. If Notes' formula ever drifts from the SPEC, this fails.
-    // (Follow-up flagged to Morning Review: extract a shared numeric combiner in ArchiveCore so
-    // both sides can literally reuse it.)
+    // `Item.sortDate` now parses its `date: String?` + precision into numeric components and defers the
+    // arithmetic to the SHARED `ArchiveCore.DocumentTags.sortDateKey` — the same combiner
+    // `DocumentTags.sortDate` uses — so the two literally reuse one formula (the earlier follow-up to
+    // extract that combiner is done). This still asserts the observable property directly: for the same
+    // logical date, Notes' key MUST equal the shared ArchiveCore key, so any future drift trips here.
     func testItemSortDateMatchesArchiveCoreSharedFormula() {
         // The shared ArchiveCore key for the equivalent typed date fields.
         func core(year: Int?, month: Int?, day: Int?, decade: Int?) -> Int? {

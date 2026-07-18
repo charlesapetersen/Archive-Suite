@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// Preserves an unrecognized YAML key and its raw text for round-trip fidelity.
 struct UnknownKey: Sendable, Equatable {
@@ -34,27 +35,28 @@ struct Item: Sendable, Equatable, Identifiable {
     /// nil when the body starts directly with a `<!-- block:` header (or is empty).
     var trailingBodyRaw: String?
 
-    /// Chronological sort key reusing the SPEC formula (DocumentTags.swift:89-92).
-    /// `year * 10_000 + month * 100 + day`; decade -> `decade * 10_000`; nil if no date.
+    /// Chronological sort key. Parses the `date` string to the precision `datePrecision` claims, then
+    /// defers the SPEC arithmetic to the shared `ArchiveCore.DocumentTags.sortDateKey` so Notes' key can
+    /// never drift from the Reader's (`year * 10_000 + month * 100 + day`; decade → `decade * 10_000`;
+    /// nil if no usable date). The string-parsing/guards below are Notes-specific input handling — a
+    /// component too coarse for its precision yields nil, matching the prior behavior exactly.
     var sortDate: Int? {
         guard let date else { return nil }
         switch datePrecision {
         case .decade:
-            guard let decade = Int(date) else { return nil }
-            return decade * 10_000
+            return DocumentTags.sortDateKey(year: nil, month: nil, day: nil, decade: Int(date))
         case .year, .none:
-            guard let yr = Int(date) else { return nil }
-            return yr * 10_000
+            return DocumentTags.sortDateKey(year: Int(date), month: nil, day: nil, decade: nil)
         case .month:
             let parts = date.split(separator: "-")
             guard parts.count >= 2,
                   let yr = Int(parts[0]), let mo = Int(parts[1]) else { return nil }
-            return yr * 10_000 + mo * 100
+            return DocumentTags.sortDateKey(year: yr, month: mo, day: nil, decade: nil)
         case .day:
             let parts = date.split(separator: "-")
             guard parts.count >= 3,
                   let yr = Int(parts[0]), let mo = Int(parts[1]), let dy = Int(parts[2]) else { return nil }
-            return yr * 10_000 + mo * 100 + dy
+            return DocumentTags.sortDateKey(year: yr, month: mo, day: dy, decade: nil)
         }
     }
 }
