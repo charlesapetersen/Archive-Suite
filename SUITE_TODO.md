@@ -608,7 +608,7 @@ Quality facet across all three apps**. Owner-locked contract: token **`Q1`/`Q2`/
 editorial judgment (distinct from capture-**Priority**), **set by Notes + editable in Reader**, **recognized but
 never auto-emitted by Processor**. This is a **shared-contract (Tier-2)** feature — SPEC first, then the shared
 parser, then each app; every code item must **build + test all three apps**, scratch-only.
-- [x] **W19.q1 — SPEC: add the Quality facet + record Notes as a date-facet emitter.** DONE `9024022` —
+- [x] **W19.q1 — SPEC: add the Quality facet + record Notes as a date-facet emitter.** DONE `06fabcc` —
   `SPEC/tag-format.md`: Quality row (`Q1`–`Q3`, 0=unrated=no tag, human-assigned, Notes-sets/Reader-edits/
   Processor-recognizes), parse-order note (`Q2` never taken for a year), and "Where each side lives" rows for
   Quality + Notes date projection. The contract is now the source of truth for q2–q5. | Tier-2 (SPEC) | S
