@@ -469,7 +469,7 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   `+OCR.swift:1117-1133`), and update the three drivers that save/restore statics. The compiler enforces
   completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
 - [x] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** DONE 2026-07-18
-  (`5058f51`). `applyTags`'s `stampUnread` is now a **required non-optional** parameter (both overloads);
+  (`806a6d3`). `applyTags`'s `stampUnread` is now a **required non-optional** parameter (both overloads);
   the process-global is no longer read by `applyTags` (retained only as a test-driver affordance + `taggingMode.didSet`
   writer, to be deleted with the run-config globals in W16.cfg6). All 13 sites audited individually: the four
   copy-source pass-through sites (`+OCR.swift:168/1064`, `+Pipeline.swift:1091`, `+ReviewFlows.swift:388`) pass a
