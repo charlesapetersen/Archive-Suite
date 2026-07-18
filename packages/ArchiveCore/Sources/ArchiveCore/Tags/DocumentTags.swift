@@ -87,7 +87,18 @@ public struct DocumentTags: Sendable, Equatable {
     /// `nil` when there is no year → the caller sorts undated rows to the end.
     /// Month/day absent count as 0, so a year-only doc sorts just before its January.
     public var sortDate: Int? {
-        if let year { return year * 10_000 + (month?.number ?? 0) * 100 + (day ?? 0) }
+        DocumentTags.sortDateKey(year: year, month: month?.number, day: day, decade: decade)
+    }
+
+    /// The canonical chronological sort key from already-parsed numeric date components — the single
+    /// source of truth for the SPEC sort formula (`year * 10_000 + month * 100 + day`), shared by every
+    /// Suite app so a sort key never drifts between them: Reader via `sortDate` (typed facets), Notes via
+    /// `Item.sortDate` (a `date:String?` + precision it parses into these components). **No epoch limit**
+    /// (medieval-safe). Year wins over decade; absent month/day count as `0` so a year-only doc sorts just
+    /// before its January. Returns `nil` when neither a year nor a decade is known → the caller sorts
+    /// undated rows to the end. Sort-only (display, never a corpus write) → no file-safety stakes.
+    public static func sortDateKey(year: Int?, month: Int?, day: Int?, decade: Int?) -> Int? {
+        if let year { return year * 10_000 + (month ?? 0) * 100 + (day ?? 0) }
         if let decade { return decade * 10_000 }
         return nil
     }

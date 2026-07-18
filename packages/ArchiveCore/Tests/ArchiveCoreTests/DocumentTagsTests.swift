@@ -179,4 +179,38 @@ final class DocumentTagsTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Shared sort-date combiner (reused by Reader's DocumentTags.sortDate + Notes' Item.sortDate)
+
+    func testSortDateKeyFormula() {
+        // year * 10_000 + month * 100 + day; absent month/day count as 0.
+        XCTAssertEqual(DocumentTags.sortDateKey(year: 1968, month: nil, day: nil, decade: nil), 19_680_000)
+        XCTAssertEqual(DocumentTags.sortDateKey(year: 1968, month: 3, day: nil, decade: nil), 19_680_300)
+        XCTAssertEqual(DocumentTags.sortDateKey(year: 1968, month: 3, day: 25, decade: nil), 19_680_325)
+        // Medieval-safe: no epoch floor.
+        XCTAssertEqual(DocumentTags.sortDateKey(year: 842, month: nil, day: nil, decade: nil), 8_420_000)
+    }
+
+    func testSortDateKeyYearWinsOverDecade() {
+        // When both are present, year supersedes decade (matches parse-time demotion).
+        XCTAssertEqual(DocumentTags.sortDateKey(year: 1975, month: nil, day: nil, decade: 1970), 19_750_000)
+    }
+
+    func testSortDateKeyDecadeOnly() {
+        XCTAssertEqual(DocumentTags.sortDateKey(year: nil, month: nil, day: nil, decade: 1970), 19_700_000)
+    }
+
+    func testSortDateKeyUndatedIsNil() {
+        // Neither a year nor a decade → nil (caller sorts undated rows last). A stray month/day alone
+        // (no year) is still nil, never a spurious low key.
+        XCTAssertNil(DocumentTags.sortDateKey(year: nil, month: nil, day: nil, decade: nil))
+        XCTAssertNil(DocumentTags.sortDateKey(year: nil, month: 3, day: 25, decade: nil))
+    }
+
+    func testSortDateRoutesThroughSharedCombiner() {
+        // The instance property must be exactly the shared combiner over its own facets.
+        let t = DocumentTags.parse(raw: ["1968", "03 March", "Day 25"], labelNumber: nil)
+        XCTAssertEqual(t.sortDate,
+                       DocumentTags.sortDateKey(year: t.year, month: t.month?.number, day: t.day, decade: t.decade))
+    }
 }
