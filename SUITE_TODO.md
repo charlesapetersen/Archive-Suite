@@ -323,6 +323,12 @@ maintain-only** (see §Project focus). Leave parked until the Drive milestone is
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
+- [ ] **Reader/Notes: PDF + JPEG dual image reference** (owner, 2026-07-17). Let a Reader image entity — and
+  thus the durable link surfaced in Notes — reference **both** an archival PDF and its JPEG partner (opens the
+  PDF by default; user can switch to the higher-detail JPEG when the PDF lost resolution). Naming/paths mirror
+  1:1 (`Archival Photos/<Coll>/00140 — Swarthmore.pdf` ↔ `Archival Photos JPEGS/<Coll>/00140 — Swarthmore.jpg`),
+  so the partner is derivable by filename. Supports the DEVONthink import (see `execution-plans/devonthink-import.md`
+  §4a) but is a standalone Reader feature. | Reader + Notes + ArchiveCore (durable-link/image entity) | M | med | none
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
 - [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to

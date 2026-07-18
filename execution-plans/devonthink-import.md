@@ -230,16 +230,20 @@ Database) but its **filename never changes**. So the importer:
    Key = the normalized filename **stem** (strip extension + `.zip` bundles, collapse spacing, drop the Photo
    Database's `IMG` token, NFC) — this covers both naming conventions and is robust to **folder-name variance**
    (links say "Microelectronic News" while the folder is "Microelectronic**s** News" — we key on the file, not
-   the folder). **Detect and report any duplicate/ambiguous stems** (a collision must not silently pick wrong).
+   the folder). For **Photo Database** cross-DB matches the **numeric ID is authoritative** (owner-confirmed
+   always accurate); normalization only absorbs formatting drift (the `IMG` token, em-dash vs hyphen, spacing,
+   singular/plural collection). **Detect and report any duplicate/ambiguous match** (a number that maps to >1
+   root file, or a colliding stem) — never silently pick wrong.
 2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder paths,
    and Photo Database cross-DB links all collapse to "find this filename in the root."
 3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>[&page=n]`** to the
    resolved file. Keyed on the **root GUID + current relative path**, so a later **root rename/move is safe**
    (§8 root-rename): Reader re-establishes the root at the new location under the same `RootMarker` GUID.
-4. **JPEG partner (to-consider):** the matching `.jpg` sits at the mirror path under `Archival Photos JPEGS/`
-   (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). Worth considering whether the
-   Reader image entity — and thus the Notes link — can reference **both** (PDF by default, JPEG when finer
-   detail is needed). Captured as a potential Suite feature, not a hard requirement of this import.
+4. **JPEG partner (tracked to-do):** the matching `.jpg` sits at the mirror path under `Archival Photos JPEGS/`
+   (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). The Reader image entity — and thus
+   the Notes link — should be able to reference **both** (PDF by default, JPEG on demand). **On the to-do list**
+   (`SUITE_TODO.md`, owner request); not a blocker for this import (links resolve to the PDF; the JPEG is always
+   derivable from the filename).
 5. **Unresolved → flag**, never a guessed path: filenames not found in the root (a photo still only in a
    processing folder that will move out; a truly-missing target; oddball `.docx`/`.wav`/`.jpf` targets).
 
@@ -328,7 +332,9 @@ rather than importing best-effort.
 3. ✅ **A *Database Archive* (`.zip`) backup** of the originals, kept until verified & adopted.
 4. ⏳ **Grant Automation (Apple Events) permission** so the extraction script can control DEVONthink —
    walkthrough provided (a TCC prompt on first run, or pre-grant in System Settings ▸ Privacy & Security ▸
-   Automation).
+   Automation). **Owner note:** Terminal currently lists only *System Events.app* under Automation — the
+   DEVONthink toggle appears only **after** the script first sends an Apple Event to DEVONthink, so we grant it
+   **at launch** (the one-line trigger script surfaces the prompt). Deferred until then.
 5. 🔔 **Close the databases in your primary DEVONthink at launch** (or OK opening the copies in a separate
    context) — avoids the lock / shared-`uniqueId` conflict (`isOpen=true` + a `.lock` were present). *Remind at launch.*
 6. ✅ **Excerpt tag = `0 Note Excerpts`** (confirmed). DTI-0 still checks whether `Good/Best Note Excerpts`
@@ -394,8 +400,8 @@ their structure (relative paths unchanged); only the root's own name/location ch
     (which moves out post-migration) is **flagged**. `/Volumes` links resolve by filename (the "Microelectronic
     News" run lives in the root under `Complete Journals/`); only genuinely-absent filenames flag.
 11. **Root rename after migration** — supported; durable links survive (§8a).
-12. **PDF/JPEG dual reference** — a *to-consider* Suite feature (Reader image entity referencing both PDF and
-    its JPEG partner), not a hard requirement of this import (§4a).
+12. **PDF/JPEG dual reference** — a **tracked Suite feature** (Reader image entity referencing both PDF and its
+    JPEG partner; PDF default, JPEG on demand) — on the to-do list (`SUITE_TODO.md`); not a blocker (§4a).
 
 *All owner decisions resolved. DTI-0 discoveries (findings, not decisions): the `Alias` date grammar;
 month-prefix title format; near-dup prevalence + similarity calibration; replicant counts; the name-index
