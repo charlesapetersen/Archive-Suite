@@ -242,7 +242,7 @@ Legend as above.
   (Capture/Net, phone↔Mac protocol — no wire-format change: this is send-*timing*, not a new field). Daemon-buildable:
   Android `./gradlew :app:assembleDebug` + iOS `xcodebuild` build-clean + adversarial self-review of the
   defer/flush logic on both companions. **Keyed/owner verify tail:** the on-device / emulator E2E
-  (`scripts/e2e-phone-mac.sh`, needs a Gemini key + the `ap_test` emulator; XCUITest admin-prompt caveat) →
+  (`scripts/e2e-phone-mac.sh`, needs a Gemini key + the `ap_test36` emulator; XCUITest admin-prompt caveat) →
   Morning Review. | files: ArchiveCapture/capture/CaptureViewModel.kt, ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift | M | med | none(build)/owner(E2E)
   **✅ ALREADY SHIPPED `ce55511` (2026-07-07); verified + tracker-reconciled 2026-07-17.** The defer/flush fix
   was already in code on BOTH companions: `endedSegments` is the pending-complete record; `trySendSegmentComplete`
@@ -400,7 +400,7 @@ the payload is photographs of **public archival records the owner intends to pub
 near-worthless; the integrity loss is bounded by the Recovery Core Directive (idempotent `(group,seq)`,
 originals retained in the visible backup folder, deletions via Trash not `rm`); and it needs a targeted
 adversary co-located in the same reading room. Encrypting the transport would change the wire contract on
-**all three platforms**, needs a physical iPhone + the `ap_test` emulator E2E gate, and buys little. **Closed
+**all three platforms**, needs a physical iPhone + the `ap_test36` emulator E2E gate, and buys little. **Closed
 permanently — do not re-promote LANSEC-5/6/7 (secure transport, companion mirroring, packet-capture harness).**
 
 **But two things ARE promoted**, because they are cheap, Mac-only, and need no wire-contract change:

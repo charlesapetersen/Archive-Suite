@@ -49,7 +49,7 @@ awake Mac + the emulator and spends a little on OCR. For a cheap every-commit ga
 export OCR_KEY="<gemini-key>"       # optional; falls back to the Keychain Gemini key
 caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh
 ```
-Prereqs: `ap_test` AVD + the android-34 system image installed; the Mac free/awake (it's a live GUI app);
+Prereqs: `ap_test36` AVD + the android-36 system image installed; the Mac free/awake (it's a live GUI app);
 xcodegen on PATH. Artifacts (screencaps, `mac.log`, `REPORT.txt`, `out/`) land in a per-run `/tmp/ap-e2e-*`
 dir. Exit 0 = PASS. `KEEP_EMU=always|onfail|never` controls emulator teardown (default `onfail`).
 

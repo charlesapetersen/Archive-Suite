@@ -324,7 +324,7 @@ owner. See [`../ops/gui/README.md`](../ops/gui/README.md) and `AGENTS.md` → *G
 
 **Full phone↔Mac round-trip E2E — `scripts/e2e-phone-mac.sh`** (see `scripts/E2E-PHONE-MAC.md`). The only
 test that exercises *both* real apps end to end: a real headless Mac session (`LIVECAPTURE_AUTOSTART`) paired
-over LAN to the `ap_test` emulator running the identical Android app, which "captures" known fixtures via
+over LAN to the `ap_test36` emulator running the identical Android app, which "captures" known fixtures via
 the **debug-only inject seam** (`files/test_inject.jpg`, stripped from release). The Mac OCRs with a real
 key (`LIVECAPTURE_OCRKEY`), auto-skips tag cards (`LIVECAPTURE_AUTOSKIPTAGS`), auto-finalizes
 (`LIVECAPTURE_AUTOFINALIZE`, **gated on `LIVECAPTURE_TESTOUT`** so it can never file into the real corpus)
@@ -332,7 +332,7 @@ and drops `DONE.txt`; then `assert_mac.py` checks each fixture's unique OCR toke
 pipeline, and per-doc phone screencaps are checked. Deterministic + unattended (emulator only). Run:
 `OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh` (falls back to the Keychain key).
 **Needs:** the Mac free + awake (headless, but a live app session — don't drive its GUI meanwhile), the
-`ap_test` emulator + android-34 image installed, `xcodegen` on PATH, and a Gemini key (env or Keychain);
+`ap_test36` emulator + android-36 image installed, `xcodegen` on PATH, and a Gemini key (env or Keychain);
 spends ~a few cents. It's the Tier-2 functional gate for `Capture/`/`Net/` — **not** a per-commit/CI check
 (use `test-smoke.sh` for that).
 

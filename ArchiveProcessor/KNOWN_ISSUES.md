@@ -401,7 +401,7 @@ the integrity loss is bounded by the **Recovery Core Directive** (idempotent `(g
 in the visible backup folder, deletions via Trash not `rm`), so a forged overwrite is noticed at tag-card review
 and is recoverable; and the attack needs a targeted adversary physically co-located in the same reading room.
 Encrypting would change the wire contract on **all three platforms** and needs a physical iPhone plus the
-`ap_test` emulator E2E gate to verify. **Operator guidance instead: on untrusted venue Wi-Fi, use the USB bridge
+`ap_test36` emulator E2E gate to verify. **Operator guidance instead: on untrusted venue Wi-Fi, use the USB bridge
 or the Drive relay.**
 
 *Nuance worth keeping:* venues that enforce client isolation **block the LAN transport entirely** (which is why
@@ -908,7 +908,7 @@ un-filed (straggler) page** in the backup folder + Captured pane. No page is eve
    The `session/complete` half is moot on the phone: the transport `sessionComplete()` has **no caller** (the phone
    "Finish" action that once sent it was removed — End segment is the only phone-side "done"), and whole-session
    force-completion is a Mac-side backstop. An adversarial re-read of both companion trees (2026-07-17) could not
-   break the gate. **Owner device-verify tail:** `scripts/e2e-phone-mac.sh` (Gemini key + `ap_test` emulator).
+   break the gate. **Owner device-verify tail:** `scripts/e2e-phone-mac.sh` (Gemini key + `ap_test36` emulator).
 2. **Per-page P10 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleP10` re-uploads
    only when `state == UPLOADED`. Fix: a `needsResend` flag the upload-completion handler honors. Both companions.
    **FIXED in code (B5-i — pending owner device-verify):** both companions gained a persisted `needsResend`
