@@ -292,6 +292,29 @@ Database) but its **filename never changes**. So the importer:
 All of DTI-2 is pure functions with a **fixture corpus** (hand-built tiny DT export + golden expected
 output) so every rule has a regression test. No transform reaches DEVONthink or the live app.
 
+### 5a. OCR-quality flagging & gated repair (owner, 2026-07-17)
+Much of the corpus is text copied from imperfect PDF OCR, with three recurring defects: **glued words**
+(`careerdidnotoccurtome`), **split spacing** (`m a g a zin e`), and **bad line breaks** (hard wraps
+mid-sentence). Running all ~40k notes through a model to find these is prohibitively expensive, so detection is
+free and only the flagged subset ever costs model tokens.
+
+- **Detect — free, pure code over the extracted text (≈0 model tokens), on every note.** Per-note signals
+  (validated on the owner's examples; prototype `ocr_defect_detector.py`): space-ratio (low → glued, high →
+  split), a ≥18-char glued-run count, orphan short-token ratio (split), and mid-sentence-newline ratio (bad
+  wraps); a local dictionary corroborates. Each note gets defect tags {glued-words, split-spacing,
+  bad-line-breaks} + severity, and an **OCR report** lists counts + worst offenders. Thresholds are
+  **calibrated in DTI-0** on a labeled sample (the owner's 5 examples are the seed fixtures) — tuned for high
+  recall, low false-positive.
+- **Repair — only the FLAGGED subset, after owner review, cheapest tier first:** (1) **deterministic (free):**
+  join mid-sentence hard wraps (newline→space); de-hyphenate soft-hyphen / `word-\nfrag` splits. (2) **local
+  word-segmenter (free):** a dictionary/Viterbi segmenter fixes many glued/split cases with no model
+  (`careerdidnotoccurtome` → `career did not occur to me`). (3) **model tier (bounded tokens):** only the
+  residue tiers 1–2 can't confidently fix, **batched** many-per-call and paced. **Transpositions**
+  (`targets must past be set`) are flagged, **never auto-fixed** — owner review only (reordering is too risky).
+- **Bulletproof:** the **original text is always preserved** (frozen manifest + an `original` variant on the
+  note); every fix is **proposed for owner review**, never silent or irreversible. Token math: flagging ≈ free;
+  only the model-tier residue of the flagged subset ever costs tokens — not "millions to scan everything."
+
 ---
 
 ## 6. Replicants vs near-duplicates (get this exactly right)
@@ -342,6 +365,9 @@ DB and the live Notes store are untouched; the output is a fresh store the owner
    stratified sample (a replicant, a consolidated near-dup, an extract, a pointer-note, an archival-provenance
    note) before adoption.
 8. **Reversibility.** Fresh store + untouched original = re-runnable from the frozen JSON manifest at will.
+9. **OCR-quality report.** The free detector's defect counts (glued/split/wrap) + worst offenders are reported;
+   any note whose text is later repaired retains its verbatim **original** (§5a) — repairs are owner-reviewed,
+   never silent.
 
 Every "flag" above lands in a single report; the run **stops for owner review on any non-zero flag class**
 rather than importing best-effort.
@@ -430,6 +456,10 @@ their structure (relative paths unchanged); only the root's own name/location ch
     *Copy*, no text) are **excluded** from import (§2). "Empty" = no text AND no images; **image-only notes are
     content** (images imported), never text-merged; text auto-merge needs text above a min-length floor;
     image-only near-dups match by image content-hash (§6). *Closes the wave-1 empty-body mass-merge finding.*
+14. **OCR-quality flagging & gated repair** — flag glued-words / split-spacing / bad-line-breaks with a **free
+    pure-code detector** over all notes (§5a); repair only the flagged subset, cheapest-tier-first
+    (deterministic → local segmenter → model on the residue), **after owner review, originals preserved**;
+    transpositions flagged, never auto-fixed.
 
 *All owner decisions resolved. DTI-0 discoveries (findings, not decisions): the `Alias` date grammar;
 month-prefix title format; near-dup prevalence + similarity calibration; replicant counts; the name-index
@@ -454,6 +484,7 @@ whenever built, must build **and test all three apps** (memory: shared-core chan
 | **DTI-3 — Archive Notes model changes** *(prerequisite — built as Notes gap-closure, not owned here)* | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI), Related-notes section, and the **5★→3★ rating** switch (§3d). Tier-2 shared-core; build+test all apps. | L | before DTI-4 |
 | **DTI-4 — Materializer** | Write a fresh store: `items/<uuid>/*.md` + `assets/` + `organization.json` (VFolders + memberships) directly, then rebuild index. Idempotent, deterministic, resumable. | M | DTI-2, DTI-3, §8 |
 | **DTI-5 — Verify & reconcile** | Run the §7 gate; produce the report; owner audits a stratified sample; adopt. | M | DTI-4 |
+| **DTI-6 — OCR-quality repair (gated)** | Run the free detector over imported notes; owner reviews the OCR report; apply tier-1/2 (free) fixes + model-tier on the residue — all **proposed for review**, originals preserved (§5a). Iterative, post-adoption-safe. | M | after DTI-5 |
 
 Tooling (extractor/transformer/materializer/verifier) lives under a dedicated dir (e.g.
 `ArchiveNotes/tools/devonthink-import/`) so it doesn't bloat the app; it's deletable after the one-time run,
