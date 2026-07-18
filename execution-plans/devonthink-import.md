@@ -179,8 +179,8 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 | `x-devonthink-item://UUID` → a **PDF/other** record | subset | that record is out-of-scope-as-note but may be an archival PDF → treat as archival provenance if it maps to a `file://` under Archival Photos | else flag |
 | `file://…/Archival Photos/…` | most of 3,034 | normalize everything **before** `Archival%20Photos` to the canonical corpus root → compute path relative to the **Reader root** → durable `archivereader://` link (+ page if present) | path not found on disk after normalization → **flag** (must resolve to a real PDF, §7) |
 | `file://…` Zotero storage PDF | subset | tie to the record's `zotero://` item as a `zoteroAttachment` if resolvable; else flag | flag |
-| `file://…` other (Desktop, `/Volumes/…`) | subset | resolve to a Reader link only if under a Reader root; else record as unresolved-source in the report | flag |
-| `zotero://select/…` | 1,437 | `ZoteroRef` / `zoteroItem` block (`SourceAnchor.zoteroSelect`); optional citation enrichment (§ open decision) | keep select link even if enrichment unavailable |
+| `file://…` other (Desktop, `/Volumes/…`, non-corpus) | few | **flag for owner review; default disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment (owner 2026-07-17; expected rare) | flag |
+| `zotero://select/…` | 1,437 | `ZoteroRef` / `zoteroItem` block (`SourceAnchor.zoteroSelect`); **enrich to a full citation when the local Zotero DB is available, else keep the select link** (owner 2026-07-17) | keep select link even if enrichment unavailable |
 | `https://` / `http://` | 888 | keep as markdown link (unchanged) | — |
 | `DEVONwiki` | 6 | resolve to a note link by target name; else flag | flag |
 | `applewebdata://` | 4 | drop (transient WebKit artifact), log each | logged |
@@ -224,10 +224,14 @@ output) so every rule has a regression test. No transform reaches DEVONthink or 
 - **Near-duplicate** — independent records, **different `uuid`s**, near-identical text (owner's deliberate
   space/nonsense-char trick to carry multiple timeline dates). → **consolidate into one `Item`** whose
   primary date is one occurrence's alias and whose `additional_dates` collect the others' alias dates.
-  Merge policy is **conservative by default**: only auto-merge when the two bodies are byte-identical after
-  a defined normalization (collapse whitespace runs, strip trailing non-alphanumeric noise, NFC-normalize);
-  anything below exact-normalized-match is **flagged for owner review, never auto-merged**. Merges are
-  logged with both source uuids + all dates so every consolidation is auditable and reversible.
+  **Merge policy (owner, 2026-07-17): auto-merge only when normalized-text similarity is ≈98%+ AND the
+  records' `Alias` dates differ** — the exact signature of the owner's pattern (same idea, a space/nonsense
+  char apart, filed under different dates). Anything below the threshold, or with the *same* alias date, is
+  **flagged for owner review, never auto-merged.** Because this is fuzzy (not exact-match), a false merge =
+  irreversible data loss, so: (a) the similarity metric + exact threshold are **calibrated in DTI-0 against
+  real near-dup pairs** before any bulk merge; (b) every auto-merge is logged with both source uuids, a text
+  diff, and all dates; (c) near-threshold merges are additionally surfaced in the review report; and (d)
+  consolidation preserves the **union** of the losers' tags/links/memberships/provenance — nothing is dropped.
 
 `uuid` is the **only** trustworthy discriminator (DT's "duplicate" flag is content-based and unreliable
 for this). This distinction is the highest-severity correctness item in the project.
@@ -259,35 +263,69 @@ rather than importing best-effort.
 
 ---
 
-## 8. Owner prerequisites (must be true before DTI-4)
+## 8. Owner prerequisites (the full checklist)
 
-1. **Archive Reader root over the archival corpus.** Durable-link provenance requires a Reader root (with a
-   `RootMarker` GUID) over `~/Desktop/Google Drive/Archival Photos/`. Confirm one exists (or create it); the
-   materializer needs its GUID + the corpus's on-disk location to compute relative paths.
-2. **A copy of the `.dtBase2`** to extract from, and a *Database Archive* ZIP backup of the original.
-3. **Fresh Archive Notes store root** for output (not the live store).
-4. Decisions in §9 resolved (or explicitly deferred to DTI-0 discovery).
+**Source / DEVONthink side**
+1. DEVONthink 3 installed & licensed (confirmed 3.9.18) and able to open the database. *(met)*
+2. **A working copy of the `.dtBase2`** to extract from — never the original.
+3. **A *Database Archive* (`.zip`) backup** of the original, retained until the migration is verified & adopted.
+4. **Grant Automation (Apple Events) permission** for the extraction script to control DEVONthink (a TCC
+   prompt; per the dev-env notes, TCC grants require the owner in System Settings).
+5. **Close the database in your primary DEVONthink** (or confirm we may open the *copy* in a separate
+   context) — avoids the lock / shared-`uniqueId` conflict (the package showed `isOpen=true` + a `.lock`).
+6. **Confirm the excerpt tag string(s)** (`0 Note Excerpt` / `0 Note Excerpts`) and the "everything else is
+   a note" assumption — or let DTI-0 discover and you confirm.
+7. **Name any OTHER DEVONthink databases** cross-linked from this one (`x-devonthink-item` links can point
+   across databases) so those targets resolve instead of dangling.
+
+**Provenance / Archive Reader side**
+8. **An Archive Reader root over the archival corpus** at `~/Desktop/Google Drive/Archival Photos/` (with a
+   `RootMarker` GUID) — *required* for durable archival provenance links. Confirm the canonical on-disk
+   location and that the referenced PDFs actually live there; the materializer needs the GUID + location to
+   compute relative paths.
+9. **Confirm the canonical path prefix** file:// links normalize to, and whether the
+   `/Volumes/Archival Storage/…` variant is the same corpus.
+
+**Zotero side** (decisions §9.1 & §9.3)
+10. **Zotero installed with its local library accessible** (for citation enrichment of `zotero://` links and
+    the non-archival→Zotero moves). Confirm the library location / Better BibTeX use. If unavailable, zotero
+    links stay as select-links.
+
+**Target / Archive Notes side**
+11. **Adoption model decided** (§9.6, still open) — determines whether we build a fresh store root or write
+    into the existing store.
+12. **DTI-3 net-new features shipped** (multi-date; Related-notes) and building/testing across all apps,
+    before materialize.
+13. If merging into an existing store: confirm what content is already there, to avoid collisions.
+
+**Machine / operational**
+14. **Disk headroom** — the DB copy (~8 GB) + extraction sidecars + the fresh store.
+15. **A multi-hour window** with the machine available for the extraction run.
+16. **Owner availability to adjudicate the review report** (flags, borderline near-dup merges) before adoption.
 
 ---
 
-## 9. Open decisions for the owner (defaults proposed)
+## 9. Decisions (owner, 2026-07-17)
 
-1. **Zotero fidelity** — resolve `zotero://select` to full `ZoteroRef` citations (needs the local Zotero
-   DB / Better BibTeX), or keep the select link + item key only? *Default: keep select link + enrich to a
-   citation when the Zotero DB is available; never block on it.*
-2. **Near-duplicate merge aggressiveness** — confirm the conservative exact-normalized-match-only policy
-   (§6), everything else flagged. *Default: yes, conservative.*
-3. **Non-archival `file://`** (Zotero PDFs, misc Desktop/Volume PDFs) — enrich Zotero ones as attachments;
-   flag the rest for manual disposition? *Default: yes.*
-4. **Minor schemes** — `DEVONwiki`→note-link-or-flag, `applewebdata`→drop+log, `mailto`→keep. *Default as
-   stated.*
-5. **Adoption model** — build a fresh store the owner swaps in wholesale (vs merge into an existing store).
-   *Default: fresh store, wholesale adoption after the §7 gate.*
-6. **One-time vs repeatable** — assume a **one-time** migration (idempotent + re-runnable, but not an ongoing
-   sync). *Confirm.*
+**Locked:**
+1. **Zotero fidelity** — resolve `zotero://select` to a full `ZoteroRef` citation **when the local Zotero DB
+   is available; otherwise keep the select link + item key. Never block on it.**
+2. **Near-duplicate merge** — **auto-merge only when normalized-text similarity ≈98%+ AND the `Alias` dates
+   differ**; everything else → owner review. Metric/threshold calibrated in DTI-0; every merge logged with a
+   diff; losers' tags/links/memberships/provenance preserved as a union (see §6).
+3. **Non-archival `file://`** (Zotero PDFs; misc Desktop/Volume PDFs) — **flag for owner review; default
+   disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment. Expected rare.
+4. **Minor schemes** — `DEVONwiki` → note-link-or-flag; `applewebdata` → drop + log; `mailto` → keep.
+5. **One-time migration** — idempotent + re-runnable from the frozen manifest, but **not** an ongoing sync.
 
-DTI-0 discoveries that are *findings*, not decisions: exact excerpt tag string(s); the `Alias` date
-grammar; the month-prefix title format; near-duplicate prevalence; replicant counts.
+**Still open:**
+6. **Adoption model** — how the imported notes become the live Archive Notes library. Either build a **fresh
+   store** and point the app at it (clean swap; the old store is untouched, so it's reversible), or **merge**
+   the imported notes into the existing store. Pending owner choice (hinges on whether Archive Notes already
+   holds content worth keeping).
+
+*DTI-0 discoveries (findings, not decisions): exact excerpt tag string(s); the `Alias` date grammar;
+month-prefix title format; near-dup prevalence + similarity calibration; replicant counts.*
 
 ---
 
