@@ -13,9 +13,14 @@ whole project as **Tier-2** (adversarial review + functional tests on scratch co
 
 ## 0. What we're importing (ground truth from the sample)
 
-Source: `Test Files/Devonthink database/Devonthink database for export.dtBase2` — a **DEVONthink 3**
-database (`.dtBase2`; the `DEVONthink-1..10.dtMeta` files are numbered shards, *not* "version 4"),
-**7.6 GB**, database name **"Meritocracy Project"**. DEVONthink 3.9.18 is installed and scriptable.
+Source: **two** DEVONthink 3 databases (`.dtBase2`; the `DEVONthink-1..10.dtMeta` files are numbered shards,
+*not* "version 4"). DEVONthink 3.9.18 is installed and scriptable.
+- **`Devonthink database for export.dtBase2`** — the note corpus, **7.6 GB**, database **"Meritocracy
+  Project"** (~40k notes/excerpts; the import payload).
+- **`Photo Database.dtBase2`** — **1.8 GB**, photo records named `NNNNN IMG — <Collection>` (e.g.
+  `04157 IMG — Brown.pdf`), used by a small number of recent notes. **Not imported as notes**; extracted only
+  so cross-database photo links resolve — every one of its photos also lives in the Archival Photos root, so
+  we resolve by **name/ID** (§4a).
 
 Corpus profile (measured, whole DB):
 
@@ -43,15 +48,20 @@ Embedded-link scheme distribution across all rich text (HYPERLINK targets):
 | broken `file` (no scheme prefix, doubled path, trailing `%22`) | ≥1 | corrupt links to repair |
 
 Key patterns confirmed by sampling (drive the transform rules in §5):
-- **Extracts** are tagged `0 Note Excerpt` **or** `0 Note Excerpts` (exact string(s) TBD in DTI-0);
-  everything else is a **note**. An extract ends with a DEVONthink link = its provenance.
+- **Extracts** are tagged **`0 Note Excerpts`** (confirmed by owner); everything else is a **note**. An
+  extract ends with a DEVONthink link = its provenance. Quality tags `10 Good Note Excerpts` / `12 Best Note
+  Excerpts` → 2★/3★ (§3d).
+- **Every archival photo has a stable ID-name** `NNNNN — <Collection>` (e.g. `00140 — Swarthmore.pdf`), with
+  a JPEG partner mirrored at `Archival Photos JPEGS/<Collection>/00140 — Swarthmore.jpg`. Folders get
+  **renumbered over time** (a link's `05 A Initial Tagging` is now `04 A Initial Tagging` in the live root),
+  so archival links resolve by **name, not path** (§4a).
 - **Broken DEVONthink links** have a single space inside the UUID at a hyphen boundary, e.g.
   `x-devonthink-item://EF7851F5-6F3C-4373-90C5- BE14C6B8AAD5`. UUID is fixed `8-4-4-4-12` → deterministic repair.
 - **`file://` prefix variants before `Archival%20Photos`** seen: `/Users/olduser/Google Drive/…`,
-  `/Users/<user>/Desktop/Google Drive/…` (current canonical, matches the live corpus at
-  `~/Desktop/Google Drive/Archival Photos/`), `/Users/<user>/Google Drive/…`,
-  `/Volumes/Archival Storage/…`, and a corrupted `/Userolduseren/…`. Non-archival `file://` also exists
-  (Zotero storage PDFs; a Desktop "D's revision" PDF).
+  `/Users/<user>/Desktop/Google Drive/…` (current canonical), `/Users/<user>/Google Drive/…`,
+  `/Volumes/Archival Storage/…` (540 links — some to an *external* "Microelectronics News" collection **not**
+  in the root), and a corrupted `/Userolduseren/…`. Non-archival `file://` also exists (Zotero storage PDFs;
+  a Desktop "D's revision" PDF). ~1,100 links point into **numbered processing folders** (`01`–`06`).
 - **Dates live in DEVONthink's `Alias` field** (per-record metadata, NOT in the file body) → readable only
   via scripting. Some **titles are month-prefixed** ("Nov: …") — but on-disk filenames are sanitized, so
   title rules must run against the DEVONthink `name` property, not the filename (a filename scan found 0).
@@ -192,10 +202,13 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 |---|---:|---|---|
 | `x-devonthink-item://UUID` → a **note** | ~26k | resolve UUID → imported note's new id. Role decides shape: **trailing** on an extract → `note-passage` provenance; **leading run** on a note → Related-notes entry; **inline** → inline `archivenotes://open?id=…` link | UUID not in manifest → **flag** (unresolved), never silently drop |
 | …with a **space in the UUID** | subset | repair: remove interior space, re-validate `8-4-4-4-12`, then resolve as above | fails validation → flag |
-| `x-devonthink-item://UUID` → a **PDF/other** record | subset | that record is out-of-scope-as-note but may be an archival PDF → treat as archival provenance if it maps to a `file://` under Archival Photos | else flag |
-| `file://…/Archival Photos/…` | most of 3,034 | normalize everything **before** `Archival%20Photos` to the canonical corpus root → compute path relative to the **Reader root** → durable `archivereader://` link (+ page if present) | path not found on disk after normalization → **flag** (must resolve to a real PDF, §7) |
+| `x-devonthink-item://UUID` → a **Photo Database** record | small | cross-DB: look up the record's **name/ID** in the Photo Database manifest → resolve that photo **by name** in the Archival Photos root → durable `archivereader://` link (§4a) | name not found in root → **flag** |
+| `x-devonthink-item://UUID` → other out-of-scope record | subset | if it maps to an archival photo, route via §4a; else flag | flag |
+| `file://…/Archival Photos/…` | most of 3,034 | **resolve by name/ID (§4a), not by path** → durable `archivereader://` link into the Reader root (+ page if present) | name not found in root → **flag** (§7) |
+| `file://…/Volumes/Archival Storage/…` | 540 | if the photo's name/ID resolves in the Archival Photos root → §4a; the **"Microelectronics News"** subset is **not** in the root → **flag for owner review** | flag |
+| `file://…` into a **numbered processing folder** (`01`–`06`) | ~1,100 paths | resolve by name/ID (§4a) — most now live in a permanent collection; those still **only** in a processing folder (will move out post-migration) → **flag** | flag |
 | `file://…` Zotero storage PDF | subset | tie to the record's `zotero://` item as a `zoteroAttachment` if resolvable; else flag | flag |
-| `file://…` other (Desktop, `/Volumes/…`, non-corpus) | few | **flag for owner review; default disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment (owner 2026-07-17; expected rare) | flag |
+| `file://…` other (Desktop, non-corpus) | few | **flag for owner review; default disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment (owner 2026-07-17; expected rare) | flag |
 | `zotero://select/…` | 1,437 | `ZoteroRef` / `zoteroItem` block (`SourceAnchor.zoteroSelect`); **enrich to a full citation when the local Zotero DB is available, else keep the select link** (owner 2026-07-17) | keep select link even if enrichment unavailable |
 | `https://` / `http://` | 888 | keep as markdown link (unchanged) | — |
 | `DEVONwiki` | 6 | resolve to a note link by target name; else flag | flag |
@@ -204,15 +217,35 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 
 **Corrupt links** (e.g. the observed `olduser/olduser/…Archival%20Photos/…pdf%22` — doubled segment, missing
 `file:///Users/` prefix, stray `%22`): a repair pass strips the trailing `%22`, de-dupes the doubled
-segment, and re-anchors on `Archival%20Photos`, then routes through the archival rule. Anything the repair
-can't confidently fix is flagged, never guessed.
+segment, and re-anchors on `Archival%20Photos`, then routes through §4a. Anything the repair can't
+confidently fix is flagged, never guessed.
+
+### 4a. Archival photo resolution — by stable name/ID, not path
+Every archival photo carries a stable ID-name `NNNNN — <Collection>` (e.g. `00140 — Swarthmore`); the same
+photo is referenced from many stale paths (old usernames, `/Volumes/…`, renumbered processing folders, the
+Photo Database) but its **name never changes**. So the importer:
+1. **Builds a name→path index** of the live Archival Photos root once (all `.pdf`, plus `.jpg`/`.jpeg` under
+   it). Key = normalized ID-name (strip extension, collapse spacing, drop the Photo Database's `IMG` token,
+   NFC). **Detect and report any duplicate/ambiguous names** (a collision must not silently pick the wrong file).
+2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder
+   paths, and Photo Database cross-DB links all collapse to "find `NNNNN — <Collection>` in the root."
+3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>[&page=n]`** to the
+   resolved file. Keyed on the **root GUID + current relative path**, so a later **root rename/move is safe**
+   (§8 root-rename): Reader re-establishes the root at the new location under the same `RootMarker` GUID.
+4. **JPEG partner (to-consider):** the matching `.jpg` sits at the mirror path under `Archival Photos JPEGS/`
+   (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). Worth considering whether the
+   Reader image entity — and thus the Notes link — can reference **both** (PDF by default, JPEG when finer
+   detail is needed). Captured as a potential Suite feature, not a hard requirement of this import.
+5. **Unresolved → flag**, never a guessed path: names not in the root (the external "Microelectronics News"
+   collection; photos still only in a processing folder; oddball `.docx`/`.wav`/`.jpf` targets).
 
 ---
 
 ## 5. Transform details (DTI-2)
 
-- **Note vs extract:** by the excerpt tag(s) confirmed in DTI-0. Assert every record classifies as exactly
-  one; report any record with neither/both.
+- **Note vs extract:** by the `0 Note Excerpts` tag. Assert every record classifies as exactly one; report
+  any record with neither/both. (DTI-0 confirms whether `Good/Best Note Excerpts` records also carry it — §3d.)
+- **Archival links:** resolve via the name/ID index (§4a), spanning both databases; emit durable Reader links.
 - **Quality & control tags (§3d):** map `12 Best Note Excerpts`→3★, `10 Good Note Excerpts`→2★ into
   `Item.quality` (3★ scale); **strip every number-prefixed control tag** (`0/10/12 …`) from `Item.tags` so
   only real subject tags survive. Any other `N …`-prefixed tag → report for an explicit decision, never a
@@ -286,41 +319,50 @@ rather than importing best-effort.
 ## 8. Owner prerequisites (the full checklist)
 
 **Source / DEVONthink side**
-1. DEVONthink 3 installed & licensed (confirmed 3.9.18) and able to open the database. *(met)*
-2. **A working copy of the `.dtBase2`** to extract from — never the original.
-3. **A *Database Archive* (`.zip`) backup** of the original, retained until the migration is verified & adopted.
-4. **Grant Automation (Apple Events) permission** for the extraction script to control DEVONthink (a TCC
-   prompt; per the dev-env notes, TCC grants require the owner in System Settings).
-5. **Close the database in your primary DEVONthink** (or confirm we may open the *copy* in a separate
-   context) — avoids the lock / shared-`uniqueId` conflict (the package showed `isOpen=true` + a `.lock`).
-6. **Confirm the excerpt tag string(s)** (`0 Note Excerpt` / `0 Note Excerpts`) and the "everything else is
-   a note" assumption — or let DTI-0 discover and you confirm.
-7. **Name any OTHER DEVONthink databases** cross-linked from this one (`x-devonthink-item` links can point
-   across databases) so those targets resolve instead of dangling.
+1. ✅ DEVONthink 3 installed & able to open the DBs (3.9.18).
+2. ✅ **Working copies of both `.dtBase2` files** (Meritocracy + Photo Database) to extract from — never the originals.
+3. ✅ **A *Database Archive* (`.zip`) backup** of the originals, kept until verified & adopted.
+4. ⏳ **Grant Automation (Apple Events) permission** so the extraction script can control DEVONthink —
+   walkthrough provided (a TCC prompt on first run, or pre-grant in System Settings ▸ Privacy & Security ▸
+   Automation).
+5. 🔔 **Close the databases in your primary DEVONthink at launch** (or OK opening the copies in a separate
+   context) — avoids the lock / shared-`uniqueId` conflict (`isOpen=true` + a `.lock` were present). *Remind at launch.*
+6. ✅ **Excerpt tag = `0 Note Excerpts`** (confirmed). DTI-0 still checks whether `Good/Best Note Excerpts`
+   records also carry it (§3d).
+7. ✅ **Second database identified: `Photo Database`** — extracted for name-based cross-DB photo resolution
+   (§4a), not imported as notes.
 
 **Provenance / Archive Reader side**
-8. **An Archive Reader root over the archival corpus** at `~/Desktop/Google Drive/Archival Photos/` (with a
-   `RootMarker` GUID) — *required* for durable archival provenance links. Confirm the canonical on-disk
-   location and that the referenced PDFs actually live there; the materializer needs the GUID + location to
-   compute relative paths.
-9. **Confirm the canonical path prefix** file:// links normalize to, and whether the
-   `/Volumes/Archival Storage/…` variant is the same corpus.
+8. ✅ **Archive Reader root over `~/Desktop/Google Drive/Archival Photos/`** (path confirmed; needs a
+   `RootMarker` GUID). **Post-migration root rename is supported — see §8a.** The `01`–`06` processing folders
+   may move out of the root afterward; any note resolving only into them is flagged pre-adoption (§4a/§4).
+9. ✅ **`/Volumes/Archival Storage` + JPEGs understood** (see the #9 answer): archival targets resolve by name
+   (§4a); the external "Microelectronics News" subset (not in the root) is flagged; `.jpg`/`.jpeg` map to
+   `Archival Photos JPEGS/`.
 
-**Zotero side** (decisions §9.1 & §9.3)
-10. **Zotero installed with its local library accessible** (for citation enrichment of `zotero://` links and
-    the non-archival→Zotero moves). Confirm the library location / Better BibTeX use. If unavailable, zotero
-    links stay as select-links.
+**Zotero side**
+10. ✅ **Zotero installed with its local library accessible** (citation enrichment + non-archival→Zotero moves).
 
 **Target / Archive Notes side**
-11. **Fresh output store root** for the import to build into (§9.7 — fresh-store swap; the live store is not
+11. ✅ **Fresh output store root** for the import to build into (fresh-store swap, §9.7; the live store is not
     written to until you adopt).
-12. **DTI-3 net-new features shipped** (multi-date; Related-notes; 3★ rating) and building/testing across all
-    apps, before materialize.
+12. ⏳ **App feature-complete before import** — multi-date, Related-notes, and the 3★ rating are **built first
+    as Notes gap-closure**; this plan **assumes** them and specifies the requirements (§3a/§3b/§3d), it does
+    not own building them. *("Making a plan for how to import once the app is complete.")*
 
 **Machine / operational**
-14. **Disk headroom** — the DB copy (~8 GB) + extraction sidecars + the fresh store.
-15. **A multi-hour window** with the machine available for the extraction run.
-16. **Owner availability to adjudicate the review report** (flags, borderline near-dup merges) before adoption.
+13. ✅ **Disk headroom — 45 GB free**; the two DB copies (~9.4 GB) + sidecars + fresh store fit comfortably
+    (exact sizes reconfirmed in DTI-0).
+14. 🔔 **A multi-hour window** with the machine free for the extraction run. *Remind when ready.*
+15. ✅ **Owner availability to adjudicate the review report** (flags, borderline near-dup merges) before adoption.
+
+### 8a. Renaming the root folder after migration (owner request)
+The `Google Drive` folder name is historical (it isn't Google Drive). Renaming/moving the root **after**
+migration is **low-risk by design**, because durable links don't hard-code the path: each `archivereader://`
+link is `root=<GUID>&rel=<relative-path>`. Steps: (1) rename/move the folder; (2) re-point the Archive Reader
+root at the new location — it keeps the same `RootMarker` GUID (`.archive-suite-root.json` travels with the
+folder), so every Notes link keeps resolving. **Constraint honored:** the non-numbered collection folders keep
+their structure (relative paths unchanged); only the root's own name/location changes.
 
 ---
 
@@ -340,24 +382,37 @@ rather than importing best-effort.
    `10 Good Note Excerpts`→2★; number-prefixed control tags are stripped, not imported as subjects (§3d).
 7. **Adoption model** — **fresh-store swap**: build the import into a new store, verify it against the §7
    gate, then point Archive Notes at it (the prior store is left untouched → fully reversible). *No merge.*
+8. **Excerpt tag** — `0 Note Excerpts` (confirmed); `10 Good` / `12 Best Note Excerpts` → 2★/3★ (§3d).
+9. **Archival resolution by name/ID** (§4a), across both DBs — a note→photo link (file://, `/Volumes`,
+   processing-folder path, or a **Photo Database** cross-DB link) resolves by the stable `NNNNN — <Collection>`
+   name in the Archival Photos root, not by path.
+10. **Numbered processing folders (`01`–`06`)** — name-resolve; a photo found only in a processing folder
+    (which moves out post-migration) is **flagged**. `/Volumes` "Microelectronics News" (not in root) → flag.
+11. **Root rename after migration** — supported; durable links survive (§8a).
+12. **PDF/JPEG dual reference** — a *to-consider* Suite feature (Reader image entity referencing both PDF and
+    its JPEG partner), not a hard requirement of this import (§4a).
 
-*All owner decisions resolved. DTI-0 discoveries (findings, not decisions): exact excerpt tag string(s); the `Alias` date grammar;
-month-prefix title format; near-dup prevalence + similarity calibration; replicant counts.*
+*All owner decisions resolved. DTI-0 discoveries (findings, not decisions): the `Alias` date grammar;
+month-prefix title format; near-dup prevalence + similarity calibration; replicant counts; the name-index
+normalization + any duplicate/ambiguous photo names; whether `Good/Best Note Excerpts` records also carry the
+`0 Note Excerpts` marker; a sweep for other `N …` control tags.*
 
 ---
 
 ## 10. Phases & sequencing
 
-Each phase is bounded, reviewed (Tier-2), and leaves an inspectable artifact. Shared-`ArchiveCore`/`Item`
-changes (DTI-3) must build **and test all three apps** (memory: shared-core changes rebuild Reader +
-Processor + Notes), not just Notes.
+Each phase is bounded, reviewed (Tier-2), and leaves an inspectable artifact. **DTI-3 (the model changes) is
+assumed already shipped** as Notes gap-closure before the import runs (owner: "a plan for how to import once
+the app is complete") — it is listed only as the dependency it is. Those shared-`ArchiveCore`/`Item` changes,
+whenever built, must build **and test all three apps** (memory: shared-core changes rebuild Reader + Processor
++ Notes).
 
 | Phase | Deliverable | Effort | Depends |
 |---|---|---:|---|
-| **DTI-0 — Spike & ground truth** | JXA extraction spike on a **copy**, run over a 300–500 record sample; corpus-profile report answering §9 findings (excerpt tag, alias grammar, month-prefix, replicant/near-dup prevalence). De-risks everything. | M | copy of DB |
-| **DTI-1 — Full extraction** | Complete JXA dump → frozen JSON manifest (all fields incl. `parents`) + content sidecars (HTML w/ hrefs, rtfd media) + count cross-check vs Metadata Overview TSV. | L | DTI-0 |
-| **DTI-2 — Transform library** | Pure, unit-tested transform: classify, dates, link contract (§4), replicant/near-dup (§6), blocks/assets. Fixture corpus + golden tests. Emits the import model + a dry-run report. | L | DTI-1 |
-| **DTI-3 — Archive Notes model changes** | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI), Related-notes section, and the **5★→3★ rating** switch (§3d). Tier-2 shared-core; build+test all apps. | L | (parallel w/ DTI-2) |
+| **DTI-0 — Spike & ground truth** | JXA extraction spike on **copies of both DBs** over a 300–500 record sample; **build the Archival Photos name/ID index** (§4a) + report duplicate/ambiguous names; corpus-profile report on the §9 findings (alias grammar, month-prefix, near-dup calibration, replicant counts, `Good/Best`-overlay, other control tags). De-risks everything. | M | copies of both DBs |
+| **DTI-1 — Full extraction** | Complete JXA dump of **both databases** → frozen JSON manifest (all fields incl. `parents`; Photo Database → uuid→name only) + content sidecars (HTML w/ hrefs, rtfd media) + count cross-check vs Metadata Overview TSV. | L | DTI-0 |
+| **DTI-2 — Transform library** | Pure, unit-tested transform: classify, dates, link contract (§4/§4a), replicant/near-dup (§6), blocks/assets. Fixture corpus + golden tests. Emits the import model + a dry-run report. | L | DTI-1 |
+| **DTI-3 — Archive Notes model changes** *(prerequisite — built as Notes gap-closure, not owned here)* | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI), Related-notes section, and the **5★→3★ rating** switch (§3d). Tier-2 shared-core; build+test all apps. | L | before DTI-4 |
 | **DTI-4 — Materializer** | Write a fresh store: `items/<uuid>/*.md` + `assets/` + `organization.json` (VFolders + memberships) directly, then rebuild index. Idempotent, deterministic, resumable. | M | DTI-2, DTI-3, §8 |
 | **DTI-5 — Verify & reconcile** | Run the §7 gate; produce the report; owner audits a stratified sample; adopt. | M | DTI-4 |
 
@@ -373,8 +428,9 @@ but keep it in git for reproducibility until adoption is final.
   reconciliation-gate architecture; stop-on-flag; conservative near-dup merges; nothing best-effort.
 - **Replicant/near-dup confusion** → strict `uuid` discriminator (§6); highest-severity review focus.
 - **Alias/date misparse** → tabulated grammar with flag-on-unknown; no guessed dates.
-- **Archival links unresolvable** (stale paths, Reader root missing) → normalization table + filesystem
-  probe in the gate; §8 prerequisite.
+- **Archival links unresolvable** (stale paths, renumbered/moved folders, external volumes, cross-DB) →
+  **name/ID index** (§4a) instead of path matching + a filesystem probe in the gate; unresolved → flag; §8
+  prerequisite. **Ambiguous/duplicate photo names** in the root are reported, never silently picked.
 - **Scale (7.6 GB / 40k)** → extraction may be slow in JXA; batch by group, checkpoint, resume; run on a copy
   so a re-run is free.
 - **Live-app / live-corpus mutation** → operate on a DB copy and a fresh output store; original untouched
