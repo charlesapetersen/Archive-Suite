@@ -26,6 +26,17 @@ thumbnails (B4), note-level Zotero attach/citation/auto-fill (B1/B2), round-ups 
 `archivenotes://open` (B5) — or are plan-stated deferrals (quick-preview *page* navigation = the
 "page-within-merged-PDF scroll navigation" deferral in the out-of-scope list); those are **not** re-flagged.
 
+**Addendum — 2026-07-17 W14.4 live GUI-verification pass.** A sighted GUI drive (`ops/gui/capture-window.sh`
++ `cliclick`, on the scratch `AN-GUI-Fixture` only) verified the shipped W14.4 polish cluster end-to-end and
+reconciled it against this plan: **(b)** window-raise on Jump-to-Source (→ Notes window fronts + source
+selected) and on Create Extract (→ Extracts window fronts + new extract selected); **(c)** reactive
+provenance-chip refresh (changing the source note's year in the Notes window relabeled the extract's chip in
+the Extracts window with no reopen, cross-window; the raw-markdown snapshot stayed unchanged); **(d)**
+per-window Sources column default (Note window hides it, Extracts shows it). Three reconciliations came out of
+that pass: **D5 is already shipped** by W14.4b (annotated below — not an open gap); **B3's title-rename gap is
+now live-confirmed** (annotated below); and one new **cosmetic** item (chip-scroll visibility) is folded into
+**D12**.
+
 ---
 
 ## Summary of gaps by phase
@@ -120,6 +131,7 @@ claims editing lives in the inspector.
 - *Files:* `.../Core/NotesModel.swift` (+`mutateItem`), `.../Views/NoteMetadataInspector.swift`, `.../Views/NotesTableView.swift` (comment), optionally `.../Views/NotesContextMenu.swift`.
 - *Steps:* add `setTitle(_:to:)` and `setTags(_:to:)` on `NotesModel` routed through the audited `mutateItem` path; `setTitle` triggers the store's title→filename re-sync; `setTags` must run the front-matter write **and** `NotesTagProjector` so Finder tags stay in sync (Tier-2 write seam). Add a title field + a tag editor to the inspector; correct the `NotesTableView` comment.
 - *Verify:* rename persists + renames the `.md`; tag edits update front-matter *and* the projected Finder tags with all safety invariants (assert on a scratch store). **Tier-2** (tag projection + rename). *Done:* a note can be retitled and re-tagged in-app; `NotesTagProjectorSafetyTests`-style assertions extended.
+- *Live-confirmed (2026-07-17 GUI drive, scratch fixture):* the title half of this gap was verified end-to-end — there is **no in-app note-title rename path today**: the detail-pane title is a static (non-focusable) label (clicking it focuses the list table), list rows are not inline-editable (double-click and Return do nothing), and there is no Rename in the Edit menu, the Note menu, or the item-row context menu. So `setTitle` + a title editor is a real, reachable-by-users gap, not just missing library code. (The W14.4(c) reactive chip refresh was still verified by mutating the source's *year* — the same `itemsGeneration` re-style path — so only the *editing* affordance is missing, not the reactive plumbing.)
 
 **B4. Wire page-thumbnail rendering end-to-end.** — **MED** — `04` S2/S4/S6. `PDFThumbnailer` +
 `ThumbnailImageCache` are built/tested but never instantiated; Reader passes `thumbnailer: nil` at every
@@ -246,14 +258,14 @@ Each is small and independently shippable; Tier-1 unless noted.
 - **D2. Flesh out the item-row context menu** (LOW-MED) — `06` S3. Add Open / Reveal in Finder / New from Template / Set Quality ▸ / Delete… (Copy Archive Link stays W4). *Files:* `.../Views/NotesContextMenu.swift`.
 - **D3. Template body editing in-app** (LOW-MED) — `06` S6. Route template selection through `NoteStore` template load/save into `NoteEditorPane`. *Files:* `.../Views/TemplatesManagerView.swift`.
 - **D4. Quality quick-edit** (LOW) — `06` S7. Add the inline borderless quality `Menu` (None + 5–1) to the list/detail cell and a context-menu "Set Quality ▸". *Files:* `.../Views/QualityControl.swift`, `NotesTableView.swift`.
-- **D5. Raise/select a newly created extract** (LOW-MED) — `07` S2. `createExtract` returns an id; raise `NotesWindowID.extracts` and select it. *Files:* `.../Editor/EditorFormatting.swift`, `.../Core/NotesModel.swift`.
+- **D5. Raise/select a newly created extract** — **DONE (shipped in W14.4b; live-verified 2026-07-17).** `07` S2. `createExtract`/`appendToExtract` now route through `NotesModel.openItem`, which raises the Extracts window and selects the new/updated extract. GUI drive confirmed it end-to-end: with the Notes window frontmost and a passage selected, Create Extract flipped the front window Notes→Extracts and the new extract was selected. No further work. *Files (shipped):* `.../Core/NotesModel.swift`, `.../Editor/EditorFormatting.swift`.
 - **D6. `roundup` date field: UI or removal** (LOW-MED) — overview/`06`–`07`. Field persists + round-trips but has no UI and is always `false`. Either add the "round to year / circa" affordance in the date inspector or remove the field + its codec handling. *Files:* `.../Views/NoteMetadataInspector.swift`, `.../Store/Item.swift`, `FrontMatterCodec.swift`.
 - **D7. Raw→styled parse-failure banner / stay-in-raw** (LOW) — `03` §6. Detect a genuine parse failure in `switchMode` and surface the non-destructive banner instead of degrading silently. *Files:* `.../Editor/MarkdownEditorView.swift`.
 - **D8. Empty-state UI** (LOW) — overview G2. Add an empty state for an empty note list / empty folder. *Files:* `.../Views/NotesBrowserView.swift`.
 - **D9. Smart-folder live match-count badge** (LOW) — `06` S2/S3. Compute the count for smart rows (search already exists). *Files:* `.../Core/NotesFolderNode.swift`, `NotesFolderTreeView.swift`.
 - **D10. Extract inspector provenance summary** (LOW) — `07` S4. Detail-pane list of distinct source notes + counts (aggregate count column already exists). *Files:* `.../Views/NoteMetadataInspector.swift` / a new inspector section.
 - **D11. Editor large-paste off-main parse** (LOW-MED perf) — `03` S6. `MarkdownBridge` is `@MainActor` and `insertLargeTextAsync` parses inside `MainActor.run`; either make the parse produce a Sendable AST off-main (as designed) or drop the "pure nonisolated" header claim + stale comment. *Files:* `.../Editor/MarkdownBridge.swift`, `EditorTextView.swift`.
-- **D12. Small correctness/coverage/cosmetic** (LOW): block-header chip thumbnail render (`03` §8); ordered-list renumber-from-first (`03`); focus-on-appear focus-token (`03` §1); drop move-vs-copy cursor + AppKit drop reliability (`06` §5); wrap Trash delete in `NSFileCoordinator` (`06` §5 — intent already met); extract paste degradation status string (`07` §5); e2e-durable-links.sh step-5 negative parity (`08` §4.5); delete vestigial `NoteBody`/`NoteBlock` dead types (`03`); add `nestedListMixed` + debounce/snapshot unit tests (`03`/`06`). Retire or extract the `SearchGeneration` helper (`02`) and add the filename↔front-matter divergence log line (`02`).
+- **D12. Small correctness/coverage/cosmetic** (LOW): block-header chip thumbnail render (`03` §8); ordered-list renumber-from-first (`03`); focus-on-appear focus-token (`03` §1); drop move-vs-copy cursor + AppKit drop reliability (`06` §5); wrap Trash delete in `NSFileCoordinator` (`06` §5 — intent already met); extract paste degradation status string (`07` §5); e2e-durable-links.sh step-5 negative parity (`08` §4.5); delete vestigial `NoteBody`/`NoteBlock` dead types (`03`); add `nestedListMixed` + debounce/snapshot unit tests (`03`/`06`). Retire or extract the `SearchGeneration` helper (`02`) and add the filename↔front-matter divergence log line (`02`). **Provenance-chip initial visibility (2026-07-17 GUI drive):** on item selection — and after a raw⇄styled toggle — the compact detail-pane editor can render scrolled past block 0, so an extract's note-passage provenance chip is hidden until a manual scroll-to-top; scroll the editor to its top on item load so the chip (the whole point of an extract) is visible without interaction. *Files:* `.../Views/NoteEditorPane.swift` / `.../Editor/MarkdownEditorView.swift`.
 
 ---
 
