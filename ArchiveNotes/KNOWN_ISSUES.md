@@ -344,6 +344,11 @@ no-op (no mod-date churn), shared-convention title-casing, the §7 label-drift g
 byte-equality assertion on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector`
 (see below). All green; existing `NotesTagProjectorTests` (9) unaffected.
 
+- **LATENT — PROMOTED → Wave 15 (owner review 2026-07-18).** Now tracked as **W15.tu3** in `SUITE_TODO.md`
+  §"Known-issues work — Wave 15" (a per-resolved-path serialization actor/lock inside `CoordinatedTagWriter`),
+  bundled with the Processor's "lossless Finder-tag undo" item because both land on the same shared writer.
+  **Cross-process writers stay explicitly out of scope** — an in-process lock cannot cover them. Still latent
+  (not an active bug) until then; original analysis below.
 - **LATENT (found by this suite; NOT fixed — shared cross-app choke-point) — two concurrent same-file
   metadata writes can lose a racing tag.** `ArchiveCore.CoordinatedTagWriter.write` coordinates via
   `NSFileCoordinator(.contentIndependentMetadataOnly)`, which does **not** mutually-exclude two

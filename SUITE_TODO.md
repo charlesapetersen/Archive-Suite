@@ -321,6 +321,73 @@ Legend as above.
 output** (A11, MED, Drive-milestone) lives entirely in the **Google-Drive relay path**, which is **ON HOLD /
 maintain-only** (see §Project focus). Leave parked until the Drive milestone is un-held; do not build it unattended.
 
+## Known-issues work — Wave 15 (shared tag writer; owner-reviewed 2026-07-18)
+Promoted from `ArchiveProcessor/KNOWN_ISSUES.md` → "lossless Finder-tag undo must preserve duplicate
+occurrences" [MED · shared contract], **bundled with** `ArchiveNotes/KNOWN_ISSUES.md` → the W8-S2 latent
+concurrent-write race. Both land on the same `ArchiveCore.CoordinatedTagWriter` choke-point, so the shared
+serialization/reconcile layer gets built once instead of paying the shared-Core Tier-2 tax twice.
+
+**Owner review 2026-07-18 settled three questions — do not re-litigate:**
+1. **Scope** = bundle the two items (this wave).
+2. **Restore semantics** = **occurrence-only**: undo restores the correct *count* of each token; position/order
+   is **not** guaranteed (macOS reorders on write and the SPEC already compares as a multiset, so exact-order
+   restoration is unobservable and buys nothing).
+3. **No persisted undo ledger** — undo stays in-memory/session-scoped, so `TagDelta` needs **no**
+   `Codable`/versioning. The CLAUDE.md §12 audit ledger stays unbuilt; it is a separate future item.
+
+**Verified during the review (established facts, don't re-derive):** macOS **does** persist duplicate tag
+strings — a scratch probe round-tripped `["A","A","B"]` through both `setResourceValue(.tagNamesKey)` and raw
+`setxattr`, so this is a real on-disk state, not theoretical. Forward writes are **already** duplicate-lossless
+(untouched tokens kept verbatim + multiset verify) and **color-label undo is already exact**
+(`.restoreLabel(Int?)` is a single `Int?` — no multiplicity problem, out of scope). Only the **inverse/undo**
+loses occurrences, and closing it needs **both** fixes below: the inverse is computed by `Set` subtraction
+(`TagWrite.swift:191-196`) **and** the apply path refuses to re-add an already-present token
+(`TagWriter.swift:52`) — fixing either one alone still loses the duplicate.
+
+All five are **Tier-2** (shared audited tag writer) and must **build + test all three apps** (Reader +
+Processor + Notes) per the shared-Core rule. All are daemon-buildable ($0, no key, no GUI, no hardware) and
+verified on **scratch copies only — never the corpus**. Legend as above.
+- [ ] **W15.tu0 — pin the macOS duplicate-tag fact in SPEC + a test [S].** Add a scratch unit test asserting
+  `["A","A","B"]` survives a `setResourceValue(.tagNamesKey)` write→read round-trip (pattern:
+  `TagWriterPrimitiveTests.makeFile` — temp dir + teardown), and record the verified fact in
+  `SPEC/tag-format.md` beside the existing multiset-comparison rule. Pure test + doc, no behavior change —
+  this is the premise the rest of the wave rests on, so it lands first.
+  | files: packages/ArchiveCore/Tests/ArchiveCoreTests/, SPEC/tag-format.md | S | low | none
+- [ ] **W15.tu1 — occurrence-aware undo inverse in ArchiveCore [M].** Compute the undo inverse from
+  before/after **without collapsing to `Set`** (`packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift:191-196`),
+  carrying per-token multiplicity. **Occurrence-only** per the owner decision (count, not order). Additive
+  representation alongside `TagDelta`; ordinary **user-edit** deltas stay set-like and unchanged. No consumer
+  rewiring in this sub-task — keep the diff auditable.
+  | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift | M | med | none
+- [ ] **W15.tu2 — multiplicity-aware apply/restore + wire Reader undo** (blocked-on: W15.tu1) **[M].** Today
+  the add step only adds a token when absent (`ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift:52`),
+  so it would refuse to re-introduce a duplicate even with a correct inverse. Make the undo/restore path
+  multiplicity-aware and route it through a **bounded reconcile step** (fresh read + occurrence diff), then
+  wire Reader's `NavigationModel.undoLast`. **Must preserve today's Safety-Protocol §9 guarantee:** an
+  unrelated concurrent tag edit made between the edit and the undo still survives.
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift, Views/NavigationModel.swift | M | med | none
+- [ ] **W15.tu3 — per-path write serialization → closes the Notes lost-update race** (blocked-on: W15.tu1)
+  **[M].** `NSFileCoordinator(.contentIndependentMetadataOnly)` does **not** mutually-exclude two concurrent
+  metadata-only write *claims* on one file, so two parallel projections each read pre-write state and the
+  later `setxattr` wins (a lost update). Latent today only because all three apps are one-writer-per-file.
+  Add a per-resolved-path serialization actor/lock **inside** `CoordinatedTagWriter`, designed together with
+  tu2's reconcile layer. **Cross-process writers are explicitly out of scope** — an in-process lock cannot
+  cover them; say so in the code comment rather than implying a guarantee that doesn't hold.
+  | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift | M | med | none
+- [ ] **W15.tu4 — cross-app duplicate + concurrency fixtures** (blocked-on: W15.tu2, W15.tu3) **[M].** Shared
+  scratch fixtures exercised against all three callers — Reader `TagWriter`, Processor `MacOSTagger`, Notes
+  `NotesTagProjector`: (a) `["A","A"]` → remove the subject → undo → the on-disk **multiset** is `["A","A"]`
+  (the case that silently loses one token today); (b) concurrent-injection — an unrelated tag added between
+  edit and undo survives; (c) two parallel writes to one scratch file **both** survive, which flips the
+  assertion `NotesTagProjectorSafetyTests.concurrentProjectionsNeverCorrupt` deliberately does *not* make
+  today. Gate = `swift test` in `packages/ArchiveCore` **plus** all three app test bundles green.
+  | files: packages/ArchiveCore/Tests/, ArchiveReader/Tests/, ArchiveNotes/macOS/Tests/ | M | med | none
+
+**Explicitly NOT in Wave 15:** the persisted/versioned undo **audit ledger** (Reader `CLAUDE.md` Safety
+Protocol §12 — documented but never built; undo is an in-memory `NavigationModel.undoStack` today). Owner
+decision 2026-07-18: undo stays in-memory. A durable ledger is a separate future item and must not be
+coupled to this bug.
+
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 - [ ] **Import the personal DEVONthink database into Archive Notes** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3

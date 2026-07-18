@@ -94,7 +94,21 @@ changing the wire contract; retain the narrow fail-closed implementation until t
 
 ---
 
-## DEFERRED: lossless Finder-tag undo must preserve duplicate occurrences [MEDIUM — shared contract]
+## PROMOTED → Wave 15: lossless Finder-tag undo must preserve duplicate occurrences [MEDIUM — shared contract]
+
+**No longer deferred (owner review 2026-07-18).** Promoted to `SUITE_TODO.md` §"Known-issues work — Wave 15"
+as **W15.tu0–tu4**, bundled with the ArchiveNotes W8-S2 concurrent-write race (same `CoordinatedTagWriter`
+choke-point). The three questions this entry left open are now **decided**: restore semantics =
+**occurrence-only** (correct token *count*; order is not guaranteed, since macOS reorders on write and the
+SPEC already compares as a multiset); a concurrent unrelated edit between edit and undo must still **survive**
+(keep today's Safety-Protocol §9 reconcile-against-fresh-read behavior); and undo stays **in-memory** — no
+persisted/versioned undo records, so `TagDelta` needs no `Codable` (the §12 audit ledger remains unbuilt and
+is a separate future item). **Also verified during that review:** macOS *does* persist duplicate tag strings
+(scratch probe round-tripped `["A","A","B"]` through both `setResourceValue(.tagNamesKey)` and raw `setxattr`),
+so this is real, not theoretical; forward writes and color-label undo are **already** lossless — only the
+inverse/undo drops occurrences, and closing it needs both a multiplicity-aware inverse **and** a
+multiplicity-aware apply (the apply path today refuses to re-add an already-present token). Original analysis
+below.
 
 Finder metadata can contain duplicate tag strings, but ArchiveCore's current inverse calculation uses
 `Set` subtraction and `TagDelta` intentionally applies ordinary edits with set-like semantics. Replacing
