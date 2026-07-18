@@ -380,6 +380,22 @@ Owner went through the owner-only queue. Recorded here so none of it gets re-sur
   drive + screenshot the GUI themselves — see `AGENTS.md` → *GUI verification*. The Processor's Keychain
   "Always Allow" is **seeded**, so its GUI launches unattended. **Stop deferring visual checks to the owner as
   "GUI blocked"** — that claim was stale and cost the owner a lot of pointless eyeballing.
+- [x] **Visual-render test tooling — the pixels XCUITest can't see (NEW 2026-07-17).** XCUITest only reads the
+  accessibility tree (element exists/hittable); it is blind to whether a PDF/scan actually *drew*. Added two
+  layers: **(1) headless pixel guards** — `RenderProbe.swift` renders a SwiftUI view (`ImageRenderer`) or a PDF
+  page (ArchiveCore `PDFThumbnailer`) to real pixels and asserts on them (`assertRendersNonBlank`,
+  `nonWhiteFraction`); `DocumentRenderGuardTests.swift` guards the **2-page PDF SPEC** (page 0 scan / page 1 OCR)
+  + a negative "blank page IS flagged" test; runs in the unit bundle with **no launch / no TCC prompt** → health-
+  gate-safe. Reference-image diffs via **swift-snapshot-testing** (`SnapshotTests.swift`, new SPM dep). Rendered
+  PNGs are logged as `ARTIFACT <name>: <path>` + attached to the .xcresult so a session can `Read` them.
+  **(2) live sighted loop** — `ops/gui/capture-window.sh` grabs a running window's on-screen pixels (needs GUI-on)
+  to pair with `cliclick`. Installed `imagemagick` for image ops. Reader units 205/206 pass (the 1 failure is the
+  known env-only `DeepLinkTests.testRevealAndSelectNoRoot`). Pre-push adversarial review (workflow) fixed 3 issues
+  (OCR fixture ink margin vs font-smoothing, uniform grey/black blank detection, AppleScript arg injection in the
+  capture script). Considered Appium mac2 → **rejected** (same XCUITest substrate, so same a11y-tree blindness +
+  extra TCC surface). | files: ArchiveReader/macOS/Tests/
+  ArchiveReaderTests/{RenderProbe,DocumentRenderGuardTests,SnapshotTests}.swift, ArchiveReader/macOS/project.yml,
+  ops/gui/{capture-window.sh,README.md}, AGENTS.md | done
 - **DROPPED — Live Capture output-folder default** ("forget about this", owner 2026-07-16). The Downloads-if-unset
   default stays; the picker already lets the operator change it. Not an open question.
 - **iOS is ON HOLD — read §Project focus before listing anything iOS.** The iOS Drive-relay OAuth client was

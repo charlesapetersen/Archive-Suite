@@ -398,6 +398,13 @@ item-4 wins, tag rename) — see `git log` for the detail.
 `ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (186 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 
+**Visual-render guards (the pixels XCUITest can't see).** `RenderProbe.swift` renders a SwiftUI view
+(`ImageRenderer`) or a PDF page (ArchiveCore `PDFThumbnailer`) to real pixels and asserts on them
+(`assertRendersNonBlank`, `nonWhiteFraction`, `meanLuminance`); `DocumentRenderGuardTests.swift` guards the
+2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly — no app launch, no TCC prompt, health-gate-safe.
+Reference-image diffs: `SnapshotTests.swift` (swift-snapshot-testing SPM dep; refs in `__Snapshots__/`).
+Live sighted loop for the running app: `ops/gui/` (`capture-window.sh` + `cliclick`). See `ops/gui/README.md`.
+
 ## Stack & Build
 
 - Swift 6, SwiftUI (+ AppKit where needed), **XcodeGen** (`project.yml` authoritative; `.xcodeproj`

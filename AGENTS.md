@@ -72,7 +72,8 @@ asking the owner for anything:
 | What you're verifying | How |
 |---|---|
 | A control **exists / is wired** ("is the toggle there?", "is it bound to the right key?") | **Read the code** — a grep. Never an owner question. |
-| It **renders / behaves** (layout, interaction, a bug repro) | **Drive it yourself**: `./launch.sh reader\|processor\|notes` from your worktree, `cliclick` for pointer input, `osascript` System Events for keys/menus, `screencapture` → **read the shot**. |
+| Something **actually rendered** (a PDF/scan drew, a thumbnail isn't blank, a view isn't the wrong colour) — the truth the accessibility tree is blind to | **Render to pixels headlessly** (no launch, no TCC): `RenderProbe`/`DocumentRenderGuardTests` in the Reader unit bundle — `assertRendersNonBlank` etc. Rendered PNGs are logged `ARTIFACT <name>: <path>` — **`Read` them**. See `ops/gui/README.md`. |
+| It **renders / behaves** (layout, interaction, a bug repro) | **Drive it yourself**: `./launch.sh reader\|processor\|notes` from your worktree, `cliclick` for pointer input, `osascript` System Events for keys/menus, then `ops/gui/capture-window.sh <App>` (or `screencapture`) → **read the shot**. |
 | **Subjective taste** (does this look right?), an **API key**, or an **account/device** action | Genuinely owner-only — ask. |
 
 Rules while driving: point the app at a **scratch copy, never the real corpus** (choosing a folder clobbers the
