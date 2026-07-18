@@ -14,13 +14,15 @@ whole project as **Tier-2** (adversarial review + functional tests on scratch co
 ## 0. What we're importing (ground truth from the sample)
 
 Source: **two** DEVONthink 3 databases (`.dtBase2`; the `DEVONthink-1..10.dtMeta` files are numbered shards,
-*not* "version 4"). DEVONthink 3.9.18 is installed and scriptable.
-- **`Devonthink database for export.dtBase2`** — the note corpus, **7.6 GB**, database **"Meritocracy
-  Project"** (~40k notes/excerpts; the import payload).
+*not* "version 4"), now living in **`~/Desktop/Scholarship/`** (owner relocated them 2026-07-18, out of the
+repo, backups saved there before proceeding). DEVONthink 3.9.18 is installed and scriptable.
+- **`1000 Research Database.dtBase2`** — the note corpus, **~7.5 GB**, internal database name **"Meritocracy
+  Project"** (`uniqueId E3665700983D40D4A8A9078A52920FC6`; 29,757 rtf + 10,299 rtfd + 31 txt; the import payload).
 - **`Photo Database.dtBase2`** — **1.8 GB**, photo records named `NNNNN IMG — <Collection>` (e.g.
   `04157 IMG — Brown.pdf`), used by a small number of recent notes. **Not imported as notes**; extracted only
   so cross-database photo links resolve — every one of its photos also lives in the Archival Photos root, so
-  we resolve by **name/ID** (§4a).
+  we resolve by **name/ID** (§4a). ⚠️ It carries the **same `uniqueId`** as the note DB (a Finder-duplicate) —
+  handled in §1.
 
 Corpus profile (measured, whole DB):
 
@@ -92,8 +94,10 @@ Why this shape:
 - **Extraction is decoupled from transform.** The JSON manifest is the frozen, inspectable source of truth;
   every later stage is a pure function over it, re-runnable and diffable. Bulletproofing (§7) hinges on the
   extraction being provably complete *before* any transform runs.
-- **Never touch the original.** All DT reads run against a **copy** of the `.dtBase2` (repo rule: never
-  write a real corpus). First action is a *File > Export > Database Archive* ZIP as an untouched safety net.
+- **Never touch the original.** The live DBs are the owner's `~/Desktop/Scholarship/{1000 Research
+  Database,Photo Database}.dtBase2`; all DT reads run against a **transient working copy** (in scratch, not a
+  new repo duplicate — the owner moved them out of the repo on purpose), and the first action is a
+  *File > Export > Database Archive* ZIP as an untouched safety net (owner is also saving backups in Scholarship).
 - **Never touch the live Archive Notes store.** Materialize into a **fresh store root**, verify, then the
   owner swaps it in (memory: *never mutate the live app root*).
 
@@ -115,8 +119,9 @@ parse hrefs — or read `source` directly for records DT already stores as HTML/
 files inside the `.rtfd` package → copy them out (in scope, §2).
 
 **Extraction hazards handled (review-hardened):**
-- **Shared `uniqueId`.** The two DBs carry the **same** database `uniqueId` (the Photo DB is a Finder-duplicate
-  of Meritocracy) and item-level uuids can overlap. So: **reassign the Photo DB copy a fresh `uniqueId`** before
+- **Shared `uniqueId`.** The two DBs carry the **same** database `uniqueId`
+  (`E3665700983D40D4A8A9078A52920FC6`, confirmed 2026-07-18 — the Photo DB is a Finder-duplicate of
+  Meritocracy) and item-level uuids can overlap. So: **reassign the Photo DB copy a fresh `uniqueId`** before
   scripting; **namespace every extracted uuid by its source DB** in the manifest; and make §4's resolver
   **disambiguate by DB (never first-match)**. DTI-0 enumerates the overlapping item-uuids and any cross-DB link
   that hits both.
@@ -451,8 +456,11 @@ un-adjudicated class blocks adoption.
 
 **Source / DEVONthink side**
 1. ✅ DEVONthink 3 installed & able to open the DBs (3.9.18).
-2. ✅ **Working copies of both `.dtBase2` files** (Meritocracy + Photo Database) to extract from — never the originals.
-3. ✅ **A *Database Archive* (`.zip`) backup** of the originals, kept until verified & adopted.
+2. ✅ **Both `.dtBase2` files relocated to `~/Desktop/Scholarship/`** (2026-07-18): `1000 Research Database`
+   (note corpus, internal "Meritocracy Project") + `Photo Database`. Extraction runs on a **transient working
+   copy**, never the originals (they were moved out of the repo on purpose — don't re-duplicate into it).
+3. ⏳ **A *Database Archive* (`.zip`) backup** of the originals — owner saving backups in Scholarship before
+   proceeding; kept until the migration is verified & adopted.
 4. ⏳ **Grant Automation (Apple Events) permission** so the extraction script can control DEVONthink —
    walkthrough provided (a TCC prompt on first run, or pre-grant in System Settings ▸ Privacy & Security ▸
    Automation). **Owner note:** Terminal currently lists only *System Events.app* under Automation — the
@@ -474,7 +482,8 @@ un-adjudicated class blocks adoption.
    `.jpg`/`.jpeg` targets map to `Archival Photos JPEGS/`.
 
 **Zotero side**
-10. ✅ **Zotero installed with its local library accessible** (citation enrichment + non-archival→Zotero moves).
+10. ✅ **Zotero library available for enrichment** — a **BetterBibTeX export at `~/Desktop/Scholarship/mylibrary.json`**
+    (plus the live library) is the source for `zotero://` citation enrichment + non-archival→Zotero moves (§9.1).
 
 **Target / Archive Notes side**
 11. ✅ **Fresh output store root** for the import to build into (fresh-store swap, §9.7; the live store is not
@@ -564,7 +573,7 @@ DB-namespaced uuid) is always possible.
 
 | Phase | Deliverable | Effort | Depends |
 |---|---|---:|---|
-| **DTI-0 — Spike & ground truth** | JXA extraction spike on **copies of both DBs** over a 300–500 record sample; **build the Archival Photos name/ID index** (§4a) + report duplicate/ambiguous names; corpus-profile report on the §9 findings (alias grammar, month-prefix, near-dup calibration, replicant counts, `Good/Best`-overlay, other control tags). De-risks everything. | M | copies of both DBs |
+| **DTI-0 — Spike & ground truth** | JXA extraction spike on **copies of both DBs** over a 300–500 record sample; **build the Archival Photos name/ID index** (§4a) + report duplicate/ambiguous names; corpus-profile report on the §9 findings (alias grammar, month-prefix, near-dup calibration, replicant counts, `Good/Best`-overlay, other control tags). De-risks everything. | M | copies from `~/Desktop/Scholarship` |
 | **DTI-1 — Full extraction** | Complete JXA dump of **both databases** → frozen JSON manifest (all fields incl. `parents`; Photo Database → uuid→name only) + content sidecars (HTML w/ hrefs, rtfd media) + count cross-check vs Metadata Overview TSV. | L | DTI-0 |
 | **DTI-2 — Transform library** | Pure, unit-tested transform: classify, dates, link contract (§4/§4a), replicant/near-dup (§6), blocks/assets. Fixture corpus + golden tests. Emits the import model + a dry-run report. | L | DTI-1 |
 | **DTI-3 — Archive Notes model changes** *(prerequisite — built as Notes gap-closure, not owned here)* | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI), Related-notes section, and the **5★→3★ rating** switch (§3d). Tier-2 shared-core; build+test all apps. | L | before DTI-4 |
@@ -587,7 +596,7 @@ but keep it in git for reproducibility until adoption is final.
 - **Archival links unresolvable** (stale paths, renumbered/moved folders, external volumes, cross-DB) →
   **name/ID index** (§4a) instead of path matching + a filesystem probe in the gate; unresolved → flag; §8
   prerequisite. **Ambiguous/duplicate photo names** in the root are reported, never silently picked.
-- **Scale (7.6 GB / 40k)** → extraction may be slow in JXA; batch by group, checkpoint, resume; run on a copy
+- **Scale (~7.5 GB + 1.8 GB / 40k)** → extraction may be slow in JXA; batch by group, checkpoint, resume; run on a copy
   so a re-run is free.
 - **Live-app / live-corpus mutation** → operate on a DB copy and a fresh output store; original untouched
   (repo file-safety Core Directive + memory *never-mutate-live-app-root*).

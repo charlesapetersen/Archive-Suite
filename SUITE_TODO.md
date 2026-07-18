@@ -48,8 +48,9 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 
 ## Active execution plans (`execution-plans/`)
 - `devonthink-import.md` — **PLANNING (Archive Notes; HIGH-risk, Tier-2 + reconciliation gate)**: import the
-  owner's personal **DEVONthink 3** database (`Test Files/…/Devonthink database for export.dtBase2`, 7.6 GB,
-  ~40k rtf/rtfd/txt notes+excerpts) into Archive Notes, losslessly. 3-stage offline pipeline (JXA extract →
+  owner's personal **DEVONthink 3** database (`~/Desktop/Scholarship/1000 Research Database.dtBase2`, ~7.5 GB,
+  internal "Meritocracy Project", ~40k rtf/rtfd/txt notes+excerpts; + `Photo Database.dtBase2` for cross-DB photo
+  links) into Archive Notes, losslessly. 3-stage offline pipeline (JXA extract →
   frozen JSON manifest → pure transform → materialize a **fresh** store) + a stop-on-flag verification gate.
   Owner decisions locked (2026-07-17): text notes+excerpts incl. embedded images; archival `file://` →
   durable `archivereader://` Reader links; **primary + additional dates**; pointer-notes → a **Related-notes**
@@ -663,8 +664,9 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 - [ ] **Import the personal DEVONthink database into Archive Notes** — plan
-  `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3
-  "Meritocracy Project" DB (~40k notes+excerpts) into Archive Notes: 3-stage offline pipeline (JXA extract →
+  `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's ~7.5 GB DEVONthink 3
+  "Meritocracy Project" DB (`~/Desktop/Scholarship/1000 Research Database.dtBase2`; ~40k notes+excerpts) into
+  Archive Notes: 3-stage offline pipeline (JXA extract →
   frozen JSON manifest → pure transform → materialize a **fresh** store) + a stop-on-flag reconciliation
   gate. Delivers net-new Notes features (multi-date primary+additional with per-date timeline rows;
   Related-notes section) and a deletable import toolchain. **Owner prerequisites (§8):** a Reader root over
