@@ -135,6 +135,37 @@ enum KeyValidator {
         }
     }
 
+    // MARK: - Anthropic
+
+    /// Cheap auth check: GET /v1/models with the `x-api-key` header (no generation cost). Like OpenAI,
+    /// Anthropic's API has **no free tier**, so this endpoint returns 200 for a *valid* key even when the
+    /// account has no credits — a "works" here means the key authenticates, not that a paid run will
+    /// succeed; the live OCR smoke (keyed/owner tail) is what surfaces an unfunded account, the same
+    /// division of labor as `validateOpenAI`. Anthropic authenticates with `x-api-key` + a required
+    /// `anthropic-version` header (matching the app's OCR clients), not a Bearer token.
+    static func validateAnthropic(key: String) async -> KeyStatus {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .invalidKey }
+        guard let url = URL(string: "https://api.anthropic.com/v1/models") else { return .unknown("bad-url") }
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.httpMethod = "GET"
+        req.setValue(trimmed, forHTTPHeaderField: "x-api-key")
+        req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return .providerBusy }
+            switch http.statusCode {
+            case 200: return .works
+            case 401, 403: return .invalidKey
+            case 429: return .rateLimited
+            case 500...599: return .providerBusy
+            default: return .unknown("HTTP \(http.statusCode)")
+            }
+        } catch {
+            return .offline
+        }
+    }
+
     /// Map an OCR-pipeline error (from the end-to-end sample test) to a status. `errorCode` is the
     /// provider HTTP status string the OCR clients already surface; used to catch plan/billing on Mistral.
     static func classifySampleOCR(errorCode: String?, errorMessage: String?) -> KeyStatus {

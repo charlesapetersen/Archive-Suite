@@ -91,6 +91,30 @@ struct ProviderKeySpec: Identifiable, Sendable {
         validate: { await KeyValidator.validateOpenAI(key: $0) }
     )
 
-    /// The providers offered in the guided wizard (Anthropic remains available via manual key entry).
-    static let onboardable: [ProviderKeySpec] = [.gemini, .mistral, .openai]
+    // ⚠️ deep links + on-screen steps mirror the live 2026 Anthropic Console sign-up flow — re-verify
+    // wording/URLs (and capture screenshots) in the keyed/owner tail before shipping, per the type doc
+    // comment above. Like OpenAI, the Anthropic *API* has no free tier: a key needs prepaid credits (or a
+    // saved card) before a paid run works — GET /v1/models still validates the key itself.
+    static let anthropic = ProviderKeySpec(
+        provider: .anthropic,
+        account: LLMProvider.anthropic.rawValue,
+        blurb: "Archive Processor can also use Anthropic's Claude to read your archive photos. You'll make your own key so you control cost and privacy. Like OpenAI, Anthropic's API has no free tier, so you'll add a small amount of prepaid credit — any charges go to Anthropic, never to this app.",
+        signInURL: URL(string: "https://console.anthropic.com/settings/keys")!,
+        billingURL: URL(string: "https://console.anthropic.com/settings/billing")!,
+        privacyURL: URL(string: "https://privacy.anthropic.com/")!,
+        steps: [
+            "Sign in at console.anthropic.com (create an account if you don't have one).",
+            "Open “Billing” and add a payment method or a little prepaid credit — the API won't run without it.",
+            "Open “API keys” → “Create Key”, then COPY IT NOW — it's shown only once (it starts with “sk-ant-”).",
+            "Come back here and paste it below."
+        ],
+        costNote: "Pay-as-you-go — no free tier. Add a small prepaid amount to start; you're billed by Anthropic for what you use, not by this app.",
+        privacyNote: "Anthropic does not use data sent through its API to train its models by default. API inputs/outputs may be retained for a limited period for trust-and-safety monitoring, then deleted; zero-retention is available to eligible accounts on request.",
+        cardNote: "Have a payment method ready — the Anthropic API needs billing set up (a card or prepaid credit) before it will run.",
+        keyPrecheck: { $0.hasPrefix("sk-ant-") && $0.count >= 20 && !$0.contains(" ") },
+        validate: { await KeyValidator.validateAnthropic(key: $0) }
+    )
+
+    /// The providers offered in the guided wizard (each also still supports manual key entry).
+    static let onboardable: [ProviderKeySpec] = [.anthropic, .gemini, .mistral, .openai]
 }

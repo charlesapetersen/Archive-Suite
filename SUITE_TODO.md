@@ -349,11 +349,23 @@ maintain-only** (see §Project focus). Leave parked until the Drive milestone is
 
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)
 Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unless flagged owner-decision/Tier-2. Legend as above.
-- [ ] **Guided key setup for Anthropic (Processor).** The onboarding wizard's `onboardable` list is
+- [x] **Guided key setup for Anthropic (Processor).** The onboarding wizard's `onboardable` list is
   `[.gemini, .mistral, .openai]` — Anthropic has only a manual key field. Add `ProviderKeySpec.anthropic`
   (console.anthropic.com deep links, `sk-ant-` precheck, cost/privacy notes) so Anthropic gets the same guided flow.
   **Verify:** drive the wizard with `ops/gui/capture-window.sh` + `cliclick` and read the shot — the visual half is
   no longer owner-gated (TCC granted). | files: Models/ProviderKeySpec.swift (+ `onboardable`) | S | low | none
+  — ✅ shipped: `ProviderKeySpec.anthropic` added (mirrors the `.openai` spec — console.anthropic.com deep
+  links for keys/billing/privacy, `sk-ant-` precheck, honest no-free-tier cost/privacy/card notes; URLs +
+  wording `// VERIFY`) and prepended to `onboardable` → `[.anthropic, .gemini, .mistral, .openai]` (enum order,
+  Anthropic is the lead provider). The item under-scoped its file list: the spec's `validate` closure needs a
+  validator, so **`KeyValidator.validateAnthropic`** was also added (cheap `GET /v1/models` with
+  `x-api-key`+`anthropic-version: 2023-06-01` — matching the app's Anthropic OCR clients; 200 works / 401·403
+  invalidKey / 429 rateLimited / 5xx providerBusy; like OpenAI, /v1/models 200s even for an unfunded account →
+  live smoke surfaces that). Keychain account = `LLMProvider.anthropic.rawValue` ("Anthropic"), so the wizard
+  writes the same slot the app reads. The wizard is fully generic (the only provider-specific branch,
+  `geminiRegionWarning`, returns nil for Anthropic — same as OpenAI). Additive + opt-in; no default-provider
+  change. Build clean, 0 new warnings; Tier-1 self-review. **GUI visual (wizard "Set up (guided)…" → Anthropic
+  step) → Morning Review** (GUI off this run).
 - [ ] **OpenAI LLM rotation detection (Processor).** `.openai` is wired to LOCAL Vision rotation only
   (`LLMRotationDetector.swift:72` + `CostEstimator.rotationModelCost` return nil — defensive, like Mistral/gateway).
   OpenAI is a capable vision model, so wire `.openai` into the LLM candidate-compare rotation path + add its
