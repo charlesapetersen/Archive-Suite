@@ -22,7 +22,7 @@ chmod +x "$fake" 2>/dev/null || true
 work=$(mktemp -d)
 report="$work/result.txt"
 log="$work/app.log"
-ARCHIVEPROC_HEADLESS=1 \
+ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     LOCALAGENT_TEST=1 LOCALAGENT_TEST_OUT="$report" LOCALAGENT_FAKE_CLI="$fake" \
     "$bin" >"$log" 2>&1 &
 pid=$!

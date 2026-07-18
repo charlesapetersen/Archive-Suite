@@ -4,6 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-17): Local Agent ignored an invalid CLI override and accepted malformed Claude output [HIGH]
+
+**FIXED:** a non-empty CLI path override is now authoritative, so an invalid configured path reports
+`cli_not_found` instead of silently launching a different standard installation. Claude's requested JSON
+contract is enforced; arbitrary stdout now reports `cli_bad_response` rather than being accepted as OCR
+text. The Local Agent regression also isolates its backup directory. (2026-07-17)
+
+---
+
 ## ✅ FIXED (2026-07-17): ambiguous retries could duplicate billable requests [CRITICAL]
 
 **FIXED:** every HTTP call now declares whether it is idempotent. Billable generation, upload, and

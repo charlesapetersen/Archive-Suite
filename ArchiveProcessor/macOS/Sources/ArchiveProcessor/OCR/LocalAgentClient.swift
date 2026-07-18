@@ -141,8 +141,8 @@ struct LocalAgentClient: Sendable {
 
     /// One tiny prompt-only round-trip through the SAME spawn path OCR uses, to verify the CLI is
     /// reachable and signed in. Cheaper than an OCR call (no image, trivial prompt) and never throws.
-    /// The binary is resolved exactly like `ocr`/`textCompletion` (override → standard paths, never
-    /// `$PATH`); an unresolved binary reports `cli_not_found` instead of probing.
+    /// The binary is resolved exactly like `ocr`/`textCompletion` (an explicit override, otherwise
+    /// standard paths; never `$PATH`); an unresolved binary reports `cli_not_found` instead of probing.
     func probe() async -> ProbeOutcome {
         guard let binary = Self.resolveBinaryPath(tool: config.tool, override: config.binaryPath) else {
             return ProbeOutcome(ok: false, code: "cli_not_found",
@@ -160,12 +160,16 @@ struct LocalAgentClient: Sendable {
 
     // MARK: - Binary resolution (absolute path only, never $PATH)
 
-    /// Resolve the CLI to an absolute executable path: the operator override if it is executable,
-    /// else the first hit on the standard install locations. Returns nil when nothing is found.
+    /// Resolve the CLI to an absolute executable path. A non-empty operator override is authoritative:
+    /// returning nil for an invalid override prevents a typo or stale setting from silently launching a
+    /// different installation. Standard locations are searched only when no override was supplied.
     static func resolveBinaryPath(tool: LocalAgentTool, override: String) -> String? {
         let fm = FileManager.default
         let trimmed = override.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty, fm.isExecutableFile(atPath: trimmed) { return trimmed }
+        if !trimmed.isEmpty {
+            guard NSString(string: trimmed).isAbsolutePath else { return nil }
+            return fm.isExecutableFile(atPath: trimmed) ? trimmed : nil
+        }
         let home = NSHomeDirectory()
         let name = tool.binaryName
         let candidates = [
@@ -263,8 +267,9 @@ struct LocalAgentClient: Sendable {
     }
 
     /// Pull the model's text out of the CLI's JSON envelope. `claude -p --output-format json` puts it
-    /// in `.result`; the others try a set of common keys (VERIFY). Falls back to raw stdout only if it
-    /// is plainly not JSON, so a non-JSON CLI still surfaces something rather than silently failing.
+    /// in `.result`; malformed/non-JSON Claude output must fail instead of being mistaken for OCR text.
+    /// The unverified Gemini/Codex adapters retain a plain-text compatibility fallback until their real
+    /// CLI envelope contracts are validated.
     private static func extractText(tool: LocalAgentTool, stdout: String) -> String? {
         guard let data = stdout.data(using: .utf8) else { return nil }
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -279,8 +284,9 @@ struct LocalAgentClient: Sendable {
                     ?? (json["output"] as? String)
             }
         }
-        // Not a JSON object. Only treat non-empty plain text as usable (claude always emits JSON, so
-        // this path is for a mis-detected/older CLI).
+        if tool == .claude { return nil }
+        // Gemini/Codex CLI contracts are still marked VERIFY. Preserve their compatibility with versions
+        // that emit plain text despite the requested JSON flag, but never apply that fallback to Claude.
         let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }

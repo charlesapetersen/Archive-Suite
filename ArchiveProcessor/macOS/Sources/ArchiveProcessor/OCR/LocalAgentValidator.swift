@@ -17,7 +17,7 @@ enum LocalAgentValidator {
     /// `rateLimited` / `offline` / `providerBusy` semantics of `KeyValidator.KeyStatus`.
     enum Status: Equatable {
         case works                  // ✓ installed and signed in (a trivial prompt returned a response)
-        case cliNotFound            // binary not on the override path or any standard install location
+        case cliNotFound            // explicit path invalid, or binary absent from standard locations
         case cliNotLoggedIn         // installed, but no active subscription login
         case cliEntitlementMissing  // signed in, but the account/seat isn't authorized to use this CLI
         case rateLimited            // signed in, but at the usage window right now (transient; app paces)
@@ -59,7 +59,7 @@ enum LocalAgentValidator {
     /// Both steps run off the main thread (via `LocalAgentClient`'s async subprocess plumbing), so
     /// this is safe to `await` from a `@MainActor` view without blocking the UI.
     static func detectAndVerify(config: LocalAgentConfig) async -> Status {
-        // 1) Detect: resolve to an absolute binary (override → standard paths, never $PATH).
+        // 1) Detect: resolve to an absolute binary (explicit override, otherwise standard paths; never $PATH).
         guard let binary = LocalAgentClient.resolveBinaryPath(tool: config.tool, override: config.binaryPath) else {
             return .cliNotFound
         }

@@ -89,6 +89,10 @@ enum LocalAgentTestDriver {
             unsetenv("LOCALAGENT_FAKE_MODE")
 
             // 6. Missing binary → not-found (no spawn, no crash).
+            check("binary resolution: invalid explicit override is authoritative",
+                  LocalAgentClient.resolveBinaryPath(tool: .claude, override: "/nonexistent/claude-xyz") == nil)
+            check("binary resolution: relative explicit override is rejected",
+                  LocalAgentClient.resolveBinaryPath(tool: .claude, override: "scripts/localagent-fake-cli.sh") == nil)
             do {
                 let bogus = LocalAgentClient(config: LocalAgentConfig(tool: .claude, binaryPath: "/nonexistent/claude-xyz"))
                 let r = try await bogus.ocr(imageURL: imageURL)
