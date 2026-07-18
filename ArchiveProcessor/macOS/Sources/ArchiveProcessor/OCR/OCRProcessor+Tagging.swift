@@ -23,7 +23,10 @@ extension OCRProcessor {
             default: continue
             }
             if let outputPDF = outputURLMap[job.sourceURL] {
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
+                // Mode-dependent: reached BOTH from `applyBoxFolderLabelTags` (only when tagging is
+                // off or copy-source → verbatim) AND unconditionally from the manual tagging modes
+                // (→ real-tagging, label written + trailing Unread). Must follow the run's mode.
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: taggingMode.stampsUnread)
             }
         }
     }
@@ -48,7 +51,9 @@ extension OCRProcessor {
             guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
             if !tags.contains(raw) {
                 tags.append(raw)
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
+                // Read-append-rewrite of whatever the tagging phase already applied — follow the
+                // run's mode so a real-tagging output keeps "Unread" last and its label intact.
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: taggingMode.stampsUnread)
             }
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
@@ -104,6 +109,9 @@ extension OCRProcessor {
         }
         guard !work.isEmpty else { return }
         exportedImageMap = imageMap
+        // Capture the run's stamping mode on the MainActor — the detached task below must not touch
+        // the @MainActor `taggingMode` (same pattern as `exportedMB` above).
+        let isStamping = taggingMode.stampsUnread
         // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
         // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {
@@ -119,7 +127,7 @@ extension OCRProcessor {
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
                 guard let tags = try? MacOSTagger.readTags(from: w.pdf) else { continue }
-                _ = try? MacOSTagger.applyTags(tags, to: w.img)
+                _ = try? MacOSTagger.applyTags(tags, to: w.img, stampUnread: isStamping)
             }
         }.value
     }
@@ -254,7 +262,9 @@ extension OCRProcessor {
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
-                    _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
+                    // Manual tagging modes are real-tagging modes; follow the run's mode.
+                    _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
+                                                   stampUnread: taggingMode.stampsUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = tags.allTags
@@ -500,7 +510,9 @@ extension OCRProcessor {
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
-                    _ = try? MacOSTagger.applyTags(gtags, to: outputPDF)
+                    // Manual segment tagging is a real-tagging mode; follow the run's mode.
+                    _ = try? MacOSTagger.applyTags(gtags, to: outputPDF,
+                                                   stampUnread: taggingMode.stampsUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = gtags.allTags
@@ -729,7 +741,8 @@ extension OCRProcessor {
         }
         for sourceURL in segment.pdfURLs {
             if let outputPDF = outputURLMap[sourceURL] {
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
+                                               stampUnread: taggingMode.stampsUnread)
             }
             if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                 jobs[jobIndex].appliedTags = tags.allTags
@@ -822,7 +835,7 @@ extension OCRProcessor {
                 // Empty generated tags still mean `Unread` in real-tagging modes. Select a segment job
                 // even when its explicit array is empty whenever the adapter is stamping that implicit tag.
                 let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty })
-                    ?? (MacOSTagger.stampUnread ? segmentJobs.first : nil)
+                    ?? (taggingMode.stampsUnread ? segmentJobs.first : nil)
                 if let tagged {
                     // Derive the authoritative color from the classification so a subject
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
@@ -832,7 +845,8 @@ extension OCRProcessor {
                         try tagWriter(tagged.appliedTags, mergedURL, color, true)
                     } else {
                         _ = try MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
-                                                     appColor: color, colorIsAuthoritative: true)
+                                                     appColor: color, colorIsAuthoritative: true,
+                                                     stampUnread: taggingMode.stampsUnread)
                     }
                 }
 

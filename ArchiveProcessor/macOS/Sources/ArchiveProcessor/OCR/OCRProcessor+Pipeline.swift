@@ -1088,7 +1088,8 @@ extension OCRProcessor {
                     outputURLMap[r.sourceURL] = r.outputURL
                     if passSourceTags {
                         if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
-                            _ = try? MacOSTagger.applyTags(sourceTags, to: r.outputURL)
+                            // Copy-source pass-through on resume: verbatim, label untouched.
+                            _ = try? MacOSTagger.applyTags(sourceTags, to: r.outputURL, stampUnread: false)
                             jobs[r.index].appliedTags = sourceTags
                         }
                     }

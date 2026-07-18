@@ -95,10 +95,15 @@ enum MergeSafetyTestDriver {
               merged1 == merged2 && merged1.map { fm.fileExists(atPath: $0.path) } == true)
 
         // An otherwise-empty generated tag set still carries the adapter's implicit Unread tag.
+        // W16.cfg4: stamping is now driven by the RUN'S `taggingMode`, not the process-global —
+        // `performDocumentMerging` reads `taggingMode.stampsUnread`. Setting the mode also arms the
+        // legacy global via its `didSet`, so the global assignment below is redundant but retained
+        // to keep this driver's intent explicit.
         MacOSTagger.stampUnread = true
         let stampedDir = root.appendingPathComponent("empty-stamped", isDirectory: true)
         let (stampedProcessor, stampedSource1, stampedSource2, stampedPDF1, stampedPDF2) =
             configuredProcessor(in: stampedDir, tags: [])
+        stampedProcessor.taggingMode = .automatic   // a real-tagging mode → stampsUnread == true
         var stampedWriterCalled = false
         stampedProcessor.performDocumentMerging(files: [stampedSource1, stampedSource2], outputDirectory: stampedDir) {
             tags, _, _, _ in
@@ -111,10 +116,15 @@ enum MergeSafetyTestDriver {
               !fm.fileExists(atPath: stampedPDF1.path) && !fm.fileExists(atPath: stampedPDF2.path))
 
         // With stamping disabled and no explicit tags, no metadata transfer is required.
+        // W16.cfg4: `configuredProcessor` builds a fresh OCRProcessor whose `taggingMode` DEFAULTS to
+        // `.automatic` (stampsUnread == true), and an initializer default does not fire `didSet`. So
+        // setting the mode explicitly is REQUIRED here — without it this case would read `true` and
+        // the "skips unnecessary tag writer" assertion below would flip.
         MacOSTagger.stampUnread = false
         let plainDir = root.appendingPathComponent("empty-plain", isDirectory: true)
         let (plainProcessor, plainSource1, plainSource2, plainPDF1, plainPDF2) =
             configuredProcessor(in: plainDir, tags: [])
+        plainProcessor.taggingMode = .none          // not a real-tagging mode → stampsUnread == false
         var plainWriterCalled = false
         plainProcessor.performDocumentMerging(files: [plainSource1, plainSource2], outputDirectory: plainDir) {
             _, _, _, _ in plainWriterCalled = true

@@ -176,7 +176,8 @@ extension OCRProcessor {
                     } else if newClassification == .folderLabel {
                         if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
                     }
-                    _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
+                    _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
+                                                   stampUnread: taggingMode.stampsUnread)
                     jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
@@ -317,7 +318,8 @@ extension OCRProcessor {
             } else if newClassification == .folderLabel {
                 if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
             }
-            _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
+            _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
+                                           stampUnread: taggingMode.stampsUnread)
             jobs[index].appliedTags = existingTags
         }
     }
@@ -385,7 +387,9 @@ extension OCRProcessor {
                 // tags were applied during OCR and nothing re-applies them later, so restore them now.
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
                 if passSourceTags {
-                    _ = try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL)
+                    // Copy-source restore after rotation regen: verbatim, label untouched.
+                    _ = try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL,
+                                                   stampUnread: false)
                 }
             }
         }
@@ -581,7 +585,8 @@ extension OCRProcessor {
                 default:
                     break
                 }
-                _ = try? MacOSTagger.applyTags(existingTags, to: outputURL)
+                _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
+                                               stampUnread: taggingMode.stampsUnread)
                 jobs[item.fileIndex].appliedTags = existingTags
             }
 

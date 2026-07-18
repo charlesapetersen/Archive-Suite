@@ -165,7 +165,11 @@ extension OCRProcessor {
             for (index, url) in files.enumerated() {
                 guard let sourceTags = try? MacOSTagger.readTags(from: url), !sourceTags.isEmpty,
                       let outputURL = outputURLMap[url] else { continue }
-                _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                // Copy-source pass-through: write the source's tags VERBATIM and leave the Finder
+                // label untouched. `false` is unconditional here, not `taggingMode.stampsUnread` —
+                // `passSourceTags` implies `.copySource` (OCRView.swift:27), so they agree today, but
+                // the verbatim semantics are what this path requires regardless of the run's mode.
+                _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL, stampUnread: false)
                 jobs[index].appliedTags = sourceTags
             }
         }
@@ -1061,7 +1065,9 @@ extension OCRProcessor {
                 var appliedTags: [String]? = nil
                 if shouldPassTags {
                     if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
-                        _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL)
+                        // Copy-source pass-through (verbatim, label untouched) — see the note at the
+                        // sibling pre-OCRed site. `shouldPassTags` implies `.copySource`.
+                        _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL, stampUnread: false)
                         appliedTags = sourceTags
                     }
                 }

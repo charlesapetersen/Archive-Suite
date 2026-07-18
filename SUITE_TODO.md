@@ -468,16 +468,23 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   the config builder, drop the now-redundant `explicit…` fallback params (`OCRProcessor.swift:114-124`,
   `+OCR.swift:1117-1133`), and update the three drivers that save/restore statics. The compiler enforces
   completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
-- [ ] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** ⚠️ **READ THIS
-  BEFORE TOUCHING IT — do NOT do this as a mechanical sweep.** Several **copy-source** `applyTags` sites are
-  correct today *only because the global happens to be `false`*; blindly passing the run's `taggingMode` would
-  silently start stamping **`Unread` on copy-source output — a SPEC-visible tag regression** on irreplaceable
-  files. Audit each of the ~13 sites individually (`OCRProcessor+OCR.swift:168, :1064`; `+ReviewFlows.swift:179,
-  :320, :388, :584`; `+Tagging.swift:26, :51, :122, :257, :503, :732`; `+Pipeline.swift:1091`) and pass the value
-  that site actually requires. **Approach: remove the default from `applyTags` so every site must pass
-  explicitly, but KEEP the lock-backed property** (the three test drivers legitimately exercise its semantics).
-  Gate: `MergeSafetyTestDriver` **and** `ManifestPersistenceTestDriver` both pass.
-  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor+*.swift | M | **high** | none
+- [x] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** DONE 2026-07-18
+  (`5058f51`). `applyTags`'s `stampUnread` is now a **required non-optional** parameter (both overloads);
+  the process-global is no longer read by `applyTags` (retained only as a test-driver affordance + `taggingMode.didSet`
+  writer, to be deleted with the run-config globals in W16.cfg6). All 13 sites audited individually: the four
+  copy-source pass-through sites (`+OCR.swift:168/1064`, `+Pipeline.swift:1091`, `+ReviewFlows.swift:388`) pass a
+  literal `false`; the nine real-tagging sites pass `taggingMode.stampsUnread`. The merge path's direct global
+  *read* for job selection (`+Tagging.swift:825`) was also moved to `taggingMode.stampsUnread` so it can't disagree
+  with its paired write (:834). The image-mirror detached task hoists `taggingMode.stampsUnread` onto the MainActor
+  before detaching. **The `⚠️` copy-source-regression hazard was confirmed real and avoided** (the four false sites);
+  the `MergeSafetyTestDriver` "empty non-stamping merge skips unnecessary tag writer" case had to be re-expressed via
+  `taggingMode = .none` because a fresh `OCRProcessor()` defaults `taggingMode` to `.automatic` and an init default
+  doesn't fire `didSet`. **Verification:** non-optional param → compiler-proven site completeness; build clean, 0 new
+  warnings; `MergeSafetyTestDriver` (15/15) + `ManifestPersistenceTestDriver` (42/42) ALL PASS; **4-lens adversarial
+  refute-verify (equivalence/lifecycle/invariant/concurrency) — 0 findings, none could refute behavior-preservation**
+  (the invariant lens proved `enableTagging` is derived, so `passSourceTags && enableTagging ≡ (mode==.copySource)`,
+  closing the one hypothesized hole). Behavior-preserving for every production path.
+  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor+{OCR,Tagging,ReviewFlows,Pipeline}.swift, Capture/MergeSafetyTestDriver.swift | M | **high** | none
 - **Deferred (needs owner sign-off, NOT queued):** the concurrent-runs + Thread-Sanitizer stress driver
   (verification-plan items 1/2/4). It needs either live API keys for a genuine concurrent OCR run or an
   **owner-approved stub OCR backend**, and the mutate-Settings-mid-run steps need GUI. Revisit if the stub

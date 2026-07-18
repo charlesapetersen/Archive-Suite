@@ -14,10 +14,13 @@ import os
 /// is delegated entirely to ArchiveCore (no direct `setResourceValue` in Processor sources).
 struct MacOSTagger {
 
-    /// When true, every file written by `applyTags` gets a trailing "Unread" tag (as the last tag).
-    /// Set once per run by the processor from the selected `TaggingMode` (real-tagging modes only —
-    /// off for "No tagging" and "Copy source tags"). Written on the main actor before a run begins
-    /// and read during tagging from detached tasks — the lock makes the cross-actor access safe.
+    /// Legacy process-global "stamp a trailing Unread tag" flag, armed from `OCRProcessor.taggingMode`'s
+    /// `didSet`. **`applyTags` no longer reads it** (W16.cfg4): every call site now passes `stampUnread:`
+    /// explicitly, so the write semantics are a per-call input rather than ambient process state.
+    ///
+    /// Retained only as a test-driver affordance (`ManifestPersistenceTestDriver` asserts its arming) and
+    /// because `taggingMode.didSet` still maintains it. Nothing in production reads it — deleting it (and
+    /// that `didSet`) is a natural follow-up once W16.cfg6 removes the remaining run-config globals.
     private static let _stampUnread = OSAllocatedUnfairLock(initialState: false)
     static var stampUnread: Bool {
         get { _stampUnread.withLock { $0 } }
@@ -40,17 +43,21 @@ struct MacOSTagger {
     /// - Parameter appColor: when non-nil, THIS is the authoritative app color (Red/Purple) and no
     ///   color detection is done on `tags`, so a *subject* tag that is literally "Red"/"Purple" is
     ///   never promoted to a Finder color label. When nil, Red/Purple are detected within `tags`.
+    /// - Parameter stampUnread: **required — selects the whole write semantics, not just one tag.**
+    ///   `true` (real-tagging modes) re-stamps a trailing "Unread", resolves the Red/Purple color, and
+    ///   WRITES the Finder label (clearing it to 0 when there is no color). `false` (copy-source /
+    ///   no-tagging) passes the tag names through VERBATIM and leaves the existing label untouched.
+    ///   Pass `taggingMode.stampsUnread` for a real-tagging write, or a literal `false` for a
+    ///   copy-source pass-through. There is deliberately no default: choosing wrongly silently
+    ///   rewrites Finder metadata on irreplaceable files (W16.cfg4).
     @discardableResult
     static func applyTags(
         _ tags: [String],
         to url: URL,
         appColor: String? = nil,
         colorIsAuthoritative: Bool = false,
-        stampUnread explicitStampUnread: Bool? = nil
+        stampUnread isStamping: Bool
     ) throws -> TagWriteResult {
-        // Capture stampUnread once outside the closure (the lock is not re-entrant with
-        // the file-coordination block, and the value is stable within a single call).
-        let isStamping = explicitStampUnread ?? stampUnread
 
         return try CoordinatedTagWriter.write(url) { current, label in
             // Copy-source mode (stampUnread == false): pass the source tag names through verbatim.
@@ -108,7 +115,7 @@ struct MacOSTagger {
     static func applyTags(
         _ generatedTags: GeneratedTags,
         to url: URL,
-        stampUnread: Bool? = nil
+        stampUnread: Bool
     ) throws -> TagWriteResult {
         // Pass the app-assigned color explicitly so a subject tag equal to "Red"/"Purple" isn't
         // promoted to a Finder color label.
