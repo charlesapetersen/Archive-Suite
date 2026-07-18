@@ -1,7 +1,9 @@
 import XCTest
-@testable import ArchiveCore
+import ArchiveCore
 
 /// Tests for the read-only tag-facet parser, keyed to REAL tag arrays from the corpus.
+/// Uses a plain (non-`@testable`) import: every symbol exercised here is part of the
+/// public `DocumentTags` API, so the test doubles as a guard that the parse surface stays public.
 final class DocumentTagsTests: XCTestCase {
 
     // Real file 03063 IMG — Brown.pdf
