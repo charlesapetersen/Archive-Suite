@@ -601,50 +601,63 @@ The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(.
 folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
 the same three lines and landing them separately would silently revert part of the first. See that entry.
 
-## Wave 19 — Notes date-mirror + unified Quality facet (owner-reviewed 2026-07-18)
-Owner decision from the wishlist review: (a) Notes mirrors its front-matter **date** into Finder tags (reusing
-the existing Year/Month/Day/Decade facets — **no** SPEC change), (b) **no author** tags, (c) a **new unified
-Quality facet across all three apps**. Owner-locked contract: token **`Q1`/`Q2`/`Q3`** (higher = better), a 0–3
-**star** scale where **`Q0`/unrated writes NO tag** (absence = 0 stars, like Priority); Quality is a human
-editorial judgment (distinct from capture-**Priority**), **set by Notes + editable in Reader**, **recognized but
-never auto-emitted by Processor**. This is a **shared-contract (Tier-2)** feature — SPEC first, then the shared
-parser, then each app; every code item must **build + test all three apps**, scratch-only.
-- [x] **W19.q1 — SPEC: add the Quality facet + record Notes as a date-facet emitter.** DONE `06fabcc` —
-  `SPEC/tag-format.md`: Quality row (`Q1`–`Q3`, 0=unrated=no tag, human-assigned, Notes-sets/Reader-edits/
-  Processor-recognizes), parse-order note (`Q2` never taken for a year), and "Where each side lives" rows for
-  Quality + Notes date projection. The contract is now the source of truth for q2–q5. | Tier-2 (SPEC) | S
-- [ ] **W19.q2 — ArchiveCore: parse Quality in the shared `DocumentTags` [M].** Add `parseQuality` (→ 0–3;
-  `Q1`/`Q2`/`Q3` recognized, absence = 0), the token constants, and include Quality in facet classification with
-  the **subject-collision rule** (a subject literally `"Q2"` must survive — facet parse is display/sort/filter
-  only, never drives a destructive write). Unit tests in `ArchiveCoreTests`. **Tier-2 shared-Core → build+test
-  Reader + Processor + Notes.** | packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift, Tests/ | M | med | none
+## Wave 19 — Notes date-mirror + Quality facet (MERGES/replaces Priority) (owner-reviewed 2026-07-18)
+Owner decision from the wishlist review, refined: (a) Notes mirrors its front-matter **date** into Finder tags
+(reuse the existing Year/Month/Day/Decade facets — **no** SPEC change); (b) **no author** tags; (c) a **single
+rating facet, `Q1`/`Q2`/`Q3`**, that **MERGES WITH + REPLACES the legacy Priority facet** — they were redundant
+("how important is this document"). Owner-locked contract: 0–3 scale, **`Q0`/unrated writes NO tag** (so the wire
+only carries `Q1`/`Q2`/`Q3`); **`Q3` = old `P10`**, mapping `P10`→`Q3` / `P9`→`Q2` / `P8`→`Q1` / `P7`→unrated.
+Priority is **retired** (no app or companion writes `P` anymore); legacy `P8`–`P10` on pre-W19 files **alias to
+`Q1`–`Q3` on read** — no corpus rewrite. Human-set everywhere, never LLM-emitted: Notes (front-matter), Reader
+(edit), Processor's interactive tagging, **and the phone companions** (the old priority control now emits `Q`).
+Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app + companions; every code item must
+**build + test all three apps**, scratch-only. **This wave REPLACES existing priority UI/plumbing — merge, don't
+add a second control alongside.**
+- [x] **W19.q1 — SPEC: the Quality facet + Notes-as-date-emitter.** DONE `06fabcc`, **merge revision** 2026-07-18
+  — `SPEC/tag-format.md` now defines Quality as the single rating facet that supersedes Priority (Priority row →
+  RETIRED + read-alias `P8`–`P10`→`Q1`–`Q3`, `P7`→unrated; `Q3`=old `P10`), records the companions as `Q` emitters
+  + the phone↔Mac protocol as a SHARED HOTSPOT, and keeps the Notes date-projection row. Source of truth for q2–q7. | Tier-2 (SPEC) | S
+- [ ] **W19.q2 — ArchiveCore: `parseQuality` in shared `DocumentTags` + legacy Priority alias [M].** `Q1`/`Q2`/`Q3`
+  → 1–3 (absence = 0); include Quality in facet classification with the **subject-collision rule** (a subject
+  literally `"Q2"` survives — facet parse is display/sort/filter only, never a destructive write). **Fold the old
+  `parsePriority` into the alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3`, `P7` as unrated (read-only; nothing
+  writes `P`). Unit tests. **Tier-2 shared-Core → build+test Reader + Processor + Notes.** | packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift, Tests/ | M | med | none
 - [ ] **W19.date — Notes: project front-matter date → existing Year/Month/Day/Decade tags [M].** `NotesTagProjector`
   additionally projects the item's `date`+`datePrecision` into the existing date facets (reuse
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q3 — Reader: display / filter / edit Quality** (blocked-on: W19.q2) **[M].** Parse via the shared
-  `DocumentTags` (free from q2); surface Quality as a nav facet (column + filter, like Priority) and make it
-  **editable via `TagWriter`** (set `Q1`–`Q3`; clearing = unrated = remove the token — never write `Q0`). Tier-2
-  (tag write). Build + Reader unit tests; live GUI confirm → owner tail. | ArchiveReader/.../Core/, Views/ | M | med | none
+- [ ] **W19.q3 — Reader: Quality REPLACES the Priority column/filter/editor** (blocked-on: W19.q2) **[M].** The
+  existing Priority nav facet **becomes** the Quality facet (column + filter + inline edit) — rename `P`→`Q` in
+  the UI, don't add a parallel control. Edit via `TagWriter` (set `Q1`–`Q3`; clear = remove the token, never write
+  `Q0`). Legacy `P8`–`P10` still display as `Q1`–`Q3` via the q2 alias. Tier-2 (tag write). Build + Reader unit
+  tests; live GUI confirm → owner tail. | ArchiveReader/.../Core/, Views/ | M | med | none
 - [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
   maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
   quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q5 — Processor: recognize + preserve Quality (foundation)** (blocked-on: W19.q2) **[S].** Processor
-  parses Quality for free via the shared `DocumentTags`; ensure its tag writes **preserve** an existing `Q1`–`Q3`
-  token (never strip a user's rating as an unknown subject on re-tag / merge / mirror-to-image). Never auto-emit
-  from OCR. This is the parser-wiring + preserve foundation for the authoring UIs in q6. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/ | S | med | none
-- [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** Owner
-  decision 2026-07-18: the user can set the 0–3 quality rating while capturing/processing, not just in Reader/Notes.
-  Add a **0–3 star control** to **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)
+- [ ] **W19.q5 — Processor: recognize + preserve Quality; retire priority code paths (foundation)** (blocked-on: W19.q2) **[S–M].**
+  Parse Quality for free via the shared `DocumentTags`; ensure Processor tag writes **preserve** an existing
+  `Q1`–`Q3` token (never strip a rating as an unknown subject on re-tag / merge / mirror-to-image). Repoint the
+  existing priority-writing path (`OCR/OCRProcessor+Tagging.swift` `applyCapturePriorityTags`) to emit `Q`, and
+  stop emitting `P`. Never auto-emit from OCR. Foundation for q6/q7. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/, Capture/ | S–M | med | none
+- [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** The
+  user sets the 0–3 rating while capturing/processing. **Merge into the existing priority entry** (don't add a
+  second control): a 0–3 selector in **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)
   and **(b)** the **Process Files manual tagging** sheets (`Views/ManualTaggingSheet.swift`,
-  `Views/ManualSegmentTagView.swift`). Carry it through the manual-tag data (`SegmentTagData` / `ManualTagSegment`)
-  → a `quality` field on `GeneratedTags` whose `allTags` emits `Q1`/`Q2`/`Q3` (0/unrated → **no token**), so it
-  writes through the existing `MacOSTagger` path (mirrors how manual year/month/subjects already flow). **Tier-2 —
-  Live Capture is the no-undo capture path:** adversarial review + a functional test (the Live Capture recovery /
-  manifest drivers), scratch-only, and confirm quality survives finalize + the image-mirror. **Phone-side quality
-  entry (companion + protocol) is NOT in scope** — deferred; the Mac tag card is the live-capture authoring
-  surface (the phone sets per-page priority today, not quality). GUI verify → owner tail. | ArchiveProcessor/.../Views/, Tagging/GeneratedTags.swift, Capture/ | M | med | none
+  `Views/ManualSegmentTagView.swift`), carried via `SegmentTagData`/`ManualTagSegment` → a `quality` field on
+  `GeneratedTags` whose `allTags` emits `Q1`/`Q2`/`Q3` (0/unrated → **no token**) through the existing
+  `MacOSTagger` path. **Tier-2 no-undo Capture path** → adversarial review + Live Capture functional test
+  (recovery/manifest drivers), scratch-only; confirm quality survives finalize + the image-mirror. GUI verify →
+  owner tail. | ArchiveProcessor/.../Views/, Tagging/GeneratedTags.swift, Capture/ | M | med | none
+- [ ] **W19.q7 — Companions: phone priority control → Quality; emit `Q`** (blocked-on: W19.q6) **[M].** The old
+  phone priority picker/per-page toggle becomes the 0–3 **quality** control on **both** companions
+  (`ArchiveCapture/` Android + `ArchiveCaptureiOS/`), emitting `Q1`–`Q3` (map the 4-level `P7`–`P10` picker → 3
+  levels + none; `P10`→`Q3`). **Phone↔Mac protocol is a SHARED HOTSPOT — change all sides together:** the
+  companion `MacClient` + the Mac `Net/CaptureServer` route (+ `RelayObjectFormat` if the relay carries it). The
+  code change is small (a token/level swap), but it spans the wire contract. Alias-on-read (q2) means an old-build
+  phone still works mid-rollout, so no flag-day. Daemon-buildable (code + Android/iOS builds); **on-device /
+  emulator E2E (`scripts/e2e-phone-mac.sh`) = owner tail** (companions have no unit tests — the E2E is the gate).
+  | files: ArchiveProcessor/ArchiveCapture/, ArchiveProcessor/ArchiveCaptureiOS/, Net/CaptureServer.swift, Net/RelayObjectFormat.swift | M | med | owner(E2E)
 
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
