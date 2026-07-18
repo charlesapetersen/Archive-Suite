@@ -9,7 +9,6 @@
 - **Side-by-side original/OCR verification view** — show the original image alongside its OCR text in the main review flow (the Tools "Compare Models" tool already shows multiple model outputs side by side)
 
 ### Workflow
-- **Processing profiles/presets** — save combinations of provider, model, tagging, and segmentation settings as named profiles
 - **Queue system** — add files to a processing queue and process in the background
 - **Undo/redo for review changes** — general undo across review dialogs (a redo-tagging loop already exists)
 - **Resume interrupted processing (standard runs)** — persist non-batch Files-processing state across restart (Live Capture already resumes via its staging manifest)
@@ -36,15 +35,8 @@
 ## Lower Priority
 
 ### Performance & Scale
-- → **Incremental processing** — process only new/changed files in a directory. **Promoted to the near-term
-  queue** (owner, 2026-07-15) — now in [`SUITE_TODO.md`](../SUITE_TODO.md).
 - **Distributed batch processing** — split large jobs across multiple API keys for faster throughput
 - **Memory-efficient streaming** — stream batch results instead of loading all into memory
-
-### UI Enhancements
-- → **Dark mode optimization + global keyboard shortcuts** — **promoted to the near-term queue** (owner,
-  2026-07-15) as one item in [`SUITE_TODO.md`](../SUITE_TODO.md): main-window shortcuts for start-processing /
-  switch-provider (review + tag-card dialogs already have full keyboard nav) + a dark-mode render audit.
 
 ### API & Extensibility
 - **Offline local model support** — integrate with Ollama or llama.cpp for fully offline, on-device processing. _(The subscription-authed **Local Agent CLI** backend — Claude Code / Gemini / Codex, no API key — shipped in W13.cli-1…4; this line now covers only the distinct **offline/on-device** case.)_
@@ -53,9 +45,6 @@
 - **Apple Shortcuts integration** — expose processing actions via Shortcuts app
 
 ### Data & Analytics
-- → **Processing history + cost tracking** — **promoted to the near-term queue** (owner, 2026-07-15) as one item
-  in [`SUITE_TODO.md`](../SUITE_TODO.md): persist each run (timestamp/settings/results) + its **actual** cost and
-  surface a history view.
 - **Accuracy metrics** — compare OCR results against ground truth files for benchmarking
 - **Tag frequency analysis** — show most common tags, date distributions, subject clusters
 

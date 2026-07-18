@@ -33,9 +33,6 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
 ## Medium priority
 - **Controlled subject vocabulary (optional)** — restrict subject tags to an allowed list (near-duplicate
   detection via `TagSimilarity` and corpus-wide bulk rename already shipped).
-- → **Full-text search snippet previews** — **promoted to the near-term queue** (owner, 2026-07-15); the live
-  item now lives in [`SUITE_TODO.md`](../SUITE_TODO.md) → *Archive Reader — search*. (Keyword-in-context excerpt
-  per hit via FTS5 `snippet()`; the index already stores the OCR `body`, so it's a search-UI addition.)
 - **Fuzzy OCR text search** — tolerate typos / near-matches in full-text search (FTS5 prefix/`NEAR`,
   a trigram tokenizer, or an edit-distance layer over candidates), so a misspelled query still finds
   the document. Deferred by owner (2026-07-09); would coordinate with the bm25 ranking in the
