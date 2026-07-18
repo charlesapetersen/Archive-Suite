@@ -114,6 +114,19 @@ Per-record properties to capture: `uuid`, `id`, `reference URL`, `name`, `aliase
 parse hrefs — or read `source` directly for records DT already stores as HTML/MD. rtfd embedded images are
 files inside the `.rtfd` package → copy them out (in scope, §2).
 
+**Extraction hazards handled (review-hardened):**
+- **Shared `uniqueId`.** The two DBs carry the **same** database `uniqueId` (the Photo DB is a Finder-duplicate
+  of Meritocracy) and item-level uuids can overlap. So: **reassign the Photo DB copy a fresh `uniqueId`** before
+  scripting; **namespace every extracted uuid by its source DB** in the manifest; and make §4's resolver
+  **disambiguate by DB (never first-match)**. DTI-0 enumerates the overlapping item-uuids and any cross-DB link
+  that hits both.
+- **Copy hygiene.** Each `.dtBase2` contains its own `Backup …` subfolders — the extractor reads only the live
+  records/metadata, never the backups (the copy may strip them to save space).
+- **Resume / idempotency.** Extraction writes **one JSON per `(source-DB, uuid)`**, so a re-run skips completed
+  records; the pure transform is idempotent over the frozen manifest. Resume key = the DB-namespaced uuid.
+- **AppleScript reliability.** Fetch record lists, then per-record content in **chunks** inside `with timeout`
+  blocks (a 40k `contents` fetch or a large `source` read can time out); wall-clock measured on the DTI-0 sample.
+
 ---
 
 ## 2. Scope (locked with owner 2026-07-17)
@@ -168,12 +181,17 @@ index emits one `sortDate` (`Item.swift:39-59`). Add:
 - **Front-matter:** new key `additional_dates` appended to `FrontMatterCodec.knownKeys`
   (`FrontMatterCodec.swift:156-160`). Unknown keys already round-trip, but surfacing in UI + index requires
   it to be a known key.
-- **Index / timeline (the crux of "appears in multiple places"):** the decade facet + timeline read one
-  `sortDate` per row today. A note with N dates must appear at **each** date → emit **one index row per
-  date** (primary + each additional), or add a date-multiplicity table. This is the change that makes a
-  consolidated near-duplicate show up on the timeline at every original date.
-- **UI:** date editor gains add/remove additional dates; note header shows all; timeline dedupes by note id
-  when a range spans several of a note's dates. (Detailed UI is a sub-task, not blocking the importer.)
+- **Index / timeline (the crux — reviewed against the real code):** the list/search index is keyed
+  `id TEXT PRIMARY KEY` (`NotesIndex.swift`) and the list feeds an `NSDiffableDataSourceSnapshot<_,UUID>`
+  (`NotesTableView.swift`), so **you cannot emit >1 index row per note UUID** — a second row overwrites, and a
+  duplicate UUID in the snapshot is a *fatal crash*. Multi-date multiplicity therefore lives in a **separate
+  `item_dates` table** (one row per `(uuid,date)`) that **only the date facets/timeline** read; the note list +
+  FTS stay strictly **one row per UUID**. Every date *consumer* must become date-set-aware — today only
+  `NotesFilter.matches` evaluates a single `sortDate` (`NotesFilter.swift:75-79`), so a date-range filter would
+  silently ignore additional dates unless it consults `item_dates`. Gate invariant (§7): the list snapshot has
+  no duplicate UUID, and a multi-dated note is returned by a date filter on **each** of its dates.
+- **UI:** date editor gains add/remove additional dates; note header shows all. (Detailed UI is a sub-task, not
+  blocking the importer.) **These are Notes-local changes** (`Item` + Notes index/UI), *not* shared-ArchiveCore (§3d).
 
 ### 3b. Pointer-notes — "Related notes" section (owner choice)
 Notes that begin with a run of DEVONthink links to other notes/extracts become a first-class, one-way
@@ -198,7 +216,9 @@ Excerpts` → 2★** (no such tag → no rating). These number-prefixed tags —
 excerpt marker — are **control tags: stripped from `Item.tags`, never imported as subject tags.**
 - **Broader app change (bundled into DTI-3):** the 5→3 star control + any rating filter, and a remap of any
   *existing* 4–5★ ratings already in the app (min, if any — new app). Standalone from the import mechanics but
-  the import targets the 3★ scale, so it ships first.
+  the import targets the 3★ scale, so it ships first. **Scope note (review):** `Item`, `quality`, the star UI,
+  and the multi-date model are **Notes-local**, not shared `ArchiveCore` — the "build+test all apps" rule (§10)
+  applies only to the genuine shared touchpoint, the `Item.sortDate` ≡ `ArchiveCore.DocumentTags.sortDate` parity guard.
 - **Open classification question (DTI-0):** do `Good/Best Note Excerpts`-tagged records **also** carry the
   `0 Note Excerpt` marker (quality is an overlay on excerpts), or do these tags themselves mark a record as an
   excerpt? This affects note-vs-extract classification (§5) — confirm against the real DB before the bulk run.
@@ -234,19 +254,28 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 segment, and re-anchors on `Archival%20Photos`, then routes through §4a. Anything the repair can't
 confidently fix is flagged, never guessed.
 
+**Provenance vs. "see also" — position is not enough (review-hardened).** A trailing DEVONthink link is
+*usually* an extract's provenance, but related "See also" links also appear as a **trailing run** *after* the
+real provenance, and notes carry multiple trailing links. So **don't infer provenance from position alone**:
+parse explicit `See:` / `See also:` markers to split trailing provenance from a trailing related-notes run; a
+record with **>1 trailing DT link** after that split is **flagged for review, never auto-picked**. A leading run
+→ Related notes (§3b); a single unambiguous trailing link → provenance.
+
 ### 4a. Archival photo resolution — by stable name/ID, not path
 Every archival photo carries a **stable filename** — either `NNNNN — <Collection>` (e.g. `00140 — Swarthmore`)
 or, for journal runs, `YYYY — <Journal> — NNNNN` (e.g. `1981 — Microelectronic News — 00075`). The same photo
 is referenced from many stale paths (old usernames, `/Volumes/…`, renumbered processing folders, the Photo
 Database) but its **filename never changes**. So the importer:
-1. **Builds a filename→path index** of the live Archival Photos root once (all `.pdf`, plus `.jpg`/`.jpeg`).
-   Key = the normalized filename **stem** (strip extension + `.zip` bundles, collapse spacing, drop the Photo
-   Database's `IMG` token, NFC) — this covers both naming conventions and is robust to **folder-name variance**
-   (links say "Microelectronic News" while the folder is "Microelectronic**s** News" — we key on the file, not
-   the folder). For **Photo Database** cross-DB matches the **numeric ID is authoritative** (owner-confirmed
-   always accurate); normalization only absorbs formatting drift (the `IMG` token, em-dash vs hyphen, spacing,
-   singular/plural collection). **Detect and report any duplicate/ambiguous match** (a number that maps to >1
-   root file, or a colliding stem) — never silently pick wrong.
+1. **Builds a `(collection, id, stem)`→path index** of the live Archival Photos root once (all `.pdf`, plus
+   `.jpg`/`.jpeg`). **Correction (review):** the `IMG` token is **pervasive in the root** (~28k files are
+   `NNNNN IMG — <Collection>`), *not* a Photo-DB-only artifact — so `IMG` is normalized **uniformly on both
+   sides**, never used as a discriminator, and DTI-0 **re-derives the full naming inventory** (`NNNNN — X`,
+   `NNNNN IMG — X`, `YYYY — Journal — NNNNN`) from a full-root scan. **Numeric IDs are per-collection, not
+   global** (the same `00003` exists in many collections), so the match key is **`(collection, number)`** with
+   the normalized stem as corroboration; the source link's own collection folder (Babbage/Huntington/Stanford…)
+   supplies the collection, and only the renumbered `01`–`06` processing prefixes are matched name-only.
+   **Any ambiguous match — a `(collection,number)` or stem mapping to >1 root file — is flagged, never silently
+   picked** (§7.11 probes identity, not just existence).
 2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder paths,
    and Photo Database cross-DB links all collapse to "find this filename in the root."
 3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>[&page=n]`** to the
@@ -255,9 +284,11 @@ Database) but its **filename never changes**. So the importer:
 4. **JPEG partner (tracked to-do):** the matching `.jpg` sits at the mirror path under `Archival Photos JPEGS/`
    (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). The Reader image entity — and thus
    the Notes link — should be able to reference **both** (PDF by default, JPEG on demand). **On the to-do list**
-   (`SUITE_TODO.md`, owner request); not a blocker for this import (links resolve to the PDF; the JPEG is always
-   derivable from the filename). **Verify** with a headless render guard that the PDF page and its JPEG partner
-   both render non-blank (`RenderProbe`/`DocumentRenderGuardTests`), plus `ops/gui/` for the in-viewer switch.
+   (`SUITE_TODO.md`, owner request); not a blocker for this import. **Derivable-if-present, not always (review):**
+   roughly half of root PDFs have no JPEG partner, so **probe the mirror path and degrade to PDF-only when
+   absent**; the JPEG mirror is **excluded from the resolution stem-index** so it can't inflate collisions.
+   DTI-0 measures per-collection JPEG coverage. **Verify** with a headless render guard
+   (`RenderProbe`/`DocumentRenderGuardTests`), plus `ops/gui/` for the in-viewer switch.
 5. **Unresolved → flag**, never a guessed path: filenames not found in the root (a photo still only in a
    processing folder that will move out; a truly-missing target; oddball `.docx`/`.wav`/`.jpf` targets).
 
@@ -281,9 +312,23 @@ Database) but its **filename never changes**. So the importer:
   small, fully-tabulated, unit-tested grammar — unrecognized alias → flag, never a wrong date. **Month-prefix
   titles** ("Nov: …") on the DT `name`: move the month into a `date`/`datePrecision:.month` (only if no
   conflicting alias date) and strip the prefix from the title.
-- **Body → blocks/markdown:** RTF/RTFD → markdown; preserve emphasis/lists; extract embedded rtfd images to
-  `assets/` and rewrite as markdown image refs. DT item-link "images" that are really links, not media, go
-  through the link contract, not asset import.
+- **Body → blocks/markdown (pinned converter + fidelity spec — review-hardened):** the RTF/RTFD→markdown step is
+  the highest-loss transform, so it is **specified, not hand-waved.** Pin a converter (and version) plus a
+  **golden fidelity spec** enumerating every RTF feature in the corpus with an explicit KEEP or LOSSY-BY-DESIGN
+  decision: bold/italic/lists KEEP; **yellow highlight KEEP** (→ `==mark==` / inline HTML span — measured on
+  ~11,530 records, the load-bearing "this is important" signal); **underline KEEP** (~7,722 records); text
+  color, tables, super/subscript KEEP-or-explicitly-drop. Links come from the HTML sidecar (§1), since
+  `plain text` strips URLs. **Embedded images** are extracted by walking the RTF/RTFD **stream** (preserving
+  inline **position** and repeated placements — not a trailing gallery, not filename-dedup) into `assets/` and
+  re-linked in place; DT item-link "images" that are really links go through §4, not asset import. Golden tests
+  cover each KEEP feature.
+- **Other DEVONthink metadata → explicit map (nothing silently dropped):** `creation/modification` →
+  `created`/`modified`; `addition`/`document date` → considered for `additional_dates`; **Finder/Spotlight
+  comment** → appended as a note field/block; **URL field** → a source link; **label/color, flag/state,
+  read/unread** → mapped to a tag or **explicitly dropped (logged)**, decided per-field in DTI-0. **Nested DT
+  tags** flatten to `Item.tags` preserving the **full path** (leaf-only risks collisions); report collisions.
+  Any DT field with no mapping is reported as *dropped*, never silently omitted. **Dateless notes are fine** —
+  no `Alias` → no date (absent from the timeline), never flagged as an error.
 - **Links:** apply §4 in a single deterministic pass over the HTML-with-hrefs, using the uuid→new-id map.
 - **Replicants → memberships** (§6). **Groups → VFolders** mirroring the DT hierarchy (filter the `/Tags`
   pseudo-groups DT models as replicants).
@@ -321,8 +366,9 @@ free and only the flagged subset ever costs model tokens.
 
 - **Replicant** — same underlying record filed in ≥2 groups. **All instances share one `uuid`**;
   `parents of <record>` lists every group. → **De-dupe by `uuid` to a single `Item`; add one `Membership`
-  per real parent group** (excluding `/Tags`). This reproduces the DT filing exactly, as memberships not
-  copies. `number of replicants > 0` is the gate.
+  per real parent group** — via an explicit **exclusion list** (`/Tags` and every tag group, plus **Trash,
+  Inbox, and the DB root**, which `parents` also returns), not just `/Tags`. This reproduces the DT filing
+  exactly, as memberships not copies. `number of replicants > 0` is the gate.
 - **Near-duplicate** — independent records, **different `uuid`s**, near-identical text (owner's deliberate
   space/nonsense-char trick to carry multiple timeline dates). → **consolidate into one `Item`** whose
   primary date is one occurrence's alias and whose `additional_dates` collect the others' alias dates.
@@ -336,7 +382,16 @@ free and only the flagged subset ever costs model tokens.
   consolidation preserves the **union** of the losers' tags/links/memberships/provenance — nothing is dropped;
   and (e) a **min-length floor** guards against degenerate matches — records with **empty/below-floor
   normalized text are never text-merged**, and template placeholders are excluded upstream (§2), so
-  empty-normalizing records can't mass-merge.
+  empty-normalizing records can't mass-merge; (f) **no body loss** — when merged bodies aren't byte-identical
+  after normalization, the **loser's verbatim body is retained** on the survivor (an `original`/alternate-version
+  block); the union never drops note text; (g) **deterministic winner + primary date** — the surviving
+  id/title/body and primary `date` follow a total order (earliest alias date; ties → lowest uuid), recorded in
+  the merge log and asserted **idempotent** by re-running DTI-2 and diffing (§7.10); inbound links resolve to the
+  surviving id; **quality** = the group's **max** star; (h) **clustering/transitivity** — near-dup grouping is
+  defined (single-link clusters over the pinned metric) so `A~B~C` resolves to one deterministic cluster, and
+  the metric + normalization pipeline + floor are pinned in DTI-0 (the owner's space/nonsense-char trick
+  normalizes to 100%-identical, so DTI-0 confirms whether exact-normalized-equality suffices before trusting the
+  ~98% band).
 - **Image-only near-duplicates** — the multi-date trick also applies to image-only notes (same image, a
   space/nonsense char apart, different dates). Match these by **image content-hash** (identical image set +
   differing alias dates → merge into multi-date; else **flag**), never by text.
@@ -359,18 +414,36 @@ DB and the live Notes store are untouched; the output is a fresh store the owner
    `archivereader://` target; unresolved → report (must be zero, or explicitly owner-accepted).
 4. **Every extract has provenance.** No extract lands without a `note-passage`/reader/zotero source.
 5. **Replicant fidelity.** For each de-duped uuid, memberships == real parent count.
-6. **Round-trip spot check.** Re-parse a random N notes with `FrontMatterCodec`/`BlockParser`; must
-   round-trip byte-identical.
-7. **Human audit.** A generated diff/report (counts, flags, merges, unresolved) + manual UI spot-check of a
-   stratified sample (a replicant, a consolidated near-dup, an extract, a pointer-note, an archival-provenance
-   note) before adoption.
-8. **Reversibility.** Fresh store + untouched original = re-runnable from the frozen JSON manifest at will.
-9. **OCR-quality report.** The free detector's defect counts (glued/split/wrap) + worst offenders are reported;
-   any note whose text is later repaired retains its verbatim **original** (§5a) — repairs are owner-reviewed,
-   never silent.
+6. **Body content-fidelity (CRITICAL — the biggest gap the review found).** For every record, strip the
+   materialized markdown to plain text and assert it equals DT's captured `plain text` under a defined
+   unicode/whitespace normalization. This is the *only* check that catches silent RTF→markdown corruption; a
+   mismatch beyond the normalization is a flag. Intended transforms (OCR repair §5a, link rewriting) are applied
+   to the expected side so they don't false-positive.
+7. **Formatting fidelity.** Every source RTF **highlight / underline / color / table** run must be represented
+   in the output (per the §5 fidelity spec); a record that had such a run but shows none is flagged — no silent
+   formatting loss.
+8. **Embedded-image survival.** Per record, images extracted from the source rtfd == images in `assets/`, **and**
+   every markdown image ref resolves to an existing asset; reconcile totals corpus-wide.
+9. **Date-parse sanity.** Every parsed year is derivable from its raw `Alias`; dates synthesized from a
+   month-prefix title (not the alias) are flagged; a sample from each distinct alias-format bucket is reviewed.
+10. **Merge fidelity.** Every near-dup merge retained the loser's body (§6f) and is idempotent (re-run + diff);
+    `merged_away` is itemized so count-reconciliation can't hide a bad merge.
+11. **Archival-resolution identity.** Probe not just that a file exists but that the resolved file matches the
+    link's `(collection, id)` — a wrong-but-valid PDF is a flag (§4a).
+12. **Serializer round-trip** *(regression test, NOT a fidelity guarantee).* Re-parse N notes with
+    `FrontMatterCodec`/`BlockParser`; must round-trip byte-identical — proves the codec is stable (incl. the new
+    `additional_dates`/`related` keys, which leave the unknown-key passthrough once known), **not** fidelity to
+    DEVONthink (that is check 6).
+13. **Human audit.** A stratified UI spot-check (a replicant, a consolidated near-dup, an extract, a
+    pointer-note, an archival-provenance note, an OCR-repaired note) before adoption.
+14. **Reversibility.** Fresh store + untouched original = re-runnable from the frozen JSON manifest.
+15. **OCR-quality report.** Detector defect counts (glued/split/wrap) + worst offenders; any repaired note keeps
+    its verbatim `original` (§5a).
 
-Every "flag" above lands in a single report; the run **stops for owner review on any non-zero flag class**
-rather than importing best-effort.
+**Review is by flag CATEGORY, not per-row.** At 40k scale there may be thousands of flags, so the gate presents
+**each flag class with a count + a stratified sample + a per-class accept/deny**, and **blocks adoption only if a
+class exceeds an agreed bound** — the owner adjudicates categories, not 40,000 rows. No best-effort import: an
+un-adjudicated class blocks adoption.
 
 ---
 
@@ -474,7 +547,20 @@ Each phase is bounded, reviewed (Tier-2), and leaves an inspectable artifact. **
 assumed already shipped** as Notes gap-closure before the import runs (owner: "a plan for how to import once
 the app is complete") — it is listed only as the dependency it is. Those shared-`ArchiveCore`/`Item` changes,
 whenever built, must build **and test all three apps** (memory: shared-core changes rebuild Reader + Processor
-+ Notes).
++ Notes) — though the multi-date/rating model itself is Notes-local (§3d).
+
+**Interface contract (makes "assume the app is complete" safe).** The exact front-matter schema the importer
+emits — the `additional_dates` shape, `related`, the 1–3 `quality` scale, any new block kinds — is pinned as a
+**single source of truth both DTI-3 (the app) and DTI-2/DTI-4 (the importer) build to** (extend
+`execution-plans/archive-notes/00-overview.md` §5, already the cited front-matter contract). DTI-2's golden
+output is validated against that schema, so the importer can't emit shapes the shipped app won't read.
+**DTI-0 is a go/no-go gate**, not just a spike: it exits only when the alias-date grammar covers the corpus
+(rest flagged), the name-index ambiguity rate is measured and acceptable, near-dup calibration is validated on
+real pairs, the shared-`uniqueId` is handled, the RTF converter + golden fidelity set pass, the naming inventory
+is re-derived, and the OCR thresholds are tuned.
+**Rollback.** Pre-adoption the fresh-store swap is fully reversible; post-adoption (after you've edited notes)
+corrections are manual, but the frozen manifest + toolchain stay in git so a **targeted re-run/patch** (keyed by
+DB-namespaced uuid) is always possible.
 
 | Phase | Deliverable | Effort | Depends |
 |---|---|---:|---|
