@@ -135,7 +135,37 @@ currently being changed by another autonomous run.
 
 ---
 
-## DEFERRED: replace process-global processing settings with immutable per-run dependencies [HIGH — architecture/concurrency]
+## PROMOTED → Wave 16: replace process-global processing settings with per-run dependencies [MEDIUM-LOW — was HIGH]
+
+**No longer deferred; severity corrected (owner review 2026-07-18).** Promoted to `SUITE_TODO.md` §"Known-issues
+work — Wave 16" as **W16.cfg1–cfg6**. **Owner decision: extend `SessionProcessingConfig` to be the single run
+config** (it already carries 5 of the 6 values; `ocrWorkerCount` is the only gap) and have
+`PendingRunRuntimeConfig` wrap it — **do NOT introduce a third type.** This is a consolidation job, not the
+greenfield build the original text implies.
+
+**Two claims below are STALE — corrected here so they aren't re-derived:**
+- *"`MacOSTagger` retains a global fallback for older call sites"* — the global exists (~13 sites use the
+  implicit default) but it is **no longer `nonisolated(unsafe)`**: commit `5b58da8` made it an
+  `OSAllocatedUnfairLock`-backed property (`MacOSTagger.swift:21-25`), and an explicit `stampUnread:` parameter
+  already allows per-call injection everywhere. The residual defect is **style, not a data race.**
+- *"let persisted recovery records own a versioned copy"* — **already shipped.** `PendingRunRuntimeConfig`
+  (`OCRProcessor.swift:403`) is schema-versioned, manifest-attached, structurally validated independent of the
+  fingerprint (`+Pipeline.swift:204-233`), and round-trip tested (`BatchResumeTestDriver.swift:304-426`).
+
+**Why it is not HIGH:** the headline scenario — a Process Files run mutating an in-flight Live Capture's
+settings — is **already impossible**; Live Capture is fully injected and reads/writes zero globals. The count of
+six `nonisolated(unsafe)` statics IS still accurate (`OCRProcessor.swift:70/73/76/79/82/85`). The residual risk
+that justifies the work: the env-gated headless **test drivers mutate these globals directly**, so a driver run
+(or a crash that skips its `defer` restore) alongside real work yields wrong image size, wrong column count, or a
+missing/extra `Unread` tag — non-zero because the daemon runs smoke tests unattended. It becomes genuinely HIGH
+only if background processing, a second processor instance, or a share extension is ever added.
+
+⚠️ **Hazard recorded for W16.cfg4:** several **copy-source** `applyTags` sites are correct today only because the
+global happens to be `false`. A mechanical "pass the run's `taggingMode`" edit would silently start stamping
+`Unread` on copy-source output — a SPEC-visible tag regression on irreplaceable files. Audit each site
+individually. Original analysis below.
+
+## Original text: replace process-global processing settings with immutable per-run dependencies
 
 The immediate Live Capture overlap bug is fixed: Live Capture now carries its locked rotation, image-size,
 and unread-tag policy through the OCR and file-writing calls instead of reading or mutating Process Files'
@@ -181,7 +211,41 @@ size and tag policies win. (2026-07-17)
 
 ---
 
-## DEFERRED: unify paid-batch providers behind one durable state machine [MEDIUM — architecture/safety]
+## LOW — typed BatchProvider refactor + provider contract fixtures (was: "unify paid-batch providers", MEDIUM)
+
+**Downgraded + retitled (owner review 2026-07-18); the protocol rewrite is CLOSED, the tests are promoted** to
+`SUITE_TODO.md` §"Known-issues work — Wave 16" as **W16.bat1** (provider contract fixtures) and **W16.bat2**
+(cancel-path coverage).
+
+**This entry was substantially STALE — three of its four headline risks are already closed AND regression-tested:**
+- *"forget a persistence transition"* → `persistPendingBatchMutation` mutates a copy, writes atomically, and
+  publishes in memory **only** if the disk write succeeded; on failure it halts the run rather than running ahead
+  of its journal (`+Pipeline.swift:593-613`, transitions at :616/:626/:633).
+- *"mishandle partial submission"* → partial submission is a **first-class journaled state**
+  (`submissionComplete`, `OCRProcessor.swift:298`; guard `+Pipeline.swift:408`), regression-tested at
+  `BatchResumeTestDriver.swift:476-486`.
+- *"delete recovery state before cancellation is confirmed"* → `cancel()` deletes the journal **only** when every
+  server cancellation is confirmed (`+Pipeline.swift:1466-1470`).
+- *"keep a migration decoder for existing `pending_batch.json`"* → **already shipped** (`OCRProcessor.swift:344-372`).
+
+*"Gemini returns multiple job IDs as a comma-separated string"* is **half stale**: the joined string survives as a
+**derived compatibility mirror**, but the authoritative representation is the ordered `submittedChunkIds` array
+(`OCRProcessor.swift:292`, `:380`), and self-consistency *forbids* a comma inside any individual ID
+(`+Pipeline.swift:403`), so the join is provably lossless. Gemini's per-chunk IDs reach the journal via the
+`onJobCreated` hook (`BatchOCR.swift:265-271`), not by parsing the joined string.
+
+**Still true:** the three clients remain stringly-typed behind three `switch provider` blocks (`+OCR.swift:525`,
+`+OCR.swift:630`, `+Pipeline.swift:1445`). **Owner decision: do NOT build the full `BatchProvider` protocol
+rewrite** — it would touch the only code path that spends real money to remove risks that are already gone.
+Revisit only when OpenAI batch (Phase 4) is actually implemented; the defensive `case .openai` arms
+(`+OCR.swift:551-555`, `:740-743`, `+Pipeline.swift:1463-1464`) are where that work will land.
+
+**The genuinely unmet gap** (and the reason W16.bat1 exists): verification-plan item 5, provider contract
+fixtures. `GeminiBatchClient.checkStatus` parses **six alternative JSON shapes** (`BatchOCR.swift:511-548`) with
+**zero tests** — a provider response-shape change would silently mark an entire paid batch as failed. Original
+analysis below.
+
+## Original text: unify paid-batch providers behind one durable state machine
 
 The Processor's crash-safety fixes now journal paid-batch progress at the orchestration boundary, but the
 Anthropic, Gemini, and Mistral clients still expose separate stringly-typed submit/status/result/cancel
@@ -212,7 +276,73 @@ substantially harder to audit and back out.
 
 ---
 
-## DEFERRED: authenticate and encrypt the Live Capture LAN channel [HIGH — cross-platform security]
+## LOW (not queued): paid-batch lost-create reconciliation — no way to re-adopt an orphan server job
+
+Split out of the paid-batch entry above by the 2026-07-18 owner review, so the one genuine (if unlikely)
+money-risk gap stays visible on its own terms rather than being bundled into a refactor that was dropped.
+
+**The gap.** If a provider accepts a batch-create POST and the response is lost in transit, the app records the
+ambiguity **honestly** — the journal is retained, the message differentiates "no server ID was received … review
+before retrying" from "stopped after N server jobs" (`OCR/OCRProcessor+OCR.swift:558-571`), and resume refuses to
+auto-retry a v1 journal with no chunk IDs because "retrying automatically could duplicate a paid job"
+(`+Pipeline.swift:748-753`). But there is **no reconciliation hook**: the app cannot list the provider's batches
+and re-adopt the orphan. The operator must open the provider console.
+
+**Cost if it fires:** one batch's spend possibly paid twice. **No data loss, no duplicate output** — the run
+halts loudly rather than proceeding past its journal.
+
+**Why it is not being built.** Auto-adoption needs **live paid API calls** against each provider's list endpoint
+to develop and verify — outside the autonomous daemon's envelope — for a failure mode **never observed in this
+project**. The `NetworkSession` `.nonIdempotent` retry policy (`BatchOCR.swift:130, :421, :722`) already prevents
+the app from creating the duplicate itself, and the UI actively discourages the operator from blind-retrying.
+An adoption mistake would also attach results to the wrong local run, so the UI needs owner design input.
+
+**Decision:** ship an operator-facing note pointing at the provider console (folded into **W16.bat1**); build the
+real reconciliation **only if a lost-create event is ever actually observed.** If it is built, it must preserve
+the per-call idempotency declaration — dropping that silently reopens the FIXED CRITICAL "ambiguous retries could
+duplicate billable requests."
+
+---
+
+## PARTLY CLOSED (accepted risk) + PROMOTED → Wave 16: Live Capture LAN channel [MEDIUM — was HIGH]
+
+**Owner review 2026-07-18 split this entry in two.**
+
+**A) The encryption/transport redesign is CLOSED as accepted risk — do NOT re-promote it.** No TLS, no AEAD, no
+companion changes, no packet-capture harness. Rationale, recorded so it isn't reopened: the payload is
+photographs of **public archival records the owner intends to publish**, so confidentiality is near-worthless;
+the integrity loss is bounded by the **Recovery Core Directive** (idempotent `(group, seq)`, originals retained
+in the visible backup folder, deletions via Trash not `rm`), so a forged overwrite is noticed at tag-card review
+and is recoverable; and the attack needs a targeted adversary physically co-located in the same reading room.
+Encrypting would change the wire contract on **all three platforms** and needs a physical iPhone plus the
+`ap_test` emulator E2E gate to verify. **Operator guidance instead: on untrusted venue Wi-Fi, use the USB bridge
+or the Drive relay.**
+
+*Nuance worth keeping:* venues that enforce client isolation **block the LAN transport entirely** (which is why
+the relay and `USBBridge` exist), so LAN capture works precisely on the open/shared-PSK guest networks that ARE
+sniffable. That is why the residual risk is real rather than hypothetical — it is simply low enough to accept.
+
+**B) The credential weakness IS promoted** → `SUITE_TODO.md` §"Known-issues work — Wave 16", **W16.lan1** (this
+threat-model doc) and **W16.lan2** (the fix). It survives the deflation above because **it requires no sniffing
+at all** — only network reachability to the Mac, so none of the "needs an open network and co-location"
+reasoning applies. The token is 6 chars from a 31-char alphabet (**~29.7 bits**), minted **once per Mac and
+persisted forever** (`CaptureSession.swift:275-282`), with **no lockout on repeated 401s** — an 8-connection
+sweep exhausts the space in tens of hours. Fix = high-entropy token + per-source 401 backoff. **Owner decision:
+SPLIT the credentials** — mint a new LAN credential, leave the stable 6-char **Drive relay token untouched**
+(`SPEC/relay-object-format.md:38` pins it, with committed golden fixtures and a shipped Android transport).
+Migration cost is one QR re-scan per phone — accepted.
+
+**Stale sub-item corrected:** verification-plan item 4's *"Bonjour discovery"* is moot. The Mac advertises
+`_archivecap._tcp` (`CaptureServer.swift:68`) but **neither companion browses for it** — pairing is QR-only.
+
+**Already shipped (don't rebuild):** unauthenticated resource exhaustion is closed (header-first admission,
+8-connection cap, 96 MB aggregate budget, 30 s idle timeout); `constantTimeEquals` is timing-safe; auth precedes
+route disclosure; `CaptureValidation.isSafeGroupId` gates every phone-supplied id. The **Drive relay already has
+the epoch binding** this entry wanted for LAN (`FileRelayReceiver.swift:152-153, :212, :242`) — if replay
+protection is ever revisited, copy that reviewed design rather than inventing one. `CaptureServer._testAdmission`
+makes all of this headlessly testable without a phone. Original analysis below.
+
+## Original text: authenticate and encrypt the Live Capture LAN channel
 
 The LAN receiver authenticates requests with a bearer token, but the current HTTP transport is plaintext
 and the token is persistent. A device able to observe local Wi-Fi traffic can recover that token and replay

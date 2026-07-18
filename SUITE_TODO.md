@@ -388,6 +388,137 @@ Protocol §12 — documented but never built; undo is an in-memory `NavigationMo
 decision 2026-07-18: undo stays in-memory. A durable ledger is a separate future item and must not be
 coupled to this bug.
 
+## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
+Promoted from three deferred `ArchiveProcessor/KNOWN_ISSUES.md` entries after a code-grounded review. **Two of
+the three entries were materially over-stated** — the review's main output was deflation plus a few genuinely
+unmet slices. Severities corrected in KNOWN_ISSUES; the scope decisions below are the owner's and are final.
+
+### #6 LAN channel — crypto redesign CLOSED (accepted risk); credential hardening promoted
+**Owner decision 2026-07-18: do NOT build the TLS/AEAD redesign.** Rationale, recorded so it isn't reopened:
+the payload is photographs of **public archival records the owner intends to publish**, so confidentiality is
+near-worthless; the integrity loss is bounded by the Recovery Core Directive (idempotent `(group,seq)`,
+originals retained in the visible backup folder, deletions via Trash not `rm`); and it needs a targeted
+adversary co-located in the same reading room. Encrypting the transport would change the wire contract on
+**all three platforms**, needs a physical iPhone + the `ap_test` emulator E2E gate, and buys little. **Closed
+permanently — do not re-promote LANSEC-5/6/7 (secure transport, companion mirroring, packet-capture harness).**
+
+**But two things ARE promoted**, because they are cheap, Mac-only, and need no wire-contract change:
+- [ ] **W16.lan1 — write the LAN threat-model + accepted-risk doc [S].** Docs only, no code. Record: sniffability
+  depends on venue Wi-Fi type; **venues that enforce client isolation block the LAN transport entirely** (which
+  is why the Drive relay and `USBBridge` exist) — so LAN capture works precisely on the open/shared-PSK guest
+  networks that ARE sniffable, and that correlation is why the residual risk is *real* even though it's low.
+  State the accepted risk explicitly, point the operator at USB / the Drive relay on untrusted venue Wi-Fi, and
+  **correct the stale verification sub-item**: "Bonjour discovery" is moot — the Mac advertises `_archivecap._tcp`
+  (`CaptureServer.swift:68`) but **neither companion browses for it**; pairing is QR-only.
+  | files: ArchiveProcessor/KNOWN_ISSUES.md, ArchiveProcessor/CLAUDE.md | S | low | none
+- [ ] **W16.lan2 — high-entropy LAN token + failed-auth throttle [S].** The one finding that survives the
+  deflation, because **it needs no sniffing at all** — only network reachability to the Mac. The token is 6 chars
+  from a 31-char alphabet (**~29.7 bits**), minted **once per Mac and persisted forever** in UserDefaults
+  (`CaptureSession.loadOrCreateToken()`, `CaptureSession.swift:275-282`, incl. its `existing.count == 6` guard),
+  and there is **no lockout on repeated 401s** — an 8-connection sweep at LAN latency exhausts the space in tens
+  of hours. Replace with a high-entropy value and add per-source 401 backoff in `CaptureServer.admission`.
+  **Owner decision: SPLIT the credentials** — mint a new LAN credential and leave the stable 6-char **Drive relay
+  token untouched**, because `SPEC/relay-object-format.md:38` pins it and there are committed golden byte
+  fixtures + a shipped Android transport riding on it. Both companions treat the token as an opaque string, so
+  the only migration cost is **one QR re-scan per phone** — accepted. Verify headlessly via the existing
+  `CaptureServer._testAdmission` hook + `ManifestPersistenceTestDriver` (no phone needed).
+  | files: Capture/CaptureSession.swift, Net/CaptureServer.swift, Views/LiveCaptureView.swift | S | med | none
+
+### #4 process-global processing settings — consolidation, not greenfield
+**Corrected severity: HIGH → MEDIUM-LOW.** The headline scenario (a Process Files run mutating an in-flight
+Live Capture's settings) is **already impossible** — Live Capture reads and writes zero globals. Two things the
+entry claims as missing already exist: `MacOSTagger.stampUnread` is **no longer** `nonisolated(unsafe)` (it's
+`OSAllocatedUnfairLock`-backed since `5b58da8`, so the residual defect is an implicit default at ~13 call sites,
+not a data race), and `PendingRunRuntimeConfig` is **already** the versioned, manifest-persisted,
+structurally-validated run config the entry asks for. **Owner decision 2026-07-18: extend
+`SessionProcessingConfig` to be the single run config** (it already carries 5 of the 6 values) and have
+`PendingRunRuntimeConfig` wrap it — **do NOT introduce a third type.**
+
+The residual that justifies doing this at all: the env-gated headless test drivers mutate these globals directly
+(`ManifestPersistenceTestDriver` sets `rotationModeForRun`/`standardImageMB`, `MultiPageReOCRTestDriver` sets
+`pdfImageMB`/`textColumns`, `MergeSafetyTestDriver` flips `stampUnread`). If a driver runs — **or its `defer`
+restore is skipped by a crash** — alongside real work, output gets the wrong embedded-image size, wrong column
+count, or a missing/extra `Unread` tag. That is non-zero **precisely because the daemon runs smoke tests
+unattended.** All Tier-2 (file-writing/tag paths); Processor has no unit target, so verify via the headless
+drivers + `scripts/test-smoke.sh` on scratch fixtures.
+- [ ] **W16.cfg1 — make `SessionProcessingConfig` the single run config [S].** Mark it `Sendable`; it already
+  carries `standardImageMB`/`pdfImageMB`/`exportedImageMB`/`textColumns`/`rotationMode` — **`ocrWorkerCount` is
+  the one gap**. Add it plus a run-start builder mirroring `OCRProcessor.loadStandardImageMB()`'s clamping. No
+  behavior change. **Keep the type in the Processor — do NOT move it to ArchiveCore.**
+  | files: Capture/SessionProcessingConfig.swift | S | low | none
+- [ ] **W16.cfg2 — thread the run config into OCR scheduling + PDF generation reads** (blocked-on: W16.cfg1) **[M].**
+  Sites: `OCRProcessor+OCR.swift:235-236, :807, :965, :1052-1053, :1124` and `OCRProcessor+Pipeline.swift:1061-1062, :1304`.
+  Keep the statics as fallback so nothing breaks mid-migration. Every site already binds to a local `let` before
+  crossing into detached work, so this is "pass a struct instead of read a static", not a redesign.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
+- [ ] **W16.cfg3 — thread the run config into review/regeneration + tagging reads** (blocked-on: W16.cfg1) **[M].**
+  `OCRProcessor+ReviewFlows.swift:377-378` and `OCRProcessor+Tagging.swift:81, :448`. **Highest-value sites** —
+  they fire well after the main OCR pass, which is exactly when a resume can race a still-finalizing prior run.
+  Independent of W16.cfg2; can run in a parallel session.
+  | files: OCR/OCRProcessor+ReviewFlows.swift, OCR/OCRProcessor+Tagging.swift | M | med | none
+- [ ] **W16.cfg5 — resume constructs a run config instead of fanning out to globals** (blocked-on: W16.cfg2, W16.cfg3) **[M].**
+  Replace the six assignments at `OCRProcessor+Pipeline.swift:280-285` (the only remaining global-write on a
+  non-run-start path) with construction of the run config from `PendingRunRuntimeConfig`; same for the three
+  other write points (`Pipeline:773, :997, :1591`). **Leave `pendingRunRuntimeConfigIsValid` (Pipeline:204-233)
+  unchanged — the manifest schema does NOT change, so do NOT bump `schemaVersion`.** `BatchResumeTestDriver.swift:411-426`
+  assertions will need rewriting to assert on the config rather than the statics.
+  | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- [ ] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2, W16.cfg3, W16.cfg5) **[S].**
+  The payoff commit: remove `OCRProcessor.swift:70/73/76/79/82/85`, fold `loadStandardImageMB()`'s clamping into
+  the config builder, drop the now-redundant `explicit…` fallback params (`OCRProcessor.swift:114-124`,
+  `+OCR.swift:1117-1133`), and update the three drivers that save/restore statics. The compiler enforces
+  completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
+- [ ] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** ⚠️ **READ THIS
+  BEFORE TOUCHING IT — do NOT do this as a mechanical sweep.** Several **copy-source** `applyTags` sites are
+  correct today *only because the global happens to be `false`*; blindly passing the run's `taggingMode` would
+  silently start stamping **`Unread` on copy-source output — a SPEC-visible tag regression** on irreplaceable
+  files. Audit each of the ~13 sites individually (`OCRProcessor+OCR.swift:168, :1064`; `+ReviewFlows.swift:179,
+  :320, :388, :584`; `+Tagging.swift:26, :51, :122, :257, :503, :732`; `+Pipeline.swift:1091`) and pass the value
+  that site actually requires. **Approach: remove the default from `applyTags` so every site must pass
+  explicitly, but KEEP the lock-backed property** (the three test drivers legitimately exercise its semantics).
+  Gate: `MergeSafetyTestDriver` **and** `ManifestPersistenceTestDriver` both pass.
+  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor+*.swift | M | **high** | none
+- **Deferred (needs owner sign-off, NOT queued):** the concurrent-runs + Thread-Sanitizer stress driver
+  (verification-plan items 1/2/4). It needs either live API keys for a genuine concurrent OCR run or an
+  **owner-approved stub OCR backend**, and the mutate-Settings-mid-run steps need GUI. Revisit if the stub
+  backend is ever approved.
+
+### #5 paid-batch — downgraded to LOW; refactor dropped, tests promoted
+**Corrected: MEDIUM architecture/safety → LOW maintainability/test-coverage**, retitled *"typed BatchProvider
+refactor + provider contract fixtures."* **Three of the entry's four headline risks are already closed and
+regression-tested** (persist-before-next-irreversible-action `+Pipeline.swift:593-613`; partial submission as a
+first-class journaled state `OCRProcessor.swift:298` + `+Pipeline.swift:408`; cancel-retains-journal-until-confirmed
+`+Pipeline.swift:1466-1470`), and the legacy migration decoder already shipped. The comma-joined Gemini `batchId`
+still exists but is now a **derived, no-comma-validated, provably-lossless mirror** — the ordered
+`submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
+`BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
+risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
+- [ ] **W16.bat1 — provider contract fixtures for the three batch clients' response parsing [M].** The **only
+  unmet item in the entry's own verification plan**, and the highest-value remaining slice. `GeminiBatchClient.checkStatus`
+  parses **six alternative JSON shapes** (`BatchOCR.swift:511-548`) with **zero tests** — a provider response-shape
+  change would silently mark an entire paid batch as failed. Pure-parse, **$0, no network**. Requires promoting
+  `parseInlinedResponses`/`parseSingleResponse` (`BatchOCR.swift:559, :588`) and the Anthropic/Mistral JSONL
+  parsing from `private` to internal (or extracting free functions) so a headless driver can reach them. Cover:
+  all six Gemini status shapes, inline vs result-file, Recitation/blockReason, error entries, key normalization
+  (`'0'` → `'file-0'`), empty + malformed result sets, and Anthropic/Mistral succeeded+errored JSONL lines. Wire
+  into `scripts/test-batch-resume.sh`. **Also fold in here:** a short operator-facing note pointing at the
+  provider console for the lost-create case (see the separate LOW entry below).
+  | files: OCR/BatchOCR.swift, Capture/BatchResumeTestDriver.swift, scripts/ | M | low | none
+- [ ] **W16.bat2 — headless coverage for the cancel path's journal-retention contract [M].** `cancel()`
+  (`+Pipeline.swift:1437-1473`) is the one shipped safety guarantee with **no regression test** — the
+  delete-only-if-all-confirmed rule is currently verified by reading the code. Add a small injectable cancel seam
+  (a closure) so a no-network driver can prove: all-confirmed → journal deleted; any chunk unconfirmed → journal
+  **retained** + status message; multi-chunk Anthropic/Mistral (`chunkIds.count != 1`, :1448-1455) → not
+  confirmed, retained; zero chunks → not confirmed.
+  | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
+  reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
+  honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid
+  twice. Building auto-adoption needs **live paid API calls** against each provider's list endpoint (outside the
+  daemon's envelope) for a failure mode **never observed here**; the non-idempotent retry policy already stops the
+  app from creating the duplicate itself. Ship the operator doc note (in W16.bat1) instead; build only if a
+  lost-create event is ever actually observed.
+
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 - [ ] **Import the personal DEVONthink database into Archive Notes** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3
