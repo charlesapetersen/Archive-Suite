@@ -519,6 +519,80 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   app from creating the duplicate itself. Ship the operator doc note (in W16.bat1) instead; build only if a
   lost-create event is ever actually observed.
 
+## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
+Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
+entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
+Live Capture inputs."** **Both headline proposals are CLOSED by owner decision.** Two small units are promoted,
+one fix was folded into the already-queued `W3.cap-r1`, and both KNOWN_ISSUES entries were rewritten because
+they described machinery that **was never built**.
+
+### ⚠️ The finding that drove the decision: both entries were written in past tense about code that doesn't exist
+- RAT claimed Live Capture "freezes exact content hashes" and commits a "receipt." **`grep -rn "sha256|SHA256|CryptoKit"`
+  across `Capture/` returns ZERO hits.** There is no receipt anywhere in the finalize path.
+- IMMCAP claimed "the narrow safety fix preserves a changed re-upload instead of overwriting." `CaptureSession.ingest`
+  still does `try? FileManager.default.removeItem(at: finalURL)` then `moveItem` (`CaptureSession.swift:505-507`).
+
+That is not staleness — it is **fictional shipped work sitting in the data-safety register**, and it would
+mislead every cold-start reader (human or daemon) into believing guarantees that do not exist. Both entries are
+now corrected in place.
+
+### CLOSED by owner decision 2026-07-18 — do NOT re-promote any of these
+The shared **`RecoverableArtifactTransaction` engine**; the bundled **Recovery screen** (Validate/Retry/Export/
+**Abandon**); the **companion-persisted photo UUID** wire migration; and the **conflict/reconciliation UI**.
+Reasons, recorded so they aren't relitigated:
+1. **The guarantees are already delivered by other means.** The finalize deletion gate keys off
+   `outcome.filedGroupIds` — an **on-disk fact**, not a promise (`LiveCaptureProcessor.swift:983-986`); every
+   deletion is a Trash move; staging is co-located in the **visible** backup folder; `OutputFileSafety.relocateArtifactSet`
+   already **is** a copy-verify-install-then-delete transaction; `PendingBatch` v1 already **is** a versioned
+   SHA-256-fingerprinted journal. RAT's own stated blocker — the trustworthy tri-state tag reader — **shipped**
+   as `ArchiveCore/Tags/TagReading.swift`.
+2. **Consolidation would be a net risk increase.** Three understood, separately-regression-tested mechanisms
+   beat one general engine with unknown failure modes — in the one subsystem that has already caused real data
+   loss. The entry's own verification plan concedes it needs contract tests proving each path's existing
+   guarantees survive, i.e. *the same guarantees, differently spelled.*
+3. **Finder is already the recovery surface**, via the one-click Backup Folder button (`LiveCaptureView.swift:139-148`),
+   and it works in the one case a bundled screen cannot — when the app won't launch. **`Abandon` would also add a
+   destructive affordance to a subsystem whose entire design is that no destructive affordance exists.**
+4. **IMMCAP's central hazard is unreachable from our own companions.** It needs two byte-distinct uploads on one
+   `(groupId, seq)`; but `groupId` is a fresh random `"g" + UUID().prefix(8)` per segment
+   (`CaptureViewModel.swift:97`), `seq` is a durably-persisted monotonic counter, retries re-POST the same
+   immutable file, and reclassify mints a new groupId. **No such incident has ever been recorded** — the conflict
+   UI was speculative.
+5. **The queued items retire them.** `W3.cap-r6` is the concrete ~10-line instance of the recoverability hole RAT
+   wanted a hundred-times-larger engine for; `W3.cap-r2` delivers IMMCAP's stable-identity pillar with **no**
+   persisted generation record, **no** manifest migration, and **no** three-app protocol review. The obsolescence
+   runs the *opposite* direction from what the entries assumed — nothing in RAT/IMMCAP makes any queued item
+   obsolete (a transaction engine that faithfully commits the wrong destination is exactly as broken).
+
+### Promoted
+- [ ] **W17.stg1 — version + fingerprint + fail-closed the Live Capture staging manifest** (blocked-on: W3.cap-r4) **[M].**
+  Live Capture's durable state is the **only one of the Processor's three** that is unversioned and unverified:
+  `PendingBatch` has `lifecycleVersion` + a SHA-256 `lifecycleFingerprint` and fails closed on an unknown version
+  (`OCRProcessor.swift:289-305, :379-383`); `OutputFileSafety.relocateArtifactSet` byte-verifies with
+  `contentsEqual` before installing; `StagingManifest` (`LiveCaptureProcessor.swift:709-719`) has **neither**, and
+  `loadStagingManifest` (:190-242) **fails SILENT-OPEN** — both decodes fail, `restored` stays empty, and the
+  operator sees an empty Processing pane while `_processed/` holds orphaned output. Mirror the proven in-repo
+  `PendingBatch` pattern: add `schemaVersion` + a fingerprint, and on a corrupt/unknown-version manifest **rename
+  it to `staging-manifest.corrupt-<ts>.json` and surface a banner — never auto-delete, never silently continue.**
+  Owner decision: **manifest only** — do NOT add a per-source content hash (that was defensible as corruption
+  detection but is optional, and it is *not* collision defense given #4 above). Testable end-to-end in the
+  existing `$0` `LIVECAPTURE_RECOVERYTEST` driver. **Sequencing: after `W3.cap-r4`** — both touch `RetainedSegment`
+  (:552-563), so let the fingerprint land on settled struct semantics.
+  | files: Capture/LiveCaptureProcessor.swift, Capture/LiveCaptureRecoveryTestDriver.swift | M | med | none
+- [ ] **W17.det1 — stranded-session DETECTION logic (no UI) [S].** The one operator gap neither Finder nor the
+  Backup Folder button covers is **discovery** of a session stranded by a crash. Owner decision: build the
+  **pure-logic half only** — scan `backupRoot` for sessions with a non-empty `staged` array and surface the count
+  on the existing status line / log. **No new SwiftUI, no banner, no Recovery screen.** This costs none of the
+  owner's design-review time and settles empirically whether stranded sessions actually occur before any UI is
+  committed to. Revisit the at-launch banner only once this has been seen to fire.
+  | files: Capture/CaptureSession.swift, Capture/LiveCaptureProcessor.swift | S | low | none
+
+### Folded into an existing item (NOT a separate task)
+The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(...)` at
+`LiveCaptureProcessor.swift:640/647/673`) — a real finding that appeared in **neither** KNOWN_ISSUES entry — is
+folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
+the same three lines and landing them separately would silently revert part of the first. See that entry.
+
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 - [ ] **Import the personal DEVONthink database into Archive Notes** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3
@@ -1169,7 +1243,13 @@ HOLD queue. Every fix is **Tier-2** (Capture/ no-undo path): a fix session must 
 run a scratch-copy functional test before shipping. ⚠️ The Opus-max **refute-verify was budget-truncated**
 (verifiers stopped to protect the session usage window — see memory `workflow-pacing-usage-window`); these are
 finder-level candidates (only #1's premise manually confirmed). Report: `.maintenance/review/Processor-Capture.md`.
-- [ ] **W3.cap-r1 [MED · tag/PDF SPEC]** `LiveCaptureProcessor.swift:640/647/673` — the live path writes tags via the raw `[String]` `MacOSTagger.applyTags` overload (no `colorIsAuthoritative`), so a document segment whose subject is literally "Red"/"Purple" is promoted to a Finder color label (Red=6/Purple=3) → the Reader mis-parses it as a box/folder photo (SPEC subject-collision). KNOWN_ISSUES #5's fix (derive authoritative color from classification) was applied to the batch merge path but **never to the live streaming path**. *(Premise manually confirmed: raw overload at all 3 call sites.)* | Capture | Tier-2
+
+> **SHIP ORDER (set by the 2026-07-18 Live-Capture architecture review — see Wave 17 below).** Recommended:
+> **r6 → r2 → r1 → r5 → r4 → r3.** `r6` is the only genuine recoverability hole in the subsystem (a straggler's
+> processed output is discarded), and `r2` costs real money on every phone retry — those two are the highest
+> value and between them retire most of the two now-closed deferred architecture entries. **Sequencing
+> constraint:** do `r4` **before** `W17.stg1` (both touch `RetainedSegment`), which is enforced by a blocked-on.
+- [ ] **W3.cap-r1 [MED · tag/PDF SPEC] — NOW TWO FIXES IN ONE COMMIT (see ⚠️ below)** `LiveCaptureProcessor.swift:640/647/673` — **(a) the SPEC subject-collision:** the live path writes tags via the raw `[String]` `MacOSTagger.applyTags` overload (no `colorIsAuthoritative`), so a document segment whose subject is literally "Red"/"Purple" is promoted to a Finder color label (Red=6/Purple=3) → the Reader mis-parses it as a box/folder photo. KNOWN_ISSUES #5's fix (derive authoritative color from classification) was applied to the batch merge path but **never to the live streaming path**. *(Premise manually confirmed: raw overload at all 3 call sites.)* **(b) tag-write failures are silently swallowed** (found by the 2026-07-18 review; was NOT in any KNOWN_ISSUES entry): all three sites are `_ = try? MacOSTagger.applyTags(...)`, so a PDF can land byte-perfect, count as **filed**, and have its **source photo trashed** while carrying no subject/date/priority tags at all — in the Reader that file is then invisible to tag-driven triage. **This is the only way today's "filed" verdict can be wrong without the operator ever knowing.** Owner decision 2026-07-18: record a per-artifact `tagsApplied` and **warn in the finalize summary**, but the file still counts as filed — the bytes are safe and retagging is possible, so withholding "filed" (and thus retaining the source) over-corrects. ⚠️ **THESE MUST BE ONE COMMIT.** (a) changes *which* overload is called; (b) changes *whether the result is discarded* — both rewrite the same three lines, so landing them separately means the second silently reverts part of the first. | Capture | Tier-2
 - [ ] **W3.cap-r2 [MED]** `LiveCaptureProcessor.swift:333` — live-OCR dedup keys `pageTasks`/`startedPhotoIds` on the ephemeral `CapturedPhoto.id`, but `CaptureSession.ingest` mints a fresh `CapturedPhoto` (id) on the idempotent-replace/re-upload path (`CaptureSession.swift:516`); a phone auto-retry after a dropped ack bypasses the `!startedPhotoIds.contains(photo.id)` guard (line 301) → a **duplicate paid OCR call** + the prior Task orphaned. | Capture | Tier-2
 - [ ] **W3.cap-r3 [LOW]** `CaptureSession.swift:539/549` — `removePhoto`/`removePhotoIfSafe` delete a photo from `session.photos` but never tell `liveProcessor` to cancel that photo's in-flight OCR Task → deleting/reclassifying a page mid-OCR leaves a paid OCR call running + Task/result orphaned in `pageTasks`. | Capture | Tier-2
 - [ ] **W3.cap-r4 [MED · misfile]** `LiveCaptureProcessor.swift:385` — `backfillCollections` corrects `staged[i].collectionKey` for an out-of-order Box but never updates the parallel `retained[groupId].collectionKey`; the rotation-review regeneration path reads `collectionKey` from `retained` and overwrites the staged entry → silently reverts the correction → **misfiles the document into the wrong collection folder**. | Capture | Tier-2

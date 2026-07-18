@@ -4,7 +4,51 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
-## DEFERRED: one recoverable filesystem-transaction service with operator recovery UI [HIGH — architecture/data safety]
+## CLOSED (owner decision 2026-07-18): one recoverable filesystem-transaction service + operator recovery UI
+
+**Do NOT build the shared engine or the Recovery screen. Do NOT re-promote this.**
+
+### ⚠️ The original text below is FICTION in one important respect — read this first
+It is written in the **past tense about machinery that was never built.** It claims Live Capture finalization
+"freezes exact content hashes" and commits a "receipt." Verified 2026-07-18: **`grep -rn "sha256|SHA256|CryptoKit"`
+across `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/` returns ZERO hits**, and there is **no receipt
+anywhere in the finalize path.** Anyone reading the original paragraph would believe Live Capture hashes content
+and writes receipts. It does not. The paragraph is retained below only as the historical proposal.
+
+### Why it is closed
+1. **The guarantees it wants already exist by other means.** The finalize deletion gate keys off
+   `outcome.filedGroupIds` — an **on-disk fact**, not a promise (`LiveCaptureProcessor.swift:983-986`, with the
+   Recovery Core Directive comment directly above it); every deletion is a Trash move (`trashOrRemove`); staging
+   is co-located in the **visible** backup folder; `OutputFileSafety.relocateArtifactSet` already **is** a real
+   copy-verify-install-then-delete transaction; and `PendingBatch` v1 already **is** a versioned, SHA-256
+   fingerprinted, fail-closed journal.
+2. **Its stated blocker shipped.** "the still-unfixed ArchiveCore metadata-read contract" is satisfied —
+   `ArchiveCore/Tags/TagReading.swift` provides the tri-state `TagReadResult` (confirmed-empty vs unreadable),
+   and `readTags` throws rather than coercing a read failure to `[]`.
+3. **Consolidation would raise risk, not lower it.** Replacing three understood, separately-regression-tested
+   mechanisms with one unproven abstraction — in the subsystem that already caused a real data-loss incident
+   (2026-07-07) — buys no additional guarantee. The verification plan below even concedes it needs contract tests
+   proving each path's *existing* guarantees survive: the same guarantees, differently spelled.
+4. **Finder is already the recovery surface**, via the Backup Folder button (`LiveCaptureView.swift:139-148`), and
+   it works in the one case a bundled screen cannot — when the app won't launch. **`Abandon` would add a
+   destructive affordance to a subsystem whose entire design is that no destructive affordance exists.**
+5. **A queued ten-line fix closes the actual hole.** `W3.cap-r6` — `finalize()`'s `allFiled` branch trashes the
+   whole `stagingDir` after the `executePlans` await, so a straggler finalizing *during* that await loses its
+   output. That is the one genuine recoverability gap this entry gestures at.
+
+### What WAS promoted instead (see `SUITE_TODO.md` §"Known-issues work — Wave 17")
+- **`W17.stg1`** — version + fingerprint + fail-closed the staging manifest. `StagingManifest`
+  (`LiveCaptureProcessor.swift:709-719`) is the only one of the three durable-state records that is unversioned
+  and unverified, and `loadStagingManifest` (:190-242) **fails silent-open**: both decodes fail, `restored` stays
+  empty, and the operator sees an empty Processing pane while `_processed/` holds orphaned output. Corrupt
+  manifests get renamed + bannered, never auto-deleted.
+- **`W17.det1`** — stranded-session **detection logic only**, no UI.
+- **Tag-write failures folded into `W3.cap-r1`** — a real finding this entry does NOT contain: all three live-path
+  tag writes are `_ = try? MacOSTagger.applyTags(...)` (`LiveCaptureProcessor.swift:640/647/673`), so a file can be
+  trashed-at-source while its output carries **no tags at all** and is invisible to Reader triage. Fix = record
+  `tagsApplied` + warn in the finalize summary; still counts as filed. **Must ship in the same commit as r1.**
+
+**Original proposal (historical — see the fiction warning above):**
 
 Live Capture finalization now has a purpose-built durable transaction: it freezes exact content hashes and
 destinations, records exact source-photo identities, admits only complete/hashable groups, pauses capture,
@@ -51,7 +95,49 @@ metadata-read contract. Review the state model and Abandon semantics with the ow
 
 ---
 
-## DEFERRED: immutable, versioned Live Capture inputs from receipt through cleanup [HIGH — architecture/data safety]
+## CLOSED (owner decision 2026-07-18): immutable, versioned Live Capture inputs from receipt through cleanup
+
+**Do NOT build the generation-record model, the companion-persisted photo UUID wire migration, or the conflict/
+reconciliation UI. Do NOT re-promote this.**
+
+### ⚠️ The original text below is FICTION in one important respect — read this first
+Like its sibling entry above, it is written in the **past tense about work that was never done.** It claims "the
+narrow safety fix preserves a changed re-upload instead of overwriting an existing `(groupId, seq)` path" and that
+"staged generations carry a content proof captured before OCR and rechecked through output generation/
+finalization." Verified 2026-07-18: **`CaptureSession.ingest` still does `try? FileManager.default.removeItem(at: finalURL)`
+followed by `moveItem` (`CaptureSession.swift:505-507`)** — it overwrites — and **there is no content hash
+anywhere in `Capture/`** (zero `sha256`/`CryptoKit` hits). Neither the non-overwriting fix nor the content proof
+exists. Retained below only as the historical proposal.
+
+### Why it is closed
+1. **The central hazard is unreachable from our own companions.** It requires two **byte-distinct** uploads
+   claiming one `(groupId, seq)`. But `groupId` is a fresh random `"g" + UUID().prefix(8)` minted per segment
+   (`CaptureViewModel.swift:97`), `seq` is a durably-persisted monotonic counter, an ordinary retry re-POSTs the
+   **same immutable file**, and a reclassify mints a **new** groupId. **No such collision has ever been recorded
+   in this project** — so the conflict/reconciliation UI is speculative, and it is the most expensive part of the
+   proposal (it needs owner design input precisely because an adoption mistake binds results to the wrong photo).
+2. **A queued fix delivers the stable-identity pillar far more cheaply.** `W3.cap-r2` re-keys
+   `pageTasks`/`startedPhotoIds` (`LiveCaptureProcessor.swift:88-89`) on `(groupId, seq)` instead of the ephemeral
+   `CapturedPhoto.id` (`CaptureModels.swift:23`), which `ingest` re-mints on the replace path
+   (`CaptureSession.swift:516`). That closes the real, **money-costing** bug today — a phone auto-retry after a
+   dropped ack currently bypasses the dedup guard and triggers a **duplicate paid OCR call** — with **no** persisted
+   generation record, **no** manifest migration, and **no** three-app protocol review.
+3. **The wire-contract cost is disproportionate.** Companion-persisted photo UUIDs would change the capture
+   protocol across macOS + iOS + Android and all four transports (LAN, USB, file relay, Drive), requiring the
+   emulator E2E gate and a physical iPhone to verify — for a failure mode that cannot currently occur (#1).
+4. **The Recovery Core Directive already bounds the blast radius:** deletion keys off outputs confirmed on disk
+   (`filedGroupIds`), all deletions go to the Trash, and both raw sources and processed output persist in the
+   visible backup folder until finalize confirms the destination.
+
+### What WAS promoted instead (see `SUITE_TODO.md` §"Known-issues work — Wave 17")
+Nothing from this entry directly. Its legitimate residue is covered by **`W3.cap-r2`** (stable `(groupId, seq)`
+keying, already queued) and **`W17.stg1`** (versioning + integrity + fail-closed on the staging manifest). The
+per-source **content hash** was considered and **deliberately dropped** by owner decision: it is defensible as
+*corruption detection* (truncated write, partial Drive download, an externally edited JPEG) but it is **not**
+same-key collision defense, and the collision it was meant to defend cannot occur (#1). Revisit only if a
+byte-distinct same-key upload is ever actually observed.
+
+**Original proposal (historical — see the fiction warning above):**
 
 The narrow safety fix preserves a changed re-upload instead of overwriting an existing `(groupId, seq)`
 path, and current staged generations carry a content proof captured before OCR and rechecked through output
