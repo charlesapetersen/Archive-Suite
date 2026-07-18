@@ -600,6 +600,22 @@ The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(.
 folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
 the same three lines and landing them separately would silently revert part of the first. See that entry.
 
+## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
+Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
+asked to queue the **Android `targetSdk` 34→36** bump, but grounding against the real `build.gradle.kts` found
+it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now corrected in
+`ArchiveProcessor/POTENTIAL_FEATURES.md`). So only the one item below was queued.
+- [ ] **W18.reader-breadcrumb — Reader Box/Folder provenance breadcrumb column [S–M].** Surface each document's
+  Box/Folder provenance (the `Classification` value — `Box`/`Folder`/`Document Start`/`Continuation`) as an
+  optional nav-table column. It is the one unshipped residual of the shipped "Select Document Run" feature
+  (Reader `POTENTIAL_FEATURES.md` High §). **Display-only, no writes → Tier-1** (not a tag-write path). Reuse the
+  existing customizable-column machinery (`Views/AppKitTableView.swift` + `ColumnPickerHeaderView`); the
+  `Classification` already lives in the content index (`Search/ContentIndex.swift`, the same value that drives
+  `DocumentRuns`), so the work is joining it into the nav row model + adding a hide-by-default column (mirror the
+  Notes Sources-column pattern). Daemon-buildable ($0/no key); build + the 186 Reader unit tests + a `RenderProbe`
+  assertion for the new column. **Live GUI confirm → owner tail** (the fixture XCUITest / sighted loop).
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/Views/, Core/ArchiveFile.swift, Search/ContentIndex.swift | S–M | low | none
+
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 - [ ] **Import the personal DEVONthink database into Archive Notes** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's 7.6 GB DEVONthink 3

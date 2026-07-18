@@ -109,7 +109,7 @@ review feedback demands a change.
 
 ### Open decisions & logistics (migrated from the retired distribution plan)
 
-- **Android `targetSdk` 36** becomes mandatory for Play updates ~**2026-08-31**; `ArchiveCapture/app/build.gradle.kts` is still on `targetSdk 34` and must be bumped before that submission.
+- **Android `targetSdk` 36** — ✅ **DONE `8eb4ef4`** (toolchain upgrade + `targetSdk`/`compileSdk` 34→36, compiles clean; on-device smoke remains an owner tail). This unblocks the ~**2026-08-31** Play-update mandate; no further bump needed before submission.
 - **Play closed-testing gate:** new personal Play Console accounts must run a **closed test with ≥12 testers for ≥14 days** before production access — plan for that lead time.
 - **[D1] macOS distribution channel (UNDECIDED):** Mac App Store (free) vs. a notarized Developer-ID DMG. Today the Mac app ships as an owner-only, ad-hoc-signed DMG (see CLAUDE.md → Releasing).
 - **iOS "minimal functionality" risk (App Store guidelines 2.1 / 4.2):** the companion is useless without the paired Mac, so the listing and first-run must clearly state the Mac-app dependency.
