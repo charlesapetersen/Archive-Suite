@@ -23,9 +23,9 @@ Batch sizing).
 
 ## The three levers that keep it inside a window
 
-1. **One unit per session.** ~90 Processor + ~38 Reader Swift files + companions → **10 units** (below). A
-   session does ONE, commits its report, marks it done, exits. Usage caps reset ~every 5h; the next unit runs
-   in the next window. Durable progress = `.maintenance/REVIEW_PROGRESS.md`.
+1. **One unit per session.** ~90 Processor + ~38 Reader + ~67 Notes Swift files + companions → **16 units**
+   (below; iOS on hold). A session does ONE, commits its report, marks it done, exits. Usage caps reset ~every
+   5h; the next unit runs in the next window. Durable progress = `.maintenance/REVIEW_PROGRESS.md`.
 2. **Lean fan-out.** ~6 dimension finders (not 15), and **single refute-verify** per finding (not a 3-lens
    panel). That's ~6 + (findings) agents/unit — the shape that completed cleanly before (~20 agents).
 3. **Budget guard.** Resume sessions cap spend with `--max-budget-usd`; the workflow verifies findings as each
@@ -47,6 +47,12 @@ Highest-risk first. Paths are repo-root-relative.
 | 8 | Reader/Core | `ArchiveReader/macOS/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
 | 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
 | 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety, **render (blank/wrong pixels)** |
+| 11 | Notes/Store+Tags | `ArchiveNotes/macOS/Sources/ArchiveNotes/Store/ ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagVocabulary.swift` | **PRIME file-safety:** the shared `CoordinatedTagWriter` tag-write choke-point (+ the latent concurrent-write race, W15.tu3), atomic store writes / Trash-delete / asset name-reservation, front-matter + block codec integrity, **never writes the corpus** |
+| 12 | Notes/Index+Org | `ArchiveNotes/macOS/Sources/ArchiveNotes/Index/` | FTS5 correctness, prune-gate never-wipes (empty snapshot), OrganizationStore replication / delete-last-instance invariants, org-graph persistence, DB-vs-fixture shadowing |
+| 13 | Notes/Core | `ArchiveNotes/macOS/Sources/ArchiveNotes/Core/ ArchiveNotes/macOS/Sources/ArchiveNotes/Models/` | model/scope state, extract provenance + jump-to-source correctness, replication/delete guard at the VM layer, sort/filter determinism (tag projector itself is covered by unit 11) |
+| 14 | Notes/Editor | `ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/` | Markdown⇄disk round-trip idempotency (no silent text loss), autosave/flush-on-switch race, force-quit flush, inline-image asset writes, TextKit 2 |
+| 15 | Notes/Views | `ArchiveNotes/macOS/Sources/ArchiveNotes/Views/` | resource/perf at 100k-note scale, **PDF-pane render (blank/wrong pixels — Notes has NO RenderProbe yet → live sighted loop)**, state desync |
+| 16 | Notes/Zotero+Links+Paste | `ArchiveNotes/macOS/Sources/ArchiveNotes/Zotero/ ArchiveNotes/macOS/Sources/ArchiveNotes/Sources/` | Zotero client robustness over the real transport, durable-link resolution + re-grant + **path-traversal**, source-block paste / pasteboard codecs |
 
 > **Views units (5, 10) — visual dimension.** View / PDF-render code fails in a way the other dimensions miss:
 > it renders blank or wrong while every assertion and the accessibility tree still pass. Add a render-guard /
@@ -59,6 +65,20 @@ ON HOLD — skip it.** For **Processor/Net (unit 2)**, review the **LAN/USB** tr
 (`CaptureServer`, `CaptureReceiver`, `CaptureValidation`, `USBBridge`, `RelayObjectFormat` as a contract) but
 **skip the cloud/Drive relay** (`DriveObjectStore`, `DriveClient`, `DriveAuth`, `FileRelayReceiver` cloud
 path) — it's maintain-only. Everything else (Capture, OCR, Tagging, Views, **Android**, Reader) reviews as normal.
+
+**Archive Notes units (11–16, added 2026-07-18).** Notes was built after the original 10-unit pass and had
+**never been lean-reviewed** (it has strong W8 *unit* tests, but no adversarial cross-cutting review). All six
+enter the cadence picker's tier-1 (never-reviewed) pool, taken in table order. Notes has no on-device/companion
+surface and no HOLD carve-out; review all six as normal. The one caveat is the visual dimension on unit 15
+(Notes/Views): Notes has **no headless `RenderProbe`** yet, so a blank/wrong PDF pane or thumbnail can only be
+caught via the live sighted loop (`ops/gui/`), not a headless guard.
+
+> **Cadence bookkeeping caveat (orthogonal, pre-existing).** `last-reviewed.tsv` currently records **only
+> `Processor/Capture`** — the one-pass sweep's completed units (Net/OCR/Reader/…) predate the WS11 `--record`
+> cadence and so also read as `last=never`. So the tier-1 pool is not "just Notes": the picker will reach the
+> highest-in-table-order never-recorded unit (Processor/Net, then the high-churn OCR at ~48 unreviewed commits)
+> **before** Notes. Notes is in the rotation regardless. If Notes should go FIRST, backfill the TSV for the
+> genuinely-completed units (see `REVIEW_PROGRESS.md`) — an owner call, not done here.
 
 ## How to run one unit
 

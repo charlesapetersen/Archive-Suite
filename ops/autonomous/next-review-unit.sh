@@ -36,7 +36,13 @@ Processor/Views	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/
 Android	ArchiveProcessor/ArchiveCapture/
 Reader/Core	ArchiveReader/macOS/Sources/ArchiveReader/Core/
 Reader/Search	ArchiveReader/macOS/Sources/ArchiveReader/Search/
-Reader/Views	ArchiveReader/macOS/Sources/ArchiveReader/Views/"
+Reader/Views	ArchiveReader/macOS/Sources/ArchiveReader/Views/
+Notes/Store+Tags	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/ ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagVocabulary.swift
+Notes/Index+Org	ArchiveNotes/macOS/Sources/ArchiveNotes/Index/
+Notes/Core	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/ ArchiveNotes/macOS/Sources/ArchiveNotes/Models/
+Notes/Editor	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/
+Notes/Views	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/
+Notes/Zotero+Links+Paste	ArchiveNotes/macOS/Sources/ArchiveNotes/Zotero/ ArchiveNotes/macOS/Sources/ArchiveNotes/Sources/"
 
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || { echo "next-review-unit: $REPO is not a git repo"; exit 2; }
 HEAD_SHA="$(git -C "$REPO" rev-parse HEAD 2>/dev/null)"
