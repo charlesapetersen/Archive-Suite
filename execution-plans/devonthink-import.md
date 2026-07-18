@@ -59,8 +59,9 @@ Key patterns confirmed by sampling (drive the transform rules in §5):
   `x-devonthink-item://EF7851F5-6F3C-4373-90C5- BE14C6B8AAD5`. UUID is fixed `8-4-4-4-12` → deterministic repair.
 - **`file://` prefix variants before `Archival%20Photos`** seen: `/Users/olduser/Google Drive/…`,
   `/Users/<user>/Desktop/Google Drive/…` (current canonical), `/Users/<user>/Google Drive/…`,
-  `/Volumes/Archival Storage/…` (540 links — some to an *external* "Microelectronics News" collection **not**
-  in the root), and a corrupted `/Userolduseren/…`. Non-archival `file://` also exists (Zotero storage PDFs;
+  `/Volumes/Archival Storage/…` (540 links — incl. a "Microelectronic News" journal run that **does** live in
+  the root under `Complete Journals/Microelectronics News/`, so it resolves by name), and a corrupted
+  `/Userolduseren/…`. Non-archival `file://` also exists (Zotero storage PDFs;
   a Desktop "D's revision" PDF). ~1,100 links point into **numbered processing folders** (`01`–`06`).
 - **Dates live in DEVONthink's `Alias` field** (per-record metadata, NOT in the file body) → readable only
   via scripting. Some **titles are month-prefixed** ("Nov: …") — but on-disk filenames are sanitized, so
@@ -205,7 +206,7 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 | `x-devonthink-item://UUID` → a **Photo Database** record | small | cross-DB: look up the record's **name/ID** in the Photo Database manifest → resolve that photo **by name** in the Archival Photos root → durable `archivereader://` link (§4a) | name not found in root → **flag** |
 | `x-devonthink-item://UUID` → other out-of-scope record | subset | if it maps to an archival photo, route via §4a; else flag | flag |
 | `file://…/Archival Photos/…` | most of 3,034 | **resolve by name/ID (§4a), not by path** → durable `archivereader://` link into the Reader root (+ page if present) | name not found in root → **flag** (§7) |
-| `file://…/Volumes/Archival Storage/…` | 540 | if the photo's name/ID resolves in the Archival Photos root → §4a; the **"Microelectronics News"** subset is **not** in the root → **flag for owner review** | flag |
+| `file://…/Volumes/Archival Storage/…` | 540 | resolve by filename via §4a — incl. the "Microelectronic News" journal run (lives in the root under `Complete Journals/Microelectronics News/`) | filename not found in root → **flag** |
 | `file://…` into a **numbered processing folder** (`01`–`06`) | ~1,100 paths | resolve by name/ID (§4a) — most now live in a permanent collection; those still **only** in a processing folder (will move out post-migration) → **flag** | flag |
 | `file://…` Zotero storage PDF | subset | tie to the record's `zotero://` item as a `zoteroAttachment` if resolvable; else flag | flag |
 | `file://…` other (Desktop, non-corpus) | few | **flag for owner review; default disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment (owner 2026-07-17; expected rare) | flag |
@@ -221,14 +222,17 @@ segment, and re-anchors on `Archival%20Photos`, then routes through §4a. Anythi
 confidently fix is flagged, never guessed.
 
 ### 4a. Archival photo resolution — by stable name/ID, not path
-Every archival photo carries a stable ID-name `NNNNN — <Collection>` (e.g. `00140 — Swarthmore`); the same
-photo is referenced from many stale paths (old usernames, `/Volumes/…`, renumbered processing folders, the
-Photo Database) but its **name never changes**. So the importer:
-1. **Builds a name→path index** of the live Archival Photos root once (all `.pdf`, plus `.jpg`/`.jpeg` under
-   it). Key = normalized ID-name (strip extension, collapse spacing, drop the Photo Database's `IMG` token,
-   NFC). **Detect and report any duplicate/ambiguous names** (a collision must not silently pick the wrong file).
-2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder
-   paths, and Photo Database cross-DB links all collapse to "find `NNNNN — <Collection>` in the root."
+Every archival photo carries a **stable filename** — either `NNNNN — <Collection>` (e.g. `00140 — Swarthmore`)
+or, for journal runs, `YYYY — <Journal> — NNNNN` (e.g. `1981 — Microelectronic News — 00075`). The same photo
+is referenced from many stale paths (old usernames, `/Volumes/…`, renumbered processing folders, the Photo
+Database) but its **filename never changes**. So the importer:
+1. **Builds a filename→path index** of the live Archival Photos root once (all `.pdf`, plus `.jpg`/`.jpeg`).
+   Key = the normalized filename **stem** (strip extension + `.zip` bundles, collapse spacing, drop the Photo
+   Database's `IMG` token, NFC) — this covers both naming conventions and is robust to **folder-name variance**
+   (links say "Microelectronic News" while the folder is "Microelectronic**s** News" — we key on the file, not
+   the folder). **Detect and report any duplicate/ambiguous stems** (a collision must not silently pick wrong).
+2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder paths,
+   and Photo Database cross-DB links all collapse to "find this filename in the root."
 3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>[&page=n]`** to the
    resolved file. Keyed on the **root GUID + current relative path**, so a later **root rename/move is safe**
    (§8 root-rename): Reader re-establishes the root at the new location under the same `RootMarker` GUID.
@@ -236,8 +240,8 @@ Photo Database) but its **name never changes**. So the importer:
    (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). Worth considering whether the
    Reader image entity — and thus the Notes link — can reference **both** (PDF by default, JPEG when finer
    detail is needed). Captured as a potential Suite feature, not a hard requirement of this import.
-5. **Unresolved → flag**, never a guessed path: names not in the root (the external "Microelectronics News"
-   collection; photos still only in a processing folder; oddball `.docx`/`.wav`/`.jpf` targets).
+5. **Unresolved → flag**, never a guessed path: filenames not found in the root (a photo still only in a
+   processing folder that will move out; a truly-missing target; oddball `.docx`/`.wav`/`.jpf` targets).
 
 ---
 
@@ -336,9 +340,9 @@ rather than importing best-effort.
 8. ✅ **Archive Reader root over `~/Desktop/Google Drive/Archival Photos/`** (path confirmed; needs a
    `RootMarker` GUID). **Post-migration root rename is supported — see §8a.** The `01`–`06` processing folders
    may move out of the root afterward; any note resolving only into them is flagged pre-adoption (§4a/§4).
-9. ✅ **`/Volumes/Archival Storage` + JPEGs understood** (see the #9 answer): archival targets resolve by name
-   (§4a); the external "Microelectronics News" subset (not in the root) is flagged; `.jpg`/`.jpeg` map to
-   `Archival Photos JPEGS/`.
+9. ✅ **`/Volumes/Archival Storage` + JPEGs understood** (see the #9 answer): archival targets resolve by
+   filename (§4a), incl. the "Microelectronic News" journal run (in the root under `Complete Journals/`);
+   `.jpg`/`.jpeg` targets map to `Archival Photos JPEGS/`.
 
 **Zotero side**
 10. ✅ **Zotero installed with its local library accessible** (citation enrichment + non-archival→Zotero moves).
@@ -387,7 +391,8 @@ their structure (relative paths unchanged); only the root's own name/location ch
    processing-folder path, or a **Photo Database** cross-DB link) resolves by the stable `NNNNN — <Collection>`
    name in the Archival Photos root, not by path.
 10. **Numbered processing folders (`01`–`06`)** — name-resolve; a photo found only in a processing folder
-    (which moves out post-migration) is **flagged**. `/Volumes` "Microelectronics News" (not in root) → flag.
+    (which moves out post-migration) is **flagged**. `/Volumes` links resolve by filename (the "Microelectronic
+    News" run lives in the root under `Complete Journals/`); only genuinely-absent filenames flag.
 11. **Root rename after migration** — supported; durable links survive (§8a).
 12. **PDF/JPEG dual reference** — a *to-consider* Suite feature (Reader image entity referencing both PDF and
     its JPEG partner), not a hard requirement of this import (§4a).
