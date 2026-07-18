@@ -37,6 +37,38 @@ that pass: **D5 is already shipped** by W14.4b (annotated below — not an open 
 now live-confirmed** (annotated below); and one new **cosmetic** item (chip-scroll visibility) is folded into
 **D12**.
 
+**Addendum — 2026-07-18 GUI sweep (PARTIAL — cut short at the session usage limit).** A broader sighted
+GUI sweep of Notes (scratch fixture) was started to empirically confirm which Phase-B/D features are actually
+reachable vs. "built but dead" (i.e. execute the Phase-E2 drive-at-runtime pass early). Two **CANDIDATE**
+findings surfaced before the session limit stopped the sweep — both need a confirming pass (GUI-driving
+imprecision is not fully ruled out), so they are recorded as candidates, not confirmed gaps:
+- **NEW-ITEM CREATION may be unreachable from the obvious affordances (CANDIDATE, verify first).** With the
+  app focused on the scratch fixture, **⌘N created no note** (item count unchanged on disk across two
+  attempts), and a click on the toolbar **"New" pencil button also created nothing**. Note there is **no
+  `File` menu** at all (menu bar is Apple · Archive Notes · Edit · View · Format · Note · Extract · Debug ·
+  Window · Help), so ⌘N appears unbound; the impl-map says the toolbar "New" is a menu (`New <kind> ⌘N` +
+  `New from Template ▸`). *Possible benign explanations to rule out:* the New menu may need a real folder
+  selected (I was on the "All Notes" pseudo-row), or a new empty note may be created in-memory/index and not
+  flushed to a `.md` until first edit, or my click missed the split-button. **Action:** confirm whether a
+  brand-new note can be created at all from the GUI (and whether ⌘N should be bound). If creation is genuinely
+  unreachable, this is **HIGH** (a note app you can't add a note to); if it's the folder-scope/flush nuance,
+  downgrade to a small UX note. Ties into **B3** (no in-app retitle) — if both hold, notes can be neither
+  created nor renamed in-app.
+- **Pasted note-passage provenance block renders as a RAW `<!-- block: note-passage … -->` comment
+  (CANDIDATE).** After a W14.3 copy-passage→paste-into-extract, the pasted passage's provenance chip showed as
+  the literal HTML-comment source in the extract's **styled** editor (the surrounding heading + image rendered
+  styled), and it persisted after a reselect/reload. Pre-existing note-passage chips render correctly (verified
+  in W14.4b/c), so this may be specific to the **freshly-pasted** block not being re-styled into a chip.
+  **Action:** confirm on a clean paste; if real, the paste path should re-run the chip styling (or the pasted
+  block's on-disk form differs from what `MarkdownBridge` chip-parses). Low data risk (bytes import correctly —
+  W14.3 confirmed); this is a rendering gap. Fold into **D12** if confirmed.
+
+The rest of the systematic sweep (note delete + delete-last-instance guard, tag editing **B3**, quality
+quick-edit **D4**, manual author **B8**, keyword FTS + quality/tag/date filters, folder create/rename/delete +
+move/reorder **D1** + move/replicate, templates **D3**, context menu **D2**, Zotero attach/auto-fill **B1/B2**,
+source-block paste, **Copy Link B9**, deep-link **B5**, smart folders, empty-state **D8**) is **still
+outstanding** — it is exactly the Phase-E2 runtime-drive pass and should be finished in a fresh session.
+
 ---
 
 ## Summary of gaps by phase
