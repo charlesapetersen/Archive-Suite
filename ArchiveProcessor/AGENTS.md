@@ -17,7 +17,7 @@ Prereq: `brew install xcodegen` (or just run `./bootstrap.sh` from the worktree 
 The **authoritative, detailed** versions — ownership lanes, the shared hotspots, and the `OCRProcessor` /
 `OCRView` split-class rules — live in **[CLAUDE.md](CLAUDE.md) → "Concurrent / multi-agent development."**
 Kept here as a glance so this file stands alone; edit the detail in CLAUDE.md, not here.
-- **Lanes** (one agent each): Android `ArchiveCapture/` · iPhone `ArchiveCaptureiOS/` · macOS OCR core `Sources/ArchiveProcessor/{OCR,Models,Capture,Net}` · macOS Views+Tagging `Sources/ArchiveProcessor/{Views,Tagging}`.
+- **Lanes** (one agent each): Android `ArchiveCapture/` · iPhone `ArchiveCaptureiOS/` (**PARKED 2026-07-18 — build out of the verify loop; see CLAUDE.md / `ArchiveCaptureiOS/PARKED.md`**) · macOS OCR core `Sources/ArchiveProcessor/{OCR,Models,Capture,Net}` · macOS Views+Tagging `Sources/ArchiveProcessor/{Views,Tagging}`.
 - **Coordinate before editing:** the `ProviderModels.swift` persisted enums (all `String`-backed — never rename a case or change an explicit rawValue string; appending is safe, reordering is harmless); the phone↔Mac protocol (`Net/CaptureServer.swift` ⇄ iOS `Net/MacClient.swift` — change both sides); the two `project.yml` files.
 - **Split classes:** `OCRProcessor.swift` = stored state only (methods in `OCRProcessor+*.swift`, types in `+Types.swift`); `OCRView.swift` = main view (sheets/rows/diff in `OCRView+*.swift`).
 

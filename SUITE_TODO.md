@@ -33,9 +33,14 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 **Focus now:** the **wired (USB) + wireless (LAN/Wi-Fi) phone↔Mac transmission** path and the **Android**
 companion — plus the core Mac pipeline (OCR/tag/PDF/finalize) and the Reader, which continue as normal.
 
-**ON HOLD — maintain-only** (keep them compiling / mirror shared-contract changes so they don't rot, but
-**no new feature development, and NOT a code-review or bug-fix target**):
-- **iOS companion** — `ArchiveProcessor/ArchiveCaptureiOS/`.
+**ON HOLD — maintain-only** (mirror shared-contract changes so they don't rot, but **no new feature
+development, and NOT a code-review or bug-fix target**; keep them compiling — **except the iOS companion,
+now fully PARKED, see below**):
+- **iOS companion** — `ArchiveProcessor/ArchiveCaptureiOS/`. **PARKED 2026-07-18 — stronger than
+  maintain-only: its full-app build is now OUT of the verify loop** (iOS simulator runtime removed to
+  reclaim ~18 GB — see `ArchiveCaptureiOS/PARKED.md`). Source retained and still gets shared-contract
+  edits; parity is auto-checked via `scripts/test-relay-golden.sh` (host `swiftc`, no runtime needed), so
+  it can't rot. Reviving = reinstall a simulator runtime + restore its build line (steps in PARKED.md).
 - **Cloud (Google Drive) relay transport** — Mac `Net/{DriveObjectStore,DriveClient,DriveAuth}.swift` + the
   `FileRelayReceiver`/`RelayObjectStore` cloud path (incl. the offline `FileRelay` stand-in); both companions'
   `DriveRelayTransport`/`DriveAuth`/`DriveClient`. The `RelayObjectFormat` wire contract stays frozen — only

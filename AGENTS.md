@@ -33,7 +33,7 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 |------|-----------|
 | **reader** | `ArchiveReader/` — views, navigation, tag editing (via `TagWriter`), content index |
 | **processor-macOS** | `ArchiveProcessor/macOS/` — OCR pipeline, tagging, review flows, capture server |
-| **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion |
+| **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion. **PARKED 2026-07-18** — source retained, full-app build out of the verify loop; see `ArchiveCaptureiOS/PARKED.md` |
 | **processor-android** | `ArchiveProcessor/ArchiveCapture/` — Android capture companion |
 | **notes** | `ArchiveNotes/` — note/extract store, editor, index, cross-app linking, Zotero |
 | **suite** | root docs, `SPEC/`, `release/`, `launch.sh` dispatcher |

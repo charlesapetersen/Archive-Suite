@@ -41,7 +41,7 @@ if [ "$found" -eq 0 ]; then err "No project.yml found — are you in the repo ro
 say "Done."
 echo "  Open a project to build & run:"
 echo "    open macOS/ArchiveProcessor.xcodeproj       # macOS app"
-echo "    open ArchiveCaptureiOS/ArchiveCaptureiOS.xcodeproj     # iPhone companion (iOS 17+; camera needs a physical device)"
+echo "    open ArchiveCaptureiOS/ArchiveCaptureiOS.xcodeproj     # iPhone companion — PARKED (see ArchiveCaptureiOS/PARKED.md); needs an iOS simulator runtime reinstalled to build"
 echo "  Android companion uses Gradle (no bootstrap needed):  (cd ArchiveCapture && ./gradlew assembleDebug)"
 
 # 3) Optional convenience: open the macOS project.

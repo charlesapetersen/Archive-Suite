@@ -245,19 +245,24 @@ git worktree remove "../ap-wt-<lane>"   # ./build is gitignored, so it doesn't b
 **Per-worktree build isolation** — give each worktree its own DerivedData so concurrent builds don't collide:
 ```bash
 xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build
-# iOS: xcodebuild -scheme ArchiveCaptureiOS -sdk iphonesimulator -configuration Debug -derivedDataPath ./build/DD build
+# iOS companion: PARKED 2026-07-18 — NOT part of routine build-verify (no iOS simulator runtime is
+# installed; source is retained). Revive steps + the build command live in ArchiveCaptureiOS/PARKED.md.
 ```
 `./build` is already gitignored, so per-worktree DerivedData is never committed. Note: `-derivedDataPath` isolates DerivedData and module caches but **not** the shared user-level Clang cache (`CACHE_ROOT`) — treat it as "separate DerivedData per worktree," not fully sandboxed.
 
 **Ownership lanes** — avoid two instances editing the same lane at once:
 - **Android** — `ArchiveCapture/` (Gradle, Kotlin). Fully independent.
-- **iPhone** — `ArchiveCaptureiOS/` (Swift 5). Independent *except* the phone↔Mac protocol.
+- **iPhone** — `ArchiveCaptureiOS/` (Swift 5). **PARKED 2026-07-18** — source retained (relay/contract
+  tests still run against it), but its full-app build is out of the routine verify loop; see
+  `ArchiveCaptureiOS/PARKED.md`. Still independent *except* the phone↔Mac protocol.
 - **macOS OCR core** — `Sources/ArchiveProcessor/{OCR, Models, Capture, Net}`.
 - **macOS Views + Tagging** — `Sources/ArchiveProcessor/{Views, Tagging}`.
 
 **Shared hotspots that force cross-lane coordination:**
 - **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position).
-- **Phone↔Mac protocol:** `Net/CaptureServer.swift` (Bearer-authed routes `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`) ↔ both companions' `MacClient` (`ArchiveCaptureiOS/.../Net/MacClient.swift` + Android `net/MacClient.kt`). The cloud-relay transport shares a second contract — the object format in [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) (`Net/RelayObjectFormat.swift` ↔ the phones' mirror). Change all sides together.
+- **Phone↔Mac protocol:** `Net/CaptureServer.swift` (Bearer-authed routes `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`) ↔ both companions' `MacClient` (`ArchiveCaptureiOS/.../Net/MacClient.swift` + Android `net/MacClient.kt`). The cloud-relay transport shares a second contract — the object format in [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) (`Net/RelayObjectFormat.swift` ↔ the phones' mirror). Change all sides together. *(iOS is PARKED — still
+  edit its mirror source when the contract changes; its app build-verify is deferred, but
+  `scripts/test-relay-golden.sh` keeps checking the iOS `RelayObjectFormat.swift` for parity.)*
 - **The two `project.yml` files.**
 - **`packages/ArchiveCore` (shared Swift package).** The tag/PDF/link contract both apps depend on. Its
   `CoordinatedTagWriter` (`Tags/TagWrite.swift`) is the single Finder-tag write choke-point — Processor's
