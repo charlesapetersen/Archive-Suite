@@ -2,7 +2,7 @@
 
 Umbrella conventions for working in this monorepo (solo or with multiple agents in parallel). Each app
 also has its own `AGENTS.md` with app‑specific lanes — read it before working inside a subdir:
-[`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/CLAUDE.md`](ArchiveNotes/CLAUDE.md).
+[`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/AGENTS.md`](ArchiveNotes/AGENTS.md).
 
 ## Ground rules
 

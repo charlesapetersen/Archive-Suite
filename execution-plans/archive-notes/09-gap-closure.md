@@ -90,13 +90,13 @@ this plan). Each item is independently shippable in its own worktree per the rep
 
 ## Phase A — Doc & tracker reconciliation (DOC; do first, one commit each or batched)
 
-**A1. Write `ArchiveNotes/README.md`.** — planned in `01` S5 Files + layout sketch; never existed.
+**A1. Write `ArchiveNotes/README.md`. — ✅ DONE (W9 Phase A docs, 2026-07-18).** — planned in `01` S5 Files + layout sketch; never existed.
 - *Files:* NEW `ArchiveNotes/README.md`. *Steps:* mirror `ArchiveReader/README.md` / `ArchiveProcessor/README.md` (what the app is, build/run via `./launch.sh notes` + `bootstrap.sh`, pointer to `CLAUDE.md`/`GUI_SAFETY.md`). *Verify:* prose review; links resolve. *Tier-1. Done:* file exists; matches peer-app README shape.
 
-**A2. Add Archive Notes to the root `README.md`.** — root README currently has zero mention of Notes (describes a two-app suite).
+**A2. Add Archive Notes to the root `README.md`. — ✅ DONE (W9 Phase A docs, 2026-07-18).** — root README currently has zero mention of Notes (describes a two-app suite). *Shipped:* intro "Two"→"Three", a third app-table row, the "three separate apps" prose (Notes builds on Reader's durable links), the `packages/ArchiveCore` + `ArchiveNotes/` repo-layout entries, the `./launch.sh notes` dispatcher line, and the per-app README link.
 - *Files:* `README.md`. *Steps:* add the third app to the suite intro + any app list/table. *Verify:* prose review. *Tier-1.*
 
-**A3. Decide & resolve `ArchiveNotes/AGENTS.md`.** — planned in `01` S5 Files; absent. Peers have one; root `AGENTS.md:5` routes readers to `ArchiveNotes/CLAUDE.md` instead (worked around).
+**A3. Decide & resolve `ArchiveNotes/AGENTS.md`. — ✅ DONE (W9 Phase A docs, 2026-07-18).** — planned in `01` S5 Files; absent. Peers have one; root `AGENTS.md:5` routes readers to `ArchiveNotes/CLAUDE.md` instead (worked around). *Decision:* created the app-local lane doc like the peers (both peers ship one), and fixed root `AGENTS.md:5` to route to `ArchiveNotes/AGENTS.md`.
 - *Files:* NEW `ArchiveNotes/AGENTS.md` **or** an explicit note in `CLAUDE.md`/root `AGENTS.md` folding the lane in. *Steps:* either create the app-local lane doc like the peers, or record the decision to keep it in root `AGENTS.md` and fix the plan's expectation. *Verify:* the routing in root `AGENTS.md` matches reality. *Tier-1.*
 
 **A4. Complete the SPEC `ArchiveSuite` marker delta.** — `01` S5/§6: the facet-table row landed (`SPEC/tag-format.md:71`), but the dedicated prose section and the change-protocol relaxation note did not.
@@ -111,7 +111,7 @@ this plan). Each item is independently shippable in its own worktree per the rep
 **A7. Refresh both apps' `CLAUDE.md` Implementation Maps for the ArchiveCore move (W0 doc-sync).** — `ArchiveReader/CLAUDE.md:~324` still lists `DocumentTags`/`TagReading`/`TagEditing`/`PDFFormatStatus` under `Core/` ("package-ready → future ArchiveCore"); `ArchiveProcessor/CLAUDE.md:~251` hotspot list stops at "the two `project.yml` files."
 - *Files:* `ArchiveReader/CLAUDE.md`, `ArchiveProcessor/CLAUDE.md`. *Steps:* move the shared types to an ArchiveCore section; add the "TagWriter/MacOSTagger delegates to `ArchiveCore.CoordinatedTagWriter`" safety note; list the `packages/ArchiveCore` build lane. *Verify:* maps match the tree. *Tier-1.*
 
-**A8. Add `ArchiveNotes/SMOKE_TEST.md`.** — `08` S9 Files lists it; Reader has one, Notes doesn't (purpose currently served by the `test-smoke.sh` header + `CLAUDE.md` + `GUI_SAFETY.md`).
+**A8. Add `ArchiveNotes/SMOKE_TEST.md`. — ✅ DONE (W9 Phase A docs, 2026-07-18).** — `08` S9 Files lists it; Reader has one, Notes doesn't (purpose currently served by the `test-smoke.sh` header + `CLAUDE.md` + `GUI_SAFETY.md`). *Shipped:* mirrors `ArchiveReader/SMOKE_TEST.md` (safety block, legend, resumable step checklist A–P), cross-refs `GUI_SAFETY.md` + `scripts/GUI-HARNESS.md` (DRY — links the G0–G11 catalog, doesn't duplicate it); steps `[ ]` pending the first GUI-on run.
 - *Files:* NEW `ArchiveNotes/SMOKE_TEST.md`. *Steps:* mirror `ArchiveReader/SMOKE_TEST.md`, cross-referencing `GUI_SAFETY.md` and the scratch-only rule. *Verify:* cross-refs resolve. *Tier-1.*
 
 **A9. Drop `@testable` from `DocumentTagsTests`.** — `01` S1 Verify required plain `import ArchiveCore` (types are `public`); `packages/ArchiveCore/Tests/ArchiveCoreTests/DocumentTagsTests.swift:2` still uses `@testable`.
