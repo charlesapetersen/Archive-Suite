@@ -96,6 +96,109 @@ extension OCRProcessor {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Canonical identity for the evolving paid-batch lifecycle journal. The original batch
+    /// `runFingerprint` intentionally remains unchanged for backward compatibility; this additive hash
+    /// covers every persisted setting plus the ordered server IDs and per-file completion associations.
+    private struct PendingBatchLifecycleIdentityV1: Encodable {
+        let formatVersion = 1
+        let batchId: String
+        let provider: LLMProvider
+        let model: LLMModel
+        let thinkingLevel: ThinkingLevel?
+        let orderedFilePaths: [String]
+        let outputDirectoryPath: String
+        let enableTagging: Bool
+        let enableCollectionSegmentation: Bool
+        let sendPreviousImage: Bool
+        let submittedAt: Date
+        let enableSegmentJSON: Bool
+        let confirmCollectionIDs: Bool
+        let reviewDocumentSegmentation: Bool
+        let customPrompt: String?
+        let taggingMode: TaggingMode
+        let fingerprintVersion: Int?
+        let runFingerprint: String?
+        let exportOriginals: Bool?
+        let submittedChunkIds: [String]
+        let consumedChunkIds: [String]
+        let submissionComplete: Bool
+        let completedResults: [String: OCRResult]
+        let completedOutputPaths: [String: String]?
+
+        init(batch: PendingBatch) {
+            batchId = batch.batchId
+            provider = batch.provider
+            model = batch.model
+            thinkingLevel = batch.thinkingLevel
+            orderedFilePaths = batch.fileURLs.map { $0.standardizedFileURL.path }
+            outputDirectoryPath = batch.outputDirectory.standardizedFileURL.path
+            enableTagging = batch.enableTagging
+            enableCollectionSegmentation = batch.enableCollectionSegmentation
+            sendPreviousImage = batch.sendPreviousImage
+            submittedAt = batch.submittedAt
+            enableSegmentJSON = batch.enableSegmentJSON
+            confirmCollectionIDs = batch.confirmCollectionIDs
+            reviewDocumentSegmentation = batch.reviewDocumentSegmentation
+            customPrompt = batch.customPrompt
+            taggingMode = batch.taggingMode
+            fingerprintVersion = batch.fingerprintVersion
+            runFingerprint = batch.runFingerprint
+            exportOriginals = batch.exportOriginals
+            submittedChunkIds = batch.submittedChunkIds
+            consumedChunkIds = batch.consumedChunkIds.sorted()
+            submissionComplete = batch.submissionComplete
+            completedResults = batch.completedResults
+            completedOutputPaths = batch.completedOutputPaths
+        }
+    }
+
+    nonisolated static func pendingBatchLifecycleFingerprint(_ batch: PendingBatch) -> String? {
+        guard batch.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(PendingBatchLifecycleIdentityV1(batch: batch)) else {
+            return nil
+        }
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Return a copy ready for an atomic write. Callers only publish this copy in memory after the disk
+    /// replacement succeeds, so a failed save cannot move the process ahead of its durable journal.
+    nonisolated static func preparedPendingBatchForPersistence(_ batch: PendingBatch) -> PendingBatch? {
+        var prepared = batch
+        if prepared.lifecycleVersion != nil {
+            guard prepared.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return nil }
+            prepared.batchId = prepared.submittedChunkIds.joined(separator: ",")
+            guard let fingerprint = pendingBatchLifecycleFingerprint(prepared) else { return nil }
+            prepared.lifecycleFingerprint = fingerprint
+        }
+        return prepared
+    }
+
+    /// Re-open consumed chunks when one of their materialized PDFs disappeared after the journal write.
+    /// The injected existence probe keeps the recovery policy deterministic and headless-testable.
+    nonisolated static func batchByReopeningMissingOutputs(
+        _ batch: PendingBatch,
+        fileExists: (String) -> Bool
+    ) -> PendingBatch {
+        guard batch.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return batch }
+        var repaired = batch
+        let missingKeys = repaired.completedOutputPaths?.compactMap { key, path in
+            fileExists(path) ? nil : key
+        } ?? []
+        guard !missingKeys.isEmpty else { return batch }
+        for key in missingKeys {
+            repaired.completedResults.removeValue(forKey: key)
+            repaired.completedOutputPaths?.removeValue(forKey: key)
+        }
+        // Chunk→file ranges are provider-owned and legacy Gemini IDs are string-only, so conservatively
+        // re-fetch every consumed chunk. processBatchResults skips still-present per-file keys.
+        repaired.consumedChunkIds = []
+        repaired.lifecycleFingerprint = nil
+        return repaired
+    }
+
     /// Structural validation is separate from the fingerprint. A locally-edited manifest could carry a
     /// freshly recomputed hash, so bound every value before it can control concurrency/sizing and require
     /// all Live Capture parallel arrays to be either absent or aligned with the ordered input list.
@@ -269,24 +372,59 @@ extension OCRProcessor {
             taggingMode: nil, enableTagging: run.enableTagging, batchMode: false)
     }
     nonisolated static func pendingBatchIsSelfConsistent(_ batch: PendingBatch) -> Bool {
-        let preserveOrder: Bool
+        let immutableIdentityIsValid: Bool
         switch batch.fingerprintVersion {
         case nil:
             // Legacy on-disk batch; a missing fingerprint predates integrity tracking and must remain
             // visible so a paid server-side job is not stranded.
-            guard let stored = batch.runFingerprint else { return true }
-            return stored == runFingerprint(
-                files: batch.fileURLs, outputDirectory: batch.outputDirectory,
-                taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true)
+            if let stored = batch.runFingerprint {
+                immutableIdentityIsValid = stored == runFingerprint(
+                    files: batch.fileURLs, outputDirectory: batch.outputDirectory,
+                    taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true)
+            } else {
+                immutableIdentityIsValid = true
+            }
         case 2:
-            preserveOrder = true
+            guard let stored = batch.runFingerprint else { return false }
+            immutableIdentityIsValid = stored == runFingerprint(
+                files: batch.fileURLs, outputDirectory: batch.outputDirectory,
+                taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true,
+                preserveInputOrder: true)
         default: return false                 // unknown future identity contract
         }
-        guard let stored = batch.runFingerprint else { return false }
-        return stored == runFingerprint(
-            files: batch.fileURLs, outputDirectory: batch.outputDirectory,
-            taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true,
-            preserveInputOrder: preserveOrder)
+        guard immutableIdentityIsValid else { return false }
+
+        // A nil lifecycle version is the old submit-once manifest. Preserve its paid job exactly as the
+        // compatibility path above did; only v1 journals are held to the stronger evolving-state contract.
+        guard let lifecycleVersion = batch.lifecycleVersion else { return true }
+        guard lifecycleVersion == PendingBatch.currentLifecycleVersion,
+              !batch.fileURLs.isEmpty,
+              batch.batchId == batch.submittedChunkIds.joined(separator: ","),
+              batch.submittedChunkIds.allSatisfy({ !$0.isEmpty && !$0.contains(",") }),
+              Set(batch.submittedChunkIds).count == batch.submittedChunkIds.count,
+              batch.consumedChunkIds.allSatisfy({ !$0.isEmpty }),
+              Set(batch.consumedChunkIds).count == batch.consumedChunkIds.count,
+              Set(batch.consumedChunkIds).isSubset(of: Set(batch.submittedChunkIds)),
+              !batch.submissionComplete || !batch.submittedChunkIds.isEmpty else { return false }
+
+        let resultKeysAreValid = batch.completedResults.keys.allSatisfy { key in
+            guard let index = Int(key) else { return false }
+            return key == String(index) && index >= 0 && index < batch.fileURLs.count
+        }
+        let outputPaths = batch.completedOutputPaths ?? [:]
+        let outputPathsAreValid = Set(outputPaths.keys) == Set(batch.completedResults.keys)
+            && outputPaths.allSatisfy { key, path in
+                guard batch.completedResults[key] != nil else { return false }
+                let url = URL(fileURLWithPath: path).standardizedFileURL
+                return NSString(string: path).isAbsolutePath
+                    && url.pathExtension.lowercased() == "pdf"
+                    && url.deletingLastPathComponent().path
+                        == batch.outputDirectory.standardizedFileURL.path
+            }
+        guard resultKeysAreValid, outputPathsAreValid,
+              let stored = batch.lifecycleFingerprint,
+              let computed = pendingBatchLifecycleFingerprint(batch) else { return false }
+        return stored == computed
     }
 
     // MARK: Headless self-test hooks ($0, no network) — see BatchResumeTestDriver
@@ -301,6 +439,15 @@ extension OCRProcessor {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(PendingRun.self, from: data)
     }
+    nonisolated static func _testWritePendingBatch(_ batch: PendingBatch, to url: URL) -> PendingBatch? {
+        guard let prepared = preparedPendingBatchForPersistence(batch),
+              let data = try? JSONEncoder().encode(prepared) else { return nil }
+        do { try data.write(to: url, options: .atomic); return prepared } catch { return nil }
+    }
+    nonisolated static func _testReadPendingBatch(from url: URL) -> PendingBatch? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(PendingBatch.self, from: data)
+    }
 
     private static var pendingBatchURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -309,12 +456,20 @@ extension OCRProcessor {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("pending_batch.json")
     }
-    static func savePendingBatch(_ batch: PendingBatch) {
-        guard let data = try? JSONEncoder().encode(batch) else { return }
+    @discardableResult
+    static func savePendingBatch(_ batch: PendingBatch) -> PendingBatch? {
+        guard let prepared = preparedPendingBatchForPersistence(batch),
+              let data = try? JSONEncoder().encode(prepared) else { return nil }
         // Crash-safe: `.atomic` writes to a sibling temp file then renames it into place, so a crash or
         // power-loss mid-write can never leave a half-written (corrupt) manifest — a reader sees either
         // the previous complete manifest or the new complete one (Tier-2 rule e).
-        try? data.write(to: pendingBatchURL, options: .atomic)
+        do {
+            try data.write(to: pendingBatchURL, options: .atomic)
+            return prepared
+        } catch {
+            NSLog("[ArchiveProcessor] ERROR: could not persist paid-batch journal: %@", error.localizedDescription)
+            return nil
+        }
     }
     private static func loadPendingBatch() -> PendingBatch? {
         guard let data = try? Data(contentsOf: pendingBatchURL) else { return nil }
@@ -387,6 +542,22 @@ extension OCRProcessor {
     /// index order, which would swap outputs for two sources that share a base filename (B7).
     @discardableResult
     func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) -> Bool {
+        // Paid batches have their own lifecycle journal. Persist every materialized result before a
+        // Gemini chunk can be marked consumed, so a relaunch can skip already-written files even if the
+        // process died halfway through that chunk.
+        if activePendingRun == nil, activePendingBatch != nil {
+            return persistPendingBatchMutation(
+                failureMessage: "Could not save paid-batch progress. Processing stopped to avoid duplicate outputs or charges."
+            ) { batch in
+                let key = "\(index)"
+                batch.completedResults[key] = result
+                if let outputURL {
+                    if batch.completedOutputPaths == nil { batch.completedOutputPaths = [:] }
+                    batch.completedOutputPaths?[key] = outputURL.path
+                }
+            }
+        }
+
         guard var run = activePendingRun else { return true }
         run.completedResults["\(index)"] = result
         if let outputURL {
@@ -414,6 +585,56 @@ extension OCRProcessor {
         }
         activePendingRun = run
         return true
+    }
+
+    /// Atomically advance the in-memory + on-disk paid-batch journal. The old durable snapshot remains
+    /// authoritative if the replacement fails; callers stop immediately instead of continuing past it.
+    @discardableResult
+    func persistPendingBatchMutation(
+        failureMessage: String,
+        _ mutation: (inout PendingBatch) -> Void
+    ) -> Bool {
+        guard var candidate = activePendingBatch else { return false }
+        mutation(&candidate)
+        guard let persisted = Self.savePendingBatch(candidate) else {
+            statusMessage = failureMessage
+            batchPollInterrupted = true
+            isProcessing = false
+            processingTask?.cancel()
+            return false
+        }
+        activePendingBatch = persisted
+        if let context = activeBatch {
+            activeBatch = BatchContext(
+                batchId: persisted.batchId, apiKey: context.apiKey, model: context.model,
+                thinkingLevel: context.thinkingLevel, provider: context.provider)
+        }
+        return true
+    }
+
+    @discardableResult
+    func recordSubmittedBatchChunk(_ chunkId: String) -> Bool {
+        let normalized = chunkId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty, !normalized.contains(",") else { return false }
+        if activePendingBatch?.submittedChunkIds.contains(normalized) == true { return true }
+        return persistPendingBatchMutation(
+            failureMessage: "A paid batch chunk was created, but its server ID could not be saved. Submission stopped."
+        ) { $0.submittedChunkIds.append(normalized) }
+    }
+
+    @discardableResult
+    func markBatchSubmissionComplete() -> Bool {
+        persistPendingBatchMutation(
+            failureMessage: "The paid batch was submitted, but final submission state could not be saved. It was kept for recovery."
+        ) { $0.submissionComplete = true }
+    }
+
+    @discardableResult
+    func markBatchChunkConsumed(_ chunkId: String) -> Bool {
+        if activePendingBatch?.consumedChunkIds.contains(chunkId) == true { return true }
+        return persistPendingBatchMutation(
+            failureMessage: "Batch results were written, but chunk completion could not be saved. The batch was kept for recovery."
+        ) { $0.consumedChunkIds.append(chunkId) }
     }
     /// File URLs from a pending run (for populating the file list on resume).
     var pendingRunFileURLs: [URL]? {
@@ -507,7 +728,30 @@ extension OCRProcessor {
     /// Resume polling a previously submitted batch.
     func resumeBatch(apiKey: String) async {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e).
-        guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) else { return }
+        guard var pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) else { return }
+
+        // A journal can be internally valid even if an operator later removed one of its output PDFs.
+        // Re-open all consumed chunks in that case, retain the still-present per-file associations, and
+        // re-fetch results so only the missing outputs are materialized again. This is a GET-only recovery;
+        // it never submits another paid batch job.
+        if pending.lifecycleVersion == PendingBatch.currentLifecycleVersion {
+            let reopened = Self.batchByReopeningMissingOutputs(
+                pending, fileExists: { FileManager.default.fileExists(atPath: $0) })
+            if reopened.completedResults.count != pending.completedResults.count {
+                guard let repaired = Self.savePendingBatch(reopened) else {
+                    statusMessage = "Missing batch outputs were found, but recovery state could not be saved. Nothing was re-fetched."
+                    isProcessing = false
+                    return
+                }
+                pending = repaired
+            }
+            guard !pending.effectiveChunkIds.isEmpty else {
+                statusMessage = "This interrupted submission has no recoverable server ID. Its journal was kept for manual review; retrying automatically could duplicate a paid job."
+                isProcessing = false
+                checkForPendingBatch()
+                return
+            }
+        }
 
         isProcessing = true
         pendingBatchInfo = nil
@@ -534,6 +778,28 @@ extension OCRProcessor {
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         let imageURLs = convertPDFInputs(pending.fileURLs)
         for i in jobs.indices { jobs[i].status = .processing }
+
+        // Restore already-materialized files before polling. Their exact source→output associations are
+        // reused verbatim; processBatchResults also skips these indices if it re-fetches an open chunk.
+        let restoredOutputs = Self.resolveResumeOutputURLs(
+            completedResults: pending.completedResults,
+            completedOutputPaths: pending.completedOutputPaths,
+            sourceURLs: pending.fileURLs,
+            outputDirectory: pending.outputDirectory)
+        for (key, result) in pending.completedResults {
+            guard let index = Int(key), jobs.indices.contains(index) else { continue }
+            jobs[index].result = result
+            jobs[index].classification = result.classification
+            jobs[index].status = result.text == nil ? .failed : .succeeded
+            if result.text == nil {
+                let name = jobs[index].sourceURL.lastPathComponent
+                if !failedFiles.contains(name) { failedFiles.append(name) }
+            }
+            if let outputURL = restoredOutputs[index], FileManager.default.fileExists(atPath: outputURL.path) {
+                outputURLMap[jobs[index].sourceURL] = outputURL
+                _takenOutputPaths.insert(outputURL.standardizedFileURL.path.lowercased())
+            }
+        }
         progress = 0
         statusMessage = "Resuming batch…"
 
@@ -546,6 +812,7 @@ extension OCRProcessor {
             model: pending.model, thinkingLevel: pending.thinkingLevel,
             provider: pending.provider
         )
+        activePendingBatch = pending
 
         await pollBatchUntilComplete(
             batchId: pending.batchId, provider: pending.provider,
@@ -558,9 +825,17 @@ extension OCRProcessor {
         // the pending batch or continue into tagging/finalize on incomplete results; let the user Resume.
         // Reset isProcessing + re-surface the pending-batch banner (mirrors startProcessing) so the UI
         // isn't wedged with every Start/Resume button disabled until relaunch.
-        if batchPollInterrupted { activeBatch = nil; isProcessing = false; cleanupTempFiles(); checkForPendingBatch(); return }
+        if batchPollInterrupted {
+            activeBatch = nil
+            activePendingBatch = nil
+            isProcessing = false
+            cleanupTempFiles()
+            checkForPendingBatch()
+            return
+        }
         Self.deletePendingBatch()
         activeBatch = nil
+        activePendingBatch = nil
 
         guard !Task.isCancelled else { return }
 
@@ -1162,23 +1437,38 @@ extension OCRProcessor {
         // Cancel server-side batch if active
         if let batch = activeBatch {
             activeBatch = nil
-            Self.deletePendingBatch()
+            let chunkIds = activePendingBatch?.effectiveChunkIds
+                ?? PendingBatch.parseChunkIDs(batch.batchId)
+            activePendingBatch = nil
             Task {
+                let cancelled: Bool
                 switch batch.provider {
                 case .anthropic:
                     let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    await client.cancelBatch(batchId: batch.batchId)
+                    if chunkIds.count == 1 {
+                        cancelled = await client.cancelBatch(batchId: chunkIds[0])
+                    } else { cancelled = false }
                 case .mistral:
                     let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
-                    await client.cancelBatch(batchId: batch.batchId)
+                    if chunkIds.count == 1 {
+                        cancelled = await client.cancelBatch(batchId: chunkIds[0])
+                    } else { cancelled = false }
                 case .gemini:
                     let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    for singleId in batch.batchId.components(separatedBy: ",") {
-                        await client.cancelBatch(batchName: singleId)
+                    var allConfirmed = !chunkIds.isEmpty
+                    for singleId in chunkIds {
+                        if !(await client.cancelBatch(batchName: singleId)) { allConfirmed = false }
                     }
+                    cancelled = allConfirmed
                 case .openai:
-                    break   // Unreachable: OpenAI has no batch path in v1 (`supportsBatch == false`), so no server-side batch to cancel.
+                    cancelled = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
                 }
+                if cancelled {
+                    Self.deletePendingBatch()
+                } else {
+                    statusMessage = "Cancelled locally, but server cancellation was not confirmed. The paid-batch journal was kept for recovery."
+                }
+                checkForPendingBatch()
             }
         }
 
@@ -1218,6 +1508,14 @@ extension OCRProcessor {
         localAgent: LocalAgentConfig? = nil
     ) async {
         guard !files.isEmpty else { return }
+        // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
+        // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
+        // callers. A paid batch may still exist even when its manifest is malformed or has no received ID.
+        if Self.loadPendingBatch() != nil || Self.loadPendingRun() != nil {
+            checkForPendingBatch()
+            statusMessage = "An interrupted run is still preserved. Resume it or explicitly dismiss its recovery record before starting another run."
+            return
+        }
         // Normalize programmatic/profile inputs to the same bounds as the UI before either the live run
         // or its immutable resume snapshot observes them.
         var segmentationContext = segmentationContext

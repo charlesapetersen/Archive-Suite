@@ -232,6 +232,10 @@ class OCRProcessor: ObservableObject {
         let provider: LLMProvider
     }
     var activeBatch: BatchContext?
+    /// Durable client-side state for the active paid batch. Unlike `activeBatch` (which only carries
+    /// credentials needed for cancellation), this mirrors the crash-safe on-disk journal and advances
+    /// after every submitted Gemini chunk and every materialized result.
+    var activePendingBatch: PendingBatch?
     /// Set true when batch polling exits WITHOUT the batch reaching a terminal state (a transient
     /// network error streak, or the safety timeout). Signals callers to KEEP the pending batch (so it
     /// stays resumable) instead of deleting it, and tells pollBatchUntilComplete not to mark every
@@ -241,7 +245,9 @@ class OCRProcessor: ObservableObject {
     // MARK: - Batch Persistence
 
     struct PendingBatch: Codable {
-        let batchId: String
+        static let currentLifecycleVersion = 1
+
+        var batchId: String
         let provider: LLMProvider
         let model: LLMModel
         let thinkingLevel: ThinkingLevel?
@@ -270,6 +276,26 @@ class OCRProcessor: ObservableObject {
         /// falls back to the live setting. NOT part of `runFingerprint` — a runtime knob, not run identity.
         let exportOriginals: Bool?
 
+        /// Version 1 turns the old submit-once manifest into a durable paid-batch journal. Nil denotes a
+        /// legacy manifest, whose comma-separated `batchId` remains readable exactly as before.
+        var lifecycleVersion: Int?
+        /// Ordered server-side job IDs acknowledged so far. Gemini can create several paid jobs for one
+        /// local run; each ID is appended and atomically saved immediately after its create response.
+        var submittedChunkIds: [String]
+        /// Terminal chunks whose results have been completely materialized and durably associated with
+        /// their source indices. A resume skips these instead of downloading/creating their PDFs again.
+        var consumedChunkIds: [String]
+        /// False while a multi-chunk submission is still being constructed. A crash in that window keeps
+        /// every acknowledged ID recoverable without guessing whether an unacknowledged POST succeeded.
+        var submissionComplete: Bool
+        /// Per-file progress is journaled before a chunk is marked consumed. This closes the crash window
+        /// where half a chunk had written PDFs but the old in-memory-only Set forgot them on relaunch.
+        var completedResults: [String: OCRResult]
+        var completedOutputPaths: [String: String]?
+        /// SHA-256 over the complete v1 journal (excluding this field). It protects the evolving
+        /// ID/result/output associations in addition to the legacy immutable run fingerprint.
+        var lifecycleFingerprint: String?
+
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
@@ -277,7 +303,14 @@ class OCRProcessor: ObservableObject {
              reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
              taggingMode: TaggingMode = .automatic, fingerprintVersion: Int? = 2,
              runFingerprint: String? = nil,
-             exportOriginals: Bool? = nil) {
+             exportOriginals: Bool? = nil,
+             lifecycleVersion: Int? = nil,
+             submittedChunkIds: [String]? = nil,
+             consumedChunkIds: [String] = [],
+             submissionComplete: Bool = true,
+             completedResults: [String: OCRResult] = [:],
+             completedOutputPaths: [String: String]? = nil,
+             lifecycleFingerprint: String? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -291,6 +324,13 @@ class OCRProcessor: ObservableObject {
             self.fingerprintVersion = fingerprintVersion
             self.runFingerprint = runFingerprint
             self.exportOriginals = exportOriginals
+            self.lifecycleVersion = lifecycleVersion
+            self.submittedChunkIds = submittedChunkIds ?? Self.parseChunkIDs(batchId)
+            self.consumedChunkIds = consumedChunkIds
+            self.submissionComplete = submissionComplete
+            self.completedResults = completedResults
+            self.completedOutputPaths = completedOutputPaths
+            self.lifecycleFingerprint = lifecycleFingerprint
         }
 
         init(from decoder: Decoder) throws {
@@ -313,6 +353,26 @@ class OCRProcessor: ObservableObject {
             fingerprintVersion = try c.decodeIfPresent(Int.self, forKey: .fingerprintVersion)
             runFingerprint = try c.decodeIfPresent(String.self, forKey: .runFingerprint)
             exportOriginals = try c.decodeIfPresent(Bool.self, forKey: .exportOriginals)
+            lifecycleVersion = try c.decodeIfPresent(Int.self, forKey: .lifecycleVersion)
+            submittedChunkIds = try c.decodeIfPresent([String].self, forKey: .submittedChunkIds)
+                ?? Self.parseChunkIDs(batchId)
+            consumedChunkIds = try c.decodeIfPresent([String].self, forKey: .consumedChunkIds) ?? []
+            submissionComplete = try c.decodeIfPresent(Bool.self, forKey: .submissionComplete) ?? true
+            completedResults = try c.decodeIfPresent([String: OCRResult].self, forKey: .completedResults) ?? [:]
+            completedOutputPaths = try c.decodeIfPresent([String: String].self, forKey: .completedOutputPaths)
+            lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
+        }
+
+        static func parseChunkIDs(_ value: String) -> [String] {
+            value.split(separator: ",", omittingEmptySubsequences: true)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
+
+        var effectiveChunkIds: [String] {
+            lifecycleVersion == Self.currentLifecycleVersion
+                ? submittedChunkIds
+                : Self.parseChunkIDs(batchId)
         }
     }
 

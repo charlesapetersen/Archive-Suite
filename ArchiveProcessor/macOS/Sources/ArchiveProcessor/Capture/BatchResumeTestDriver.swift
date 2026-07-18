@@ -27,10 +27,13 @@ import AppKit
 ///  10. V2 non-batch manifests round-trip and apply a complete immutable runtime snapshot; their identity
 ///      is input-order-sensitive, detects runtime tampering, rejects unknown/malformed snapshots, and
 ///      leaves the legacy manifest/fingerprint path readable.
+///  11. V1 paid-batch journals round-trip ordered/consumed chunk IDs and per-file output associations,
+///      preserve partial submission, reopen missing outputs without another create, reject malformed
+///      lifecycle state, and retain pre-journal comma-separated compatibility.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
-/// it operates on an explicit temp manifest url via `_testWritePendingRun`/`_testReadPendingRun`, so it
-/// never touches the user's real `pending_run.json` in Application Support.
+/// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
+/// the user's real Application Support recovery state.
 @MainActor
 enum BatchResumeTestDriver {
     private static var didRun = false
@@ -424,6 +427,98 @@ enum BatchResumeTestDriver {
         check("legacy PendingRun remains readable and uses its legacy consistency path",
               loaded?.runtimeConfig == nil
               && (loaded.map { OCRProcessor.pendingRunIsSelfConsistent($0) } ?? false))
+
+        // --- 11: B14 — paid multi-chunk lifecycle journal survives crashes without duplicate output. ---
+        let lifecycleBatch = OCRProcessor.PendingBatch(
+            batchId: "", provider: .gemini, model: LLMProvider.gemini.models[0],
+            thinkingLevel: nil, fileURLs: files, outputDirectory: outDir, enableTagging: true,
+            enableCollectionSegmentation: false, sendPreviousImage: false, submittedAt: Date(),
+            enableSegmentJSON: true, confirmCollectionIDs: false, reviewDocumentSegmentation: false,
+            customPrompt: nil, taggingMode: .automatic,
+            runFingerprint: OCRProcessor.runFingerprint(
+                files: files, outputDirectory: outDir, taggingMode: .automatic,
+                enableTagging: true, batchMode: true, preserveInputOrder: true),
+            exportOriginals: true,
+            lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+            submittedChunkIds: ["batches/chunk-a", "batches/chunk-b"],
+            consumedChunkIds: ["batches/chunk-a"], submissionComplete: true,
+            completedResults: ["0": done], completedOutputPaths: ["0": out0.path])
+        let lifecycleURL = tmp.appendingPathComponent("pending_batch_v1.json")
+        let writtenLifecycle = OCRProcessor._testWritePendingBatch(lifecycleBatch, to: lifecycleURL)
+        let loadedLifecycle = OCRProcessor._testReadPendingBatch(from: lifecycleURL)
+        check("paid-batch journal atomically persists all ordered chunk IDs",
+              writtenLifecycle?.batchId == "batches/chunk-a,batches/chunk-b"
+              && loadedLifecycle?.submittedChunkIds == ["batches/chunk-a", "batches/chunk-b"])
+        check("paid-batch journal round-trips consumed chunks and per-file output associations",
+              loadedLifecycle?.consumedChunkIds == ["batches/chunk-a"]
+              && loadedLifecycle?.completedResults["0"]?.text == done.text
+              && loadedLifecycle?.completedOutputPaths?["0"] == out0.path)
+        check("round-tripped paid-batch lifecycle passes full evolving-state validation",
+              loadedLifecycle.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+        if let loadedLifecycle {
+            let reopened = OCRProcessor.batchByReopeningMissingOutputs(
+                loadedLifecycle, fileExists: { $0 != out0.path })
+            check("a missing completed PDF re-opens consumed chunks without losing server IDs",
+                  reopened.completedResults.isEmpty
+                  && reopened.completedOutputPaths?.isEmpty == true
+                  && reopened.consumedChunkIds.isEmpty
+                  && reopened.submittedChunkIds == loadedLifecycle.submittedChunkIds)
+            let unchanged = OCRProcessor.batchByReopeningMissingOutputs(
+                loadedLifecycle, fileExists: { _ in true })
+            check("present completed PDFs retain their consumed/result journal state",
+                  Set(unchanged.completedResults.keys) == Set(loadedLifecycle.completedResults.keys)
+                  && unchanged.consumedChunkIds == loadedLifecycle.consumedChunkIds
+                  && unchanged.lifecycleFingerprint == loadedLifecycle.lifecycleFingerprint)
+        } else {
+            check("missing-output recovery fixture is constructible", false)
+            check("present-output recovery fixture is constructible", false)
+        }
+
+        var partialSubmission = lifecycleBatch
+        partialSubmission.submittedChunkIds = ["batches/chunk-a"]
+        partialSubmission.consumedChunkIds = []
+        partialSubmission.submissionComplete = false
+        partialSubmission.completedResults = [:]
+        partialSubmission.completedOutputPaths = [:]
+        let preparedPartial = OCRProcessor.preparedPendingBatchForPersistence(partialSubmission)
+        check("a crash after the first multi-chunk create keeps that acknowledged job resumable",
+              preparedPartial?.batchId == "batches/chunk-a"
+              && (preparedPartial.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false))
+
+        if var unknownChunk = loadedLifecycle {
+            unknownChunk.consumedChunkIds.append("batches/not-submitted")
+            let resigned = OCRProcessor.preparedPendingBatchForPersistence(unknownChunk)
+            check("journal rejects a consumed chunk that was never submitted even after re-signing",
+                  resigned != nil && !OCRProcessor.pendingBatchIsSelfConsistent(resigned!))
+        } else {
+            check("unknown-consumed-chunk fixture is constructible", false)
+        }
+        if var escapedOutput = loadedLifecycle {
+            escapedOutput.completedOutputPaths?["0"] = inDir.appendingPathComponent("escape.pdf").path
+            let resigned = OCRProcessor.preparedPendingBatchForPersistence(escapedOutput)
+            check("journal rejects a completed batch output outside the selected destination",
+                  resigned != nil && !OCRProcessor.pendingBatchIsSelfConsistent(resigned!))
+        } else {
+            check("escaped batch-output fixture is constructible", false)
+        }
+        if let lifecycleData = loadedLifecycle.flatMap({ try? JSONEncoder().encode($0) }),
+           var legacyObject = try? JSONSerialization.jsonObject(with: lifecycleData) as? [String: Any] {
+            for key in ["lifecycleVersion", "submittedChunkIds", "consumedChunkIds",
+                        "submissionComplete", "completedResults", "completedOutputPaths",
+                        "lifecycleFingerprint"] {
+                legacyObject.removeValue(forKey: key)
+            }
+            let legacyData = try? JSONSerialization.data(withJSONObject: legacyObject)
+            let decodedLegacy = legacyData.flatMap {
+                try? JSONDecoder().decode(OCRProcessor.PendingBatch.self, from: $0)
+            }
+            check("pre-journal comma-separated paid batches remain readable and resumable",
+                  decodedLegacy?.lifecycleVersion == nil
+                  && decodedLegacy?.effectiveChunkIds == ["batches/chunk-a", "batches/chunk-b"]
+                  && (decodedLegacy.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false))
+        } else {
+            check("legacy paid-batch journal fixture is constructible", false)
+        }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

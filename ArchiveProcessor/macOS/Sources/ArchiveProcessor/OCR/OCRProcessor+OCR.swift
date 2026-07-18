@@ -484,55 +484,100 @@ extension OCRProcessor {
         // Submit batch
         statusMessage = "Submitting batch (\(total) files)…"
 
+        // Write a complete recovery journal BEFORE the first irreversible provider request. The server ID
+        // list starts empty and is advanced immediately after each create response. If a response is lost,
+        // the retained `submissionComplete == false` journal makes that ambiguity visible instead of
+        // silently starting a second paid run.
+        let submittedAt = Date()
+        let immutableFingerprint = Self.runFingerprint(
+            files: originalFiles, outputDirectory: outputDirectory, taggingMode: taggingMode,
+            enableTagging: enableTagging, batchMode: true, preserveInputOrder: true)
+        let initialPendingBatch = PendingBatch(
+            batchId: "", provider: provider, model: model,
+            thinkingLevel: thinkingLevel, fileURLs: originalFiles,
+            outputDirectory: outputDirectory, enableTagging: enableTagging,
+            enableCollectionSegmentation: enableCollectionSegmentation,
+            sendPreviousImage: sendPreviousImage, submittedAt: submittedAt,
+            enableSegmentJSON: enableSegmentJSON,
+            confirmCollectionIDs: confirmCollectionIDs,
+            reviewDocumentSegmentation: reviewDocumentSegmentation,
+            customPrompt: customPrompt,
+            taggingMode: taggingMode,
+            runFingerprint: immutableFingerprint,
+            exportOriginals: exportOriginals,
+            lifecycleVersion: PendingBatch.currentLifecycleVersion,
+            submittedChunkIds: [], consumedChunkIds: [],
+            submissionComplete: false, completedResults: [:], completedOutputPaths: [:]
+        )
+        guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
+            statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."
+            batchPollInterrupted = true
+            isProcessing = false
+            return
+        }
+        activePendingBatch = persistedInitialBatch
+        activeBatch = BatchContext(
+            batchId: "", apiKey: apiKey, model: model,
+            thinkingLevel: thinkingLevel, provider: provider)
+
         let batchId: String
         do {
             switch provider {
             case .anthropic:
                 let client = AnthropicBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
                 batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
+                guard recordSubmittedBatchChunk(batchId) else {
+                    throw OCRError.networkError("Could not persist the submitted Anthropic batch ID")
+                }
             case .mistral:
                 let client = MistralBatchClient(apiKey: apiKey, model: model)
                 batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale)
+                guard recordSubmittedBatchChunk(batchId) else {
+                    throw OCRError.networkError("Could not persist the submitted Mistral batch ID")
+                }
             case .gemini:
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
+                batchId = try await client.submitBatch(
+                    fileURLs: fileURLs, sendPreviousImage: sendPreviousImage,
+                    customPrompt: customPrompt, imageScale: imageScale
+                ) { [weak self] chunkId in
+                    guard let self else {
+                        throw OCRError.networkError("Batch owner was released during submission")
+                    }
+                    guard await self.recordSubmittedBatchChunk(chunkId) else {
+                        throw OCRError.networkError("Could not persist a submitted Gemini chunk ID")
+                    }
+                }
             case .openai:
                 // Unreachable: `supportsBatch == false` gates OpenAI out of the batch path (Pipeline
                 // `batchMode && provider.supportsBatch`). Defensive arm keeps the switch exhaustive;
                 // Phase 4 adds a real OpenAIBatchClient. The throw is caught below → jobs marked failed.
                 throw OCRError.networkError("OpenAI batch is not supported in this version")
             }
+            guard markBatchSubmissionComplete() else { return }
         } catch {
-            statusMessage = "Batch submission failed: \(error.localizedDescription)"
-            for i in jobs.indices where jobs[i].status == .processing {
-                jobs[i].status = .failed
-                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
-            }
+            // A non-idempotent create can be accepted server-side even when its response is lost. Keep
+            // the pre-submit journal in every failure case; acknowledged IDs remain resumable, while an
+            // empty ID list explicitly records an unknown outcome and prevents an automatic duplicate.
+            let acknowledged = activePendingBatch?.submittedChunkIds.count ?? 0
+            statusMessage = acknowledged == 0
+                ? "Batch submission outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying."
+                : "Batch submission stopped after \(acknowledged) server job\(acknowledged == 1 ? "" : "s"). The acknowledged work was kept for resume."
+            NSLog("[ArchiveProcessor] paid-batch submission interrupted: %@", error.localizedDescription)
+            batchPollInterrupted = true
+            isProcessing = false
+            checkForPendingBatch()
             return
         }
 
-        // Store for cancellation + persist to disk for resume after relaunch
-        activeBatch = BatchContext(batchId: batchId, apiKey: apiKey, model: model, thinkingLevel: thinkingLevel, provider: provider)
-        // Persist the ORIGINAL input files (not the ephemeral temp JPEGs `convertPDFInputs` produced for
-        // PDF inputs): the temp <UUID>.jpg paths are purged on relaunch, so a resume that keyed off them
-        // would rebuild wrong output names + never match the fingerprint. Resume re-derives the temp JPEGs
-        // from these originals (mirrors PendingRun / resumeRun). Fingerprint likewise over the originals.
-        Self.savePendingBatch(PendingBatch(
-            batchId: batchId, provider: provider, model: model,
-            thinkingLevel: thinkingLevel, fileURLs: originalFiles,
-            outputDirectory: outputDirectory, enableTagging: enableTagging,
-            enableCollectionSegmentation: enableCollectionSegmentation,
-            sendPreviousImage: sendPreviousImage, submittedAt: Date(),
-            enableSegmentJSON: enableSegmentJSON,
-            confirmCollectionIDs: confirmCollectionIDs,
-            reviewDocumentSegmentation: reviewDocumentSegmentation,
-            customPrompt: customPrompt,
-            taggingMode: taggingMode,
-            runFingerprint: Self.runFingerprint(
-                files: originalFiles, outputDirectory: outputDirectory, taggingMode: taggingMode,
-                enableTagging: enableTagging, batchMode: true, preserveInputOrder: true),
-            exportOriginals: exportOriginals
-        ))
+        // `batchId` is retained as the provider client's compatibility return value. The authoritative ID
+        // list is the just-persisted journal (and must agree unless a future provider normalizes its ID).
+        guard activePendingBatch?.batchId == batchId else {
+            statusMessage = "Submitted batch IDs did not match the recovery journal. The journal was kept for review."
+            batchPollInterrupted = true
+            isProcessing = false
+            return
+        }
         statusMessage = "Batch submitted. Waiting for results…"
 
         // Poll for completion
@@ -543,7 +588,10 @@ extension OCRProcessor {
         )
 
         // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
-        if !batchPollInterrupted { Self.deletePendingBatch() }
+        if !batchPollInterrupted {
+            Self.deletePendingBatch()
+            activePendingBatch = nil
+        }
         activeBatch = nil
         progress = 0.7
     }
@@ -561,7 +609,7 @@ extension OCRProcessor {
         var consecutiveErrors = 0
         var batchComplete = false
         batchPollInterrupted = false
-        var consumedChunkIds = Set<String>()   // Gemini multi-chunk: chunk IDs whose results are already processed
+        var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
@@ -590,7 +638,9 @@ extension OCRProcessor {
                         if let url = status.resultsURL {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(resultsURL: url)
-                            await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
+                            guard await processBatchResults(
+                                results, fileURLs: fileURLs, model: model, apiKey: apiKey,
+                                outputDirectory: outputDirectory) else { return }
                         } else {
                             statusMessage = "Batch completed but no results available"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -611,7 +661,9 @@ extension OCRProcessor {
                         if status.status == "SUCCESS", let fileId = status.outputFileId {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(outputFileId: fileId)
-                            await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
+                            guard await processBatchResults(
+                                results, fileURLs: fileURLs, model: model, apiKey: apiKey,
+                                outputDirectory: outputDirectory) else { return }
                         } else {
                             statusMessage = "Batch \(status.status.lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -624,8 +676,9 @@ extension OCRProcessor {
 
                 case .gemini:
                     let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    // Gemini may have multiple batch IDs (comma-separated) for large batches
-                    let geminiBatchIds = batchId.components(separatedBy: ",")
+                    // New journals carry ordered IDs; legacy manifests retain their comma-separated IDs.
+                    let geminiBatchIds = activePendingBatch?.effectiveChunkIds
+                        ?? PendingBatch.parseChunkIDs(batchId)
                     var allComplete = true
                     var anyFailed = false
                     var stateDisplays: [String] = []
@@ -648,13 +701,19 @@ extension OCRProcessor {
                         } else {
                             let succeeded = status.state == "BATCH_STATE_SUCCEEDED" || status.state == "JOB_STATE_SUCCEEDED"
                             if succeeded {
+                                var materialized = true
                                 if let inlineResults = status.inlineResults {
-                                    await processBatchResults(inlineResults, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
+                                    materialized = await processBatchResults(
+                                        inlineResults, fileURLs: fileURLs, model: model, apiKey: apiKey,
+                                        outputDirectory: outputDirectory)
                                 } else if let fileName = status.resultFileName {
                                     let results = try await client.retrieveResults(resultFileName: fileName)
-                                    await processBatchResults(results, fileURLs: fileURLs, model: model, apiKey: apiKey, outputDirectory: outputDirectory)
+                                    materialized = await processBatchResults(
+                                        results, fileURLs: fileURLs, model: model, apiKey: apiKey,
+                                        outputDirectory: outputDirectory)
                                 }
-                                consumedChunkIds.insert(singleBatchId)   // don't re-process this chunk on later polls
+                                guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
+                                consumedChunkIds.insert(singleBatchId)
                             } else {
                                 anyFailed = true
                             }
@@ -718,7 +777,9 @@ extension OCRProcessor {
                                        : "Could not read the source image (unsupported or corrupt file).",
                 errorCode: readable ? "no_result" : "image_unreadable"
             )
-            _ = await handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
+            guard await handleOCRResult(
+                synthetic, index: i, url: url, model: model,
+                outputDirectory: outputDirectory) else { return }
         }
     }
     private func processBatchResults(
@@ -727,14 +788,18 @@ extension OCRProcessor {
         model: LLMModel,
         apiKey: String,
         outputDirectory: URL
-    ) async {
+    ) async -> Bool {
         // Parse valid entries upfront so the task group doesn't need to touch fileURLs.
+        // A resumed paid batch restores these keys from disk. Skip them before output-path allocation so
+        // re-fetching an incompletely acknowledged chunk cannot create duplicate "(2)" PDFs.
+        let alreadyCompleted = Set(activePendingBatch?.completedResults.keys.map { $0 } ?? [])
         let entries: [(index: Int, url: URL, result: OCRResult)] = results.compactMap { (customId, result) in
             let indexStr = customId.replacingOccurrences(of: "file-", with: "")
-            guard let index = Int(indexStr), index < fileURLs.count else { return nil }
+            guard !alreadyCompleted.contains(indexStr),
+                  let index = Int(indexStr), index >= 0, index < fileURLs.count else { return nil }
             return (index, fileURLs[index], result)
         }
-        guard !entries.isEmpty else { return }
+        guard !entries.isEmpty else { return true }
 
         // M4 perf fix: detect rotation concurrently (bounded) instead of serially.
         // handleOCRResult runs back on MainActor (serialized) for state updates;
@@ -743,6 +808,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
+        var allPersisted = true
         await withTaskGroup(of: (Int, URL, OCRResult).self) { group in
             var iter = entries.makeIterator()
 
@@ -764,6 +830,7 @@ extension OCRProcessor {
                 guard await handleOCRResult(
                     resolved, index: index, url: url, model: model,
                     outputDirectory: outputDirectory) else {
+                    allPersisted = false
                     group.cancelAll()
                     return
                 }
@@ -774,6 +841,7 @@ extension OCRProcessor {
         // batches this runs while OTHER chunks are still processing, so it would falsely fail files
         // whose chunk hasn't finished yet. The sweep is done once in pollBatchUntilComplete after the
         // whole batch is complete.
+        return allPersisted
     }
     func performOCRPhase(
         fileURLs: [URL],

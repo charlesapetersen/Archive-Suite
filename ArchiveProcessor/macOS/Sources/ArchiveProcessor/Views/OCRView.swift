@@ -503,7 +503,9 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && !apiKey.isEmpty && outputDirectory != nil && !processor.isProcessing && !isInReviewMode
+        !droppedFiles.isEmpty && !apiKey.isEmpty && outputDirectory != nil
+            && !processor.isProcessing && !isInReviewMode
+            && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
     }
 
     /// Re-point the per-provider selected model + API-key field after `selectedProvider` changes from

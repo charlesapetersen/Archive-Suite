@@ -4,6 +4,51 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## DEFERRED: unify paid-batch providers behind one durable state machine [MEDIUM — architecture/safety]
+
+The Processor's crash-safety fixes now journal paid-batch progress at the orchestration boundary, but the
+Anthropic, Gemini, and Mistral clients still expose separate stringly-typed submit/status/result/cancel
+flows. Gemini also returns multiple job IDs as a comma-separated string. That representation makes it too
+easy for a future provider-specific path to forget a persistence transition, mishandle partial submission,
+or delete recovery state before cancellation is confirmed.
+
+This should be a deliberate revision rather than part of a narrow bug patch. Replace the provider switches
+with a typed `BatchProvider` interface and one reducer-owned lifecycle (`prepared → submitting → submitted →
+retrieving → materialized → finalized`, plus explicit ambiguous/interrupted/cancel states). Give every
+server job a typed chunk record, persist transitions before scheduling the next irreversible action, and
+let providers supply reconciliation hooks where their APIs can list/recover a create request whose response
+was lost. Keep a migration decoder for existing `pending_batch.json` manifests.
+
+Verification plan:
+
+1. Inject a crash/failing manifest write before and after every state transition and prove restart resumes
+   without repeating a billable create or duplicating an output.
+2. Cover partial multi-chunk submission, mixed terminal states, empty/malformed result sets, and a response
+   lost after server acceptance.
+3. Prove cancellation retains the journal until every server job is terminal or cancellation is confirmed.
+4. Round-trip and resume legacy single-ID and comma-separated Gemini manifests.
+5. Run provider contract fixtures for all three clients plus the existing no-network and Debug build gates.
+
+Deferred because this changes the shared internal batch architecture across three providers and needs
+provider-level contract fixtures; folding it into the current Gemini lifecycle bug fix would make that fix
+substantially harder to audit and back out.
+
+---
+
+## ✅ FIXED (2026-07-17): paid multi-chunk batches lost submission/consumption progress on relaunch [CRITICAL]
+
+**FIXED:** paid batches now use a versioned, integrity-checked lifecycle journal. It is created before the
+first irreversible request; each acknowledged Gemini chunk ID is atomically appended before another chunk
+is submitted; every materialized result and exact output path is persisted before its chunk is marked
+consumed. Resume restores those associations, skips already-written files, reopens consumed chunks if an
+output disappeared, and retains legacy single/comma-separated manifests. An interrupted submission with no
+received ID remains visibly ambiguous instead of being retried automatically. New work cannot overwrite any
+preserved batch/run record, and Cancel deletes a paid-batch journal only after every server cancellation is
+confirmed. The headless crash-resume regression covers partial submission, tampering, escaped paths, missing
+outputs, and legacy decoding. (2026-07-17)
+
+---
+
 ## ✅ FIXED (2026-07-17): Process Files resumed with changed settings and an order-insensitive identity [CRITICAL]
 
 **FIXED:** new non-batch runs persist a versioned immutable runtime snapshot covering tagging/source-tag

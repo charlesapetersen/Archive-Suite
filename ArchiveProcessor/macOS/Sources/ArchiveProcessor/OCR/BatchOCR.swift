@@ -230,13 +230,16 @@ struct AnthropicBatchClient: Sendable {
     }
 
     /// Cancel a running batch.
-    func cancelBatch(batchId: String) async {
-        guard let url = URL(string: "\(baseURL)/\(batchId)/cancel") else { return }
+    func cancelBatch(batchId: String) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/\(batchId)/cancel") else { return false }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
+        do {
+            let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+        } catch { return false }
     }
 }
 
@@ -257,7 +260,15 @@ struct GeminiBatchClient: Sendable {
     /// Submit a batch of OCR requests. Uses inline requests when under 20MB, file upload otherwise.
     /// For very large batches (>2GB), splits into multiple batch jobs.
     /// Returns comma-separated batch names (e.g. "batches/123" or "batches/123,batches/456").
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
+    /// `onJobCreated` runs immediately after each create response yields a server ID, before another paid
+    /// chunk is submitted. The Processor uses it to durably journal that ID; throwing stops submission.
+    func submitBatch(
+        fileURLs: [URL],
+        sendPreviousImage: Bool,
+        customPrompt: String? = nil,
+        imageScale: Double = 1.0,
+        onJobCreated: (@Sendable (String) async throws -> Void)? = nil
+    ) async throws -> String {
         // Build JSONL lines for each file, tracking sizes for chunking
         var jsonlLines: [String] = []
         // L4 perf: cache the previous iteration's JPEG so sendPreviousImage reuses it
@@ -313,10 +324,12 @@ struct GeminiBatchClient: Sendable {
         if totalSize < Self.inlineMaxBytes {
             // Small batch — use inline requests
             let batchName = try await submitInlineBatch(jsonlLines: jsonlLines)
+            try await onJobCreated?(batchName)
             return batchName
         } else if totalSize < Self.fileMaxBytes {
             // Medium batch — single file upload
             let batchName = try await submitFileBatch(jsonlLines: jsonlLines)
+            try await onJobCreated?(batchName)
             return batchName
         } else {
             // Large batch — split into chunks under the file size limit
@@ -341,6 +354,7 @@ struct GeminiBatchClient: Sendable {
             var batchNames: [String] = []
             for chunk in chunks {
                 let name = try await submitFileBatch(jsonlLines: chunk)
+                try await onJobCreated?(name)
                 batchNames.append(name)
             }
             return batchNames.joined(separator: ",")
@@ -632,11 +646,14 @@ struct GeminiBatchClient: Sendable {
     }
 
     /// Cancel a running batch.
-    func cancelBatch(batchName: String) async {
-        guard let url = try? makeBatchURL("\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return }
+    func cancelBatch(batchName: String) async -> Bool {
+        guard let url = try? makeBatchURL("\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return false }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
-        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
+        do {
+            let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+        } catch { return false }
     }
 }
 
@@ -828,11 +845,14 @@ struct MistralBatchClient: Sendable {
     }
 
     /// Cancel a running batch job.
-    func cancelBatch(batchId: String) async {
-        guard let url = URL(string: "\(batchURL)/\(batchId)/cancel") else { return }
+    func cancelBatch(batchId: String) async -> Bool {
+        guard let url = URL(string: "\(batchURL)/\(batchId)/cancel") else { return false }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
+        do {
+            let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+        } catch { return false }
     }
 }
