@@ -42,7 +42,8 @@ even `TagWriter` never calls a move / rename / delete / content-write API — on
 > documented in [`../SPEC/tag-format.md`](../SPEC/tag-format.md) (Suite root). The facts below
 > mirror it from the Reader side; if they ever disagree, the SPEC wins and both must be reconciled.
 
-**Corpus:** `Test files/Brown Gemini/` — ~6,941 two-page PDFs. Real production scale is up to
+**Corpus:** `Test files/Brown Gemini/` — a **150-PDF representative sample** (slimmed from ~6,941 on
+2026-07-18; the culled remainder was moved to the macOS Trash). Real production scale is up to
 **~150,000** files. Filenames like `00001 IMG — Brown.pdf` (note the **em dash** U+2014; production
 paths also contain **non-breaking spaces** U+00A0).
 

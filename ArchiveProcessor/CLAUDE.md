@@ -201,10 +201,14 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 ---
 
 ## Test Files
-- Located in `Test Files/` directory within the project
-- Contain a wide range of document types
-- **Do not delete or modify any test files**
-- Only create new output files
+- Located in `Test Files/` directory within the project (gitignored; **not in git** — no recovery via git).
+- Deliberately slimmed to a representative + test-critical **minimum** (2026-07-18): all of
+  `Ground Truth Segmentation/` (the tier-2 regression anchor — its CSVs + image sequences) and
+  `Collection Segmentation*/` are kept whole; the OCR/QA collections (`Herrnstein`, `DeaverLLM`,
+  `Dean Papers`, `Deaver and Hannaford`, `Surrey`) each keep a 20–40-file representative sample. The
+  culled remainder (~13 GB) was moved to the macOS Trash, not hard-deleted.
+- **Don't modify the surviving files, and don't delete the ground-truth folders** — they back the
+  smoke/tier-2 tests. Only create new output files (never inside `Test Files/`).
 
 ---
 

@@ -160,4 +160,4 @@ are now settled in code + tests. Kept as a short record:
 ## Environment notes
 - Xcode 26.3 / Swift 6.2 toolchain; XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`.
 - GitHub CLI: use `/opt/homebrew/bin/gh` (bare `gh` is shadowed on this machine).
-- The corpus lives in `Test files/Brown Gemini/` (~6,941 PDFs) and is gitignored — never modify it.
+- The corpus lives in `Test files/Brown Gemini/` (150-PDF representative sample as of 2026-07-18, slimmed from ~6,941) and is gitignored — never modify it.
