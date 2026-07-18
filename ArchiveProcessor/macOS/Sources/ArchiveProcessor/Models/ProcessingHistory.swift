@@ -102,12 +102,11 @@ struct RunHistorySnapshot {
 }
 
 extension RunHistorySnapshot {
-    /// Build a history snapshot for a RESUMED non-batch run from its persisted manifest plus the few
-    /// runtime knobs the manifest does not store (rotation mode + image-scale are live `@AppStorage`; the
-    /// upstream gateway family drives image-token math). `fileCount` is the WHOLE run: resume never
+    /// Build a history snapshot for a RESUMED non-batch run. V2 callers pass values restored from the
+    /// immutable runtime snapshot; legacy callers pass the historical live-setting fallbacks because old
+    /// manifests never recorded them. `fileCount` is the WHOLE run: resume never
     /// re-charges files already completed, but the recorded cost is the full run's estimate, matching the
-    /// pre-run pane the operator saw. Tagging is keyed off the live mode (the manifest predates a
-    /// persisted `TaggingMode`), mirroring how the pre-run estimator reads `taggingMode.llmTags`.
+    /// pre-run pane the operator saw. Tagging is keyed off the supplied effective mode.
     init(resuming run: OCRProcessor.PendingRun, taggingMode: TaggingMode,
          rotationMode: RotationMode, imageScale: Double, imageTokenProvider: LLMProvider?) {
         self.init(

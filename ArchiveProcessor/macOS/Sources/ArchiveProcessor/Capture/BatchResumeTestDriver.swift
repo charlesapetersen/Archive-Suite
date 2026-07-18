@@ -24,6 +24,9 @@ import AppKit
 ///      PendingBatch (so a resume restores it), a legacy manifest decodes it as nil (backward-compat), and
 ///      a batch manifest persists the ORIGINAL input files (not the ephemeral temp JPEGs) with a matching
 ///      fingerprint — the temp-path fingerprint provably diverges.
+///  10. V2 non-batch manifests round-trip and apply a complete immutable runtime snapshot; their identity
+///      is input-order-sensitive, detects runtime tampering, rejects unknown/malformed snapshots, and
+///      leaves the legacy manifest/fingerprint path readable.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on an explicit temp manifest url via `_testWritePendingRun`/`_testReadPendingRun`, so it
@@ -232,7 +235,7 @@ enum BatchResumeTestDriver {
             customPrompt: nil, taggingMode: .automatic,
             runFingerprint: OCRProcessor.runFingerprint(
                 files: files, outputDirectory: outDir, taggingMode: .automatic,
-                enableTagging: true, batchMode: true),
+                enableTagging: true, batchMode: true, preserveInputOrder: true),
             exportOriginals: true)
         let batchData = try? JSONEncoder().encode(batch)
         let batchLoaded = batchData.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingBatch.self, from: $0) }
@@ -242,6 +245,24 @@ enum BatchResumeTestDriver {
               batchLoaded?.exportOriginals == true)
         check("PendingBatch is self-consistent — fingerprint over the persisted originals matches (P-2)",
               batchLoaded.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+        let batchV2ReorderedFingerprint = OCRProcessor.runFingerprint(
+            files: files.reversed(), outputDirectory: outDir, taggingMode: .automatic,
+            enableTagging: true, batchMode: true, preserveInputOrder: true)
+        check("v2 PendingBatch fingerprint is input-order-sensitive for index-keyed provider results",
+              batchV2ReorderedFingerprint != batch.runFingerprint)
+        if let batchData,
+           var legacyObject = try? JSONSerialization.jsonObject(with: batchData) as? [String: Any] {
+            legacyObject.removeValue(forKey: "fingerprintVersion")
+            let legacyData = try? JSONSerialization.data(withJSONObject: legacyObject)
+            let legacyBatch = legacyData.flatMap {
+                try? JSONDecoder().decode(OCRProcessor.PendingBatch.self, from: $0)
+            }
+            check("legacy paid batch without a fingerprint version remains resumable",
+                  legacyBatch?.fingerprintVersion == nil
+                  && (legacyBatch.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false))
+        } else {
+            check("legacy paid batch compatibility fixture is constructible", false)
+        }
         // A batch manifest that (as before the fix) persisted the TEMP-JPEG paths instead would fingerprint
         // over the temp paths — a DIFFERENT identity than the originals the resume UI presents, so it would
         // fail the match. Prove the two fingerprints diverge (why persisting originals is required).
@@ -253,6 +274,156 @@ enum BatchResumeTestDriver {
             files: tempPaths, outputDirectory: outDir, taggingMode: .automatic, enableTagging: true, batchMode: true)
         check("temp-JPEG fingerprint differs from the originals' (P-2: why originals must be persisted)",
               fpOriginals != fpTemp)
+
+        // --- 10: B11 — complete, versioned, order-sensitive non-batch resume configuration. ---
+        func runtimeConfig(
+            schemaVersion: Int = OCRProcessor.PendingRunRuntimeConfig.currentSchemaVersion,
+            mergeDocuments: Bool = true,
+            imageScale: Double = 0.37,
+            boundaries: [Bool] = [true, false]
+        ) -> OCRProcessor.PendingRunRuntimeConfig {
+            OCRProcessor.PendingRunRuntimeConfig(
+                schemaVersion: schemaVersion,
+                taggingMode: .copySource,
+                passSourceTags: true,
+                rotationMode: .off,
+                reviewRotation: true,
+                mergeDocuments: mergeDocuments,
+                tagVocabulary: ["Correspondence", "Receipts"],
+                imageScale: imageScale,
+                exportOriginals: false,
+                preGroupedBoundaries: boundaries,
+                preGroupedTypes: [.box, .document],
+                preGroupedPriorities: ["P10", nil],
+                preGroupedYears: [1944, 1944],
+                preGroupedMonths: [6, 6],
+                preGroupedSubjects: [["Correspondence"], []],
+                standardImageMB: 4.5,
+                ocrWorkerCount: 2,
+                pdfImageMB: 1.5,
+                textColumns: 3,
+                exportedImageMB: 2.5,
+                gatewayUpstreamProvider: nil)
+        }
+        func makeV2Run(files orderedFiles: [URL], config: OCRProcessor.PendingRunRuntimeConfig)
+            -> OCRProcessor.PendingRun {
+            var value = OCRProcessor.PendingRun(
+                provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
+                fileURLs: orderedFiles, outputDirectory: outDir,
+                enableTagging: true, enableSegmentJSON: false,
+                enableCollectionSegmentation: true, confirmCollectionIDs: true,
+                reviewDocumentSegmentation: true, preOCRedInput: false,
+                previousTextCharCount: 321, sendPreviousImage: true,
+                customPrompt: "v2 prompt", startedAt: Date(), gatewayConfig: nil,
+                completedResults: [:], runFingerprint: nil,
+                exportOriginals: false, localAgent: nil, runtimeConfig: config)
+            value.runFingerprint = OCRProcessor.pendingRunFingerprintV2(value)
+            return value
+        }
+
+        let v2 = makeV2Run(files: files, config: runtimeConfig())
+        let v2URL = tmp.appendingPathComponent("pending_run_v2.json")
+        _ = OCRProcessor._testWritePendingRun(v2, to: v2URL)
+        let v2Loaded = OCRProcessor._testReadPendingRun(from: v2URL)
+        check("v2 runtime snapshot survives the disk round-trip",
+              v2Loaded?.runtimeConfig?.taggingMode == .copySource
+              && v2Loaded?.runtimeConfig?.imageScale == 0.37
+              && v2Loaded?.runtimeConfig?.tagVocabulary == ["Correspondence", "Receipts"]
+              && v2Loaded?.runtimeConfig?.preGroupedSubjects == [["Correspondence"], []]
+              && v2Loaded?.runtimeConfig?.ocrWorkerCount == 2
+              && v2Loaded?.runtimeConfig?.textColumns == 3)
+        check("round-tripped v2 manifest passes structural + fingerprint validation",
+              v2Loaded.map { OCRProcessor.pendingRunIsSelfConsistent($0) } ?? false)
+
+        let reorderedV2 = makeV2Run(files: files.reversed(), config: runtimeConfig())
+        check("v2 fingerprint is input-order-sensitive because cached results are index-keyed",
+              reorderedV2.runFingerprint != v2.runFingerprint)
+
+        var runtimeTampered = v2
+        runtimeTampered.runtimeConfig = runtimeConfig(mergeDocuments: false)
+        check("v2 fingerprint rejects a changed runtime setting",
+              !OCRProcessor.pendingRunIsSelfConsistent(runtimeTampered))
+        var orderTampered = v2
+        orderTampered = makeV2Run(files: files.reversed(), config: runtimeConfig())
+        orderTampered.runFingerprint = v2.runFingerprint
+        check("v2 fingerprint rejects reordered inputs with the old index association",
+              !OCRProcessor.pendingRunIsSelfConsistent(orderTampered))
+
+        var completionState = v2
+        completionState.completedResults["0"] = done
+        completionState.completedOutputPaths = ["0": out0.path]
+        check("v2 fingerprint rejects completion-state mutation until it is re-signed",
+              !OCRProcessor.pendingRunIsSelfConsistent(completionState))
+        completionState.runFingerprint = OCRProcessor.pendingRunFingerprintV2(completionState)
+        check("v2 fingerprint accepts a coherently updated result/output association",
+              OCRProcessor.pendingRunIsSelfConsistent(completionState))
+        completionState.completedOutputPaths = ["0": inDir.appendingPathComponent("escape.pdf").path]
+        completionState.runFingerprint = OCRProcessor.pendingRunFingerprintV2(completionState)
+        check("v2 structure rejects a completed output path outside the selected destination",
+              !OCRProcessor.pendingRunIsSelfConsistent(completionState))
+
+        let future = makeV2Run(files: files, config: runtimeConfig(schemaVersion: 99))
+        check("unknown runtime schema fails closed even with a matching recomputed fingerprint",
+              !OCRProcessor.pendingRunIsSelfConsistent(future))
+        let misaligned = makeV2Run(files: files, config: runtimeConfig(boundaries: [true]))
+        check("misaligned Live Capture parallel arrays fail closed",
+              !OCRProcessor.pendingRunIsSelfConsistent(misaligned))
+        let badScale = makeV2Run(files: files, config: runtimeConfig(imageScale: .infinity))
+        check("non-finite/out-of-range runtime values fail closed",
+              !OCRProcessor.pendingRunIsSelfConsistent(badScale))
+
+        // Apply through the same method resumeRun uses, after deliberately setting contradictory live
+        // values. Restore process-global statics afterward so this env-gated test is self-contained.
+        let oldStandard = OCRProcessor.standardImageMB
+        let oldWorkers = OCRProcessor.ocrWorkerCount
+        let oldPDF = OCRProcessor.pdfImageMB
+        let oldColumns = OCRProcessor.textColumns
+        let oldExported = OCRProcessor.exportedImageMB
+        let oldRotation = OCRProcessor.rotationModeForRun
+        defer {
+            OCRProcessor.standardImageMB = oldStandard
+            OCRProcessor.ocrWorkerCount = oldWorkers
+            OCRProcessor.pdfImageMB = oldPDF
+            OCRProcessor.textColumns = oldColumns
+            OCRProcessor.exportedImageMB = oldExported
+            OCRProcessor.rotationModeForRun = oldRotation
+        }
+        processor.taggingMode = .automatic
+        processor.passSourceTags = false
+        processor.rotationMode = .llmMajority
+        processor.reviewRotation = false
+        processor.mergeDocuments = false
+        processor.tagVocabulary = []
+        processor.exportOriginals = true
+        processor.preGroupedBoundaries = []
+        processor.applyPendingRunRuntimeConfig(runtimeConfig())
+        check("resume applies instance runtime settings instead of contradictory live UI values",
+              processor.taggingMode == .copySource && processor.passSourceTags
+              && processor.rotationMode == .off && processor.reviewRotation
+              && processor.mergeDocuments && !processor.exportOriginals
+              && processor.tagVocabulary == ["Correspondence", "Receipts"]
+              && processor.preGroupedBoundaries == [true, false]
+              && processor.preGroupedTypes.map(\.rawValue) == ["box", "document"])
+        check("resume applies captured sizing/concurrency values instead of changed UserDefaults",
+              OCRProcessor.rotationModeForRun == .off
+              && OCRProcessor.standardImageMB == 4.5 && OCRProcessor.ocrWorkerCount == 2
+              && OCRProcessor.pdfImageMB == 1.5 && OCRProcessor.textColumns == 3
+              && OCRProcessor.exportedImageMB == 2.5)
+        let recaptured = processor.makePendingRunRuntimeConfig(imageScale: 0.37, gatewayConfig: nil)
+        check("run start captures every applied instance/static setting into one immutable snapshot",
+              recaptured.taggingMode == .copySource && recaptured.passSourceTags
+              && recaptured.rotationMode == .off && recaptured.reviewRotation
+              && recaptured.mergeDocuments && !recaptured.exportOriginals
+              && recaptured.tagVocabulary == ["Correspondence", "Receipts"]
+              && recaptured.preGroupedBoundaries == [true, false]
+              && recaptured.preGroupedPriorities == ["P10", nil]
+              && recaptured.imageScale == 0.37
+              && recaptured.standardImageMB == 4.5 && recaptured.ocrWorkerCount == 2
+              && recaptured.pdfImageMB == 1.5 && recaptured.textColumns == 3
+              && recaptured.exportedImageMB == 2.5)
+        check("legacy PendingRun remains readable and uses its legacy consistency path",
+              loaded?.runtimeConfig == nil
+              && (loaded.map { OCRProcessor.pendingRunIsSelfConsistent($0) } ?? false))
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

@@ -5,19 +5,19 @@ import CryptoKit
 extension OCRProcessor {
     // MARK: - Batch/run resume identity (crash-resume, Tier-2)
 
-    /// A stable content fingerprint of a run's *identity* — the exact input set + destination + the
+    /// Legacy batch/pre-v2 content fingerprint — the input set + destination + the
     /// settings that change what lands on disk. Two runs with the same fingerprint are the SAME job, so
     /// a persisted manifest may be resumed into the current context; a different fingerprint means a
     /// different input set / output / settings and MUST NOT be misapplied (Tier-2 rule e). Order-stable
-    /// (inputs are sorted) so re-adding the same files in a different order still matches.
-    /// `taggingMode` is included only when the manifest persists it (batch manifests do; the non-batch
-    /// `PendingRun` does not — it resumes under the live UI mode — so pass nil there, keeping the
-    /// fingerprint computable purely from persisted fields).
+    /// (inputs are sorted) so re-adding the same files in a different order still matches. New non-batch
+    /// manifests use `pendingRunFingerprintV2`, which is deliberately order-sensitive and covers their
+    /// complete immutable runtime snapshot and evolving completion state.
     nonisolated static func runFingerprint(
         files: [URL], outputDirectory: URL, taggingMode: TaggingMode?,
-        enableTagging: Bool, batchMode: Bool
+        enableTagging: Bool, batchMode: Bool, preserveInputOrder: Bool = false
     ) -> String {
-        let paths = files.map { $0.standardizedFileURL.path }.sorted()
+        let rawPaths = files.map { $0.standardizedFileURL.path }
+        let paths = preserveInputOrder ? rawPaths : rawPaths.sorted()
         let canonical = ([
             "out=" + outputDirectory.standardizedFileURL.path,
             "mode=" + (taggingMode?.rawValue ?? "-"),
@@ -27,6 +27,159 @@ extension OCRProcessor {
         ] + paths).joined(separator: "\n")
         let digest = SHA256.hash(data: Data(canonical.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Canonical v2 identity for a standard Process Files run. Unlike the legacy fingerprint above,
+    /// input order is significant because `completedResults` and `completedOutputPaths` are keyed by
+    /// file index. It also covers every persisted run argument/backend and the complete runtime snapshot,
+    /// so a valid-JSON manifest with any identity field changed fails closed instead of combining cached
+    /// results with different settings.
+    private struct PendingRunIdentityV2: Encodable {
+        let formatVersion = 2
+        let provider: LLMProvider
+        let model: LLMModel
+        let thinkingLevel: ThinkingLevel?
+        let orderedFilePaths: [String]
+        let outputDirectoryPath: String
+        let enableTagging: Bool
+        let enableSegmentJSON: Bool
+        let enableCollectionSegmentation: Bool
+        let confirmCollectionIDs: Bool
+        let reviewDocumentSegmentation: Bool
+        let preOCRedInput: Bool
+        let previousTextCharCount: Int
+        let sendPreviousImage: Bool
+        let customPrompt: String?
+        let startedAt: Date
+        let gatewayConfig: GatewayConfig?
+        let localAgent: LocalAgentConfig?
+        let legacyExportOriginals: Bool?
+        let runtimeConfig: PendingRunRuntimeConfig
+        let completedResults: [String: OCRResult]
+        let completedOutputPaths: [String: String]?
+
+        init(run: PendingRun, runtimeConfig: PendingRunRuntimeConfig) {
+            provider = run.provider
+            model = run.model
+            thinkingLevel = run.thinkingLevel
+            orderedFilePaths = run.fileURLs.map { $0.standardizedFileURL.path }
+            outputDirectoryPath = run.outputDirectory.standardizedFileURL.path
+            enableTagging = run.enableTagging
+            enableSegmentJSON = run.enableSegmentJSON
+            enableCollectionSegmentation = run.enableCollectionSegmentation
+            confirmCollectionIDs = run.confirmCollectionIDs
+            reviewDocumentSegmentation = run.reviewDocumentSegmentation
+            preOCRedInput = run.preOCRedInput
+            previousTextCharCount = run.previousTextCharCount
+            sendPreviousImage = run.sendPreviousImage
+            customPrompt = run.customPrompt
+            startedAt = run.startedAt
+            gatewayConfig = run.gatewayConfig
+            localAgent = run.localAgent
+            legacyExportOriginals = run.exportOriginals
+            self.runtimeConfig = runtimeConfig
+            completedResults = run.completedResults
+            completedOutputPaths = run.completedOutputPaths
+        }
+    }
+
+    /// Compute the v2 identity hash. Nil means the snapshot could not be encoded; callers must not start
+    /// a resumable paid run in that state.
+    nonisolated static func pendingRunFingerprintV2(_ run: PendingRun) -> String? {
+        guard let config = run.runtimeConfig else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(PendingRunIdentityV2(run: run, runtimeConfig: config)) else {
+            return nil
+        }
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Structural validation is separate from the fingerprint. A locally-edited manifest could carry a
+    /// freshly recomputed hash, so bound every value before it can control concurrency/sizing and require
+    /// all Live Capture parallel arrays to be either absent or aligned with the ordered input list.
+    nonisolated static func pendingRunRuntimeConfigIsValid(
+        _ config: PendingRunRuntimeConfig,
+        fileCount: Int,
+        enableTagging: Bool,
+        hasGateway: Bool
+    ) -> Bool {
+        guard config.schemaVersion == PendingRunRuntimeConfig.currentSchemaVersion,
+              enableTagging == config.taggingMode.enablesTagging,
+              config.passSourceTags == (config.taggingMode == .copySource),
+              config.imageScale.isFinite, (0.01...1.0).contains(config.imageScale),
+              config.standardImageMB.isFinite, (0.5...20.0).contains(config.standardImageMB),
+              (1...12).contains(config.ocrWorkerCount),
+              config.pdfImageMB.isFinite, (0.5...20.0).contains(config.pdfImageMB),
+              (1...4).contains(config.textColumns),
+              config.exportedImageMB.isFinite, (0.5...20.0).contains(config.exportedImageMB),
+              hasGateway == (config.gatewayUpstreamProvider != nil) else { return false }
+
+        let optionalParallelCounts = [
+            config.preGroupedPriorities.count,
+            config.preGroupedYears.count,
+            config.preGroupedMonths.count,
+            config.preGroupedSubjects.count,
+        ]
+        if config.preGroupedBoundaries.isEmpty {
+            return config.preGroupedTypes.isEmpty && optionalParallelCounts.allSatisfy { $0 == 0 }
+        }
+        return config.preGroupedBoundaries.count == fileCount
+            && config.preGroupedTypes.count == fileCount
+            && optionalParallelCounts.allSatisfy { $0 == 0 || $0 == fileCount }
+    }
+
+    /// Capture the effective runtime values after defaults have been normalized at run start.
+    func makePendingRunRuntimeConfig(imageScale: Double, gatewayConfig: GatewayConfig?) -> PendingRunRuntimeConfig {
+        let effectiveScale = imageScale.isFinite ? max(0.01, min(1.0, imageScale)) : 1.0
+        return PendingRunRuntimeConfig(
+            schemaVersion: PendingRunRuntimeConfig.currentSchemaVersion,
+            taggingMode: taggingMode,
+            passSourceTags: passSourceTags,
+            rotationMode: rotationMode,
+            reviewRotation: reviewRotation,
+            mergeDocuments: mergeDocuments,
+            tagVocabulary: tagVocabulary,
+            imageScale: effectiveScale,
+            exportOriginals: exportOriginals,
+            preGroupedBoundaries: preGroupedBoundaries,
+            preGroupedTypes: preGroupedTypes,
+            preGroupedPriorities: preGroupedPriorities,
+            preGroupedYears: preGroupedYears,
+            preGroupedMonths: preGroupedMonths,
+            preGroupedSubjects: preGroupedSubjects,
+            standardImageMB: Self.standardImageMB,
+            ocrWorkerCount: Self.ocrWorkerCount,
+            pdfImageMB: Self.pdfImageMB,
+            textColumns: Self.textColumns,
+            exportedImageMB: Self.exportedImageMB,
+            gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
+        )
+    }
+
+    /// Apply exactly the values captured above. `pendingRunIsSelfConsistent` validates the snapshot before
+    /// this is called; the direct assignments intentionally avoid reading relaunch-time UserDefaults.
+    func applyPendingRunRuntimeConfig(_ config: PendingRunRuntimeConfig) {
+        taggingMode = config.taggingMode
+        passSourceTags = config.passSourceTags
+        rotationMode = config.rotationMode
+        reviewRotation = config.reviewRotation
+        mergeDocuments = config.mergeDocuments
+        tagVocabulary = config.tagVocabulary
+        exportOriginals = config.exportOriginals
+        preGroupedBoundaries = config.preGroupedBoundaries
+        preGroupedTypes = config.preGroupedTypes
+        preGroupedPriorities = config.preGroupedPriorities
+        preGroupedYears = config.preGroupedYears
+        preGroupedMonths = config.preGroupedMonths
+        preGroupedSubjects = config.preGroupedSubjects
+        Self.rotationModeForRun = config.rotationMode
+        Self.standardImageMB = config.standardImageMB
+        Self.ocrWorkerCount = config.ocrWorkerCount
+        Self.pdfImageMB = config.pdfImageMB
+        Self.textColumns = config.textColumns
+        Self.exportedImageMB = config.exportedImageMB
     }
 
     /// The input file indices a resume must still process: everything NOT already in the manifest's
@@ -78,19 +231,62 @@ extension OCRProcessor {
 
     /// Recompute a manifest's fingerprint from its OWN persisted fields and compare to the stored one.
     /// A mismatch means the file is torn/tampered/internally inconsistent (still-valid JSON but not a
-    /// coherent run) → callers ignore it rather than misapply it. `nil` stored fingerprint (a manifest
-    /// written before the field existed) is treated as consistent for backward-compat.
+    /// coherent run) → callers ignore it rather than misapply it. A v2 manifest must carry a complete,
+    /// structurally valid runtime snapshot and matching v2 fingerprint; only legacy manifests may omit
+    /// the fingerprint for backward compatibility.
     nonisolated static func pendingRunIsSelfConsistent(_ run: PendingRun) -> Bool {
+        if let config = run.runtimeConfig {
+            let validResultKeys = run.completedResults.keys.allSatisfy { key in
+                guard let index = Int(key) else { return false }
+                return key == String(index) && index >= 0 && index < run.fileURLs.count
+            }
+            let outputPaths = run.completedOutputPaths ?? [:]
+            let validOutputPaths = Set(outputPaths.keys) == Set(run.completedResults.keys)
+                && outputPaths.allSatisfy { key, path in
+                guard run.completedResults[key] != nil else { return false }
+                let url = URL(fileURLWithPath: path).standardizedFileURL
+                return NSString(string: path).isAbsolutePath
+                    && url.pathExtension.lowercased() == "pdf"
+                    && url.deletingLastPathComponent().path == run.outputDirectory.standardizedFileURL.path
+            }
+            guard pendingRunRuntimeConfigIsValid(
+                config, fileCount: run.fileURLs.count, enableTagging: run.enableTagging,
+                hasGateway: run.gatewayConfig != nil),
+                  !run.fileURLs.isEmpty,
+                  !run.preOCRedInput,
+                  (0...20_000).contains(run.previousTextCharCount),
+                  run.gatewayConfig == nil || run.localAgent == nil,
+                  run.enableCollectionSegmentation
+                    || (!run.confirmCollectionIDs && !run.reviewDocumentSegmentation),
+                  validResultKeys, validOutputPaths,
+                  let stored = run.runFingerprint,
+                  let computed = pendingRunFingerprintV2(run) else { return false }
+            return stored == computed
+        }
         guard let stored = run.runFingerprint else { return true }
         return stored == runFingerprint(
             files: run.fileURLs, outputDirectory: run.outputDirectory,
             taggingMode: nil, enableTagging: run.enableTagging, batchMode: false)
     }
     nonisolated static func pendingBatchIsSelfConsistent(_ batch: PendingBatch) -> Bool {
-        guard let stored = batch.runFingerprint else { return true }
+        let preserveOrder: Bool
+        switch batch.fingerprintVersion {
+        case nil:
+            // Legacy on-disk batch; a missing fingerprint predates integrity tracking and must remain
+            // visible so a paid server-side job is not stranded.
+            guard let stored = batch.runFingerprint else { return true }
+            return stored == runFingerprint(
+                files: batch.fileURLs, outputDirectory: batch.outputDirectory,
+                taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true)
+        case 2:
+            preserveOrder = true
+        default: return false                 // unknown future identity contract
+        }
+        guard let stored = batch.runFingerprint else { return false }
         return stored == runFingerprint(
             files: batch.fileURLs, outputDirectory: batch.outputDirectory,
-            taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true)
+            taggingMode: batch.taggingMode, enableTagging: batch.enableTagging, batchMode: true,
+            preserveInputOrder: preserveOrder)
     }
 
     // MARK: Headless self-test hooks ($0, no network) — see BatchResumeTestDriver
@@ -138,11 +334,18 @@ extension OCRProcessor {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("pending_run.json")
     }
-    private static func savePendingRun(_ run: PendingRun) {
-        guard let data = try? JSONEncoder().encode(run) else { return }
+    @discardableResult
+    private static func savePendingRun(_ run: PendingRun) -> Bool {
+        guard let data = try? JSONEncoder().encode(run) else { return false }
         // Crash-safe write-then-rename (see savePendingBatch): the incremental per-file manifest is
         // rewritten after every completed file, so a crash mid-write must not corrupt it (Tier-2 rule e).
-        try? data.write(to: pendingRunURL, options: .atomic)
+        do {
+            try data.write(to: pendingRunURL, options: .atomic)
+            return true
+        } catch {
+            NSLog("[ArchiveProcessor] ERROR: could not persist pending run: %@", error.localizedDescription)
+            return false
+        }
     }
     private static func loadPendingRun() -> PendingRun? {
         guard let data = try? Data(contentsOf: pendingRunURL) else { return nil }
@@ -162,8 +365,8 @@ extension OCRProcessor {
     }
 
     /// Live image-size-target fraction (0–1) from the resolution `@AppStorage`, defaulting to full size
-    /// when unset. Used by the resume paths' history snapshots — the run manifest doesn't persist scale,
-    /// so this reads the live setting (which resume already applies to the run itself).
+    /// when unset. Used by batch resumes and legacy non-batch manifests that predate the v2 runtime
+    /// snapshot; new non-batch resumes use their persisted scale instead.
     static func liveImageScaleFraction() -> Double {
         let pct = (UserDefaults.standard.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double) ?? 100
         return max(0.01, min(1.0, pct / 100.0))
@@ -182,15 +385,35 @@ extension OCRProcessor {
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
     /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
     /// index order, which would swap outputs for two sources that share a base filename (B7).
-    func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) {
-        guard var run = activePendingRun else { return }
+    @discardableResult
+    func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) -> Bool {
+        guard var run = activePendingRun else { return true }
         run.completedResults["\(index)"] = result
         if let outputURL {
             if run.completedOutputPaths == nil { run.completedOutputPaths = [:] }
             run.completedOutputPaths?["\(index)"] = outputURL.path
         }
+        // V2 integrity covers the evolving completion state as well as immutable configuration. Recompute
+        // after each result so a swapped/tampered index→result/output association fails self-consistency.
+        if run.runtimeConfig != nil {
+            guard let fingerprint = Self.pendingRunFingerprintV2(run) else {
+                statusMessage = "Could not update the resume snapshot. Processing stopped to avoid duplicate OCR charges."
+                isProcessing = false
+                processingTask?.cancel()
+                return false
+            }
+            run.runFingerprint = fingerprint
+        }
+        // Do not publish the in-memory mutation until its atomic disk replacement succeeds. If storage
+        // fails, the previous durable manifest remains valid and the run stops before scheduling more work.
+        guard Self.savePendingRun(run) else {
+            statusMessage = "Could not save the resume snapshot. Processing stopped to avoid duplicate OCR charges."
+            isProcessing = false
+            processingTask?.cancel()
+            return false
+        }
         activePendingRun = run
-        Self.savePendingRun(run)
+        return true
     }
     /// File URLs from a pending run (for populating the file list on resume).
     var pendingRunFileURLs: [URL]? {
@@ -261,6 +484,12 @@ extension OCRProcessor {
     func pendingRunMatches(files: [URL], outputDirectory: URL) -> Bool {
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending),
               let fp = pending.runFingerprint else { return false }
+        if pending.runtimeConfig != nil {
+            let selectedPaths = files.map { $0.standardizedFileURL.path }
+            let persistedPaths = pending.fileURLs.map { $0.standardizedFileURL.path }
+            return selectedPaths == persistedPaths
+                && outputDirectory.standardizedFileURL.path == pending.outputDirectory.standardizedFileURL.path
+        }
         return fp == Self.runFingerprint(
             files: files, outputDirectory: outputDirectory,
             taggingMode: nil, enableTagging: pending.enableTagging, batchMode: false)
@@ -269,9 +498,11 @@ extension OCRProcessor {
     func pendingBatchMatches(files: [URL], outputDirectory: URL) -> Bool {
         guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending),
               let fp = pending.runFingerprint else { return false }
+        let preserveOrder = pending.fingerprintVersion == 2
         return fp == Self.runFingerprint(
             files: files, outputDirectory: outputDirectory,
-            taggingMode: pending.taggingMode, enableTagging: pending.enableTagging, batchMode: true)
+            taggingMode: pending.taggingMode, enableTagging: pending.enableTagging, batchMode: true,
+            preserveInputOrder: preserveOrder)
     }
     /// Resume polling a previously submitted batch.
     func resumeBatch(apiKey: String) async {
@@ -476,14 +707,23 @@ extension OCRProcessor {
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
         currentLocalAgent = pending.localAgent
-        // Restore the dual-output behavior the run was started with (see PendingRun.exportOriginals). Only
-        // when the manifest persisted it — a legacy manifest (nil) keeps the live setting the caller
-        // already applied (resumePendingRun).
-        if let e = pending.exportOriginals { exportOriginals = e }
-        // Restore the run-time knobs the OCR call reads (startProcessing sets these; resume must too,
-        // or OCR falls back to the default Local Vision rotation — which stalls the parallel workers).
-        Self.rotationModeForRun = rotationMode
-        Self.loadStandardImageMB()
+        let resumeImageScale: Double
+        let resumeGatewayUpstream: LLMProvider
+        if let config = pending.runtimeConfig {
+            // V2: replay the immutable start-time snapshot. Self-consistency above has already validated
+            // its version, ranges, parallel-array alignment, and identity fingerprint.
+            applyPendingRunRuntimeConfig(config)
+            resumeImageScale = config.imageScale
+            resumeGatewayUpstream = config.gatewayUpstreamProvider ?? .anthropic
+        } else {
+            // Legacy manifests did not record these settings, so preserve their historical live-setting
+            // fallback. There is no honest way to reconstruct the values that were active before relaunch.
+            if let e = pending.exportOriginals { exportOriginals = e }
+            Self.rotationModeForRun = rotationMode
+            Self.loadStandardImageMB()
+            resumeImageScale = Self.liveImageScaleFraction()
+            resumeGatewayUpstream = Self.gatewayUpstreamProviderFromDefaults()
+        }
         removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
@@ -491,17 +731,17 @@ extension OCRProcessor {
         // Restore the pending run tracker for incremental saves
         activePendingRun = pending
 
-        // History snapshot for the resumed run (see RunHistorySnapshot.init(resuming:…)). rotation + image
-        // scale are the live settings this resume already applies; the gateway family is read from defaults.
+        // History uses the same restored values as the resumed pipeline (legacy runs use the fallback above).
         activeRunHistory = RunHistorySnapshot(
             resuming: pending, taggingMode: taggingMode, rotationMode: rotationMode,
-            imageScale: Self.liveImageScaleFraction(),
-            imageTokenProvider: Self.gatewayUpstreamProviderFromDefaults())
+            imageScale: resumeImageScale,
+            imageTokenProvider: resumeGatewayUpstream)
 
         let segmentationContext = SegmentationContext(
             previousTextCharCount: pending.previousTextCharCount,
             sendPreviousImage: pending.sendPreviousImage,
-            customPrompt: pending.customPrompt
+            customPrompt: pending.customPrompt,
+            imageScale: resumeImageScale
         )
 
         // Convert any PDF inputs
@@ -814,7 +1054,12 @@ extension OCRProcessor {
 
                 for await (index, result) in group {
                     guard !Task.isCancelled else { group.cancelAll(); return }
-                    await handleOCRResult(result, index: index, url: fileURLs[index], model: model, outputDirectory: outputDirectory)
+                    guard await handleOCRResult(
+                        result, index: index, url: fileURLs[index], model: model,
+                        outputDirectory: outputDirectory) else {
+                        group.cancelAll()
+                        return
+                    }
                     completed += 1
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
@@ -876,7 +1121,9 @@ extension OCRProcessor {
                     )
                 }
 
-                await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                guard await handleOCRResult(
+                    result, index: index, url: url, model: model,
+                    outputDirectory: outputDirectory) else { return }
                 progress = Double(alreadyCompleted + attempt + 1) / Double(totalFiles) * 0.7
                 statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles) complete"
             }
@@ -971,6 +1218,12 @@ extension OCRProcessor {
         localAgent: LocalAgentConfig? = nil
     ) async {
         guard !files.isEmpty else { return }
+        // Normalize programmatic/profile inputs to the same bounds as the UI before either the live run
+        // or its immutable resume snapshot observes them.
+        var segmentationContext = segmentationContext
+        segmentationContext.previousTextCharCount = min(20_000, max(0, segmentationContext.previousTextCharCount))
+        segmentationContext.imageScale = segmentationContext.imageScale.isFinite
+            ? max(0.01, min(1.0, segmentationContext.imageScale)) : 1.0
 
         // Incremental processing: drop inputs whose output PDF already exists at the destination and is
         // no older than the source (the owner-specified skip key). Confined to plain per-file output —
@@ -991,6 +1244,41 @@ extension OCRProcessor {
                 progress = 1.0
                 statusMessage = "All \(incrementalSkipped) file(s) already processed — nothing to do."
                 return
+            }
+        }
+
+        // Convert sparse/partial Live Capture metadata into the exact effective arrays the pipeline
+        // already treats missing entries as (document / nil / empty). This keeps the live run and its
+        // strict resume snapshot byte-for-byte aligned even if a programmatic handoff omitted a sibling
+        // array. A boundary-count mismatch disables the handoff entirely, matching the OCRView gate.
+        if !preGroupedBoundaries.isEmpty {
+            if preGroupedBoundaries.count != files.count {
+                preGroupedBoundaries = []
+                preGroupedTypes = []
+                preGroupedPriorities = []
+                preGroupedYears = []
+                preGroupedMonths = []
+                preGroupedSubjects = []
+            } else {
+                preGroupedTypes = files.indices.map {
+                    $0 < preGroupedTypes.count ? preGroupedTypes[$0] : .document
+                }
+                if !preGroupedPriorities.isEmpty {
+                    preGroupedPriorities = files.indices.map {
+                        $0 < preGroupedPriorities.count ? preGroupedPriorities[$0] : nil
+                    }
+                }
+                if !preGroupedYears.isEmpty {
+                    preGroupedYears = files.indices.map { $0 < preGroupedYears.count ? preGroupedYears[$0] : nil }
+                }
+                if !preGroupedMonths.isEmpty {
+                    preGroupedMonths = files.indices.map { $0 < preGroupedMonths.count ? preGroupedMonths[$0] : nil }
+                }
+                if !preGroupedSubjects.isEmpty {
+                    preGroupedSubjects = files.indices.map {
+                        $0 < preGroupedSubjects.count ? preGroupedSubjects[$0] : []
+                    }
+                }
             }
         }
 
@@ -1094,8 +1382,12 @@ extension OCRProcessor {
                 // reset isProcessing so the UI isn't stuck, and let the user Resume pending batch.
                 if batchPollInterrupted { isProcessing = false; return }
             } else {
-                // Create pending run for resume-after-restart
-                activePendingRun = PendingRun(
+                // Create a complete, versioned snapshot before the first non-batch OCR request. The v2
+                // fingerprint covers ordered inputs + every run/backend/runtime setting and is recomputed
+                // with each incrementally-persisted result/output association.
+                let runtimeConfig = makePendingRunRuntimeConfig(
+                    imageScale: segmentationContext.imageScale, gatewayConfig: gatewayConfig)
+                var pendingRun = PendingRun(
                     provider: provider, model: model, thinkingLevel: thinkingLevel,
                     fileURLs: files, outputDirectory: outputDirectory,
                     enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
@@ -1108,13 +1400,35 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     startedAt: Date(), gatewayConfig: gatewayConfig,
                     completedResults: [:],
-                    runFingerprint: Self.runFingerprint(
-                        files: files, outputDirectory: outputDirectory, taggingMode: nil,
-                        enableTagging: enableTagging, batchMode: false),
+                    runFingerprint: nil,
                     exportOriginals: exportOriginals,
-                    localAgent: localAgent
+                    localAgent: localAgent,
+                    runtimeConfig: runtimeConfig
                 )
-                Self.savePendingRun(activePendingRun!)
+                guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
+                    cleanupTempFiles()
+                    activeRunHistory = nil
+                    isProcessing = false
+                    statusMessage = "Could not create a safe resume snapshot. No OCR requests were sent."
+                    return
+                }
+                pendingRun.runFingerprint = fingerprint
+                guard Self.pendingRunIsSelfConsistent(pendingRun) else {
+                    cleanupTempFiles()
+                    activeRunHistory = nil
+                    isProcessing = false
+                    statusMessage = "The run settings could not be captured safely. No OCR requests were sent."
+                    return
+                }
+                activePendingRun = pendingRun
+                guard Self.savePendingRun(pendingRun) else {
+                    cleanupTempFiles()
+                    activePendingRun = nil
+                    activeRunHistory = nil
+                    isProcessing = false
+                    statusMessage = "Could not save the resume snapshot. No OCR requests were sent."
+                    return
+                }
 
                 await performOCRPhase(
                     fileURLs: imageURLs,
@@ -1367,8 +1681,9 @@ extension OCRProcessor {
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
-        await handleOCRResult(result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
-        return result.text != nil
+        let persisted = await handleOCRResult(
+            result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
+        return persisted && result.text != nil
     }
     /// Request notification permission (call once at app launch).
     static func requestNotificationPermission() {

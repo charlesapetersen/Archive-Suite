@@ -945,7 +945,7 @@ struct OCRView: View {
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
         processor.reviewRotation = reviewRotation
-        processor.exportOriginals = outputImageFile   // live fallback; the manifest's persisted value wins on resume
+        processor.exportOriginals = outputImageFile   // legacy fallback; a v2 runtime snapshot wins on resume
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -964,7 +964,7 @@ struct OCRView: View {
         processor.taggingMode = taggingMode
         processor.rotationMode = rotationMode
         processor.reviewRotation = reviewRotation
-        processor.exportOriginals = outputImageFile   // live fallback; the manifest's persisted value wins on resume
+        processor.exportOriginals = outputImageFile   // legacy fallback; a v2 runtime snapshot wins on resume
         processor.mergeDocuments = mergeDocuments
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
@@ -1039,4 +1039,3 @@ struct OCRView: View {
         }
     }
 }
-

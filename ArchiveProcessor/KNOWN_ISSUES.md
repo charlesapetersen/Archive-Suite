@@ -4,6 +4,20 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-17): Process Files resumed with changed settings and an order-insensitive identity [CRITICAL]
+
+**FIXED:** new non-batch runs persist a versioned immutable runtime snapshot covering tagging/source-tag
+mode, rotation/review, merge, vocabulary, image scale, Live Capture grouping metadata, dual output,
+worker count, and PDF/export sizing. Resume applies that snapshot instead of current UI/UserDefaults.
+The v2 integrity hash is order-sensitive and covers the full configuration plus each evolving
+index-to-result/output association; invalid versions, ranges, parallel arrays, or escaped output paths
+fail closed. Initial snapshot failure prevents OCR from starting, and incremental persistence failure
+stops further work to limit duplicate charges. New paid-batch fingerprints are also order-sensitive,
+while legacy unversioned batches retain their old validation path so existing jobs are not stranded.
+Legacy manifests remain readable. (2026-07-17)
+
+---
+
 ## ✅ FIXED (2026-07-17): Local Agent ignored an invalid CLI override and accepted malformed Claude output [HIGH]
 
 **FIXED:** a non-empty CLI path override is now authoritative, so an invalid configured path reports

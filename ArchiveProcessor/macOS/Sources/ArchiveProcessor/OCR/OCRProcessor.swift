@@ -88,15 +88,15 @@ class OCRProcessor: ObservableObject {
     /// exported-image 3 MB) — call at run start, on @MainActor, before spawning any child task.
     static func loadStandardImageMB() {
         let v = UserDefaults.standard.double(forKey: DefaultsKeys.standardImageSizeMB)
-        standardImageMB = v > 0 ? v : 3.0
+        standardImageMB = v.isFinite && v > 0 ? min(20, max(0.5, v)) : 3.0
         let w = UserDefaults.standard.integer(forKey: DefaultsKeys.ocrWorkerCount)
-        ocrWorkerCount = w > 0 ? min(12, w) : 4
+        ocrWorkerCount = w > 0 ? min(12, max(1, w)) : 4
         let p = UserDefaults.standard.double(forKey: DefaultsKeys.pdfImageSizeMB)
-        pdfImageMB = p > 0 ? p : 2.0
+        pdfImageMB = p.isFinite && p > 0 ? min(20, max(0.5, p)) : 2.0
         let e = UserDefaults.standard.double(forKey: DefaultsKeys.exportedImageSizeMB)
-        exportedImageMB = e > 0 ? e : 3.0
+        exportedImageMB = e.isFinite && e > 0 ? min(20, max(0.5, e)) : 3.0
         let tc = UserDefaults.standard.integer(forKey: DefaultsKeys.textColumns)
-        textColumns = tc > 1 ? min(4, tc) : 1
+        textColumns = min(4, max(1, tc))
     }
 
     /// Cosmetic status suffix shown while a (typically free-tier) key is being rate-limited (429), so a
@@ -256,10 +256,12 @@ class OCRProcessor: ObservableObject {
         let reviewDocumentSegmentation: Bool
         let customPrompt: String?
         let taggingMode: TaggingMode
-        /// Content fingerprint of this run's identity (sorted input set + destination + the settings
-        /// that change what lands on disk). Lets resume confirm the manifest matches the intended job
-        /// and reject a torn/tampered one (Tier-2 rule e). Optional for backward-compat with manifests
-        /// written before this field existed. See `OCRProcessor.runFingerprint(...)`.
+        /// Nil identifies a legacy sorted-input fingerprint. Version 2 preserves input order because
+        /// provider result IDs are index-based. Unknown versions fail closed without deleting the paid job.
+        let fingerprintVersion: Int?
+        /// Content fingerprint of this run's identity (ordered inputs for v2; sorted inputs only for
+        /// legacy manifests) + destination + settings that change what lands on disk. Lets resume reject
+        /// a torn/tampered job without stranding pre-v2 paid batches.
         let runFingerprint: String?
         /// Whether this run also emits a sized original image beside each PDF (dual output). Persisted at
         /// submit time so a resume after relaunch restores the SAME dual-output behavior the run was
@@ -273,7 +275,8 @@ class OCRProcessor: ObservableObject {
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
              enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
              reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
-             taggingMode: TaggingMode = .automatic, runFingerprint: String? = nil,
+             taggingMode: TaggingMode = .automatic, fingerprintVersion: Int? = 2,
+             runFingerprint: String? = nil,
              exportOriginals: Bool? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
@@ -285,6 +288,7 @@ class OCRProcessor: ObservableObject {
             self.reviewDocumentSegmentation = reviewDocumentSegmentation
             self.customPrompt = customPrompt
             self.taggingMode = taggingMode
+            self.fingerprintVersion = fingerprintVersion
             self.runFingerprint = runFingerprint
             self.exportOriginals = exportOriginals
         }
@@ -306,6 +310,7 @@ class OCRProcessor: ObservableObject {
             reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
             customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
             taggingMode = try c.decodeIfPresent(TaggingMode.self, forKey: .taggingMode) ?? .automatic
+            fingerprintVersion = try c.decodeIfPresent(Int.self, forKey: .fingerprintVersion)
             runFingerprint = try c.decodeIfPresent(String.self, forKey: .runFingerprint)
             exportOriginals = try c.decodeIfPresent(Bool.self, forKey: .exportOriginals)
         }
@@ -317,6 +322,50 @@ class OCRProcessor: ObservableObject {
 
 
     // MARK: - Non-Batch Run Persistence
+
+    /// Versioned, immutable snapshot of every mutable/runtime knob that the standard Process Files
+    /// pipeline reads after its `startProcessing` arguments have been captured. A resumed v2 run applies
+    /// this snapshot before rebuilding output or making another OCR call, so relaunch-time UserDefaults
+    /// and UI state cannot silently change the rest of an in-flight job.
+    ///
+    /// `PendingRun` retains its original flat fields for legacy manifests. This additive carrier is
+    /// optional solely for backward compatibility; every newly-created standard run must include it and
+    /// an identity fingerprint computed over it. Unknown future schema versions fail closed (the manifest
+    /// is preserved but not resumed by an older build).
+    struct PendingRunRuntimeConfig: Codable {
+        static let currentSchemaVersion = 1
+
+        let schemaVersion: Int
+        let taggingMode: TaggingMode
+        let passSourceTags: Bool
+        let rotationMode: RotationMode
+        let reviewRotation: Bool
+        let mergeDocuments: Bool
+        let tagVocabulary: [String]
+        let imageScale: Double
+        let exportOriginals: Bool
+
+        /// Live Capture handoff metadata, parallel to `PendingRun.fileURLs` when populated.
+        let preGroupedBoundaries: [Bool]
+        let preGroupedTypes: [CaptureGroupType]
+        let preGroupedPriorities: [String?]
+        let preGroupedYears: [Int?]
+        let preGroupedMonths: [Int?]
+        let preGroupedSubjects: [[String]]
+
+        /// UserDefaults-backed sizing/concurrency values copied after `loadStandardImageMB()` normalizes
+        /// them. These affect request cost, generated PDFs/images, and scheduling, so resume must not
+        /// reload potentially-changed defaults.
+        let standardImageMB: Double
+        let ocrWorkerCount: Int
+        let pdfImageMB: Double
+        let textColumns: Int
+        let exportedImageMB: Double
+
+        /// Cost-history attribution for a gateway run. It does not affect requests, but persisting it
+        /// keeps the resumed run's history consistent with the estimate shown when the run began.
+        let gatewayUpstreamProvider: LLMProvider?
+    }
 
     struct PendingRun: Codable {
         let provider: LLMProvider
@@ -350,22 +399,26 @@ class OCRProcessor: ObservableObject {
         /// it. Optional for backward-compat: manifests written before this field decode it as nil, and
         /// resume falls back to the legacy index-order derivation ONLY for those legacy manifests.
         var completedOutputPaths: [String: String]? = nil
-        /// Content fingerprint of this run's identity (sorted input set + destination + the settings
-        /// that change what lands on disk). On resume the manifest is only applied if it is
-        /// self-consistent, so a torn/tampered/mismatched manifest is ignored rather than misapplied
-        /// (Tier-2 rule e). Optional for backward-compat with manifests written before this field.
+        /// Integrity fingerprint. Legacy manifests hash their sorted input set + a few flat settings;
+        /// v2 manifests hash ordered inputs, all persisted/runtime configuration, and the evolving
+        /// index→result/output associations. Optional only for pre-fingerprint backward compatibility.
         var runFingerprint: String? = nil
         /// Whether this run also emits a sized original image beside each PDF (dual output). Persisted so a
         /// resume restores the SAME dual-output behavior the run was started with instead of reading the
         /// live @AppStorage. Optional for backward-compat: a manifest written before this field decodes as
-        /// nil and resume falls back to the live setting. NOT part of `runFingerprint` (a runtime knob).
+        /// nil and resume falls back to the live setting. Duplicated inside (and covered by) the v2
+        /// runtime snapshot; retained here for legacy decoding.
         var exportOriginals: Bool? = nil
         /// The Local Agent (subscription-auth CLI) backend this run started with, or nil when the run
         /// uses an API key / gateway (the normal case). Additive + optional so a manifest written
         /// before this feature decodes byte-for-byte unchanged (absent → nil) and crash-resume of an
         /// in-flight run is untouched (Design decision 2 of the local-agent plan). Trailing/defaulted,
-        /// exactly like the back-compat fields above. NOT part of `runFingerprint` (a runtime backend).
+        /// exactly like the back-compat fields above. Covered by the v2 fingerprint when present.
         var localAgent: LocalAgentConfig? = nil
+        /// Complete v2 runtime snapshot. Nil only for a manifest written by an older build; legacy resumes
+        /// intentionally retain the historical live-setting fallback because the original values were
+        /// never recorded and cannot be reconstructed.
+        var runtimeConfig: PendingRunRuntimeConfig? = nil
     }
 
 

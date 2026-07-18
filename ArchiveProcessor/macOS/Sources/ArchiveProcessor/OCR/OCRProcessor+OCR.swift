@@ -530,7 +530,7 @@ extension OCRProcessor {
             taggingMode: taggingMode,
             runFingerprint: Self.runFingerprint(
                 files: originalFiles, outputDirectory: outputDirectory, taggingMode: taggingMode,
-                enableTagging: enableTagging, batchMode: true),
+                enableTagging: enableTagging, batchMode: true, preserveInputOrder: true),
             exportOriginals: exportOriginals
         ))
         statusMessage = "Batch submitted. Waiting for results…"
@@ -718,7 +718,7 @@ extension OCRProcessor {
                                        : "Could not read the source image (unsupported or corrupt file).",
                 errorCode: readable ? "no_result" : "image_unreadable"
             )
-            await handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
+            _ = await handleOCRResult(synthetic, index: i, url: url, model: model, outputDirectory: outputDirectory)
         }
     }
     private func processBatchResults(
@@ -761,7 +761,12 @@ extension OCRProcessor {
             for _ in 0..<min(maxConcurrent, entries.count) { _ = addNext() }
 
             for await (index, url, resolved) in group {
-                await handleOCRResult(resolved, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                guard await handleOCRResult(
+                    resolved, index: index, url: url, model: model,
+                    outputDirectory: outputDirectory) else {
+                    group.cancelAll()
+                    return
+                }
                 _ = addNext()
             }
         }
@@ -865,7 +870,9 @@ extension OCRProcessor {
                 )
             }
 
-            await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            guard await handleOCRResult(
+                result, index: index, url: url, model: model,
+                outputDirectory: outputDirectory) else { return }
             previousText = result.text
             previousImageURL = url
 
@@ -919,7 +926,12 @@ extension OCRProcessor {
             for await (index, result) in group {
                 guard !Task.isCancelled else { group.cancelAll(); return }
                 let url = fileURLs[index]
-                await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+                guard await handleOCRResult(
+                    result, index: index, url: url, model: model,
+                    outputDirectory: outputDirectory) else {
+                    group.cancelAll()
+                    return
+                }
 
                 completed += 1
                 progress = Double(completed) / Double(total) * 0.7
@@ -945,8 +957,10 @@ extension OCRProcessor {
             }
         }
     }
-    func handleOCRResult(_ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL) async {
-        guard index >= 0 && index < jobs.count else { return }
+    func handleOCRResult(
+        _ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL
+    ) async -> Bool {
+        guard index >= 0 && index < jobs.count else { return false }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification
@@ -1005,7 +1019,7 @@ extension OCRProcessor {
         }
         // Persist result AND its assigned output path for resume-after-restart. Records the intended
         // output path even on failure so resume can attempt to regenerate the PDF (B7).
-        saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
+        return saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     static func isTimeoutError(_ result: OCRResult) -> Bool {
         if result.errorMessage?.lowercased().contains("timed out") == true
@@ -1160,7 +1174,9 @@ extension OCRProcessor {
                 let sourceFileName = jobs[index].sourceURL.lastPathComponent
                 failedFiles.removeAll { $0 == sourceFileName }
             }
-            await handleOCRResult(result, index: index, url: url, model: model, outputDirectory: outputDirectory)
+            guard await handleOCRResult(
+                result, index: index, url: url, model: model,
+                outputDirectory: outputDirectory) else { return }
         }
     }
     /// Run a single OCR call at a given image scale for resolution testing. Public so the UI can call it.
