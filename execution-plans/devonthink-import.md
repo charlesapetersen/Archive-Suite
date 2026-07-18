@@ -125,6 +125,15 @@ notes** (rtfd media → each note's `assets/`, re-linked as markdown images).
 bookmarks (`webloc`/`inetloc`/`fileloc`). Archival PDFs still appear — but as **provenance targets** of
 notes (durable Reader links, §5), never as imported note bodies.
 
+**Excluded (dropped, not migrated):** DEVONthink DIY **template placeholders** — records whose title contains
+**"Template"** and **"Copy"** (case-insensitive) **with no text body** (the owner's old templating method;
+Archive Notes has real templates). Count logged in the report. This removes the bulk of the empty-normalizing
+records (the review measured ~1,900 `copy copy…` empties).
+
+**Image-only notes are content, not empty (owner, 2026-07-17):** a note that is just image(s) — optionally
+plus a stray space/nonsense char — is imported normally (images → `assets/`). **"Empty" means no text AND no
+images**; image-only records are never treated as empty and never text-merged (§6).
+
 ---
 
 ## 3. Target model & the decisions locked with the owner
@@ -253,6 +262,10 @@ Database) but its **filename never changes**. So the importer:
 
 - **Note vs extract:** by the `0 Note Excerpts` tag. Assert every record classifies as exactly one; report
   any record with neither/both. (DTI-0 confirms whether `Good/Best Note Excerpts` records also carry it — §3d.)
+- **Exclusions & emptiness (§2):** drop DEVONthink template placeholders (title has *Template* + *Copy*, no
+  text). A record is **empty** only if it has **neither text nor images**; **image-only** records are real
+  content (import the image(s); never text-merge them — §6). Any truly-empty non-template record → **flag**
+  (expected near-zero after exclusion).
 - **Archival links:** resolve via the name/ID index (§4a), spanning both databases; emit durable Reader links.
 - **Quality & control tags (§3d):** map `12 Best Note Excerpts`→3★, `10 Good Note Excerpts`→2★ into
   `Item.quality` (3★ scale); **strip every number-prefixed control tag** (`0/10/12 …`) from `Item.tags` so
@@ -291,8 +304,14 @@ output) so every rule has a regression test. No transform reaches DEVONthink or 
   **flagged for owner review, never auto-merged.** Because this is fuzzy (not exact-match), a false merge =
   irreversible data loss, so: (a) the similarity metric + exact threshold are **calibrated in DTI-0 against
   real near-dup pairs** before any bulk merge; (b) every auto-merge is logged with both source uuids, a text
-  diff, and all dates; (c) near-threshold merges are additionally surfaced in the review report; and (d)
-  consolidation preserves the **union** of the losers' tags/links/memberships/provenance — nothing is dropped.
+  diff, and all dates; (c) near-threshold merges are additionally surfaced in the review report; (d)
+  consolidation preserves the **union** of the losers' tags/links/memberships/provenance — nothing is dropped;
+  and (e) a **min-length floor** guards against degenerate matches — records with **empty/below-floor
+  normalized text are never text-merged**, and template placeholders are excluded upstream (§2), so
+  empty-normalizing records can't mass-merge.
+- **Image-only near-duplicates** — the multi-date trick also applies to image-only notes (same image, a
+  space/nonsense char apart, different dates). Match these by **image content-hash** (identical image set +
+  differing alias dates → merge into multi-date; else **flag**), never by text.
 
 `uuid` is the **only** trustworthy discriminator (DT's "duplicate" flag is content-based and unreliable
 for this). This distinction is the highest-severity correctness item in the project.
@@ -402,6 +421,10 @@ their structure (relative paths unchanged); only the root's own name/location ch
 11. **Root rename after migration** — supported; durable links survive (§8a).
 12. **PDF/JPEG dual reference** — a **tracked Suite feature** (Reader image entity referencing both PDF and its
     JPEG partner; PDF default, JPEG on demand) — on the to-do list (`SUITE_TODO.md`); not a blocker (§4a).
+13. **Templates & empty/image-only records** — DEVONthink DIY template placeholders (title has *Template* +
+    *Copy*, no text) are **excluded** from import (§2). "Empty" = no text AND no images; **image-only notes are
+    content** (images imported), never text-merged; text auto-merge needs text above a min-length floor;
+    image-only near-dups match by image content-hash (§6). *Closes the wave-1 empty-body mass-merge finding.*
 
 *All owner decisions resolved. DTI-0 discoveries (findings, not decisions): the `Alias` date grammar;
 month-prefix title format; near-dup prevalence + similarity calibration; replicant counts; the name-index
