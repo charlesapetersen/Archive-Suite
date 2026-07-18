@@ -86,6 +86,28 @@ enum MultiPageReOCRTestDriver {
         check("renderAllPages returns nil for a non-PDF", PDFToImageConverter.renderAllPages(of: bogus) == nil)
         for u in rendered ?? [] { try? fm.removeItem(at: u) }
 
+        // ── 1b. Auto-route detection: a MULTI-page PDF drops to re-OCR; a single-page PDF, an image,
+        //        and (unreadable) non-PDFs do not. `preOCRedInput` (the tagging pipeline) wins when on.
+        //        This mirrors the pipeline's `autoReOCR = !preOCRedInput && files.contains(isMultiPagePDF)`
+        //        so the routing is asserted at $0 without a live OCR run. ─────────────────────────────
+        let singlePage = renderDir.appendingPathComponent("one.pdf")
+        _ = writeMultiPagePDF(singlePage, pages: 1)
+        let imageInput = PDFToImageConverter.imageURL(for: singlePage)   // a real .jpg temp
+        check("isMultiPagePDF: true for a 3-page PDF", PDFToImageConverter.isMultiPagePDF(threePage))
+        check("isMultiPagePDF: false for a 1-page PDF", !PDFToImageConverter.isMultiPagePDF(singlePage))
+        check("isMultiPagePDF: false for an image file", !PDFToImageConverter.isMultiPagePDF(imageInput))
+        check("isMultiPagePDF: false for an unreadable .pdf", !PDFToImageConverter.isMultiPagePDF(bogus))
+        func autoReOCR(_ files: [URL], preOCRed: Bool) -> Bool {
+            !preOCRed && files.contains(where: PDFToImageConverter.isMultiPagePDF)
+        }
+        check("auto-route: multi-page PDF → re-OCR", autoReOCR([threePage], preOCRed: false))
+        check("auto-route: single-page PDF → standard (not re-OCR)", !autoReOCR([singlePage], preOCRed: false))
+        check("auto-route: image → standard (not re-OCR)", !autoReOCR([imageInput], preOCRed: false))
+        check("auto-route: preOCRedInput wins over a multi-page PDF", !autoReOCR([threePage], preOCRed: true))
+        check("auto-route: a multi-page PDF anywhere in a mixed drop still routes to re-OCR",
+              autoReOCR([imageInput, threePage], preOCRed: false))
+        try? fm.removeItem(at: imageInput)
+
         // ── 2. Full pipeline: 3-page PDF → 6-page alternating image/OCR-text PDF, text on odd pages. ─
         let runDir = root.appendingPathComponent("run", isDirectory: true)
         let outDir = root.appendingPathComponent("out", isDirectory: true)

@@ -1501,7 +1501,6 @@ extension OCRProcessor {
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
         preOCRedInput: Bool = false,
-        reOCRMultiPagePDF: Bool = false,
         skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil,
@@ -1597,6 +1596,15 @@ extension OCRProcessor {
         jobs = files.map { OCRJob(sourceURL: $0) }
         progress = 0
 
+        // Auto-route a dropped multi-page PDF to the re-OCR transform (render each page → OCR → one
+        // interleaved image/OCR-text PDF): it is an assembled document, not a page stream to segment
+        // and tag, so it never goes through the tagging pipeline. `preOCRedInput` stays the deliberate
+        // opt-in for that pipeline and wins when set. Presence-based (not all-inputs-are-PDF) so a
+        // multi-page PDF is NEVER silently truncated to its first page by the image path; a non-PDF
+        // sibling in the same run fails render loudly (this path only WRITES output — it never moves
+        // or deletes a source — so file-safety holds regardless).
+        let autoReOCR = !preOCRedInput && files.contains(where: PDFToImageConverter.isMultiPagePDF)
+
         // Snapshot this run's parameters for the processing-history log. Captured here (not at the tail)
         // because several completion paths clear other run state first; `enableTagging`/`sendPreviousImage`
         // mirror the pre-run cost pane's inputs (`taggingMode.llmTags`, the context-gated flag) so the
@@ -1611,7 +1619,7 @@ extension OCRProcessor {
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
-            reOCRMultiPagePDF: reOCRMultiPagePDF,
+            reOCRMultiPagePDF: autoReOCR,
             sendPreviousImage: segmentationContext.sendPreviousImage,
             contextCharCount: segmentationContext.previousTextCharCount,
             imageScale: segmentationContext.imageScale,
@@ -1619,7 +1627,7 @@ extension OCRProcessor {
             fileCount: files.count
         )
 
-        if reOCRMultiPagePDF {
+        if autoReOCR {
             // --- Multi-page PDF re-OCR path: render every page → OCR each page image → rebuild ONE
             //     output PDF alternating image/OCR-text. A pure transform (no tagging/segmentation). ---
             await performMultiPagePDFReOCR(

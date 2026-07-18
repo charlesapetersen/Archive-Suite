@@ -38,7 +38,6 @@ enum DefaultsKeys {
     // Input & processing
     static let batchMode = "batchMode"
     static let preOCRedInput = "preOCRedInput"
-    static let reOCRMultiPagePDF = "reOCRMultiPagePDF"
     static let skipAlreadyProcessed = "skipAlreadyProcessed"   // incremental processing: skip inputs whose output PDF already exists + is newer
     static let ocrWorkerCount = "ocrWorkerCount"
     static let imageResolutionPercent = "imageResolutionPercent"

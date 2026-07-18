@@ -13,7 +13,6 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
-    @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
@@ -26,6 +25,9 @@ struct OCRView: View {
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
+    /// The dropped input will auto-route to the multi-page-PDF re-OCR transform (a pure document
+    /// rebuild), so tagging/segmentation don't apply. Mirrors the pipeline's `autoReOCR` decision.
+    private var isMultiPagePDFReOCR: Bool { droppedHasMultiPagePDF && !preOCRedInput }
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
@@ -58,6 +60,10 @@ struct OCRView: View {
 
     // Transient
     @State private var droppedFiles: [URL] = []
+    /// Whether any dropped file is a multi-page PDF (recomputed on droppedFiles change, so PDFs aren't
+    /// re-opened on every render). Combined with `!preOCRedInput` this is the auto re-OCR routing the
+    /// pipeline applies — surfaced here only to grey out the (inapplicable) Tagging controls.
+    @State private var droppedHasMultiPagePDF = false
     /// Pre-grouped segmentation from a Live Capture handoff (aligned to droppedFiles); empty otherwise.
     @State private var captureBoundaries: [Bool] = []
     @State private var captureTypes: [CaptureGroupType] = []
@@ -168,6 +174,11 @@ struct OCRView: View {
         }
         .onChange(of: taggingModeRaw) { _, _ in
             if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
+        }
+        .onChange(of: droppedFiles) { _, files in
+            // Recompute the multi-page-PDF flag off the main render path (opens PDFs once per change,
+            // not per render). Short-circuits at the first multi-page PDF; non-PDFs never open a file.
+            droppedHasMultiPagePDF = files.contains(where: PDFToImageConverter.isMultiPagePDF)
         }
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
@@ -354,14 +365,14 @@ struct OCRView: View {
                                 Text(mode.displayName).tag(mode.rawValue)
                             }
                         }
-                        Text(reOCRMultiPagePDF
-                             ? "Not applied in “Re-OCR multi-page PDF” mode — it only rebuilds the alternating image/OCR-text PDF."
+                        Text(isMultiPagePDFReOCR
+                             ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
                              : taggingMode.detail)
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
                     .padding(4)
                 }
-                .disabled(reOCRMultiPagePDF)
+                .disabled(isMultiPagePDFReOCR)
 
 
                 // Cost estimate
@@ -611,10 +622,10 @@ struct OCRView: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6]))
                 .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.5))
             VStack(spacing: 12) {
-                Image(systemName: (preOCRedInput || reOCRMultiPagePDF) ? "doc.text" : "photo.stack")
+                Image(systemName: preOCRedInput ? "doc.text" : "photo.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
-                Text((preOCRedInput || reOCRMultiPagePDF) ? "Drop PDFs here" : "Drop images here")
+                Text(preOCRedInput ? "Drop PDFs here" : "Drop images or PDFs here")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Text("or use Add Files…")
@@ -933,10 +944,11 @@ struct OCRView: View {
 
     private func isImageFile(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
-        // Mode-aware: the PDF-input modes (pre-OCRed input; multi-page re-OCR) ingest PDFs; image
-        // mode accepts only the documented image formats (JPEG/PNG/TIFF/HEIC) — so a wrong-type file
-        // is rejected at the door instead of entering the pipeline and failing later.
-        return (preOCRedInput || reOCRMultiPagePDF) ? (ext == "pdf") : ImageEncoding.acceptedImageExtensions.contains(ext)
+        // Pre-OCRed input is the PDF-only tagging path. Otherwise accept images AND PDFs: images OCR
+        // normally, a multi-page PDF auto-routes to the re-OCR transform, and a single-page PDF is
+        // OCR'd like an image. A wrong-type file is still rejected at the door.
+        if preOCRedInput { return ext == "pdf" }
+        return ext == "pdf" || ImageEncoding.acceptedImageExtensions.contains(ext)
     }
 
     private func resumePendingBatch() {
@@ -1032,7 +1044,6 @@ struct OCRView: View {
                 confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
                 reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
-                reOCRMultiPagePDF: reOCRMultiPagePDF,
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,
                 gatewayConfig: gateway,

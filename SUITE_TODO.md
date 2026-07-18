@@ -383,7 +383,7 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   W13.oai-1). Additive + opt-in; default provider unchanged. Build clean, 0 new warnings; Tier-1 self-review.
   **Live-key OpenAI rotation smoke (does gpt-5.4-mini pick the upright candidate?) + final model-ID/pricing
   confirm → keyed/owner tail → Morning Review.**
-- [ ] **Auto-route multi-page-PDF drops to re-OCR; retire the mode toggle (Processor) — owner-clarified 2026-07-16.**
+- [x] **Auto-route multi-page-PDF drops to re-OCR; retire the mode toggle (Processor) — owner-clarified 2026-07-16.**
   A dropped multi-page PDF should just run the re-OCR flow (render each page → LLM-OCR → interleaved image/OCR-text
   PDF) automatically — **no text-layer heuristic.** Owner's rule: `preOCRedInput` exists only to send input through
   the **tagging pipeline** (segment + tag), which is **not relevant to a multi-page PDF** (an assembled document, not
@@ -392,6 +392,18 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   **Tier-2** (PDF output). **Verify:** a render guard on the interleaved image/OCR-text PDF output (the 2-page-SPEC
   surface `DocumentRenderGuardTests` already guards from the Reader side) + `ops/gui/` for the drop-zone / toggle
   removal. | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
+  — ✅ shipped: new `PDFToImageConverter.isMultiPagePDF` (ext + `PDFDocument.pageCount > 1`) drives
+  `autoReOCR = !preOCRedInput && files.contains(where:)` in `OCRProcessor.startProcessing`, replacing the retired
+  `reOCRMultiPagePDF` toggle — a dropped multi-page PDF now auto-routes to `performMultiPagePDFReOCR` (the transform
+  itself is unchanged), while images/single-page PDFs stay on the standard path and `preOCRedInput` stays the
+  deliberate tagging-pipeline opt-in (wins when set). Presence-based so a multi-page PDF is never silently truncated
+  to its first page by the image path; output-only, so file-safety holds. Removed the Settings toggle + its
+  `@AppStorage`/`DefaultsKeys`/`ProcessingProfileStore` entry; drop zone now accepts images **and** PDFs (label
+  "Drop images or PDFs here") and the Tagging panel greys out with an explanation when a multi-page PDF is dropped;
+  `preOCRedInput` help text explains the automatic re-OCR. Build clean 0 new warnings; **Tier-2 $0 functional test
+  20/20 PASS** (`test-multipage-reocr.sh` — added 9 auto-route/detection assertions incl. the file-safety
+  no-overwrite invariant). GUI visual (drop-zone label, toggle gone, Tagging grey-out) + a live multi-page-PDF
+  re-OCR run → Morning Review (GUI off this run).
 - [x] **Reader tag-filter → token field (selected tags INSIDE the box) [BUG-3 pane shift] — SHIPPED `b5a5a01`,
   owner-verified 2026-07-16 ("no longer pushes the left margin, all is good").** Selected subject filters used to
   render as separate buttons beside the "Add tag filter…" combo box, so each chip's width tipped the content column

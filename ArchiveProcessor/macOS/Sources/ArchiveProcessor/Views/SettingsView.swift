@@ -52,7 +52,6 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel: String = ""
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
-    @AppStorage(DefaultsKeys.reOCRMultiPagePDF) private var reOCRMultiPagePDF: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
@@ -520,24 +519,16 @@ struct SettingsView: View {
             Toggle(isOn: $preOCRedInput) {
                 HStack {
                     Text("Pre-OCRed PDF input")
-                    HelpButton(text: "Process PDFs that already contain OCR text (e.g. from a prior run or another tool). Skips OCR API calls and uses the embedded text for tagging and collection ID.")
+                    HelpButton(text: "Process PDFs that already contain OCR text (e.g. from a prior run or another tool). Skips OCR API calls and uses the embedded text for tagging and collection ID.\n\nLeave this OFF to re-OCR: a dropped multi-page PDF is automatically split into its pages, each page is re-OCR'd, and one PDF is rebuilt alternating image / OCR-text (a pure document transform — tagging and collection options don't apply). This toggle is only for the tagging pipeline on already-OCR'd input.")
                 }
             }
-            .onChange(of: preOCRedInput) { _, on in if on { reOCRMultiPagePDF = false } }
-            Toggle(isOn: $reOCRMultiPagePDF) {
-                HStack {
-                    Text("Re-OCR multi-page PDF")
-                    HelpButton(text: "Split an existing multi-page PDF into its pages, re-run OCR on each page image, and rebuild ONE PDF whose pages alternate image, OCR-text, image, OCR-text… (each source page → its image page + a selectable OCR-text page). Unlike “Pre-OCRed PDF input”, this re-OCRs each rendered page instead of reading an existing text layer. It is a pure document transform: tagging and collection options don’t apply, and the input PDF is never overwritten.")
-                }
-            }
-            .onChange(of: reOCRMultiPagePDF) { _, on in if on { preOCRedInput = false } }
             Toggle(isOn: $batchMode) {
                 HStack {
                     Text("Batch mode (slower, ~50% cheaper)")
                     HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway or pre-OCRed input.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
                 }
             }
-            .disabled(useGateway || preOCRedInput || reOCRMultiPagePDF)
+            .disabled(useGateway || preOCRedInput)
             Toggle(isOn: $skipAlreadyProcessed) {
                 HStack {
                     Text("Skip already-processed files")
@@ -570,7 +561,7 @@ struct SettingsView: View {
                     HelpButton(text: "On: each document is saved as BOTH a PDF (image page + OCR text page) and a separate image file. Off: only the PDF is saved (one file). The two images are sized independently below and separately from the image sent to the LLM.")
                 }
             }
-            .disabled(preOCRedInput || reOCRMultiPagePDF)
+            .disabled(preOCRedInput)
             HStack {
                 Text("PDF image size")
                 HelpButton(text: "Target size for the image embedded in each output PDF (default 2 MB). Independent of both the image sent to the LLM and the source resolution — larger images are downscaled toward this target, while smaller ones are embedded as-is. Not used for pre-OCRed input.")

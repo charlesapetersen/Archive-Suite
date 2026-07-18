@@ -5,6 +5,17 @@ import AppKit
 /// Renders PDF pages to temporary JPEG files for use as OCR input.
 struct PDFToImageConverter {
 
+    /// True iff `url` is a PDF with more than one page. Drives the auto-route: a dropped multi-page
+    /// PDF is an assembled document, so it goes through the re-OCR transform (render each page → OCR →
+    /// one interleaved image/OCR-text PDF) rather than the image/tagging pipeline. Opening the document
+    /// reads only its page tree, not page content, so this is cheap enough to call once per input at
+    /// run start. A non-PDF, an unreadable PDF, or a single-page PDF returns false.
+    static func isMultiPagePDF(_ url: URL) -> Bool {
+        guard url.pathExtension.lowercased() == "pdf",
+              let document = PDFDocument(url: url) else { return false }
+        return document.pageCount > 1
+    }
+
     /// If the URL points to a PDF, render its first page to a temporary JPEG and return
     /// the temp file URL. For non-PDF files, returns the original URL unchanged.
     static func imageURL(for url: URL) -> URL {
