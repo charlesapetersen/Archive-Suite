@@ -312,11 +312,10 @@ rather than importing best-effort.
     links stay as select-links.
 
 **Target / Archive Notes side**
-11. **Adoption model decided** (§9.6, still open) — determines whether we build a fresh store root or write
-    into the existing store.
-12. **DTI-3 net-new features shipped** (multi-date; Related-notes) and building/testing across all apps,
-    before materialize.
-13. If merging into an existing store: confirm what content is already there, to avoid collisions.
+11. **Fresh output store root** for the import to build into (§9.7 — fresh-store swap; the live store is not
+    written to until you adopt).
+12. **DTI-3 net-new features shipped** (multi-date; Related-notes; 3★ rating) and building/testing across all
+    apps, before materialize.
 
 **Machine / operational**
 14. **Disk headroom** — the DB copy (~8 GB) + extraction sidecars + the fresh store.
@@ -339,14 +338,10 @@ rather than importing best-effort.
 5. **One-time migration** — idempotent + re-runnable from the frozen manifest, but **not** an ongoing sync.
 6. **Rating scale** — switch Archive Notes from 5★ to **3★**; import maps `12 Best Note Excerpts`→3★,
    `10 Good Note Excerpts`→2★; number-prefixed control tags are stripped, not imported as subjects (§3d).
+7. **Adoption model** — **fresh-store swap**: build the import into a new store, verify it against the §7
+   gate, then point Archive Notes at it (the prior store is left untouched → fully reversible). *No merge.*
 
-**Still open:**
-6. **Adoption model** — how the imported notes become the live Archive Notes library. Either build a **fresh
-   store** and point the app at it (clean swap; the old store is untouched, so it's reversible), or **merge**
-   the imported notes into the existing store. Pending owner choice (hinges on whether Archive Notes already
-   holds content worth keeping).
-
-*DTI-0 discoveries (findings, not decisions): exact excerpt tag string(s); the `Alias` date grammar;
+*All owner decisions resolved. DTI-0 discoveries (findings, not decisions): exact excerpt tag string(s); the `Alias` date grammar;
 month-prefix title format; near-dup prevalence + similarity calibration; replicant counts.*
 
 ---
