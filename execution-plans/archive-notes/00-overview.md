@@ -68,7 +68,7 @@ every other surface is designed from the historian's workflow up, not copied fro
 **Deferred to future iterations** (explicitly out of scope for run 1, tracked in §13): corpus back-fill of
 `ArchiveSuite`; Processor stamping `ArchiveSuite` on new output; Reader parsing/hiding the new marker
 (only needed once the corpus carries it); the unified single storage path for all three apps; mirroring
-date/quality into Finder tags; multi-root corpus support; iOS/companion anything.
+author/date/quality into Finder tags; multi-root corpus support; iOS/companion anything.
 
 > ⚠️ **Owner call-out (R13d — the `ArchiveSuite` *exclusion* behavior).** Because corpus back-fill,
 > Processor stamping, and Reader parsing/filtering of the marker are all deferred to the convergence wave,
@@ -437,7 +437,9 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
    with thin per-app adapters (Reader delta-mutate, Processor fresh-write, Notes projector); revisit only if
    a fuller single unified-writer API is later wanted.
 3. Whether Notes and Reader should ever share **one window / unified view** (currently separate apps).
-4. Mirroring **date/quality** into Finder tags if cross-app chronological filtering of notes is wanted.
+4. Mirroring **author/date/quality** into Finder tags — e.g. cross-app chronological filtering
+   (date/quality) or author faceting of notes. Author would additionally need a SPEC `Author:` facet
+   (a shared-contract change); all three are front-matter-only in run 1 (D2/D4/D9).
 5. Zotero: write-back (creating Zotero items from Notes) — read-only for now.
 6. Scrivener specifics: confirm Scrivener honors custom URL schemes in its link fields (it does for
    standard hyperlinks; validate the `archivenotes://` round-trip on the owner's Scrivener during W4 GUI).

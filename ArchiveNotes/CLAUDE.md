@@ -11,7 +11,15 @@ this file is authoritative for Notes‑specific work.
   `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
   resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors front‑matter onto the
-  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
+  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. It projects **only `tags` (subjects) + the `ArchiveSuite` marker**;
+  `authors`, `date`, and `quality` stay **front‑matter‑only** (authoritative, durable plain‑text YAML)
+  — a deliberate deviation from the original spec (which wanted author/date in macOS tags and a quality
+  ordering "akin to Reader's priority tag"): front‑matter still satisfies "durable against this program
+  no longer being developed," and keeping author/date/quality out of the global Finder‑tag namespace
+  avoids polluting the shared vocabulary (overview decisions **D2/D4/D9**). *Additionally* mirroring
+  author/date/quality to Finder tags for cross‑app (Reader/Processor) parity is a **deferred owner
+  decision** (author would also need a SPEC `Author:` facet) — see the W9 gap‑closure plan's
+  out‑of‑scope list.
 - Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
 - **Full protocol:** [`GUI_SAFETY.md`](GUI_SAFETY.md) — the scratch-corpus rules (never drive the store
   picker; confirm scratch before any tag write) + the DEBUG scratch-write guard that mechanically aborts

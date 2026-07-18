@@ -120,7 +120,7 @@ this plan). Each item is independently shippable in its own worktree per the rep
 **A10. Confirm doc-sync hook covers `packages/`.** — the W0 plan asked to prove the doc-sync backstop fires for a package outside both app dirs; `.claude/hooks/docsync-*.sh` contain no `packages/ArchiveCore` reference.
 - *Files:* `.claude/hooks/docsync-*.sh` (+ their config). *Steps:* verify/extend scope so a `packages/ArchiveCore` code change without a doc touch is caught. *Verify:* a dry-run trips the hook. **Tier-2** (autonomous-setup change — prove the mechanism before install).
 
-**A11. Reconcile the original spec's "author/date/quality → macOS Finder tags" durability intent.** — **DOC**
+**A11. Reconcile the original spec's "author/date/quality → macOS Finder tags" durability intent. — ✅ DONE (W9 Phase A, 2026-07-18).** — **DOC**
 (spec-vs-build). The original spec's durability section says "other metadata, e.g. **author and date**, should
 go in macOS tags," and its tags section wants a **quality** ordering "akin to the priority tag in Reader …
 **not** a regular tag" — and Reader's priority *is* a projected Finder tag. The build instead keeps `authors`,
@@ -135,6 +135,13 @@ tags" but **omits author** and doesn't cite the original-spec rationale, so a fu
   the original-spec clauses. *Verify:* the deferral record matches the original spec's language; no code change
   unless the owner opts to mirror (then it becomes a **Tier-2** tag-projection change routed through
   `NotesTagProjector`, with the five tag-safety invariants). *Tier-1 (doc).*
+- *Shipped (docs-only):* extended the out-of-scope deferral (below) to name **author** explicitly + added a
+  dedicated "Author/date/quality → front-matter, not Finder tags" entry to *Deviations to record* citing
+  overview **D2/D4/D9** and the original-spec clauses; recorded the deviation **durably** in
+  `ArchiveNotes/CLAUDE.md` (the file-safety projection bullet) and `00-overview.md` (§13 future-list + the
+  run-1 out-of-scope list) since this plan is deleted on ship. No code change. The additional
+  cross-app-parity mirror — incl. a possible SPEC `Author:` facet (a HOLD-QUEUE shared-contract change) — is
+  a **deferred owner decision** (→ Morning Review 2026-07-18).
 
 ---
 
@@ -347,7 +354,7 @@ in the same commit — the docs move with the code. *Tier per the items reviewed
 ## Explicitly out of scope (plan-stated deferrals — NOT gaps)
 
 Recorded here so a future reviewer doesn't re-flag them: Reader/Processor *consuming* the `ArchiveSuite`
-marker + corpus back-fill (D4); Processor stamping the marker; mirroring date/quality into Finder tags; a
+marker + corpus back-fill (D4); Processor stamping the marker; mirroring **author/date/quality** into Finder tags (see the A11 deviation note below); a
 single merged unified-writer signature; unifying the page-2 header *builder*; a shared suite-wide storage
 path; page-within-merged-PDF scroll navigation; editor tables/footnotes/task-lists/strikethrough/HTML and
 undo-across-raw-toggle; per-block stable GUIDs and the reverse "N extracts derive from this note" index;
@@ -366,3 +373,18 @@ in ArchiveCore (§16.7 said app target — see C3); source-block UI realized as 
 `ReaderPreviewPopover` rather than a standalone `SourceBlockView`; unit suites use swift-testing `@Test`
 rather than the sketched XCTest; and the `FolderGraph→OrganizationStore` / `SmartQuery→VFolder.queryJSON`
 renames (authorized by overview §16).
+
+**Author/date/quality → front-matter, not Finder tags (A11 — spec-vs-build).** The original spec's
+durability section said other metadata "e.g. **author and date**" should go in macOS tags, and its tags
+section wanted a **quality** ordering "akin to the priority tag in Reader … **not** a regular tag"
+(Reader's priority *is* a projected Finder tag). The build instead keeps `authors`, `date`, and `quality`
+in the note's `.md` **YAML front-matter** (authoritative, durable plain text) and projects **only subjects
++ the `ArchiveSuite` marker** to Finder tags — overview **D2** (front-matter authoritative; mirror only
+subjects + marker; "no author/date/quality pollution of the global tag namespace"), **D4** ("no `Author:`
+facet"), **D9** (quality = front-matter `1..5` + priority-style UI, "not a Finder tag this run").
+**Functionally sound, no work required:** front-matter YAML still satisfies the original "durable against
+this program no longer being developed" intent. **Open owner decision (→ Morning Review):** whether to
+*additionally* mirror author/date/quality to Finder tags for cross-app (Reader/Processor) parity — if
+adopted, a **Tier-2** projection change through `NotesTagProjector` (five tag-safety invariants) plus, for
+author, a **HOLD-QUEUE** SPEC `Author:` facet. Until then it stays deferred (out-of-scope list above, now
+naming **author** explicitly).
