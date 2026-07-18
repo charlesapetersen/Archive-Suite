@@ -413,7 +413,7 @@ extension OCRProcessor {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let content = json["content"] as? [[String: Any]] else { return "" }
         return content.filter { ($0["type"] as? String) == "text" }.compactMap { $0["text"] as? String }.joined()
@@ -429,7 +429,7 @@ extension OCRProcessor {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let candidates = json["candidates"] as? [[String: Any]],
               let content = candidates.first?["content"] as? [String: Any],
@@ -448,7 +448,7 @@ extension OCRProcessor {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],

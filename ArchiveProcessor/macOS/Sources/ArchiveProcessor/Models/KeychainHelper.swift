@@ -15,6 +15,7 @@ struct KeychainHelper {
         let e = ProcessInfo.processInfo.environment
         return e["FILERELAY_TESTMODE"] != nil || e["FILERELAY_EMIT_GOLDEN"] != nil
             || e["LIVECAPTURE_TESTMODE"] != nil || e["PROCESSFILES_TESTMODE"] != nil
+            || e["NETWORKSESSION_TEST"] != nil
             || e["ARCHIVEPROC_HEADLESS"] != nil
     }
 

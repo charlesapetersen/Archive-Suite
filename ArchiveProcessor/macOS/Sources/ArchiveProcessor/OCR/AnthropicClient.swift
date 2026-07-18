@@ -60,7 +60,7 @@ struct AnthropicClient {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await NetworkSession.data(for: request)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {

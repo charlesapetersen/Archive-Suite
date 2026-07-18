@@ -127,7 +127,7 @@ struct AnthropicBatchClient: Sendable {
         }
         request.httpBody = bodyData
 
-        let (data, response) = try await NetworkSession.data(for: request)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -166,7 +166,7 @@ struct AnthropicBatchClient: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
@@ -197,7 +197,7 @@ struct AnthropicBatchClient: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
         let text = String(data: data, encoding: .utf8) ?? ""
 
         var results: [String: OCRResult] = [:]
@@ -236,7 +236,7 @@ struct AnthropicBatchClient: Sendable {
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        _ = try? await NetworkSession.data(for: request)
+        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
     }
 }
 
@@ -404,7 +404,7 @@ struct GeminiBatchClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await NetworkSession.data(for: request)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -444,7 +444,7 @@ struct GeminiBatchClient: Sendable {
         let initBody: [String: Any] = ["file": ["display_name": "batch_ocr_requests"]]
         initRequest.httpBody = try JSONSerialization.data(withJSONObject: initBody)
 
-        let (_, initResponse) = try await NetworkSession.data(for: initRequest)
+        let (_, initResponse) = try await NetworkSession.data(for: initRequest, policy: .nonIdempotent)
         guard let httpInit = initResponse as? HTTPURLResponse,
               let uploadURLString = httpInit.value(forHTTPHeaderField: "X-Goog-Upload-URL"),
               let uploadURL = URL(string: uploadURLString) else {
@@ -458,7 +458,7 @@ struct GeminiBatchClient: Sendable {
         uploadRequest.setValue("upload, finalize", forHTTPHeaderField: "X-Goog-Upload-Command")
         uploadRequest.httpBody = data
 
-        let (uploadData, _) = try await NetworkSession.data(for: uploadRequest)
+        let (uploadData, _) = try await NetworkSession.data(for: uploadRequest, policy: .nonIdempotent)
         guard let json = try? JSONSerialization.jsonObject(with: uploadData) as? [String: Any] else {
             throw OCRError.networkError("Malformed file upload response")
         }
@@ -487,7 +487,7 @@ struct GeminiBatchClient: Sendable {
         var request = URLRequest(url: statusURL, timeoutInterval: 30)
         request.httpMethod = "GET"
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
@@ -604,7 +604,7 @@ struct GeminiBatchClient: Sendable {
         var request = URLRequest(url: downloadURL, timeoutInterval: 120)
         request.httpMethod = "GET"
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
         let text = String(data: data, encoding: .utf8) ?? ""
 
         var results: [String: OCRResult] = [:]
@@ -636,7 +636,7 @@ struct GeminiBatchClient: Sendable {
         guard let url = try? makeBatchURL("\(baseURL)/\(batchName):cancel?key=\(urlComponentEncoded(apiKey))") else { return }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
-        _ = try? await NetworkSession.data(for: request)
+        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
     }
 }
 
@@ -702,7 +702,7 @@ struct MistralBatchClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await NetworkSession.data(for: request)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -735,7 +735,7 @@ struct MistralBatchClient: Sendable {
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
-        let (responseData, response) = try await NetworkSession.data(for: request)
+        let (responseData, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw OCRError.networkError("Failed to upload batch file (status \((response as? HTTPURLResponse)?.statusCode ?? 0))")
         }
@@ -765,7 +765,7 @@ struct MistralBatchClient: Sendable {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
@@ -792,7 +792,7 @@ struct MistralBatchClient: Sendable {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let (data, _) = try await NetworkSession.data(for: request)
+        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
         let text = String(data: data, encoding: .utf8) ?? ""
 
         var results: [String: OCRResult] = [:]
@@ -833,6 +833,6 @@ struct MistralBatchClient: Sendable {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        _ = try? await NetworkSession.data(for: request)
+        _ = try? await NetworkSession.data(for: request, policy: .nonIdempotent)
     }
 }

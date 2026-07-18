@@ -6,21 +6,26 @@ import Foundation
 actor RequestLimiter {
     private let limit: Int
     private var active = 0
-    private var waiters: [(id: UUID, cont: CheckedContinuation<Void, Never>)] = []
+    private var waiters: [(id: UUID, cont: CheckedContinuation<Void, Error>)] = []
 
     init(limit: Int) { self.limit = limit }
 
     /// Acquire a slot, suspending if at capacity. Cancellation-aware so a cancelled run never
     /// leaves a caller suspended forever (which would hang the OCR TaskGroup).
-    func acquire() async {
+    func acquire() async throws {
+        try Task.checkCancellation()
         if active < limit {
             active += 1
             return
         }
         let id = UUID()
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { cont in
-                waiters.append((id, cont))
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                if Task.isCancelled {
+                    cont.resume(throwing: CancellationError())
+                } else {
+                    waiters.append((id, cont))
+                }
             }
         } onCancel: {
             Task { await self.cancelWaiter(id) }
@@ -36,14 +41,26 @@ actor RequestLimiter {
         }
     }
 
-    /// Resume a still-waiting acquirer that was cancelled, granting it a (transient) slot so the
-    /// caller's paired `release()` keeps the count balanced.
+    /// Remove a cancelled waiter without inventing a slot. The old accounting incremented `active`
+    /// here even though every real slot was still occupied, allowing `active` to exceed the limit and
+    /// making later hand-offs depend on a cancelled caller reaching its paired `release()`.
     private func cancelWaiter(_ id: UUID) {
         guard let idx = waiters.firstIndex(where: { $0.id == id }) else { return }
         let waiter = waiters.remove(at: idx)
-        active += 1
-        waiter.cont.resume()
+        waiter.cont.resume(throwing: CancellationError())
     }
+
+    /// Internal headless-test visibility; production callers never inspect limiter state.
+    func testCounts() -> (active: Int, waiters: Int) { (active, waiters.count) }
+}
+
+/// Retry semantics are explicit at every HTTP call site. Idempotent reads may be repeated after an
+/// ambiguous transport failure or transient 5xx. A non-idempotent request (all billable generation and
+/// batch-creation POSTs) is retried only after an explicit 429 rejection; it is never repeated after a
+/// timeout, lost connection, or 5xx where the provider may already have accepted/charged the work.
+enum NetworkRetryPolicy: Sendable, Equatable {
+    case idempotent
+    case nonIdempotent
 }
 
 /// A shared URLSession configured for reliability, with a global concurrency limit and
@@ -68,11 +85,8 @@ enum NetworkSession {
     /// per-image rotation calls don't collectively exceed provider limits and trigger 503s.
     private static let limiter = RequestLimiter(limit: 5)
 
-    /// HTTP statuses for a transient rate-limit / overload — retried aggressively with backoff.
-    private static let retryableStatuses: Set<Int> = [429, 503, 529]
-    /// 5xx that may be non-idempotent server-side failures on a billable POST — retried at most once
-    /// so a flapping backend can't multiply token cost (see performWithRetry).
-    private static let limitedRetryStatuses: Set<Int> = [500, 502]
+    /// HTTP statuses that are safe to retry only when the request itself is idempotent.
+    private static let idempotentRetryStatuses: Set<Int> = [429, 500, 502, 503, 529]
 
     /// Timestamp of the most recent 429 (rate-limit) retry, so the OCR UI can show a "pacing to your
     /// key's rate limit" note during bulk jobs instead of looking stalled. Write-mostly; read only for
@@ -82,10 +96,17 @@ enum NetworkSession {
     /// Perform a data request through the global limiter, retrying transient transport errors
     /// and rate-limit/overload responses with exponential backoff + jitter (honoring
     /// `Retry-After` when present).
-    static func data(for request: URLRequest, maxRetries: Int = 4) async throws -> (Data, URLResponse) {
-        await limiter.acquire()
+    static func data(
+        for request: URLRequest,
+        policy: NetworkRetryPolicy,
+        maxRetries: Int = 4
+    ) async throws -> (Data, URLResponse) {
+        try await limiter.acquire()
         do {
-            let result = try await performWithRetry(request, maxRetries: maxRetries)
+            // Cancellation can race with a waiter being granted. Refuse to start the request, then release
+            // the legitimately granted slot through the shared catch path.
+            try Task.checkCancellation()
+            let result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
             await limiter.release()
             return result
         } catch {
@@ -94,13 +115,22 @@ enum NetworkSession {
         }
     }
 
-    private static func performWithRetry(_ request: URLRequest, maxRetries: Int) async throws -> (Data, URLResponse) {
+    private typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private typealias Sleeper = @Sendable (Double) async throws -> Void
+
+    private static func performWithRetry(
+        _ request: URLRequest,
+        policy: NetworkRetryPolicy,
+        maxRetries: Int,
+        transport: Transport = { try await shared.data(for: $0) },
+        sleeper: Sleeper = { try await Task.sleep(for: .seconds($0)) }
+    ) async throws -> (Data, URLResponse) {
         var lastError: Error?
         var retryAfter: Double?
 
         for attempt in 0...maxRetries {
             if attempt > 0 {
-                try? await Task.sleep(for: .seconds(backoffDelay(attempt: attempt, retryAfter: retryAfter)))
+                try await sleeper(backoffDelay(attempt: attempt, retryAfter: retryAfter))
                 retryAfter = nil
             }
             guard !Task.isCancelled else { throw CancellationError() }
@@ -110,14 +140,13 @@ enum NetworkSession {
                 // keep-alive connections that go stale on cellular.
                 var req = request
                 req.setValue("close", forHTTPHeaderField: "Connection")
-                let (data, response) = try await shared.data(for: req)
+                let (data, response) = try await transport(req)
 
-                // Retry transient rate-limit / overload statuses with full backoff; 500/502 (which on a
-                // billable POST may be non-idempotent server-side failures) at most once, so a flapping
-                // backend can't multiply token cost.
+                // A 429 is an explicit rejection and can be retried for either policy. Ambiguous 5xx
+                // responses are retried only for idempotent requests.
                 if let http = response as? HTTPURLResponse, attempt < maxRetries {
-                    let retryable = retryableStatuses.contains(http.statusCode)
-                        || (limitedRetryStatuses.contains(http.statusCode) && attempt < 1)
+                    let retryable = http.statusCode == 429
+                        || (policy == .idempotent && idempotentRetryStatuses.contains(http.statusCode))
                     if retryable {
                         if http.statusCode == 429 { lastRateLimitedAt = Date() }
                         retryAfter = parseRetryAfter(http)
@@ -130,12 +159,24 @@ enum NetworkSession {
                 lastError = error
                 let code = (error as NSError).code
                 let retryableTransport = code == -1005 || code == -1001 || code == -1009
-                if !retryableTransport || attempt == maxRetries {
+                if policy != .idempotent || !retryableTransport || attempt == maxRetries {
                     throw error
                 }
             }
         }
         throw lastError ?? URLError(.badServerResponse)
+    }
+
+    /// Injected no-network seam used by `NetworkSessionTestDriver` to prove retry policy exactly.
+    static func testPerformWithRetry(
+        _ request: URLRequest,
+        policy: NetworkRetryPolicy,
+        maxRetries: Int,
+        transport: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    ) async throws -> (Data, URLResponse) {
+        try await performWithRetry(
+            request, policy: policy, maxRetries: maxRetries,
+            transport: transport, sleeper: { _ in })
     }
 
     /// Exponential backoff (base 1.5s, doubling) with jitter, capped at 30s. If the server

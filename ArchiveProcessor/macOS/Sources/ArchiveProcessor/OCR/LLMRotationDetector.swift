@@ -92,7 +92,8 @@ enum LLMRotationDetector {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        guard let (respData, _) = try? await NetworkSession.data(for: request, maxRetries: 1),
+        guard let (respData, _) = try? await NetworkSession.data(
+            for: request, policy: .nonIdempotent, maxRetries: 1),
               let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
               let candidates = json["candidates"] as? [[String: Any]],
               let content = candidates.first?["content"] as? [String: Any],
@@ -119,7 +120,8 @@ enum LLMRotationDetector {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.httpBody = data
-        guard let (respData, _) = try? await NetworkSession.data(for: request, maxRetries: 1),
+        guard let (respData, _) = try? await NetworkSession.data(
+            for: request, policy: .nonIdempotent, maxRetries: 1),
               let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
               let contentArr = json["content"] as? [[String: Any]] else { return nil }
         return contentArr.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines)

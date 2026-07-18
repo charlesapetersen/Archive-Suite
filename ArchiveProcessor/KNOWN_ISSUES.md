@@ -4,6 +4,16 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-17): ambiguous retries could duplicate billable requests [CRITICAL]
+
+**FIXED:** every HTTP call now declares whether it is idempotent. Billable generation, upload, and
+batch-creation POSTs retry only an explicit 429 rejection; they are never repeated after a timeout, lost
+connection, or ambiguous 5xx. Idempotent status/result reads retain transient retries. Cancelled limiter
+waiters are removed without inventing active slots. An injected, no-network driver proves both retry
+policies and stresses cancellation/drain accounting. (2026-07-17)
+
+---
+
 ## ✅ FIXED (2026-07-12): capture completion was acknowledged before durable Mac persistence [CRITICAL]
 
 **FIXED:** segment and whole-session completion are now transactional: they snapshot affected completion

@@ -192,8 +192,19 @@ struct LocalAgentClient: Sendable {
         // Dedicated low ceiling — the subprocess path bypasses NetworkSession's HTTP limiter, so pace it
         // here so a wide OCR task group never spawns a swarm of CLI children against a personal
         // subscription. `spawnAndClassify` never throws, so a plain acquire → body → release is balanced
-        // (including under cancellation: `acquire()` is cancellation-aware and `runAsync` always resumes).
-        await concurrencyLimiter.acquire()
+        // (`acquire()` throws on cancellation, so a queued cancelled call never spawns a child process;
+        // `spawnAndClassify` itself never throws, keeping every granted slot balanced).
+        do {
+            try await concurrencyLimiter.acquire()
+        } catch {
+            return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+        }
+        // Cancellation can race with the limiter granting this waiter. Return the granted slot before
+        // declining to spawn, matching NetworkSession's post-acquire cancellation check.
+        if Task.isCancelled {
+            await concurrencyLimiter.release()
+            return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+        }
         let outcome = await spawnAndClassify(binary: binary, tool: tool, modelOverride: modelOverride,
                                              prompt: prompt, timeout: timeout)
         await concurrencyLimiter.release()

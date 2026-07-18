@@ -43,6 +43,7 @@ struct ContentView: View {
             IncrementalSkipTestDriver.runIfRequested()       // $0 incremental-processing skip-decision self-test (env-gated)
             SegmentJSONBuilderTestDriver.runIfRequested()    // $0 segment-JSON sidecar byte-identity self-test (env-gated)
             LocalAgentTestDriver.runIfRequested()            // $0 Local Agent CLI backend + PendingRun resume self-test (env-gated)
+            NetworkSessionTestDriver.runIfRequested()        // $0 injected HTTP retry/limiter safety test (env-gated)
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {

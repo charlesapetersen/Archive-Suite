@@ -98,7 +98,7 @@ struct OpenAICompatibleClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        return try await NetworkSession.data(for: request)
+        return try await NetworkSession.data(for: request, policy: .nonIdempotent)
     }
 
     static func parseErrorResponse(data: Data, statusCode: Int) -> String {
