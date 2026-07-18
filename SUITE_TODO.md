@@ -600,6 +600,40 @@ The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(.
 folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
 the same three lines and landing them separately would silently revert part of the first. See that entry.
 
+## Wave 19 — Notes date-mirror + unified Quality facet (owner-reviewed 2026-07-18)
+Owner decision from the wishlist review: (a) Notes mirrors its front-matter **date** into Finder tags (reusing
+the existing Year/Month/Day/Decade facets — **no** SPEC change), (b) **no author** tags, (c) a **new unified
+Quality facet across all three apps**. Owner-locked contract: token **`Q1`/`Q2`/`Q3`** (higher = better), a 0–3
+**star** scale where **`Q0`/unrated writes NO tag** (absence = 0 stars, like Priority); Quality is a human
+editorial judgment (distinct from capture-**Priority**), **set by Notes + editable in Reader**, **recognized but
+never auto-emitted by Processor**. This is a **shared-contract (Tier-2)** feature — SPEC first, then the shared
+parser, then each app; every code item must **build + test all three apps**, scratch-only.
+- [x] **W19.q1 — SPEC: add the Quality facet + record Notes as a date-facet emitter.** DONE `9024022` —
+  `SPEC/tag-format.md`: Quality row (`Q1`–`Q3`, 0=unrated=no tag, human-assigned, Notes-sets/Reader-edits/
+  Processor-recognizes), parse-order note (`Q2` never taken for a year), and "Where each side lives" rows for
+  Quality + Notes date projection. The contract is now the source of truth for q2–q5. | Tier-2 (SPEC) | S
+- [ ] **W19.q2 — ArchiveCore: parse Quality in the shared `DocumentTags` [M].** Add `parseQuality` (→ 0–3;
+  `Q1`/`Q2`/`Q3` recognized, absence = 0), the token constants, and include Quality in facet classification with
+  the **subject-collision rule** (a subject literally `"Q2"` must survive — facet parse is display/sort/filter
+  only, never drives a destructive write). Unit tests in `ArchiveCoreTests`. **Tier-2 shared-Core → build+test
+  Reader + Processor + Notes.** | packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift, Tests/ | M | med | none
+- [ ] **W19.date — Notes: project front-matter date → existing Year/Month/Day/Decade tags [M].** `NotesTagProjector`
+  additionally projects the item's `date`+`datePrecision` into the existing date facets (reuse
+  `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
+  Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
+  W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
+- [ ] **W19.q3 — Reader: display / filter / edit Quality** (blocked-on: W19.q2) **[M].** Parse via the shared
+  `DocumentTags` (free from q2); surface Quality as a nav facet (column + filter, like Priority) and make it
+  **editable via `TagWriter`** (set `Q1`–`Q3`; clearing = unrated = remove the token — never write `Q0`). Tier-2
+  (tag write). Build + Reader unit tests; live GUI confirm → owner tail. | ArchiveReader/.../Core/, Views/ | M | med | none
+- [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
+  maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
+  quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
+- [ ] **W19.q5 — Processor: recognize + preserve Quality** (blocked-on: W19.q2) **[S–M].** Processor parses
+  Quality for free via the shared `DocumentTags`; ensure its tag writes **preserve** an existing `Q1`–`Q3` token
+  (never strip a user's rating as an unknown subject). **Manual-tag authoring of quality is OPTIONAL** (a field in
+  the manual tagging sheet) — defer unless cheap. Never auto-emit from OCR. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/, Views/ | S–M | med | none
+
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
 asked to queue the **Android `targetSdk` 34→36** bump, but grounding against the real `build.gradle.kts` found

@@ -54,8 +54,8 @@ token (a subject literally `1984`, `P7`, `Read`, `Box`), so a mis-classified fac
 is `DocumentTags.parse` (`Core/DocumentTags.swift`); Processor emits them from `GeneratedTags.allTags`
 (`Tagging/TagGenerator.swift`).
 
-Parse order matters (read-state / priority / month / day are recognized **before** the bare-number
-year test, so `P7` or `Day 25` is never taken for a year).
+Parse order matters (read-state / priority / quality / month / day are recognized **before** the
+bare-number year test, so `P7`, `Q2`, or `Day 25` is never taken for a year).
 
 | Facet | Exact string form | Cardinality | Notes |
 |---|---|---|---|
@@ -65,6 +65,7 @@ year test, so `P7` or `Day 25` is never taken for a year).
 | **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 digit run whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor **only** when the user types it into the manual tag dialog's Year field; the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
 | **Date Uncertain** | literal `Date Uncertain` | 0–1 | Flags a **speculative year** — the file _usually still carries a Year tag_. Not "no date." |
 | **Priority** | exactly one of `P7` `P8` `P9` `P10` | 0–1 | **P10 highest.** Comes **only from Live Capture phone input** — the LLM tagger never emits priority. Box/folder pages and most batch docs have none. |
+| **Quality** | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **NEW 2026-07-18 (impl tracked as W19).** A **human-assigned 0–3 star rating**, unified across all three apps. The scale is 0–3, but **`Q0` / unrated writes NO tag** — absence *is* 0 stars, exactly as most files carry no Priority (so the wire only ever carries `Q1`/`Q2`/`Q3`). Distinct from **Priority** (capture-triage urgency): Quality is an editorial judgment of the document/note. **Set by Notes** (projected from its front-matter `quality`) and **editable in Reader**; **Processor recognizes it but never auto-emits** it (quality is a human judgment, not OCR output). Q-prefix means it can never collide with the digits-only Year test. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
 | **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`. |
 | **Color label** | `.labelNumberKey` + color-name token | 0–1 | **Red = 6 ⇒ box** photo; **Purple = 3 ⇒ folder** photo. Only these two are meaningful to the Suite. |
@@ -193,6 +194,8 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | Year / Month / Day / Date Uncertain | `Tagging/TagGenerator.swift` (`GeneratedTags`, prompt) | `Core/DocumentTags.swift` (`parseYear`/`parseMonth`/`parseDay`) |
 | Decade `NNNNs` | `Views/ManualTaggingSheet.swift` + `Views/ManualSegmentTagView.swift` (Year date field → verbatim via `GeneratedTags.allTags`/`MacOSTagger`) | `Core/DocumentTags.swift` (`parseDecade`/`sortDate`/`displayDate`) |
 | Priority `P7`–`P10` | `Capture/LiveCaptureProcessor.swift`, `OCR/OCRProcessor+Tagging.swift` (`applyCapturePriorityTags`) | `Core/DocumentTags.swift` (`parsePriority`) |
+| **Quality `Q1`–`Q3`** (NEW, W19) | recognizes only (parses via shared `ArchiveCore.DocumentTags`; manual-tag authoring optional/deferred) | `Core/DocumentTags.swift` (`parseQuality`, shared) + `Core/TagWriter.swift` (set/clear). **Also set by Notes** — `NotesTagProjector` projects front-matter `quality`→`Q1`–`Q3`. |
+| **Notes date facets** (Year/Month/Day/Decade) | (n/a) | Notes `NotesTagProjector` projects its front-matter `date`+`datePrecision` into the **existing** date facets (reuses `ArchiveCore.DocumentTags.sortDateKey`; no new vocabulary). |
 | Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `Core/DocumentTags.swift` (`ReadState`), `Core/TagWriter.swift` (`setReadState`) |
 | Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |
 | Color label (Red=6/Purple=3) | `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `Core/DocumentTags.swift` (`ArchiveColor`), `Core/TagWriter.swift` |
