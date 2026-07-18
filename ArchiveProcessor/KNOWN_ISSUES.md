@@ -4,6 +4,123 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## DEFERRED: one recoverable filesystem-transaction service with operator recovery UI [HIGH — architecture/data safety]
+
+Live Capture finalization now has a purpose-built durable transaction: it freezes exact content hashes and
+destinations, records exact source-photo identities, admits only complete/hashable groups, pauses capture,
+and commits destination → capture manifest → receipt → staging manifest before retiring recovery state.
+Other Processor paths still implement their own multi-artifact ordering, and Live Capture's journal remains
+an internal file with automatic retry/fail-closed messages rather than an operator-visible recovery tool.
+The content hash also proves file bytes, not Finder tag/label metadata; proving those correctly depends on
+the trustworthy tri-state tag reader tracked in the ArchiveCore review.
+
+Build one reusable `RecoverableArtifactTransaction` component rather than growing more path-specific
+journals. Give it explicit persisted states (`planned → destinationsVerified → sourceManifestCommitted →
+stagingRetired`), versioned migrations, exact artifact/source identities, required metadata fingerprints,
+atomic destination-side temporary copies, directory durability where supported, and bounded background
+verification. Integrate Process Files organization/merge, paid-batch materialization, and Live Capture only
+after contract tests prove the shared primitive preserves each path's current recovery guarantees.
+
+Add a Recovery screen that lists interrupted transactions with human-readable source/destination paths and
+offers Validate, Retry, Reveal, Export report, and a deliberately guarded Abandon action. Abandon must never
+overwrite or delete an unverified destination, must retain irreplaceable raw sources, and must explain which
+derived staging files will remain or move to Trash. An invalid/tampered journal should remain inspectable;
+it must not silently block capture forever or be auto-deleted.
+
+Verification plan:
+
+1. Crash/fault-inject before and after every state transition, file copy, hash/metadata read, manifest save,
+   receipt save, and container retirement; prove replay is idempotent and numbering never changes.
+2. Exercise partial multi-group success, missing requested PDF/JPG/JSON, destination races, external-volume
+   disconnect/reconnect, legacy staging roots, source replacement, late stragglers, and terminal receipts.
+   Preflight directory-sync/metadata capabilities before accepting a plan; classify unsupported SMB,
+   cloud-backed, and removable volumes explicitly so a durable journal cannot become permanently
+   unreplayable merely because that filesystem does not implement APFS-style directory `fsync`.
+3. Verify content plus required Finder tags/color label on APFS and on volumes that cannot preserve them;
+   unsupported metadata must be an explicit policy/result, never silently treated as verified.
+4. Stress thousands of large artifacts while proving hashing/copying never blocks the main actor and intake
+   stays quiescent only for the owning transaction.
+5. Test every Recovery-screen action against corrupt, unknown-version, partially committed, and already-
+   completed journals; require an exportable audit report before any manual abandon.
+6. Migrate one workflow at a time and run its old regression suite plus cross-workflow concurrency tests
+   before deleting that workflow's specialized journal.
+
+Deferred because the reviewed Live Capture bug needs a narrow, auditable checkpoint now, while a shared
+transaction engine and recovery UI would span all Processor pipelines and the still-unfixed ArchiveCore
+metadata-read contract. Review the state model and Abandon semantics with the owner before implementation.
+
+---
+
+## DEFERRED: immutable, versioned Live Capture inputs from receipt through cleanup [HIGH — architecture/data safety]
+
+The narrow safety fix preserves a changed re-upload instead of overwriting an existing `(groupId, seq)`
+path, and current staged generations carry a content proof captured before OCR and rechecked through output
+generation/finalization. The underlying model still treats a mutable filename as the capture's primary
+identity, however. Deferred/replacement generations share a logical phone key, crash recovery reconstructs
+them from filenames plus manifest entries, and there is no operator-facing conflict queue explaining why
+two byte-distinct uploads claimed the same key.
+
+Replace mutable raw paths with immutable capture-generation records. Give every receipt a stable generation
+UUID, sender key `(device/session/group/seq)`, content hash, durable storage URL, byte count, received time,
+and explicit relationship (`original`, `exact retry`, `supersedes`, or `conflict`). Store raw bytes under a
+content-addressed or generation-addressed filename that is never overwritten. OCR, page work, staged-output
+manifests, rotation regeneration, and finalization journals must reference that generation ID plus hash—not
+re-read identity from the sender-key path at Finish.
+
+Add a conflict/reconciliation UI for byte-distinct uploads that reuse a sender key. It should show both
+generations, allow Reveal/compare, and offer Keep both, Treat newest as replacement, or discard-to-Trash
+only with an explicit choice. Companion clients should eventually generate and persist their own immutable
+photo UUID so ordinary retries never rely solely on `(group, seq)`; roll this out compatibly across macOS,
+iOS, Android, LAN, USB, and Drive relay transports.
+
+Verification plan:
+
+1. Exercise `A receipt → OCR(A) → same-key B`, replacement during OCR/tagging/PDF generation, and a crash at
+   every boundary; prove no artifact can bind A's OCR/tags to B's image or authorize deleting B.
+2. Retry identical bytes before/after restart over every transport and prove exactly one generation/receipt;
+   send different bytes under the same key and prove both remain durable without blocking Finish drain.
+3. Commit A while B is deferred and another group is omitted/failed; prove A clears once, B immediately
+   re-arms as new work, and stale completion/tag state cannot suppress its card or finalization.
+4. Corrupt or remove generation metadata while leaving raw bytes; fail closed, surface recovery UI, and
+   never infer destructive authority from a filename alone.
+5. Migrate legacy manifests conservatively: hash/import each existing raw file as a new immutable generation,
+   keep ambiguous duplicates, and require review before any legacy staged output may clear a source.
+6. Stress thousands of large captures while source hashing/version checks stay off the main actor and prove
+   storage deduplication cannot merge metadata or delete a generation still referenced by a transaction.
+
+Deferred because this changes the capture protocol and persistence model across three apps and all receiver
+transports. Review the generation identity, supersession semantics, and conflict UI with the owner before
+changing the wire contract; retain the narrow fail-closed implementation until that migration is proven.
+
+---
+
+## DEFERRED: lossless Finder-tag undo must preserve duplicate occurrences [MEDIUM — shared contract]
+
+Finder metadata can contain duplicate tag strings, but ArchiveCore's current inverse calculation uses
+`Set` subtraction and `TagDelta` intentionally applies ordinary edits with set-like semantics. Replacing
+one subtraction expression would therefore not make undo lossless: `['A', 'A'] → ['A']` still cannot be
+represented by the existing inverse type. Normalizing duplicates away would silently mutate raw Finder
+metadata and conflicts with the suite's lossless-write goal.
+
+Introduce a separate exact-occurrence undo delta (ordered multiplicity plus color-label state) while keeping
+ordinary user edits set-like. Route both through one bounded reconcile/verification layer, migrate undo
+consumers only after ArchiveNotes' concurrent shared-Core work is clear, and version any persisted undo
+records. Review with the owner before choosing between exact order restoration and occurrence-only
+restoration if unrelated concurrent tag edits occurred.
+
+Verification plan:
+
+1. Cover duplicate additions/removals, exact inverse round trips, tag order, and color-label restoration.
+2. Inject unrelated concurrent tag additions between edit and undo; prove they survive reconciliation.
+3. Fault after each metadata write/read and require either a verified result or structured partial state.
+4. Exercise Processor, Reader, and Notes callers against the same fixtures before changing the public
+   `TagDelta` contract or deleting compatibility adapters.
+
+Deferred because this is a real shared-contract revision, not a safe local bug patch, and ArchiveNotes is
+currently being changed by another autonomous run.
+
+---
+
 ## DEFERRED: replace process-global processing settings with immutable per-run dependencies [HIGH — architecture/concurrency]
 
 The immediate Live Capture overlap bug is fixed: Live Capture now carries its locked rotation, image-size,
