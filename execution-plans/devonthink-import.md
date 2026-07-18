@@ -127,10 +127,12 @@ blocks/provenance: `Block` + `SourceAnchor` (`Store/BlockParser.swift`), durable
 | DEVONthink concept | Archive Notes target | Fit |
 |---|---|---|
 | Record (note) | `Item(kind:.note)` — one `items/<uuid>/*.md` | native |
-| Record tagged excerpt | `Item(kind:.extract)` + `note-passage`/reader provenance block | native |
+| Record tagged excerpt (`0 Note Excerpt(s)`) | `Item(kind:.extract)` + `note-passage`/reader provenance block | native |
 | **Replicant** (1 record, N `parents`) | **one `Item`, N folder memberships** (`VFolder`/`Membership` in `organization.json`) | native — replication is memberships, not copies |
 | DT group hierarchy | `VFolder` graph | native |
-| Tags | `Item.tags` (+ mirrored Finder tags via `NotesTagProjector`) | native |
+| Subject tags | `Item.tags` (+ mirrored Finder tags via `NotesTagProjector`) | native |
+| **Number-prefixed control tags** (`0 Note Excerpt(s)`, `10 Good…`, `12 Best…`) | drive `kind`/`quality`; **stripped from** `Item.tags`, never imported as subjects (§3d) | rule |
+| **Quality control-tags** (`12 Best…`→3★, `10 Good…`→2★) | `Item.quality` on a **new 3★ scale** | **NET-NEW (§3d)** |
 | Extract's trailing DT link | `SourceAnchor.noteRef` = `archivenotes://open?id=<newUUID>#block-n` | native |
 | Internet URL | markdown link (only surviving `://`) | native |
 | **Alias date + additional dates** | **primary date + `additional_dates[]`** | **NET-NEW (§3a)** |
@@ -165,6 +167,20 @@ section. Distinguish from extracts (which carry `note-passage` provenance, not "
   `archivereader://reveal?root=<GUID>&rel=<pct-path>[&page=n]` (`DurableLink.readerReveal`).
 - Zotero → `zoteroItem`/`zoteroAttachment` block / `Item.zotero` (`ZoteroRef`) with `SourceAnchor.zoteroSelect`.
 
+### 3d. Rating — switch 5★→3★, and map quality control-tags (owner, 2026-07-17)
+Today `Item.quality` is a **1–5** star rating (`Item.swift`). **Change Archive Notes to a 3★ scale (1–3).**
+Import maps the DEVONthink quality control-tags to it: **`12 Best Note Excerpts` → 3★**, **`10 Good Note
+Excerpts` → 2★** (no such tag → no rating). These number-prefixed tags — like the `0 Note Excerpt(s)`
+excerpt marker — are **control tags: stripped from `Item.tags`, never imported as subject tags.**
+- **Broader app change (bundled into DTI-3):** the 5→3 star control + any rating filter, and a remap of any
+  *existing* 4–5★ ratings already in the app (min, if any — new app). Standalone from the import mechanics but
+  the import targets the 3★ scale, so it ships first.
+- **Open classification question (DTI-0):** do `Good/Best Note Excerpts`-tagged records **also** carry the
+  `0 Note Excerpt` marker (quality is an overlay on excerpts), or do these tags themselves mark a record as an
+  excerpt? This affects note-vs-extract classification (§5) — confirm against the real DB before the bulk run.
+- **Sweep for other `N …` control tags** in DTI-0 (e.g. other number-prefixed tags) and decide each explicitly
+  rather than letting them leak in as subjects.
+
 ---
 
 ## 4. The link-conversion contract (the correctness core)
@@ -197,6 +213,10 @@ can't confidently fix is flagged, never guessed.
 
 - **Note vs extract:** by the excerpt tag(s) confirmed in DTI-0. Assert every record classifies as exactly
   one; report any record with neither/both.
+- **Quality & control tags (§3d):** map `12 Best Note Excerpts`→3★, `10 Good Note Excerpts`→2★ into
+  `Item.quality` (3★ scale); **strip every number-prefixed control tag** (`0/10/12 …`) from `Item.tags` so
+  only real subject tags survive. Any other `N …`-prefixed tag → report for an explicit decision, never a
+  silent subject tag.
 - **Dates:** parse `Alias` → primary `date` + `datePrecision` (+ `dateUncertain` if the alias is fuzzy).
   Alias date grammar is discovered in DTI-0 (e.g. `1955`, `Mar 1955`, `1955-03-12`, `Nov`); the parser is a
   small, fully-tabulated, unit-tested grammar — unrecognized alias → flag, never a wrong date. **Month-prefix
@@ -317,6 +337,8 @@ rather than importing best-effort.
    disposition = move the target into Zotero** and represent as a `ZoteroRef`/attachment. Expected rare.
 4. **Minor schemes** — `DEVONwiki` → note-link-or-flag; `applewebdata` → drop + log; `mailto` → keep.
 5. **One-time migration** — idempotent + re-runnable from the frozen manifest, but **not** an ongoing sync.
+6. **Rating scale** — switch Archive Notes from 5★ to **3★**; import maps `12 Best Note Excerpts`→3★,
+   `10 Good Note Excerpts`→2★; number-prefixed control tags are stripped, not imported as subjects (§3d).
 
 **Still open:**
 6. **Adoption model** — how the imported notes become the live Archive Notes library. Either build a **fresh
@@ -340,7 +362,7 @@ Processor + Notes), not just Notes.
 | **DTI-0 — Spike & ground truth** | JXA extraction spike on a **copy**, run over a 300–500 record sample; corpus-profile report answering §9 findings (excerpt tag, alias grammar, month-prefix, replicant/near-dup prevalence). De-risks everything. | M | copy of DB |
 | **DTI-1 — Full extraction** | Complete JXA dump → frozen JSON manifest (all fields incl. `parents`) + content sidecars (HTML w/ hrefs, rtfd media) + count cross-check vs Metadata Overview TSV. | L | DTI-0 |
 | **DTI-2 — Transform library** | Pure, unit-tested transform: classify, dates, link contract (§4), replicant/near-dup (§6), blocks/assets. Fixture corpus + golden tests. Emits the import model + a dry-run report. | L | DTI-1 |
-| **DTI-3 — Archive Notes model changes** | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI) and Related-notes section. Tier-2 shared-core; build+test all apps. | L | (parallel w/ DTI-2) |
+| **DTI-3 — Archive Notes model changes** | Multi-date (`additional_dates` + `DateValue`, codec, **per-date index rows**, UI), Related-notes section, and the **5★→3★ rating** switch (§3d). Tier-2 shared-core; build+test all apps. | L | (parallel w/ DTI-2) |
 | **DTI-4 — Materializer** | Write a fresh store: `items/<uuid>/*.md` + `assets/` + `organization.json` (VFolders + memberships) directly, then rebuild index. Idempotent, deterministic, resumable. | M | DTI-2, DTI-3, §8 |
 | **DTI-5 — Verify & reconcile** | Run the §7 gate; produce the report; owner audits a stratified sample; adopt. | M | DTI-4 |
 
