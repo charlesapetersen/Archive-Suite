@@ -57,6 +57,12 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   core = replicants (shared `uuid` → memberships) vs near-duplicates (different `uuid` → date consolidation),
   and the link-conversion contract (nothing survives as `file://`/`zotero://`/`x-devonthink-item://`; only
   internet URLs stay `://`). See §9 open decisions + §8 owner prerequisites (a Reader root over Archival Photos).
+- `archive-notes/09-gap-closure.md` — **IN PROGRESS (Archive Notes post-ship reconciliation; W9; mixed Tier-1/Tier-2)**:
+  closes the plan-vs-build + spec-vs-build deltas found after W0–W8 shipped (docs/tracker sync, wire built-but-dead
+  features, re-arm safety-net lint/smoke tooling, secondary UI polish), then a **Phase-E verification review** that
+  gates flipping the **W9** checkbox + deleting the plan. Phase A docs A1/A2/A3/A8 shipped `56360f7` (2026-07-18);
+  `00-overview.md` remains the retained interface contract alongside it. See **W9 (gap-closure)** in the Archive
+  Notes section below.
 - ~~`autonomous-2wk-hardening.md`~~ — **SHIPPED 2026-07-16/17** (all 12 workstreams; see the DONE rollup above
   + `ops/autonomous/README.md` for the mechanisms, and `ops/autonomous/tests/prove-*.sh` for the proofs). Plan
   deleted per the "delete a shipped plan" convention — git history keeps the detailed Progress log.
@@ -66,14 +72,12 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   daemon-buildable sub-tasks landed (build-verified, additive + opt-in, default provider unchanged); the
   live-key OCR smoke + OpenAI Batch API (Phase 4) remain the **keyed/owner tail** (see the keyed-tail note in
   Wave 13 + Morning Review). **Plan deleted on ship** (git history keeps it).
-- `local-agent-cli-provider.md` — **READY (daemon-buildable), Processor**: drive OCR/tagging through a locally
-  installed, subscription-authenticated CLI — **Claude Code + Gemini CLI + OpenAI Codex CLI**, all first-class —
-  for enterprise Claude / Gemini / ChatGPT(Edu) accounts with no API key. Additive `localAgent` config sibling to
-  the gateway (append-only, keeps resume-critical snapshots unchanged). Tier-2, but the whole gate is satisfiable
-  **unattended** via a committed fake-CLI harness ($0). The plan now carries a **Daemon build plan** splitting it
-  into `W13.cli-1…4` (unattended) + a keyed/entitlement tail (gemini/codex install; real-CLI live smoke — blocked
-  inside a Claude Code session by the nested-session guard). Claude path validated on-machine 2026-07-10.
-  → queued in **Provider expansion (Wave 13)** below.
+- ~~`local-agent-cli-provider.md`~~ — **SHIPPED (Processor, W13.cli-1…4)**: drive OCR/tagging through a locally
+  installed, subscription-authenticated CLI (**Claude Code + Gemini CLI + OpenAI Codex CLI**, first-class) with no
+  API key — additive `localAgent` config sibling to the gateway (`localAgent > gateway > direct` selection),
+  validator + guided wizard + subscription cost pane + full pipeline wiring, all gated unattended at $0 via a
+  committed fake-CLI harness. **Plan deleted on ship** (git history keeps it); the real-CLI live smoke +
+  gemini/codex install remain the keyed/owner tail (see **Provider expansion (Wave 13)** + Morning Review).
 - ~~`archive-notes/` (00a, 01–08)~~ — **SHIPPED** (NEW APP: Archive Notes, W0–W8). The per-wave plans were
   **deleted on ship** (git history keeps them). `execution-plans/archive-notes/00-overview.md` is **RETAINED** as
   the authoritative interface contract (§2 locked decisions, §5 front-matter schema, **§16 Interface Contract**
@@ -506,7 +510,10 @@ before any Notes-specific work.
   write seam; adds the SPEC delta — `00a-archivecore-refactor.md` — **Tier-2** (TagWriter + both apps + SPEC)
   (S0 `f050d88` → S5 `cd7ff4f` → S6 `b90800f`)
 - [x] **W1** scaffold + app skeleton **depending on the W0 ArchiveCore** — `01-scaffolding-and-core.md` — Tier-2 (scaffold)
-  (S1 `7cddf60` → S2 `254fd73` → S3 `91c3c45` → S4 `220b582` → S5 docs)
+  (S1 `7cddf60` → S2 `254fd73` → S3 `91c3c45` → S4 `220b582` → S5 docs — **partial**: app-local
+  `README.md`/`AGENTS.md`/`SMOKE_TEST.md` were not actually written at S5; they shipped later under **W9 Phase A**
+  `56360f7` (2026-07-18). The SPEC `ArchiveSuite` marker prose section (A4) is still pending — see
+  `archive-notes/09-gap-closure.md`.)
 - [x] **W2** store + front-matter I/O + virtual folders/replication + FTS5 index — `02-storage-model-and-index.md` — Tier-2 (writers)
   (S1 `64eaa9c` → S2 `02201f0` → S3 `2404852` → S4 `afd06c7` → S5 org graph + organization.json)
 - [x] **W3** rich-text/Markdown editor (WYSIWYG + raw toggle, inline images) — `03-rich-text-markdown-editor.md` — Tier-1
@@ -944,7 +951,6 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 ## P3 — Suite structural
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
 - [x] De-nest the `App/App` folders → `App/macOS/`. Both apps build (0 warnings), 161 Reader tests green, DMG verified. ✅
-  - *(`ArchiveCore` shared-package extraction moved to `ArchiveProcessor/POTENTIAL_FEATURES.md` — deferred, 2026-07-08.)*
 
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 - [x] **GUI-verified 2026-07-08 (owner-driven, on the AR-Smoke scratch corpus, checked at the on-disk xattr level):** Reader inline tag-editor commit — Return-commit ✓, blur-commit of a completed token ✓. Found the half-typed-fragment case *dropped* the word (the documented no-lost-tag safety) yet left a misleading phantom chip; owner chose **WYSIWYG** instead, so `SubjectTokenField` now commits the field's tokens on blur (typed text sticks). Adds route through `TagWriter` (no tag loss); Tier-2 APPROVE. | files: Views/SubjectTokenField.swift | done
