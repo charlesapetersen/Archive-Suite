@@ -112,8 +112,16 @@ class OCRProcessor: ObservableObject {
     /// standard size gives a target file size; the dimension scale is ~√(target/actual), clamped to
     /// ≤1 (never upscale). So larger files are downscaled more; files already at/under target are
     /// left full-resolution. Returns 1.0 (full) at fraction ≥ 1 for average/small files.
-    nonisolated static func targetDimensionScale(forFileAt url: URL, sizeFraction: Double) -> Double {
-        let targetBytes = max(0.01, sizeFraction) * standardImageMB * 1_000_000
+    nonisolated static func targetDimensionScale(
+        forFileAt url: URL,
+        sizeFraction: Double,
+        standardImageMB explicitStandardImageMB: Double? = nil
+    ) -> Double {
+        // Live Capture supplies its immutable session snapshot here. Process Files keeps using the
+        // run-scoped static until its larger dependency-injection refactor is complete. Crucially,
+        // a Process Files run can no longer change the size target of an in-flight Live Capture call.
+        let runStandardImageMB = explicitStandardImageMB ?? standardImageMB
+        let targetBytes = max(0.01, sizeFraction) * runStandardImageMB * 1_000_000
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let bytes = (attrs[.size] as? NSNumber)?.doubleValue, bytes > 0 else {
             return min(1.0, sizeFraction)   // unknown size → treat the fraction as a dimension scale

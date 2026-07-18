@@ -41,10 +41,16 @@ struct MacOSTagger {
     ///   color detection is done on `tags`, so a *subject* tag that is literally "Red"/"Purple" is
     ///   never promoted to a Finder color label. When nil, Red/Purple are detected within `tags`.
     @discardableResult
-    static func applyTags(_ tags: [String], to url: URL, appColor: String? = nil, colorIsAuthoritative: Bool = false) throws -> TagWriteResult {
+    static func applyTags(
+        _ tags: [String],
+        to url: URL,
+        appColor: String? = nil,
+        colorIsAuthoritative: Bool = false,
+        stampUnread explicitStampUnread: Bool? = nil
+    ) throws -> TagWriteResult {
         // Capture stampUnread once outside the closure (the lock is not re-entrant with
         // the file-coordination block, and the value is stable within a single call).
-        let isStamping = stampUnread
+        let isStamping = explicitStampUnread ?? stampUnread
 
         return try CoordinatedTagWriter.write(url) { current, label in
             // Copy-source mode (stampUnread == false): pass the source tag names through verbatim.
@@ -99,10 +105,19 @@ struct MacOSTagger {
     }
 
     @discardableResult
-    static func applyTags(_ generatedTags: GeneratedTags, to url: URL) throws -> TagWriteResult {
+    static func applyTags(
+        _ generatedTags: GeneratedTags,
+        to url: URL,
+        stampUnread: Bool? = nil
+    ) throws -> TagWriteResult {
         // Pass the app-assigned color explicitly so a subject tag equal to "Red"/"Purple" isn't
         // promoted to a Finder color label.
-        try applyTags(generatedTags.allTags, to: url, appColor: generatedTags.colorTag, colorIsAuthoritative: true)
+        try applyTags(
+            generatedTags.allTags,
+            to: url,
+            appColor: generatedTags.colorTag,
+            colorIsAuthoritative: true,
+            stampUnread: stampUnread)
     }
 
     /// Finder label number for a color name. Processor-specific (the shared primitive works with

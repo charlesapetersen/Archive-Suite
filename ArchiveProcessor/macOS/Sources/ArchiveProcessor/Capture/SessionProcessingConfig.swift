@@ -19,6 +19,7 @@ struct SessionProcessingConfig {
     var sendPreviousImage: Bool
     var customOCRPrompt: String
     var imageScale: Double            // 0…1 (fraction of full resolution)
+    var standardImageMB: Double = 3.0 // size target used to translate imageScale into dimensions
     var enableSegmentJSON: Bool
     var tagVocabulary: [String]
     var gateway: GatewayConfig?
@@ -80,6 +81,7 @@ struct SessionProcessingConfig {
             sendPreviousImage: d.bool(forKey: DefaultsKeys.sendPreviousImage),
             customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
+            standardImageMB: { let s = d.double(forKey: DefaultsKeys.standardImageSizeMB); return s.isFinite && s > 0 ? min(20, max(0.5, s)) : 3.0 }(),
             enableSegmentJSON: d.object(forKey: DefaultsKeys.enableSegmentJSON) as? Bool ?? true,
             tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
                 .components(separatedBy: .newlines)

@@ -4,6 +4,52 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## DEFERRED: replace process-global processing settings with immutable per-run dependencies [HIGH — architecture/concurrency]
+
+The immediate Live Capture overlap bug is fixed: Live Capture now carries its locked rotation, image-size,
+and unread-tag policy through the OCR and file-writing calls instead of reading or mutating Process Files'
+globals. Process Files itself still stores six run settings in `nonisolated(unsafe)` static variables, and
+`MacOSTagger` retains a global fallback for older call sites. Its current single-run UI gate makes ordinary
+Process Files use safe, but the representation remains fragile for future background work, tests, app
+extensions, or a second entry point.
+
+Replace the remaining globals with one immutable, `Sendable` `ProcessingRunConfig` created at every run
+boundary. Pass it through OCR scheduling, retries, review/regeneration, PDF/image generation, tagging,
+batch resume, and Live Capture. Let persisted recovery records own a versioned copy of the same type rather
+than translating between manifest fields and mutable globals. Remove `nonisolated(unsafe)` configuration
+entirely; keep only genuinely process-wide synchronized services (for example rate-limit accounting).
+
+Verification plan:
+
+1. Run Process Files and Live Capture concurrently with opposite rotation, image-size, worker-count,
+   PDF/export-size, column, and unread-tag settings; prove each output matches only its own snapshot.
+2. Suspend both modes at OCR, retry, tagging review, rotation review, and PDF regeneration boundaries,
+   mutate Settings, then prove neither run changes behavior.
+3. Crash and resume standard, batch, pre-OCRed, re-OCR, and Live Capture runs; compare the restored config
+   byte-for-byte with the original and verify legacy recovery manifests still decode safely.
+4. Add Thread Sanitizer/stress coverage that interleaves two programmatic processors and Live Capture,
+   with no data races and no cross-run output/tag contamination.
+5. Delete the static fallback fields and make compile-time configuration injection mandatory at every
+   processing call site.
+
+Deferred because completing it touches the whole Processor pipeline and recovery schema. The narrow fix
+removes the actual cross-mode corruption path without forcing a high-risk pipeline rewrite into this bug
+checkpoint.
+
+---
+
+## ✅ FIXED (2026-07-17): Process Files could change an in-flight Live Capture run's settings [HIGH]
+
+**FIXED:** Live Capture no longer writes or reads Process Files' mutable rotation, standard-image-size, or
+unread-tag globals. Its locked `SessionProcessingConfig` now carries those values explicitly into every
+detached OCR task and staged/rotation-regenerated output write; the unread policy is also persisted with
+retained staging state for crash recovery. Process Files can therefore start or resume while a capture
+session is open without changing that session's rotation detection, request image scale, or Finder tags.
+The key-free manifest regression activates Live Capture under conflicting globals and proves its explicit
+size and tag policies win. (2026-07-17)
+
+---
+
 ## DEFERRED: unify paid-batch providers behind one durable state machine [MEDIUM — architecture/safety]
 
 The Processor's crash-safety fixes now journal paid-batch progress at the orchestration boundary, but the

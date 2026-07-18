@@ -176,11 +176,6 @@ final class LiveCaptureProcessor: ObservableObject {
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         stagingDir = dir
         Self.pruneLegacyStaging()   // best-effort: drop orphaned staging left by older builds
-        // Arm the shared tagging knobs for this session's writes.
-        MacOSTagger.stampUnread = config.taggingMode.stampsUnread
-        OCRProcessor.rotationModeForRun = config.rotationMode
-        OCRProcessor.loadStandardImageMB()
-
         loadStagingManifest()   // resume: reload already-staged segments so they're not re-OCR'd
         // Process photos already received (resume after a crash, or "chose live after some capture").
         for photo in session.photos { photoIngested(photo) }
@@ -343,7 +338,8 @@ final class LiveCaptureProcessor: ObservableObject {
             apiKey: ov?.apiKey ?? config.apiKey,
             customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
             imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
-            localAgent: ov == nil ? config.localAgent : nil)
+            localAgent: ov == nil ? config.localAgent : nil,
+            rotationMode: config.rotationMode, standardImageMB: config.standardImageMB)
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
         upsertStatus(groupId: photo.groupId, type: photo.type, pageCount: pageCount,
@@ -457,6 +453,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let writeJSON = config.enableSegmentJSON && gType == .document
         let jsonTags = tags
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
+        let stampUnread = config.taggingMode.stampsUnread
 
         // B8: `computeTags` above may have suspended on an LLM tagging call. Re-check BEFORE writing the
         // output PDF, so a Clear during OCR/tagging bails here and never leaves an orphan PDF in the cleared
@@ -469,7 +466,9 @@ final class LiveCaptureProcessor: ObservableObject {
                                    gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
                                    jsonTags: jsonTags, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
-                                   outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB, textColumns: textColumns)
+                                   outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
+                                   exportedImageMB: exportedImageMB, textColumns: textColumns,
+                                   stampUnread: stampUnread)
         }.value
 
         // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
@@ -485,7 +484,9 @@ final class LiveCaptureProcessor: ObservableObject {
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
-            outputImageFile: outputImageFile, pdfImageMB: pdfImageMB, exportedImageMB: exportedImageMB, textColumns: textColumns)
+            outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
+            exportedImageMB: exportedImageMB, textColumns: textColumns,
+            stampUnread: stampUnread)
         persistManifest()
         for p in group.photos { pageTasks[p.id] = nil }   // free memory
         // A1 — discriminated failure taxonomy (labeling ONLY; the data-safety gate is unchanged). The
@@ -566,8 +567,12 @@ final class LiveCaptureProcessor: ObservableObject {
         let pdfImageMB: Double
         let exportedImageMB: Double
         let textColumns: Int
+        /// Nil only for a legacy manifest that pre-dates this field. Rotation regeneration then uses
+        /// the recovered session config, matching the old global-at-activation behavior.
+        let stampUnread: Bool?
 
-        // Custom decoder: decodeIfPresent for textColumns so old manifests (pre-multicol) decode safely.
+        // Custom decoder: decodeIfPresent for fields added after the original manifest so old staged
+        // sessions remain recoverable. A nil legacy tag policy is resolved from the session config below.
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             groupId = try c.decode(String.self, forKey: .groupId)
@@ -587,18 +592,21 @@ final class LiveCaptureProcessor: ObservableObject {
             pdfImageMB = try c.decode(Double.self, forKey: .pdfImageMB)
             exportedImageMB = try c.decode(Double.self, forKey: .exportedImageMB)
             textColumns = try c.decodeIfPresent(Int.self, forKey: .textColumns) ?? 1
+            stampUnread = try c.decodeIfPresent(Bool.self, forKey: .stampUnread)
         }
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
-             outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int) {
+             outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
+             stampUnread: Bool) {
             self.groupId = groupId; self.type = type; self.collectionKey = collectionKey; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName; self.writeJSON = writeJSON; self.jsonTags = jsonTags
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
+            self.stampUnread = stampUnread
         }
     }
 
@@ -606,7 +614,8 @@ final class LiveCaptureProcessor: ObservableObject {
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
-        outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int
+        outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
+        stampUnread: Bool
     ) -> StagedSegment {
         let fm = FileManager.default
         let pdfGen = PDFGenerator()
@@ -628,14 +637,14 @@ final class LiveCaptureProcessor: ObservableObject {
             guard fm.fileExists(atPath: stagedPDF.path) else { continue }
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
-            _ = try? MacOSTagger.applyTags(tagList, to: stagedPDF)
+            _ = try? MacOSTagger.applyTags(tagList, to: stagedPDF, stampUnread: stampUnread)
             pdfURLs.append(stagedPDF)
 
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
-                    _ = try? MacOSTagger.applyTags(tagList, to: stagedImg)
+                    _ = try? MacOSTagger.applyTags(tagList, to: stagedImg, stampUnread: stampUnread)
                     imageURLs.append(stagedImg)
                 }
             }
@@ -661,7 +670,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
                 var tagList = baseTags
                 if let pr = pages.first?.priority, !tagList.contains(pr) { tagList.append(pr) }
-                _ = try? MacOSTagger.applyTags(tagList, to: mergedURL)
+                _ = try? MacOSTagger.applyTags(tagList, to: mergedURL, stampUnread: stampUnread)
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
             } catch { /* keep the individual PDFs if merge fails */ }
@@ -682,13 +691,14 @@ final class LiveCaptureProcessor: ObservableObject {
     nonisolated private static func ocrTask(
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
-        localAgent: LocalAgentConfig?
+        localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
             await OCRProcessor.performOCRCall(
                 imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
-                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway, localAgent: localAgent)
+                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
+                localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB)
         }
     }
 
@@ -873,6 +883,10 @@ final class LiveCaptureProcessor: ObservableObject {
             .compactMap { retained[$0] }
             .filter { seg in seg.pages.allSatisfy { fm.fileExists(atPath: $0.sourceURL.path) } }
         guard !segsToRegen.isEmpty, let stagingDir else { beginFinalize(); return }
+        // Legacy retained manifests had no per-run unread policy. Before this fix, activation set the
+        // recovered session config on the global immediately before regeneration; this fallback preserves
+        // that behavior while every new manifest carries the exact original value.
+        let legacyStampUnread = config?.taggingMode.stampsUnread ?? true
         isFinalizing = true
         Task { [weak self] in
             let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
@@ -883,7 +897,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
-                                           exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns)
+                                           exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
+                                           stampUnread: seg.stampUnread ?? legacyStampUnread)
                 }
             }.value
             guard let self else { return }

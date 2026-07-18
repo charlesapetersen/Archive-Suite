@@ -36,6 +36,56 @@ enum ManifestPersistenceTestDriver {
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
         let file = tmp.appendingPathComponent("manifest.json")
 
+        // --- B8: Live Capture must not read or write Process Files' mutable run statics. ---
+        // Activate an empty live session under deliberately conflicting globals. Activation used to
+        // overwrite all three, and later Process Files writes could change Live Capture mid-session.
+        let originalRotation = OCRProcessor.rotationModeForRun
+        let originalStandardImageMB = OCRProcessor.standardImageMB
+        let originalStampUnread = MacOSTagger.stampUnread
+        defer {
+            OCRProcessor.rotationModeForRun = originalRotation
+            OCRProcessor.standardImageMB = originalStandardImageMB
+            MacOSTagger.stampUnread = originalStampUnread
+        }
+        OCRProcessor.rotationModeForRun = .off
+        OCRProcessor.standardImageMB = 19
+        MacOSTagger.stampUnread = false
+        let liveIsolationSession = CaptureSession()
+        let liveProvider = LLMProvider.gemini
+        let liveConfig = SessionProcessingConfig(
+            provider: liveProvider, model: liveProvider.models[0], thinkingLevel: .low, apiKey: "",
+            taggingMode: .automatic, rotationMode: .llmSingle, mergeDocuments: false,
+            outputDirectory: tmp, contextCharCount: 200, sendPreviousImage: false,
+            customOCRPrompt: "", imageScale: 1, standardImageMB: 0.5,
+            enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
+            outputImageFile: true, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
+        liveIsolationSession.beginLiveSession(config: liveConfig)
+        check("B8: Live Capture activation does not mutate Process Files rotation/size/tag globals",
+              OCRProcessor.rotationModeForRun == .off
+              && OCRProcessor.standardImageMB == 19
+              && !MacOSTagger.stampUnread)
+
+        let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
+        try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)
+        let explicitScale = OCRProcessor.targetDimensionScale(
+            forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 0.5)
+        let globalScale = OCRProcessor.targetDimensionScale(forFileAt: sizedInput, sizeFraction: 1)
+        check("B8: explicit Live Capture size snapshot wins over conflicting Process Files global",
+              abs(explicitScale - 0.5.squareRoot()) < 0.0001 && globalScale == 1)
+
+        let explicitlyStamped = tmp.appendingPathComponent("b8-explicit-stamp.txt")
+        let explicitlyPlain = tmp.appendingPathComponent("b8-explicit-plain.txt")
+        try? Data("stamp".utf8).write(to: explicitlyStamped)
+        try? Data("plain".utf8).write(to: explicitlyPlain)
+        _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyStamped, stampUnread: true)
+        MacOSTagger.stampUnread = true
+        _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyPlain, stampUnread: false)
+        let stampedTags = try? MacOSTagger.readTags(from: explicitlyStamped)
+        let plainTags = try? MacOSTagger.readTags(from: explicitlyPlain)
+        check("B8: explicit Live Capture tag policy wins over conflicting Process Files global",
+              stampedTags?.last == "Unread" && plainTags == ["Subject"])
+        MacOSTagger.stampUnread = false
+
         typealias Entry = CaptureSession.ManifestEntry
         let entries = [
             Entry(name: "00001-gDoc.jpg", groupId: "gDoc", seq: 1, type: "document", priority: "P8", year: 1968, month: 3),

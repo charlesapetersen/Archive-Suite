@@ -1098,8 +1098,9 @@ extension OCRProcessor {
         if let code = result.errorCode, code == "408" || code == "504" { return true }
         return false
     }
-    /// Single-image OCR + concurrent rotation detection, merged into one result. Reused by the
-    /// Live Capture streaming coordinator (reads `rotationModeForRun`, set before the run).
+    /// Single-image OCR + concurrent rotation detection, merged into one result. Live Capture passes
+    /// its immutable session values explicitly; Process Files uses the static defaults until its
+    /// per-run dependency-injection refactor is complete.
     nonisolated static func performOCRCall(
         imageURL: URL,
         provider: LLMProvider,
@@ -1111,19 +1112,25 @@ extension OCRProcessor {
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
         gatewayConfig: GatewayConfig? = nil,
-        localAgent: LocalAgentConfig? = nil
+        localAgent: LocalAgentConfig? = nil,
+        rotationMode explicitRotationMode: RotationMode? = nil,
+        standardImageMB explicitStandardImageMB: Double? = nil
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
         // The detected correction overrides the OCR prompt's own rotation guess.
         async let rotationCorrection = detectRotation(
             imageURL: imageURL, provider: provider, apiKey: apiKey,
-            mode: rotationModeForRun, gatewayConfig: gatewayConfig, localAgent: localAgent
+            mode: explicitRotationMode ?? rotationModeForRun,
+            gatewayConfig: gatewayConfig, localAgent: localAgent
         )
 
         // The incoming `imageScale` is the size-target slider fraction; convert to a per-file
         // dimension scale (larger files reduced more; average/small files left full-res).
-        let scale = targetDimensionScale(forFileAt: imageURL, sizeFraction: imageScale)
+        let scale = targetDimensionScale(
+            forFileAt: imageURL,
+            sizeFraction: imageScale,
+            standardImageMB: explicitStandardImageMB)
 
         let networkResult: OCRResult
         do {
