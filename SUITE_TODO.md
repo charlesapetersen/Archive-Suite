@@ -366,11 +366,23 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   `geminiRegionWarning`, returns nil for Anthropic — same as OpenAI). Additive + opt-in; no default-provider
   change. Build clean, 0 new warnings; Tier-1 self-review. **GUI visual (wizard "Set up (guided)…" → Anthropic
   step) → Morning Review** (GUI off this run).
-- [ ] **OpenAI LLM rotation detection (Processor).** `.openai` is wired to LOCAL Vision rotation only
+- [x] **OpenAI LLM rotation detection (Processor).** `.openai` is wired to LOCAL Vision rotation only
   (`LLMRotationDetector.swift:72` + `CostEstimator.rotationModelCost` return nil — defensive, like Mistral/gateway).
   OpenAI is a capable vision model, so wire `.openai` into the LLM candidate-compare rotation path + add its
   `rotationModelCost` arm, matching Anthropic/Gemini (keep local Vision as the free default; Mistral genuinely can't
   → leave nil). | files: OCR/LLMRotationDetector.swift, Models/CostEstimator.swift, OCR/OCRProcessor+OCR.swift | M | low | none
+  — ✅ shipped: `.openai` wired into the LLM candidate-compare rotation path — extended the `LLMRotationDetector`
+  provider guard + added `askOpenAI` (OpenAI vision chat: `image_url` data URLs, Bearer auth,
+  `choices[0].message.content` parse; endpoint via `OpenAICompatibleClient.openAIBaseURL`) on a new
+  **non-reasoning** `cheapOpenAIModel = gpt-5.4-mini` (deterministic `temperature: 0` + `max_tokens: 8`; a
+  reasoning model would reject `temperature` and could burn the tiny budget on hidden reasoning). Added the
+  `CostEstimator.rotationModelCost` `.openai` arm `(0.75, 4.50)` + a tiling-accurate per-candidate token estimate
+  (765), so the cost estimate now matches the runtime path. Local Vision stays the free default; Mistral/gateway
+  still nil; any call failure falls back to local Vision. **`OCRProcessor+OCR.swift` needed no change** —
+  `detectRotation` already passes `provider` through generically (the item over-scoped its file list, like
+  W13.oai-1). Additive + opt-in; default provider unchanged. Build clean, 0 new warnings; Tier-1 self-review.
+  **Live-key OpenAI rotation smoke (does gpt-5.4-mini pick the upright candidate?) + final model-ID/pricing
+  confirm → keyed/owner tail → Morning Review.**
 - [ ] **Auto-route multi-page-PDF drops to re-OCR; retire the mode toggle (Processor) — owner-clarified 2026-07-16.**
   A dropped multi-page PDF should just run the re-OCR flow (render each page → LLM-OCR → interleaved image/OCR-text
   PDF) automatically — **no text-layer heuristic.** Owner's rule: `preOCRedInput` exists only to send input through

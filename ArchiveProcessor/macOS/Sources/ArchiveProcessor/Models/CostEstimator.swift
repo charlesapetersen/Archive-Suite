@@ -57,12 +57,16 @@ struct CostEstimator {
 
     // Rotation (LLM comparative call): 4 downscaled (~800px) candidate images + a short prompt,
     // one letter of output. `.llmSingle` = 1 call/file, `.llmMajority` = 3 calls/file. Always runs
-    // on a fixed cheap model (gemini-2.5-flash-lite for Gemini, claude-sonnet-4-6 for Anthropic);
-    // Gateway/Mistral fall back to free local Vision.
+    // on a fixed cheap model (gemini-2.5-flash-lite for Gemini, claude-sonnet-4-6 for Anthropic,
+    // gpt-5.4-mini for OpenAI); Gateway/Mistral fall back to free local Vision.
     static let estimatedRotationPromptTokens: Double = 90
     static let estimatedRotationOutputTokens: Double = 5
     static func estimatedRotationCandidateTokens(for provider: LLMProvider) -> Double {
-        provider == .anthropic ? 650 : 600     // per 800px candidate image
+        switch provider {                       // per 800px candidate image
+        case .anthropic: return 650
+        case .openai: return 765                // ~85 base + tiled 800px (OpenAI bills images as tokens)
+        default: return 600
+        }
     }
     /// (inputCostPer1M, outputCostPer1M) of the fixed model used for rotation, or nil if rotation
     /// is free/unavailable for this provider.
@@ -71,7 +75,7 @@ struct CostEstimator {
         case .gemini: return (0.0375, 0.15)     // gemini-2.5-flash-lite
         case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
-        case .openai: return nil                // v1: no LLM rotation path for OpenAI → local Vision (free)
+        case .openai: return (0.75, 4.50)       // gpt-5.4-mini (LLMRotationDetector.cheapOpenAIModel)
         }
     }
 

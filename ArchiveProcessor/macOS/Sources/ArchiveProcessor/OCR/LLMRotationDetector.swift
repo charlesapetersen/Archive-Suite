@@ -13,6 +13,11 @@ enum LLMRotationDetector {
 
     /// Cheap, fast Gemini model used for rotation regardless of the OCR model.
     static let cheapGeminiModel = "gemini-2.5-flash-lite"
+    /// Cheap, **non-reasoning** OpenAI model used for rotation regardless of the OCR model. Must stay a
+    /// non-reasoning model: this path sends `temperature: 0` + `max_tokens`, and a reasoning model would
+    /// reject `temperature` and could spend the tiny `max_tokens` budget on hidden reasoning, returning no
+    /// letter. gpt-5.4-mini is benchmarked non-reasoning (`LLMModel.openaiModels`). // VERIFY at build time.
+    static let cheapOpenAIModel = "gpt-5.4-mini"
     /// Long edge of the downscaled candidate images (orientation is obvious at low res).
     private static let candidatePixels = 800
 
@@ -38,7 +43,7 @@ enum LLMRotationDetector {
     ) async -> Int? {
         // Gateway / Mistral don't have a supported multi-image vision chat path here.
         if gatewayConfig != nil { return nil }
-        guard provider == .gemini || provider == .anthropic else { return nil }
+        guard provider == .gemini || provider == .anthropic || provider == .openai else { return nil }
 
         guard let candidates = renderCandidates(imageURL: imageURL) else { return nil }
 
@@ -69,7 +74,7 @@ enum LLMRotationDetector {
         case .gemini: letter = await askGemini(images: images, apiKey: apiKey)
         case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
         case .mistral: letter = nil
-        case .openai: letter = nil   // v1: no LLM rotation path (gated out at the guard above) → local Vision fallback
+        case .openai: letter = await askOpenAI(images: images, apiKey: apiKey)
         }
         guard let ch = letter?.uppercased().first, let idx = labels.firstIndex(of: String(ch)) else { return nil }
         return order[idx]
@@ -125,6 +130,36 @@ enum LLMRotationDetector {
               let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
               let contentArr = json["content"] as? [[String: Any]] else { return nil }
         return contentArr.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func askOpenAI(images: [(label: String, base64: String)], apiKey: String) async -> String? {
+        var content: [[String: Any]] = [["type": "text", "text": prompt]]
+        for img in images {
+            content.append(["type": "text", "text": "\nImage \(img.label):"])
+            content.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(img.base64)"]])
+        }
+        // gpt-5.4-mini is non-reasoning → plain `max_tokens` + deterministic `temperature: 0`, mirroring the
+        // Gemini path (a reasoning model would need `max_completion_tokens` and reject `temperature`).
+        let body: [String: Any] = [
+            "model": cheapOpenAIModel,
+            "max_tokens": 8,
+            "temperature": 0,
+            "messages": [["role": "user", "content": content]]
+        ]
+        guard let url = URL(string: "\(OpenAICompatibleClient.openAIBaseURL)/chat/completions"),
+              let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 90)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = data
+        guard let (respData, _) = try? await NetworkSession.data(
+            for: request, policy: .nonIdempotent, maxRetries: 1),
+              let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any],
+              let text = message["content"] as? String else { return nil }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Candidate rendering
