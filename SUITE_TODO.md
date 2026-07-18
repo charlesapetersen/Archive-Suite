@@ -664,6 +664,21 @@ add a second control alongside.**
   emulator E2E (`scripts/e2e-phone-mac.sh`) = owner tail** (companions have no unit tests — the E2E is the gate).
   | files: ArchiveProcessor/ArchiveCapture/, ArchiveProcessor/ArchiveCaptureiOS/, Net/CaptureServer.swift, Net/RelayObjectFormat.swift | M | med | owner(E2E)
 
+## Reader test hardening (owner-reviewed 2026-07-18)
+From the review of Reader `KNOWN_ISSUES.md` "Open risks / to verify" — almost all entries were already settled in
+code; the owner queued only this one (the others are pruned/soft-backlog there). See that file for the record.
+- [ ] **W20.deeplink-isolation — isolate `DeepLinkTests.testRevealAndSelectNoRoot` from the machine's real defaults [S–M].**
+  The test builds `NavigationModel()` with no `-ARUITestRootPath`, so `RootFolderStore.resolveSaved()` reads
+  `UserDefaults.standard` and picks up the owner's persisted `archiveRootBookmark` → the "no archive folder"
+  assertion fails on this machine. The WS7 health gate currently `-skip-testing`s it, so the **no-root deep-link
+  path has zero automated coverage here.** Fix: make `RootFolderStore`'s defaults **injectable** (it hardcodes
+  `UserDefaults.standard` at `RootFolderStore.swift:15/58`) and have the test inject a **volatile
+  `UserDefaults(suiteName:)` with no bookmark**; then drop the `-skip-testing` line in
+  `ops/autonomous/health-gate.sh`. ⚠️ **Do NOT** stash/remove the machine's real `archiveRootBookmark` — that's
+  the never-mutate-live-root hazard; inject a throwaway defaults instead. **Tier-2** (touches the security-scoped
+  bookmark store) — adversarial review; daemon-buildable (build + Reader unit tests, scratch-only). Restores
+  coverage + removes the skip. | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/RootFolderStore.swift, Tests/ArchiveReaderTests/DeepLinkTests.swift, ops/autonomous/health-gate.sh | S–M | low | none
+
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
 asked to queue the **Android `targetSdk` 34→36** bump, but grounding against the real `build.gradle.kts` found

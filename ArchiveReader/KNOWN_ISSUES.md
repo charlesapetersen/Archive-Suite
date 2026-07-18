@@ -9,8 +9,10 @@ resolves a root and the test's "No archive folder" assertion fails. It's **envir
 the diff under test touches no NavigationModel/DeepLink/RootFolderStore code. The WS7 health gate
 (`ops/autonomous/health-gate.sh`) therefore runs the Reader unit suite with
 `-skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot` so it doesn't false-park the
-autonomous run. **Real fix (then drop the skip):** isolate the test's defaults (a per-test suite name / a
-volatile `UserDefaults`), so it doesn't read the machine's persisted archive root.
+autonomous run. **Real fix (then drop the skip) — QUEUED 2026-07-18 as `W20.deeplink-isolation`:** isolate the
+test's defaults (inject a volatile `UserDefaults(suiteName:)` with no bookmark), so it doesn't read the machine's
+persisted archive root. ⚠️ Must NOT be "fixed" by stashing/removing the machine's real `archiveRootBookmark`
+(that's the never-mutate-live-root hazard) — inject a throwaway defaults instead.
 
 ## GUI-pass regressions in the AppKit nav table + tag filter (2026-07-16 — owner GUI re-test)
 An interactive GUI pass surfaced three display/interaction bugs in shipped Reader features. Two fixed, one deferred:
@@ -128,24 +130,32 @@ A multi-agent hunt for this bug class (the willSet + clobber category) confirmed
   the doc window without dismissing the sheet. Fix: `openSelection()` clears `showingPreview` first.
 
 ## Open risks / to verify
-- **Spotlight content indexing is unreliable here:** `kMDItemTextContent` was `null` on the freshly
-  copied test corpus. → Full-text search must use the app's own content index (extract page-2 text
-  per file), not `kMDItemTextContent`. Re-check whether normal on-disk archives get content-indexed.
-- **`.documentIdentifierKey` may mutate the file** (assigns/persists an identifier on read) — do NOT
-  request it. Use security-scoped bookmarks + path-identity re-verification instead. *To confirm.*
-- **Tag-write coordination:** must use `NSFileCoordinator(.contentIndependentMetadataOnly)`, never
-  `.forReplacing`. TOCTOU: read the array *inside* the coordinated write. *Property-test this.*
-- **Unicode normalization on tag write:** confirm macOS does not NFC/NFD-normalize or trim tag
-  strings on write (would make the multiset verify false-fail). *Property-test on the real corpus copy.*
-- **Classification is not always present** (`Document Start`/`Continuation` absent on some outputs) —
-  segment features must degrade gracefully; never assume presence.
-- **RESOLVED (`435b8c4`):** the nav table is now AppKit `NSTableView` (`Views/AppKitTableView.swift`) —
-  virtualized rows + diffable snapshots + 150ms-debounced filter; handles large corpora without the SwiftUI
-  `Table` jank measured at 40k. (Interactive inline cell editing is a follow-up — see the NSTableView note.)
-- **Not every file is a clean 2-page PDF** — guard 1-page/>2-page/0-page/corrupt/encrypted and
-  tagged non-PDF images; the two-up viewer must degrade, not crash.
-- **Subject/facet collisions** (a subject literally `1984`, `P7`, `Read`) — facet classification is
-  display/sort/filter only and must never drive a write.
+**Reviewed with the owner 2026-07-18** — every former entry here was grounded against current code; almost all
+are now settled in code + tests. Kept as a short record:
+- **SETTLED — Spotlight content indexing is not relied on.** Full-text search uses the Reader's own FTS5 index
+  (`Search/ContentIndex.swift` + `ContentIndexer` + `PDFTextExtractor` over page-2 text), never
+  `kMDItemTextContent` (0 code references). The old "re-check on-disk indexing" residual is moot.
+- **SETTLED — `.documentIdentifierKey` is never requested** (it can assign/persist an identifier = a mutation).
+  It appears only in "never request" comments; W14.2 identity re-verification uses `fileResourceIdentifier`
+  (Safety §6). Enforced, not "to confirm."
+- **SETTLED — tag-write coordination.** The shared `CoordinatedTagWriter` uses
+  `NSFileCoordinator(.contentIndependentMetadataOnly)` (never `.forReplacing`), reads the array **inside** the
+  coordinated block (TOCTOU), and verifies by re-read multiset. Covered by focused example tests
+  (`TagWriterPrimitiveTests`/`TagWriterTests`). *(A generative property test was considered 2026-07-18 and
+  declined as assurance-only — the path is deterministic + audited + green.)*
+- **SETTLED — facet classification is display/sort/filter only, never drives a write.** `DocumentTags.parse`
+  demotes shadowed collisions (a subject literally `1984`/`P7`/`Read`) back to subjects; `TagEditing` removes only
+  the exact winning token. Regression-tested (incl. the `Read`-substring case).
+- **SETTLED — segment features degrade when Classification is absent** (`DocumentRuns` returns a single item);
+  the nav table is AppKit `NSTableView`; non-2-page / corrupt / non-PDF files degrade via `PDFFormatStatus` +
+  render guards (page count is never a defect signal).
+- **Low-pri, NOT queued (owner-reviewed 2026-07-18) — Unicode-on-write verification.** A scratch probe/guard for
+  (a) macOS not trimming whitespace off a tag on write and (b) locking in that the verify treats NFC==NFD as
+  equal. **The note's NFC/NFD "false-fail" fear is already neutralized** — Swift `String` comparison is
+  canonical-equivalence-aware — so only the trim case is unpinned. Assurance-only, not a correctness gap; left
+  as a soft backlog item.
+- **QUEUED (owner-reviewed 2026-07-18) — the `DeepLinkTests` no-root flake real-fix** (top of this file) is now
+  tracked as **`W20.deeplink-isolation`** in `SUITE_TODO.md`.
 
 ## Environment notes
 - Xcode 26.3 / Swift 6.2 toolchain; XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`.
