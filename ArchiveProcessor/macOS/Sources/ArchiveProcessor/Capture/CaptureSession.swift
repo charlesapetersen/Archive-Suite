@@ -14,6 +14,10 @@ final class CaptureSession: ObservableObject {
     @Published var statusMessage = "Idle"
     @Published private(set) var connectedDeviceName: String?
 
+    /// Headless test seam for manifest durability failures. Nil in production; the closure owns no files
+    /// unless the test explicitly writes them.
+    var manifestWriteOverride: ((Data, URL) -> Bool)?
+
     /// How many photos the phone still has un-sent (its last heartbeat), + when we last heard it, so the
     /// Mac can surface "phone still has N to send" and hold Finish until the phone has drained.
     @Published private(set) var phonePendingCount = 0
@@ -619,7 +623,12 @@ final class CaptureSession: ObservableObject {
     /// already-streamed pages (so the tag card pre-fills), then mark it complete so the card appears.
     /// A per-page `P10` already on a photo (streamed with it) is never downgraded. Idempotent: re-sending
     /// the same signal (retry) just re-applies the same tags + is a no-op on the completed set.
-    func markSegmentComplete(groupId: String, priority: String?, year: Int?, month: Int?) {
+    @discardableResult
+    func markSegmentComplete(groupId: String, priority: String?, year: Int?, month: Int?) -> Bool {
+        let previousPhotos = photos.indices.filter { photos[$0].groupId == groupId }.map {
+            (index: $0, priority: photos[$0].priority, year: photos[$0].year, month: photos[$0].month)
+        }
+        let wasCompleted = completedDocGroups.contains(groupId)
         var changed = false
         for i in photos.indices where photos[i].groupId == groupId {
             if year != nil { photos[i].year = year }
@@ -631,22 +640,40 @@ final class CaptureSession: ObservableObject {
         // durable state change on its own — persist even when no photo field changed (e.g. re-tagging with
         // the same values), or a Mac restart right after would drop this segment's tag card until Finish.
         let newlyCompleted = completedDocGroups.insert(groupId).inserted
-        if changed || newlyCompleted { _ = writeManifest() }
+        if changed || newlyCompleted, !writeManifest() {
+            // No ack without durable state. Restore memory too, so a retry is guaranteed to attempt the
+            // manifest write again and the UI cannot surface a completion the phone still owns.
+            for previous in previousPhotos {
+                photos[previous.index].priority = previous.priority
+                photos[previous.index].year = previous.year
+                photos[previous.index].month = previous.month
+            }
+            if !wasCompleted { completedDocGroups.remove(groupId) }
+            return false
+        }
         headlessResolvePendingTags()   // headless E2E only (env-gated); no-op in production
+        return true
     }
 
     /// Finish (`POST /session/complete`): surface the tag card for any document segment still open — e.g.
     /// the last segment if the operator finished without tapping End segment — so nothing is stranded.
-    func completeAllOpenDocGroups() {
-        var changed = false
+    @discardableResult
+    func completeAllOpenDocGroups() -> Bool {
+        var newlyCompleted: [String] = []
         for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id) {
-            if completedDocGroups.insert(g.id).inserted { changed = true }
+            if completedDocGroups.insert(g.id).inserted { newlyCompleted.append(g.id) }
         }
-        if changed { _ = writeManifest() }   // persist the completion set (B5-ii) so a restart keeps the cards
+        if !newlyCompleted.isEmpty, !writeManifest() {
+            // Session-complete is a sender-owned control just like segment-complete. Keep memory aligned
+            // with disk so LAN/relay can refuse the ack and a retry will attempt persistence again.
+            for groupId in newlyCompleted { completedDocGroups.remove(groupId) }
+            return false
+        }
         // Headless E2E only (env-gated): resolve the just-completed cards, then drive the finish→finalize
         // path (this is called on the phone's POST /session/complete). Both are no-ops in production.
         headlessResolvePendingTags()
         startHeadlessFinalizeIfRequested()
+        return true
     }
 
     func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
@@ -728,6 +755,7 @@ final class CaptureSession: ObservableObject {
         let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups),
                                        resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
+        if let manifestWriteOverride { return manifestWriteOverride(data, manifestURL) }
         do { try data.write(to: manifestURL, options: .atomic); return true }
         catch { return false }
     }

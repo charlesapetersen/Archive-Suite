@@ -762,7 +762,13 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Once everything is staged, `proceedToFinishIfReady` runs `finishSession`.
     func requestFinish() {
         guard !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
-        session.completeAllOpenDocGroups()
+        guard session.completeAllOpenDocGroups() else {
+            // A prior Finish may already have armed the watchdog. Cancel it too; otherwise it could later
+            // advance after this re-tap rolled a newly-open group's undurable completion back.
+            pendingFinish = false
+            session.statusMessage = "Could not save session completion — check the backup folder and try Finish again."
+            return
+        }
         let wasPending = pendingFinish
         pendingFinish = true
         if !wasPending { startFinishWatchdog() }   // one watchdog per pending-finish episode

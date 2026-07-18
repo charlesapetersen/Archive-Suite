@@ -277,18 +277,25 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             let year = (req.headers["x-year"]).flatMap { Int($0) }
             let month = (req.headers["x-month"]).flatMap { Int($0) }
             Task { @MainActor [weak self] in
-                self?.session?.markSegmentComplete(groupId: groupId, priority: priority, year: year, month: month)
+                guard let self else { conn.cancel(); return }
+                let durable = self.session?.markSegmentComplete(
+                    groupId: groupId, priority: priority, year: year, month: month) ?? false
+                self.respond(conn, status: durable ? "200 OK" : "500 Internal Server Error",
+                             json: ["ok": durable])
             }
-            respond(conn, status: "200 OK", json: ["ok": true])
 
         case "POST /session/complete":
             // Phone finished capturing. Surface the tag card for any still-open document segment (e.g. a
             // last segment the operator didn't tap End segment on) so nothing is stranded, then nudge.
             Task { @MainActor [weak self] in
-                self?.session?.completeAllOpenDocGroups()
-                self?.session?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
+                guard let self else { conn.cancel(); return }
+                let durable = self.session?.completeAllOpenDocGroups() ?? false
+                if durable {
+                    self.session?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
+                }
+                self.respond(conn, status: durable ? "200 OK" : "500 Internal Server Error",
+                             json: ["ok": durable])
             }
-            respond(conn, status: "200 OK", json: ["ok": true])
 
         case "POST /phone/status":
             // Heartbeat: how many photos the phone still has un-sent. Lets the Mac surface "phone still

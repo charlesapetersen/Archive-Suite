@@ -94,6 +94,68 @@ enum ManifestPersistenceTestDriver {
               legacy?.resolved.isEmpty == true && legacy?.macTags.isEmpty == true
               && emptyDecoded?.resolved.isEmpty == true && emptyDecoded?.macTags.isEmpty == true)
 
+        // --- B10: segment completion is acknowledged only after the real session manifest write succeeds.
+        // Inject a write failure, prove memory rolls back, then retry and prove the card becomes durable.
+        let session = CaptureSession()
+        session.beginStageSessionForTest()   // never inherit live-processing defaults / launch OCR or network
+        let ingested = session.ingest(jpeg: Data("synthetic page".utf8), groupId: "gDurable", seq: 99,
+                                      type: .document, priority: nil, year: nil, month: nil,
+                                      deviceName: "ManifestTest")
+        check("B10: synthetic page ingests before completion test", ingested != nil)
+        session.manifestWriteOverride = { _, _ in false }
+        let failedCompletion = session.markSegmentComplete(
+            groupId: "gDurable", priority: "P8", year: 1972, month: 6)
+        check("B10: manifest failure refuses completion acknowledgement", !failedCompletion)
+        check("B10: manifest failure rolls completion/card state back", session.pendingTagGroup == nil)
+        check("B10: manifest failure rolls photo metadata back",
+              session.photos.first(where: { $0.groupId == "gDurable" })?.year == nil
+              && session.photos.first(where: { $0.groupId == "gDurable" })?.priority == nil)
+        session.manifestWriteOverride = nil
+        let retriedCompletion = session.markSegmentComplete(
+            groupId: "gDurable", priority: "P8", year: 1972, month: 6)
+        check("B10: retry acknowledges after durable manifest write", retriedCompletion)
+        check("B10: successful retry exposes the completed tag card with metadata",
+              session.pendingTagGroup?.id == "gDurable"
+              && session.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
+              && session.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+
+        let sessionPhoto = session.ingest(jpeg: Data("synthetic final page".utf8), groupId: "gSession",
+                                          seq: 100, type: .document, priority: nil, year: nil, month: nil,
+                                          deviceName: "ManifestTest")
+        check("B10: final open group ingests before session-completion test", sessionPhoto != nil)
+        session.manifestWriteOverride = { _, _ in false }
+        let failedSessionCompletion = session.completeAllOpenDocGroups()
+        check("B10: manifest failure refuses session-completion acknowledgement", !failedSessionCompletion)
+        check("B10: manifest failure rolls whole-session completion back",
+              !session.completedDocGroups.contains("gSession"))
+        session.manifestWriteOverride = nil
+        let retriedSessionCompletion = session.completeAllOpenDocGroups()
+        check("B10: whole-session retry acknowledges after durable manifest write",
+              retriedSessionCompletion && session.completedDocGroups.contains("gSession"))
+
+        session.liveProcessor.requestFinish()
+        check("B10: initial operator Finish can wait on unresolved tag cards",
+              session.liveProcessor.pendingFinish)
+        let latePhoto = session.ingest(jpeg: Data("synthetic late page".utf8), groupId: "gLate",
+                                       seq: 101, type: .document, priority: nil, year: nil, month: nil,
+                                       deviceName: "ManifestTest")
+        check("B10: late group ingests while Finish is pending", latePhoto != nil)
+        session.manifestWriteOverride = { _, _ in false }
+        session.liveProcessor.requestFinish()
+        check("B10: failed Finish re-tap cancels the earlier watchdog",
+              !session.liveProcessor.pendingFinish && !session.completedDocGroups.contains("gLate"))
+        session.manifestWriteOverride = nil
+        session.liveProcessor.requestFinish()
+        check("B10: operator Finish retry persists the late group and re-arms safely",
+              session.liveProcessor.pendingFinish && session.completedDocGroups.contains("gLate"))
+        session.liveProcessor.cancelPendingFinish()
+        let restoredSession = CaptureSession()
+        check("B10: successful segment/session retries survive a fresh session restore",
+              restoredSession.pendingTagGroup?.id == "gDurable"
+              && restoredSession.completedDocGroups.isSuperset(of: ["gSession", "gLate"])
+              && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
+              && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_MANIFESTTEST_OUT"]

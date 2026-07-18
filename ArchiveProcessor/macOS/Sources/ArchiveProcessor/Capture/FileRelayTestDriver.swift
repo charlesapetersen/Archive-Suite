@@ -203,6 +203,45 @@ enum FileRelayTestDriver {
                 "epochPublished=\(epochPublished) a10rejected=\(a10) wrongEpochIgnored=\(wrongEpochIgnored)")
         }
 
+        // ── Case 9: segment control remains sender-owned until the manifest commit succeeds ──
+        do {
+            let d = caseDir("c9"); let r = makeRcv(d)
+            writePhoto(d, "c9g0", 0, "document"); _ = await r.scanOnce()
+            let marker = RelayObjectFormat.segmentName(group: "c9g0")
+            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c9g0", priority: "P8",
+                                                 year: "1972", month: "6", seqs: "0")
+                .write(to: d.appendingPathComponent(marker))
+            session.manifestWriteOverride = { _, _ in false }
+            let a = await r.scanOnce()
+            let retained = a.segmentsDeferred.contains("c9g0") && has(d, marker)
+                && !session.completedDocGroups.contains("c9g0")
+            session.manifestWriteOverride = nil
+            let b = await r.scanOnce()
+            let recovered = b.segmentsApplied.contains("c9g0") && !has(d, marker)
+                && session.completedDocGroups.contains("c9g0")
+            rec("segment-control-retained-until-manifest-durable(B10)", retained && recovered,
+                "retained=\(retained) recovered=\(recovered)")
+        }
+
+        // ── Case 10: session control has the same no-ack-before-durable contract ──
+        do {
+            let d = caseDir("c10"); let r = makeRcv(d)
+            writePhoto(d, "c10g0", 0, "document"); _ = await r.scanOnce()
+            let marker = RelayObjectFormat.sessionCompleteName
+            try? RelayObjectFormat.encodeSessionComplete(token: token, epoch: epoch)
+                .write(to: d.appendingPathComponent(marker))
+            session.manifestWriteOverride = { _, _ in false }
+            let a = await r.scanOnce()
+            let retained = !a.sessionCompleted && has(d, marker)
+                && !session.completedDocGroups.contains("c10g0")
+            session.manifestWriteOverride = nil
+            let b = await r.scanOnce()
+            let recovered = b.sessionCompleted && !has(d, marker)
+                && session.completedDocGroups.contains("c10g0")
+            rec("session-control-retained-until-manifest-durable(B10)", retained && recovered,
+                "retained=\(retained) recovered=\(recovered)")
+        }
+
         session.clear()   // tidy the test session folder
 
         let allPass = results.allSatisfy { $0.pass }

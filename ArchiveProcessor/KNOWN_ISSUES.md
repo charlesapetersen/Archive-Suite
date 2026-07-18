@@ -4,6 +4,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (2026-07-12): capture completion was acknowledged before durable Mac persistence [CRITICAL]
+
+**FIXED:** segment and whole-session completion are now transactional: they snapshot affected completion
+state (and segment photo metadata), write the manifest, and return success only after the atomic write
+succeeds; failure restores the snapshot. LAN sends HTTP 500 instead of 200 on failure, and the relay
+retains its control object for retry instead of deleting it. Operator Finish also stops with a retryable
+message. Headless manifest/relay drivers inject failure and prove rollback, retained controls, successful
+retry, and restart recovery. (2026-07-12)
+
+---
+
 ## ✅ FIXED (2026-07-12): dismissing the macOS live tag card silently acted as Skip [HIGH]
 
 **FIXED:** interactive dismissal is disabled and the sheet binding no longer translates a nil write into

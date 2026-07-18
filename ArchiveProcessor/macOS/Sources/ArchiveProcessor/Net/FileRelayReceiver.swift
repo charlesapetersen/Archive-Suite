@@ -223,10 +223,12 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             }
             if deferIt { report.segmentsDeferred.append(group); continue }
             let s = session
-            await MainActor.run {
+            let durable = await MainActor.run {
                 s?.markSegmentComplete(groupId: group, priority: meta["priority"],
-                                       year: meta["year"].flatMap { Int($0) }, month: meta["month"].flatMap { Int($0) })
+                                       year: meta["year"].flatMap { Int($0) },
+                                       month: meta["month"].flatMap { Int($0) }) ?? false
             }
+            if !durable { report.segmentsDeferred.append(group); continue }
             store.delete(seg); report.segmentsApplied.append(group)
         }
 
@@ -246,12 +248,17 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             }
             if !anyUnprocessed && report.segmentsDeferred.isEmpty {
                 let s = session
-                await MainActor.run {
-                    s?.completeAllOpenDocGroups()
-                    s?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
+                let durable = await MainActor.run {
+                    let durable = s?.completeAllOpenDocGroups() ?? false
+                    if durable {
+                        s?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
+                    }
+                    return durable
                 }
-                for n in mySessionCompletes { store.delete(n) }
-                report.sessionCompleted = true
+                if durable {
+                    for n in mySessionCompletes { store.delete(n) }
+                    report.sessionCompleted = true
+                }
             }
         }
 
