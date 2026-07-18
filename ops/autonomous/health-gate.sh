@@ -27,6 +27,9 @@ step() { local name="$1"; shift; printf '── %s ──\n' "$name"; if "$@" >>
 # this machine's shared com.archivereader.app defaults hold a persisted archiveRootBookmark (NavigationModel
 # resolves a root, so the "No archive folder" assertion fails) — it's env, not a regression, and without the
 # skip the gate would RED (false-park) on every run. Documented in KNOWN_ISSUES; fix it and drop the skip.
+# Pixel-truth runs here too: DocumentRenderGuardTests (RenderProbe) lives INSIDE ArchiveReaderTests and renders a
+# PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
+# draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotes  -destination "platform=macOS" -only-testing:ArchiveNotesTests  -derivedDataPath ./build/gate-DD'
 # Processor: BUILD only (free) — catches compile breaks without the paid OCR round-trip. xcodebuild exits

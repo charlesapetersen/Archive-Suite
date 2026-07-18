@@ -126,7 +126,7 @@ claims editing lives in the inspector.
 `ArchiveLinkWriter` site, and Notes has no render-on-demand fallback on paste.
 - *Files (Reader):* `ArchiveReader/.../Core/ArchiveLinkWriter.swift`, `.../Views/NavigationModel.swift:~1028`, `.../Views/DocumentViewerModel.swift:~220`. *Files (Notes):* `.../Editor/MarkdownEditorView.swift` (`handleSourceBlockPaste`), `.../Views/ThumbnailImageCache.swift`.
 - *Steps:* instantiate a shared `PDFThumbnailer` in Reader and pass it to `ArchiveLinkWriter.pageLink` (populate `thumbPNGBase64`) — including the batch "Copy Archive Link(s)" path, which currently hardcodes `nil`. In Notes, when a pasted page-entry has `thumbnailData == nil`, resolve within granted scope and render via `PDFThumbnailer`, else skip (as planned).
-- *Verify:* the W8 acceptance "paste from Reader → source block with a live thumbnail" passes; cache LRU/eviction exercised. **Tier-2** (spans both apps + the Reader copy path). *Done:* pasted page-links show a rendered thumbnail; `PDFThumbnailer` has a production caller.
+- *Verify:* the W8 acceptance "paste from Reader → source block with a live thumbnail" passes; cache LRU/eviction exercised. Add a headless render guard (the `RenderProbe`/`DocumentRenderGuardTests` pattern over `PDFThumbnailer`) so a **blank** thumbnail fails a test, not just the eye. **Tier-2** (spans both apps + the Reader copy path). *Done:* pasted page-links show a rendered thumbnail; `PDFThumbnailer` has a production caller.
 
 **B5. Consume `archivenotes://open` to select/raise the note.** — **MED** — `04` S5. `NotesDeepLinkRouter.pendingOpen`
 is published but nothing observes it, so an external `archivenotes://open?id=<uuid>` activates the app
@@ -279,7 +279,9 @@ without Zotero, persisted to front-matter + FTS (B8)**; a pasted page-link shows
 `archivenotes://open?id=…` selects the note; **Copy Link puts the item's `archivenotes://open` URL on the
 pasteboard and pasting it back selects/raises that item — the full Scrivener round-trip (B9 ⇄ B5)**; a
 menu-created extract embeds its image bytes; a moved source re-grants in-app. Anything needing a human (real
-Zotero/Reader/Scrivener install) is owner-eye — flag it, don't claim it. *Done:* each behavior observed, not inferred.
+Zotero/Reader/Scrivener install) is owner-eye — flag it, don't claim it. **Tooling:** use headless render guards
+(`RenderProbe`) for pixel truth (a thumbnail / PDF pane actually drew) and `ops/gui/capture-window.sh` → read the
+shot for chip / empty-state / banner rendering — see `ops/gui/README.md`. *Done:* each behavior observed, not inferred.
 
 **E3. Prove the safety-net actually bites.** Confirm the new guards fail on a planted violation, not just
 pass on the clean tree: `./test-smoke.sh archivecore` runs and is in `all`; the Processor lint trips on a

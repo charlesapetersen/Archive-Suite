@@ -15,7 +15,10 @@ working inside a subdirectory:
 The whole per-change checklist in one place, so no rule hides inside a longer section. Every change, in order:
 
 1. **Isolate** — work in your own git worktree, never the primary checkout (→ *Worktree-first*, below).
-2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test.
+2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test. For a **view /
+   PDF-render** change, also confirm it *actually drew*: XCUITest sees only the accessibility tree, not pixels —
+   use a headless render guard (`RenderProbe` / `DocumentRenderGuardTests`, no launch/TCC) and/or the live
+   sighted loop (`ops/gui/capture-window.sh` + `cliclick`). See [`ops/gui/README.md`](ops/gui/README.md).
 3. **Review by risk** — Tier-2 (adversarial review + a functional test) for anything with **no undo**:
    `Capture/`·`Net/`, file-writing tag/output, manifest/finalize, actor isolation, or the tag/PDF SPEC.
    Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*. For a

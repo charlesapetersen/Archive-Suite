@@ -205,6 +205,10 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
   Plan `execution-plans/local-agent-cli-provider.md` DELETED (shipped). **Keyed/owner tail → below.** | M | med | none
 
 **Keyed / owner tail (NOT daemon-buildable — do not attempt unattended):**
+> The *visual* half of these (does the wizard / Settings row / cost pane look right) is now dischargeable in a
+> GUI-on / Morning-Review session via the live sighted loop (`ops/gui/capture-window.sh` + `cliclick` → read the
+> shot); only the *live-key / account* halves stay genuinely owner-gated. Don't park a pure visual check on the
+> owner as "GUI blocked."
 - **⏸️ ON HOLD (owner 2026-07-16) — OpenAI live 2-image OCR smoke** through gateway + native `.openai` (needs an
   OpenAI key). Come back to it. _(Model-ID + pricing `// VERIFY` placeholders are RESOLVED — `openaiModels` is now
   the current GPT-5 generation (gpt-5-nano/-mini/5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench
@@ -328,7 +332,9 @@ maintain-only** (see §Project focus). Leave parked until the Drive milestone is
   PDF by default; user can switch to the higher-detail JPEG when the PDF lost resolution). Naming/paths mirror
   1:1 (`Archival Photos/<Coll>/00140 — Swarthmore.pdf` ↔ `Archival Photos JPEGS/<Coll>/00140 — Swarthmore.jpg`),
   so the partner is derivable by filename. Supports the DEVONthink import (see `execution-plans/devonthink-import.md`
-  §4a) but is a standalone Reader feature. | Reader + Notes + ArchiveCore (durable-link/image entity) | M | med | none
+  §4a) but is a standalone Reader feature. **Verify:** headless render guards (`RenderProbe`/`DocumentRenderGuardTests`)
+  that both the PDF page and the JPEG partner render non-blank; the live sighted loop (`ops/gui/`) for the in-viewer
+  PDF↔JPEG switch. | Reader + Notes + ArchiveCore (durable-link/image entity) | M | med | none
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
 - [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
@@ -346,7 +352,8 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
 - [ ] **Guided key setup for Anthropic (Processor).** The onboarding wizard's `onboardable` list is
   `[.gemini, .mistral, .openai]` — Anthropic has only a manual key field. Add `ProviderKeySpec.anthropic`
   (console.anthropic.com deep links, `sk-ant-` precheck, cost/privacy notes) so Anthropic gets the same guided flow.
-  | files: Models/ProviderKeySpec.swift (+ `onboardable`) | S | low | none
+  **Verify:** drive the wizard with `ops/gui/capture-window.sh` + `cliclick` and read the shot — the visual half is
+  no longer owner-gated (TCC granted). | files: Models/ProviderKeySpec.swift (+ `onboardable`) | S | low | none
 - [ ] **OpenAI LLM rotation detection (Processor).** `.openai` is wired to LOCAL Vision rotation only
   (`LLMRotationDetector.swift:72` + `CostEstimator.rotationModelCost` return nil — defensive, like Mistral/gateway).
   OpenAI is a capable vision model, so wire `.openai` into the LLM candidate-compare rotation path + add its
@@ -358,7 +365,9 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
   the **tagging pipeline** (segment + tag), which is **not relevant to a multi-page PDF** (an assembled document, not
   a page stream to segment). So: multi-page PDF dropped → auto re-OCR; keep `preOCRedInput` as the separate
   tagging-pipeline path (single-page/image input); retire the manual "Re-OCR multi-page PDF" Settings toggle.
-  **Tier-2** (PDF output). | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
+  **Tier-2** (PDF output). **Verify:** a render guard on the interleaved image/OCR-text PDF output (the 2-page-SPEC
+  surface `DocumentRenderGuardTests` already guards from the Reader side) + `ops/gui/` for the drop-zone / toggle
+  removal. | files: Views/OCRView.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
 - [x] **Reader tag-filter → token field (selected tags INSIDE the box) [BUG-3 pane shift] — SHIPPED `b5a5a01`,
   owner-verified 2026-07-16 ("no longer pushes the left margin, all is good").** Selected subject filters used to
   render as separate buttons beside the "Add tag filter…" combo box, so each chip's width tipped the content column
@@ -483,6 +492,8 @@ before any Notes-specific work.
   - **Phase B — wire built-but-dead features (HIGH→MED):** Zotero auto-fill action + note-level chips (dead code,
     no UI); note retitle/tag-edit path; page-thumbnail render end-to-end (Reader passes `thumbnailer:nil`); consume
     `archivenotes://open`; embed image bytes on the extract menu path; guided root re-grant. Mostly **Tier-2**.
+    **Verify the render items** (page-thumbnail end-to-end) with a headless render guard — the `RenderProbe`/
+    `DocumentRenderGuardTests` pattern over Notes' in-app `PDFThumbnailer` — so a blank thumbnail can't pass.
   - **Phase C — safety-net tooling (MED):** add `archivecore` smoke step; Processor write-surface lint; extend the
     lint to ArchiveCore (uncaught `import AppKit` in Core) + run on Notes; scope Notes smoke to `-only-testing`;
     (opt) fix the documented tag-projector concurrent lost-update race. **Tier-2**.
@@ -491,6 +502,8 @@ before any Notes-specific work.
     large-paste parse + minor coverage/cosmetic. Tier-1.
   - **Phase E — verification review:** re-run the plan-vs-build gap analysis + drive the features at runtime to
     prove every A–D item is actually done + **wired** (not "built but dead" again) before flipping this checkbox.
+    Use headless render guards (`RenderProbe`/`DocumentRenderGuardTests`) for pixel truth (thumbnail / PDF pane
+    actually drew) and the live sighted loop (`ops/gui/`) for chip / empty-state / raw-parse-banner rendering.
 - [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): **unified suite storage path** — Tier-2, separately gated.
   - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
     (owner 2026-07-16).** The whole `ArchiveSuite` marker/exclusion feature is reversed: Notes stops stamping it

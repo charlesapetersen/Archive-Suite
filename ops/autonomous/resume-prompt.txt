@@ -114,6 +114,10 @@ STEP 3.5 — GUI-VERIFY — **gated by the GUI-mode flag (STEP 1).**
   `xcodebuild test` (use `-only-testing:<unit>` / `-skip-testing:*UITests`). Exception: **W8-S7 may `xcodebuild
   build-for-testing`** the UITest target to confirm it compiles — that builds, never runs. Build + unit-verify
   only, and defer the GUI check / any UITest RUN to Morning Review. Skip the rest of this step.
+  **But note:** the headless render guards (`DocumentRenderGuardTests`/`RenderProbe` in `ArchiveReaderTests`) DO
+  run with GUI off — rendering a PDF page / view to pixels and asserting non-blank is a plain unit test. So do
+  NOT defer *render* verification ("did the PDF/thumbnail/view actually draw") to Morning Review; only
+  *interaction / whole-window* checks are deferred. (→ `ops/gui/README.md`.)
   **If GUI mode is `on`** and the item has a visible UI effect:
   after the clean build launch the app in your worktree (`./launch.sh reader|processor|notes`) and
   `source scripts/gui-drive.sh`. Prefer **cliclick (real CGEvents) for ALL pointer input** (single/double/
@@ -129,6 +133,8 @@ STEP 3.5 — GUI-VERIFY — **gated by the GUI-mode flag (STEP 1).**
   server / screen locked), fall back to build+unit and flag the check to Morning Review. Full protocol: the
   "GUI VERIFICATION" block in .maintenance/AUTONOMOUS_PLAN.md. (Once the Wave-7 XCUITest harness lands, prefer
   `xcodebuild test -only-testing:ArchiveReaderUITests` for deterministic assertions over screenshot checks.)
+  For a standalone window grab outside a `gui-drive.sh` session, `ops/gui/capture-window.sh <App>` prints a PNG
+  path to READ; for pixel truth that needs no window at all, prefer the headless render guards (`RenderProbe`).
 
 STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
   commit + push. This completing commit MUST also flip the shipped SUITE_TODO.md checkbox (cite the sha)

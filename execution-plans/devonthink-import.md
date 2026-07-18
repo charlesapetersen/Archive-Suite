@@ -181,6 +181,10 @@ Notes that begin with a run of DEVONthink links to other notes/extracts become a
 dedicated front-matter key `related: [<uuid>…]` or a distinct `related-notes` block; render as a labeled
 section. Distinguish from extracts (which carry `note-passage` provenance, not "see also").
 
+> **Verify the new §3a/§3b views** (per-date timeline rows, Related-notes section) with a reference-image
+> snapshot (`SnapshotTests`) or the live sighted loop (`ops/gui/capture-window.sh` + `cliclick`) — see
+> `ops/gui/README.md`. XCUITest asserts the a11y tree, not the rendered layout.
+
 ### 3c. Provenance blocks (existing, reused)
 - Extract provenance → `note-passage` block (`SourceAnchor.notePassage`, `SourceAnchor+NotePassage.swift`).
 - Archival PDF provenance → `reader-page`/`reader-doc` block with `SourceAnchor.link` = durable
@@ -252,7 +256,8 @@ Database) but its **filename never changes**. So the importer:
    (confirmed: `…/Archival Photos JPEGS/Swarthmore/00140 — Swarthmore.jpg`). The Reader image entity — and thus
    the Notes link — should be able to reference **both** (PDF by default, JPEG on demand). **On the to-do list**
    (`SUITE_TODO.md`, owner request); not a blocker for this import (links resolve to the PDF; the JPEG is always
-   derivable from the filename).
+   derivable from the filename). **Verify** with a headless render guard that the PDF page and its JPEG partner
+   both render non-blank (`RenderProbe`/`DocumentRenderGuardTests`), plus `ops/gui/` for the in-viewer switch.
 5. **Unresolved → flag**, never a guessed path: filenames not found in the root (a photo still only in a
    processing folder that will move out; a truly-missing target; oddball `.docx`/`.wav`/`.jpf` targets).
 

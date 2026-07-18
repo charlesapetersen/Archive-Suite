@@ -306,6 +306,14 @@ run them before pushing an OCR/pipeline change or as a sanity gate:
   even if the exec bit is lost. This is the deeper Tier-1 companion to the pre-existing
   `scripts/test-smoke.sh` (raw per-provider OCR calls) and `scripts/test-tier2.sh` (multi-case pipeline).
 
+**Visual / render verification.** XCUITest reports only the accessibility tree, not pixels — it won't catch a
+GUI that renders blank/wrong. The Processor has **no unit-test target**, so the headless render guards
+(`RenderProbe` / `DocumentRenderGuardTests`) live in the Reader bundle — but they guard the **2-page PDF
+output** the Processor writes (`PDFGenerator`), verifying the Reader-side read of exactly what the Processor
+produced. For the Processor's own GUI (setup wizards, Settings rows, review flows) drive the **live sighted
+loop** — `ops/gui/capture-window.sh` + `cliclick` → read the shot — rather than deferring visual checks to the
+owner. See [`../ops/gui/README.md`](../ops/gui/README.md) and `AGENTS.md` → *GUI verification*.
+
 **Full phone↔Mac round-trip E2E — `scripts/e2e-phone-mac.sh`** (see `scripts/E2E-PHONE-MAC.md`). The only
 test that exercises *both* real apps end to end: a real headless Mac session (`LIVECAPTURE_AUTOSTART`) paired
 over LAN to the `ap_test` emulator running the identical Android app, which "captures" known fixtures via

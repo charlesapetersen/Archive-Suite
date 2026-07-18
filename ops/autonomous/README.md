@@ -132,6 +132,10 @@ paid Processor OCR smoke.
   UITest bundles, and running a UITest pops the macOS "Enable UI Automation" prompt, which would **hang the
   gate** (it runs synchronously in the daemon loop) and wake you. (`./test-smoke.sh reader|notes` run the full
   scheme, so the gate does *not* use them.)
+- **Pixel-level "did it render" checks run in the gate too** — `DocumentRenderGuardTests` (`RenderProbe`) is a
+  plain unit test inside `ArchiveReaderTests`: it renders a PDF page / view to a bitmap and asserts non-blank,
+  with no "Enable UI Automation" prompt. So render regressions (blank PDF pane, blank thumbnail) are caught
+  headlessly; only *interaction / whole-window* checks still need GUI-on. → `ops/gui/README.md`.
 - **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
   deterministic and fails again (→ park), but a flaky XCTest / transient `xcodebuild` blip passes the retry
   (→ green, no park). This is what keeps a routine flake from false-parking a multi-day run.

@@ -46,7 +46,13 @@ Highest-risk first. Paths are repo-root-relative.
 | ~~7~~ | ~~iOS companion~~ | **ON HOLD — skip** (maintain-only; see SUITE_TODO "Project focus") | — |
 | 8 | Reader/Core | `ArchiveReader/macOS/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
 | 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
-| 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety |
+| 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety, **render (blank/wrong pixels)** |
+
+> **Views units (5, 10) — visual dimension.** View / PDF-render code fails in a way the other dimensions miss:
+> it renders blank or wrong while every assertion and the accessibility tree still pass. Add a render-guard /
+> snapshot check (`RenderProbe` / `DocumentRenderGuardTests`, headless — no launch/TCC) or drive `ops/gui/` for
+> the live app. Reader has the guards today; Processor/Notes fall back to the live sighted loop. See
+> [`ops/gui/README.md`](ops/gui/README.md).
 
 **Scope (owner, 2026-07-09 — see SUITE_TODO "Project focus & ON-HOLD"):** the **iOS companion (unit 7) is
 ON HOLD — skip it.** For **Processor/Net (unit 2)**, review the **LAN/USB** transmission surface
