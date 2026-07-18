@@ -629,10 +629,21 @@ parser, then each app; every code item must **build + test all three apps**, scr
 - [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
   maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
   quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q5 — Processor: recognize + preserve Quality** (blocked-on: W19.q2) **[S–M].** Processor parses
-  Quality for free via the shared `DocumentTags`; ensure its tag writes **preserve** an existing `Q1`–`Q3` token
-  (never strip a user's rating as an unknown subject). **Manual-tag authoring of quality is OPTIONAL** (a field in
-  the manual tagging sheet) — defer unless cheap. Never auto-emit from OCR. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/, Views/ | S–M | med | none
+- [ ] **W19.q5 — Processor: recognize + preserve Quality (foundation)** (blocked-on: W19.q2) **[S].** Processor
+  parses Quality for free via the shared `DocumentTags`; ensure its tag writes **preserve** an existing `Q1`–`Q3`
+  token (never strip a user's rating as an unknown subject on re-tag / merge / mirror-to-image). Never auto-emit
+  from OCR. This is the parser-wiring + preserve foundation for the authoring UIs in q6. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/ | S | med | none
+- [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** Owner
+  decision 2026-07-18: the user can set the 0–3 quality rating while capturing/processing, not just in Reader/Notes.
+  Add a **0–3 star control** to **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)
+  and **(b)** the **Process Files manual tagging** sheets (`Views/ManualTaggingSheet.swift`,
+  `Views/ManualSegmentTagView.swift`). Carry it through the manual-tag data (`SegmentTagData` / `ManualTagSegment`)
+  → a `quality` field on `GeneratedTags` whose `allTags` emits `Q1`/`Q2`/`Q3` (0/unrated → **no token**), so it
+  writes through the existing `MacOSTagger` path (mirrors how manual year/month/subjects already flow). **Tier-2 —
+  Live Capture is the no-undo capture path:** adversarial review + a functional test (the Live Capture recovery /
+  manifest drivers), scratch-only, and confirm quality survives finalize + the image-mirror. **Phone-side quality
+  entry (companion + protocol) is NOT in scope** — deferred; the Mac tag card is the live-capture authoring
+  surface (the phone sets per-page priority today, not quality). GUI verify → owner tail. | ArchiveProcessor/.../Views/, Tagging/GeneratedTags.swift, Capture/ | M | med | none
 
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
