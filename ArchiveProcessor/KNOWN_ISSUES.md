@@ -35,6 +35,49 @@ substantially harder to audit and back out.
 
 ---
 
+## DEFERRED: authenticate and encrypt the Live Capture LAN channel [HIGH — cross-platform security]
+
+The LAN receiver authenticates requests with a bearer token, but the current HTTP transport is plaintext
+and the token is persistent. A device able to observe local Wi-Fi traffic can recover that token and replay
+photo/control requests. The new header-first admission and memory caps prevent unauthenticated resource
+exhaustion, but they do not provide confidentiality, peer identity, or replay protection.
+
+Revise pairing across macOS, iOS, and Android to establish authenticated encryption: either pinned TLS with
+a pairing-generated device certificate/key, or a small reviewed AEAD protocol derived from a high-entropy
+pairing secret. Rotate credentials per capture session, bind every request to a session ID plus monotonic
+nonce, retain USB-tunnel compatibility, and provide an explicit migration/re-pair path for existing saved
+hosts. Do not improvise crypto inside the current HTTP parser; use platform cryptography and a documented
+wire contract.
+
+Verification plan:
+
+1. Packet-capture a full pairing/upload session and prove tokens, metadata, and JPEG bytes are unreadable.
+2. Replay captured photo, completion, and disconnect requests and prove all are rejected without mutating
+   the Mac session.
+3. Prove a phone paired to one Mac/session cannot authenticate to another and that credential rotation
+   invalidates prior traffic.
+4. Exercise Wi-Fi, Bonjour discovery, host/port persistence, and `adb reverse` USB flows on both phones.
+5. Add downgrade tests so a secure-capable client/server never silently falls back to plaintext.
+
+Deferred because this changes the pairing and transport contract on all three platforms and needs an
+explicit compatibility rollout; it should be reviewed as a security feature, not hidden in a macOS memory
+limit patch.
+
+---
+
+## ✅ FIXED (2026-07-17): unauthenticated LAN uploads were buffered before authentication and had no global cap [CRITICAL]
+
+**FIXED:** `CaptureServer` now reads at most a bounded header prefix, rejects ambiguous framing, verifies the
+bearer token, validates the route-specific declared size, and reserves aggregate capacity before reading a
+body. The receiver admits at most eight concurrent connections, caps retained/declared bodies at 96 MB
+across them, limits control bodies separately, and holds each reservation until ingest/response releases
+the request. A single mutable accumulator avoids recursive `Data` copy-on-write spikes, and stop/timeout
+release tracked connections. The no-network Live Capture regression covers authentication order, per-route
+and aggregate limits, invalid/duplicate framing, unknown routes, and bytes beyond `Content-Length`.
+(2026-07-17)
+
+---
+
 ## ✅ FIXED (2026-07-17): paid multi-chunk batches lost submission/consumption progress on relaunch [CRITICAL]
 
 **FIXED:** paid batches now use a versioned, integrity-checked lifecycle journal. It is created before the

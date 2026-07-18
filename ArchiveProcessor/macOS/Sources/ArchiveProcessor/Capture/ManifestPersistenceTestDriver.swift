@@ -10,6 +10,8 @@ import AppKit
 ///   3. A LEGACY bare-array manifest (pre-B5 builds) still decodes — entries intact, completion set empty —
 ///      so recovery of an in-flight legacy session is never broken (the ingest recovery invariant holds).
 ///   4. Corrupt (non-JSON) bytes decode to nil (ignored, not misapplied).
+///   5. The LAN receiver authenticates and admits a bounded request head before body buffering, rejects
+///      ambiguous HTTP framing, and enforces route-specific plus aggregate memory limits.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_MANIFESTTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -155,6 +157,77 @@ enum ManifestPersistenceTestDriver {
               && restoredSession.completedDocGroups.isSuperset(of: ["gSession", "gLate"])
               && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
               && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+
+        // --- B17: LAN request admission happens from a bounded head before body accumulation. ---
+        let serverToken = "test-token"
+        func requestPrefix(
+            method: String = "POST",
+            path: String = "/photo",
+            authorization: String = "Bearer test-token",
+            contentLength: String,
+            extraHeaders: [String] = [],
+            bodyPrefix: Data = Data()
+        ) -> Data {
+            var lines = [
+                "\(method) \(path) HTTP/1.1",
+                "Authorization: \(authorization)",
+                "Content-Length: \(contentLength)",
+            ]
+            lines.append(contentsOf: extraHeaders)
+            var data = Data((lines.joined(separator: "\r\n") + "\r\n\r\n").utf8)
+            data.append(bodyPrefix)
+            return data
+        }
+        check("B17: unauthenticated large upload is rejected from headers before size/body admission",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    authorization: "Bearer wrong", contentLength: "\(CaptureServer.maxPhotoBodyBytes)"),
+                token: serverToken) == "unauthorized")
+        check("B17: authenticated photo above the per-route cap is rejected",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "\(CaptureServer.maxPhotoBodyBytes + 1)"),
+                token: serverToken) == "tooLarge")
+        check("B17: control routes have a much smaller body cap",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    path: "/session/complete",
+                    contentLength: "\(CaptureServer.maxControlBodyBytes + 1)"),
+                token: serverToken) == "tooLarge")
+        check("B17: authenticated body is refused when aggregate reservation is unavailable",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "4096"),
+                token: serverToken, aggregateAvailable: 4095) == "overloaded")
+        check("B17: valid authenticated photo head is admitted without requiring its body first",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "4096"),
+                token: serverToken, aggregateAvailable: 4096) == "accept")
+        check("B17: duplicate Content-Length framing is rejected",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    contentLength: "1", extraHeaders: ["Content-Length: 1"]),
+                token: serverToken) == "bad")
+        check("B17: unsupported Transfer-Encoding framing is rejected",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    contentLength: "0", extraHeaders: ["Transfer-Encoding: chunked"]),
+                token: serverToken) == "bad")
+        check("B17: non-numeric Content-Length is rejected instead of treated as zero",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "not-a-number"),
+                token: serverToken) == "bad")
+        check("B17: an unknown authenticated route is rejected before its declared body is read",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(path: "/unknown", contentLength: "1048576"),
+                token: serverToken) == "unknownRoute")
+        check("B17: bytes beyond Content-Length are rejected as ambiguous pipelining",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    contentLength: "1", bodyPrefix: Data([0x01, 0x02])),
+                token: serverToken) == "bad")
+        check("B17: connection and aggregate caps are finite and below their multiplied worst case",
+              CaptureServer.maxConcurrentConnections == 8
+              && CaptureServer.maxAggregateBodyBytes
+                    < CaptureServer.maxConcurrentConnections * CaptureServer.maxPhotoBodyBytes)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

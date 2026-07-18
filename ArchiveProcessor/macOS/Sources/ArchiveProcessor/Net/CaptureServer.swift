@@ -12,7 +12,7 @@ import Network
 /// phones' `MacClient` (iOS `ArchiveCaptureiOS` + Android `ArchiveCapture`).
 /// One request per connection (responses set `Connection: close`); the phone opens a fresh
 /// connection per photo, which keeps framing trivial and robust.
-/// Mutable state (`listener`) is only touched on the serial `queue`, and `session` is a
+/// Mutable listener/connection/budget state is only touched on the serial `queue`, and `session` is a
 /// `@MainActor` object always reached via `Task { @MainActor }`, so this is safe to treat as
 /// Sendable for the Network.framework callbacks.
 final class CaptureServer: @unchecked Sendable, CaptureReceiver {
@@ -20,6 +20,24 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "capture.server")
     private let token: String
+    /// All entries are owned by `queue`. Holding the declared body reservation until the response send
+    /// completes accounts for bytes that have left the socket buffer but are still retained by a
+    /// MainActor ingest task.
+    private struct ConnectionState {
+        let connection: NWConnection
+        var reservedBodyBytes: Int
+    }
+    private final class BodyAccumulator: @unchecked Sendable {
+        var data: Data
+        init(_ data: Data) { self.data = data }
+    }
+    private final class TimeoutHandle: @unchecked Sendable {
+        let workItem: DispatchWorkItem
+        init(_ workItem: DispatchWorkItem) { self.workItem = workItem }
+        func cancel() { workItem.cancel() }
+    }
+    private var connections: [ObjectIdentifier: ConnectionState] = [:]
+    private var aggregateReservedBodyBytes = 0
 
     init(session: CaptureSession) {
         self.session = session
@@ -92,6 +110,10 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         queue.async { [self] in
             self.listener?.cancel()
             self.listener = nil
+            let openConnections = self.connections.values.map(\.connection)
+            self.connections.removeAll()
+            self.aggregateReservedBodyBytes = 0
+            for connection in openConnections { connection.cancel() }
         }
     }
 
@@ -101,38 +123,78 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     /// 30 s is generous for a single-request-per-connection protocol over LAN/USB.
     private static let connectionTimeoutSeconds: Int = 30
 
+    /// Bound aggregate file descriptors and declared/retained request bodies, not just each connection.
+    /// Eight concurrent phone requests is well above the companion clients' normal fan-out while keeping
+    /// a hostile LAN peer from multiplying the per-photo cap into process-wide memory exhaustion.
+    static let maxConcurrentConnections = 8
+    static let maxAggregateBodyBytes = 96 * 1024 * 1024
+    static let maxHeaderBytes = 64 * 1024
+    static let headerReadChunkBytes = 16 * 1024
+    static let maxPhotoBodyBytes = 64 * 1024 * 1024
+    static let maxControlBodyBytes = 64 * 1024
+
     private func handle(_ conn: NWConnection) {
         conn.start(queue: queue)
 
+        guard connections.count < Self.maxConcurrentConnections else {
+            respond(conn, status: "503 Service Unavailable", json: ["error": "receiver busy"])
+            return
+        }
+        connections[ObjectIdentifier(conn)] = ConnectionState(connection: conn, reservedBodyBytes: 0)
+
         // Schedule an idle timeout — if no complete request arrives within the deadline,
         // cancel the connection so it doesn't leak an FD + buffers for the process lifetime.
-        let timeout = DispatchWorkItem { [weak conn] in conn?.cancel() }
-        queue.asyncAfter(deadline: .now() + .seconds(Self.connectionTimeoutSeconds), execute: timeout)
+        let timeout = TimeoutHandle(DispatchWorkItem { [weak self, weak conn] in
+            guard let conn else { return }
+            self?.close(conn)
+        })
+        queue.asyncAfter(
+            deadline: .now() + .seconds(Self.connectionTimeoutSeconds), execute: timeout.workItem)
 
-        readRequest(conn, buffer: Data(), timeout: timeout)
+        readHeaders(conn, buffer: Data(), timeout: timeout)
     }
 
-    /// Max bytes we will buffer for a single request — a hard cap so a rogue/oversized upload
-    /// (or a lying Content-Length) can't grow the buffer unboundedly and OOM the app.
-    private static let maxRequestBytes = 64 * 1024 * 1024   // 64 MB
-
-    /// Accumulate bytes until the full request (headers + Content-Length body) is available.
-    private func readRequest(_ conn: NWConnection, buffer: Data, timeout: DispatchWorkItem) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
+    /// Read only a small bounded header prefix first. Authentication, route-specific size checks, and an
+    /// aggregate reservation all happen before `readBody` is allowed to accumulate the declared payload.
+    private func readHeaders(_ conn: NWConnection, buffer: Data, timeout: TimeoutHandle) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: Self.headerReadChunkBytes) { [weak self] data, _, isComplete, error in
             guard let self else { timeout.cancel(); conn.cancel(); return }
             var buffer = buffer
             if let data { buffer.append(data) }
 
-            if buffer.count > Self.maxRequestBytes {
-                timeout.cancel()
-                self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
-                return
-            }
-
-            switch Self.tryParse(buffer) {
-            case .parsed(let parsed):
-                timeout.cancel()
-                self.process(parsed, on: conn)
+            switch Self.parseHead(buffer) {
+            case .parsed(let head, let bodyPrefix):
+                switch Self.admission(
+                    for: head, token: self.token,
+                    aggregateAvailable: Self.maxAggregateBodyBytes - self.aggregateReservedBodyBytes
+                ) {
+                case .unauthorized:
+                    timeout.cancel()
+                    self.respond(conn, status: "401 Unauthorized", json: ["error": "bad token"])
+                case .unknownRoute:
+                    timeout.cancel()
+                    self.respond(conn, status: "404 Not Found", json: ["error": "unknown route"])
+                case .tooLarge:
+                    timeout.cancel()
+                    self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
+                case .overloaded:
+                    timeout.cancel()
+                    self.respond(conn, status: "503 Service Unavailable", json: ["error": "receiver memory budget busy"])
+                case .accept:
+                    guard bodyPrefix.count <= head.contentLength,
+                          self.reserveBodyBytes(head.contentLength, for: conn) else {
+                        timeout.cancel()
+                        self.respond(conn, status: "400 Bad Request", json: ["error": "malformed request"])
+                        return
+                    }
+                    if bodyPrefix.count == head.contentLength {
+                        timeout.cancel()
+                        self.process(ParsedRequest(head: head, body: bodyPrefix), on: conn)
+                    } else {
+                        self.readBody(
+                            conn, head: head, accumulator: BodyAccumulator(bodyPrefix), timeout: timeout)
+                    }
+                }
             case .tooLarge:
                 timeout.cancel()
                 self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
@@ -144,8 +206,41 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
                     timeout.cancel()
                     self.respond(conn, status: "400 Bad Request", json: ["error": "incomplete request"])
                 } else {
-                    self.readRequest(conn, buffer: buffer, timeout: timeout)   // need more bytes
+                    self.readHeaders(conn, buffer: buffer, timeout: timeout)
                 }
+            }
+        }
+    }
+
+    private func readBody(
+        _ conn: NWConnection,
+        head: ParsedHead,
+        accumulator: BodyAccumulator,
+        timeout: TimeoutHandle
+    ) {
+        let remaining = head.contentLength - accumulator.data.count
+        guard remaining > 0 else {
+            timeout.cancel()
+            process(ParsedRequest(head: head, body: accumulator.data), on: conn)
+            return
+        }
+        conn.receive(minimumIncompleteLength: 1, maximumLength: min(1 << 20, remaining)) {
+            [weak self] data, _, isComplete, error in
+            guard let self else { timeout.cancel(); conn.cancel(); return }
+            if let data { accumulator.data.append(data) }
+            guard accumulator.data.count <= head.contentLength else {
+                timeout.cancel()
+                self.respond(conn, status: "400 Bad Request", json: ["error": "malformed request"])
+                return
+            }
+            if accumulator.data.count == head.contentLength {
+                timeout.cancel()
+                self.process(ParsedRequest(head: head, body: accumulator.data), on: conn)
+            } else if error != nil || isComplete {
+                timeout.cancel()
+                self.respond(conn, status: "400 Bad Request", json: ["error": "incomplete request"])
+            } else {
+                self.readBody(conn, head: head, accumulator: accumulator, timeout: timeout)
             }
         }
     }
@@ -155,22 +250,42 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         let path: String
         let headers: [String: String]   // lowercased keys
         let body: Data
+
+        init(head: ParsedHead, body: Data) {
+            method = head.method
+            path = head.path
+            headers = head.headers
+            self.body = body
+        }
     }
 
-    private enum ParseOutcome {
-        case need                    // more bytes required
-        case parsed(ParsedRequest)
-        case tooLarge                // declared/actual body exceeds the cap → 413
-        case bad                     // malformed framing / smuggling vector → 400
+    private struct ParsedHead {
+        let method: String
+        let path: String
+        let headers: [String: String]
+        let contentLength: Int
     }
 
-    /// Returns `.parsed` once headers + full Content-Length body are present, `.need` for more bytes,
-    /// or `.bad`/`.tooLarge` for a request we refuse.
-    private static func tryParse(_ buffer: Data) -> ParseOutcome {
+    private enum HeadParseOutcome {
+        case need
+        case parsed(ParsedHead, bodyPrefix: Data)
+        case tooLarge
+        case bad
+    }
+
+    private enum AdmissionOutcome: String {
+        case accept, unauthorized, unknownRoute, tooLarge, overloaded
+    }
+
+    /// Parse only the HTTP head and return whatever bounded body prefix arrived in the same socket read.
+    /// Critically, this does not wait for `Content-Length` bytes; authorization runs on the result first.
+    private static func parseHead(_ buffer: Data) -> HeadParseOutcome {
         let sep = Data("\r\n\r\n".utf8)
         guard let range = buffer.range(of: sep) else {
-            // No header terminator yet — bound the header section too.
-            return buffer.count > 64 * 1024 ? .bad : .need
+            return buffer.count > maxHeaderBytes ? .tooLarge : .need
+        }
+        guard buffer.distance(from: buffer.startIndex, to: range.lowerBound) <= maxHeaderBytes else {
+            return .tooLarge
         }
         let headerData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
         guard let headerText = String(data: headerData, encoding: .utf8) else { return .bad }
@@ -178,33 +293,92 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         let lines = headerText.components(separatedBy: "\r\n")
         guard let requestLine = lines.first else { return .bad }
         let parts = requestLine.split(separator: " ")
-        guard parts.count == 3 else { return .bad }   // METHOD SP request-target SP HTTP-version
+        guard parts.count == 3,
+              parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0" else { return .bad }
         let method = String(parts[0])
         let path = String(parts[1])
+        guard !path.isEmpty, path.first == "/" else { return .bad }
 
         var headers: [String: String] = [:]
-        var sawContentLength = false
         for line in lines.dropFirst() {
-            guard let colon = line.firstIndex(of: ":") else { continue }
+            guard !line.isEmpty, let colon = line.firstIndex(of: ":") else { return .bad }
             let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            // Refuse request-smuggling vectors: any Transfer-Encoding (chunked unsupported) and
-            // duplicate Content-Length headers.
-            if key == "transfer-encoding" { return .bad }
-            if key == "content-length" {
-                if sawContentLength { return .bad }
-                sawContentLength = true
-            }
+            guard !key.isEmpty,
+                  key.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }),
+                  headers[key] == nil,
+                  key != "transfer-encoding" else { return .bad }
             headers[key] = value
         }
 
-        let contentLength = Int(headers["content-length"] ?? "0") ?? 0
-        guard contentLength >= 0, contentLength <= maxRequestBytes else { return .tooLarge }
+        let rawLength = headers["content-length"] ?? "0"
+        guard !rawLength.isEmpty, rawLength.allSatisfy({ $0.isASCII && $0.isNumber }) else { return .bad }
+        guard let contentLength = Int(rawLength), contentLength >= 0 else { return .tooLarge }
         let bodyStart = range.upperBound
-        let available = buffer.distance(from: bodyStart, to: buffer.endIndex)
-        guard available >= contentLength else { return .need }   // wait for full body
-        let body = buffer.subdata(in: bodyStart..<buffer.index(bodyStart, offsetBy: contentLength))
-        return .parsed(ParsedRequest(method: method, path: path, headers: headers, body: body))
+        let bodyPrefix = buffer.subdata(in: bodyStart..<buffer.endIndex)
+        return .parsed(
+            ParsedHead(method: method, path: path, headers: headers, contentLength: contentLength),
+            bodyPrefix: bodyPrefix)
+    }
+
+    /// Decide whether a parsed head is allowed to reserve/read a body. Authentication deliberately comes
+    /// before route and size disclosure, and aggregate capacity is checked before any recursive body read.
+    private static func admission(
+        for head: ParsedHead,
+        token: String,
+        aggregateAvailable: Int
+    ) -> AdmissionOutcome {
+        let auth = head.headers["authorization"] ?? ""
+        guard auth.hasPrefix("Bearer "),
+              constantTimeEquals(String(auth.dropFirst(7)), token) else { return .unauthorized }
+
+        let route = "\(head.method) \(head.path.split(separator: "?").first ?? "")"
+        let bodyLimit: Int
+        switch route {
+        case "POST /photo":
+            bodyLimit = maxPhotoBodyBytes
+        case "GET /ping", "POST /segment/complete", "POST /session/complete",
+             "POST /phone/status", "POST /session/disconnect":
+            bodyLimit = maxControlBodyBytes
+        default:
+            return .unknownRoute
+        }
+        guard head.contentLength <= bodyLimit else { return .tooLarge }
+        guard head.contentLength <= max(0, aggregateAvailable) else { return .overloaded }
+        return .accept
+    }
+
+    /// Pure no-network regression hook used by the manifest/safety test driver.
+    static func _testAdmission(
+        requestPrefix: Data,
+        token: String,
+        aggregateAvailable: Int = maxAggregateBodyBytes
+    ) -> String {
+        switch parseHead(requestPrefix) {
+        case .need: return "need"
+        case .tooLarge: return "headerTooLarge"
+        case .bad: return "bad"
+        case .parsed(let head, let bodyPrefix):
+            guard bodyPrefix.count <= head.contentLength else { return "bad" }
+            return admission(for: head, token: token, aggregateAvailable: aggregateAvailable).rawValue
+        }
+    }
+
+    private func reserveBodyBytes(_ count: Int, for conn: NWConnection) -> Bool {
+        let key = ObjectIdentifier(conn)
+        guard count >= 0, var state = connections[key], state.reservedBodyBytes == 0,
+              count <= Self.maxAggregateBodyBytes - aggregateReservedBodyBytes else { return false }
+        state.reservedBodyBytes = count
+        connections[key] = state
+        aggregateReservedBodyBytes += count
+        return true
+    }
+
+    private func close(_ conn: NWConnection) {
+        if let state = connections.removeValue(forKey: ObjectIdentifier(conn)) {
+            aggregateReservedBodyBytes = max(0, aggregateReservedBodyBytes - state.reservedBodyBytes)
+        }
+        conn.cancel()
     }
 
     // MARK: - Routing
@@ -340,6 +514,9 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         response += "Connection: close\r\n\r\n"
         var out = Data(response.utf8)
         out.append(body)
-        conn.send(content: out, completion: .contentProcessed { _ in conn.cancel() })
+        conn.send(content: out, completion: .contentProcessed { [weak self, weak conn] _ in
+            guard let conn else { return }
+            if let self { self.close(conn) } else { conn.cancel() }
+        })
     }
 }
