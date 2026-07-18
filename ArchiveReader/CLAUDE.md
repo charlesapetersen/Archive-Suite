@@ -325,16 +325,13 @@ ArchiveReaderApp.swift        @main; two scenes (nav Window + document WindowGro
 ArchiveReaderCommands.swift   Menu bar (File · Selection · Tags · Sort & Filter · Document). Menus are
                               the SINGLE source of the keyboard shortcuts (toolbars don't re-declare
                               them); commands act on the focused window via @FocusedObject.
-Core/                         UI-free domain (package-ready → future ArchiveCore):
-  TagWriter.swift             THE single write choke-point. TagDelta{add,remove,color}; apply()/
-                              setReadState()/batch; coordinated metadata-only write; trustworthy-read
-                              guard; multiset+label+bytes verify; label-only .restoreLabel inverse undo.
-  TagEditing.swift            TagEditOp → per-file TagDelta; GroupTagSummary (tri-state across selection).
-  TagReading.swift            Safe read; TagReadResult distinguishes confirmed-empty vs unreadable.
+Core/                         UI-free Reader-local domain (shared tag/PDF facets now live in ArchiveCore — see below):
+  TagWriter.swift             Reader's DELTA ADAPTER over `ArchiveCore.CoordinatedTagWriter` (the shared
+                              write choke-point). TagDelta{add,remove,color}; apply()/setReadState()/batch;
+                              trustworthy-read guard; multiset+label+bytes verify; label-only .restoreLabel
+                              inverse undo.
   TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
-  DocumentTags.swift          Tag→facet parser (year/month/Day N/priority/read/color/subjects);
-                              sortDate (medieval-safe), displayDate, dateIsSpeculative.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.
   ArchiveFile.swift           A nav-row record (url identity + parsed tags).
   DuplicateNames.swift        Pure detection of rows sharing a base filename + containing-folder
@@ -347,8 +344,6 @@ Core/                         UI-free domain (package-ready → future ArchiveCo
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.
-  PDFFormatStatus.swift       Pure read-only classifier: standard / unreadable / no-text-layer (page
-                              count is NOT a defect signal). Drives the ⚠︎ badge + viewer banner.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        NSMetadataQuery over Read/Unread tags, scoped to the root; live updates.
@@ -393,6 +388,21 @@ Views/
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```
+
+**`packages/ArchiveCore` (shared Swift package — the safety-critical tag/PDF/link contract).** The domain
+types both apps must interpret *identically* now live in one package instead of being duplicated per app
+(extracted in the W0 refactor, `49c0162`–`b90800f`): `DocumentTags` (tag→facet parser —
+year/month/Day N/decade/priority/read/color/subjects; `sortDate` medieval-safe, `displayDate`,
+`dateIsSpeculative`), `TagReading`/`TagEditing`, `PDFFormatStatus`/`ExtractedContent`, `GeneratedTags`, the
+durable-link types (`DurableLink`/`ArchiveLinkPayload`/`RootMarker`), `PDFThumbnailer`/`ThumbnailCacheKey`,
+and `ArchiveSuiteMarker`. **The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
+(`Tags/TagWrite.swift`): Reader's `TagWriter` is a thin *delta adapter* over it and Processor's `MacOSTagger`
+is the *fresh-write adapter* — no app calls `setResourceValue` directly, so the coordinated metadata-only
+write + verify can never drift between apps. **Build lane:** `swift test` in `packages/ArchiveCore` (~100
+unit tests); both apps depend on it via `project.yml` (`packages: ArchiveCore` → `path: ../../packages/ArchiveCore`).
+A change here is **Tier-2** and must build+test all three apps (Reader + Processor + Notes). SPEC:
+[`../SPEC/tag-format.md`](../SPEC/tag-format.md).
+
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
 `ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (186 tests). `scripts/lint-write-surface.sh`
@@ -418,6 +428,12 @@ Live sighted loop for the running app: `ops/gui/` (`capture-window.sh` + `clicli
   Per-worktree DerivedData (`-derivedDataPath ./build/DD`) for concurrent agents, like the sibling.
 
 ## Archive Suite (long-term convergence with Archive Processor)
+
+> **✅ SHIPPED (2026-07).** This convergence plan is done: the shared domain was extracted to the
+> `packages/ArchiveCore` Swift package (W0 refactor, `49c0162`–`b90800f`) and the repos merged into the
+> **Archive Suite** monorepo (v1.0.0; de-nesting `7706368`). The staged rationale below is kept as history;
+> for the *current* repo layout, build lane, and shared-contract rules see the umbrella
+> [`../CLAUDE.md`](../CLAUDE.md) and [`../SPEC/tag-format.md`](../SPEC/tag-format.md).
 
 Archive Reader and Archive Processor are two halves of one offering — the Processor *writes* tags,
 the Reader *reads and edits* them — and will eventually ship together as **Archive Suite**. Notably,

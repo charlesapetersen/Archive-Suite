@@ -259,6 +259,14 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 - **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position).
 - **Phone↔Mac protocol:** `Net/CaptureServer.swift` (Bearer-authed routes `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`) ↔ both companions' `MacClient` (`ArchiveCaptureiOS/.../Net/MacClient.swift` + Android `net/MacClient.kt`). The cloud-relay transport shares a second contract — the object format in [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) (`Net/RelayObjectFormat.swift` ↔ the phones' mirror). Change all sides together.
 - **The two `project.yml` files.**
+- **`packages/ArchiveCore` (shared Swift package).** The tag/PDF/link contract both apps depend on. Its
+  `CoordinatedTagWriter` (`Tags/TagWrite.swift`) is the single Finder-tag write choke-point — Processor's
+  `MacOSTagger` is a *fresh-write adapter* over it and Reader's `TagWriter` a *delta adapter*, so no app calls
+  `setResourceValue` directly and the coordinated write + verify can't drift. `DocumentTags`, `PDFFormatStatus`,
+  `DurableLink`, `ArchiveSuiteMarker`, and `PDFThumbnailer` are the shared cross-app types. A change here is
+  **Tier-2** and must build+test **all three** apps (Reader + Processor + Notes), not just Processor. SPEC:
+  [`../SPEC/tag-format.md`](../SPEC/tag-format.md); build lane: `swift test` in `packages/ArchiveCore` (~100
+  tests; wired via `project.yml` → `packages: ArchiveCore`, `path: ../../packages/ArchiveCore`).
 
 **Rules:** never hand-edit `.pbxproj` (edit `project.yml` + `xcodegen generate`, now also required after clone); keep commits small and rebase often; build-verify before every commit.
 
@@ -424,7 +432,8 @@ OCR/                           OCR pipeline + provider clients:
                                fields, optional box/folder format override). Both Process-Files and Live
                                writeSegmentJSON delegate to it; callers own the URL + atomic disk write.
 Tagging/                       Finder-tag writing + segmentation (Tier-2 — writes irreplaceable data):
-  MacOSTagger.swift            Writes Finder tags (subjects/date/priority/color + trailing Unread).
+  MacOSTagger.swift            Fresh-write ADAPTER over `ArchiveCore.CoordinatedTagWriter`; writes Finder tags
+                               (subjects/date/priority/color + trailing Unread) — no direct `setResourceValue` here.
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification.
   CollectionSegmenter.swift    Group files into box/folder collections.
