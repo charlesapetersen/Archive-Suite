@@ -208,4 +208,64 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertFalse(a1.matches(bId))   // distinct files
         XCTAssertNil(FileIdentity.capture(tempDir.appendingPathComponent("nope.pdf")))
     }
+
+    // MARK: §9 (W15.tu1) Occurrence-aware (multiset) inverse — never loses a duplicate
+
+    /// The multiset-difference primitive underneath the occurrence-aware inverse.
+    func testMultisetDifference() {
+        XCTAssertEqual(multisetDifference(["A", "A", "B"], minus: ["A"]), ["A", "B"])  // one A cancels
+        XCTAssertEqual(multisetDifference(["A", "A"], minus: []), ["A", "A"])          // both surplus
+        XCTAssertEqual(multisetDifference(["A"], minus: ["A", "A"]), [])               // a has fewer → empty
+        XCTAssertEqual(multisetDifference([], minus: ["A"]), [])
+        XCTAssertEqual(multisetDifference(["A", "B"], minus: ["A", "C"]), ["B"])       // parity w/ set-diff (no dups)
+    }
+
+    /// The occurrence-aware inverse restores the exact COUNT of a duplicated token — the case the
+    /// set-based `inverse` silently collapses.
+    func testOccurrenceInversePreservesDuplicateCount() {
+        let inv = tagOccurrenceInverse(before: ["A", "A"], after: [], beforeLabel: nil, afterLabel: nil)
+        XCTAssertTrue(multisetEqual(inv.add, ["A", "A"]))  // BOTH occurrences re-added, not one
+        XCTAssertTrue(inv.remove.isEmpty)
+        XCTAssertNil(inv.color)
+    }
+
+    /// For ordinary (no-duplicate) edits the occurrence-aware inverse equals the set-based inverse.
+    func testOccurrenceInverseMatchesSetInverseWhenNoDuplicates() {
+        let before = ["A", "B"], after = ["A", "C"]
+        let occ = tagOccurrenceInverse(before: before, after: after, beforeLabel: nil, afterLabel: nil)
+        XCTAssertTrue(multisetEqual(occ.add, ["B"]))     // re-add what was removed
+        XCTAssertTrue(multisetEqual(occ.remove, ["C"]))  // strip what was added
+    }
+
+    /// Color restore rides along unchanged (a label has no multiplicity).
+    func testOccurrenceInverseColorRestore() {
+        let occ = tagOccurrenceInverse(before: ["Red"], after: [], beforeLabel: 6, afterLabel: 0)
+        guard case let .restoreLabel(lbl)? = occ.color else { return XCTFail("expected .restoreLabel") }
+        XCTAssertEqual(lbl, 6)
+        // No label change → no color inverse.
+        let noChange = tagOccurrenceInverse(before: ["x"], after: ["x", "y"], beforeLabel: 6, afterLabel: 6)
+        XCTAssertNil(noChange.color)
+    }
+
+    /// End-to-end through the write primitive: removing both copies of a duplicated tag yields an
+    /// occurrence-aware inverse that re-adds BOTH, while the legacy set-based inverse collapses to one.
+    func testWriteExposesOccurrenceAwareInverseForDuplicates() throws {
+        let url = try makeFile("dup-inverse.pdf", tags: ["A", "A"])
+        // Premise of the wave (W15.tu0): macOS persists duplicate tag strings. Skip if a volume dedups.
+        try XCTSkipUnless(try readTags(url).filter { $0 == "A" }.count == 2,
+                          "platform did not persist duplicate tags; occurrence-inverse test N/A")
+        let r = try CoordinatedTagWriter.write(url) { _, label in ([], label) }  // remove both A's
+        XCTAssertTrue(multisetEqual(r.after, []))
+        XCTAssertTrue(multisetEqual(r.occurrenceInverse.add, ["A", "A"]), "got \(r.occurrenceInverse.add)")
+        XCTAssertTrue(r.occurrenceInverse.remove.isEmpty)
+        XCTAssertEqual(r.inverse.add, ["A"])  // the set-based collapse the occurrence inverse routes around
+    }
+
+    /// A no-op write carries an empty occurrence-aware inverse (default), same as the set-based one.
+    func testOccurrenceInverseEmptyForNoOp() throws {
+        let url = try makeFile("occ-noop.pdf", tags: ["A", "A", "B"])
+        let r = try CoordinatedTagWriter.write(url) { _, _ in nil }
+        XCTAssertTrue(r.isNoOp)
+        XCTAssertTrue(r.occurrenceInverse.isEmpty)
+    }
 }

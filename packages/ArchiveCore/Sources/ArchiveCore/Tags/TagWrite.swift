@@ -49,6 +49,30 @@ public struct TagDelta: Sendable, Equatable {
     public var isEmpty: Bool { add.isEmpty && remove.isEmpty && color == nil }
 }
 
+/// A multiplicity-aware (multiset) tag change — the shape of an *undo inverse* that must restore the
+/// exact OCCURRENCE COUNT of each token, not merely its presence. A peer to `TagDelta`, which stays
+/// set-like for ordinary user edits; this exists ALONGSIDE it so the undo path can be made
+/// occurrence-lossless (consumers rewired in W15.tu2) without changing user-edit semantics.
+/// Occurrence-only per the owner decision (2026-07-18): counts are preserved, order is not (macOS
+/// reorders tags on write and the SPEC already compares tag arrays as a multiset, so position is
+/// unobservable). Unlike the `Set`-based `TagDelta` inverse, this never drops a duplicate.
+public struct TagOccurrenceDelta: Sendable, Equatable {
+    /// Tokens to add, WITH multiplicity — a token appears once per occurrence to restore.
+    public var add: [String]
+    /// Tokens to remove, WITH multiplicity — a token appears once per occurrence to strip.
+    public var remove: [String]
+    /// Optional Finder color-label change (no multiplicity — a label is a single value).
+    public var color: TagDelta.ColorChange?
+
+    public init(add: [String] = [], remove: [String] = [], color: TagDelta.ColorChange? = nil) {
+        self.add = add
+        self.remove = remove
+        self.color = color
+    }
+
+    public var isEmpty: Bool { add.isEmpty && remove.isEmpty && color == nil }
+}
+
 /// The outcome of a successful write, including the inverse delta needed to undo it safely.
 public struct TagWriteResult: Sendable, Equatable {
     public let url: URL
@@ -58,12 +82,20 @@ public struct TagWriteResult: Sendable, Equatable {
     public let afterLabel: Int?
     /// Applying this delta through the write primitive undoes this edit while preserving any concurrent
     /// third-party tag changes (it re-reads and reconciles rather than restoring a stale array).
+    /// Set-based (collapses duplicates) — kept for existing consumers; the undo path prefers
+    /// `occurrenceInverse` once rewired (W15.tu2).
     public let inverse: TagDelta
+    /// The occurrence-aware (multiset) inverse — restores each token's exact COUNT, so undoing an edit
+    /// that touched a duplicated tag never loses an occurrence. Additive alongside `inverse` (W15.tu1);
+    /// the undo/restore path is wired to it in W15.tu2. Empty for a no-op.
+    public let occurrenceInverse: TagOccurrenceDelta
 
     public init(url: URL, before: [String], after: [String],
-                beforeLabel: Int?, afterLabel: Int?, inverse: TagDelta) {
+                beforeLabel: Int?, afterLabel: Int?, inverse: TagDelta,
+                occurrenceInverse: TagOccurrenceDelta = TagOccurrenceDelta()) {
         self.url = url; self.before = before; self.after = after
-        self.beforeLabel = beforeLabel; self.afterLabel = afterLabel; self.inverse = inverse
+        self.beforeLabel = beforeLabel; self.afterLabel = afterLabel
+        self.inverse = inverse; self.occurrenceInverse = occurrenceInverse
     }
 
     /// True when nothing actually changed (idempotent no-op).
@@ -194,8 +226,14 @@ public enum CoordinatedTagWriter {
                     remove: Array(afterSet.subtracting(beforeSet)),
                     color: normalizedLabel(afterLabel) != normalizedLabel(beforeLabel) ? .restoreLabel(beforeLabel) : nil
                 )
+                // §9 (W15.tu1) occurrence-aware inverse — carries per-token multiplicity so undo can
+                // restore a duplicate the set-based `inverse` collapses. Additive: `inverse` above is
+                // unchanged; consumers switch to this in W15.tu2.
+                let occurrenceInverse = tagOccurrenceInverse(before: before, after: after,
+                                                             beforeLabel: beforeLabel, afterLabel: afterLabel)
                 box.result = TagWriteResult(url: url, before: before, after: after,
-                                            beforeLabel: beforeLabel, afterLabel: afterLabel, inverse: inverse)
+                                            beforeLabel: beforeLabel, afterLabel: afterLabel,
+                                            inverse: inverse, occurrenceInverse: occurrenceInverse)
             } catch {
                 box.error = error
             }
@@ -238,3 +276,32 @@ public func isReadStateWord(_ s: String) -> Bool {
 
 /// Multiset (order-independent) equality for tag arrays.
 public func multisetEqual(_ a: [String], _ b: [String]) -> Bool { a.sorted() == b.sorted() }
+
+/// Computes the occurrence-aware (multiset) inverse of a tag write: the delta that, applied to the
+/// post-write state, restores the pre-write state while preserving each token's exact OCCURRENCE
+/// COUNT — not just its presence. Occurrence-only per the owner decision (count, not order): macOS
+/// reorders tags on write and the SPEC compares tag arrays as a multiset, so restoring position is
+/// unobservable. Unlike the `Set`-based `TagDelta` inverse (which collapses `["A","A"]`→`["A"]`),
+/// this never drops a duplicate. Color restore matches the set inverse (a label has no multiplicity).
+public func tagOccurrenceInverse(before: [String], after: [String],
+                                 beforeLabel: Int?, afterLabel: Int?) -> TagOccurrenceDelta {
+    TagOccurrenceDelta(
+        add: multisetDifference(before, minus: after),     // more copies in `before` → re-add the surplus
+        remove: multisetDifference(after, minus: before),  // more copies in `after`  → strip the surplus
+        color: normalizedLabel(afterLabel) != normalizedLabel(beforeLabel) ? .restoreLabel(beforeLabel) : nil
+    )
+}
+
+/// The multiset difference `a − b`: each token repeated by how many MORE times it appears in `a`
+/// than in `b` (never negative). Order follows first appearance in `a`; occurrence-only (count, not
+/// position). E.g. `multisetDifference(["A","A","B"], minus: ["A"]) == ["A","B"]`.
+func multisetDifference(_ a: [String], minus b: [String]) -> [String] {
+    var remaining: [String: Int] = [:]
+    for t in b { remaining[t, default: 0] += 1 }
+    var out: [String] = []
+    for t in a {
+        if let n = remaining[t], n > 0 { remaining[t] = n - 1 }  // cancelled by a copy in `b`
+        else { out.append(t) }                                   // surplus occurrence → part of a − b
+    }
+    return out
+}

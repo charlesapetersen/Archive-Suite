@@ -367,11 +367,16 @@ verified on **scratch copies only — never the corpus**. Legend as above.
   `SPEC/tag-format.md` beside the existing multiset-comparison rule. Pure test + doc, no behavior change —
   this is the premise the rest of the wave rests on, so it lands first.
   | files: packages/ArchiveCore/Tests/ArchiveCoreTests/, SPEC/tag-format.md | S | low | none
-- [ ] **W15.tu1 — occurrence-aware undo inverse in ArchiveCore [M].** Compute the undo inverse from
-  before/after **without collapsing to `Set`** (`packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift:191-196`),
-  carrying per-token multiplicity. **Occurrence-only** per the owner decision (count, not order). Additive
-  representation alongside `TagDelta`; ordinary **user-edit** deltas stay set-like and unchanged. No consumer
-  rewiring in this sub-task — keep the diff auditable.
+- [x] **W15.tu1 — occurrence-aware undo inverse in ArchiveCore [M].** DONE 2026-07-28 (recovered from a
+  preserved dead-session WIP — `old/w15tu1-divergent-wip-20260728/attemptA` — and independently re-verified).
+  New `TagOccurrenceDelta` (multiset peer to `TagDelta`) + `TagWriteResult.occurrenceInverse`, computed via
+  `tagOccurrenceInverse` / `multisetDifference` (no `Set` collapse), so an inverse carries per-token
+  multiplicity (`["A","A"]`→`[]` undoes to `["A","A"]`, not `["A"]`). Purely ADDITIVE — `inverse: TagDelta`
+  and all consumers untouched (new init param defaulted); occurrence-only (count, not order). Verified HERE
+  (not the WIP's self-claim): ArchiveCore `swift test` 100/100 green incl. 6 new W15.tu1 tests (the
+  end-to-end duplicate test RAN, not skipped — macOS persisted the dup); all three app test bundles
+  `build-for-testing` SUCCEEDED; 0 new warnings. NOTE: W15.tu0 (SPEC doc + premise test) still `[ ]`, lands
+  separately; the undo/restore consumers are rewired in W15.tu2.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift | M | med | none
 - [ ] **W15.tu2 — multiplicity-aware apply/restore + wire Reader undo** (blocked-on: W15.tu1) **[M].** Today
   the add step only adds a token when absent (`ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift:52`),
