@@ -56,9 +56,9 @@ bare `arm` selects this) by `tests/prove-arm-dispatch.sh`.
 **Opt-in — detached nohup (`./ops/autonomous/arm.sh nohup`).** macOS has **no `setsid`**, so a subshell +
 `nohup` detaches the loop so it survives the launching command returning (equivalent to
 `( nohup ~/.local/bin/archive-suite-autonomous.sh >…/nohup.out 2>&1 & )`). It runs while this login session is
-alive and inherits its `~/Desktop`/screen (TCC) grant — so it is the better choice **when you need GUI-verify
-(`arm.sh gui on`)**: the daemon inherits the launching terminal's Accessibility/Screen-Recording grant, which
-a LaunchAgent may not. Downside: **no crash-restart** (a crash just stops it). If the launching terminal
+alive and inherits its `~/Desktop`/screen (TCC) grant. (That host-screen grant used to matter for GUI-verify;
+it no longer does — GUI runs off-screen in the Tart VM regardless of supervisor, `ops/gui/README.md` §3.)
+Downside: **no crash-restart** (a crash just stops it). If the launching terminal
 closes, the daemon stops — fine by design: all state is durable in the plan + `git`, so a stop loses nothing
 and the next `arm.sh` continues the queue. **We deliberately do NOT chase reboot/close durability.**
 
@@ -95,7 +95,7 @@ consecutive run of usage fast-fails all count as unbroken no-progress, and a *we
 ~5 h rolling window, so a 6 h idle clock would park a run that is merely *waiting for the window to reopen*.
 
 **Progress is *derived*, never self-reported.** A cycle counts as progress iff a **work fingerprint** moved —
-`sha256(git HEAD + plan '^RUN STATUS:' line + plan '## WORK QUEUE' section + the gui-mode file)`. The model
+`sha256(git HEAD + plan '^RUN STATUS:' line + plan '## WORK QUEUE' section)`. The model
 can't forget to set a flag, and a session that *believes* it worked can't lie past an unchanged fingerprint.
 Exit code does **not** gate it: a session that ships a commit then gets killed (budget/watchdog) still moved
 the fingerprint and resets the backoff; a usage fast-fail can't move it and falls through to no-progress.
@@ -104,10 +104,10 @@ the fingerprint and resets the backoff; a usage fast-fail can't move it and fall
   silently restore the old spin. `SUITE_TODO.md` is tracked, so it rides in `git HEAD`.
 - **Accelerator, not gate.** It is tempting to *skip* firing while the fingerprint is unchanged. That was
   **rejected on evidence:** on 2026-07-16 a 09:34 session concluded "nothing actionable", then at 10:40 —
-  identical HEAD, queue, and gui-mode — a session found real work and shipped the code-signing fix
+  identical HEAD and queue — a session found real work and shipped the code-signing fix
   (`496d202`). Sessions are **nondeterministic**, so "same inputs ⇒ same conclusion" is false; the fingerprint
   only *accelerates* retries (an unchanged one → keep backing off; a changed one → retry now, via an
-  interruptible `backoff_sleep` that wakes early the instant the owner arms an item or flips gui-mode).
+  interruptible `backoff_sleep` that wakes early the instant the owner arms an item).
 - **Idle clock shares the daemon's lifetime.** `idle.since` is cleared at every startup (and on park), so a
   stale stamp from a prior run can't make a fresh daemon park on cycle 1 — an owner re-arm always buys a full
   `IDLE_STOP` window. *(Confirmed-HIGH finding from the change's own adversarial review.)*

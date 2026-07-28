@@ -98,7 +98,7 @@ EOF
 }
 write_plan
 
-STATE="$T/state"; mkdir -p "$STATE"; echo off > "$STATE/gui-mode"
+STATE="$T/state"; mkdir -p "$STATE"
 CTRL="$T/ctrl"; echo "1:no" > "$CTRL"          # stub claude behaviour: "<rc>:<commit?>[:<complete-item?>]"
 
 CHILDENV="$T/childenv.log"

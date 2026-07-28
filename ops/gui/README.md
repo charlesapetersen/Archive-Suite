@@ -86,6 +86,7 @@ match) → **suite is 15/15 in the VM**. (b) ✅ daemon wiring landed as a **fai
 `AUTONOMOUS_GUI_VM=0` to disable): a missing VM / boot failure / timeout **skips** (never parks, so it's inert
 where no VM is built), and it REDs only on a reproducible `** TEST FAILED **` (retry-once). The gate's
 `GATE_MAXRUN` was raised to 50 min to absorb the ~15–20 min VM step. Sessions also verify view/interaction
-changes here off-screen regardless of gui-mode (CLAUDE.md loop step 2 + resume-prompt STEP 3.5). Before relying
+changes here off-screen — the old `gui-mode` flag was retired, GUI is unattended now (CLAUDE.md loop step 2 +
+resume-prompt STEP 3.5). Before relying
 on it, build the VM + run `gui-vm-gate.sh` once by hand. VM TCC grants live on the VM's disk (re-apply if the
 VM is rebuilt).

@@ -248,14 +248,13 @@ work_fingerprint() {
     git -C "$REPO" rev-parse HEAD 2>/dev/null || echo no-head
     grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null || echo no-status
     awk '/^## WORK QUEUE/{f=1;print;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null
-    cat "$STATE/gui-mode" 2>/dev/null || echo no-gui
   } | shasum -a 256 2>/dev/null | cut -d' ' -f1
 }
 
 # NOTE (why the fingerprint is an ACCELERATOR, not a gate): it is tempting to SKIP the session outright while
 # the fingerprint is unchanged ("a fresh session would provably reach the same conclusion — don't pay for
 # it"). That is WRONG and was rejected on evidence: on 2026-07-16 the 09:34 session concluded "nothing
-# autonomously actionable", then at 10:40 — same HEAD, same queue, same gui-mode, i.e. an IDENTICAL
+# autonomously actionable", then at 10:40 — same HEAD, same queue, i.e. an IDENTICAL
 # fingerprint — a session found real work and shipped the code-signing fix (496d202) plus the segment-json
 # de-dup. These sessions are NONDETERMINISTIC, so "same inputs => same conclusion" does not hold. A skip-gate
 # would have suppressed that work indefinitely. So an unchanged fingerprint only means "keep backing off"
@@ -321,8 +320,8 @@ $recent"
 }
 
 # Sleep out the current $BACKOFF, but WAKE EARLY the moment the decision surface changes. This is the other
-# half of "accelerator, not gate": backing off is what stops the waste, but the owner arming an item or
-# flipping gui-mode must not then sit through a 30-minute nap — that flip is exactly what unblocked the
+# half of "accelerator, not gate": backing off is what stops the waste, but the owner arming an item
+# must not then sit through a 30-minute nap — that arming is exactly what unblocked the
 # 2026-07-15 run. Without this the backoff is a pure latency tax on the owner's own unblocking action.
 # Poll cost is trivial (one rev-parse + one hash per step) and bounded to a 30s granularity.
 backoff_sleep() {

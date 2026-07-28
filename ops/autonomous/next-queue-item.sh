@@ -17,7 +17,7 @@
 #   status = `ok`  (no blocked-on, or every prerequisite done)  |  `blocked:T1,T2` (these prerequisites unmet)
 # EXIT: 0 = at least one `ok` item exists; 4 = `[ ]` items exist but ALL are dependency-blocked; 3 = no `[ ]`
 # items at all; 2 = no plan file OR no `## WORK QUEUE` section (bad plan — surfaced, not silently "empty").
-# (GUI-mode / hold-queue skips are layered by the resume prompt ON TOP of this — the script's ONLY concern is
+# (Hold-queue skips are layered by the resume prompt ON TOP of this — the script's ONLY concern is
 # `blocked-on` dependency state. The tag->state scan reads the WHOLE plan + SUITE_TODO, not just the queue, so
 # a prerequisite ticked anywhere counts as done; the `[ ]`-anywhere-wins rule keeps that safe.)
 set -u

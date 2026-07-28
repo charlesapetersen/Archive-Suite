@@ -10,9 +10,9 @@
 #   ./ops/autonomous/arm.sh            # DEFAULT: install + verify prereqs + launch under launchd KeepAlive, so
 #                                      #   a CRASH/OOM/kill auto-restarts (WS1) — best for a long unattended run.
 #                                      #   Survives a daemon crash, NOT a logout/reboot (reboot out of scope).
-#   ./ops/autonomous/arm.sh nohup      # opt-in: detached nohup, NO crash-restart. Use when you want GUI-verify
-#                                      #   (gui on): nohup inherits the launching terminal's TCC grants; a
-#                                      #   LaunchAgent may not. `keepalive` is an explicit alias for the default.
+#   ./ops/autonomous/arm.sh nohup      # opt-in: detached nohup, NO crash-restart. (GUI now runs off-screen in
+#                                      #   the Tart VM — ops/gui/README §3 — so nohup no longer buys GUI-verify.)
+#                                      #   `keepalive` is an explicit alias for the default.
 #   ./ops/autonomous/arm.sh status     # show daemon state + supervisor + RUN STATUS + recent log (read-only)
 #   ./ops/autonomous/arm.sh stop       # stop it (boots out the launchd job first, then kills the process)
 #
@@ -38,11 +38,6 @@ PLIST_DST="$HOME/Library/LaunchAgents/$JOB.plist"
 GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd domain for the LaunchAgent
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
-# taskport = the debugger right XCUITest needs; 'allow' = password-free. Set on `gui on`, reverted on `gui off`.
-tp_is_allow() { security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>'; }
-# UI-automation mode (macOS Sequoia+): the "XCTest is trying to Enable UI Automation" prompt. `automationmodetool
-# enable-automationmode-without-authentication` pre-authorizes it (Apple's CI workaround) — separate from taskport.
-am_state() { automationmodetool 2>/dev/null | grep -qi 'requires.*authentication' && echo auth-required || echo no-auth; }
 
 status() {
   echo "== daemon process =="
@@ -72,15 +67,15 @@ status() {
     esac
   elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
     echo "  PARKED — auto-stopped after a long no-progress stretch; every queue item looks blocked on you."
-    echo "  Nothing lost, plan intact. Unblock (e.g. '$0 gui on') then re-arm: '$0'."
+    echo "  Nothing lost, plan intact. Unblock (arm the next queue item) then re-arm: '$0'."
     [ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && echo "  see: ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt"
   else
     echo "  stopped (normal stop, or the launching session closed — not parked). Re-arm with '$0'."
   fi
   echo "== plan RUN STATUS =="
   runstatus || echo "  (no plan at $PLAN)"
-  echo "== GUI mode =="
-  echo "  $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)  |  UI-automation: $(am_state)   (toggle: $0 gui on|off)"
+  echo "== GUI =="
+  echo "  runs off-screen in the Tart VM (unattended) — no flag. See ops/gui/README §3."
   echo "== keychain =="
   # The daemon's test-smoke gate reads the OCR key via /usr/bin/security, which re-prompts until the item's
   # partition list includes Apple's tool partitions. fix-keychain-access.sh sets that + drops this marker
@@ -138,82 +133,10 @@ case "${1:-arm}" in
     elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
     else echo "daemon was not running."; fi
     exit 0 ;;
-  gui)
-    # GUI-mode flag: each resume session reads $STATE/gui-mode to decide whether to drive/verify GUI (see the
-    # resume prompt). ON also makes XCUITest password-free by setting `taskport` allow via sudo (you're prompted
-    # ONCE now, instead of a random prompt mid-run); OFF reverts taskport to secure. ON still needs TCC
-    # Accessibility + Screen Recording + an unlocked/no-sleep screen. Absent flag = off (safe default).
-    TP_BACKUP="$STATE/taskport-rule.backup.plist"
-    case "${2:-status}" in
-      on)
-        echo on > "$STATE/gui-mode"
-        echo "GUI mode -> ON — sessions will drive+verify GUI for visible-effect items."
-        echo "  Requires: TCC Accessibility + Screen Recording + an unlocked/no-sleep screen."
-        # Ensure a SECURE revert target exists — never overwrite a good backup, never capture 'allow' as the
-        # revert (that would make `gui off` restore the insecure state).
-        if [ ! -f "$TP_BACKUP" ]; then
-          if tp_is_allow; then
-            echo "  ⚠️ taskport is already 'allow' with no backup — cannot capture a secure revert target."
-            echo "     When it's secure, run: security authorizationdb read system.privilege.taskport > \"$TP_BACKUP\""
-          else
-            security authorizationdb read system.privilege.taskport > "$TP_BACKUP" 2>/dev/null \
-              && echo "  backed up the current (secure) taskport rule -> $TP_BACKUP"
-          fi
-        fi
-        if tp_is_allow; then
-          echo "  taskport: already 'allow' (XCUITest ready)."
-        else
-          echo "  Setting taskport password-free for XCUITest (sudo — you'll be prompted once)…"
-          if sudo security authorizationdb write system.privilege.taskport allow; then
-            echo "  taskport -> allow ✅ (reverted automatically on \`$0 gui off\`)."
-          else
-            echo "  ⚠️ taskport sudo failed/cancelled — GUI is ON (cliclick works), but XCUITest may prompt for a password."
-          fi
-        fi
-        # UI-automation mode (Sequoia+ "Enable UI Automation" prompt — a SEPARATE gate from taskport).
-        if [ "$(am_state)" = no-auth ]; then
-          echo "  UI-automation mode: already enabled without auth."
-        else
-          echo "  Enabling UI-automation mode for XCUITest (sudo)…"
-          sudo automationmodetool enable-automationmode-without-authentication >/dev/null 2>&1 \
-            && echo "  UI-automation mode -> enabled ✅ (no 'Enable UI Automation' prompt)." \
-            || echo "  ⚠️ automationmodetool failed/cancelled — XCUITest may still prompt 'Enable UI Automation'."
-        fi
-        ;;
-      off)
-        echo off > "$STATE/gui-mode"
-        echo "GUI mode -> OFF — sessions do build+unit only, defer GUI to Morning Review, skip GUI-only items."
-        if ! tp_is_allow; then
-          echo "  taskport: already secure."
-        elif [ -f "$TP_BACKUP" ]; then
-          echo "  Reverting taskport to secure (sudo — you'll be prompted once)…"
-          if sudo security authorizationdb write system.privilege.taskport < "$TP_BACKUP"; then
-            echo "  taskport -> secure ✅."
-          else
-            echo "  ⚠️ taskport revert failed/cancelled — it is STILL 'allow'. Revert manually:"
-            echo "     sudo security authorizationdb write system.privilege.taskport < \"$TP_BACKUP\""
-          fi
-        else
-          echo "  ⚠️ taskport is 'allow' but no backup at $TP_BACKUP — cannot auto-revert; do it manually."
-        fi
-        # Revert UI-automation mode (re-require auth).
-        if [ "$(am_state)" = auth-required ]; then
-          echo "  UI-automation mode: already requires auth."
-        else
-          echo "  Reverting UI-automation mode (sudo)…"
-          sudo automationmodetool disable-automationmode-without-authentication >/dev/null 2>&1 \
-            && echo "  UI-automation mode -> requires auth ✅." \
-            || echo "  ⚠️ revert failed — disable manually: sudo automationmodetool disable-automationmode-without-authentication"
-        fi
-        ;;
-      status|"") echo "GUI mode: $(cat "$STATE/gui-mode" 2>/dev/null || echo 'off (default)')  |  taskport: $(tp_is_allow && echo allow || echo secure)  |  UI-automation: $(am_state)" ;;
-      *) fail "usage: $0 gui on|off|status" ;;
-    esac
-    exit 0 ;;
   arm|keepalive) MODE='keepalive' ;;   # DEFAULT (2026-07-17): launchd KeepAlive so a crash/kill auto-restarts (WS1)
-  nohup)         MODE='nohup' ;;       # opt-in: detached nohup (no crash-restart) — inherits the terminal's TCC
-                                       # grants, so it's the better pick when GUI-verify (gui on) is needed
-  *) fail "unknown command '${1}'. Use: arm | nohup | keepalive | status | stop | gui on|off|status" ;;
+  nohup)         MODE='nohup' ;;       # opt-in: detached nohup (no crash-restart). (GUI now runs off-screen in
+                                       # the Tart VM — ops/gui/README §3 — so nohup no longer buys GUI-verify.)
+  *) fail "unknown command '${1}'. Use: arm | nohup | keepalive | status | stop" ;;
 esac
 
 # --dry-run: report the resolved launch mode and exit BEFORE any install/launch — a loud, unmistakable line so
@@ -272,8 +195,8 @@ if [ "$MODE" = keepalive ]; then
   # Install the LaunchAgent + (re)bootstrap it. RunAtLoad launches the daemon; KeepAlive=true relaunches it
   # on any bootout-less death (crash/OOM/stray signal). `arm.sh stop`, park, and plan-COMPLETE all bootout,
   # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
-  # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). GUI-verify (gui on) is
-  # best under `arm.sh nohup` where the daemon inherits the terminal's TCC grants; a LaunchAgent may not.
+  # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). (GUI verification now
+  # runs off-screen in the Tart VM regardless of supervisor — ops/gui/README §3 — so no host TCC grant matters.)
   plutil -lint "$PLIST_SRC" >/dev/null || fail "plist is malformed: $PLIST_SRC"
   mkdir -p "$HOME/Library/LaunchAgents"
   install -m 644 "$PLIST_SRC" "$PLIST_DST"

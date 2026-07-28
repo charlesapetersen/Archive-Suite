@@ -15,9 +15,10 @@ STEP 1 — RECOVER STATE (always, first):
   PRIME DIRECTIVES (file safety, no-force, Tier-2, worktree-first). Where its RESUME PROTOCOL or commit/
   checkbox directives describe the older single-commit "complete-then-tick" or "revert-on-blocker" flow, THIS
   PROMPT's checkpoint model supersedes them. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
-  **GUI mode:** `cat ~/.local/state/archive-autonomous/gui-mode` (absent → treat as `off`). This one flag gates
-  ALL GUI work this session (STEP 2 item-picking + STEP 3.5); the owner toggles it via
-  `./ops/autonomous/arm.sh gui on|off` — do NOT change it yourself.
+  **GUI is unattended now — there is no `gui-mode` flag.** GUI work runs OFF the owner's screen in the headless
+  Tart VM (XCUITest + pixel capture; STEP 3.5), and Live-Capture E2E runs on the Android emulator — neither needs
+  the owner or the physical display. The only things the daemon must NOT auto-do are the hold-queue (owner-gated:
+  releases / SPEC / real-corpus / HIGH-risk findings) and `(blocked-on:)`-dependent items — both below.
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
 STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
@@ -50,26 +51,24 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   `blocked:<unmet-tags><TAB><tag><TAB>text`, resolving each `(blocked-on:)` against checkbox state across the
   plan + `SUITE_TODO.md` (a missing prerequisite counts as unmet → blocked, so an out-of-order run can't
   happen). Exit 0 = at least one `ok` item; exit 4 = "[ ]" items exist but ALL are dependency-blocked; exit 3
-  = no "[ ]" items. Pick the first `ok` item that is ALSO not GUI-gated / hold-queue (below); skip a `blocked:`
-  item exactly like a GUI-off one — leave it for a later session once its prerequisite lands. If every `ok`
-  item is GUI/hold-gated, or the script reports all-blocked (exit 4) / empty (exit 3), there is nothing
+  = no "[ ]" items. Pick the first `ok` item that is ALSO not hold-queue (below); skip a `blocked:`
+  item — leave it for a later session once its prerequisite lands. If every `ok`
+  item is hold-gated, or the script reports all-blocked (exit 4) / empty (exit 3), there is nothing
   autonomously actionable — STOP (the idle backoff/park handles it). (Authoring note: a prerequisite `<tag>` is
   the prereq item's leading tag — the first token after its checkbox, e.g. `W15.a`; keep it distinctive.)
   NEVER auto-pick a HOLD-QUEUE item (WS10). The plan's "## HOLD QUEUE (owner-gated)" section — and any item
   tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
   (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything
   that **writes the real corpus**, and any **HIGH review finding on an irreversible path** (Capture/Net/
-  finalize, TagWriter/file-safety) routed here by STEP 2.0. Skip them exactly like GUI-off items: surface each
-  to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue
-  (or GUI-gated), there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
+  finalize, TagWriter/file-safety) routed here by STEP 2.0. Skip them: surface each
+  to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
+  there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
   backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
   misread can't publish a release; but the point is to LEAVE the work for the owner, not to lean on the deny.)
-  If GUI mode is `off`, SKIP items that RUN the GUI: Notes **W8-S8** (GUI checks) + Reader **W7.6** (both need a
-  live XCUITest/cliclick run). **W8-S7 (GUI harness scaffold) IS allowed with GUI off** — author the XCUITest
-  target / accessibility IDs / entitlements / DEBUG fixture-root / cliclick helper and verify with `xcodebuild
-  build-for-testing` (compiles the test bundle; does NOT run it → no window, no password); DEFER the actual
-  UITest RUN to W8-S8 (GUI on). If the only remaining "[ ]" items require RUNNING the GUI, there is nothing to do
-  this session — STOP without opening any window.
+  GUI items that RUN UITests (e.g. Reader **W7.6**, Notes **W8-S8**) are NOT gated — verify them OFF the owner's
+  screen in the Tart VM (STEP 3.5), so pick them like any other item. Live-Capture **Wave 1 E2E** likewise runs
+  on the Android emulator (the harness is "emulator only, never a physical phone" — unattended), so it needs no
+  flag or owner either. The VM + emulator make all GUI/capture work screen-free; there is no "GUI off" case left.
   CONTINUE, don't restart: before starting, `git log --oneline --grep='<item-tag>' -20` (items carry stable
   tags — W4-S7, W5.d1, …) for prior commits on THIS item. First rule out ALREADY-DONE: if SUITE_TODO's box for
   it is "[x]", or a FINAL (non-"checkpoint") commit for it is already on origin/main, a prior session finished
@@ -109,39 +108,21 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
     self-review + a scratch-copy functional test — BEFORE you push it; checkpointing never lowers the Tier-2
     bar to a bare compile.
 
-STEP 3.5 — GUI-VERIFY — **gated by the GUI-mode flag (STEP 1).**
-  **If GUI mode is `off`:** do NOT open any app window — no `./launch.sh`, no `open`, no whole-scheme
-  `xcodebuild test` (use `-only-testing:<unit>` / `-skip-testing:*UITests`). Exception: **W8-S7 may `xcodebuild
-  build-for-testing`** the UITest target to confirm it compiles — that builds, never runs. Build + unit-verify
-  only, and defer the GUI check / any UITest RUN to Morning Review. Skip the rest of this step.
-  **But note:** the headless render guards (`DocumentRenderGuardTests`/`RenderProbe` in `ArchiveReaderTests`) DO
-  run with GUI off — rendering a PDF page / view to pixels and asserting non-blank is a plain unit test. So do
-  NOT defer *render* verification ("did the PDF/thumbnail/view actually draw") to Morning Review; only
-  *interaction / whole-window* checks are deferred. (→ `ops/gui/README.md`.)
-  **VM GUI lane (screen-free — runs REGARDLESS of gui-mode):** interaction / whole-window checks no longer
-  have to wait for Morning Review either — run them off the owner's screen in the headless Tart VM via
-  `ops/gui/vm-gui-runner.sh` (XCUITest + a VNC sighted capture; artifacts in `~/.tart-mirror/vm-artifacts/`).
-  It needs neither gui-mode nor the host's Accessibility/Screen-Recording grants (nothing draws on the owner's
-  display), and it fail-open SKIPs if the VM isn't built. So when the VM is present, VERIFY a view/interaction
-  change here instead of deferring it. The gui-mode gate + host `gui-drive.sh` below remain ONLY for driving
-  the app on the *host* screen. (→ `ops/gui/README.md` §3.)
-  **If GUI mode is `on`** and the item has a visible UI effect:
-  after the clean build launch the app in your worktree (`./launch.sh reader|processor|notes`) and
-  `source scripts/gui-drive.sh`. Prefer **cliclick (real CGEvents) for ALL pointer input** (single/double/
-  right-click, drag) — AppleScript System Events `click at {x,y}` does NOT select NSTableView rows or focus
-  in-content fields; it only works for menus, toolbar buttons, and keyboard-focused fields. Use osascript
-  System Events ONLY for keystrokes + menu items (`gui_menu "Menu>Item"`, `gui_type`, `gui_key`); select rows
-  with `gui_click_row N` / `gui_double_click_row N` / `gui_right_click_row N`; capture with `gui_capture_full`
-  / `gui_capture_window` and READ the shot; assert tag writes by READING (`gui_assert_tag PATH TAGNAME`) —
-  writes go only through the app's TagWriter. Point the app at a SCRATCH copy, NEVER the real corpus (driving
-  File ▸ Choose Archive Folder… clobbers the user's real root bookmark — re-choose it after). QUIT the app when
-  done (`osascript -e 'quit app "ArchiveReader"'`). The driving process needs macOS Accessibility permission
-  (+ Screen Recording for window capture) or clicks silently no-op; if the GUI can't be driven (no window
-  server / screen locked), fall back to build+unit and flag the check to Morning Review. Full protocol: the
-  "GUI VERIFICATION" block in .maintenance/AUTONOMOUS_PLAN.md. (Once the Wave-7 XCUITest harness lands, prefer
-  `xcodebuild test -only-testing:ArchiveReaderUITests` for deterministic assertions over screenshot checks.)
-  For a standalone window grab outside a `gui-drive.sh` session, `ops/gui/capture-window.sh <App>` prints a PNG
-  path to READ; for pixel truth that needs no window at all, prefer the headless render guards (`RenderProbe`).
+STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended now):
+  For a change with a visible UI effect, verify it without ever touching the host display:
+  * RENDER ("did the PDF / thumbnail / view actually draw"): the headless render guards
+    (`DocumentRenderGuardTests` / `RenderProbe` in `ArchiveReaderTests`) render to pixels and assert non-blank —
+    plain unit tests in your build (no VM, no window). Always run these for a render change; never defer them.
+  * INTERACTION / whole-window: run the app's UITests in the headless Tart VM (off-screen, via VNC — never the
+    host display). Reader: `ops/gui/vm-gui-runner.sh xcuitest` (builds + runs `ArchiveReaderUITests` in the VM;
+    screenshots land in `~/.tart-mirror/vm-artifacts/` — READ them to eyeball a render). Any other app: the SAME
+    pattern (`tart exec archive-gui-runner … xcodebuild test -only-testing:<App>UITests`). The VM needs no host
+    Accessibility/Screen-Recording and never draws on the owner's display; it fail-open SKIPs if the VM isn't
+    built — only THEN defer that one interaction check to Morning Review. (→ `ops/gui/README.md` §3.)
+  Never point a test at the real corpus — scratch/TESTOUT/mktemp only (file safety).
+  Do NOT drive the app on the HOST screen — `./launch.sh` + `scripts/gui-drive.sh` / `ops/gui/capture-window.sh`
+  (the retired host cliclick/osascript path) hijack the owner's physical display and are for INTERACTIVE owner
+  debugging only. The unattended daemon uses the VM (above) for every interaction check.
 
 STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
   commit + push. This completing commit MUST also flip the shipped SUITE_TODO.md checkbox (cite the sha)
