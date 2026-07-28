@@ -394,13 +394,24 @@ verified on **scratch copies only — never the corpus**. Legend as above.
   unrelated; Notes test bundle + Processor app build green; 0 new warnings. (Umbrella KNOWN_ISSUE stays open
   for tu3/tu4.)
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift, Views/NavigationModel.swift | M | med | none
-- [ ] **W15.tu3 — per-path write serialization → closes the Notes lost-update race** (blocked-on: W15.tu1)
-  **[M].** `NSFileCoordinator(.contentIndependentMetadataOnly)` does **not** mutually-exclude two concurrent
-  metadata-only write *claims* on one file, so two parallel projections each read pre-write state and the
-  later `setxattr` wins (a lost update). Latent today only because all three apps are one-writer-per-file.
-  Add a per-resolved-path serialization actor/lock **inside** `CoordinatedTagWriter`, designed together with
-  tu2's reconcile layer. **Cross-process writers are explicitly out of scope** — an in-process lock cannot
-  cover them; say so in the code comment rather than implying a guarantee that doesn't hold.
+- [x] **W15.tu3 — per-path write serialization → closes the Notes lost-update race** (blocked-on: W15.tu1)
+  **[M].** DONE 2026-07-28 (mechanism `f52756d`; doc-sync this commit). Added an in-process,
+  per-resolved-path serialization lock INSIDE `ArchiveCore.CoordinatedTagWriter` (Safety §10): a refcounted
+  registry of per-path `NSLock`s (`PathWriteSerializer`) wraps the ENTIRE read→modify→verify→write, so two
+  concurrent in-process writers to the same file can no longer both read pre-write state and clobber each
+  other (the lost update). Distinct paths never contend (unrelated writes stay parallel); an entry is
+  discarded once its last holder releases (bounded map). Synchronous `NSLock`, not an actor — keeps `write`
+  synchronous so all three callers (Reader `TagWriter`, Processor `MacOSTagger`, Notes `NotesTagProjector`)
+  are unchanged; public API is byte-identical (additive). **Cross-PROCESS writers explicitly out of scope**
+  (documented in code, not implied). Tier-2 APPROVE (adversarial self-review: deadlock/lock-ordering,
+  refcount handoff, balanced acquire/release via `defer`, unchanged single-writer semantics). Functional
+  test (ArchiveCore, scratch temp files only): two concurrent same-path writers each appending a distinct
+  tag BOTH survive — PROVEN non-vacuous (fails deterministically, racing tag lost, when the §10 lock is
+  removed); plus a different-paths fan-out. Verified all three per the shared-Core rule: ArchiveCore 101
+  tests green (incl. 2 new §10); Reader `ArchiveReaderTests` 210/211 (the 1 = pre-existing
+  `DeepLinkTests.testRevealAndSelectNoRoot` env flake, W20, unrelated); Notes `ArchiveNotesTests` 189/189;
+  Processor app BUILD SUCCEEDED; 0 new warnings. Notes KNOWN_ISSUES race marked FIXED (mechanism); the
+  cross-app fixture matrix + Notes `concurrentProjectionsNeverCorrupt` assertion flip land in W15.tu4.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift | M | med | none
 - [ ] **W15.tu4 — cross-app duplicate + concurrency fixtures** (blocked-on: W15.tu2, W15.tu3) **[M].** Shared
   scratch fixtures exercised against all three callers — Reader `TagWriter`, Processor `MacOSTagger`, Notes

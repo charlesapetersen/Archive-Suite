@@ -344,12 +344,18 @@ no-op (no mod-date churn), shared-convention title-casing, the §7 label-drift g
 byte-equality assertion on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector`
 (see below). All green; existing `NotesTagProjectorTests` (9) unaffected.
 
-- **LATENT — PROMOTED → Wave 15 (owner review 2026-07-18).** Now tracked as **W15.tu3** in `SUITE_TODO.md`
-  §"Known-issues work — Wave 15" (a per-resolved-path serialization actor/lock inside `CoordinatedTagWriter`),
-  bundled with the Processor's "lossless Finder-tag undo" item because both land on the same shared writer.
-  **Cross-process writers stay explicitly out of scope** — an in-process lock cannot cover them. Still latent
-  (not an active bug) until then; original analysis below.
-- **LATENT (found by this suite; NOT fixed — shared cross-app choke-point) — two concurrent same-file
+- **FIXED (mechanism) — W15.tu3 (2026-07-28, `f52756d`).** A per-resolved-path serialization lock now lives
+  inside `ArchiveCore.CoordinatedTagWriter` (Safety §10): the full read→modify→verify→write is mutually
+  excluded PER FILE, so two concurrent IN-PROCESS writers to the same file can no longer both read pre-write
+  state and clobber each other — the lost update is closed. Distinct paths never contend, so unrelated tag
+  writes still run concurrently. Proven by an ArchiveCore concurrency test that is non-vacuous — it fails
+  deterministically (the racing tag is lost) when the §10 lock is removed. **Cross-PROCESS writers stay
+  explicitly out of scope** — an in-process lock cannot cover them (documented in code, not implied). The
+  cross-app fixture matrix exercising this against all three callers (Reader `TagWriter`, Processor
+  `MacOSTagger`, Notes `NotesTagProjector`) — and flipping the Notes `concurrentProjectionsNeverCorrupt`
+  assertion to require both racing subjects survive — lands in **W15.tu4**. Original analysis below (now
+  historical).
+- **(HISTORICAL — now FIXED by W15.tu3, above.) LATENT (found by this suite) — two concurrent same-file
   metadata writes can lose a racing tag.** `ArchiveCore.CoordinatedTagWriter.write` coordinates via
   `NSFileCoordinator(.contentIndependentMetadataOnly)`, which does **not** mutually-exclude two
   concurrent metadata-only write *claims* on the same file. Two projections dispatched in parallel to the
@@ -361,9 +367,9 @@ byte-equality assertion on every write. Also added a DEBUG **scratch-write guard
   write one-writer-per-file — Reader/Processor batch tag edits across *different* files, Notes saves one
   note at a time, and the projector isn't yet wired to any concurrent path. It would only bite if a future
   design ran the projector on a background re-index *concurrently* with an interactive save of the **same**
-  note. **Not fixed here** (S2 is the test suite; touching the shared audited writer's concurrency is a
-  separate Tier-2 item — a per-path serialization actor/lock, and it wouldn't cover cross-process writers
-  anyway). → flagged to Morning Review as a follow-up-if-it-becomes-real.
+  note. **Not fixed in S2** (S2 was the test suite); the fix — a per-path serialization lock inside the
+  shared audited writer — shipped separately as **W15.tu3** (`f52756d`, see the FIXED entry above). It does
+  not, and cannot, cover cross-process writers.
 - **Added — DEBUG scratch-write guard on `NotesTagProjector` (belt-and-suspenders, plan §5).** Under a
   unit-test harness (`XCTestConfigurationFilePath` set) **or** the GUI-drive store override
   (`ANUITestStorePath` set), `project(…)` now `precondition`s that the write target is under a known
