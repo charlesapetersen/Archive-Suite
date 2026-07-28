@@ -344,16 +344,19 @@ no-op (no mod-date churn), shared-convention title-casing, the §7 label-drift g
 byte-equality assertion on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector`
 (see below). All green; existing `NotesTagProjectorTests` (9) unaffected.
 
-- **FIXED (mechanism) — W15.tu3 (2026-07-28, `f52756d`).** A per-resolved-path serialization lock now lives
+- **FIXED — mechanism W15.tu3 (2026-07-28, `f52756d`); regression-pinned across all three callers W15.tu4.** A per-resolved-path serialization lock now lives
   inside `ArchiveCore.CoordinatedTagWriter` (Safety §10): the full read→modify→verify→write is mutually
   excluded PER FILE, so two concurrent IN-PROCESS writers to the same file can no longer both read pre-write
   state and clobber each other — the lost update is closed. Distinct paths never contend, so unrelated tag
   writes still run concurrently. Proven by an ArchiveCore concurrency test that is non-vacuous — it fails
   deterministically (the racing tag is lost) when the §10 lock is removed. **Cross-PROCESS writers stay
   explicitly out of scope** — an in-process lock cannot cover them (documented in code, not implied). The
-  cross-app fixture matrix exercising this against all three callers (Reader `TagWriter`, Processor
-  `MacOSTagger`, Notes `NotesTagProjector`) — and flipping the Notes `concurrentProjectionsNeverCorrupt`
-  assertion to require both racing subjects survive — lands in **W15.tu4**. Original analysis below (now
+  cross-app fixture matrix exercising this against all three callers **landed in W15.tu4**: ArchiveCore
+  parity for the Processor `MacOSTagger` fresh-write adapter (a duplicated subject survives as a
+  multiset; two concurrent same-path fresh writes neither throw nor tear — the final array is one
+  complete write), a Reader `TagWriter` concurrent-same-path fixture (both added tags survive — the
+  delta adapter inherits §10), and the flipped Notes `concurrentProjectionsNeverCorrupt` assertion —
+  which now requires **both racing subjects survive** (not just the marker). Original analysis below (now
   historical).
 - **(HISTORICAL — now FIXED by W15.tu3, above.) LATENT (found by this suite) — two concurrent same-file
   metadata writes can lose a racing tag.** `ArchiveCore.CoordinatedTagWriter.write` coordinates via

@@ -316,7 +316,7 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorSafetyTests.swift  10 crown-jewel safety tests (W8-S2, Tier-2, scratch .md +
                                    data-fork byte-equality): §3 read-failure aborts (no []-coercion,
                                    neighbors untouched), concurrent-projections-never-corrupt (marker
-                                   never lost — pins the latent lost-update race, see KNOWN_ISSUES),
+                                   + both racing subjects survive — §10 closed the lost-update race, W15.tu4),
                                    §5 unmanaged-tag lossless, §6 "ArchiveSuite"-subject collision
                                    (single/whole-string/marker-never-stripped), §8/§9 disk-backed
                                    verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,

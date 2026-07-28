@@ -413,13 +413,25 @@ verified on **scratch copies only — never the corpus**. Legend as above.
   Processor app BUILD SUCCEEDED; 0 new warnings. Notes KNOWN_ISSUES race marked FIXED (mechanism); the
   cross-app fixture matrix + Notes `concurrentProjectionsNeverCorrupt` assertion flip land in W15.tu4.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift | M | med | none
-- [ ] **W15.tu4 — cross-app duplicate + concurrency fixtures** (blocked-on: W15.tu2, W15.tu3) **[M].** Shared
-  scratch fixtures exercised against all three callers — Reader `TagWriter`, Processor `MacOSTagger`, Notes
-  `NotesTagProjector`: (a) `["A","A"]` → remove the subject → undo → the on-disk **multiset** is `["A","A"]`
-  (the case that silently loses one token today); (b) concurrent-injection — an unrelated tag added between
-  edit and undo survives; (c) two parallel writes to one scratch file **both** survive, which flips the
-  assertion `NotesTagProjectorSafetyTests.concurrentProjectionsNeverCorrupt` deliberately does *not* make
-  today. Gate = `swift test` in `packages/ArchiveCore` **plus** all three app test bundles green.
+- [x] **W15.tu4 — cross-app duplicate + concurrency fixtures** (blocked-on: W15.tu2, W15.tu3) **[M].** DONE
+  2026-07-28. Cross-app regression matrix pinning the W15 duplicate-survival + no-lost-update fixes at each
+  real caller, honoring each adapter's shape: **(a)/(b)** the dup→remove→undo→multiset-survives and
+  concurrent-unrelated-tag-survives cases were already pinned at the Reader `TagWriter` boundary by W15.tu2
+  (`testOccurrenceInverseRestoresDuplicateTag`, `testOccurrenceUndoPreservesConcurrentUnrelatedTag`) and at
+  the ArchiveCore primitive by W15.tu1; this wave ADDED the fresh-write analog for the Processor `MacOSTagger`
+  adapter (which has no undo path) — a *duplicated subject survives a fresh write as a multiset*
+  (`MacOSTaggerParityTests.testDuplicateSubjectSurvivesFreshWrite`). **(c)** two parallel same-path writes:
+  ADDED a Reader `TagWriter` concurrent fixture (both added tags survive — the delta adapter inherits §10,
+  `testConcurrentAdapterWritesBothSurvive`), a MacOSTagger concurrency parity fixture (fresh-write adapter:
+  neither writer throws `.verificationFailed` and the final array is one complete write — "both survive"
+  doesn't apply to an overwrite, `testConcurrentFreshWritesNeitherThrowsAndFinalIsWhole`), and **flipped**
+  `NotesTagProjectorSafetyTests.concurrentProjectionsNeverCorrupt` to require **both racing subjects survive**
+  (not just the marker) now that W15.tu3's §10 lock closed the lost update. Case (a) is N/A for the Notes
+  projector (set-based, dedups, no undo — duplicates are unreachable through it by design). KNOWN_ISSUES
+  reconciled (the race is now FIXED + regression-pinned). Gate MET: ArchiveCore `swift test` 103 XCTest + 100
+  swift-testing green; Reader `ArchiveReaderTests` 212 (only the pre-existing `DeepLinkTests` env flake, W20,
+  unrelated); Notes `ArchiveNotesTests` green; Processor app BUILD SUCCEEDED. Test/doc-only — no production
+  change. Two Tier-2 checkpoints (`19228ee` ArchiveCore, `005fa96` Reader) pushed before this completing commit.
   | files: packages/ArchiveCore/Tests/, ArchiveReader/Tests/, ArchiveNotes/macOS/Tests/ | M | med | none
 
 **Explicitly NOT in Wave 15:** the persisted/versioned undo **audit ledger** (Reader `CLAUDE.md` Safety

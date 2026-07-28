@@ -122,7 +122,7 @@ struct NotesTagProjectorSafetyTests {
 
     // MARK: - Concurrency: never corrupt, never lose the marker (torn-write / wipe guard)
 
-    @Test("concurrent same-file projections never corrupt the file or drop the marker")
+    @Test("concurrent same-file projections keep BOTH racing subjects + marker; never corrupt (§10, W15.tu4)")
     func concurrentProjectionsNeverCorrupt() async throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
@@ -140,20 +140,25 @@ struct NotesTagProjectorSafetyTests {
         _ = try await b.value
 
         let after = Set(try readTags(url))
-        // The file is always in a VALID, non-corrupt state = one of the legal serial outcomes.
-        // The membership marker is NEVER lost and NEVER duplicated (each write is a single atomic
-        // setxattr, so there is no torn array), and no token neither writer intended appears.
-        #expect(after.contains("ArchiveSuite"), "the membership marker survives any concurrent race")
+        // W15.tu4 — the assertion is now STRONGER than at W8-S2: the §10 per-resolved-path lock
+        // (W15.tu3, inside ArchiveCore.CoordinatedTagWriter) serializes the two same-file writes, so
+        // BOTH racing subjects survive — not just the marker. Each projection passes
+        // previouslyManaged: [] (so it removes nothing), and the second to acquire the lock reads the
+        // first's committed tags fresh and merely appends its own subject → exactly the two subjects
+        // plus the marker, deterministically, in either interleaving.
+        #expect(after == ["Economics", "History", "ArchiveSuite"],
+                "both racing subjects survive + marker; no lost update, no invented/torn token (§10)")
         #expect(try readTags(url).filter { $0 == "ArchiveSuite" }.count == 1, "marker present exactly once")
-        #expect(after.isSubset(of: ["Economics", "History", "ArchiveSuite"]), "no invented/torn token")
-        #expect(!after.subtracting(["ArchiveSuite"]).isEmpty, "never wiped to only-the-marker / empty")
         #expect(try fileBytes(url) == bytesBefore, "CORE DIRECTIVE: file bytes never change")
-        // NOTE: a racing *subject* CAN be superseded here — `.contentIndependentMetadataOnly` does
-        // NOT mutually-exclude two concurrent metadata-only write claims on the same file, so this
-        // does NOT assert both subjects survive. That latent lost-update race in the shared
-        // `ArchiveCore.CoordinatedTagWriter` is tracked in ArchiveNotes/KNOWN_ISSUES.md; it is not
-        // reachable in current single-writer-per-file usage. The file-safety guarantee that DOES
-        // hold — no corruption, no marker loss, no wipe — is what this test pins.
+        // NOTE (W15.tu4): before W15.tu3 this test could assert only the weaker invariants (marker
+        // never lost, no corruption/wipe) because `.contentIndependentMetadataOnly` does not
+        // mutually-exclude two concurrent metadata-only write claims, so a racing *subject* could be
+        // superseded (the lost update formerly tracked in ArchiveNotes/KNOWN_ISSUES.md). The §10
+        // in-process per-path lock closes it. Its non-vacuous deterministic-loss-*without*-the-lock
+        // proof lives in ArchiveCore `TagWriterPrimitiveTests.testConcurrentSamePathWritesBothSurvive`
+        // (that seam can widen the RMW window from inside the transform); this pins that the Notes
+        // projector — the app's ONE file-safety write surface — is on that protected path.
+        // Cross-PROCESS writers remain out of scope (an in-process lock cannot cover them).
     }
 
     // MARK: - §5 lossless: never touch a token the projector does not manage
