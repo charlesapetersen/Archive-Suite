@@ -87,9 +87,12 @@ had no terminal state and spun forever. Two real waste modes, both observed 2026
   `--max-budget-usd`) burns real tokens to re-reach "nothing to do", every 90 s.
 
 **The mechanism.** Any cycle that **advances nothing** doubles the gap (`INTERVAL` → `MAXBACKOFF`, default
-30 min); any progress resets it to `INTERVAL`; `IDLE_STOP` (default 6 h) of *unbroken* no-progress **parks**
+30 min); any progress resets it to `INTERVAL`; `IDLE_STOP` (default **72 h**) of *unbroken* no-progress **parks**
 the run — a clean stop with a loud, owner-visible signal (`daemon.log` + `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`
 + a notification). Park deliberately leaves `RUN STATUS: IN_PROGRESS`, so a plain re-arm resumes with no edit.
+`IDLE_STOP` is **72 h** (not 6 h) so a long usage-cap outage doesn't self-park a healthy multi-day run: a
+consecutive run of usage fast-fails all count as unbroken no-progress, and a *weekly* cap can exceed the
+~5 h rolling window, so a 6 h idle clock would park a run that is merely *waiting for the window to reopen*.
 
 **Progress is *derived*, never self-reported.** A cycle counts as progress iff a **work fingerprint** moved —
 `sha256(git HEAD + plan '^RUN STATUS:' line + plan '## WORK QUEUE' section + the gui-mode file)`. The model
@@ -355,32 +358,44 @@ blast radius. Treat every change to them like a Tier-2 code change:
 Each session mints a `wt/<slug>-<stamp>` worktree + branch. Clean ones the session self-removes (resume
 prompt STEP 5), but dirty/interrupted ones — and **all** the merged branch refs — used to pile up (91 stray
 `wt/*` branches accrued before the first sweep). The daemon now GCs its own leftovers itself: `housekeeping()`
-runs in the loop **between sessions**, with a deliberately **split scope** (because sessions don't reliably
-follow the `wt/autonomous-$stamp` template — they improvise slugs like `wt/notes-w3s1-…`):
+runs in the loop **between sessions**. Both phases cover **all `wt/*` slugs** — sessions don't reliably follow
+the `wt/autonomous-$stamp` template (they improvise slugs like `wt/notes-w3s1-…`), so a namespace narrower than
+`wt/*` would strand the improvised-slug worktrees' `build/DD` and let it pile up unbounded over a multi-day run:
 
-- **Phase 1 — worktree removal, narrow (`wt/autonomous*`):** removes a worktree whose branch is an **ancestor
-  of `origin/main`** with a **plain `git worktree remove`, never `--force`**. Kept narrow so it can't reclaim
-  a clean *interactive* worktree out from under you.
-- **Phase 2 — branch deletion, broad (all merged `wt/*`):** deletes every `wt/*` branch that is an ancestor
-  of `origin/main`, whatever the slug. Safe regardless of scope: `git branch -D` **refuses a branch checked
-  out in any worktree** (an active worktree — yours, or the running session's — is protected), and the merged
-  gate means `-D` drops nothing reachable. This is what actually kills the pile-up (branches were 91 of it).
+- **Phase 1 — worktree removal (all `wt/*`):** removes a worktree whose branch is an **ancestor of
+  `origin/main`** (provably pushed) with a **plain `git worktree remove`, never `--force`**. The two gates
+  together mean a worktree is reclaimed only when it is **both fully pushed AND clean** — i.e. genuinely
+  finished. Any in-progress worktree is skipped: an *unpushed* one fails the ancestor gate; a *dirty* one
+  (uncommitted or untracked-non-ignored content) is refused by the plain remove.
+- **Phase 2 — branch deletion (all merged `wt/*`):** deletes every `wt/*` branch that is an ancestor of
+  `origin/main`, whatever the slug. `git branch -D` **refuses a branch checked out in any worktree** (an
+  active worktree — yours, or the running session's — is protected), and the merged gate means `-D` drops
+  nothing reachable. This is what actually killed the original pile-up (branches were 91 of it).
+
+**Why widened to all `wt/*` (2026-07-20).** Phase 1 was originally narrowed to `wt/autonomous*` to avoid
+reclaiming a clean *interactive* worktree out from under the owner. But the disk-guard self-heal calls this
+same `housekeeping()`, so a scope narrower than the slugs sessions actually create couldn't reclaim what it
+leaked — improvised-slug `build/DD` (≈1 GB each) accrued with no GC, the exact failure a multi-day run must
+avoid. Widening is safe because the **merged gate + plain remove** (below) already guarantee only a
+fully-pushed, fully-clean worktree is removed. The one behavioural cost: a *fully-pushed, fully-clean*
+interactive worktree the owner kept around (e.g. just to rebuild in) can now be GC'd between sessions — but
+that is **zero data loss** (its branch ref survives; `git worktree add` + rebuild restores it), only a
+convenience they'd re-create. Regression-guarded by `ops/autonomous/tests/prove-housekeeping.sh` (runs the
+real `housekeeping()` against a 7-case worktree matrix).
 
 **Why no `--force` (Tier-2 adversarial review, 2026-07-11).** A 3-lens review of the first draft (which *did*
-use `--force`) found a **high-severity** hole: the `wt/autonomous*` glob also matches a *maintainer's* worktree
-if they slug daemon-maintenance work `autonomous-…`, and `--force` would then delete their **uncommitted** work
+use `--force`) found a **high-severity** hole: `--force` would delete a matched worktree's **uncommitted** work
 (the ancestor gate is satisfied by any freshly-branched worktree). Same class of bug for a watchdog-killed
 session's unpushed edits, and for a live build/bg grandchild still writing a merged worktree (`merged ≠ idle`).
 Dropping `--force` makes git itself refuse any dirty/in-use worktree, so housekeeping is **structurally unable
 to destroy unpushed or in-progress work** — it skips those and logs `left N merged-but-dirty/in-use
-worktree(s) for manual review`. Proven on a 13-assertion scratch matrix (incl. a dirty `wt/autonomous-hkfix`
-human worktree → kept, work intact). Purely local (no `git fetch`; the session's push already advanced the
+worktree(s) for manual review`. Purely local (no `git fetch`; the session's push already advanced the
 shared `origin/main` ref) so it can't hang the loop; never touches the primary checkout.
 
-- **Interactive coexistence:** Phase 1 only removes *worktrees* on a `wt/autonomous*` branch, so a worktree
-  you slug anything else is never removed. Phase 2 may delete your merged `wt/*` *branch ref* once its worktree
-  is gone (no data loss — it's on `origin/main`), but never while you have it checked out. Net: your active
-  work is always safe; only fully-pushed leftovers get reclaimed.
+- **Interactive coexistence:** your in-progress work is always safe — a worktree with any uncommitted or
+  untracked-non-ignored content, or with unpushed commits, is skipped by one of the two gates. Only a
+  *fully-pushed, fully-clean* leftover worktree (any slug) is reclaimed; its branch ref then goes in Phase 2
+  once the worktree is gone (no data loss — it's on `origin/main`), but never while it is checked out.
 - **Follow-up now resolved (2026-07-12):** the watchdogs previously killed only claude's pid, so a killed
   session could orphan a runaway build child. The health-watchdog change routes every kill through
   `_terminate_tree`, which TERM+KILLs claude's whole descendant tree (snapshotted up-front, with a detached

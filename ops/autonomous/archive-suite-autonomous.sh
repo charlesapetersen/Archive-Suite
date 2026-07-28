@@ -49,7 +49,10 @@ EFFORT="${AUTONOMOUS_EFFORT:-max}"        # reasoning effort for every resume se
 # no-progress parks the run + stops the daemon. Any progress resets to $INTERVAL instantly. Rationale + the
 # two waste modes this closes: ops/autonomous/README.md "Idle backoff" (added 2026-07-16).
 MAXBACKOFF="${AUTONOMOUS_MAXBACKOFF:-1800}"  # ceiling on the idle gap (30 min)
-IDLE_STOP="${AUTONOMOUS_IDLE_STOP:-21600}"   # 6 h of zero progress -> park + stop (0 disables the auto-stop)
+IDLE_STOP="${AUTONOMOUS_IDLE_STOP:-259200}"  # 72 h of zero progress -> park + stop (0 disables the auto-stop).
+                                             # 72 h (not 6 h) so a long usage-cap outage — a weekly cap can
+                                             # exceed the ~5 h rolling window — reads as "waiting", not "idle",
+                                             # and doesn't auto-park a still-healthy multi-day run.
 
 # Disk guard (WS2) — a full disk fails EVERY build, so without this a long run just burns sessions failing to
 # compile and never says why. Checked BEFORE launching a session; tries housekeeping to reclaim first, then
@@ -468,11 +471,18 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -25)"
 #     bite: the dangerous cases are all dirty or in-use, and git refuses to remove those.)
 #   * MERGED-ONLY: only touch a wt/ ref whose tip is an ANCESTOR of origin/main — its commits are provably
 #     pushed, so branch -D drops nothing reachable and worktree removal loses no committed work.
-#   * SCOPE (split, because sessions don't reliably follow the wt/autonomous-$stamp template — they improvise
-#     slugs like wt/notes-w3s1-…): WORKTREE removal (Phase 1) stays narrow to "wt/autonomous*" so it can never
-#     reclaim a clean *interactive* worktree out from under you. BRANCH deletion (Phase 2) covers ALL merged
-#     "wt/*" refs — safe regardless of slug because git refuses to delete a branch checked out in any worktree
-#     (an active worktree, yours or the daemon's, is protected) and the merged gate means zero data loss.
+#   * SCOPE: both phases now cover ALL "wt/*" refs (any slug). This is deliberate — sessions don't reliably
+#     follow the wt/autonomous-$stamp template (they improvise slugs like wt/notes-w3s1-…), so a namespace
+#     narrower than "wt/*" strands the improvised-slug worktrees' build/DD, which piles up unbounded over a
+#     multi-day run (the disk-guard self-heal calls THIS function, so a narrow scope can't reclaim what it
+#     leaked). Widening is safe because a worktree is only removed when it is BOTH provably-pushed (merged
+#     gate, below) AND clean (plain remove, above) — i.e. genuinely finished, nothing to lose. Any in-progress
+#     worktree is skipped: an unpushed one fails the merged gate; a dirty one is refused by the plain remove.
+#     The one behavioural cost of widening past "wt/autonomous*": a *fully-pushed, fully-clean* interactive
+#     worktree an owner kept around (e.g. just to rebuild in) can be GC'd between sessions — zero data loss
+#     (its branch ref survives; re-add + rebuild to get it back), just a convenience they'd re-create.
+#     BRANCH deletion (Phase 2) also covers all merged "wt/*"; git refuses to delete a branch checked out in
+#     any worktree (an active worktree, yours or the daemon's, is protected) and the merged gate = zero loss.
 #   * PURELY LOCAL: no `git fetch` (the session's `push … HEAD:main` already advanced the shared
 #     refs/remotes/origin/main the primary checkout sees) — so this can never hang the loop on a dead network.
 #   * NEVER the primary checkout ($REPO); every step best-effort (|| true / 2>/dev/null) — no `set -e`, so a
@@ -488,7 +498,7 @@ housekeeping() {
   while IFS=$'\t' read -r dir ref; do
     [ -n "$dir" ] || continue
     [ "$dir" = "$REPO" ] && continue                                       # never the primary checkout
-    case "$ref" in refs/heads/wt/autonomous*) ;; *) continue ;; esac       # only the daemon's own namespace
+    case "$ref" in refs/heads/wt/*) ;; *) continue ;; esac                  # all wt/* slugs (see SCOPE above)
     git merge-base --is-ancestor "$ref" origin/main 2>/dev/null || continue # only provably-pushed work
     if git worktree remove "$dir" 2>/dev/null; then removed=$((removed+1)); else skipped=$((skipped+1)); fi
   done < <(git worktree list --porcelain \

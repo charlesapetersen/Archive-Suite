@@ -23,6 +23,14 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   needs-owner hold queue · **WS11** paced whole-project review cadence (`next-review-unit.sh`) · **WS12**
   keychain partition-list fix. Each with a committed regression harness (`ops/autonomous/tests/prove-*.sh`).
   Out of scope (owner): reboot/auto-login, cumulative-cost ceiling.
+  - [x] **2-week-readiness refinements (2026-07-20).** Two multi-day-duration fixes found in a
+    pre-flight audit: (1) **WS3 worktree GC widened** — Phase-1 removal now covers all `wt/*` slugs (was only
+    `wt/autonomous*`), so improvised-slug worktrees' `build/DD` no longer strands unbounded; still safe (merged
+    gate + plain remove ⇒ only fully-pushed+clean worktrees reclaimed); new regression harness
+    `ops/autonomous/tests/prove-housekeeping.sh` (7-case matrix, runs the real `housekeeping()`). (2) **`IDLE_STOP`
+    6 h → 72 h** so a long usage-cap outage (a weekly cap can exceed the ~5 h rolling window) reads as *waiting*,
+    not *idle*, and doesn't auto-park a healthy multi-day run. NOT addressed (owner, deferred 2026-07-20):
+    reboot/auto-login survival.
   **Owner actions to start a long run (standing, not blocking):** run `./ops/autonomous/fix-keychain-access.sh`
   once (DONE 2026-07-17: Gemini/Anthropic/Mistral partition-listed), then `./ops/autonomous/arm.sh` (the run is
   currently DOWN; `arm.sh` now defaults to launchd KeepAlive / crash-restart — use `arm.sh nohup` only if you
