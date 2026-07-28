@@ -13,7 +13,7 @@ final class ViewerUITests: FixtureUITestCase {
         clickRow(0)
 
         // Open preview via the toolbar button.
-        let previewButton = app.buttons["ar.toolbar.preview"]
+        let previewButton = toolbarButton("ar.toolbar.preview")
         XCTAssertTrue(previewButton.waitForExistence(timeout: 5), "Preview toolbar button should exist")
         previewButton.click()
 
@@ -41,7 +41,7 @@ final class ViewerUITests: FixtureUITestCase {
         // Select a standard 2-page PDF (file 1–6 from fixture are real PDFs).
         clickRow(0)
 
-        let previewButton = app.buttons["ar.toolbar.preview"]
+        let previewButton = toolbarButton("ar.toolbar.preview")
         previewButton.click()
 
         let doneButton = app.buttons["ar.preview.done"]

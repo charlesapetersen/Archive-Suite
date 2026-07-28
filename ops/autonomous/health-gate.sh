@@ -51,6 +51,12 @@ else
   echo "  ✓ coherence (clean tree)"
 fi
 
+# Opt-in: run the Reader UITests in a headless Tart VM — off the owner's screen, and without the
+# "Enable UI Automation" prompt that makes the steps above avoid UITests on the host. OFF by default
+# (set AUTONOMOUS_GUI_VM=1). Fail-open: a missing VM / boot failure / timeout SKIPs; only a reproducible
+# UITest failure REDs (park). See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
+[ "${AUTONOMOUS_GUI_VM:-0}" = 1 ] && step gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
+
 echo
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"

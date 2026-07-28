@@ -78,9 +78,12 @@ It parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log.
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
 at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/strided corpus.
 
-**Known follow-ups:** (a) 5 Reader UITests (`sidebar`/`tagCloud`/`preview` toggles) fail with "multiple
-matching elements" — the app opens **two windows**, so `app.buttons["id"]` matches two toolbars; fix =
-window-scope the query (`app.windows["Archive Reader"].buttons[…]`); pre-existing, hits the current macOS
-host too. (b) **Daemon-loop wiring** (having `archive-suite-autonomous.sh` invoke this) is a **Tier-2**
-change — designed here, not yet wired; needs the adversarial-review + prove-the-mechanism pass. VM TCC grants
-live on the VM's disk and must be re-applied if the VM is rebuilt.
+**Status (both follow-ups done 2026-07-28):** (a) ✅ the 5 toolbar UITests (`sidebar`/`tagCloud`/`preview`)
+that failed "multiple matching elements" (the app opens **two windows** → two toolbars) are fixed by a
+`toolbarButton(_:)` helper in `FixtureUITestCase` (window-scope to "Archive Reader" + prefer the hittable
+match) → **suite is 15/15 in the VM**. (b) ✅ daemon wiring landed as an **opt-in, fail-open** health-gate
+step — `ops/autonomous/gui-vm-gate.sh` + a `AUTONOMOUS_GUI_VM=1` hook in `health-gate.sh`: **OFF by default**;
+a missing VM / boot failure / timeout **skips** (never parks), and it REDs only on a reproducible
+`** TEST FAILED **` (retry-once). The change is committed but **inert until armed** — build the VM, run
+`gui-vm-gate.sh` once by hand, then set `AUTONOMOUS_GUI_VM=1`. VM TCC grants live on the VM's disk (re-apply
+if the VM is rebuilt).

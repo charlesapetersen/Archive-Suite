@@ -117,4 +117,19 @@ class FixtureUITestCase: XCTestCase {
     func pressKey(_ key: String, modifiers: XCUIElement.KeyModifierFlags) {
         app.typeKey(key, modifierFlags: modifiers)
     }
+
+    /// A navigation-window toolbar button, resolved robustly.
+    ///
+    /// On macOS 26 the SwiftUI toolbar can surface one `accessibilityIdentifier` on more than one
+    /// accessibility element (the visible item plus an overflow/duplicate representation), so a bare
+    /// `app.buttons[id]` fails to *click* with "Multiple matching elements found". Scope to the main
+    /// window and prefer the hittable match (the on-screen toolbar item).
+    func toolbarButton(_ id: String, timeout: TimeInterval = 5) -> XCUIElement {
+        let matches = app.windows["Archive Reader"].buttons.matching(identifier: id)
+        _ = matches.firstMatch.waitForExistence(timeout: timeout)
+        for i in 0..<matches.count where matches.element(boundBy: i).isHittable {
+            return matches.element(boundBy: i)
+        }
+        return matches.firstMatch
+    }
 }

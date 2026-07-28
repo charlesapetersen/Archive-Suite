@@ -139,6 +139,13 @@ paid Processor OCR smoke.
   plain unit test inside `ArchiveReaderTests`: it renders a PDF page / view to a bitmap and asserts non-blank,
   with no "Enable UI Automation" prompt. So render regressions (blank PDF pane, blank thumbnail) are caught
   headlessly; only *interaction / whole-window* checks still need GUI-on. → `ops/gui/README.md`.
+- **Opt-in GUI UITests in a headless VM (`AUTONOMOUS_GUI_VM=1`, OFF by default).** That last gap — real
+  *interaction / whole-window* UITests — can now run in the gate WITHOUT a screen: `ops/autonomous/gui-vm-gate.sh`
+  runs `ArchiveReaderUITests` inside the Tart VM (`ops/gui/README.md` §3), off the owner's display and with no
+  "Enable UI Automation" host prompt. **Fail-open** (Tier-2 posture): a missing VM / boot failure / timeout
+  **skips** (never parks); it REDs only on a *reproducible* UITest failure (keyed on the `** TEST FAILED **`
+  marker, with its own retry-once). Leave it off until you've built the VM and run `gui-vm-gate.sh` once by hand;
+  the VM's TCC grants live on its disk (re-apply if the VM is rebuilt).
 - **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
   deterministic and fails again (→ park), but a flaky XCTest / transient `xcodebuild` blip passes the retry
   (→ green, no park). This is what keeps a routine flake from false-parking a multi-day run.

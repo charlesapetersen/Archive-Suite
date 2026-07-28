@@ -20,7 +20,7 @@ final class NavigationUITests: FixtureUITestCase {
         // Open the tag cloud panel via toolbar button. Its visibility is @AppStorage (shared
         // UserDefaults), so toggle up to twice until tags are actually shown rather than assuming
         // it starts hidden.
-        let tagCloudButton = app.buttons["ar.toolbar.tagCloud"]
+        let tagCloudButton = toolbarButton("ar.toolbar.tagCloud")
         XCTAssertTrue(tagCloudButton.waitForExistence(timeout: 5))
         let tagTexts = app.buttons.matching(identifier: "ar.tagCloud.tag")
         for _ in 0..<2 where tagTexts.count == 0 {
@@ -61,7 +61,7 @@ final class NavigationUITests: FixtureUITestCase {
     // MARK: - Sidebar toggle (W5.c4)
 
     func testSidebarToggles() throws {
-        let sidebarButton = app.buttons["ar.toolbar.sidebar"]
+        let sidebarButton = toolbarButton("ar.toolbar.sidebar")
         XCTAssertTrue(sidebarButton.waitForExistence(timeout: 5))
 
         // Sidebar is shown by default (@AppStorage default = true).
@@ -91,7 +91,7 @@ final class NavigationUITests: FixtureUITestCase {
     // MARK: - Tag cloud panel toggle (W5.c4)
 
     func testTagCloudPanelToggles() throws {
-        let button = app.buttons["ar.toolbar.tagCloud"]
+        let button = toolbarButton("ar.toolbar.tagCloud")
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         func tagCount() -> Int { app.buttons.matching(identifier: "ar.tagCloud.tag").count }
 
