@@ -118,6 +118,13 @@ STEP 3.5 — GUI-VERIFY — **gated by the GUI-mode flag (STEP 1).**
   run with GUI off — rendering a PDF page / view to pixels and asserting non-blank is a plain unit test. So do
   NOT defer *render* verification ("did the PDF/thumbnail/view actually draw") to Morning Review; only
   *interaction / whole-window* checks are deferred. (→ `ops/gui/README.md`.)
+  **VM GUI lane (screen-free — runs REGARDLESS of gui-mode):** interaction / whole-window checks no longer
+  have to wait for Morning Review either — run them off the owner's screen in the headless Tart VM via
+  `ops/gui/vm-gui-runner.sh` (XCUITest + a VNC sighted capture; artifacts in `~/.tart-mirror/vm-artifacts/`).
+  It needs neither gui-mode nor the host's Accessibility/Screen-Recording grants (nothing draws on the owner's
+  display), and it fail-open SKIPs if the VM isn't built. So when the VM is present, VERIFY a view/interaction
+  change here instead of deferring it. The gui-mode gate + host `gui-drive.sh` below remain ONLY for driving
+  the app on the *host* screen. (→ `ops/gui/README.md` §3.)
   **If GUI mode is `on`** and the item has a visible UI effect:
   after the clean build launch the app in your worktree (`./launch.sh reader|processor|notes`) and
   `source scripts/gui-drive.sh`. Prefer **cliclick (real CGEvents) for ALL pointer input** (single/double/

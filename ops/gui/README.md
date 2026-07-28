@@ -81,9 +81,11 @@ at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/st
 **Status (both follow-ups done 2026-07-28):** (a) ✅ the 5 toolbar UITests (`sidebar`/`tagCloud`/`preview`)
 that failed "multiple matching elements" (the app opens **two windows** → two toolbars) are fixed by a
 `toolbarButton(_:)` helper in `FixtureUITestCase` (window-scope to "Archive Reader" + prefer the hittable
-match) → **suite is 15/15 in the VM**. (b) ✅ daemon wiring landed as an **opt-in, fail-open** health-gate
-step — `ops/autonomous/gui-vm-gate.sh` + a `AUTONOMOUS_GUI_VM=1` hook in `health-gate.sh`: **OFF by default**;
-a missing VM / boot failure / timeout **skips** (never parks), and it REDs only on a reproducible
-`** TEST FAILED **` (retry-once). The change is committed but **inert until armed** — build the VM, run
-`gui-vm-gate.sh` once by hand, then set `AUTONOMOUS_GUI_VM=1`. VM TCC grants live on the VM's disk (re-apply
-if the VM is rebuilt).
+match) → **suite is 15/15 in the VM**. (b) ✅ daemon wiring landed as a **fail-open** health-gate step —
+`ops/autonomous/gui-vm-gate.sh` + a hook in `health-gate.sh`, **ON by default** (owner enabled 2026-07-28; set
+`AUTONOMOUS_GUI_VM=0` to disable): a missing VM / boot failure / timeout **skips** (never parks, so it's inert
+where no VM is built), and it REDs only on a reproducible `** TEST FAILED **` (retry-once). The gate's
+`GATE_MAXRUN` was raised to 50 min to absorb the ~15–20 min VM step. Sessions also verify view/interaction
+changes here off-screen regardless of gui-mode (CLAUDE.md loop step 2 + resume-prompt STEP 3.5). Before relying
+on it, build the VM + run `gui-vm-gate.sh` once by hand. VM TCC grants live on the VM's disk (re-apply if the
+VM is rebuilt).

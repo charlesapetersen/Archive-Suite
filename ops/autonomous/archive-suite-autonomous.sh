@@ -77,7 +77,11 @@ MAX_NOCOMPLETE="${AUTONOMOUS_MAX_NOCOMPLETE:-6}"
 # bad/missing sha fails OPEN (gate due now). 0 disables.
 GATE_EVERY="${AUTONOMOUS_GATE_EVERY:-30}"          # commits since the last GREEN gate before the next runs
 GATE_CMD="${AUTONOMOUS_GATE_CMD:-$REPO/ops/autonomous/health-gate.sh}"   # overridable (harness stubs it)
-GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-1800}"      # wall-clock cap on the gate (30 min); a hang -> kill + SKIP
+GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-3000}"      # wall-clock cap on the gate (50 min); a hang -> kill + SKIP.
+                                                   # 50 not 30: the on-by-default GUI-VM step (gui-vm-gate.sh —
+                                                   # VM boot + build + UITests) adds ~15-20 min; at 30 min a slow
+                                                   # cold run could blow the cap and false-park via GATE_MAX_TIMEOUTS.
+                                                   # Set it back to 1800 if you run with AUTONOMOUS_GUI_VM=0.
 GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts before PARK (a persistent hang)
 
 # STATUS digest (WS5) — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a

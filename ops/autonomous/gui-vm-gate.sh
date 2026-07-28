@@ -4,7 +4,8 @@
 # Automation" prompt (which is exactly why the gate itself runs only unit bundles — see health-gate.sh).
 #
 # SAFETY POSTURE (this is Tier-2 autonomous infra — biased hard toward fail-open):
-#   • OFF by default. Runs only when AUTONOMOUS_GUI_VM=1.
+#   • ON by default (2026-07-28). Set AUTONOMOUS_GUI_VM=0 to disable. Inert where the VM isn't built —
+#     it SKIPs cleanly (see the VM-present guard), so on-by-default is harmless on such machines.
 #   • A missing VM, a boot failure, a timeout, or any non-test error → SKIP (exit 0). Infra must
 #     NEVER park the run.
 #   • RED (exit 1) ONLY on a reproducible UITest failure — keyed on the definitive "** TEST FAILED **"
@@ -27,7 +28,7 @@ GUEST_DD="/Users/admin/dd-reader"
 skip() { echo "GUI-VM gate SKIPPED: $*"; exit 0; }
 
 # --- guards (each SKIPs green; a missing prereq must never RED) ---
-[ "${AUTONOMOUS_GUI_VM:-0}" = 1 ] || skip "disabled (set AUTONOMOUS_GUI_VM=1 to enable)"
+[ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
 command -v tart >/dev/null || skip "tart not installed"
 # match the VM as a whole word in `tart list`
 tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || skip "VM '$VM' not present (build it — ops/gui/README.md §3)"
@@ -49,6 +50,11 @@ run_once() {
   tart stop "$VM" >/dev/null 2>&1 || true
   tart run "$VM" --no-graphics --dir=repo:"$ROOT" --dir=out:"$ART" >>"$GLOG" 2>&1 &
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 2
+  # Visibility: if the GUI fixture isn't in the VM, the fixtured UITests SKIP — the gate would still go
+  # GREEN on the lone launch test, hiding a coverage gap. Warn (don't fail; the launch test + render
+  # guards still run). The fixture persists on the VM disk; rebuild it after an image rebuild (README §3).
+  tart exec "$VM" bash -lc '[ -d "$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture" ]' 2>/dev/null \
+    || echo "WARN: GUI fixture absent in VM — fixtured UITests will SKIP (rebuild: ops/gui/README.md §3)." | tee -a "$GLOG"
   "${TO[@]}" tart exec "$VM" bash -lc "
     xcodebuild test -project '$GUEST_PROJ' -scheme ArchiveReader \
       -only-testing:ArchiveReaderUITests -destination 'platform=macOS' \
