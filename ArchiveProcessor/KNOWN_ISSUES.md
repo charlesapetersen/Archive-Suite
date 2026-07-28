@@ -408,8 +408,10 @@ or the Drive relay.**
 the relay and `USBBridge` exist), so LAN capture works precisely on the open/shared-PSK guest networks that ARE
 sniffable. That is why the residual risk is real rather than hypothetical — it is simply low enough to accept.
 
-**B) The credential weakness IS promoted** → `SUITE_TODO.md` §"Known-issues work — Wave 16", **W16.lan1** (this
-threat-model doc) and **W16.lan2** (the fix). It survives the deflation above because **it requires no sniffing
+**B) The credential weakness IS promoted** → `SUITE_TODO.md` §"Known-issues work — Wave 16". **W16.lan1** — the
+threat-model + accepted-risk doc — is **DONE** (this entry, plus the durable operator/developer summary in
+`CLAUDE.md` §"Primary Function 3: Live Capture" → *LAN transport security — accepted risk*); **W16.lan2** (the
+credential fix) remains. It survives the deflation above because **it requires no sniffing
 at all** — only network reachability to the Mac, so none of the "needs an open network and co-location"
 reasoning applies. The token is 6 chars from a 31-char alphabet (**~29.7 bits**), minted **once per Mac and
 persisted forever** (`CaptureSession.swift:275-282`), with **no lockout on repeated 401s** — an 8-connection

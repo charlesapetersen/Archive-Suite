@@ -454,13 +454,18 @@ adversary co-located in the same reading room. Encrypting the transport would ch
 permanently — do not re-promote LANSEC-5/6/7 (secure transport, companion mirroring, packet-capture harness).**
 
 **But two things ARE promoted**, because they are cheap, Mac-only, and need no wire-contract change:
-- [ ] **W16.lan1 — write the LAN threat-model + accepted-risk doc [S].** Docs only, no code. Record: sniffability
-  depends on venue Wi-Fi type; **venues that enforce client isolation block the LAN transport entirely** (which
-  is why the Drive relay and `USBBridge` exist) — so LAN capture works precisely on the open/shared-PSK guest
-  networks that ARE sniffable, and that correlation is why the residual risk is *real* even though it's low.
-  State the accepted risk explicitly, point the operator at USB / the Drive relay on untrusted venue Wi-Fi, and
-  **correct the stale verification sub-item**: "Bonjour discovery" is moot — the Mac advertises `_archivecap._tcp`
-  (`CaptureServer.swift:68`) but **neither companion browses for it**; pairing is QR-only.
+- [x] **W16.lan1 — write the LAN threat-model + accepted-risk doc [S].** DONE 2026-07-28 (this commit). Docs
+  only, no code. Added a durable **LAN transport security — accepted risk** bullet to `ArchiveProcessor/CLAUDE.md`
+  §"Primary Function 3: Live Capture": records the plaintext-HTTP + persistent-token exposure, the
+  client-isolation correlation (venues that block LAN entirely are why USB/Drive exist → LAN runs precisely on
+  the sniffable open/shared-PSK networks, so the low risk is *real*), the owner's accepted-risk rationale (public
+  records → confidentiality ≈ worthless; integrity bounded by the Recovery Core Directive; needs a co-located
+  adversary; do NOT re-promote LANSEC-5/6/7), operator guidance (USB bridge / Drive relay on untrusted venue
+  Wi-Fi), a forward-ref to the W16.lan2 credential fix, and the corrected stale sub-item (`_archivecap._tcp` is
+  advertised at `CaptureServer.swift:68` but **neither companion browses it** — no `NWBrowser`; pairing is
+  QR-only). Also marked W16.lan1 DONE in `ArchiveProcessor/KNOWN_ISSUES.md` §"Live Capture LAN channel". Facts
+  re-verified against the tree: the `:68` advertise, the `CaptureSession.swift:275-282` 31-char/~29.7-bit token,
+  no companion `NWBrowser`, and the USB/Drive alternatives.
   | files: ArchiveProcessor/KNOWN_ISSUES.md, ArchiveProcessor/CLAUDE.md | S | low | none
 - [ ] **W16.lan2 — high-entropy LAN token + failed-auth throttle [S].** The one finding that survives the
   deflation, because **it needs no sniffing at all** — only network reachability to the Mac. The token is 6 chars
