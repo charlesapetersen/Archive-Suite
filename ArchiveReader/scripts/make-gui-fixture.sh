@@ -17,7 +17,7 @@
 set -euo pipefail
 
 TAG=/opt/homebrew/bin/tag
-SRC="$HOME/Claude/Archive Suite/Test files/Brown Gemini"
+SRC="${AR_FIXTURE_SRC:-$HOME/Claude/Archive Suite/Test files/Brown Gemini}"
 DST="$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture"
 
 # --- preflight ---
@@ -29,7 +29,9 @@ rm -rf "$DST"
 mkdir -p "$DST"
 
 # --- copy a curated set of real PDFs (ditto preserves xattrs, but we strip below) ---
-# We pick 10 files by name — stable, deterministic.
+# The canonical fixture names the tag assignments + UITests expect. We copy the
+# first 10 real PDFs the corpus provides into THESE names (see loop below), so the
+# fixture is stable even when the corpus is slimmed to a strided sample.
 FILES=(
   "00001 IMG — Brown.pdf"   # will be: year + month + subject + P9 + Read
   "00002 IMG — Brown.pdf"   # will be: year + subject + P8 + Unread
@@ -42,9 +44,18 @@ FILES=(
   "00009 IMG — Brown.pdf"   # will be: year + subject + NO read-state (tri-state neither)
   "00010 IMG — Brown.pdf"   # will be: year + subject + P8 + Unread (sort tie-breaker test)
 )
-for f in "${FILES[@]}"; do
-  [ -f "$SRC/$f" ] || { echo "error: missing source file: $SRC/$f" >&2; exit 1; }
-  ditto "$SRC/$f" "$DST/$f"
+# Don't require specific source names: the corpus may be SLIMMED to a strided
+# sample (commit c07c98c removed the old consecutive 00002–00010). Take the first
+# 10 real PDFs the corpus provides and rename them into the canonical fixture
+# names above — the tag assignments below (and the UITests) key off the canonical
+# names + applied tags, not the source identity, so the fixture stays stable.
+SRCFILES=()   # portable (bash 3.2 has no `mapfile`)
+while IFS= read -r pdf; do SRCFILES+=("$pdf"); done < <(ls "$SRC"/*.pdf 2>/dev/null | head -10)
+[ "${#SRCFILES[@]}" -eq 10 ] || { echo "error: need >=10 source PDFs in $SRC, found ${#SRCFILES[@]}" >&2; exit 1; }
+i=0
+for name in "${FILES[@]}"; do
+  ditto "${SRCFILES[$i]}" "$DST/$name"
+  i=$((i+1))
 done
 
 # --- generate a single-page image-only PDF (no text layer) ---
