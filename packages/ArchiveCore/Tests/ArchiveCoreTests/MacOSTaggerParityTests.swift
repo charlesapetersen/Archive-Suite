@@ -149,4 +149,61 @@ final class MacOSTaggerParityTests: XCTestCase {
         XCTAssert(t.contains("Purple"), "Purple kept as text: \(t)")
         XCTAssertEqual(l, 6, "Red label from appColor")
     }
+
+    // MARK: - W15.tu4 — duplicate-tag survival + concurrency through the MacOSTagger fresh-write adapter
+
+    /// The W15 wave premise applied to the Processor's FRESH-write adapter: a *duplicated subject* in
+    /// the incoming tag set survives the `MacOSTagger.applyTags` transform + the coordinated write as a
+    /// multiset — the fresh-write path must not silently collapse `["Corr","Corr"]` to a single "Corr".
+    /// (macOS persists duplicate tag strings — the W15.tu0/tu1 premise; skip if a volume dedups.)
+    func testDuplicateSubjectSurvivesFreshWrite() throws {
+        let u = mkf("tu4_dup.pdf")
+        _ = try CoordinatedTagWriter.write(u) { c, l in
+            self.realTransform(tags: ["Corr", "Corr", "1962", "Red"], appColor: nil, authColor: false, c, l)
+        }
+        let (t, l) = readBack(u)
+        try XCTSkipUnless(t.filter { $0 == "Corr" }.count == 2,
+                          "platform did not persist duplicate tags; duplicate-survival test N/A")
+        XCTAssert(msEq(t, ["Red", "Corr", "Corr", "1962", "Unread"]), "dup subject preserved: \(t.sorted())")
+        XCTAssertEqual(l, 6, "Red label")
+    }
+
+    /// Two concurrent MacOSTagger fresh writes to the SAME scratch file. The §10 per-resolved-path lock
+    /// (W15.tu3) serializes each read→modify→verify→write, so neither writer's post-write verify can
+    /// observe the OTHER writer's array mid-flight (which would spuriously throw `.verificationFailed`).
+    /// Because MacOSTagger *overwrites* (a fresh array, ignoring `cur`), "both survive" does not apply —
+    /// the correct guarantee for a fresh-write adapter is: neither throws, and the final multiset is
+    /// EXACTLY one of the two complete fresh arrays (a whole write won, never a torn/interleaved mix).
+    /// The window is widened with a sleep inside the transform to force overlap; the lock's
+    /// deterministic-loss-without-lock proof lives in
+    /// `TagWriterPrimitiveTests.testConcurrentSamePathWritesBothSurvive`.
+    func testConcurrentFreshWritesNeitherThrowsAndFinalIsWhole() throws {
+        let u = mkf("tu4_race.pdf")
+        let expectedA = ["Red", "Alpha", "Unread"]
+        let expectedB = ["Purple", "Beta", "Unread"]
+        let box = ParityErrorBox()
+        DispatchQueue.concurrentPerform(iterations: 2) { i in
+            do {
+                _ = try CoordinatedTagWriter.write(u) { c, l in
+                    Thread.sleep(forTimeInterval: 0.15)  // widen the RMW window to force overlap
+                    return i == 0
+                        ? self.realTransform(tags: ["Alpha", "Red"], appColor: nil, authColor: false, c, l)
+                        : self.realTransform(tags: ["Beta", "Purple"], appColor: nil, authColor: false, c, l)
+                }
+            } catch { box.record(error) }
+        }
+        XCTAssertTrue(box.all.isEmpty, "no concurrent MacOSTagger write should throw: \(box.all)")
+        let (t, _) = readBack(u)
+        XCTAssertTrue(msEq(t, expectedA) || msEq(t, expectedB),
+                      "final tags are exactly one complete fresh write, not a torn mix: \(t.sorted())")
+    }
+}
+
+/// Thread-safe error sink for concurrent parity iterations (peer to `ErrorCollector` in
+/// `TagWriterPrimitiveTests`, which is file-private there).
+private final class ParityErrorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var errors: [Error] = []
+    func record(_ e: Error) { lock.lock(); errors.append(e); lock.unlock() }
+    var all: [Error] { lock.lock(); defer { lock.unlock() }; return errors }
 }
