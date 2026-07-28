@@ -21,6 +21,12 @@ import Foundation
 //   §7 label written only when the transform changes it; drift otherwise restored.
 //   §8 verify by re-read — multiset equality (order-independent) + label check.
 //   §9 inverse delta derived from the actual before/after diff.
+//   §10 in-process per-resolved-path serialization — the whole read→modify→verify→write above is
+//       mutually excluded PER FILE, so two concurrent in-process writers to the SAME path cannot
+//       both read the pre-write state and clobber each other (a lost update). NSFileCoordinator's
+//       .contentIndependentMetadataOnly does NOT provide this (it grants two metadata-only write
+//       claims concurrently). CROSS-PROCESS writers are explicitly OUT OF SCOPE — an in-process
+//       lock cannot cover a second process; only §1 coordination mediates across processes at all.
 //  UI-free. Lives in ArchiveCore so Reader, Processor, and Notes share one audited path.
 // ============================================================================================
 
@@ -143,7 +149,63 @@ public struct FileIdentity: @unchecked Sendable {
 /// in their transform closures without duplicating the mapping.
 public func normalizedLabel(_ label: Int?) -> Int { label ?? 0 }
 
+/// Serializes the full read→modify→verify→write sequence of `CoordinatedTagWriter.write` PER resolved
+/// file path (Safety §10), so two concurrent IN-PROCESS writers to the SAME file cannot both observe
+/// the pre-write state and clobber each other (a lost update). Different paths are never serialized
+/// against each other — unrelated tag writes still run fully concurrently.
+///
+/// A refcounted registry of per-path `NSLock`s: an entry is created on the first waiter and discarded
+/// once the last holder releases, so the map never grows without bound. A synchronous `NSLock` (not an
+/// actor) keeps `write` synchronous — every caller (Reader `TagWriter`, Processor `MacOSTagger`, Notes
+/// `NotesTagProjector`) invokes it synchronously, so an `async` hop would be a breaking change across
+/// all three apps for no benefit here.
+///
+/// OUT OF SCOPE — cross-process writers: this is an IN-PROCESS lock. A second PROCESS, or any writer
+/// that does not funnel through `CoordinatedTagWriter.write`, mutating the same file is NOT covered —
+/// only `NSFileCoordinator` (§1) mediates across processes, and it does not mutually-exclude two
+/// metadata-only write claims. Do not read this as a cross-process guarantee.
+///
+/// Non-reentrant by design: a `transform` closure must NOT call `CoordinatedTagWriter.write` on the
+/// same path (a nested same-path write would self-deadlock). No caller does — the closures are pure.
+private final class PathWriteSerializer: @unchecked Sendable {
+    private final class Entry { let lock = NSLock(); var waiters = 0 }
+    private let master = NSLock()
+    private var entries: [String: Entry] = [:]
+
+    /// Block until exclusive access for `key` is held. Balanced by exactly one `release(key)`.
+    func acquire(_ key: String) {
+        master.lock()
+        let entry: Entry
+        if let existing = entries[key] { entry = existing }
+        else { let e = Entry(); entries[key] = e; entry = e }
+        entry.waiters += 1
+        master.unlock()
+        entry.lock.lock()   // wait OUTSIDE `master` so unrelated paths never block on this one
+    }
+
+    /// Release exclusive access for `key`, discarding the per-path lock once no one else is waiting.
+    func release(_ key: String) {
+        master.lock()
+        guard let entry = entries[key] else { master.unlock(); return }  // defensive; never expected
+        entry.waiters -= 1
+        if entry.waiters == 0 { entries[key] = nil }
+        master.unlock()
+        entry.lock.unlock()
+    }
+}
+
 public enum CoordinatedTagWriter {
+
+    /// One serializer instance for the whole process — the shared choke-point's per-path lock table.
+    private static let serializer = PathWriteSerializer()
+
+    /// The per-path serialization key: a best-effort canonical path (symlinks + `.`/`..` resolved) so
+    /// two URLs that name the SAME file map to one lock. Best-effort — if two equivalent URLs ever
+    /// resolve differently we merely lose serialization for that edge (no worse than before the lock);
+    /// the common case (all three apps pass a file's canonical URL) is fully covered.
+    private static func serializationKey(for url: URL) -> String {
+        url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
 
     /// The one place that writes tags. `transform` receives the FRESHLY-READ current state (inside the
     /// coordination block) and returns the intended new state, or nil for a no-op. Everything else —
@@ -159,6 +221,16 @@ public enum CoordinatedTagWriter {
         expectedIdentity: FileIdentity? = nil,
         transform: ([String], Int?) -> ([String], Int?)?
     ) throws -> TagWriteResult {
+        // §10 in-process per-resolved-path serialization. Hold a per-file lock across the ENTIRE
+        // read→modify→verify→write below, so two concurrent in-process writers to the same file
+        // can't both read pre-write state and clobber each other (a lost update). Acquired BEFORE
+        // coordination so only one thread per path ever enters the NSFileCoordinator block; released
+        // via `defer` on every exit (success, throw, or no-op). Cross-process writers are NOT covered
+        // (see PathWriteSerializer). Different paths never contend, so unrelated writes stay parallel.
+        let serialKey = serializationKey(for: url)
+        serializer.acquire(serialKey)
+        defer { serializer.release(serialKey) }
+
         let box = ResultBox()
         var coordError: NSError?
         NSFileCoordinator().coordinate(writingItemAt: url, options: .contentIndependentMetadataOnly, error: &coordError) { writeURL in

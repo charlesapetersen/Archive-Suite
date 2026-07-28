@@ -21,6 +21,10 @@ import ArchiveCore
 //   §6 ArchiveSuite collision: deduped by "not already present" (TagWrite.swift:48).
 //   §7 No label writes. Verify label unchanged after write (drift guard).
 //   §8 Verify by re-read, multiset-equal (TagWrite.swift:127).
+//   §9 Per-path in-process serialization (W15.tu3): concurrent projections of the SAME note file
+//      are mutually excluded inside CoordinatedTagWriter (TagWrite.swift Safety §10), so two
+//      parallel writes cannot each read pre-write state and clobber each other (a lost update).
+//      Cross-PROCESS writers remain out of scope — an in-process lock cannot cover them.
 // ============================================================================================
 
 enum NotesTagProjector {

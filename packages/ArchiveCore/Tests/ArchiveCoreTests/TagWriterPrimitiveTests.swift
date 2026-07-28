@@ -268,4 +268,55 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertTrue(r.isNoOp)
         XCTAssertTrue(r.occurrenceInverse.isEmpty)
     }
+
+    // MARK: §10 In-process per-resolved-path serialization — no lost update on concurrent same-path writes
+
+    /// Two concurrent writers to the SAME file, each appending a distinct tag, with the
+    /// read→modify→write window deliberately widened (a sleep INSIDE the transform) to force the
+    /// windows to overlap. Without §10 per-path serialization the later `setxattr` clobbers the
+    /// earlier writer's tag (a lost update — exactly the race the Notes projector documented); with
+    /// it, the second writer observes the first's committed state, so BOTH tags survive.
+    /// (Verified non-vacuous: this fails deterministically when the §10 lock is removed.)
+    func testConcurrentSamePathWritesBothSurvive() throws {
+        let url = try makeFile("race-same.pdf", tags: [])
+        let tags = ["Alpha", "Beta"]
+        let errors = ErrorCollector()
+        DispatchQueue.concurrentPerform(iterations: tags.count) { i in
+            do {
+                _ = try CoordinatedTagWriter.write(url) { current, label in
+                    Thread.sleep(forTimeInterval: 0.15)   // widen the RMW window to force overlap
+                    return (current + [tags[i]], label)
+                }
+            } catch { errors.record(error) }
+        }
+        XCTAssertTrue(errors.all.isEmpty, "no concurrent writer should throw: \(errors.all)")
+        XCTAssertEqual(Set(try readTags(url)), Set(tags),
+                       "both concurrently-added tags survive — the per-path lock closed the lost-update race")
+    }
+
+    /// The lock is PER PATH, not global: concurrent writes to DIFFERENT files each complete correctly
+    /// (a global lock would still pass this — the point is it must not regress into serializing, and
+    /// it proves distinct paths get distinct locks and both writes land).
+    func testConcurrentDifferentPathWritesEachSucceed() throws {
+        let count = 8
+        let urls = try (0..<count).map { try makeFile("race-diff-\($0).pdf", tags: ["base"]) }
+        let errors = ErrorCollector()
+        DispatchQueue.concurrentPerform(iterations: count) { i in
+            do {
+                _ = try CoordinatedTagWriter.write(urls[i]) { current, label in (current + ["T\(i)"], label) }
+            } catch { errors.record(error) }
+        }
+        XCTAssertTrue(errors.all.isEmpty, "no writer should throw: \(errors.all)")
+        for i in 0..<count {
+            XCTAssertEqual(Set(try readTags(urls[i])), ["base", "T\(i)"], "file \(i) got exactly its own tag")
+        }
+    }
+}
+
+/// Thread-safe error sink for concurrent test iterations.
+private final class ErrorCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var errors: [Error] = []
+    func record(_ e: Error) { lock.lock(); errors.append(e); lock.unlock() }
+    var all: [Error] { lock.lock(); defer { lock.unlock() }; return errors }
 }
