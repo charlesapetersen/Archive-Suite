@@ -402,4 +402,37 @@ final class TagWriterTests: XCTestCase {
         XCTAssertFalse(Set(try readTags(url)).contains("Red"))               // color token stripped
         XCTAssertTrue(Set(try readTags(url)).contains("Unread"))             // subject preserved
     }
+
+    // MARK: Concurrent same-path writes (W15.tu4) — the Reader adapter inherits §10 serialization
+
+    /// Case (c) of the W15 cross-app matrix at the Reader `TagWriter` boundary: two concurrent
+    /// add-delta writes to the SAME file each survive. `TagWriter.apply` routes through
+    /// `ArchiveCore.CoordinatedTagWriter`, whose §10 per-resolved-path lock (W15.tu3) serializes the
+    /// read→modify→write so the second writer observes the first's committed tag before merging its own
+    /// delta — no lost update. (The deterministic-loss-*without*-the-lock proof lives in ArchiveCore's
+    /// `TagWriterPrimitiveTests.testConcurrentSamePathWritesBothSurvive`, which can widen the RMW window
+    /// from inside the transform; `apply` gives no such seam, so this pins — across several rounds to
+    /// shake out scheduling nondeterminism — that the Reader delta adapter is on that protected path.)
+    func testConcurrentAdapterWritesBothSurvive() throws {
+        for round in 0..<8 {
+            let url = try makeFile("race-\(round).pdf", tags: [])
+            let box = ConcurrentErrorBox()
+            DispatchQueue.concurrentPerform(iterations: 2) { i in
+                do {
+                    _ = try TagWriter.apply(TagDelta(add: [i == 0 ? "Alpha" : "Beta"]), to: url)
+                } catch { box.record(error) }
+            }
+            XCTAssertTrue(box.all.isEmpty, "round \(round): no concurrent writer should throw: \(box.all)")
+            XCTAssertEqual(Set(try readTags(url)), ["Alpha", "Beta"],
+                           "round \(round): both concurrently-added tags survive (§10 via the Reader adapter)")
+        }
+    }
+}
+
+/// Thread-safe error sink for the concurrent-write test.
+private final class ConcurrentErrorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var errors: [Error] = []
+    func record(_ e: Error) { lock.lock(); errors.append(e); lock.unlock() }
+    var all: [Error] { lock.lock(); defer { lock.unlock() }; return errors }
 }
