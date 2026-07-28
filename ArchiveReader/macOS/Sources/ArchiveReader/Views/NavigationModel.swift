@@ -798,11 +798,13 @@ final class NavigationModel: ObservableObject {
         undoDepth = undoStack.count
         var verified: [TagWriteResult] = []
         for entry in batch {
-            // Undo = inverse delta applied to a FRESH read (§9), preserving any concurrent third-party
-            // edit. Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
+            // Undo = OCCURRENCE-AWARE inverse applied to a FRESH read (§9), preserving any concurrent
+            // third-party edit AND restoring a duplicated tag's exact count (W15.tu2 — the set-based
+            // `.inverse` collapses `["A","A"]`→`["A"]`; `.occurrenceInverse` + `applyOccurrence` do not).
+            // Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
             // §6: re-verify against the identity captured at the ORIGINAL edit so undo never re-tags a
             // file swapped under this path since then (a mismatch throws → try? skips just that file).
-            if let rr = try? TagWriter.apply(entry.result.inverse, to: entry.result.url, expecting: entry.identity) {
+            if let rr = try? TagWriter.applyOccurrence(entry.result.occurrenceInverse, to: entry.result.url, expecting: entry.identity) {
                 verified.append(rr)
             }
         }

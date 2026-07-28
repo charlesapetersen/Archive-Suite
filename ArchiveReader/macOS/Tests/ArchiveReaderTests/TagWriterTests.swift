@@ -329,4 +329,77 @@ final class TagWriterTests: XCTestCase {
         XCTAssertNoThrow(try results[2].result.get())                     // nil identity → skipped, wrote
         XCTAssertTrue(Set(try readTags(optOut)).contains("Reviewed"))
     }
+
+    // MARK: Occurrence-aware undo (W15.tu2) — multiset restore via applyOccurrence
+
+    /// A count-aware multiset of a tag array (occurrence-only; order is unobservable per SPEC).
+    private func multiset(_ tags: [String]) -> [String: Int] {
+        tags.reduce(into: [:]) { $0[$1, default: 0] += 1 }
+    }
+
+    /// Headline W15.tu2 fix: undoing an edit that stripped a DUPLICATED tag restores BOTH occurrences.
+    /// The forward remove deletes every "A"; the occurrence inverse re-adds the exact surplus (`["A","A"]`),
+    /// so the on-disk multiset is `["A","A","B"]` again — which the set-based inverse could not do.
+    func testOccurrenceInverseRestoresDuplicateTag() throws {
+        let url = try makeFile("dup.pdf", tags: ["A", "A", "B"])
+        let r = try TagWriter.apply(TagDelta(remove: ["A"]), to: url)
+        XCTAssertEqual(multiset(try readTags(url)), ["B": 1])                 // forward: both A's gone
+        XCTAssertEqual(r.occurrenceInverse.add.sorted(), ["A", "A"])          // inverse carries multiplicity
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)       // occurrence-aware undo
+        XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "B": 1])         // exact count restored
+    }
+
+    /// Proves WHY the occurrence path is needed: the set-based inverse collapses the duplicate, so the
+    /// legacy `apply(_:inverse)` undo would leave only ONE "A" — the bug W15.tu2 closes.
+    func testSetInverseLosesDuplicateButOccurrenceDoesNot() throws {
+        let setURL = try makeFile("dup-set.pdf", tags: ["A", "A", "B"])
+        let rSet = try TagWriter.apply(TagDelta(remove: ["A"]), to: setURL)
+        _ = try TagWriter.apply(rSet.inverse, to: setURL)                    // legacy set-based undo
+        XCTAssertEqual(multiset(try readTags(setURL)), ["A": 1, "B": 1])     // one occurrence LOST
+
+        let occURL = try makeFile("dup-occ.pdf", tags: ["A", "A", "B"])
+        let rOcc = try TagWriter.apply(TagDelta(remove: ["A"]), to: occURL)
+        _ = try TagWriter.applyOccurrence(rOcc.occurrenceInverse, to: occURL)
+        XCTAssertEqual(multiset(try readTags(occURL)), ["A": 2, "B": 1])     // both restored
+    }
+
+    /// Safety §9 through the occurrence path: an UNRELATED tag a concurrent editor added between the edit
+    /// and the undo survives, while the duplicate is still restored to its exact count.
+    func testOccurrenceUndoPreservesConcurrentUnrelatedTag() throws {
+        let url = try makeFile("concurrent.pdf", tags: ["A", "A"])
+        let r = try TagWriter.apply(TagDelta(remove: ["A"]), to: url)        // → []
+        // Simulate a concurrent third-party edit landing before the undo.
+        try (url as NSURL).setResourceValue(["Y"], forKey: .tagNamesKey)
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "Y": 1])        // Y kept, both A's restored
+    }
+
+    /// The remove side strips EXACTLY the delta's count: if a concurrent edit added a SECOND copy of the
+    /// same token the forward edit introduced, undo removes only the one occurrence it is responsible for.
+    func testOccurrenceUndoStripsExactlyDeltaCount() throws {
+        let url = try makeFile("exact.pdf", tags: ["Unread"])
+        let r = try TagWriter.apply(TagDelta(add: ["Economics"]), to: url)   // → ["Unread","Economics"]
+        XCTAssertEqual(r.occurrenceInverse.remove, ["Economics"])
+        // A concurrent editor adds a second "Economics" before the undo.
+        try (url as NSURL).setResourceValue(["Unread", "Economics", "Economics"], forKey: .tagNamesKey)
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1, "Economics": 1])  // one copy survives
+    }
+
+    /// Color-label restore through the occurrence path (`.restoreLabel`): undoing a color set removes the
+    /// color token (carried in the multiset) and restores the original label.
+    func testOccurrenceUndoRestoresColorLabel() throws {
+        let url = try makeFile("occ-color.pdf", tags: ["Unread"], label: nil)
+        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        XCTAssertEqual(try readLabel(url), 6)
+        XCTAssertTrue(Set(try readTags(url)).contains("Red"))
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        XCTAssertEqual(try readLabel(url) ?? 0, 0)                            // label restored
+        XCTAssertFalse(Set(try readTags(url)).contains("Red"))               // color token stripped
+        XCTAssertTrue(Set(try readTags(url)).contains("Unread"))             // subject preserved
+    }
 }

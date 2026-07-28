@@ -378,12 +378,21 @@ verified on **scratch copies only — never the corpus**. Legend as above.
   `build-for-testing` SUCCEEDED; 0 new warnings. NOTE: W15.tu0 (SPEC doc + premise test) still `[ ]`, lands
   separately; the undo/restore consumers are rewired in W15.tu2.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift | M | med | none
-- [ ] **W15.tu2 — multiplicity-aware apply/restore + wire Reader undo** (blocked-on: W15.tu1) **[M].** Today
-  the add step only adds a token when absent (`ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift:52`),
-  so it would refuse to re-introduce a duplicate even with a correct inverse. Make the undo/restore path
-  multiplicity-aware and route it through a **bounded reconcile step** (fresh read + occurrence diff), then
-  wire Reader's `NavigationModel.undoLast`. **Must preserve today's Safety-Protocol §9 guarantee:** an
-  unrelated concurrent tag edit made between the edit and the undo still survives.
+- [x] **W15.tu2 — multiplicity-aware apply/restore + wire Reader undo** (blocked-on: W15.tu1) **[M].** DONE
+  2026-07-28. Added `TagWriter.applyOccurrence(_:to:expecting:)` — a **bounded reconcile step**: an
+  occurrence-precise multiset diff against the FRESH read inside `CoordinatedTagWriter`'s coordination block
+  (§2/§3), stripping EXACTLY the delta's occurrence count of each removed token and APPENDING the listed
+  copies of each added token, so it re-introduces a duplicate the set-based `apply` (add-when-absent,
+  `TagWriter.swift:52`) refuses to. Wired `NavigationModel.undoLast` to `result.occurrenceInverse` +
+  `applyOccurrence` (was the set-based `result.inverse`, the sole production consumer). **Safety §9
+  preserved** — only named tokens are touched, each by ≤ its listed multiplicity, so an unrelated concurrent
+  edit (and any extra copy a concurrent edit added of a named token) survives; undo stays in-memory (no
+  persisted ledger). Behavior-identical for the common non-duplicate case; §6 identity re-verify unchanged.
+  Tier-2 APPROVE (adversarial self-review, 11 vectors). Verified: Reader `ArchiveReaderTests` 210/211 green
+  incl. 5 new occurrence tests (`["A","A","B"]` round-trips; §9 concurrent-survive; exact-count strip; color
+  restore) — the 1 failure is the pre-existing `DeepLinkTests.testRevealAndSelectNoRoot` env flake (W20),
+  unrelated; Notes test bundle + Processor app build green; 0 new warnings. (Umbrella KNOWN_ISSUE stays open
+  for tu3/tu4.)
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Core/TagWriter.swift, Views/NavigationModel.swift | M | med | none
 - [ ] **W15.tu3 — per-path write serialization → closes the Notes lost-update race** (blocked-on: W15.tu1)
   **[M].** `NSFileCoordinator(.contentIndependentMetadataOnly)` does **not** mutually-exclude two concurrent
