@@ -408,17 +408,23 @@ or the Drive relay.**
 the relay and `USBBridge` exist), so LAN capture works precisely on the open/shared-PSK guest networks that ARE
 sniffable. That is why the residual risk is real rather than hypothetical — it is simply low enough to accept.
 
-**B) The credential weakness IS promoted** → `SUITE_TODO.md` §"Known-issues work — Wave 16". **W16.lan1** — the
-threat-model + accepted-risk doc — is **DONE** (this entry, plus the durable operator/developer summary in
-`CLAUDE.md` §"Primary Function 3: Live Capture" → *LAN transport security — accepted risk*); **W16.lan2** (the
-credential fix) remains. It survives the deflation above because **it requires no sniffing
-at all** — only network reachability to the Mac, so none of the "needs an open network and co-location"
-reasoning applies. The token is 6 chars from a 31-char alphabet (**~29.7 bits**), minted **once per Mac and
-persisted forever** (`CaptureSession.swift:275-282`), with **no lockout on repeated 401s** — an 8-connection
-sweep exhausts the space in tens of hours. Fix = high-entropy token + per-source 401 backoff. **Owner decision:
-SPLIT the credentials** — mint a new LAN credential, leave the stable 6-char **Drive relay token untouched**
-(`SPEC/relay-object-format.md:38` pins it, with committed golden fixtures and a shipped Android transport).
-Migration cost is one QR re-scan per phone — accepted.
+**B) The credential weakness — FIXED (W16.lan2, 2026-07-28, `c335abd` + this commit).** Both promoted items are
+now done: **W16.lan1** (threat-model + accepted-risk doc, in this entry + `CLAUDE.md` §"Primary Function 3: Live
+Capture" → *LAN transport security — accepted risk*) and **W16.lan2** (the credential fix). This finding survived
+the crypto-redesign deflation because it **requires no sniffing at all** — only network reachability to the Mac —
+so the old ~29.7-bit persistent shared code was the real exposure. Now: `CaptureSession.lanToken` is a fresh
+**~158-bit** LAN credential (32 chars over the 31-symbol alphabet, CSPRNG-drawn via `randomElement()`, persisted
+under `LiveCaptureLANToken`), authenticated by `CaptureServer` and carried in the QR's `token` field; and
+`CaptureServer` now applies a **per-source failed-auth throttle** (`AuthThrottle`: 5 free 401s, then exponential
+backoff capped at 30 s, keyed per remote IP, fail-open on an undeterminable source, cleared on any authenticated
+request) so a hostile LAN peer can't sweep tokens at connection speed. **The credentials are SPLIT** per the owner
+decision: the 6-char **Drive-relay token is untouched** (`session.token`, still stamped as `appProperties.relayToken`
+and carried in the QR's `relay` key — `SPEC/relay-object-format.md:38` pins it, with committed golden fixtures and a
+shipped Android transport). Both companions parse `token` as opaque (Android `MacEndpoint.fromQrPayload`, iOS
+`MacEndpoint.decode` — non-empty check only, no length assumption), so the sole migration cost is **one QR re-scan
+per phone** for the LAN path; the Cloud path is unaffected. Verified headlessly: a standalone algorithm test (token
+entropy + the full throttle schedule) plus the committed `ManifestPersistenceTestDriver` W16.lan2 checks (real
+`CaptureSession`/`CaptureServer` types); Processor Debug build clean, 0 warnings.
 
 **Stale sub-item corrected:** verification-plan item 4's *"Bonjour discovery"* is moot. The Mac advertises
 `_archivecap._tcp` (`CaptureServer.swift:68`) but **neither companion browses for it** — pairing is QR-only.

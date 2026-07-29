@@ -19,6 +19,8 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private weak var session: CaptureSession?
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "capture.server")
+    /// The LAN/USB bearer this receiver authenticates: the session's high-entropy `lanToken`, NOT the
+    /// SPEC-pinned Drive-relay `token` (W16.lan2 split the two). Constant for the receiver's lifetime.
     private let token: String
     /// All entries are owned by `queue`. Holding the declared body reservation until the response send
     /// completes accounts for bytes that have left the socket buffer but are still retained by a
@@ -38,10 +40,12 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     }
     private var connections: [ObjectIdentifier: ConnectionState] = [:]
     private var aggregateReservedBodyBytes = 0
+    /// Per-source failed-auth throttle (owned by `queue`, like the maps above). W16.lan2.
+    private var authThrottle = AuthThrottle()
 
     init(session: CaptureSession) {
         self.session = session
-        self.token = session.token
+        self.token = session.lanToken
     }
 
     /// Fixed listen port so the phone's saved pairing (host/port/token) keeps working across Mac
@@ -164,10 +168,29 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
 
             switch Self.parseHead(buffer) {
             case .parsed(let head, let bodyPrefix):
-                switch Self.admission(
+                // Per-source failed-auth throttle (W16.lan2): a source that has burned through its free
+                // 401s is refused BEFORE admission runs, so a hostile LAN peer can't sweep tokens at
+                // connection speed. Fail-open for an undeterminable source so a real phone is never
+                // collaterally locked out. Belt-and-suspenders atop the ~158-bit `lanToken`.
+                let source = Self.sourceKey(for: conn)
+                let now = Self.nowMonotonic()
+                if self.authThrottle.isThrottled(source, now: now) {
+                    timeout.cancel()
+                    self.respond(conn, status: "429 Too Many Requests", json: ["error": "too many failed attempts"])
+                    return
+                }
+                let outcome = Self.admission(
                     for: head, token: self.token,
-                    aggregateAvailable: Self.maxAggregateBodyBytes - self.aggregateReservedBodyBytes
-                ) {
+                    aggregateAvailable: Self.maxAggregateBodyBytes - self.aggregateReservedBodyBytes)
+                if outcome == .unauthorized {
+                    self.authThrottle.recordFailure(source, now: now)
+                } else {
+                    // Any non-unauthorized outcome means the bearer matched (admission authenticates
+                    // first), so this source proved the token — clear its streak so a legit phone that
+                    // trips a size/route limit, or re-scans after rotation, recovers immediately.
+                    self.authThrottle.recordSuccess(source)
+                }
+                switch outcome {
                 case .unauthorized:
                     timeout.cancel()
                     self.respond(conn, status: "401 Unauthorized", json: ["error": "bad token"])
@@ -361,6 +384,77 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         case .parsed(let head, let bodyPrefix):
             guard bodyPrefix.count <= head.contentLength else { return "bad" }
             return admission(for: head, token: token, aggregateAvailable: aggregateAvailable).rawValue
+        }
+    }
+
+    /// Test hook: the bearer the LAN receiver authenticates against — the session's high-entropy
+    /// `lanToken`, never the SPEC-pinned Drive-relay `token` (W16.lan2). Read-only.
+    var _testActiveToken: String { token }
+
+    // MARK: - Failed-auth throttle (W16.lan2)
+
+    /// Monotonic clock for the throttle (immune to wall-clock adjustments; never runs backward).
+    private static func nowMonotonic() -> Double { ProcessInfo.processInfo.systemUptime }
+
+    /// Stable per-remote-host key for the throttle. The ephemeral source PORT is intentionally ignored so
+    /// a peer's many short-lived (one-request-per-connection) sockets share ONE bucket. Returns "unknown"
+    /// when the remote endpoint can't be determined — callers treat that as fail-open (never throttled).
+    private static func sourceKey(for conn: NWConnection) -> String {
+        guard case let .hostPort(host, _) = (conn.currentPath?.remoteEndpoint ?? conn.endpoint) else {
+            return "unknown"
+        }
+        switch host {
+        case .ipv4(let a): return "v4:\(a.debugDescription)"
+        case .ipv6(let a): return "v6:\(a.debugDescription)"
+        case .name(let n, _): return "name:\(n)"
+        @unknown default: return "unknown"
+        }
+    }
+
+    /// Per-source failed-auth throttle. Value type; all state is owned by `CaptureServer.queue` (the serial
+    /// queue every connection callback runs on), so it needs no extra locking. Belt-and-suspenders on top of
+    /// the high-entropy `lanToken`: it bounds the *rate* of token guesses from any one LAN peer and stops a
+    /// misconfigured / stale phone from hammering the receiver with a dead credential. A source that has
+    /// proven the token (any authenticated request) is cleared immediately, so recovery after a QR re-scan
+    /// is bounded by at most one backoff window (`maxBackoff`).
+    struct AuthThrottle {
+        /// Failed 401s a source may accrue before any backoff applies.
+        static let freeAttempts = 5
+        /// First backoff once the free attempts are spent; doubles each further failure, capped at `maxBackoff`.
+        static let baseBackoff: Double = 2
+        static let maxBackoff: Double = 30
+        /// A source with no failure for this long is forgotten (its counter resets).
+        static let idleReset: Double = 300
+
+        private struct Entry { var failures: Int; var blockedUntil: Double; var lastFailure: Double }
+        private var entries: [String: Entry] = [:]
+
+        /// True while `source` is inside a backoff window. Unknown sources fail open (never throttled).
+        func isThrottled(_ source: String, now: Double) -> Bool {
+            guard source != "unknown", let e = entries[source] else { return false }
+            return now < e.blockedUntil
+        }
+
+        /// Record a failed auth from `source` and, once past `freeAttempts`, arm an exponential backoff.
+        mutating func recordFailure(_ source: String, now: Double) {
+            guard source != "unknown" else { return }
+            pruneExpired(now: now)   // also resets a long-idle source: its stale entry is dropped here
+            var e = entries[source] ?? Entry(failures: 0, blockedUntil: 0, lastFailure: now)
+            e.failures += 1
+            e.lastFailure = now
+            if e.failures > Self.freeAttempts {
+                let over = e.failures - Self.freeAttempts
+                e.blockedUntil = now + min(Self.maxBackoff, Self.baseBackoff * pow(2, Double(over - 1)))
+            }
+            entries[source] = e
+        }
+
+        /// Clear a source's streak after any authenticated request (it proved the token).
+        mutating func recordSuccess(_ source: String) { entries[source] = nil }
+
+        /// Drop sources idle past `idleReset` so the map stays bounded on a busy/hostile LAN.
+        private mutating func pruneExpired(now: Double) {
+            entries = entries.filter { now - $0.value.lastFailure <= Self.idleReset }
         }
     }
 

@@ -279,6 +279,58 @@ enum ManifestPersistenceTestDriver {
               && CaptureServer.maxAggregateBodyBytes
                     < CaptureServer.maxConcurrentConnections * CaptureServer.maxPhotoBodyBytes)
 
+        // --- W16.lan2: the LAN credential is high-entropy and SPLIT from the SPEC-pinned Drive-relay token. ---
+        check("W16.lan2: LAN token length is high-entropy (≥128 bits: ≥26 chars over the 31-symbol alphabet)",
+              CaptureSession.lanTokenLength >= 26
+              && CaptureSession.makeLANToken().count == CaptureSession.lanTokenLength)
+        check("W16.lan2: two freshly minted LAN tokens differ (drawn from a random source, not a constant)",
+              CaptureSession.makeLANToken() != CaptureSession.makeLANToken())
+        let lanSplitSession = CaptureSession()
+        check("W16.lan2: LAN token is split from — and longer than — the 6-char Drive-relay token",
+              lanSplitSession.lanToken != lanSplitSession.token
+              && lanSplitSession.lanToken.count >= CaptureSession.lanTokenLength)
+        check("W16.lan2: the Drive-relay token keeps its stable 6-char SPEC-pinned format (untouched)",
+              lanSplitSession.token.count == 6)
+        let lanServer = CaptureServer(session: lanSplitSession)
+        check("W16.lan2: the LAN receiver authenticates the high-entropy lanToken, not the Drive-relay token",
+              lanServer._testActiveToken == lanSplitSession.lanToken
+              && lanServer._testActiveToken != lanSplitSession.token)
+        check("W16.lan2: a request bearing the OLD 6-char Drive-relay token is rejected on the LAN path",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    authorization: "Bearer \(lanSplitSession.token)", contentLength: "1024"),
+                token: lanServer._testActiveToken) == "unauthorized")
+        check("W16.lan2: a request bearing the lanToken is admitted on the LAN path",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(
+                    authorization: "Bearer \(lanSplitSession.lanToken)", contentLength: "1024"),
+                token: lanServer._testActiveToken, aggregateAvailable: 4096) == "accept")
+
+        // --- W16.lan2: per-source failed-auth throttle bounds online token guessing. ---
+        var throttle = CaptureServer.AuthThrottle()
+        let src = "v4:10.0.0.5"
+        check("W16.lan2 throttle: a fresh source is not throttled", !throttle.isThrottled(src, now: 0))
+        for _ in 0..<CaptureServer.AuthThrottle.freeAttempts { throttle.recordFailure(src, now: 0) }
+        check("W16.lan2 throttle: still open at exactly the free-attempt threshold",
+              !throttle.isThrottled(src, now: 0))
+        throttle.recordFailure(src, now: 0)   // one past the threshold → exponential backoff armed
+        check("W16.lan2 throttle: blocked inside the backoff window after exceeding the threshold",
+              throttle.isThrottled(src, now: 1))
+        check("W16.lan2 throttle: a distinct source is unaffected by another's failures",
+              !throttle.isThrottled("v4:10.0.0.6", now: 1))
+        check("W16.lan2 throttle: recovers once the backoff window elapses",
+              !throttle.isThrottled(src, now: 1000))
+        var throttle2 = CaptureServer.AuthThrottle()   // a valid auth clears an ACTIVE block (QR re-scan recovery)
+        for _ in 0...CaptureServer.AuthThrottle.freeAttempts { throttle2.recordFailure(src, now: 0) }
+        check("W16.lan2 throttle: a source is blocked before the successful auth", throttle2.isThrottled(src, now: 1))
+        throttle2.recordSuccess(src)
+        check("W16.lan2 throttle: an authenticated request clears the source's streak immediately",
+              !throttle2.isThrottled(src, now: 1))
+        var unknownThrottle = CaptureServer.AuthThrottle()
+        for _ in 0..<20 { unknownThrottle.recordFailure("unknown", now: 0) }
+        check("W16.lan2 throttle: an undeterminable source fails open (a real phone is never locked out)",
+              !unknownThrottle.isThrottled("unknown", now: 1))
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_MANIFESTTEST_OUT"]

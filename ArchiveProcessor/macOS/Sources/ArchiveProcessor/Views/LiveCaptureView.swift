@@ -312,14 +312,16 @@ struct LiveCaptureView: View {
     /// token (emitted only while the Mac is signed into the Drive relay). The extra key is ADDITIVE — an
     /// older companion that ignores it still pairs over LAN byte-for-byte (when not signed in the payload is
     /// exactly the original four keys); a current companion reads `relay` and can upload via Drive if the
-    /// operator picks Cloud. `relay` == the session token (the same value `DriveObjectStore` stamps as the
-    /// shared folder's `appProperties.relayToken`), so no separate value is needed.
+    /// operator picks Cloud. W16.lan2 split the two credentials: `token` is the high-entropy LAN/USB bearer
+    /// (`CaptureServer`), while `relay` stays the SPEC-pinned 6-char Drive-relay code (the value
+    /// `DriveObjectStore` stamps as `appProperties.relayToken`). Both are opaque to the companions, so the
+    /// only migration cost of the LAN split is one QR re-scan per phone.
     private var pairingPayload: String? {
         guard session.serverRunning, let ip = Self.primaryIPv4() else { return nil }
         var dict: [String: Any] = [
             "host": ip,
             "port": Int(session.listenPort),
-            "token": session.token,
+            "token": session.lanToken,
             "name": Host.current().localizedName ?? "Mac"
         ]
         if session.isDriveSignedIn { dict["relay"] = session.token }   // optional Cloud path (additive key)

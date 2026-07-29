@@ -467,17 +467,21 @@ permanently — do not re-promote LANSEC-5/6/7 (secure transport, companion mirr
   re-verified against the tree: the `:68` advertise, the `CaptureSession.swift:275-282` 31-char/~29.7-bit token,
   no companion `NWBrowser`, and the USB/Drive alternatives.
   | files: ArchiveProcessor/KNOWN_ISSUES.md, ArchiveProcessor/CLAUDE.md | S | low | none
-- [ ] **W16.lan2 — high-entropy LAN token + failed-auth throttle [S].** The one finding that survives the
-  deflation, because **it needs no sniffing at all** — only network reachability to the Mac. The token is 6 chars
-  from a 31-char alphabet (**~29.7 bits**), minted **once per Mac and persisted forever** in UserDefaults
-  (`CaptureSession.loadOrCreateToken()`, `CaptureSession.swift:275-282`, incl. its `existing.count == 6` guard),
-  and there is **no lockout on repeated 401s** — an 8-connection sweep at LAN latency exhausts the space in tens
-  of hours. Replace with a high-entropy value and add per-source 401 backoff in `CaptureServer.admission`.
-  **Owner decision: SPLIT the credentials** — mint a new LAN credential and leave the stable 6-char **Drive relay
-  token untouched**, because `SPEC/relay-object-format.md:38` pins it and there are committed golden byte
-  fixtures + a shipped Android transport riding on it. Both companions treat the token as an opaque string, so
-  the only migration cost is **one QR re-scan per phone** — accepted. Verify headlessly via the existing
-  `CaptureServer._testAdmission` hook + `ManifestPersistenceTestDriver` (no phone needed).
+- [x] **W16.lan2 — high-entropy LAN token + failed-auth throttle [S].** DONE 2026-07-28 (`c335abd` checkpoint +
+  this commit). SPLIT the credentials per the owner decision: added `CaptureSession.lanToken` — a fresh **~158-bit**
+  LAN credential (32 chars over the 31-symbol alphabet, CSPRNG-drawn via `randomElement()`, persisted under a new
+  `LiveCaptureLANToken` key) — now authenticated by `CaptureServer` and carried in the QR's `token` field, while the
+  6-char **Drive-relay `token` is untouched** (still `appProperties.relayToken` + QR `relay`; `SPEC/relay-object-format.md:38`
+  + golden fixtures + the shipped Android transport ride on it). Added a **per-source failed-auth throttle**
+  (`CaptureServer.AuthThrottle`: 5 free 401s → exponential backoff capped at 30 s, keyed per remote IP, fail-open on
+  an undeterminable source, cleared on any authenticated request) so a hostile LAN peer can't sweep tokens at
+  connection speed. Both companions parse `token` as opaque (Android `MacEndpoint.fromQrPayload`, iOS
+  `MacEndpoint.decode` — non-empty check only), so the sole migration cost is **one QR re-scan per phone** for LAN;
+  Cloud is unaffected. Tier-2 APPROVE (adversarial self-review; happy-path unaffected, per-IP isolation, bounded
+  map, no new timing side-channel). Verified headlessly: standalone algorithm test (22 checks — token entropy + the
+  full throttle schedule 2→4→8→16→30-capped + idle-reset + fail-open) PASS; committed `ManifestPersistenceTestDriver`
+  W16.lan2 checks exercise the real types (run defers to the next smoke/VM — host app-launch is denied in the
+  autonomous scope); Processor Debug build clean, 0 warnings. KNOWN_ISSUES §"Live Capture LAN channel" B marked FIXED.
   | files: Capture/CaptureSession.swift, Net/CaptureServer.swift, Views/LiveCaptureView.swift | S | med | none
 
 ### #4 process-global processing settings — consolidation, not greenfield
