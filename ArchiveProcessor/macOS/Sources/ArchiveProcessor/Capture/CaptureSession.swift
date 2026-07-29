@@ -266,17 +266,50 @@ final class CaptureSession: ObservableObject {
     /// Called by the streaming coordinator when the first segment begins processing.
     func lockSettings() { if config != nil { settingsLocked = true } }
 
-    /// Short, easy-to-type bearer token the phone presents (shown in the pairing QR, and typeable
-    /// for USB/manual pairing). **Stable across launches** (persisted) so a paired phone keeps
-    /// working without re-pairing. LAN/USB-local transport only, so a short code is fine.
+    /// Stable 6-char bearer for the **Drive (Cloud) relay only** — the value stamped as the shared
+    /// folder's `appProperties.relayToken` and carried in the QR's optional `relay` key. Its byte format
+    /// is pinned by `SPEC/relay-object-format.md` (committed golden fixtures + the shipped Android
+    /// transport ride on it), so it stays a short, stable code. **Not** the LAN credential: the LAN/USB
+    /// HTTP receiver authenticates `lanToken` instead. W16.lan2 split the two so LAN could go high-entropy
+    /// without touching the relay wire contract. Persisted so a paired phone keeps its Cloud path.
     let token = CaptureSession.loadOrCreateToken()
 
-    /// 6 chars from an unambiguous alphabet (no 0/O/1/I/L), persisted in UserDefaults.
+    /// High-entropy bearer the phone presents to the **LAN/USB HTTP receiver** (`CaptureServer`), carried
+    /// in the QR's `token` key. Unlike the relay code, this credential faces a reachability-only online
+    /// guess — no sniffing needed — so it must be brute-force-infeasible: `lanTokenLength` chars over a
+    /// 31-symbol alphabet (≈ 158 bits at 32), drawn from the cryptographically-secure system RNG, minted
+    /// once per Mac and persisted. Rotating it costs only one QR re-scan per phone (companions treat the
+    /// token as opaque). (W16.lan2 — replaces the old ~29.7-bit shared 6-char code on the LAN path.)
+    let lanToken = CaptureSession.loadOrCreateLANToken()
+
+    /// Unambiguous 31-symbol alphabet shared by both credentials (no 0/O/1/I/L).
+    private static let tokenAlphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
+
+    /// Length of the high-entropy LAN token: 32 × log2(31) ≈ 158 bits.
+    static let lanTokenLength = 32
+
+    /// 6 chars from an unambiguous alphabet (no 0/O/1/I/L), persisted in UserDefaults. Drive-relay code.
     private static func loadOrCreateToken() -> String {
         let key = "LiveCaptureToken"
         if let existing = UserDefaults.standard.string(forKey: key), existing.count == 6 { return existing }
-        let alphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
-        let t = String((0..<6).map { _ in alphabet.randomElement()! })
+        let t = String((0..<6).map { _ in tokenAlphabet.randomElement()! })
+        UserDefaults.standard.set(t, forKey: key)
+        return t
+    }
+
+    /// Mint a fresh high-entropy LAN token (pure; no persistence). Each character is an independent draw
+    /// from `SystemRandomNumberGenerator` (a CSPRNG on Apple platforms) via `randomElement()`.
+    static func makeLANToken() -> String {
+        String((0..<lanTokenLength).map { _ in tokenAlphabet.randomElement()! })
+    }
+
+    /// Persisted high-entropy LAN token. Re-mints when the stored value is missing or shorter than the
+    /// current `lanTokenLength` (so a future length bump upgrades in place); an existing full-length token
+    /// is kept stable across launches so a paired phone keeps working without re-scanning.
+    private static func loadOrCreateLANToken() -> String {
+        let key = "LiveCaptureLANToken"
+        if let existing = UserDefaults.standard.string(forKey: key), existing.count >= lanTokenLength { return existing }
+        let t = makeLANToken()
         UserDefaults.standard.set(t, forKey: key)
         return t
     }
