@@ -548,8 +548,33 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
-trap remind_revert_taskport EXIT
-trap 'exit 0' TERM INT
+# ---- WHY the daemon used to vanish without a trace (added 2026-07-29) --------------------------------
+# Only the NORMAL loop exit logged "=== daemon down ===" (bottom of file). `trap 'exit 0' TERM INT` exited
+# immediately, so a SIGTERM logged NOTHING — and SIGTERM is what launchd sends on `bootout`, logout and
+# shutdown, i.e. what effectively happens when this laptop's lid closes. The daemon just disappeared
+# mid-cycle, which on inspection is indistinguishable from a crash; on 2026-07-29 that cost real diagnosis
+# time and produced a wrong "reproducible code failure" conclusion. Now every TRAPPABLE exit says why.
+#
+# HARD LIMIT, and it is itself diagnostic: SIGKILL, an OOM kill and a power cut CANNOT be trapped, so they
+# still produce no line. Therefore — "daemon up" with NO matching "daemon down" means a hard kill, which on
+# a personal laptop is almost always the lid closing or power loss, NOT a defect. A `reason:` line that says
+# SIGTERM likewise means an orderly system stop. Only "fell out of the main loop" is the daemon's own doing.
+_DAEMON_STARTED=$SECONDS
+_EXIT_REASON="fell out of the main loop (rc 9 — RUN STATUS: COMPLETE, or parked)"
+
+_log_exit() {
+  local st=$?                      # MUST be the first statement — any command clobbers $?
+  local up=$(( SECONDS - _DAEMON_STARTED ))
+  local sess="no"
+  [ -f "$LOCK" ] && sess="YES (engine.lock present — a resume session was in flight and may leave it stale)"
+  log "=== daemon down (pid $$) — reason: ${_EXIT_REASON} | status=${st} | uptime=${up}s | session-in-flight=${sess} ==="
+  remind_revert_taskport         # preserve the pre-existing EXIT behaviour (WS6 security reminder)
+}
+trap _log_exit EXIT
+# Each signal records WHY before exiting. Keep `exit 0` (launchd KeepAlive semantics unchanged).
+trap '_EXIT_REASON="SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing"; exit 0' TERM
+trap '_EXIT_REASON="SIGINT — Ctrl-C / interactive interrupt"; exit 0' INT
+trap '_EXIT_REASON="SIGHUP — controlling terminal closed / login session ended"; exit 0' HUP
 
 # Children must be INDEPENDENT claude sessions, not NESTED. When this daemon is armed from an interactive
 # Claude session it inherits CLAUDECODE / CLAUDE_CODE_* / CLAUDE_EFFORT etc., and a child `claude -p` would
@@ -820,4 +845,6 @@ while true; do
   [ "$rc" = "9" ] && break
   backoff_sleep
 done
-log "=== daemon down (pid $$) ==="
+# NOTE: no log here on purpose — the EXIT trap (_log_exit) is the SINGLE place that logs "daemon down",
+# so every path (normal rc-9 exit, SIGTERM/INT/HUP) produces exactly one line, with a reason. Logging here
+# too would double-log the normal path and still miss the signal paths.

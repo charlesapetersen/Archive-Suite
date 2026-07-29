@@ -218,6 +218,28 @@ app still has access under the new partition list. **Re-run after rotating/re-ad
 re-created item gets a fresh, empty partition list). `arm.sh status` shows whether the fix is applied.
 (Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
 
+## Reading `daemon.log` when the run is down (exit reasons, added 2026-07-29)
+
+Every **trappable** exit now logs one line saying why, so an ordinary shutdown is distinguishable from a
+crash at a glance:
+
+```
+=== daemon down (pid N) — reason: … | status=0 | uptime=1234s | session-in-flight=YES (engine.lock present …) ===
+```
+
+| what you see | what it means |
+|---|---|
+| `reason: SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing` | An orderly system stop. **This is the normal case on a personal laptop** — closing the lid ends the login session and launchd TERMs the job. Not a defect. Just `./ops/autonomous/arm.sh` again. |
+| `reason: fell out of the main loop (rc 9 …)` | The daemon's own decision: `RUN STATUS: COMPLETE`, or it parked (idle past `IDLE_STOP`, attempt cap, disk guard, or a reproducible RED health gate). Check for `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`. |
+| `reason: SIGINT` / `SIGHUP` | Ctrl-C, or the controlling terminal/login session went away. |
+| a `daemon up` line with **no** matching `daemon down` | A **hard kill** — SIGKILL, OOM, or power loss. These cannot be trapped, so the *absence* of a line is itself the signature. On this laptop that is almost always the lid closing or the battery dying, not a bug. |
+
+`session-in-flight=YES` means a resume session was running when the daemon went down, so
+`$STATE/engine.lock` is probably stale; the next daemon takes it over after `AUTONOMOUS_STALE` (25 min), or
+you can delete the lock to skip the wait. Proven by `ops/autonomous/tests/prove-exit-logging.sh` (12
+assertions, incl. that a SIGKILL logs nothing and that the WS6 taskport security reminder still fires from
+the EXIT trap).
+
 ## Regression suite — `ops/autonomous/tests/prove-daemon.sh`
 
 Runs the **real** daemon against a stub `claude` in a sandboxed `HOME`/`STATE`/`REPO`, with every
