@@ -944,9 +944,33 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | **owner** (DurableLink/SPEC change)
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
-- [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
-  `SPEC/`, then delete the plan.** The per-wave Notes plans shipped + were deleted; `00-overview.md` is retained
-  only because §2/§5/§16 are still cited by `ArchiveNotes/CLAUDE.md`. Doc-only; Tier-1. | S | low | none
+- [ ] **Archive Notes `00-overview.md` — RE-DECIDE: keep it permanently as the Notes interface spec, or pay the
+  real cost of deleting it. ⚠️ Do NOT act on the old scoping; it was wrong twice.** | **owner** | low
+  - **History.** Originally "fold §16 into `CLAUDE.md`, delete the plan" [S]. The 2026-07-18 review found that
+    under-scoped and re-estimated it as "§2/§5/§6/§16, ~190 lines, 8+ citation sites". On **2026-07-29** the owner
+    picked that fuller scope — but a `git grep` census then showed **that estimate is also wrong, by a lot.**
+  - **Measured reality (2026-07-29, `git grep`):** the file is cited **65 times across 38 tracked files**, spanning
+    **31 distinct sections** — §2, §3.1, §3.2, §3.3, §3.4, §3.6, §3.7, §5, §6, §7, §8.2, §8.3, §8.4, §9, §10, §13,
+    §15.1, §15.3, §15.4, §15.5, §16, §16.1, §16.3, §D.1–§D.6, plus D2/D9. Citations are **not** doc-to-doc: most are
+    source and test comments (`NotesModel.swift`, `MarkdownBridge.swift`, `FrontMatterCodec.swift`, `ZoteroClient.swift`,
+    `NotesGUITests.swift`, `DurableLinkE2ETests.swift`, `e2e-durable-links.sh`, `packages/ArchiveCore` parity tests…),
+    and it is also cited by `POTENTIAL_FEATURES.md`, `09-gap-closure.md` and `devonthink-import.md`.
+    Note `§2` is **not** cited by `ArchiveNotes/CLAUDE.md` at all (that claim was wrong) — it is cited from
+    `POTENTIAL_FEATURES.md` and `SUITE_TODO.md` instead.
+  - **The repo already treats it as a spec, not a lingering plan:** this very file says it is "**RETAINED** as the
+    authoritative interface contract" (L96) and cites `00-overview.md §2` for the locked D1–D10 decisions (L1101).
+  - **RECOMMENDATION: keep it permanently and close this item.** The "delete a shipped execution plan" convention
+    exists to stop *stale* plans lingering; this one is not stale — it is the live interface contract for Notes and
+    is load-bearing in 38 files. Deleting it means rewiring 65 citations across source, tests, scripts and three
+    other docs, for no functional gain and a real risk of breaking references. If kept, the right small tidy is to
+    **rename/relocate it out of `execution-plans/`** (e.g. `ArchiveNotes/INTERFACE-CONTRACT.md`) so its status is
+    obvious and the doc convention is honoured — that is a ~1-line-per-citation path update, still 38 files.
+  - **Decide one:** (a) keep permanently, close this item, optionally note in `ArchiveNotes/CLAUDE.md` that
+    `00-overview.md` IS the interface spec [recommended]; (b) keep the content but relocate it out of
+    `execution-plans/` and update all 65 citations [M–L, mechanical]; (c) genuinely delete it — relocate all 31
+    cited sections into `ArchiveNotes/CLAUDE.md` and rewire 65 citations [L, and `CLAUDE.md` becomes very large];
+    (d) promote to `SPEC/` — ⚠️ this makes it a cross-app contract and therefore **hold-queue** for the daemon
+    thereafter, which is a real ongoing cost for a Notes-internal document.
 - **Worktree hygiene (standing rule, not a to-do).** The 4 stray `suite-wt-2026071[45]-…` worktrees this note
   used to list are **gone** (cleaned 2026-07-16) — don't go looking for them. Standing rules: remove your own
   worktree once your work is pushed, and **never touch a worktree you didn't create.** In particular **IGNORE the
