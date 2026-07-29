@@ -897,6 +897,31 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   Docs-only unless a fact is wrong; then it becomes a small code fix in the same commit. No corpus, no keys,
   no GUI. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMRotationDetector,Models/CostEstimator,Models/ProviderKeySpec,Models/LocalAgentSpec}.swift | S | low | none
 
+- [ ] **W22.localagent-provenance — the Local Agent backend is invisible in every durable record [S–M].**
+  Found 2026-07-29 while verifying the owner's Local-Agent run: a run performed by the local `claude` CLI is
+  recorded everywhere as if the selected API provider did it. Three sites, one cause — the Local Agent was
+  added as a third backend but only the *gateway* was ever threaded into the provenance/reporting layer:
+  1. **The output PDF's text page — the serious one.** `OCR/PDFGenerator.swift:9/207` take only
+     `gatewayDisplayName`; with none set, line 220 falls back to `model.provider.rawValue`, so a CLI-produced
+     transcription is permanently stamped `Gemini · Gemini 2.5 Flash Lite`. In a provenance-first suite that
+     text page IS the durable record of how the text came to exist, and it is **wrong** — verified on the
+     owner's real output (`RGB — upright.pdf`, produced with `useLocalAgent = 1`). Fix: add a
+     `localAgentDisplayName` (e.g. "Local CLI Agent (claude)") alongside `gatewayDisplayName` and thread it
+     from the 4 `PDFGenerator.generate` call sites (`OCRProcessor+OCR.swift:325`, `:1092`,
+     `OCRProcessor+Pipeline.swift:1071`, `OCRProcessor+ReviewFlows.swift:378`, `OCRProcessor+Tagging.swift:457`).
+     ⚠️ **Wording is a de-facto output-format change** — check `SPEC/tag-format.md` before choosing the string,
+     and note `PDFTextExtractor` parses this page (it must keep round-tripping).
+  2. **Run history `providerLabel`** = `gatewayConfig?.displayName ?? provider.rawValue`
+     (`Models/ProcessingHistory.swift:78`) → also says "Gemini".
+  3. **Run history `cost` records a phantom charge.** `estimatedCost` (`ProcessingHistory.swift:61-73`) calls
+     `CostEstimator.estimate(… useGateway: gatewayConfig != nil …)` with **no localAgent parameter**, so a
+     subscription run that spent **$0** is logged with a real dollar figure. The owner's six runs today all
+     show non-zero Gemini cost. Fix: pass the backend through and record 0 (or nil/"subscription") for Local
+     Agent — the cost pane already knows to say "Included in your subscription".
+  **Side effect worth having:** until this is fixed there is *no way* to confirm from artifacts which backend
+  produced a given output, which is exactly why the owner's Local-Agent verification could not be closed
+  conclusively. | files: OCR/PDFGenerator.swift, Models/ProcessingHistory.swift, Models/CostEstimator.swift, OCR/OCRProcessor+{OCR,Pipeline,ReviewFlows,Tagging}.swift | S–M | med | none
+
 - [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · owner
   decision needed].** Partly fixed 2026-07-29: the *silence* is closed (see `ArchiveProcessor/KNOWN_ISSUES.md`
   top entry) but the **routing still skips every non-PDF file in any run containing a multi-page PDF**.
@@ -909,11 +934,15 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     the wrong job — it would mark an innocent file failed. Change the signature to take
     `[(jobIndex: Int, url: URL)]` (or resolve via `jobs.firstIndex(where:)`), and compute `progress` over the
     whole run, not the subset.
-  - ⚠️ **OWNER DECISION before landing — tagging semantics.** Tagging is disabled whenever a multi-page PDF is
-    present (`Views/OCRView.swift:30`, `:375` `.disabled(isMultiPagePDFReOCR)`) because the re-OCR route is a
-    pure transform that never tags. A partitioned run therefore has **two** semantics at once. Pick one:
-    (a) re-enable the picker, relabelled "applies to images only"; or (b) force `.none` for the image subset
-    and say so in the UI. (a) is more useful, (b) is more conservative.
+  - ✅ **OWNER DECIDED 2026-07-29 — option (a): re-enable the tagging picker, relabelled "applies to images
+    only".** Tagging is currently disabled whenever a multi-page PDF is present (`Views/OCRView.swift:30`,
+    `:375` `.disabled(isMultiPagePDFReOCR)`) because the re-OCR route is a pure transform that never tags. In a
+    partitioned run the picker must be **live again**, with its label/help making clear it applies to the
+    **image subset only** — multi-page PDFs in the same run are still never tagged. Do NOT force `.none` for the
+    image subset (that was option (b), rejected). The re-OCR'd PDFs must stay untagged even with tagging ON for
+    the run, so the functional check should assert exactly that asymmetry in ONE run: image outputs carry
+    `com.apple.metadata:_kMDItemUserTags`, re-OCR'd PDF outputs do not. (That xattr asymmetry is what proved
+    which route the owner's 13:25 run took, so it is a known-good discriminator.)
   - **Tests to update:** invert `Capture/MultiPageReOCRTestDriver.swift:107-108` (it currently *pins* the
     whole-run routing) and keep §4's reason checks; widen `Capture/ProcessFilesTestDriver.swift:102`, whose
     `imageExts` filter excludes `.pdf` so the driver **cannot form a mixed drop today**; add a functional case
