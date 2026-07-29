@@ -897,6 +897,30 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   Docs-only unless a fact is wrong; then it becomes a small code fix in the same commit. No corpus, no keys,
   no GUI. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMRotationDetector,Models/CostEstimator,Models/ProviderKeySpec,Models/LocalAgentSpec}.swift | S | low | none
 
+- [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · owner
+  decision needed].** Partly fixed 2026-07-29: the *silence* is closed (see `ArchiveProcessor/KNOWN_ISSUES.md`
+  top entry) but the **routing still skips every non-PDF file in any run containing a multi-page PDF**.
+  - **The fix:** partition at `OCRProcessor+Pipeline.swift:1607` — `reOCRSet = files.filter(isMultiPagePDF)`,
+    `imageSet = rest` — and run the re-OCR transform over `reOCRSet` then the standard path over `imageSet`
+    in one run, instead of handing the unfiltered array to `performMultiPagePDFReOCR` (line 1634).
+  - ⚠️ **Index hazard (the reason this isn't a one-liner):** `performMultiPagePDFReOCR` writes `jobs[index]`
+    using `files.enumerated()`, which is only correct because `jobs = files.map { OCRJob(sourceURL: $0) }`
+    (`Pipeline.swift:1597`) makes them positionally identical. Passing a **filtered subset** silently aliases
+    the wrong job — it would mark an innocent file failed. Change the signature to take
+    `[(jobIndex: Int, url: URL)]` (or resolve via `jobs.firstIndex(where:)`), and compute `progress` over the
+    whole run, not the subset.
+  - ⚠️ **OWNER DECISION before landing — tagging semantics.** Tagging is disabled whenever a multi-page PDF is
+    present (`Views/OCRView.swift:30`, `:375` `.disabled(isMultiPagePDFReOCR)`) because the re-OCR route is a
+    pure transform that never tags. A partitioned run therefore has **two** semantics at once. Pick one:
+    (a) re-enable the picker, relabelled "applies to images only"; or (b) force `.none` for the image subset
+    and say so in the UI. (a) is more useful, (b) is more conservative.
+  - **Tests to update:** invert `Capture/MultiPageReOCRTestDriver.swift:107-108` (it currently *pins* the
+    whole-run routing) and keep §4's reason checks; widen `Capture/ProcessFilesTestDriver.swift:102`, whose
+    `imageExts` filter excludes `.pdf` so the driver **cannot form a mixed drop today**; add a functional case
+    (mixed drop → the image writes its 2-page PDF **and** the PDF writes its 2N-page rebuild).
+  - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
+
 - [ ] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** Verified
   2026-07-28: line 23 sets `APPDIR="ArchiveProcessor"`, so `APP` resolves to
   `ArchiveProcessor/ArchiveProcessor/build/DD/…/ArchiveProcessor.app` — a path that **does not exist** (the

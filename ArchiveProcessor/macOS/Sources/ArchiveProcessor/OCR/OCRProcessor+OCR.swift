@@ -248,9 +248,30 @@ extension OCRProcessor {
             // 1. Render every page to a temp JPEG. nil = render failure; renderAllPages fails loud
             //    (no partial set) so we never silently drop an archival page.
             guard let pageImages = PDFToImageConverter.renderAllPages(of: pdfURL), !pageImages.isEmpty else {
+                // WHY THIS SETS AN errorMessage (2026-07-29 bug fix). This route is chosen when the run
+                // contains ANY multi-page PDF (`OCRProcessor+Pipeline.swift` `autoReOCR`), so a non-PDF
+                // sibling — an ordinary .jpg — lands here too and `renderAllPages` returns nil for it
+                // (`PDFDocument(url:)` is nil for a JPEG). The route's comment says such a sibling "fails
+                // render loudly", but it did NOT: leaving `result.errorMessage` nil makes the UI render
+                // `ItemState.ocrEmpty` -> **"No OCR text"** (`OCRView+FileRowView.swift:99`), which blames
+                // the model for what is actually a routing skip, and no output file is written. An owner hit
+                // exactly this: two .jpg files dropped alongside one 3-page PDF vanished with "No OCR text".
+                // Setting a precise, actionable reason is what makes the documented "loudly" true.
+                let isPDF = pdfURL.pathExtension.lowercased() == "pdf"
+                let reason = isPDF
+                    ? "This PDF could not be rendered, so it was not re-OCR'd. The file may be corrupt, "
+                      + "encrypted, or password-protected."
+                    : "Skipped: not a PDF. This run also contained a multi-page PDF, which routes the whole "
+                      + "run through the multi-page re-OCR transform — a path that can only process PDFs. "
+                      + "Process images in a separate run (or remove the multi-page PDF from this one)."
+                jobs[index].result = OCRResult(text: nil, classification: nil,
+                                               errorMessage: reason,
+                                               errorCode: isPDF ? "pdf_render_failed" : "not_a_pdf_in_reocr_run")
                 jobs[index].status = .failed
                 if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
-                statusMessage = "Could not render \(pdfURL.lastPathComponent)."
+                statusMessage = isPDF
+                    ? "Could not render \(pdfURL.lastPathComponent)."
+                    : "Skipped \(pdfURL.lastPathComponent) — not a PDF (multi-page re-OCR run)."
                 progress = Double(index + 1) / Double(total)
                 continue
             }
@@ -331,6 +352,14 @@ extension OCRProcessor {
                 jobs[index].status = .succeeded
                 failedFiles.removeAll { $0 == pdfURL.lastPathComponent }
             } else {
+                // The generate/merge threw; the only record used to be an os_log (which is not reliably
+                // retrievable) plus a nil errorMessage that the UI mislabels as "No OCR text". Give the
+                // operator the real reason — this is an OUTPUT-write failure, not an empty OCR result.
+                jobs[index].result = OCRResult(
+                    text: nil, classification: nil,
+                    errorMessage: "OCR succeeded but the output PDF could not be written or merged. "
+                                + "Check that the output folder exists and is writable, and that there is free disk space.",
+                    errorCode: "pdf_write_failed")
                 jobs[index].status = .failed
                 if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
             }
@@ -1087,12 +1116,27 @@ extension OCRProcessor {
                 jobs[index].appliedTags = tags
             }
         } else {
+            // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on
+            // `PDFDocument.write(to:)` returning false; a bad image yields a placeholder page instead).
+            // Previously the reason went only to `os_log`, leaving `result.errorMessage` nil, which the UI
+            // renders as "No OCR text" — blaming the model for a failed output WRITE. Keep the OCR text and
+            // `rotationDegrees` (all `OCRResult` fields are `let`, so this must be rebuilt, not mutated —
+            // dropping rotationDegrees here would silently lose the detected rotation) and add the reason.
+            jobs[index].result = OCRResult(
+                text: result.text,
+                classification: result.classification,
+                rotationDegrees: result.rotationDegrees,
+                errorMessage: "OCR succeeded but the output PDF could not be written. Check that the output "
+                            + "folder exists and is writable, and that there is free disk space.",
+                errorCode: "pdf_write_failed")
             jobs[index].status = .failed
             let name = sourceURL.lastPathComponent
             if !failedFiles.contains(name) { failedFiles.append(name) }
         }
         // Persist result AND its assigned output path for resume-after-restart. Records the intended
-        // output path even on failure so resume can attempt to regenerate the PDF (B7).
+        // output path even on failure so resume can attempt to regenerate the PDF (B7). NOTE: the ORIGINAL
+        // `result` is persisted deliberately — the pending-run snapshot records what the model returned, so
+        // a resume regenerates the PDF from the real OCR text rather than inheriting this write-failure note.
         return saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     static func isTimeoutError(_ result: OCRResult) -> Bool {

@@ -153,6 +153,54 @@ enum MultiPageReOCRTestDriver {
         check("re-OCR output is the 4-page alternating rebuild (2 pages × 2)",
               inplaceOut.flatMap { PDFDocument(url: $0)?.pageCount } == 4)
 
+        // ── 4. MIXED DROP: a non-PDF sibling must fail *loudly*, not silently. ──────────────────────
+        // Regression for the 2026-07-29 bug: an owner dropped two .jpg files alongside one 3-page PDF.
+        // Because `autoReOCR` is presence-based (section 1, checks at 107-108), the whole run took this
+        // PDF-only route, `renderAllPages` returned nil for each JPEG, and the guard marked them .failed
+        // WITHOUT setting `result` — so the UI rendered "No OCR text" (blaming the model) and no output was
+        // written. The route's own comment claimed such a sibling "fails render loudly"; it did not.
+        // These checks pin the reason being attached. NOTE: the ROUTING itself is unchanged and still skips
+        // non-PDFs — the per-file partition is a separate, owner-gated follow-up (it changes tagging
+        // semantics for a mixed run). What is fixed here is that the skip can no longer be silent.
+        let mixDir = root.appendingPathComponent("mixed", isDirectory: true)
+        let mixOut = root.appendingPathComponent("mixedout", isDirectory: true)
+        try? fm.createDirectory(at: mixDir, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: mixOut, withIntermediateDirectories: true)
+        let mixPDF = mixDir.appendingPathComponent("doc.pdf")
+        _ = writeMultiPagePDF(mixPDF, pages: 2)
+        // A genuine .jpg, via the same idiom section 1 uses: render a 1-page PDF's page to a real JPEG.
+        // (`mixSingle` is only the source for that render — it is NOT one of the run's inputs.)
+        let mixSingle = mixDir.appendingPathComponent("single.pdf")
+        _ = writeMultiPagePDF(mixSingle, pages: 1)
+        let mixIMG = PDFToImageConverter.imageURL(for: mixSingle)
+
+        let mixProc = OCRProcessor()
+        // Job order deliberately puts the IMAGE first, so an index-mapping regression (jobs[index] vs the
+        // files array) would show up as the wrong job being marked.
+        mixProc.jobs = [OCRJob(sourceURL: mixIMG), OCRJob(sourceURL: mixPDF)]
+        await mixProc.performMultiPagePDFReOCR(
+            files: [mixIMG, mixPDF], provider: .gemini, model: model, thinkingLevel: nil,
+            apiKey: "", outputDirectory: mixOut, ocrOverride: makeInjectedOCR())
+
+        let imgJob = mixProc.jobs.first { $0.sourceURL == mixIMG }
+        let pdfJob = mixProc.jobs.first { $0.sourceURL == mixPDF }
+        check("mixed: the non-PDF sibling is marked failed", imgJob?.status == .failed)
+        check("mixed: the non-PDF sibling now carries an errorMessage (was nil → 'No OCR text')",
+              imgJob?.result?.errorMessage?.isEmpty == false)
+        check("mixed: its errorCode identifies the ROUTING skip, not an OCR/model fault",
+              imgJob?.result?.errorCode == "not_a_pdf_in_reocr_run")
+        check("mixed: the reason names the actual cause (multi-page PDF routed the run)",
+              imgJob?.result?.errorMessage?.contains("multi-page") == true)
+        check("mixed: the non-PDF sibling produced NO output (unchanged, but now explained)",
+              mixProc.outputURLMap[mixIMG] == nil)
+        check("mixed: the multi-page PDF in the same run still succeeds", pdfJob?.status == .succeeded)
+        check("mixed: the PDF's own output landed (index mapping intact, image listed first)",
+              mixProc.outputURLMap[mixPDF].map { fm.fileExists(atPath: $0.path) } == true)
+        check("mixed: the PDF's output is the 4-page alternating rebuild (2 × 2)",
+              mixProc.outputURLMap[mixPDF].flatMap { PDFDocument(url: $0)?.pageCount } == 4)
+        check("mixed: the source image is untouched on disk (route only writes output)",
+              fm.fileExists(atPath: mixIMG.path))
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let output = ProcessInfo.processInfo.environment["MULTIPAGE_REOCR_TEST_OUT"]

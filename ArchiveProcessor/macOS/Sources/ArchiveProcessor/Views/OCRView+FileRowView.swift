@@ -96,7 +96,21 @@ struct FileItem: ProcessableItem {
         case .pending: return .pending
         case .processing: return .processing(label: "OCR…")
         case .succeeded: return .succeeded   // Files: succeeded ⟺ text != nil (see handleOCRResult)
-        case .failed: return .failed(job.result?.errorMessage != nil ? .provider : .ocrEmpty)
+        // 2026-07-29 — this used "errorMessage == nil" as a proxy for "the model returned nothing", which is
+        // FALSE wherever a failure sets no message. The result was that a routing skip and a failed output
+        // WRITE both surfaced as "No OCR text", blaming the model for neither of its own faults. An owner lost
+        // two .jpg files to exactly that. `.ocrEmpty` is now reserved for its literal meaning — a result came
+        // back and it had no text — and `.noOutput` (which already existed here, unused) carries the cases
+        // where nothing was written at all.
+        case .failed:
+            guard let r = job.result else { return .failed(.noOutput) }   // never even reached OCR
+            guard let _ = r.errorMessage else { return .failed(.ocrEmpty) }   // a result, but no text
+            switch r.errorCode {
+            case "not_a_pdf_in_reocr_run", "pdf_render_failed", "pdf_write_failed":
+                return .failed(.noOutput)      // OCR was fine (or never ran) — no file was produced
+            default:
+                return .failed(.provider)      // a genuine provider/transport error
+            }
         case .removed: return .removed
         }
     }

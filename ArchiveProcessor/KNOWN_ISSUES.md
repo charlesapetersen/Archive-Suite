@@ -4,6 +4,56 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ⚠️ OPEN (routing) / ✅ FIXED (silence): a mixed drop containing a multi-page PDF discards every non-PDF file
+
+**Found the hard way 2026-07-29** — the owner dropped two `.jpg` files alongside one 3-page PDF. The PDF
+processed correctly; **both images produced no output at all** and the UI reported **"No OCR text"**, which
+blames the model for something it never saw.
+
+**Root cause (confirmed by code trace, a headless repro, and the app's own `processingHistory`).** The
+multi-page re-OCR route is chosen **per RUN, not per file**:
+`OCRProcessor+Pipeline.swift:1607` — `let autoReOCR = !preOCRedInput && files.contains(where:
+PDFToImageConverter.isMultiPagePDF)` — and line 1634 then passes the **unfiltered** `files` array to
+`performMultiPagePDFReOCR`. So ONE multi-page PDF anywhere in a drop sends every sibling into a PDF-only
+transform. There, `PDFToImageConverter.renderAllPages` opens with `PDFDocument(url:)`, which is nil for a
+JPEG, and the guard at `OCRProcessor+OCR.swift:250` marks the job `.failed` and `continue`s — **before** any
+output is written. Evidence it was the route and nothing about the files: the same grayscale, em-dash-named
+JPEG succeeded **alone** in the same output folder with the same backend; the failing run is recorded as
+`modeLabel:"Re-OCR PDF", fileCount:3, succeeded:1, failed:2`; and the 13:25 output carries **no** tag xattr
+(the re-OCR route skips tagging) while the later single-file outputs do. Ruled out: grayscale, the em dash,
+image decode, write permissions, `PDFError.writeFailed`, and the `claude` CLI (it read the grayscale file
+perfectly). Mixed drops are reachable and unwarned — `Views/OCRView.swift:948-951` accepts PDFs and images
+into one `droppedFiles` array, and `droppedHasMultiPagePDF` only greys out the tagging controls.
+
+**The design intended this but its safety net never worked.** `Pipeline.swift:1604-1606` says "a non-PDF
+sibling in the same run fails render loudly." It did not: the guard left `jobs[index].result` nil, and
+`OCRView+FileRowView.swift:99` mapped `.failed` + nil `errorMessage` to `.ocrEmpty` — literally **"No OCR
+text"**. The true reason existed only as a `statusMessage` overwritten by the next iteration, plus an
+`os_log` that returns nothing via `log show`. The `.txt` batch log would have said so, but `writeLogFile`
+is **opt-in and defaults to OFF** (`DefaultsKeys.writeLogFile`).
+
+**FIXED (this commit) — the silence, not the routing.** A skipped sibling now carries a precise reason
+(`errorCode: "not_a_pdf_in_reocr_run"`) naming the multi-page-PDF routing and telling the operator to re-run
+images separately; the two PDF-write failure sites likewise set `"pdf_write_failed"` instead of nothing; the
+row label now uses the pre-existing-but-unused `FailureKind.noOutput` ("No output produced") so `.ocrEmpty`
+means only what it says; and the always-visible completion line appends an explicit ⚠️ count of non-PDF files
+not processed. Pinned by 9 checks in `MultiPageReOCRTestDriver` §4 — **proven non-vacuous** (disabling the
+fix fails exactly the three reason-related checks and no others).
+
+**STILL OPEN — the routing itself.** A mixed drop still processes only the PDFs. The real fix is per-file
+dispatch (partition `files` into the multi-page PDFs and the rest, run both in one pass), which requires
+decoupling `performMultiPagePDFReOCR`'s positional index from `jobs` (it relies on `files.enumerated()`
+matching `jobs = files.map { OCRJob(sourceURL: $0) }`, `Pipeline.swift:1597`) and inverting the assertion at
+`MultiPageReOCRTestDriver.swift:107-108`, which currently pins the whole-run behaviour. **It also needs an
+owner decision:** tagging is disabled whenever a multi-page PDF is present (`OCRView.swift:30`, `:375`), so a
+partitioned run has two tagging semantics — either re-enable the picker as "applies to images only", or force
+`.none` for the image subset and say so. Queued in `SUITE_TODO.md` as `W22.mixed-batch`.
+
+**Workaround until then:** process multi-page PDFs in their own run. You will now be told plainly when a run
+skips images instead of losing them silently.
+
+---
+
 ## CLOSED (owner decision 2026-07-18): one recoverable filesystem-transaction service + operator recovery UI
 
 **Do NOT build the shared engine or the Recovery screen. Do NOT re-promote this.**

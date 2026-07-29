@@ -1895,6 +1895,18 @@ extension OCRProcessor {
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        // Make the multi-page-re-OCR routing skip UNMISSABLE. "N failed" alone reads as an OCR/model problem,
+        // and the per-row reason requires inspecting a row — so an operator whose images were skipped for a
+        // pure ROUTING reason had no way to know. (2026-07-29: an owner dropped two .jpg files alongside one
+        // 3-page PDF; both images were silently discarded and reported as "No OCR text".) The batch log would
+        // also have said so, but `writeLogFile` is opt-in and defaults to OFF, so the status line is the only
+        // channel guaranteed to be seen.
+        let skippedNotPDF = jobs.filter { $0.result?.errorCode == "not_a_pdf_in_reocr_run" }.count
+        if skippedNotPDF > 0 {
+            statusMessage += " ⚠️ \(skippedNotPDF) non-PDF file\(skippedNotPDF == 1 ? "" : "s") NOT processed:"
+                          + " this run contained a multi-page PDF, which routes the whole run through the"
+                          + " PDF-only re-OCR transform. Re-run the images on their own."
+        }
         if incrementalSkipped > 0 {
             statusMessage += " \(incrementalSkipped) already-processed skipped."
         }
