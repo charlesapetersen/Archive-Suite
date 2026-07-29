@@ -65,9 +65,20 @@ add_need() { needs="$needs"$'\n'"  • $1"; }
 security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>' && add_need "taskport is 'allow' (password-free) — revert: see ~/Desktop/REVERT-TASKPORT-SECURITY.txt"
 [ -f "$STATE/keychain-partition-fixed" ] || add_need "keychain partition-fix not applied — run ./ops/autonomous/fix-keychain-access.sh (stops 'security' prompts)"
 [ "$hold" -gt 0 ] 2>/dev/null && add_need "$hold hold-queue item(s) await you (Tier-3/SPEC/corpus/irreversible) — see the plan's ## HOLD QUEUE"
-# Morning Review OPEN head (first bullet), if the plan has one
-mr="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^- /{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | cut -c1-72)"
-[ -n "$mr" ] && add_need "Morning Review has entries (top): ${mr}…"
+# Morning Review — count OPEN checkboxes, then show the first one.
+# The 2026-07-28 triage replaced ~29 prose entries with a "### Outstanding owner checks" CHECKLIST, so
+# counting "- [ ]" is now the real signal; the old code only ever printed the first "- " line and would
+# report NOTHING once the section was reorganised. Both shapes are handled: `- [ ]` checklist rows AND
+# the legacy `- **[YYYY-MM-DD] …` prose entries. Sub-headings inside the section are ### by convention —
+# a ## there still (correctly) ends the section.
+mr_open="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
+case "$mr_open" in ''|*[!0-9]*) mr_open=0 ;; esac
+mr="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-72)"
+if [ "$mr_open" -gt 0 ] 2>/dev/null; then
+  add_need "$mr_open outstanding owner check(s) in Morning Review — first: ${mr}…"
+elif [ -n "$mr" ]; then
+  add_need "Morning Review has entries (top): ${mr}…"
+fi
 
 printf '=== Archive Suite — autonomous run STATUS (%s) ===\n' "$(date '+%F %T')"
 printf 'RUN:      %s   [%s]\n' "$(run_state)" "$(supervisor)"

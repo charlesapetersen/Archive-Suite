@@ -74,7 +74,26 @@ const VERDICT_SCHEMA = {
   },
 }
 
-log(`lean-review: unit="${unit}" paths="${paths}" (${dimensions.length} dimensions)`)
+// ---- Cost controls (owner decision B1, 2026-07-28) --------------------------------------------------
+// WHY: the daemon runs every session under a HARD `--max-budget-usd 30`. With BOTH waves pinned
+// opus/effort:max this fan-out was budget-killed on two consecutive units (2026-07-18): Processor/Capture
+// spent ~$27 of $30 and died before a single verdict landed; Processor/Net's finders burned ~$4.5/min and
+// were stopped before emitting one finding. Cadence review has been frozen since.
+//
+// The owner's call: cheapen the VERIFIERS, keep the FINDERS at opus/max. That asymmetry is the point —
+// finding is open-ended discovery over a whole subsystem (worth peak reasoning), whereas verification is a
+// bounded question handed a specific file:line and a concrete claim ("can you reach this and get a wrong
+// result?"). Sonnet at high effort does the bounded job; it is not asked to discover anything.
+const VERIFY_MODEL  = 'sonnet'
+const VERIFY_EFFORT = 'high'
+// Second lever: the verify wave is UNBOUNDED in the finding count, so no budget raise can make it safe —
+// one chatty dimension returning 40 findings means 40 verifier agents. Cap it. Over-cap findings are NOT
+// dropped and NOT called refuted: they come back as `unverified` for the caller to judge. Repo rule is
+// "no silent caps", so every skip is logged.
+const VERIFY_CAP_PER_DIM = 8
+
+log(`lean-review: unit="${unit}" paths="${paths}" (${dimensions.length} dimensions); ` +
+    `finders opus/max, verifiers ${VERIFY_MODEL}/${VERIFY_EFFORT}, verify cap ${VERIFY_CAP_PER_DIM}/dimension`)
 
 const results = await pipeline(
   dimensions,
@@ -91,18 +110,33 @@ const results = await pipeline(
   ).then((r) => ({ dim: d.key, findings: (r && r.findings) || [] })),
 
   // Verify EACH finding of this dimension as soon as the dimension's find completes (no barrier).
-  (found) => parallel(
-    found.findings.map((f) => () =>
-      agent(
-        `Adversarially VERIFY this claimed defect in the Archive Suite unit "${unit}".\n\n` +
-        `File: ${f.file}:${f.line || '?'}\nClaim: ${f.summary}\nAlleged failure: ${f.failure_scenario}\n\n` +
-        `Your job is to REFUTE it. Read the actual code and surrounding context. Set refuted=true unless you can ` +
-        `state a concrete, realistic input/state that reaches this code and produces the wrong result. ` +
-        `Default to refuted=true when uncertain, when the bad path is unreachable, or when existing guards prevent it.`,
-        { label: `verify:${unit}:${f.file.split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'max' }
-      ).then((v) => ({ ...f, dim: found.dim, verdict: v }))
-    )
-  )
+  (found) => {
+    // Highest-severity first, so if the cap bites it is the LOW findings that go unverified, never a HIGH.
+    const rank = { high: 0, medium: 1, low: 2 }
+    const ordered = [...found.findings].sort((a, b) => (rank[a.severity] ?? 1) - (rank[b.severity] ?? 1))
+    const toVerify = ordered.slice(0, VERIFY_CAP_PER_DIM)
+    const overCap  = ordered.slice(VERIFY_CAP_PER_DIM)
+    if (overCap.length) {
+      log(`⚠️ lean-review "${unit}"/${found.dim}: ${found.findings.length} findings > cap ${VERIFY_CAP_PER_DIM} — ` +
+          `${overCap.length} returned UNVERIFIED (not refuted): ${overCap.map((f) => `${f.file}:${f.line || 0}`).join(', ')}`)
+    }
+    return parallel(
+      toVerify.map((f) => () =>
+        agent(
+          `Adversarially VERIFY this claimed defect in the Archive Suite unit "${unit}".\n\n` +
+          `File: ${f.file}:${f.line || '?'}\nClaim: ${f.summary}\nAlleged failure: ${f.failure_scenario}\n\n` +
+          `Your job is to REFUTE it. Read the actual code and surrounding context. Set refuted=true unless you can ` +
+          `state a concrete, realistic input/state that reaches this code and produces the wrong result. ` +
+          `Default to refuted=true when uncertain, when the bad path is unreachable, or when existing guards prevent it.`,
+          { label: `verify:${unit}:${f.file.split('/').pop()}:${f.line || 0}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: VERIFY_MODEL, effort: VERIFY_EFFORT }
+        ).then((v) => ({ ...f, dim: found.dim, verdict: v }))
+      )
+    ).then((verified) => [
+      ...verified,
+      // Carry over-cap findings through with an explicit marker so they are neither lost nor mislabelled.
+      ...overCap.map((f) => ({ ...f, dim: found.dim, verdict: null, unverified: 'over verify cap' })),
+    ])
+  }
 )
 
 // results = array (per dimension) of arrays (per finding) of verified findings.
@@ -112,8 +146,15 @@ const confirmed = all
   .map((f) => ({ ...f, severity: (f.verdict && f.verdict.corrected_severity) || f.severity }))
   .sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.severity] - { high: 0, medium: 1, low: 2 }[b.severity]))
 
+// A finding with NO verdict was never CHECKED — it is not the same as one a verifier refuted, and lumping
+// the two together silently downgrades real bugs (pre-existing wart; the verify cap would have made it worse).
+const unverified = all.filter((f) => !f.verdict)
+const refuted    = all.filter((f) => f.verdict && f.verdict.refuted !== false)
+
 phase('Synthesize')
-log(`lean-review "${unit}": ${all.length} raw findings, ${confirmed.length} survived refute-verify`)
+log(`lean-review "${unit}": ${all.length} raw findings — ${confirmed.length} CONFIRMED, ` +
+    `${refuted.length} refuted, ${unverified.length} unverified` +
+    (unverified.length ? ` (verify cap ${VERIFY_CAP_PER_DIM}/dim or a dead verifier — treat as PLAUSIBLE, not clean)` : ''))
 
 return {
   unit,
@@ -121,5 +162,7 @@ return {
   raw_count: all.length,
   confirmed,
   // keep the refuted ones too, so the caller can spot-check the verifier's calls
-  refuted: all.filter((f) => !f.verdict || f.verdict.refuted !== false).map((f) => ({ file: f.file, line: f.line, summary: f.summary, reason: f.verdict && f.verdict.reason })),
+  refuted: refuted.map((f) => ({ file: f.file, line: f.line, summary: f.summary, reason: f.verdict && f.verdict.reason })),
+  // NEVER silently merged into `refuted`: these reached no verdict, so they are PLAUSIBLE and still need a look.
+  unverified: unverified.map((f) => ({ file: f.file, line: f.line, severity: f.severity, summary: f.summary, why: f.unverified || 'verifier returned no verdict' })),
 }

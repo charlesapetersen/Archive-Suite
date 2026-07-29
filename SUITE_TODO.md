@@ -903,14 +903,45 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
-- [ ] **Reader/Notes: PDF + JPEG dual image reference** (owner, 2026-07-17). Let a Reader image entity — and
-  thus the durable link surfaced in Notes — reference **both** an archival PDF and its JPEG partner (opens the
-  PDF by default; user can switch to the higher-detail JPEG when the PDF lost resolution). Naming/paths mirror
-  1:1 (`Archival Photos/<Coll>/00140 — Swarthmore.pdf` ↔ `Archival Photos JPEGS/<Coll>/00140 — Swarthmore.jpg`),
-  so the partner is derivable by filename. Supports the DEVONthink import (see `execution-plans/devonthink-import.md`
-  §4a) but is a standalone Reader feature. **Verify:** headless render guards (`RenderProbe`/`DocumentRenderGuardTests`)
-  that both the PDF page and the JPEG partner render non-blank; the live sighted loop (`ops/gui/`) for the in-viewer
-  PDF↔JPEG switch. | Reader + Notes + ArchiveCore (durable-link/image entity) | M | med | none
+- [ ] **Reader/Notes: PDF + JPEG dual image reference** (owner, 2026-07-17; **design decided + premise corrected
+  by a full corpus audit 2026-07-29**). Let a Reader image entity — and thus the durable link surfaced in Notes —
+  reference **both** an archival PDF and its JPEG partner (opens the PDF by default; user can switch to the
+  higher-detail JPEG when the PDF lost resolution). Supports the DEVONthink import
+  (`execution-plans/devonthink-import.md` §4a) but is a standalone Reader feature.
+
+  ⚠️ **The original premise was WRONG and is retained here only as a warning.** It claimed "naming/paths mirror
+  1:1 … so the partner is derivable by filename." A read-only audit of all **102,516** PDFs (manifest +
+  per-collection rollup: see the 2026-07-29 corpus-audit report) found:
+  - **relocated 82,147 (80.1%)** — partner exists but under a *differently named* collection folder;
+    **mirrored only 10,765 (10.5%)**; **none 9,529 (9.3%)**; **ambiguous 75 (0.07%)**.
+  - So **90.7% of PDFs do have a partner, but pure path derivation finds 1 in 10.** Leaf *stems* mirror; the
+    *collection folders* do not (24 exact-name matches, 23 main-only, 17 JPEGS-only), and the divergence recurs
+    at sub-collection level (`Cambridge/Young, Michael` ↔ `.../Michael Young Archive`).
+  - The JPEGS tree is not purely JPEG (**4 image extensions** jpg/jpeg/JPG/HEIC with case variance, plus 443 pdf,
+    8 mp3, 6 rtf), and the MAIN tree already holds ~18k images of its own.
+  - **The corpus cannot be normalised by renaming** (owner asked; audit says no): JPEGS `Stanford University
+    Archives` is the dominant partner for BOTH PDF `Stanford University Archives` AND `… — Tech` (**41,585 PDFs,
+    41% of the corpus**) — a many-to-one that no 1:1 rename can express; same for Harvard. The 7 genuinely safe
+    renames would fix only ~10% of the relocated cases. **Decision: leave the corpus alone.**
+
+  **Decided design (owner, 2026-07-28/29):**
+  1. **Root:** raise Reader's granted root to the common parent so both trees sit under one root GUID.
+     *(Owner's choice; note it widens Reader's WRITE surface over sibling folders — keep tag writes scoped.)*
+  2. **Detection:** index the JPEGS tree (a second `NSMetadataQuery`). This is **REQUIRED, not an optimisation** —
+     80.1% of partners need relocation resolution no path rule can do. Resolve in this order: exact mirrored
+     subpath → indexed stem within collection context → **refuse and show no partner when ambiguous** (75 files);
+     never guess, since a wrong partner shows the historian a different archive's scan.
+  3. **Durable link:** encode the PDF path **and** the resolved JPEG path explicitly — the partner is not
+     re-derivable, so a citation must pin what was actually cited. ⚠️ This changes `DurableLink`
+     (`packages/ArchiveCore/Sources/ArchiveCore/Links/DurableLink.swift`) — a shared ArchiveCore type + cross-app
+     URL contract → **still HOLD-QUEUE / owner-gated**, and it must rebuild all three app test bundles.
+     Old links without the JPEG field must keep parsing (additive/optional).
+  4. **Switch UI:** View-menu item + keyboard shortcut, **no** toolbar button; the choice is **sticky per
+     document** (needs a small persisted per-file preference store).
+  Also handle: PDFs with no partner (9.3%) → hide the switch entirely; case-insensitive extension matching.
+  **Verify:** headless render guards (`RenderProbe`/`DocumentRenderGuardTests`) that both the PDF page and the
+  JPEG partner render non-blank; VM GUI lane (`W21.vmgui`) for the in-viewer switch.
+  | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | **owner** (DurableLink/SPEC change)
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
 - [ ] **Fold Archive Notes `00-overview.md` §16 (Interface Contract) into `ArchiveNotes/CLAUDE.md` or promote to
