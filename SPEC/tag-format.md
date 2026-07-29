@@ -34,6 +34,13 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 
 - The tag array is an **ordered `[String]`**; macOS may reorder on write, so consumers compare as a
   **multiset**, never by position.
+- **Duplicate tag strings persist verbatim.** A `.tagNamesKey` write→read round-trip preserves repeated
+  strings: `["A","A","B"]` reads back as a two-of-`A` multiset, **not** the collapsed `["A","B"]` — macOS
+  does not de-duplicate the tag array on write. *(Verified on macOS/APFS by
+  `ArchiveCoreTests/DuplicateTagPremiseTests` — a hard-asserted pin, complemented by the
+  `XCTSkipUnless`-guarded occurrence-aware consumer tests.)* This is **why** consumers compare as a multiset
+  (above) and why occurrence-aware undo/restore must carry per-token **multiplicity** (ArchiveCore
+  `tagOccurrenceInverse`, Wave 15) — a `Set`-collapse would silently drop a duplicate on undo.
 - **Color-name-token preserves labelNumber.** The color label (`.labelNumberKey`) and a color-name
   token (`"Red"`/`"Purple"`) in the tag array are two representations of the same fact. **Verified:**
   keeping the color-name token in the array and writing only `.tagNamesKey` **preserves the existing

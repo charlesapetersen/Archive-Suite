@@ -361,12 +361,16 @@ loses occurrences, and closing it needs **both** fixes below: the inverse is com
 All five are **Tier-2** (shared audited tag writer) and must **build + test all three apps** (Reader +
 Processor + Notes) per the shared-Core rule. All are daemon-buildable ($0, no key, no GUI, no hardware) and
 verified on **scratch copies only — never the corpus**. Legend as above.
-- [ ] **W15.tu0 — pin the macOS duplicate-tag fact in SPEC + a test [S].** Add a scratch unit test asserting
-  `["A","A","B"]` survives a `setResourceValue(.tagNamesKey)` write→read round-trip (pattern:
-  `TagWriterPrimitiveTests.makeFile` — temp dir + teardown), and record the verified fact in
-  `SPEC/tag-format.md` beside the existing multiset-comparison rule. Pure test + doc, no behavior change —
-  this is the premise the rest of the wave rests on, so it lands first.
-  | files: packages/ArchiveCore/Tests/ArchiveCoreTests/, SPEC/tag-format.md | S | low | none
+- [x] **W15.tu0 — pin the macOS duplicate-tag fact in SPEC + a test [S].** DONE 2026-07-29 — added
+  `ArchiveCoreTests/DuplicateTagPremiseTests` (hard-asserts `["A","A","B"]` survives a raw
+  `setResourceValue(.tagNamesKey)` write→read round-trip on a scratch temp file — the test RAN, not skipped)
+  and recorded the fact in `SPEC/tag-format.md` §"Finder tag model" beside the multiset-comparison rule
+  (duplicate tag strings persist verbatim; a `Set`-collapse would drop a duplicate on undo — the premise all
+  of Wave 15 rests on). Pure test + doc, **no behavior change, no ArchiveCore Sources/API touched** → app
+  bundles unaffected (shared-Core rebuild rule's type-change trigger not met), so ArchiveCore `swift test` is
+  the correct-and-sufficient gate: premise test 1/1 green + full suite exit 0, **0 warnings**. Tier-2 APPROVE
+  (adversarial self-review + scratch functional test; never the corpus).
+  | files: packages/ArchiveCore/Tests/ArchiveCoreTests/DuplicateTagPremiseTests.swift, SPEC/tag-format.md | S | low | none
 - [x] **W15.tu1 — occurrence-aware undo inverse in ArchiveCore [M].** DONE 2026-07-28 (recovered from a
   preserved dead-session WIP — `old/w15tu1-divergent-wip-20260728/attemptA` — and independently re-verified).
   New `TagOccurrenceDelta` (multiset peer to `TagDelta`) + `TagWriteResult.occurrenceInverse`, computed via
@@ -375,8 +379,8 @@ verified on **scratch copies only — never the corpus**. Legend as above.
   and all consumers untouched (new init param defaulted); occurrence-only (count, not order). Verified HERE
   (not the WIP's self-claim): ArchiveCore `swift test` 100/100 green incl. 6 new W15.tu1 tests (the
   end-to-end duplicate test RAN, not skipped — macOS persisted the dup); all three app test bundles
-  `build-for-testing` SUCCEEDED; 0 new warnings. NOTE: W15.tu0 (SPEC doc + premise test) still `[ ]`, lands
-  separately; the undo/restore consumers are rewired in W15.tu2.
+  `build-for-testing` SUCCEEDED; 0 new warnings. NOTE: W15.tu0 (SPEC doc + premise test) landed separately
+  (DONE 2026-07-29); the undo/restore consumers are rewired in W15.tu2.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift | M | med | none
 - [x] **W15.tu2 — multiplicity-aware apply/restore + wire Reader undo** (blocked-on: W15.tu1) **[M].** DONE
   2026-07-28. Added `TagWriter.applyOccurrence(_:to:expecting:)` — a **bounded reconcile step**: an
