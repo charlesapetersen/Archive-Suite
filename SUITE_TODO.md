@@ -505,11 +505,17 @@ restore is skipped by a crash** — alongside real work, output gets the wrong e
 count, or a missing/extra `Unread` tag. That is non-zero **precisely because the daemon runs smoke tests
 unattended.** All Tier-2 (file-writing/tag paths); Processor has no unit target, so verify via the headless
 drivers + `scripts/test-smoke.sh` on scratch fixtures.
-- [ ] **W16.cfg1 — make `SessionProcessingConfig` the single run config [S].** Mark it `Sendable`; it already
-  carries `standardImageMB`/`pdfImageMB`/`exportedImageMB`/`textColumns`/`rotationMode` — **`ocrWorkerCount` is
-  the one gap**. Add it plus a run-start builder mirroring `OCRProcessor.loadStandardImageMB()`'s clamping. No
-  behavior change. **Keep the type in the Processor — do NOT move it to ArchiveCore.**
-  | files: Capture/SessionProcessingConfig.swift | S | low | none
+- [x] **W16.cfg1 — make `SessionProcessingConfig` the single run config [S].** DONE 2026-07-29 (this commit).
+  `SessionProcessingConfig` is now explicitly `Sendable`; its existing `fromDefaults()` builder snapshots
+  `ocrWorkerCount` with the same 1…12 clamp/fallback of 4 as `OCRProcessor.loadStandardImageMB()`. A dedicated,
+  currently-unused `fromProcessFilesRunStart()` builder centralizes that method's complete normalization (worker
+  count, all three finite 0.5…20 image sizes, and 1…4 text columns) for W16.cfg2/3 without changing Live Capture
+  behavior in this checkpoint. The field defaults to 4 for the two direct Live Capture test-driver configs; no
+  scheduling/output call site reads it yet. Kept app-local (no ArchiveCore/SPEC/protocol change). Processor
+  Debug build succeeded with no new code warnings; the scratch-only manifest/config regression uses volatile
+  defaults to cover the returned configs' worker wiring/bounds and complete Process Files normalization, and
+  passed all checks.
+  | files: Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift | S | low | none
 - [ ] **W16.cfg2 — thread the run config into OCR scheduling + PDF generation reads** (blocked-on: W16.cfg1) **[M].**
   Sites: `OCRProcessor+OCR.swift:235-236, :807, :965, :1052-1053, :1124` and `OCRProcessor+Pipeline.swift:1061-1062, :1304`.
   Keep the statics as fallback so nothing breaks mid-migration. Every site already binds to a local `let` before
@@ -528,10 +534,11 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   assertions will need rewriting to assert on the config rather than the statics.
   | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
 - [ ] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2, W16.cfg3, W16.cfg5) **[S].**
-  The payoff commit: remove `OCRProcessor.swift:70/73/76/79/82/85`, fold `loadStandardImageMB()`'s clamping into
-  the config builder, drop the now-redundant `explicit…` fallback params (`OCRProcessor.swift:114-124`,
-  `+OCR.swift:1117-1133`), and update the three drivers that save/restore statics. The compiler enforces
-  completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
+  The payoff commit: remove `OCRProcessor.swift:70/73/76/79/82/85`; delete the now-redundant
+  `loadStandardImageMB()` and make every run start use cfg1's already-normalized
+  `SessionProcessingConfig.fromProcessFilesRunStart()` builder; drop the redundant `explicit…` fallback params
+  (`OCRProcessor.swift:114-124`, `+OCR.swift:1117-1133`); and update the three drivers that save/restore statics.
+  The compiler enforces completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
 - [x] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** DONE 2026-07-18
   (`806a6d3`). `applyTags`'s `stampUnread` is now a **required non-optional** parameter (both overloads);
   the process-global is no longer read by `applyTags` (retained only as a test-driver affordance + `taggingMode.didSet`

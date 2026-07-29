@@ -6,7 +6,7 @@ import Foundation
 ///
 /// It reads the same UserDefaults / `@AppStorage` keys the Files tab uses (plus the API key from the
 /// Keychain), so Live Capture and the Files tab share one source of truth.
-struct SessionProcessingConfig {
+struct SessionProcessingConfig: Sendable {
     var provider: LLMProvider
     var model: LLMModel
     var thinkingLevel: ThinkingLevel
@@ -20,6 +20,7 @@ struct SessionProcessingConfig {
     var customOCRPrompt: String
     var imageScale: Double            // 0…1 (fraction of full resolution)
     var standardImageMB: Double = 3.0 // size target used to translate imageScale into dimensions
+    var ocrWorkerCount: Int = 4        // parallel Process Files workers (1…12)
     var enableSegmentJSON: Bool
     var tagVocabulary: [String]
     var gateway: GatewayConfig?
@@ -33,9 +34,19 @@ struct SessionProcessingConfig {
     /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
     var localAgent: LocalAgentConfig? = nil
 
+    /// Preserve the Process Files run-start normalization while the mutable statics are migrated to this
+    /// config in W16.cfg2/3/5/6.
+    static func normalizedImageMB(_ value: Double, fallback: Double) -> Double {
+        value.isFinite && value > 0 ? min(20, max(0.5, value)) : fallback
+    }
+
+    static func ocrWorkerCount(from defaults: UserDefaults) -> Int {
+        let value = defaults.integer(forKey: DefaultsKeys.ocrWorkerCount)
+        return value > 0 ? min(12, max(1, value)) : 4
+    }
+
     /// Read the app's shared settings into a config snapshot.
-    static func fromDefaults() -> SessionProcessingConfig {
-        let d = UserDefaults.standard
+    static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let modelId = d.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         let builtIns = provider.models
@@ -81,7 +92,8 @@ struct SessionProcessingConfig {
             sendPreviousImage: d.bool(forKey: DefaultsKeys.sendPreviousImage),
             customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
-            standardImageMB: { let s = d.double(forKey: DefaultsKeys.standardImageSizeMB); return s.isFinite && s > 0 ? min(20, max(0.5, s)) : 3.0 }(),
+            standardImageMB: normalizedImageMB(d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0),
+            ocrWorkerCount: ocrWorkerCount(from: d),
             enableSegmentJSON: d.object(forKey: DefaultsKeys.enableSegmentJSON) as? Bool ?? true,
             tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
                 .components(separatedBy: .newlines)
@@ -94,6 +106,23 @@ struct SessionProcessingConfig {
             textColumns: { let tc = d.integer(forKey: DefaultsKeys.textColumns); return tc > 1 ? min(4, tc) : 1 }(),
             localAgent: LocalAgentConfig.fromDefaults(d)
         )
+    }
+
+    /// Build the Process Files run snapshot with the exact normalization currently performed by
+    /// `OCRProcessor.loadStandardImageMB()`. W16.cfg2/3 will switch scheduling/output reads to this config;
+    /// keeping this as a separate, currently-unused builder preserves Live Capture behavior during cfg1.
+    static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
+        var config = fromDefaults(d)
+        config.standardImageMB = normalizedImageMB(
+            d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0)
+        config.ocrWorkerCount = ocrWorkerCount(from: d)
+        config.pdfImageMB = normalizedImageMB(
+            d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: 2.0)
+        config.exportedImageMB = normalizedImageMB(
+            d.double(forKey: DefaultsKeys.exportedImageSizeMB), fallback: 3.0)
+        let columns = d.integer(forKey: DefaultsKeys.textColumns)
+        config.textColumns = min(4, max(1, columns))
+        return config
     }
 
     /// The effective model for OCR calls (gateway model when a gateway is configured).

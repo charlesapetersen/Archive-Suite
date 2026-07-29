@@ -65,6 +65,37 @@ enum ManifestPersistenceTestDriver {
               && OCRProcessor.standardImageMB == 19
               && !MacOSTagger.stampUnread)
 
+        let configDefaultsSuite = "APManifestTest-\(UUID().uuidString)"
+        let configDefaults = UserDefaults(suiteName: configDefaultsSuite)!
+        defer { configDefaults.removePersistentDomain(forName: configDefaultsSuite) }
+        check("W16.cfg1: an unset OCR worker default preserves the fallback of 4",
+              SessionProcessingConfig.ocrWorkerCount(from: configDefaults) == 4)
+        configDefaults.set(-1, forKey: DefaultsKeys.ocrWorkerCount)
+        let invalidWorkers = SessionProcessingConfig.ocrWorkerCount(from: configDefaults)
+        configDefaults.set(1, forKey: DefaultsKeys.ocrWorkerCount)
+        let minimumWorkers = SessionProcessingConfig.ocrWorkerCount(from: configDefaults)
+        configDefaults.set(13, forKey: DefaultsKeys.ocrWorkerCount)
+        let maximumWorkers = SessionProcessingConfig.ocrWorkerCount(from: configDefaults)
+        check("W16.cfg1: invalid/bounded OCR worker defaults preserve the existing 1...12 clamp",
+              invalidWorkers == 4 && minimumWorkers == 1 && maximumWorkers == 12)
+        check("W16.cfg1: fromDefaults wires the clamped worker count into the config",
+              SessionProcessingConfig.fromDefaults(configDefaults).ocrWorkerCount == 12)
+        check("W16.cfg1: image-size normalization mirrors the existing run-start clamp",
+              SessionProcessingConfig.normalizedImageMB(0.1, fallback: 3) == 0.5
+              && SessionProcessingConfig.normalizedImageMB(21, fallback: 3) == 20
+              && SessionProcessingConfig.normalizedImageMB(.infinity, fallback: 3) == 3)
+        configDefaults.set(0.1, forKey: DefaultsKeys.standardImageSizeMB)
+        configDefaults.set(21.0, forKey: DefaultsKeys.pdfImageSizeMB)
+        configDefaults.set(Double.infinity, forKey: DefaultsKeys.exportedImageSizeMB)
+        configDefaults.set(5, forKey: DefaultsKeys.textColumns)
+        let processFilesConfig = SessionProcessingConfig.fromProcessFilesRunStart(configDefaults)
+        check("W16.cfg1: Process Files run-start builder normalizes every migrated setting",
+              processFilesConfig.standardImageMB == 0.5
+              && processFilesConfig.ocrWorkerCount == 12
+              && processFilesConfig.pdfImageMB == 20
+              && processFilesConfig.exportedImageMB == 3
+              && processFilesConfig.textColumns == 4)
+
         let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
         try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)
         let explicitScale = OCRProcessor.targetDimensionScale(
