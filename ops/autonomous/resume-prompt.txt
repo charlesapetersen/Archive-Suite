@@ -60,7 +60,12 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
   (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything
   that **writes the real corpus**, and any **HIGH review finding on an irreversible path** (Capture/Net/
-  finalize, TagWriter/file-safety) routed here by STEP 2.0. Skip them: surface each
+  finalize, TagWriter/file-safety) routed here by STEP 2.0. **ONE EXCEPTION MECHANISM:** the plan's
+  "## OWNER AUTHORIZATIONS" section lists specific items, BY TAG, that the owner has explicitly cleared
+  (currently `W15.tu0` and `R13d`, both SPEC edits). An item named there IS pickable — read its entry first and
+  obey any constraint attached to it verbatim (R13d in particular carries a hard do-NOT-strip constraint whose
+  violation would delete tags from the owner's real notes). Nothing else narrows the categories: a category is
+  never authorized wholesale, only item by item. Skip everything else: surface each
   to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
   there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
   backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
@@ -72,7 +77,10 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   CONTINUE, don't restart: before starting, `git log --oneline --grep='<item-tag>' -20` (items carry stable
   tags — W4-S7, W5.d1, …) for prior commits on THIS item. First rule out ALREADY-DONE: if SUITE_TODO's box for
   it is "[x]", or a FINAL (non-"checkpoint") commit for it is already on origin/main, a prior session finished
-  but died before ticking the plan — just reconcile the plan checkbox ("[x]" + sha) and STOP; do NOT redo it.
+  but died before ticking the plan — reconcile the plan checkbox ("[x]" + sha) and do NOT redo it. **Then do NOT
+  stop: go straight back to STEP 2 and pick the next actionable item IN THIS SAME SESSION.** A reconcile is a
+  ~10-second gitignored edit, not a session's work; stopping there burned a whole daemon fire on W15.tu1 AND
+  W15.tu4 (2026-07-28). Only stop if the reconcile leaves nothing else actionable.
   Otherwise, if CHECKPOINT commits exist, they are already on origin/main (so your fresh worktree from STEP 3
   contains them) — CONTINUE the REMAINING sub-steps, do NOT redo the committed parts. A KILLED session won't
   have written a Session Log note, so reconstruct what's left from the item's `execution-plans/` plan + the
@@ -129,14 +137,20 @@ STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --
   and/or update the relevant KNOWN_ISSUES.md IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
   Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
   one): a change that ships no tracked item at all (infra) →
-  `touch "/Users/<user>/Claude/Archive Suite/.claude/.docsync-ok"`. If you must stop with the item only PARTIALLY
+  `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`. If you must stop with the item only PARTIALLY
   done (a real blocker — rare; prefer finishing it), your checkpoints are already pushed, so just
-  `touch "/Users/<user>/Claude/Archive Suite/.claude/.docsync-ok"`, do NOT tick the checkbox, and record the
+  `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`, do NOT tick the checkbox, and record the
   remaining sub-steps (STEP 5). End the commit message with:
       Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   Push commits freely; do NOT cut a DMG/GitHub release (that's owner-gated).
 
-STEP 5 — RECORD + CLEAN UP: if you COMPLETED the item, tick it in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha
+STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4's push, in the SAME TURN — before
+  any cleanup, build, or further tool work.** The plan is gitignored, so ticking it needs no commit and takes
+  seconds; anything you interleave is a chance for the session to die holding a `[ ]` the work already finished,
+  which costs the next daemon fire a reconcile (hit on W15.tu1 and W15.tu4). **Do NOT "fix" this by ticking the
+  plan BEFORE the push** — the plan's `[ ]` is what makes `next-queue-item.sh` OFFER the item, so a tick that
+  lands without its push would silently drop the item from the queue entirely. Push first, tick immediately after.
+  If you COMPLETED the item, tick it in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha
   + one-line result); if you only ADVANCED it (checkpointed, not complete), leave it "[ ]" and note in its
   Session Log EXACTLY which sub-steps remain + your last checkpoint sha, so the next session continues from
   there instead of restarting. Append to the Session Log either way, and append anything owner-needed to

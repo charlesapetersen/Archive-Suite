@@ -21,6 +21,11 @@ release/*.dmg
 # Transient per-app maintenance / resume state (session working files).
 .maintenance/
 
+# Doc-sync backstop one-shot ack (see .claude/hooks/docsync-guard.sh). Lives at the repo ROOT, not in
+# .claude/, because the model must be able to create it and tool writes under .claude/ are refused as a
+# sensitive path — which auto-denies for the unattended daemon. Per-machine, per-session; never committed.
+.docsync-ok
+
 # Local test corpora — large, irreplaceable image collections; never version-controlled, never modified.
 Test files/
 Test Files/

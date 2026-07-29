@@ -733,6 +733,149 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   bookmark store) — adversarial review; daemon-buildable (build + Reader unit tests, scratch-only). Restores
   coverage + removes the skip. | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/RootFolderStore.swift, Tests/ArchiveReaderTests/DeepLinkTests.swift, ops/autonomous/health-gate.sh | S–M | low | none
 
+## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
+From the 2026-07-28 Morning Review walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
+Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended on this machine — but it is
+**hardcoded to the Reader**, so a 10-day-old Processor + Notes backlog still reads "GUI blocked → Morning
+Review": the Anthropic key-wizard visual, the multi-page-PDF auto-re-OCR visuals, the three Notes **W14.4
+b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. Generalizing drains them off-screen.
+
+- [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
+  three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
+  scratch fixture builder and a 13/13 GUI-on baseline; Processor is greenfield **and** carries the Keychain risk).
+  **Reader-specific assumptions to parametrize — the complete list** (`ops/gui/vm-gui-runner.sh`): `PROJ_REL` +
+  `SPEC_REL` (L29–30), `SCHEME` (L31), `ONLY_TESTING` (L32 — the *only* env-overridable one today), `GUEST_DD=
+  /Users/admin/dd-reader` (L34), `GUEST_APP` (L35), `GUEST_FIXTURE=…/ArchiveReader/AR-GUI-Fixture` (L36), the
+  fixture builder `ArchiveReader/scripts/make-gui-fixture.sh` + its `AR_FIXTURE_SRC` env (L95–96), `pkill -x
+  ArchiveReader` (L97), the `-ARUITestRootPath` launch arg (L98), and the artifact name `sighted-launch.png`
+  (L103) — **plus the same six in `ops/autonomous/gui-vm-gate.sh`** (`GUEST_PROJ`, `-scheme`, `-only-testing:`,
+  `GUEST_DD`, the Reader-only fixture-absent WARN, and the `--spec` handed to `xcodegen`).
+  - [ ] **W21.vmgui-a — `APP` argument + one per-app config table in both scripts [M].** `vm-gui-runner.sh
+    [reader|processor|notes] [xcuitest|sighted|both]` (keep today's arg order + env overrides working). Per-app:
+    project/spec/scheme/only-testing, `GUEST_DD=/Users/admin/dd-<app>`, app bundle, `pkill` name, fixture builder
+    + fixture path + launch arg, artifact prefix. **Also fix the LATENT fixture bug this exposes (verified
+    2026-07-28):** L95–96 passes `AR_FIXTURE_SRC='$GUEST_REPO/../fixture-src'` → `/Volumes/My Shared Files/
+    fixture-src`, but only `repo` + `out` are mounted (`--dir=repo:… --dir=out:…`, L55), so that path does not
+    exist and the in-VM fixture build can never succeed — and `>/dev/null 2>&1 || true` swallows it. It is
+    currently MASKED by the `[ -d "$GUEST_FIXTURE" ] ||` guard plus a fixture baked into the VM image, so it will
+    bite silently the first time the image is rebuilt. Make a failed fixture build LOUD (warn + name it), never silent.
+  - [ ] **W21.vmgui-b — corpus-free fixtures so the VM never needs the real corpora [S].** Both builders require
+    gitignored test corpora that **do not exist in a worktree and are not on the mount**: Reader's
+    `make-gui-fixture.sh` hard-exits when `<10` PDFs are found under `Test files/Brown Gemini`, Notes'
+    `make-notes-fixture.sh` only warns and leaves `reader-corpus/` empty. Add a synthetic source mode to both
+    (Reader already writes a raw minimal PDF inline for its no-text-layer fixture — extend that to N text-bearing
+    pages) so the lane is corpus-independent. If a real sample is ever wanted, mount it as a **read-only** third
+    share — **never** mount anything under `~/Desktop/Google Drive`.
+  - [ ] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** `ArchiveNotesUITests`
+    already exists (`macOS/project.yml`: `bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveNotes`, ad-hoc sign +
+    `ENABLE_HARDENED_RUNTIME: NO`) and is in the scheme's test action; Debug already uses
+    `ArchiveNotes.uitest.entitlements` and the fixture builder + `-ANUITestStorePath` override are shipped — so
+    this is wiring, not construction. Build the fixture **in the guest**, assert prereqs there
+    (`/opt/homebrew/bin/tag`; absent → tag projection is skipped with a warning), and **reset the app container**
+    (`~/Library/Containers/com.archivenotes.app`) before each run: `organization.json` is loaded only when the
+    container's index DB has no folders, so a stale container shadows the fixture graph and makes G7/G8
+    nondeterministic (the INDEX-DB CAVEAT in `make-notes-fixture.sh`). **Store safety:** hit only
+    `…/ArchiveNotes/AN-GUI-Fixture` with the DEBUG scratch-write guard armed — **never** the real store
+    (`GUI_SAFETY.md`). Then discharge **W14.4** (b) window raise/focus, (c) cross-window chip recolour,
+    (d) two-window column visibility, and **W14.3** live copy→paste image bytes.
+  - [ ] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
+    W21.vmgui-c). Processor has **no test target of any kind**, **no `schemes:` block** (it relies on Xcode
+    autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes) and **no
+    UITest launch-arg override** — all four must be created: (1) an `ArchiveProcessorUITests` target
+    (`bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveProcessor`, `CODE_SIGN_IDENTITY: "-"`,
+    `CODE_SIGNING_REQUIRED: NO`, **`ENABLE_HARDENED_RUNTIME: NO`** — the W7.1 finding: an ad-hoc-signed runner
+    can't load the xctest plugin under hardened runtime, and `settings.base` sets it YES); (2) an explicit
+    `schemes:` block mirroring Notes with the UITest target `[test]`-only, so `-scheme ArchiveProcessor … build`
+    keeps working for `launch.sh`, `test-smoke.sh` and `scripts/e2e-phone-mac.sh`; (3) `accessibilityIdentifier`s
+    on exactly the surfaces under check (Settings provider rows + "Set up (guided)…", `ProviderKeyWizard`, the
+    drop zone + Tagging panel in `OCRView`); (4) a scratch launch config (guest `mktemp` IN/OUT) — Processor is
+    **not sandboxed**, so no temporary-exception entitlement is needed.
+    **Keychain posture — why the VM is the right place, and how to keep it that way.** The host prompt comes from
+    `ContentView.maybePresentKeyOnboarding` (5 eager `KeychainHelper.load`s on first launch) plus
+    `SettingsView.loadKeys()` (5 more on appear): the host keychain *has* those items, and an ad-hoc rebuild
+    changes the code identity so their ACL no longer matches → macOS prompts. **The VM is a different machine
+    whose login keychain holds no ArchiveProcessor items at all, so `SecItemCopyMatching` returns
+    `errSecItemNotFound`, which does not prompt (there is no ACL to fail).** The lane's job is to preserve that:
+    **never seed API keys into the guest keychain, never run `ensure-signing.sh` in the guest** (ad-hoc is correct
+    there), never point the guest at the host keychain. Belt-and-braces: set `ARCHIVEPROC_HEADLESS=1` in the
+    UITest `launchEnvironment` so `KeychainHelper.load/save` early-return and **zero** Keychain calls happen.
+    *Caveat that shapes the check:* that same flag suppresses the wizard's auto-present, so the key-wizard visual
+    must be reached explicitly via Settings → "Set up (guided)…" (or a dedicated `-APUITestShowKeyWizard` arg),
+    not the no-key first-launch path. **Gate safety:** a Processor launch yielding no window within N s must SKIP
+    (fail-open) **and** save a VNC capture, so an unexpected keychain/unlock panel is diagnosable instead of an
+    invisible 20-minute hang. Then discharge the *visual* halves only (Anthropic key-wizard; multi-page-PDF
+    auto-re-OCR drop-zone label, retired toggle, Tagging grey-out). The **live-key** halves stay keyed/owner.
+
+  **Acceptance criteria (all must hold):**
+  1. `vm-gui-runner.sh reader xcuitest` is still **15/15** (regression baseline), `notes` matches its host
+     baseline (G0–G11 + Smoke, 13/13 recorded 2026-07-15) **with no `XCTSkip`**, and `processor` runs its new
+     UITests green plus produces a sighted VNC capture.
+  2. Every app-specific string (project · spec · scheme · only-testing · DerivedData · app bundle · pkill name ·
+     fixture path · launch arg · artifact prefix) comes from **one** per-app table per script — no `ArchiveReader`
+     literal survives outside that table in either `vm-gui-runner.sh` or `gui-vm-gate.sh`.
+  3. The health-gate step stays **fail-open**: missing VM / boot failure / timeout / missing target → SKIP
+     (exit 0); RED only on a reproducible `** TEST FAILED **` after retry-once. Proven by a new
+     `ops/autonomous/tests/prove-gui-vm.sh` (fake `tart` on PATH, full matrix), in the style of
+     `prove-housekeeping.sh` — the existing gate has no prove harness.
+  4. The gate runs **one app per invocation, round-robin via a state file** (the `next-review-unit.sh` cadence
+     pattern). 3 apps × `AUTONOMOUS_GUI_VM_MAXRUN` (1200 s) = 60 min > the daemon's whole-gate `GATE_MAXRUN`
+     (3000 s / 50 min), so an all-three run would false-park on timeout — round-robin (or a raised cap) is
+     required, not optional.
+  5. No corpus dependency: with `Test files/` and `ArchiveProcessor/Test Files/` absent (the normal worktree
+     case) both fixtures still build inside the VM; nothing under `~/Desktop/Google Drive` is mounted or read.
+  6. File safety: Notes touches only `AN-GUI-Fixture` (scratch guard armed), Reader only `AR-GUI-Fixture`,
+     Processor only a guest `mktemp` IN/OUT; no API key is ever written to the guest keychain.
+  7. Artifacts land per app under `~/.tart-mirror/vm-artifacts/<app>/` (xcuitest log · `.xcresult` · sighted
+     PNGs), and every drained backlog item cites the PNG/log it was verified from.
+  8. Guest housekeeping: three DerivedData trees (`/Users/admin/dd-{reader,processor,notes}`) are pruned/reused
+     so the guest disk (≈33 GB free on the 120 GB image) can't fill; a full guest disk SKIPs, never REDs.
+  9. Docs move in the same commits: `ops/gui/README.md` §3 (three apps, per-app fixtures, the round-robin rule),
+     root `CLAUDE.md` loop step 2, `AGENTS.md` → *GUI verification*, and the per-app `CLAUDE.md`
+     visual-verification sections; each drained item's checkbox flipped in the **same commit** as its verification.
+
+  **Verification gate.** Two halves: (i) `gui-vm-gate.sh` + the round-robin state file are **daemon infra →
+  Tier-2** — adversarial review + prove-the-mechanism (`prove-gui-vm.sh`) **before** it goes live, per the
+  autonomous-setup change discipline; (ii) `ArchiveProcessor/macOS/project.yml` + the a11y-ID edits are **Tier-1
+  but cross-cutting** — `project.yml` is a documented SHARED HOTSPOT, so build all three app schemes clean with
+  **no new warnings**, keep `swift test` in `packages/ArchiveCore` green, and re-confirm `-scheme ArchiveProcessor
+  … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
+  | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
+
+- [ ] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** On every Notes launch the console
+  logs *"Obj-C `-hash` invoked on a Swift value of type `ArchiveNotes.BlockKind` that is Equatable but not
+  Hashable; this can lead to severe performance problems."* Diagnosed 2026-07-28: `BlockKind` is declared
+  `Sendable, Equatable` (`Editor/MarkdownAttributes.swift:19`) but is stored as an **`NSAttributedString`
+  attribute value** under the custom key `.noteBlockKind` (`"an.blockKind"`, same file L6–7), so AppKit bridges it
+  to Obj-C and calls `-hash` on it — a boxed/slow hash on every markdown parse (chip styling). Fix: add `Hashable`
+  to the conformance list; all payloads are synthesizable (`Int`, `String?`, `(ordered: Bool, depth: Int,
+  ordinal: Int)`), so no manual `hash(into:)` is needed. Pre-existing, **not** caused by W14.4. Tier-1 (no data
+  path): build clean + `ArchiveNotesTests` green + confirm the warning is gone from a launch log.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownAttributes.swift | XS | low | none
+
+- [ ] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** Verified
+  2026-07-28: line 23 sets `APPDIR="ArchiveProcessor"`, so `APP` resolves to
+  `ArchiveProcessor/ArchiveProcessor/build/DD/…/ArchiveProcessor.app` — a path that **does not exist** (the
+  de-nesting `7706368` moved the Xcode project to `macOS/`). Fix: `APPDIR="macOS"` (→
+  `macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app`). ⚠️ **Correction to the original 2026-07-17 note,
+  which was WRONG on its second claim:** the "`Test Files/` doesn't exist" part is false — `cd "$(dirname
+  "$0")/.."` makes `REPO=ArchiveProcessor/`, and both `Test Files/Ground Truth Segmentation/Herrnstein` and the
+  `Test Files/Herrnstein` fallback exist, so section [3] needs no change. Don't "fix" that half. The owner has to
+  run the script once interactively because section [2] `open`s the app (login-Keychain modal → see W21.seed).
+  | files: ArchiveProcessor/scripts/test-smoke.sh | S | low | none
+- [ ] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift` [S · LOW].**
+  `TimeoutHandle(DispatchWorkItem { [weak self, weak conn] … })` at `CaptureServer.swift:151` captures a
+  non-`Sendable` `DispatchWorkItem` in a `@Sendable` context; surfaces only on a full clean build. ⚠️ The file
+  imports **only `Foundation` + `Network`** (verified 2026-07-28), and Foundation re-exports Dispatch, so the
+  originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
+  clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
+  change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
+- [ ] **W21.seed — OWNER, one-time ~2 min: seed the Processor login-Keychain "Always Allow" [XS].** ⛔ **This
+  gates every Processor GUI check.** Launch `./launch.sh processor` **interactively** once and click **Always
+  Allow** on the login-Keychain prompt so the stable "Archive Suite Dev" cert requirement sticks across rebuilds
+  (memory `processor-keychain-stable-signing`). Until then the Processor cannot be GUI-verified on the HOST at
+  all. Note this is *host-only*: `W21.vmgui-d` deliberately avoids it entirely (the VM's keychain holds no
+  ArchiveProcessor items, so nothing prompts there). | files: — | XS | low | **owner**
+
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
 asked to queue the **Android `targetSdk` 34→36** bump, but grounding against the real `build.gradle.kts` found
