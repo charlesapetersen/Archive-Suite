@@ -438,4 +438,21 @@ packages/ArchiveCore/              Shared read-side contract — see root CLAUDE
 ```
 
 The map grows with each wave (W2 storage, W3 editor, W4 linking, W5 Zotero, W6 viewers,
-W7 extracts, W8 tests). Master plan: `execution-plans/archive-notes/00-overview.md`.
+W7 extracts, W8 tests).
+
+## `00-overview.md` is the interface spec — keep it (owner decision 2026-07-29)
+
+`execution-plans/archive-notes/00-overview.md` is the **authoritative Archive Notes interface spec**, and it is
+deliberately **exempt from the "delete a shipped `execution-plans/` plan" convention** (root `CLAUDE.md`
+§*Docs & backlog convention*). That convention targets *stale* plans; this one is not stale. It is cited **65
+times across 38 tracked files**, overwhelmingly from **source and test comments** — `NotesModel`,
+`MarkdownBridge`, `FrontMatterCodec`, `BlockParser`, `Item`, `NoteStore`, `Template`, the whole `Zotero/` group,
+`NotesGUITests`, `DurableLinkE2ETests`, `scripts/e2e-durable-links.sh`, and `packages/ArchiveCore`'s date-sort
+parity tests — spanning 31 distinct sections: §2 (locked decisions D1–D10), §3.x (domain model), §5
+(front-matter schema), §6 (block + round-trip policy), §7, §8.x (durable links), §9, §10, §13, §15.x (future
+lines), §16.x (interface contract), §D.x (Zotero).
+
+Deleting or relocating it means rewiring all 65 references inside shipped code for no functional gain. It was
+also **not** promoted to `SPEC/` — that would make it a cross-app contract and put every future edit behind the
+owner hold-queue, an ongoing tax on a Notes-internal document. If you are tempted to "tidy" it away, read the
+CLOSED item in `SUITE_TODO.md` §*Suite doc hygiene* first: the deletion has been mis-scoped twice.

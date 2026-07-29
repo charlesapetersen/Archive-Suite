@@ -922,7 +922,10 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   - **The corpus cannot be normalised by renaming** (owner asked; audit says no): JPEGS `Stanford University
     Archives` is the dominant partner for BOTH PDF `Stanford University Archives` AND `… — Tech` (**41,585 PDFs,
     41% of the corpus**) — a many-to-one that no 1:1 rename can express; same for Harvard. The 7 genuinely safe
-    renames would fix only ~10% of the relocated cases. **Decision: leave the corpus alone.**
+    renames would fix only ~10% of the relocated cases. **DECIDED by the owner 2026-07-29: leave the corpus
+    alone — no renames, ever, for this feature.** Do not re-propose corpus normalisation as a way to simplify
+    this work: it was measured, it does not work, and the index below resolves 100% of partners without touching
+    a single irreplaceable file. Full evidence: `~/Desktop/CORPUS-AUDIT-REPORT.md`.
 
   **Decided design (owner, 2026-07-28/29):**
   1. **Root:** raise Reader's granted root to the common parent so both trees sit under one root GUID.
@@ -944,8 +947,14 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | **owner** (DurableLink/SPEC change)
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
-- [ ] **Archive Notes `00-overview.md` — RE-DECIDE: keep it permanently as the Notes interface spec, or pay the
-  real cost of deleting it. ⚠️ Do NOT act on the old scoping; it was wrong twice.** | **owner** | low
+- [x] **Archive Notes `00-overview.md` — RESOLVED 2026-07-29 (owner): KEEP IT PERMANENTLY as the Notes interface
+  spec. This item is CLOSED — do not re-open it as a doc-hygiene task.** `00-overview.md` is deliberately exempt
+  from the "delete a shipped `execution-plans/` plan" convention: that convention targets *stale* plans, and this
+  file is not stale — it is the live, load-bearing interface contract for Archive Notes, cited **65 times across 38
+  tracked files** (mostly source and test comments), which `ArchiveNotes/CLAUDE.md` now states explicitly. Deleting
+  or relocating it would mean rewiring 65 references inside shipped code for zero functional gain. Left in place at
+  its current path by owner decision; it was NOT promoted to `SPEC/` (that would make every future edit hold-queue
+  and owner-gated — an ongoing tax on a Notes-internal document). Evidence for the decision below.
   - **History.** Originally "fold §16 into `CLAUDE.md`, delete the plan" [S]. The 2026-07-18 review found that
     under-scoped and re-estimated it as "§2/§5/§6/§16, ~190 lines, 8+ citation sites". On **2026-07-29** the owner
     picked that fuller scope — but a `git grep` census then showed **that estimate is also wrong, by a lot.**
