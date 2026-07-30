@@ -42,6 +42,51 @@ gate.
 multi-day unattended run isn't parked by an already-tracked issue. Remove `notes` from that list the
 moment the suite is green — a permanent warn tier is just a disabled test with extra steps.
 
+## ✅ FIXED (W23.h3): confirming a STALE folder-removal alert trashed a live note — Tier-2
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review); **premise re-confirmed empirically
+2026-07-30** before any code changed. `OrganizationStore.removeMembership` decided `.wasLastInstance`
+**solely from the item's total membership count**, without first checking that the `(item, folder)` pair the
+alert names still existed. Two-window repro, reproduced exactly: note B is filed only in F1 → the
+delete-last-instance alert opens on `(B, F1)` → the other window MOVES B from F1 to F2 → the user confirms
+the now-stale alert. `membershipCount(item:) <= 1` still reads **1** (because F2 exists), so the stale pair
+was called "last instance", `forceRemoveLastMembership(B, F1)` was a **silent no-op**, and the note went to
+Trash **despite a perfectly valid F2 membership**. The RED fixture also caught the second half: the F2
+membership row *survived* the trash, leaving the organization graph pointing at a trashed note.
+
+**Why the obvious fix wasn't enough.** Verifying the pair in `removeMembership` closes the reported hole but
+not its twin one step later: the confirm path did `removeMembership` → `await` → unconditional
+`forceRemoveLastMembership`, and since `NotesIndex` is an `actor` that `await` is a real suspension point the
+other window can interleave at (`@MainActor` is **reentrant** there). So the verdict had to move inside the
+store, *after* the removal.
+
+**Fixed** in `Index/OrganizationStore.swift` + `Core/NotesNavigationModel.swift` (`8d68e13`):
+
+1. `removeMembership` verifies the specific `(item, folder)` pair exists **first** and returns a new
+   `.notPresent` outcome when it does not. That check is what makes the count meaningful — with the pair
+   proven present, `count == 1` provably means *this* pair is the only one. It also closes a second, quieter
+   lie: a stale pair with ≥2 memberships used to delete nothing and still answer `.removed`.
+2. New `removeConfirmedLastMembership` **replaces** `forceRemoveLastMembership` and makes the confirm path ONE
+   store call returning `.deletedLastInstance` / `.unlinkedNotLast` / `.notPresent`. The verdict is read from
+   what *survives* the removal, so a membership that appears while the DB write is in flight downgrades the
+   outcome to `.unlinkedNotLast` and the file is **kept**. Only `.deletedLastInstance` licenses the trash. The
+   unverified force-remove helper is **gone**, so no caller can reintroduce this.
+3. `NotesNavigationModel` treats `.notPresent` as a no-op + resync in both the quiet-remove and confirm paths,
+   never as a last instance.
+
+Every failure mode now errs toward **keeping** the note. The batched folder-delete path was re-checked and has
+**no twin defect** — it already intersects the confirmed set with the FRESH orphan set from `deleteFolder`.
+
+**Verification** (Tier-2, destructive seam; **scratch `mktemp` fixtures only — never the real store**):
+adversarial self-review + 1 nav-level race fixture (`confirmAfterConcurrentMoveKeepsFile` — the RED repro
+above, now GREEN, asserting the note dir survives *and* that the valid F2 membership does) + 6 store-level
+cases covering both stale-pair variants and all three confirmed outcomes. Full Notes suite **540 tests / 64
+suites + 189 XCTest pass**; build clean, **0 new warnings**.
+
+**Residual (not data loss).** Two windows can still disagree *visually* for an instant — the losing window's
+folder list is stale until its `rebuild()`/`recompute()` lands. That is a refresh lag, not a destructive
+outcome: no path trashes a note without a proven `.deletedLastInstance`.
+
 ## ✅ FIXED (W23.h2): two concurrent edits to one note silently overwrote each other — Tier-2
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review). Every note edit was a

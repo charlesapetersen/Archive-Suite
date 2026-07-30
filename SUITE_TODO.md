@@ -225,20 +225,35 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   editor tests cover cross-item selection/autosave races, not two edits to one item; add a deterministic
   same-item race fixture. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Store/NoteStore,Core/ExtractBuilder}.swift | M | **high** | none
 
-- [ ] **W23.h3 — confirming a STALE folder-removal alert trashes a note that still has a valid membership
-  [S–M · HIGH · destructive].** `Index/OrganizationStore.swift` → `removeMembership(item:folder:)`;
-  `Core/NotesNavigationModel.swift` (the confirmation path). `removeMembership` decides `.wasLastInstance`
-  **solely from the item's total membership count**, without first verifying that the requested
-  `(item, folder)` pair still exists. The confirm path then force-removes the stale pair and
-  **unconditionally trashes the note**. Two-window repro: a delete alert opens for the sole membership in
-  folder A → the other window moves the note A→B → the user confirms the stale A alert. Fresh count is 1
-  (because B exists) so the stale removal is called "last instance"; force-removing A is a no-op; the note
-  goes to Trash **despite a valid B membership.**
-  **Fix:** `removeMembership` must **verify the specific `(item, folder)` membership still exists** and return
-  a distinct "membership no longer present — nothing removed" outcome; the caller must treat that as a
-  no-op + refresh, never as `.wasLastInstance`. Compute last-instance from *the set the removal actually
-  applied to*, not a bare count. The existing test adds B while A remains (count 2) — add the case where **A
-  is removed/moved while the alert is open**. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S–M | **high** | none
+- [x] **W23.h3 — confirming a STALE folder-removal alert trashes a note that still has a valid membership
+  [S–M · HIGH · destructive].** ✅ FIXED `8d68e13` (checkpoint 1/2) — the last-instance verdict is now taken
+  from **the membership the removal actually applied to**, never from a bare count.
+  **Premise re-confirmed empirically before fixing** and the reported two-window repro reproduced exactly: with
+  note B filed only in F1, open the alert on `(B, F1)`, let the other window MOVE B from F1 to F2, then confirm
+  — `membershipCount(item:) <= 1` still reads 1 (F2 exists), so the stale pair was called "last instance",
+  `forceRemoveLastMembership(B, F1)` was a silent no-op, and the note was trashed **with a perfectly valid F2
+  membership**. The RED fixture also showed the F2 membership row *surviving* the trash, so the organization
+  graph was left pointing at a trashed note.
+  Three parts: (a) `OrganizationStore.removeMembership` verifies the specific `(item, folder)` pair exists
+  **first** and returns a new `.notPresent` outcome when it does not — that check is what makes the count
+  meaningful, since with the pair proven present `count == 1` provably means *this* pair is the only one; it
+  also closes a second, quieter lie (a stale pair with ≥2 memberships used to delete nothing and still answer
+  `.removed`). (b) New `removeConfirmedLastMembership` **replaces** `forceRemoveLastMembership`, collapsing the
+  confirm path into ONE store call returning `.deletedLastInstance` / `.unlinkedNotLast` / `.notPresent`:
+  `NotesIndex` is an actor, so the caller's `await` between "was it the last instance?" and an unconditional
+  force-remove was itself a suspension point the other window could interleave at (`@MainActor` is reentrant
+  there) — the same bug one step later. Deciding *inside* the store *after* the removal closes that window, so a
+  membership that appears while the DB write is in flight downgrades the outcome to `.unlinkedNotLast` and the
+  file is **kept**; only `.deletedLastInstance` licenses the trash, and the unverified force-remove helper is
+  gone so no caller can reintroduce it. (c) `NotesNavigationModel` treats `.notPresent` as a no-op + resync in
+  both the quiet-remove and confirm paths, never as a last instance. Every failure mode now errs toward
+  **keeping** the note. The batched folder-delete path was re-checked and has **no twin defect** (it already
+  intersects the confirmed set with the FRESH orphan set from `deleteFolder`).
+  Tier-2 (destructive seam), **scratch fixtures only** — never the owner's real store: adversarial self-review +
+  1 nav-level race fixture (the RED repro above, now GREEN, asserting both that the note dir survives *and*
+  that the valid F2 membership does) + 6 store-level cases covering both stale-pair variants and all three
+  confirmed outcomes. Full Notes suite **540 tests / 64 suites + 189 XCTest pass**; build clean, **0 new
+  warnings**. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S–M | **high** | none
 
 - [ ] **W23.h4 — Android permanently deletes an un-uploaded capture with no confirmation and no upload-job
   cancel [M · HIGH · data loss · Android].** `ui/CaptureScreen.kt` (thumbnail gesture) →
