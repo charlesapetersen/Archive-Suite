@@ -146,6 +146,21 @@ for f in ArchiveNotes/test-smoke.sh ArchiveReader/test-smoke.sh; do
     || no "$f has no unattended guard — it will run the scheme's UITest bundle on the host"
 done
 
+echo "== 8. VM boot mode never puts a window on the owner's display =="
+RUNNER="$ROOT/ops/gui/vm-gui-runner.sh"
+GATEF="$ROOT/ops/autonomous/gui-vm-gate.sh"
+# `--vnc-experimental` is NOT headless: per `tart run --help` it swaps tart's own UI for a VNC server, and
+# tart then opens Screen Sharing.app at it — a visible VM window (owner-reported 2026-07-30). The xcuitest
+# lane needs no pixels at all, so it must boot --no-graphics; only the sighted lane may use VNC.
+grep -q 'gfx=(--no-graphics)' "$RUNNER" && ok "runner defaults to --no-graphics" || no "runner does not default to --no-graphics"
+grep -q '\[ "\$LANE" = "xcuitest" \] || gfx=(--vnc-experimental)' "$RUNNER" \
+  && ok "runner uses VNC ONLY for the sighted lane" || no "runner boot mode is not per-lane"
+grep -q 'close_vm_viewer' "$RUNNER" && ok "runner closes the auto-opened viewer" || no "runner leaves the Screen Sharing viewer open"
+grep -q 'SS_WAS_RUNNING' "$RUNNER" \
+  && ok "…but only if it did not exist before the boot (never kills the owner's own session)" \
+  || no "viewer close is unscoped — it would quit a screen-share the owner had open"
+grep -q 'tart run "\$VM" --no-graphics' "$GATEF" && ok "gate boots --no-graphics (always silent)" || no "gate is not booting --no-graphics"
+
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -70,7 +70,25 @@ ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
 CORPUS_SRC="$(archive_corpus_src "$REPO")"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
-# --- ensure the VM is running with a virtual display (--vnc-experimental) + shares ---
+# Close the Screen Sharing window tart auto-opens at the VM's VNC endpoint (sighted lane only). We grab
+# the framebuffer with vncdotool from the host, so that viewer is pure noise on the owner's display.
+#
+# ONLY if WE caused it. Screen Sharing is a single app process shared by every session, so an unconditional
+# quit would tear down a screen-share the owner had open to another machine. So: snapshot whether it was
+# already running BEFORE the boot (SS_WAS_RUNNING, set in ensure_vm) and leave it strictly alone if it was.
+close_vm_viewer() {
+  [ -n "${VNC_PORT:-}" ] || return 0
+  if [ "${SS_WAS_RUNNING:-0}" = 1 ]; then
+    warn "Screen Sharing was already running before this run — leaving it alone (it may be yours). tart may have added a window for the VM; close that one by hand."
+    return 0
+  fi
+  pgrep -x "Screen Sharing" >/dev/null 2>&1 || return 0
+  osascript -e 'tell application "Screen Sharing" to quit' >/dev/null 2>&1 || true
+  log "closed the Screen Sharing viewer tart auto-opened (pixels are grabbed over VNC from the host instead)"
+  return 0
+}
+
+# --- ensure the VM is running with a virtual display + shares ---
 ensure_vm() {
   tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || die "VM '$VM' not found — create it first (ops/gui/README.md §3)."
   # A VM this script did not start has no VNC endpoint we can read, and may hold the wrong mounts. That is
@@ -83,29 +101,44 @@ ensure_vm() {
     return 0
   fi
   local runlog="$ART/tart-run.log"; : > "$runlog"
-  log "booting $VM headless with a virtual display (VNC) + repo/artifact shares…"
-  # No --no-graphics: we WANT a display so pixels exist. --vnc-experimental keeps it OFF the host's
-  # physical screen (served to a local VNC framebuffer we grab).
+  # Snapshot BEFORE the boot: if the owner already had Screen Sharing open, tart's auto-opened viewer is
+  # not ours to close (see close_vm_viewer).
+  SS_WAS_RUNNING=0; pgrep -x "Screen Sharing" >/dev/null 2>&1 && SS_WAS_RUNNING=1
   local mounts=(--dir=repo:"$REPO" --dir=out:"$ART")
   if [ -n "$CORPUS_SRC" ]; then
     mounts+=(--dir=corpus:"$CORPUS_SRC")
   else
     warn "no fixture corpus found on the host — the in-VM fixture build will be skipped and fixtured UITests will XCTSkip."
   fi
+
+  # BOOT MODE IS PER LANE, and this is not cosmetic (owner reported a visible window, 2026-07-30).
+  #   xcuitest — needs NO display at all: it only shells into the guest over the agent. `--no-graphics`
+  #              ("Don't open a UI window") is genuinely silent, which is why the health gate, which has
+  #              always used it, never put anything on screen.
+  #   sighted  — needs a real framebuffer for the VNC pixel grab, so it must NOT be --no-graphics.
+  #
+  # `--vnc-experimental` is NOT headless. Per `tart run --help` it uses "Virtualization.Framework's VNC
+  # server INSTEAD OF the built-in UI" — and tart then opens macOS **Screen Sharing.app** at that endpoint,
+  # so a VM window appears on the owner's display. Harmless (it steals no input) but unasked-for, and this
+  # script previously used it for BOTH lanes, including the one that needs no pixels whatsoever.
+  local gfx=(--no-graphics)
+  [ "$LANE" = "xcuitest" ] || gfx=(--vnc-experimental)
+  log "booting $VM (${gfx[*]}) + repo/artifact shares…"
   VM_BOOTED=1
-  tart run "$VM" --vnc-experimental "${mounts[@]}" >>"$runlog" 2>&1 &
+  tart run "$VM" "${gfx[@]}" "${mounts[@]}" >>"$runlog" 2>&1 &
   echo $! > "$ART/tart-run.pid"
-  # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
-  local i; for i in $(seq 1 60); do grep -q 'vnc://' "$runlog" && break; sleep 1; done
-  local url; url="$(grep -o 'vnc://[^ ]*' "$runlog" | head -1 || true)"
-  if [ -n "$url" ]; then
+  if [ "$LANE" != "xcuitest" ]; then
+    # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
+    local i; for i in $(seq 1 60); do grep -q 'vnc://' "$runlog" && break; sleep 1; done
+    local url; url="$(grep -o 'vnc://[^ ]*' "$runlog" | head -1 || true)"
+    [ -n "$url" ] || die "VM did not report a VNC endpoint — check $runlog"
     VNC_PASS="$(printf '%s' "$url" | sed -E 's#vnc://:([^@]+)@.*#\1#')"
     local hostport; hostport="$(printf '%s' "$url" | sed -E 's#vnc://:[^@]+@##')"
     VNC_HOST="${hostport%%:*}"; VNC_PORT="${hostport##*:}"
-  elif [ "$LANE" != "xcuitest" ]; then
-    die "VM did not report a VNC endpoint — check $runlog"
-  else
-    warn "no VNC endpoint reported (xcuitest doesn't need one) — check $runlog"
+    # tart opens Screen Sharing.app at that endpoint. We grab the framebuffer with vncdotool from the
+    # host, so the viewer is pure noise on the owner's display — close it. Only ever the VM's own window:
+    # matched by the vnc://127.0.0.1:<our port> URL, never a screen-share the owner opened themselves.
+    close_vm_viewer
   fi
   tart ip "$VM" --wait 120 >/dev/null || die "VM never got an IP — check $runlog"
   # `tart ip` returns on NETWORKING; `tart exec` needs the guest agent's vsock socket, which comes up

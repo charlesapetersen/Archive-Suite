@@ -70,10 +70,22 @@ guest image has no xcodegen.
 
 **Why VNC for the sighted lane** (not in-VM `screencapture`/`cliclick`): a headless VM has **no capturable
 display** until a viewer attaches (in-VM `screencapture` → "could not create image from display"), and in-VM
-`cliclick` needs Accessibility TCC that's awkward to grant. So the runner boots with `--vnc-experimental` (a
-virtual display served over a local VNC port — still off your physical screen) and uses `vncdotool` from the
-host to grab that framebuffer **and** inject clicks/keys — **VNC-injected input bypasses guest TCC entirely.**
-It parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log.
+`cliclick` needs Accessibility TCC that's awkward to grant. So the sighted lane boots with
+`--vnc-experimental` (a virtual display served over a local VNC port) and uses `vncdotool` from the host to
+grab that framebuffer **and** inject clicks/keys — **VNC-injected input bypasses guest TCC entirely.** It
+parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log.
+
+⚠️ **`--vnc-experimental` is not silent, and the boot mode is therefore PER LANE.** `tart run --help`: it uses
+"Virtualization.Framework's VNC server **instead of** the built-in UI" — and tart then opens macOS
+**Screen Sharing.app** at that endpoint, so a VM window appears on your display. It steals no input, but it is
+unasked-for. The owner hit this on 2026-07-30 when a session ran the *xcuitest* lane, which needs no pixels at
+all. So:
+- **xcuitest → `--no-graphics`** ("Don't open a UI window") — completely silent. The guest still has its own
+  virtual display, which is why XCUITest works there; this only suppresses a *host* window. The health gate
+  has always booted this way, which is why the gate never showed anything.
+- **sighted → `--vnc-experimental`**, and the runner then **closes the auto-opened viewer** (we read the
+  framebuffer over VNC ourselves) — but only if Screen Sharing was *not* already running before the boot, so
+  a screen-share session of your own is never torn down.
 
 **GUI fixture:** fixtured Reader UITests need `ArchiveReader/scripts/make-gui-fixture.sh` (a tagged scratch
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
