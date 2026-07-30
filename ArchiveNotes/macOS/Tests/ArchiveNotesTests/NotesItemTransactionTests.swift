@@ -166,4 +166,93 @@ struct NotesItemTransactionTests {
         let landed = Set((final.trailingBodyRaw ?? "").split(separator: ";").map(String.init))
         #expect(landed.count == n)
     }
+
+    // MARK: - The reachable paths (all three RED before the fix)
+    //
+    // These drive the races an operator can actually hit — two windows on one item; body autosave
+    // racing a metadata edit; `ExtractBuilder.append` racing an ordinary mutation — through the real
+    // `NotesModel` / `ExtractBuilder` entry points, not the primitive. Each assertion is
+    // order-independent: whichever transaction lands second, BOTH edits must survive.
+
+    private struct Env {
+        let model: NotesModel
+        let store: NoteStore
+        let index: NotesIndex
+        let root: URL
+    }
+
+    @MainActor
+    private static func makeEnv() async throws -> Env {
+        let root = try scratchRoot()
+        let index = NotesIndex(url: root.appendingPathComponent("index.db"))
+        try await index.open()
+        let org = OrganizationStore(index: index)
+        try await org.load(storeRoot: root)
+        let store = NoteStore(root: root)
+        return Env(model: NotesModel(organization: org, index: index, noteStore: store),
+                   store: store, index: index, root: root)
+    }
+
+    private static func tearDown(_ env: Env) async {
+        await env.index.close()
+        try? FileManager.default.removeItem(at: env.root)
+    }
+
+    @Test("a body autosave racing a quality edit keeps BOTH edits")
+    @MainActor
+    func bodyEditRacingQualityEditKeepsBoth() async throws {
+        let env = try await Self.makeEnv()
+        let id = UUID()
+        _ = try await env.store.create(Self.blankItem(id: id, body: "before"))
+
+        async let bodyEdit: Void = env.model.setBody("after", for: id)
+        async let qualityEdit: Void = env.model.setQuality(4, for: id)
+        _ = await (bodyEdit, qualityEdit)
+
+        let r = try await env.store.load(id)
+        #expect(r.trailingBodyRaw == "after")
+        #expect(r.quality == 4)
+        await Self.tearDown(env)
+    }
+
+    @Test("a date edit racing a quality edit keeps BOTH fields")
+    @MainActor
+    func dateEditRacingQualityEditKeepsBoth() async throws {
+        let env = try await Self.makeEnv()
+        let id = UUID()
+        _ = try await env.store.create(Self.blankItem(id: id))
+
+        async let dateEdit: Void = env.model.setDate("1968-04-15", precision: .day, for: id)
+        async let qualityEdit: Void = env.model.setQuality(2, for: id)
+        _ = await (dateEdit, qualityEdit)
+
+        let r = try await env.store.load(id)
+        #expect(r.date == "1968-04-15")
+        #expect(r.datePrecision == .day)
+        #expect(r.quality == 2)
+        await Self.tearDown(env)
+    }
+
+    @Test("an extract append racing a quality edit keeps the new block AND the quality")
+    @MainActor
+    func extractAppendRacingQualityEditKeepsBoth() async throws {
+        let env = try await Self.makeEnv()
+        let id = UUID()
+        let first = Block(kind: .freeform, source: nil, markdown: "one", unknownHeaderFields: [])
+        _ = try await env.store.create(Self.blankItem(id: id, kind: .extract, blocks: [first]))
+
+        let builder = ExtractBuilder(store: env.store)
+        let passage = ExtractPassageBlock(
+            block: Block(kind: .freeform, source: nil, markdown: "two", unknownHeaderFields: []))
+
+        async let appendEdit: Item = try builder.append(toExtract: id, passages: [passage])
+        async let qualityEdit: Void = env.model.setQuality(3, for: id)
+        _ = try await (appendEdit, qualityEdit)
+
+        let r = try await env.store.load(id)
+        #expect(r.blocks.count == 2)
+        #expect(r.blocks.last?.markdown.contains("two") == true)
+        #expect(r.quality == 3)
+        await Self.tearDown(env)
+    }
 }

@@ -3,6 +3,52 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.h2): two concurrent edits to one note silently overwrote each other — Tier-2
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review). Every note edit was a
+load-whole-item → mutate → save-whole-item pair of **separate** `NoteStore` calls. The actor serialized
+each individual call but **not the read-modify-write transaction**, and `NotesModel` is `@MainActor` yet
+**reentrant at every `await`** — so two tasks could both load the same old item, apply different edits,
+and save in either order. The later whole-item save silently dropped the other's body, metadata or
+source blocks, with no error surfaced anywhere.
+
+**Measured before the fix** (scratch `mktemp` store, `NotesItemTransactionTests`) — worse than reported:
+- 24 concurrent same-item appends via the raw pattern → **1 survivor. 23 edits destroyed.**
+- A body autosave racing a quality edit → the **body edit vanished entirely** (`"before"`, not `"after"`).
+- A date edit racing a quality edit → the **date vanished entirely** (`nil`).
+- `ExtractBuilder.append` racing a quality edit → the **appended source block vanished** (1 block, not 2).
+
+**Fix — the transaction is now the unit of serialization.** `NoteStore.withItem(_:_:)` /
+`withTemplate(_:_:)` run load → mutate → save inside **one actor-isolated call**, and because `mutate` is
+**synchronous** there is no suspension point between the read and the write, so no other transaction can
+interleave. Atomicity is enforced by the type system (a non-`async` closure cannot `await`), not by a
+comment, and needs no new lock. `withItem` returns `ItemTransaction` (the item exactly as written + its
+fresh ref) so callers index what actually landed instead of re-reading.
+
+Every `.md` mutation of an existing item now goes through a transaction: `NotesModel.mutateItem` (the
+shared date / date-uncertain / quality / body write path), `NotesModel.renameTemplate`, and
+`ExtractBuilder.append`. `NoteStore` remains the single `.md` writer; no raw `save`/`saveTemplate` call
+survives outside it. In `append` the async asset copies stay **outside** the transaction (they write
+`assets/`, never the `.md`, and don't depend on item state); a pre-flight existence check preserves the
+old error-path behaviour so appending to a missing extract still can't leave a phantom item dir.
+
+**Tier-2 gate met:** adversarial self-review + a scratch-copy functional test (never the owner's real
+Notes store — Prime Directive #1). 9 new fixtures in `NotesItemTransactionTests` — the four RED cases
+above all GREEN (24/24 appends survive), plus concurrent different-field edits compose, a throwing
+`mutate` leaves the `.md` byte-untouched, a missing item throws and creates no phantom dir, and
+`withTemplate` is atomic over `Templates/`. Full Notes suite **530 tests / 63 suites pass**; build clean,
+**0 new warnings**.
+
+**Two residuals, recorded honestly (neither is data loss — the `.md` on disk is now always correct):**
+1. **The FTS index row can go transiently stale** (LOW). Two concurrent `mutateItem`s commit their disk
+   transactions in one order but their `index.upsertBatch` calls in the other, so the row for that item
+   can lack the second edit until the next edit or rebuild. The index is a documented
+   rebuilt-from-disk projection, so this self-heals; queued as **W23.h2-fu** in `SUITE_TODO.md`.
+2. **Two windows editing the SAME note's body still last-writer-wins on the body text itself** (inherent).
+   A transaction cannot merge two divergent whole-buffer editor snapshots. What is fixed is that such an
+   edit no longer destroys *other* fields or source blocks as collateral. Do not read "W23.h2 fixed" as
+   "two-window body co-editing merges".
+
 ## GUI harness (W8-S8b, W8 COMPLETE): index-ready probe now XCUITest-queryable + owner-eye harness README (2026-07-15) — Tier-2
 
 Closes the two remaining W8-S8 items → **Wave 8 (Notes tests + GUI harness) COMPLETE, SUITE_TODO W8 flipped.**

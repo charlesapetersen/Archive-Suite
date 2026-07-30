@@ -358,9 +358,11 @@ final class NotesModel: ObservableObject {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { statusMessage = "A template needs a name."; return }
         do {
-            var item = try await noteStore.loadTemplate(id)
-            item.title = name; item.modified = Date()
-            _ = try await noteStore.saveTemplate(item)
+            // W23.h2: one atomic transaction, not load + save — two windows renaming the same
+            // template would otherwise let the later whole-item save drop the other's edit.
+            _ = try await noteStore.withTemplate(id) { item in
+                item.title = name; item.modified = Date()
+            }
             await reloadTemplates()
         } catch { report(error, "rename the template") }
     }
@@ -477,8 +479,10 @@ final class NotesModel: ObservableObject {
             return
         }
         do {
-            try await ExtractBuilder(store: noteStore).append(toExtract: id, passages: passages)
-            let updated = try await noteStore.load(id)
+            // W23.h2: `append` is one atomic transaction and hands back the extract exactly as
+            // written, so the index row reflects what landed (no second read to race with).
+            let updated = try await ExtractBuilder(store: noteStore).append(toExtract: id,
+                                                                           passages: passages)
             if let index {
                 try await index.upsertBatch([NoteIndexRow(item: updated,
                                                           mtime: updated.modified.timeIntervalSince1970)])
@@ -572,18 +576,27 @@ final class NotesModel: ObservableObject {
         return ItemAssetStore(store: noteStore, root: noteStore.rootURL)
     }
 
-    /// Shared load → mutate → atomic save → single-row re-index → publish path for the field editors
-    /// above. A no-op with no `noteStore` (an injected test model built without one). The on-disk `.md`
-    /// is the source of truth and the index is a rebuilt-from-disk projection, so nothing here can
-    /// corrupt data; errors surface via `statusMessage` like the other mutations.
-    private func mutateItem(_ id: UUID, _ action: String, _ mutate: (inout Item) -> Void) async {
+    /// Shared atomic-transaction → single-row re-index → publish path for the field editors above. A
+    /// no-op with no `noteStore` (an injected test model built without one). The on-disk `.md` is the
+    /// source of truth and the index is a rebuilt-from-disk projection, so nothing here can corrupt
+    /// data; errors surface via `statusMessage` like the other mutations.
+    ///
+    /// **W23.h2 — the whole load→mutate→save runs inside ONE `NoteStore.withItem` call.** Spelling it
+    /// out here as separate `load` / `save` awaits made it a lost-update race: `NotesModel` is
+    /// `@MainActor` but *reentrant at every `await`*, so a body autosave and a metadata edit could both
+    /// load the same old item and the later save would silently drop the other's field. `mutate` must
+    /// therefore stay synchronous — that is what makes the transaction atomic.
+    private func mutateItem(_ id: UUID, _ action: String,
+                            _ mutate: @Sendable (inout Item) -> Void) async {
         guard let noteStore else { return }
         do {
-            var item = try await noteStore.load(id)
-            mutate(&item)
-            item.modified = Date()
-            let ref = try await noteStore.save(item)
-            if let index { try await index.upsertBatch([NoteIndexRow(item: item, mtime: ref.mtime)]) }
+            let tx = try await noteStore.withItem(id) { item in
+                mutate(&item)
+                item.modified = Date()
+            }
+            if let index {
+                try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)])
+            }
             await reloadItems()
         } catch { report(error, action) }
     }

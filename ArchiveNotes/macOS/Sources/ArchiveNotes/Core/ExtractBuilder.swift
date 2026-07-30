@@ -236,17 +236,31 @@ struct ExtractBuilder {
     }
 
     /// Segmentation (§D7): append passages to an EXISTING extract (which may already link to other
-    /// notes) and re-save. Assets are copied into that extract's own `assets/`.
-    func append(toExtract id: UUID, passages: [ExtractPassageBlock]) async throws {
-        var item = try await store.load(id)
+    /// notes) and re-save. Assets are copied into that extract's own `assets/`. Returns the extract as
+    /// written, so the caller re-indexes exactly what landed instead of re-reading the store.
+    ///
+    /// **W23.h2 — the append is one atomic `withItem` transaction.** It used to be
+    /// `load` → copy assets → `save`, with the asset copies (each its own `await`) sitting between the
+    /// read and the write: an ordinary metadata edit racing an append would be silently dropped by
+    /// whichever whole-item save landed second. The asset copies stay *outside* the transaction — they
+    /// write into `assets/`, never the `.md`, and don't depend on the item's current state.
+    @discardableResult
+    func append(toExtract id: UUID, passages: [ExtractPassageBlock]) async throws -> Item {
+        // Pre-flight existence check: `persist` creates `<item>/assets/` on demand, so appending to a
+        // missing extract would otherwise leave a phantom item dir with no `.md`. The authoritative
+        // read is the one inside the transaction below.
+        _ = try await store.load(id)
         let blocks = try await persist(passages, into: id)
-        item.blocks.append(contentsOf: blocks)
-        item.modified = now()
-        _ = try await store.save(item)
+        let when = now()
+        return try await store.withItem(id) { item in
+            item.blocks.append(contentsOf: blocks)
+            item.modified = when
+        }.item
     }
 
     /// Convenience: snapshot the selection and append it to an existing extract.
-    func append(toExtract id: UUID, fromSelectionIn source: PassageSelectionSource) async throws {
+    @discardableResult
+    func append(toExtract id: UUID, fromSelectionIn source: PassageSelectionSource) async throws -> Item {
         try await append(toExtract: id, passages: Self.passageBlocks(fromSelectionIn: source))
     }
 

@@ -196,8 +196,22 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   (relay dir with pending objects, HEIC-only, `.jpeg`-only, unknown-journal, genuinely-empty session).
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift | M | **high** | none
 
-- [ ] **W23.h2 — two concurrent edits to the same Notes item silently overwrite each other [M · HIGH · silent
-  data loss].** `Core/NotesModel.swift` (the body/date/quality edit paths), `Store/NoteStore.swift`,
+- [x] **W23.h2 — two concurrent edits to the same Notes item silently overwrite each other [M · HIGH · silent
+  data loss].** ✅ FIXED — `NoteStore.withItem(_:_:)` / `withTemplate(_:_:)` make the **transaction** the unit
+  of serialization: load → mutate → save runs inside ONE actor-isolated call, and because `mutate` is
+  **synchronous** there is no suspension point between the read and the write, so no other transaction can
+  interleave (atomicity enforced by the type system, no new lock). Returns `ItemTransaction` (the item as
+  written + its fresh ref) so callers index what landed instead of re-reading. All three read-modify-write
+  call sites migrated — `NotesModel.mutateItem` (date / date-uncertain / quality / body),
+  `NotesModel.renameTemplate`, `ExtractBuilder.append` (async asset copies stay OUTSIDE the transaction; a
+  pre-flight existence check preserves the old error path). No raw `save`/`saveTemplate` survives outside
+  `NoteStore`. **Premise measured before fixing — worse than reported:** 24 concurrent same-item appends left
+  **1 survivor**, and a racing body edit / date edit / extract-append each vanished **entirely**. Tier-2:
+  adversarial self-review + 9 scratch fixtures (`NotesItemTransactionTests`), the 4 RED cases now GREEN
+  (24/24 survive); Notes suite **530 tests / 63 suites pass**; 0 new warnings. Two residuals recorded in
+  `ArchiveNotes/KNOWN_ISSUES.md` — a transiently stale FTS index row (→ **W23.h2-fu** below) and two-window
+  body co-editing still last-writer-wins on the body *text* (inherent); **neither is data loss.**
+  `Core/NotesModel.swift` (the body/date/quality edit paths), `Store/NoteStore.swift`,
   `Core/ExtractBuilder.swift` → `append`. Every edit is a **load-whole-item → mutate → save-whole-item** pair
   of separate actor calls. `NoteStore` serializes each *individual* call but **not the read-modify-write
   transaction**; `NotesModel` is `@MainActor` but **reentrant at every `await`**. Two tasks can both load the
@@ -536,6 +550,22 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   `DocumentTags.sortDateKey(year:month:day:decade:)` — **validate at the input seam, do not change the shared
   sort formula.** No current Notes date-validation item covers impossible combinations.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NoteMetadataInspector,Store/Item}.swift | XS–S | low | none
+
+### Follow-ups discovered while fixing Wave 23
+
+- [ ] **W23.h2-fu — concurrent edits can leave the Notes FTS index row transiently stale [S · LOW].**
+  Found 2026-07-30 while fixing W23.h2 (adversarial self-review of the fix, not a new review). The `.md` on
+  disk is now always correct — `NoteStore.withItem` is atomic — but `NotesModel.mutateItem` does its
+  `index.upsertBatch` **after** the transaction returns, and two concurrent `mutateItem`s can commit their disk
+  transactions in one order and their index upserts in the **other**. The row for that item then lacks the
+  second edit until the next edit or an index rebuild, so the list/FTS can show a stale field while disk is
+  right. **Not data loss** (the index is a documented rebuilt-from-disk projection) — hence LOW, not a
+  re-open of W23.h2. **Fix options:** carry `ItemTransaction.ref.mtime` into the upsert and have
+  `NotesIndex.upsertBatch` skip a row whose stored mtime is newer (a compare-and-set on the projection), or
+  fold the upsert into a per-item serialized step so index writes inherit the transaction order. Prefer the
+  mtime guard — it also hardens the indexer against W23.m9's failure modes. Test: two concurrent
+  `mutateItem`s on one item, then assert the index row matches disk without a rebuild.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndex}.swift | S | low | W23.h2
 
 ## Provider expansion — Wave 13 (Processor; daemon-buildable) — queued 2026-07-16
 The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
