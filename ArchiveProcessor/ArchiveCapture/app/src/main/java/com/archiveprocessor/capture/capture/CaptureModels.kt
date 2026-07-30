@@ -60,6 +60,73 @@ internal suspend fun retireCapture(
     return withContext(Dispatchers.IO) { retireCaptureFile(file, retire) }
 }
 
+/** Which Mac owns an in-flight send (W23.m1). Pairing to a Mac — or unpairing from one — rotates the
+ *  generation, so a send stamped with an earlier generation is recognizable as belonging to an endpoint
+ *  that is no longer the destination. Main-thread confined, exactly like the queue state it describes. */
+internal class PairingGeneration {
+    var current: Long = 0L
+        private set
+
+    /** A newly paired endpoint, or an unpair. Nothing queued for the previous endpoint may confirm
+     *  itself afterwards: the acknowledgement would come from a Mac that is no longer receiving. */
+    fun rotate(): Long {
+        current += 1
+        return current
+    }
+
+    fun isCurrent(token: Long): Boolean = token == current
+}
+
+/** The sends outstanding right now, each stamped with the pairing generation that started it — keyed by
+ *  photo id for uploads, by group id for segment-completion signals. Main-thread confined. */
+internal class OutstandingSends<K> {
+    private val tokens = mutableMapOf<K, Long>()
+
+    /** Claim the right to send [key]. Refused while ANY send for that key is outstanding, including one
+     *  belonging to a retired pairing: two coroutines must never hold the same photo file at once (the
+     *  invariant the delete join in [retireCapture] depends on). The retired send releases its own claim
+     *  as it unwinds, which is what re-opens the key for the current endpoint. */
+    fun claim(key: K, generation: Long): Boolean {
+        if (tokens.containsKey(key)) return false
+        tokens[key] = generation
+        return true
+    }
+
+    /** Release only OUR claim. A send from a retired pairing must never free the guard the current
+     *  endpoint's send is holding — that would let a second coroutine send (and then delete) the page. */
+    fun release(key: K, generation: Long): Boolean {
+        if (tokens[key] != generation) return false
+        tokens.remove(key)
+        return true
+    }
+
+    fun contains(key: K): Boolean = tokens.containsKey(key)
+
+    fun clear() = tokens.clear()
+}
+
+/** What a send's outcome is allowed to do, once endpoint ownership is taken into account. */
+internal enum class SendAck {
+    /** The Mac that answered is still the paired one and took it → record it as delivered. */
+    CONFIRM,
+    /** The answer came from a pairing we have since left. The Mac paired NOW never received this, so it
+     *  must not be recorded as delivered (a delivered page is one the phone is allowed to delete) —
+     *  it goes back in the queue for the current endpoint instead. */
+    REQUEUE_STALE,
+    /** Current endpoint, but the send did not land → leave it failed for the auto-retry loop. */
+    RETRY
+}
+
+/** The endpoint-ownership rule, in one place, for BOTH kinds of send (a photo upload and a segment's
+ *  completion signal). Staleness outranks success deliberately: a success reported by a Mac we are no
+ *  longer paired with is precisely the misroute — confirming it would mark a page uploaded, and thus
+ *  deletable from the phone, when the Mac that is actually paired never received it. */
+internal fun sendAck(ok: Boolean, tokenIsCurrent: Boolean): SendAck = when {
+    !tokenIsCurrent -> SendAck.REQUEUE_STALE
+    ok -> SendAck.CONFIRM
+    else -> SendAck.RETRY
+}
+
 /** Atomically expose a deferred metadata resend as pending before the next drain heartbeat is emitted. */
 internal fun CapturedItem.prepareDeferredResend(): CapturedItem =
     copy(state = UploadState.PENDING, needsResend = false)
