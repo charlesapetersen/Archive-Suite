@@ -13,18 +13,24 @@ import Foundation
 /// but was still filed as a complete image-only PDF is a WARNING (amber), not a hard failure. It carries
 /// no data-safety weight: it never changes when/what finalize deletes (that keys off `executePlans`'
 /// `filedGroupIds`), only the label the operator sees.
+///
+/// `succeededPlaceholderImage` (W23.h5) is its mirror image: the text is fine but the IMAGE is missing —
+/// the page's source photo couldn't be decoded, so the PDF carries the deliberate placeholder image page.
+/// Also amber, also filed. Like the above it is a LABEL only: the matching data-safety decision (keep that
+/// page's source photo instead of trashing it) is made from the segment's `placeholderSources`, not here.
 enum ItemState: Equatable {
     case pending
     case processing(label: String)      // "OCR…", "Tagging…"
     case succeeded                      // filed, has OCR text
     case succeededNoText                // filed as an image-only PDF — WARN (amber), not error
+    case succeededPlaceholderImage      // filed, but a page's PDF holds a placeholder, not the scan — WARN
     case failed(FailureKind)            // needs attention: nothing usable landed
     case removed                        // user-dropped page
 
     /// Whether this item is in a terminal-but-attention state the operator may want to act on.
     var needsAttention: Bool {
         switch self {
-        case .failed, .succeededNoText: return true
+        case .failed, .succeededNoText, .succeededPlaceholderImage: return true
         default: return false
         }
     }

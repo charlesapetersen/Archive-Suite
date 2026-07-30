@@ -32,6 +32,10 @@ final class LiveCaptureProcessor: ObservableObject {
         enum Phase: String {
             case ocr = "OCR…", tagging = "Tagging…", staged = "Staged"
             case succeededNoText = "Filed (image-only)"
+            /// W23.h5: filed, but at least one page's PDF holds the placeholder instead of the scan. Amber,
+            /// not red — the document IS filed and its text is real; what's missing is the image, and the
+            /// source photo is deliberately kept in the Backup Folder so the page can be re-run.
+            case succeededPlaceholderImage = "Filed (scan MISSING)"
             case failed = "Failed"
         }
     }
@@ -50,6 +54,12 @@ final class LiveCaptureProcessor: ObservableObject {
         /// so the segment is INCOMPLETE and finalize must NOT file it (deleting its sources would lose the
         /// page that has no output). `nil` ⇒ legacy manifest (older builds never dropped a page) → complete.
         var pagesComplete: Bool?
+        /// W23.h5 — source photos whose staged PDF carries a PLACEHOLDER image page instead of the scan
+        /// (`PDFGenerator.ImagePageOutcome.placeholder`, or a `generate` that threw yet still left a file on
+        /// disk). The segment IS still filed — the bytes are real and it can be regenerated — but for these
+        /// pages the source photo is the ONLY surviving copy of the image, so finalize must not retire it.
+        /// `nil`/empty ⇒ nothing withheld (also the legacy-manifest reading, matching old behaviour).
+        var placeholderSources: [URL]?
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -505,6 +515,15 @@ final class LiveCaptureProcessor: ObservableObject {
             // Some page produced no PDF → incomplete; finalize won't file it, so it never partially deletes
             // a multi-page segment's sources. Retryable.
             markFailed(groupId, .incompleteOutput, firstError)
+        } else if !(outcome.placeholderSources ?? []).isEmpty {
+            // W23.h5 — every page produced a PDF, but at least one of them carries the PLACEHOLDER image
+            // page instead of the scan. It IS staged and WILL be filed (the bytes and the OCR text are
+            // real); what finalize must not do is retire that page's source photo, and that decision is
+            // made from `placeholderSources`, not from this label. Ranked above `.succeededNoText`: a
+            // missing IMAGE is the more serious of the two, and it's the one that holds a photo back.
+            failedGroupIds.remove(groupId)
+            setStatusDetail(groupId, kind: nil, error: firstError)
+            setPhase(groupId, .succeededPlaceholderImage)
         } else if gType == .document && !anyText {
             // Complete image-only PDF (every page produced a PDF, but no OCR text). It IS staged and WILL be
             // filed by executePlans exactly as before — this is a WARNING, not a hard failure. Drop it from
@@ -621,13 +640,14 @@ final class LiveCaptureProcessor: ObservableObject {
         let pdfGen = PDFGenerator()
         var pdfURLs: [URL] = []
         var imageURLs: [URL] = []
+        var placeholderSources: [URL] = []
 
         for page in pages {
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
-            _ = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
-                                     outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                     gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
+            let imagePage = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
+                                                 outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
+                                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
@@ -635,6 +655,12 @@ final class LiveCaptureProcessor: ObservableObject {
             // page whose PDF didn't write: its source stays in the backup folder and the segment is surfaced
             // as failed (retryable) because it produced no output.
             guard fm.fileExists(atPath: stagedPDF.path) else { continue }
+            // W23.h5 — the PDF exists, but does it hold the SCAN? `.placeholder` means it doesn't, so this
+            // page's source photo is the only copy of the image and finalize must keep it. A nil outcome
+            // (generate threw yet still left a file on disk) is UNKNOWN, and unknown resolves the safe way:
+            // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
+            // destroys an irreplaceable page.
+            if imagePage != .embedded { placeholderSources.append(page.sourceURL) }
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
             _ = try? MacOSTagger.applyTags(tagList, to: stagedPDF, stampUnread: stampUnread)
@@ -678,7 +704,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
-                             pagesComplete: pagesComplete)
+                             pagesComplete: pagesComplete, placeholderSources: placeholderSources)
     }
 
     /// Writes the metadata sidecar (OCR body + fields) via the shared `SegmentJSONBuilder`. This path
@@ -980,10 +1006,28 @@ final class LiveCaptureProcessor: ObservableObject {
             // folder, so an irreplaceable page is never lost — even when finalize "succeeds" with 0 files
             // moved (the original data-loss bug: a folder was created, nothing moved, every source deleted).
             // Deletions go to the Trash (recoverable), never a hard rm.
+            //
+            // W23.h5 — SECOND gate, on top of "did it reach the destination": did the PDF actually capture
+            // the IMAGE? A page whose image couldn't be embedded gets a deliberate placeholder page, so the
+            // PDF is valid, 2-page and filed — but it holds no scan, which makes the source photo the only
+            // surviving copy. Those sources are withheld from the deletion set (and only those: a sibling
+            // page that embedded fine is still retired normally). Computed BEFORE the `staged` cleanup below,
+            // which drops exactly these segments.
             let filedGroups = outcome.filedGroupIds
-            let filedSources = Set(self.retained.values
-                .filter { filedGroups.contains($0.groupId) }
-                .flatMap { $0.pages.map { $0.sourceURL } })
+            let placeholderByGroup = Dictionary(
+                self.staged.compactMap { seg -> (String, [URL])? in
+                    guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
+                    return (seg.groupId, held)
+                }, uniquingKeysWith: { $0 + $1 })
+            let filedSources = Self.sourcesSafeToRetire(
+                filedGroups: filedGroups,
+                sourcesByGroup: self.retained.values.reduce(into: [String: [URL]]()) { acc, r in
+                    acc[r.groupId, default: []] += r.pages.map { $0.sourceURL }
+                },
+                placeholderSourcesByGroup: placeholderByGroup)
+            let keptForPlaceholder = placeholderByGroup
+                .filter { filedGroups.contains($0.key) }
+                .values.reduce(0) { $0 + $1.count }
 
             // Drop bookkeeping for the fully-filed segments only; keep any unfiled segment staged for retry.
             self.staged.removeAll { filedGroups.contains($0.groupId) }
@@ -1013,6 +1057,14 @@ final class LiveCaptureProcessor: ObservableObject {
                     self.finalizeSummary = outcome.summary
                         + " ⚠️ All documents were filed, but a secondary file (an image or JSON sidecar) couldn't be moved — check the output folder; the leftover is in the Backup Folder."
                 }
+            }
+            // W23.h5 — say so when a filed PDF carries no scan. Silence here is the whole bug: the operator
+            // would see a plain "Finalized …", never learn the document has a placeholder where its image
+            // should be, and never know a photo was (correctly) left behind in the Backup Folder.
+            if keptForPlaceholder > 0 {
+                let n = keptForPlaceholder
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
+                    + " ⚠️ \(n) page\(n == 1 ? "" : "s") could NOT embed the original scan — \(n == 1 ? "its PDF was" : "their PDFs were") filed with a placeholder image page, so the original photo\(n == 1 ? " was" : "s were") KEPT in the Backup Folder (nothing deleted). Re-run \(n == 1 ? "that page" : "those pages") from the Backup Folder to get the image into the archive."
             }
             // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
             // stays in the backup folder + Captured pane, recoverable.
@@ -1163,6 +1215,54 @@ final class LiveCaptureProcessor: ObservableObject {
         let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
                                filedGroupIds: filedGroupIds, allFiled: allFiled)
+    }
+
+    /// THE source-retirement decision, as a pure function so it can be proven headlessly (W23.h5).
+    ///
+    /// A source photo may be sent to the Trash only when BOTH hold:
+    ///   1. its segment is in `filedGroups` — every one of that segment's PDFs was confirmed on disk at the
+    ///      destination (`executePlans`), and
+    ///   2. its own page's PDF carries the real scan — i.e. the source is NOT listed in that segment's
+    ///      `placeholderSources`. A placeholder image page means the PDF holds no image, so deleting the
+    ///      source photo would destroy the only copy of that page.
+    ///
+    /// Withholding is PER PAGE, not per segment: a sibling page that embedded normally is still retired, so
+    /// one unreadable page doesn't strand a whole session's photos. A group absent from `sourcesByGroup`
+    /// contributes nothing (there is no source to retire), and an unknown group in
+    /// `placeholderSourcesByGroup` is simply never consulted.
+    nonisolated static func sourcesSafeToRetire(
+        filedGroups: Set<String>,
+        sourcesByGroup: [String: [URL]],
+        placeholderSourcesByGroup: [String: [URL]]
+    ) -> Set<URL> {
+        var safe = Set<URL>()
+        for (groupId, sources) in sourcesByGroup where filedGroups.contains(groupId) {
+            let withheld = Set(placeholderSourcesByGroup[groupId] ?? [])
+            safe.formUnion(sources.filter { !withheld.contains($0) })
+        }
+        return safe
+    }
+
+    /// Test-only ($0, no OCR/session): stage a real segment from real image files and report which source
+    /// photos came back flagged as placeholder-backed (W23.h5). This closes the last link the two pure
+    /// tests can't reach on their own — that `writeSegmentFiles` actually POPULATES `placeholderSources`
+    /// from `PDFGenerator`'s outcome, so the detection and the retirement gate are really connected rather
+    /// than two correct halves wired to nothing. No OCR, no network: the OCR result is supplied.
+    nonisolated static func _recoveryTestStageSegment(
+        sources: [URL], stagingDir: URL, model: LLMModel
+    ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL]) {
+        let pages = sources.map {
+            PageWork(sourceURL: $0,
+                     result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
+                     priority: nil)
+        }
+        let seg = writeSegmentFiles(groupId: "T", type: .document, collectionKey: "T", order: 0,
+                                    pages: pages, baseTags: [], doMerge: false, model: model,
+                                    gatewayName: nil, stagingDir: stagingDir, writeJSON: false,
+                                    jsonTags: GeneratedTags(), texts: [], boxLabelText: nil,
+                                    outputImageFile: false, pdfImageMB: 0, exportedImageMB: 0,
+                                    textColumns: 1, stampUnread: false)
+        return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [])
     }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless

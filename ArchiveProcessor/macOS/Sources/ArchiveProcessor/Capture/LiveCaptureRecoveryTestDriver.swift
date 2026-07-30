@@ -20,6 +20,8 @@ import PDFKit
 ///      a folder holding unrecognized content, or a non-session (operator) folder.
 ///   7. `PDFGenerator.generate` (W23.h5) REPORTS whether the PDF's image page holds the real scan or the
 ///      deliberate placeholder, so finalize can refuse to retire a source whose PDF carries no scan.
+///   8. `sourcesSafeToRetire` (W23.h5) withholds exactly those source photos — per PAGE, on top of the
+///      existing filed gate — so a placeholder-only PDF never costs the operator the original image.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -235,6 +237,75 @@ enum LiveCaptureRecoveryTestDriver {
         check("file-existence alone does NOT distinguish a placeholder from a real scan",
               fm.fileExists(atPath: realOut.path) && fm.fileExists(atPath: junkOut.path)
                   && realOutcome != junkOutcome)
+
+        // --- Test 10 (W23.h5): the source-retirement gate. A filed segment's source photo is retired ONLY
+        // if its own page's PDF holds the real scan. A placeholder image page means the PDF has no image, so
+        // the photo is the last copy and must survive finalize — while its normally-embedded siblings are
+        // still retired (per-page, not per-segment). This is the decision `finalize` makes on the real path;
+        // it is a pure function precisely so it can be proven here without a session, OCR, or the GUI. ---
+        func src(_ n: String) -> URL { tmp.appendingPathComponent(n) }
+        let p1 = src("p1.jpg"), p2 = src("p2.jpg"), p3 = src("p3.jpg"), q1 = src("q1.jpg")
+
+        // (a) THE BUG: a lone filed page whose PDF is placeholder-only. Pre-fix this source was trashed.
+        let onlyPlaceholder = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["G"], sourcesByGroup: ["G": [p1]], placeholderSourcesByGroup: ["G": [p1]])
+        check("a filed placeholder-only PDF does NOT retire its source photo", onlyPlaceholder.isEmpty)
+
+        // (b) Per-page, not per-segment: siblings that embedded fine are still retired.
+        let mixedPages = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["G"], sourcesByGroup: ["G": [p1, p2, p3]], placeholderSourcesByGroup: ["G": [p2]])
+        check("the placeholder page's source is withheld", !mixedPages.contains(p2))
+        check("its normally-embedded siblings are still retired", mixedPages == Set([p1, p3]))
+
+        // (c) Happy path unchanged: no placeholders → every source of a filed segment is retired.
+        let allEmbedded = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["G"], sourcesByGroup: ["G": [p1, p2]], placeholderSourcesByGroup: [:])
+        check("no placeholder → all sources of a filed segment are retired (regression)",
+              allEmbedded == Set([p1, p2]))
+
+        // (d) The pre-existing filed gate still dominates: an UNFILED segment retires nothing, placeholder
+        // or not. The two gates are AND-ed, so neither can be weakened by the other.
+        let unfiled = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: [], sourcesByGroup: ["G": [p1, p2]], placeholderSourcesByGroup: [:])
+        check("an UNFILED segment retires nothing (existing gate intact)", unfiled.isEmpty)
+
+        // (e) Multi-segment: withholding in one filed segment must not leak into another.
+        let twoGroups = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["G", "H"], sourcesByGroup: ["G": [p1], "H": [q1]],
+            placeholderSourcesByGroup: ["G": [p1]])
+        check("withholding is scoped to its own segment", twoGroups == Set([q1]))
+
+        // (f) A legacy manifest carries no `placeholderSources` at all (nil → absent key): behaviour is
+        // exactly the old one, so an upgrade can't silently strand every pre-existing staged session.
+        let legacy = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["G"], sourcesByGroup: ["G": [p1, p2]], placeholderSourcesByGroup: ["H": [q1]])
+        check("a legacy segment (no placeholder record) behaves exactly as before", legacy == Set([p1, p2]))
+
+        // --- Test 11 (W23.h5): the WIRING. Tests 9 and 10 prove the detector and the gate independently;
+        // this proves they are actually connected — that staging a real segment from real image files
+        // records the undecodable page (and only it) in `placeholderSources`, which is what `finalize`
+        // feeds to `sourcesSafeToRetire`. Without this a correct detector and a correct gate could still
+        // be joined by nothing. ---
+        let stageDir = tmp.appendingPathComponent("wire", isDirectory: true)
+        try? fm.createDirectory(at: stageDir, withIntermediateDirectories: true)
+        let goodSrc = stageDir.appendingPathComponent("good.jpg")
+        let badSrc = stageDir.appendingPathComponent("bad.jpg")
+        if let jpegData = bitmap?.representation(using: .jpeg, properties: [:]) {
+            try? jpegData.write(to: goodSrc)
+        }
+        try? Data("not an image".utf8).write(to: badSrc)
+        let wired = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [goodSrc, badSrc], stagingDir: stageDir, model: stubModel)
+        check("staging both pages produces both PDFs (segment stays page-complete)",
+              wired.pdfCount == 2 && wired.pagesComplete == true)
+        check("the undecodable page's SOURCE is recorded as placeholder-backed",
+              wired.placeholderSources == [badSrc])
+        // And end-to-end: feeding that straight into the gate withholds exactly that photo.
+        let endToEnd = LiveCaptureProcessor.sourcesSafeToRetire(
+            filedGroups: ["T"], sourcesByGroup: ["T": [goodSrc, badSrc]],
+            placeholderSourcesByGroup: ["T": wired.placeholderSources])
+        check("end-to-end: finalize would retire the good photo and KEEP the unembeddable one",
+              endToEnd == Set([goodSrc]))
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

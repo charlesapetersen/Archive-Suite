@@ -27,6 +27,9 @@ struct StatusBadge: View {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
         case .succeededNoText:
             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).font(.caption)
+        case .succeededPlaceholderImage:
+            // Filed, but the scan is missing from the PDF (W23.h5) — a photo-shaped amber warning.
+            Image(systemName: "photo.badge.exclamationmark.fill").foregroundStyle(.orange).font(.caption)
         case .failed:
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
         case .removed:
@@ -42,7 +45,7 @@ struct StatusBadge: View {
         case .pending: return .secondary
         case .processing(let label): return label.hasPrefix("Tag") ? .blue : .orange
         case .succeeded: return .green
-        case .succeededNoText: return .orange
+        case .succeededNoText, .succeededPlaceholderImage: return .orange
         case .failed: return .red
         case .removed: return .secondary
         }
@@ -62,7 +65,7 @@ struct ItemActionHandler: ProcessableItemActions {
 /// One compact row rendering any `ProcessableItem`. Collapsed by default so the common case stays small;
 /// expands inline (on selection) to an OCR-text preview + an action-button row built from
 /// `availableActions`. Preserves the Files pane's red failure-reason line and adds an amber line for
-/// `succeededNoText`, now available to both panes.
+/// `succeededNoText` / `succeededPlaceholderImage`, now available to both panes.
 struct ProcessableItemRow: View {
     let item: any ProcessableItem
     var badgeStyle: StatusBadge.Style = .icon
@@ -145,6 +148,11 @@ struct ProcessableItemRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else if case .succeededNoText = item.state {
                 Text("Filed as image-only — no OCR text.")
+                    .font(.caption2).foregroundStyle(.orange)
+                    .padding(.leading, 22)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if case .succeededPlaceholderImage = item.state {
+                Text("Filed, but the original scan could NOT be embedded — the PDF has a placeholder image page. The source photo was KEPT in the Backup Folder; re-run the page to get the image into the archive.")
                     .font(.caption2).foregroundStyle(.orange)
                     .padding(.leading, 22)
                     .fixedSize(horizontal: false, vertical: true)

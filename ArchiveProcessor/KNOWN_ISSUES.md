@@ -4,6 +4,48 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.h5): a placeholder-only PDF counted as archived, and finalize then retired the source photo
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed verbatim by symbol
+before fixing, then measured again on 2026-07-30 against `ee9cadf`).
+
+**The defect.** When `PDFGenerator.makeImagePage` can't decode/embed a source image, `generate` inserts
+`makePlaceholderImagePage(…)` and **returns normally**. That substitution is deliberate and stays — it keeps
+the 2-page archival contract and `PDFTextExtractor`'s `pageCount >= 2` heuristic valid. The bug was that it
+was **indistinguishable from success**: `generate` returned `Void`, so the only signal any caller had was
+"did it throw / does the file exist". Live Capture's `writeSegmentFiles` checked exactly that
+(`fm.fileExists(atPath: stagedPDF.path)`), so a scan-less PDF was recorded in `pdfURLs`, counted toward
+`pagesComplete`, reached the destination, landed in `executePlans`' `filedGroupIds` — and `finalize` then
+put the corresponding raw capture in the Trash via `session.clearFiled`. Net effect: an apparently filed
+archival document containing **no image**, with the only copy of that image retired. Output-content
+validity was never established anywhere in the chain.
+
+**The fix** (per the owner's constraint: keep the placeholder, still count the file as filed, never retire
+the source — the same "warn, don't withhold-filing" shape as W3.cap-r1's `tagsApplied`):
+- `PDFGenerator.generate` now returns `ImagePageOutcome` (`.embedded` / `.placeholder`), `@discardableResult`
+  so the five Process Files call sites are untouched (their `try?` swallowing is the separate item W23.m5).
+- `writeSegmentFiles` records the affected **source URLs** on the new `StagedSegment.placeholderSources`.
+  A `nil` outcome — `generate` threw yet still left a file on disk — is treated as placeholder: unknown
+  resolves toward keeping the photo.
+- `finalize` runs its deletion set through the new pure `LiveCaptureProcessor.sourcesSafeToRetire(...)`,
+  which AND-s the existing filed gate with the new one. Withholding is **per page**: a sibling page that
+  embedded fine is still retired, so one unreadable page doesn't strand a whole session's photos.
+- Operator surface (it was silent before): new `SegmentStatus.Phase.succeededPlaceholderImage`
+  ("Filed (scan MISSING)") → new amber `ItemState.succeededPlaceholderImage` with a row explanation and
+  retry/rotate actions, plus a finalize-summary warning naming how many photos were kept and why.
+- Backward compatible: `placeholderSources` is optional, so a legacy staging manifest behaves exactly as
+  before. The rotation-review regeneration path replaces the whole `StagedSegment`, so the flag self-heals
+  when a retry succeeds and re-arms if it fails.
+
+**Regression:** `LiveCaptureRecoveryTestDriver` Tests 9–11 via `scripts/test-recovery.sh` ($0, no OCR,
+no network, no GUI, synthetic temp files) — detection, the pure retirement gate, and the wiring between
+them end-to-end. **45/45 ALL PASS.** Both halves were proven **non-vacuous** by neutering them in turn:
+disabling the gate turns 5 cases RED, disabling the detection turns 2 RED (the no-placeholder / unfiled /
+legacy regression cases correctly stay GREEN in both runs). `test-merge-safety.sh` and
+`test-output-file-safety.sh` also re-run clean.
+
+---
+
 ## ✅ FIXED (W23.h4): Android deleted an un-uploaded capture with no confirmation and no upload-job cancel
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol before

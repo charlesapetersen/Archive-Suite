@@ -597,9 +597,11 @@ private struct LiveProcessingBox: View {
                 }
                 if liveMode, !liveProc.statuses.isEmpty {
                     Divider()
-                    // "Processed" = staged OR filed-image-only (succeededNoText is a warning, not
-                    // in-flight, so it counts as done).
-                    let done = liveProc.statuses.filter { $0.phase == .staged || $0.phase == .succeededNoText }.count
+                    // "Processed" = staged OR filed-with-a-warning (succeededNoText / W23.h5's
+                    // succeededPlaceholderImage are warnings, not in-flight, so they count as done).
+                    let done = liveProc.statuses.filter {
+                        $0.phase == .staged || $0.phase == .succeededNoText || $0.phase == .succeededPlaceholderImage
+                    }.count
                     Text("\(done)/\(liveProc.statuses.count) segments processed")
                         .font(.caption).foregroundStyle(.secondary)
                     // Shared, detailed, retry-capable list (reasons + per-item actions on expand).
@@ -997,6 +999,7 @@ struct SegmentItem: ProcessableItem {
         case .tagging: return .processing(label: "Tagging…")
         case .staged: return .succeeded
         case .succeededNoText: return .succeededNoText
+        case .succeededPlaceholderImage: return .succeededPlaceholderImage
         case .failed: return .failed(s.failureKind ?? .noOutput)
         }
     }
@@ -1017,6 +1020,10 @@ struct SegmentItem: ProcessableItem {
             return [.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles]
         case .succeededNoText:
             return [.retry, .retryWithModel, .viewText, .revealFiles]
+        case .succeededPlaceholderImage:
+            // Same recovery affordances: the source photo is deliberately still in the Backup Folder, so a
+            // retry (optionally after a rotate) is exactly how the operator gets the scan into the archive.
+            return [.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles]
         case .succeeded:
             return [.viewText, .revealFiles]
         default:

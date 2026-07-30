@@ -303,8 +303,25 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   `ArchiveProcessor/KNOWN_ISSUES.md`. W23.m1 is a separate finding on the same file and stays open.
   | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{ui/CaptureScreen,capture/{CaptureViewModel,CaptureModels}}.kt + app/src/test/.../CaptureDeletePolicyTest.kt | M | **high** | none
 
-- [ ] **W23.h5 — a placeholder-only PDF counts as successfully archived, and finalize then retires the source
-  image [M · HIGH · data loss · tag/PDF SPEC-adjacent].** `OCR/PDFGenerator.swift` → `generate(...)`;
+- [x] **W23.h5 — a placeholder-only PDF counts as successfully archived, and finalize then retires the source
+  image [M · HIGH · data loss · tag/PDF SPEC-adjacent].** ✅ FIXED — the placeholder substitution is now an
+  explicit, propagated outcome instead of a silent success. `PDFGenerator.generate` returns
+  `ImagePageOutcome` (`.embedded`/`.placeholder`, `@discardableResult` so the five Process Files call sites
+  are untouched — their `try?` swallowing stays W23.m5); `writeSegmentFiles` records the affected **source
+  URLs** on the new `StagedSegment.placeholderSources` (a `nil` outcome — threw but still left a file —
+  counts as placeholder, so unknown resolves toward keeping the photo); and `finalize` runs its deletion set
+  through the new pure `sourcesSafeToRetire(...)`, AND-ing the new gate with the existing filed gate. Per the
+  owner's constraint the **placeholder page stays** and the file **still counts as filed** — only the source
+  deletion is withheld, and **per page**, so a sibling that embedded fine is still retired. Newly VISIBLE
+  where it was silent: `Phase.succeededPlaceholderImage` → amber `ItemState.succeededPlaceholderImage` (row
+  explanation + retry/rotate actions) and a finalize-summary warning naming how many photos were kept and
+  why. Legacy manifests (no `placeholderSources`) behave exactly as before; the rotation-review regeneration
+  path replaces the whole segment, so the flag self-heals on a successful retry. Tier-2: `test-recovery.sh`
+  Tests 9–11 (detect · gate · wiring end-to-end) → **45/45 ALL PASS**, both halves proven non-vacuous by
+  neutering (gate off → 5 RED; detection off → 2 RED; the regression cases stay GREEN in both);
+  `test-merge-safety.sh` + `test-output-file-safety.sh` clean; build clean, **0 new warnings**. $0 — no OCR,
+  network, device or GUI. Full write-up: `ArchiveProcessor/KNOWN_ISSUES.md`.
+  Original finding — `OCR/PDFGenerator.swift` → `generate(...)`;
   `Capture/LiveCaptureProcessor.swift` (filed-set + finalize); `Capture/CaptureSession.swift`.
   **Re-verified verbatim 2026-07-29:** when `makeImagePage` returns nil, `generate` inserts
   `makePlaceholderImagePage(note: "Original image could not be embedded (…)")` and **returns normally** — a
@@ -617,6 +634,19 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   mtime guard — it also hardens the indexer against W23.m9's failure modes. Test: two concurrent
   `mutateItem`s on one item, then assert the index row matches disk without a rebuild.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndex}.swift | S | low | W23.h2
+
+- [ ] **W23.h5-fu — Process Files still can't tell a placeholder PDF from a real one (the signal now exists;
+  nothing there reads it) [XS–S · LOW].** Found 2026-07-30 while fixing W23.h5. `PDFGenerator.generate` now
+  returns `ImagePageOutcome`, but the change was kept `@discardableResult` so the **five Process Files call
+  sites** (`OCRProcessor+{OCR,Pipeline,Tagging,ReviewFlows}`) compile untouched — they still treat "didn't
+  throw" as full success and will happily report a scan-less PDF as a clean result. **Deliberately NOT data
+  loss, which is why this is LOW and not a re-open:** unlike Live Capture, that path never trashes the source
+  image (checked by symbol — no `trashItem`/`removeItem` on a source URL in the OCR pipeline; source cleanup
+  goes through `OutputFileSafety`'s verified-move transaction, which relocates rather than destroys). So the
+  gap is **operator visibility**, not recoverability. **Do this inside W23.m5**, which already rewrites those
+  exact call sites for the `tagsApplied` warning — surface "image not embedded" through the same per-artifact
+  warning channel rather than adding a second one. Cheap there, wasteful as its own pass.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+{OCR,Pipeline,Tagging,ReviewFlows}.swift | XS–S | low | W23.h5
 
 ## Provider expansion — Wave 13 (Processor; daemon-buildable) — queued 2026-07-16
 The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
