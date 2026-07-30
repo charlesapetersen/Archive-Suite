@@ -279,12 +279,21 @@ config** (it already carries 5 of the 6 values; `ocrWorkerCount` is the only gap
 `PendingRunRuntimeConfig` wrap it — **do NOT introduce a third type.** This is a consolidation job, not the
 greenfield build the original text implies.
 
-**W16.cfg1 DONE 2026-07-29 (this commit):** `SessionProcessingConfig` is explicitly `Sendable` and now
-captures `ocrWorkerCount` in `fromDefaults()` with the existing 1…12 clamp/fallback of 4. A separate,
-currently-unused `fromProcessFilesRunStart()` builder captures the complete existing normalization (worker
+**W16.cfg1 DONE 2026-07-29:** `SessionProcessingConfig` is explicitly `Sendable` and now captures
+`ocrWorkerCount` in `fromDefaults()` with the existing 1…12 clamp/fallback of 4. A separate, then-unused
+`fromProcessFilesRunStart()` builder captures the complete existing normalization (worker
 count, all three finite 0.5…20 image sizes, and 1…4 text columns) for W16.cfg2/3 without changing Live Capture
 behavior in this checkpoint. Scratch-only volatile-defaults coverage pins the returned configs' worker
 wiring/bounds and complete Process Files normalization.
+
+**W16.cfg2 DONE 2026-07-29 (this commit):** fresh Process Files runs now capture that normalized config once
+and thread it through OCR sizing/scheduling, batch result materialization, every automatic/interactive retry,
+and PDF generation. The instance retains the same snapshot for post-run per-item retries; an adversarial review
+caught and closed the initial gap there. Non-batch manifests record the exact config values that were actually
+used. Resume continues through explicit nil/static fallbacks until cfg5, preserving schema and legacy behavior.
+Scratch config/manifest, multi-page PDF, and batch/non-batch resume regressions passed with a clean Debug build.
+The remaining work is cfg3 (review/tagging consumers), cfg5 (construct/store config on resume), and cfg6 (delete
+the fallback statics).
 
 **Two claims below are STALE — corrected here so they aren't re-derived:**
 - *"`MacOSTagger` retains a global fallback for older call sites"* — the global exists (~13 sites use the

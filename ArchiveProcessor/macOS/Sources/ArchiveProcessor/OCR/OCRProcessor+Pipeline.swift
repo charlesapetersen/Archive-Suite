@@ -233,8 +233,13 @@ extension OCRProcessor {
             && optionalParallelCounts.allSatisfy { $0 == 0 || $0 == fileCount }
     }
 
-    /// Capture the effective runtime values after defaults have been normalized at run start.
-    func makePendingRunRuntimeConfig(imageScale: Double, gatewayConfig: GatewayConfig?) -> PendingRunRuntimeConfig {
+    /// Capture the effective runtime values used by this run. Fresh runs supply their immutable config;
+    /// nil retains the static migration fallback for legacy callers until W16.cfg5/6.
+    func makePendingRunRuntimeConfig(
+        imageScale: Double,
+        gatewayConfig: GatewayConfig?,
+        runConfig: SessionProcessingConfig? = nil
+    ) -> PendingRunRuntimeConfig {
         let effectiveScale = imageScale.isFinite ? max(0.01, min(1.0, imageScale)) : 1.0
         return PendingRunRuntimeConfig(
             schemaVersion: PendingRunRuntimeConfig.currentSchemaVersion,
@@ -252,11 +257,11 @@ extension OCRProcessor {
             preGroupedYears: preGroupedYears,
             preGroupedMonths: preGroupedMonths,
             preGroupedSubjects: preGroupedSubjects,
-            standardImageMB: Self.standardImageMB,
-            ocrWorkerCount: Self.ocrWorkerCount,
-            pdfImageMB: Self.pdfImageMB,
-            textColumns: Self.textColumns,
-            exportedImageMB: Self.exportedImageMB,
+            standardImageMB: runConfig?.standardImageMB ?? Self.standardImageMB,
+            ocrWorkerCount: runConfig?.ocrWorkerCount ?? Self.ocrWorkerCount,
+            pdfImageMB: runConfig?.pdfImageMB ?? Self.pdfImageMB,
+            textColumns: runConfig?.textColumns ?? Self.textColumns,
+            exportedImageMB: runConfig?.exportedImageMB ?? Self.exportedImageMB,
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
         )
     }
@@ -772,6 +777,10 @@ extension OCRProcessor {
         // against the wrong standard-image target.
         Self.rotationModeForRun = rotationMode
         Self.loadStandardImageMB()
+        // W16.cfg5 will construct this from persisted resume state. Until then, nil deliberately selects
+        // cfg2's static fallback so batch-resume behavior is unchanged in this migration checkpoint.
+        let runConfig: SessionProcessingConfig? = nil
+        activeRunConfig = runConfig
         // Jobs carry the ORIGINAL source URLs (correct output names + tag targets). For PDF inputs the
         // persisted temp JPEGs are long gone, so regenerate them from the originals — exactly like
         // resumeRun — and feed the temp images (not the .pdf) to the result/PDF-embed + retry paths.
@@ -818,7 +827,7 @@ extension OCRProcessor {
             batchId: pending.batchId, provider: pending.provider,
             model: pending.model, thinkingLevel: pending.thinkingLevel,
             apiKey: apiKey, fileURLs: imageURLs,
-            outputDirectory: pending.outputDirectory
+            outputDirectory: pending.outputDirectory, runConfig: runConfig
         )
 
         // A transient interruption (network streak / timeout) leaves the batch resumable — don't delete
@@ -842,14 +851,16 @@ extension OCRProcessor {
         await retryHighUseFailures(
             fileURLs: imageURLs, provider: pending.provider,
             model: pending.model, thinkingLevel: pending.thinkingLevel,
-            apiKey: apiKey, outputDirectory: pending.outputDirectory
+            apiKey: apiKey, outputDirectory: pending.outputDirectory,
+            runConfig: runConfig
         )
 
         guard !Task.isCancelled else { return }
 
         await retryLoopForFailedFiles(
             imageURLs: imageURLs,
-            outputDirectory: pending.outputDirectory
+            outputDirectory: pending.outputDirectory,
+            runConfig: runConfig
         )
 
         guard !Task.isCancelled else { return }
@@ -984,6 +995,10 @@ extension OCRProcessor {
         currentLocalAgent = pending.localAgent
         let resumeImageScale: Double
         let resumeGatewayUpstream: LLMProvider
+        // W16.cfg5 will construct this from `pending.runtimeConfig`. Keeping it nil in cfg2 intentionally
+        // preserves the already-validated static restoration below while every consumer becomes injectable.
+        let runConfig: SessionProcessingConfig? = nil
+        activeRunConfig = runConfig
         if let config = pending.runtimeConfig {
             // V2: replay the immutable start-time snapshot. Self-consistency above has already validated
             // its version, ranges, parallel-array alignment, and identity fingerprint.
@@ -1058,8 +1073,9 @@ extension OCRProcessor {
             if !toGenerate.isEmpty {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
-                let pdfMB = Self.pdfImageMB
-                let txtCols = Self.textColumns
+                let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
+                let pdfMB = pdfSettings.imageMB
+                let txtCols = pdfSettings.textColumns
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
                 failedRegenURLs = await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
@@ -1149,7 +1165,8 @@ extension OCRProcessor {
                 outputDirectory: pending.outputDirectory,
                 segmentationContext: segmentationContext,
                 totalFiles: pending.fileURLs.count,
-                alreadyCompleted: completedCount
+                alreadyCompleted: completedCount,
+                runConfig: runConfig
             )
         }
 
@@ -1162,7 +1179,8 @@ extension OCRProcessor {
             model: pending.model,
             thinkingLevel: pending.thinkingLevel,
             apiKey: apiKey,
-            outputDirectory: pending.outputDirectory
+            outputDirectory: pending.outputDirectory,
+            runConfig: runConfig
         )
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1170,7 +1188,8 @@ extension OCRProcessor {
         // Interactive retry
         await retryLoopForFailedFiles(
             imageURLs: imageURLs,
-            outputDirectory: pending.outputDirectory
+            outputDirectory: pending.outputDirectory,
+            runConfig: runConfig
         )
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1293,7 +1312,8 @@ extension OCRProcessor {
         outputDirectory: URL,
         segmentationContext: SegmentationContext,
         totalFiles: Int,
-        alreadyCompleted: Int
+        alreadyCompleted: Int,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         let remaining = indices.count
         let gateway = currentGateway
@@ -1302,7 +1322,7 @@ extension OCRProcessor {
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
             var completed = 0
-            let concurrency = max(1, Self.ocrWorkerCount)
+            let concurrency = Self.schedulingWorkerCount(for: runConfig)
             for i in indices { jobs[i].status = .processing }
             statusMessage = "OCR 0/\(remaining) remaining… (parallel)"
 
@@ -1322,7 +1342,8 @@ extension OCRProcessor {
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: segmentationContext.customPrompt,
                             imageScale: scale,
-                            gatewayConfig: gateway, localAgent: localAgent
+                            gatewayConfig: gateway, localAgent: localAgent,
+                            standardImageMB: runConfig?.standardImageMB
                         )
                         return (index, result)
                     }
@@ -1332,7 +1353,7 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { group.cancelAll(); return }
                     guard await handleOCRResult(
                         result, index: index, url: fileURLs[index], model: model,
-                        outputDirectory: outputDirectory) else {
+                        outputDirectory: outputDirectory, runConfig: runConfig) else {
                         group.cancelAll()
                         return
                     }
@@ -1353,7 +1374,8 @@ extension OCRProcessor {
                                 previousText: nil, previousImageURL: prevImageURL,
                                 customPrompt: segmentationContext.customPrompt,
                                 imageScale: scale,
-                                gatewayConfig: gateway, localAgent: localAgent
+                                gatewayConfig: gateway, localAgent: localAgent,
+                                standardImageMB: runConfig?.standardImageMB
                             )
                             return (idx, result)
                         }
@@ -1382,7 +1404,8 @@ extension OCRProcessor {
                     previousText: previousText, previousImageURL: contextImageURL,
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
-                    gatewayConfig: gateway, localAgent: localAgent
+                    gatewayConfig: gateway, localAgent: localAgent,
+                    standardImageMB: runConfig?.standardImageMB
                 )
 
                 if Self.isTimeoutError(result) {
@@ -1393,13 +1416,14 @@ extension OCRProcessor {
                         previousText: nil, previousImageURL: nil,
                         customPrompt: segmentationContext.customPrompt,
                         imageScale: segmentationContext.imageScale,
-                        gatewayConfig: gateway, localAgent: localAgent
+                        gatewayConfig: gateway, localAgent: localAgent,
+                        standardImageMB: runConfig?.standardImageMB
                     )
                 }
 
                 guard await handleOCRResult(
                     result, index: index, url: url, model: model,
-                    outputDirectory: outputDirectory) else { return }
+                    outputDirectory: outputDirectory, runConfig: runConfig) else { return }
                 progress = Double(alreadyCompleted + attempt + 1) / Double(totalFiles) * 0.7
                 statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles) complete"
             }
@@ -1591,6 +1615,8 @@ extension OCRProcessor {
         removedSourceURLs = []
         Self.rotationModeForRun = rotationMode
         Self.loadStandardImageMB()
+        let runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+        activeRunConfig = runConfig
         currentModel = model
         currentGateway = gatewayConfig
         currentLocalAgent = localAgent
@@ -1640,7 +1666,8 @@ extension OCRProcessor {
                 outputDirectory: outputDirectory,
                 customPrompt: segmentationContext.customPrompt,
                 gatewayConfig: gatewayConfig,
-                localAgent: localAgent
+                localAgent: localAgent,
+                runConfig: runConfig
             )
         } else if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
@@ -1682,7 +1709,8 @@ extension OCRProcessor {
                     confirmCollectionIDs: confirmCollectionIDs,
                     reviewDocumentSegmentation: reviewDocumentSegmentation,
                     customPrompt: segmentationContext.customPrompt,
-                    imageScale: segmentationContext.imageScale
+                    imageScale: segmentationContext.imageScale,
+                    runConfig: runConfig
                 )
                 // Transient interruption during batch polling: the batch is preserved (resumable) and
                 // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results;
@@ -1693,7 +1721,9 @@ extension OCRProcessor {
                 // fingerprint covers ordered inputs + every run/backend/runtime setting and is recomputed
                 // with each incrementally-persisted result/output association.
                 let runtimeConfig = makePendingRunRuntimeConfig(
-                    imageScale: segmentationContext.imageScale, gatewayConfig: gatewayConfig)
+                    imageScale: segmentationContext.imageScale,
+                    gatewayConfig: gatewayConfig,
+                    runConfig: runConfig)
                 var pendingRun = PendingRun(
                     provider: provider, model: model, thinkingLevel: thinkingLevel,
                     fileURLs: files, outputDirectory: outputDirectory,
@@ -1744,7 +1774,8 @@ extension OCRProcessor {
                     thinkingLevel: thinkingLevel,
                     apiKey: apiKey,
                     outputDirectory: outputDirectory,
-                    segmentationContext: segmentationContext
+                    segmentationContext: segmentationContext,
+                    runConfig: runConfig
                 )
             }
 
@@ -1757,7 +1788,8 @@ extension OCRProcessor {
                 model: model,
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
-                outputDirectory: outputDirectory
+                outputDirectory: outputDirectory,
+                runConfig: runConfig
             )
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1765,7 +1797,8 @@ extension OCRProcessor {
             // Phase 1c: Prompt user to retry remaining failures with different provider/model
             await retryLoopForFailedFiles(
                 imageURLs: imageURLs,
-                outputDirectory: outputDirectory
+                outputDirectory: outputDirectory,
+                runConfig: runConfig
             )
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1949,7 +1982,8 @@ extension OCRProcessor {
     /// Retry loop: keeps presenting the retry dialog until all files succeed or user continues.
     private func retryLoopForFailedFiles(
         imageURLs: [URL],
-        outputDirectory: URL
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         while true {
             guard !Task.isCancelled else { return }
@@ -1970,13 +2004,19 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { return }
                     _ = await retryOne(index: index, imageURL: imageURLs[index], provider: provider,
                                        model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
-                                       outputDirectory: outputDirectory)
+                                       outputDirectory: outputDirectory, runConfig: runConfig)
                     progress = Double(attempt + 1) / Double(indicesToRetry.count)
                     statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
                 }
             }
             // Loop back — if there are still failures, the dialog will appear again
         }
+    }
+
+    /// An explicit caller snapshot wins; post-run per-item actions reuse the snapshot retained by the
+    /// original fresh run. Resume leaves both nil until W16.cfg5, preserving its static fallback meanwhile.
+    func runConfigForRetry(_ explicit: SessionProcessingConfig?) -> SessionProcessingConfig? {
+        explicit ?? activeRunConfig
     }
 
     /// Re-OCR a single file, then regenerate its output PDF (+ re-prune `failedFiles`). Extracted from the
@@ -1988,20 +2028,23 @@ extension OCRProcessor {
     @discardableResult
     func retryOne(index: Int, imageURL: URL? = nil, provider: LLMProvider, model: LLMModel,
                   thinkingLevel: ThinkingLevel?, apiKey: String, outputDirectory: URL,
-                  rotation: Int? = nil) async -> Bool {
+                  rotation: Int? = nil, runConfig: SessionProcessingConfig? = nil) async -> Bool {
         guard jobs.indices.contains(index) else { return false }
         jobs[index].status = .processing
         let ocrURL = imageURL ?? jobs[index].sourceURL
+        let effectiveRunConfig = runConfigForRetry(runConfig)
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
-            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway, localAgent: currentLocalAgent)
+            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway,
+            localAgent: currentLocalAgent, standardImageMB: effectiveRunConfig?.standardImageMB)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
         let persisted = await handleOCRResult(
-            result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory)
+            result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory,
+            runConfig: effectiveRunConfig)
         return persisted && result.text != nil
     }
     /// Request notification permission (call once at app launch).

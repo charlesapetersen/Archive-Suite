@@ -109,8 +109,8 @@ struct SessionProcessingConfig: Sendable {
     }
 
     /// Build the Process Files run snapshot with the exact normalization currently performed by
-    /// `OCRProcessor.loadStandardImageMB()`. W16.cfg2/3 will switch scheduling/output reads to this config;
-    /// keeping this as a separate, currently-unused builder preserves Live Capture behavior during cfg1.
+    /// `OCRProcessor.loadStandardImageMB()`. W16.cfg2 uses it for OCR scheduling and PDF generation;
+    /// the remaining migration steps will move review/tagging and resume consumers onto the same snapshot.
     static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         var config = fromDefaults(d)
         config.standardImageMB = normalizedImageMB(

@@ -508,7 +508,7 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
 - [x] **W16.cfg1 — make `SessionProcessingConfig` the single run config [S].** DONE 2026-07-29 (this commit).
   `SessionProcessingConfig` is now explicitly `Sendable`; its existing `fromDefaults()` builder snapshots
   `ocrWorkerCount` with the same 1…12 clamp/fallback of 4 as `OCRProcessor.loadStandardImageMB()`. A dedicated,
-  currently-unused `fromProcessFilesRunStart()` builder centralizes that method's complete normalization (worker
+  then-unused `fromProcessFilesRunStart()` builder centralizes that method's complete normalization (worker
   count, all three finite 0.5…20 image sizes, and 1…4 text columns) for W16.cfg2/3 without changing Live Capture
   behavior in this checkpoint. The field defaults to 4 for the two direct Live Capture test-driver configs; no
   scheduling/output call site reads it yet. Kept app-local (no ArchiveCore/SPEC/protocol change). Processor
@@ -516,20 +516,34 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   defaults to cover the returned configs' worker wiring/bounds and complete Process Files normalization, and
   passed all checks.
   | files: Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift | S | low | none
-- [ ] **W16.cfg2 — thread the run config into OCR scheduling + PDF generation reads** (blocked-on: W16.cfg1) **[M].**
-  Sites: `OCRProcessor+OCR.swift:235-236, :807, :965, :1052-1053, :1124` and `OCRProcessor+Pipeline.swift:1061-1062, :1304`.
-  Keep the statics as fallback so nothing breaks mid-migration. Every site already binds to a local `let` before
-  crossing into detached work, so this is "pass a struct instead of read a static", not a redesign.
-  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | M | med | none
-- [ ] **W16.cfg3 — thread the run config into review/regeneration + tagging reads** (blocked-on: W16.cfg1) **[M].**
+- [x] **W16.cfg2 — thread the run config into OCR scheduling + PDF generation reads [M].** DONE 2026-07-29
+  (this commit). Fresh Process Files runs now capture one normalized `SessionProcessingConfig` and pass it through
+  multi-page re-OCR, paid-batch result materialization, sequential/parallel OCR, timeout/high-use retries, the
+  interactive retry loop, and PDF writes. OCR calls receive its `standardImageMB`; schedulers use its bounded
+  `ocrWorkerCount`; PDF generation uses its `pdfImageMB`/`textColumns`. The exact sizing/scheduling values used
+  are also written to `PendingRunRuntimeConfig`, rather than re-read from globals. The processor retains the
+  snapshot for the Files pane's post-run per-item Retry / Retry with model / Rotate & re-run actions (an
+  adversarial-review catch). Resume paths explicitly pass nil and preserve the existing validated static fallback
+  until W16.cfg5, so this checkpoint changes no recovery schema or legacy behavior. Debug build succeeded; the
+  scratch config/manifest, multi-page PDF, and batch/non-batch resume suites all passed. The general smoke wrapper's
+  two self-contained Local Agent checks passed; its unrelated build/launch/corpus stages remain unusable in an
+  isolated worktree because the script assumes a nonexistent nested `ArchiveProcessor/` path and untracked
+  `Test Files`. Tier-2 adversarial review approved after the per-item retry gap was fixed.
+  | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
+    Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver,MultiPageReOCRTestDriver}.swift | M | med | none
+- [ ] **W16.cfg3 — thread the run config into review/regeneration + tagging reads** (blocked-on: W16.cfg1,
+  W16.cfg2) **[M].**
   `OCRProcessor+ReviewFlows.swift:377-378` and `OCRProcessor+Tagging.swift:81, :448`. **Highest-value sites** —
   they fire well after the main OCR pass, which is exactly when a resume can race a still-finalizing prior run.
-  Independent of W16.cfg2; can run in a parallel session.
-  | files: OCR/OCRProcessor+ReviewFlows.swift, OCR/OCRProcessor+Tagging.swift | M | med | none
+  Thread the exact `runConfig` already captured by `startProcessing` in Pipeline; do not rebuild it from mutable
+  defaults. | files: OCR/{OCRProcessor+Pipeline,OCRProcessor+ReviewFlows,OCRProcessor+Tagging}.swift | M | med | none
 - [ ] **W16.cfg5 — resume constructs a run config instead of fanning out to globals** (blocked-on: W16.cfg2, W16.cfg3) **[M].**
   Replace the six assignments at `OCRProcessor+Pipeline.swift:280-285` (the only remaining global-write on a
-  non-run-start path) with construction of the run config from `PendingRunRuntimeConfig`; same for the three
-  other write points (`Pipeline:773, :997, :1591`). **Leave `pendingRunRuntimeConfigIsValid` (Pipeline:204-233)
+  non-run-start path) with construction of the run config from `PendingRunRuntimeConfig`; store it in
+  `activeRunConfig` and pass it through the cfg2/cfg3 seams. A legacy `PendingRun` and `PendingBatch` have no
+  persisted runtime config, so their `Pipeline:773, :997` paths must build one from current defaults (the same
+  values their present `loadStandardImageMB()` fallback uses), while fresh-run `Pipeline:1591` deletes its
+  redundant static fan-out. **Leave `pendingRunRuntimeConfigIsValid` (Pipeline:204-233)
   unchanged — the manifest schema does NOT change, so do NOT bump `schemaVersion`.** `BatchResumeTestDriver.swift:411-426`
   assertions will need rewriting to assert on the config rather than the statics.
   | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none

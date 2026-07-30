@@ -70,8 +70,13 @@ enum MultiPageReOCRTestDriver {
             }
         }
         // Deterministic PDF output for the assembly path (no image re-encode size games in a synthetic test).
-        OCRProcessor.pdfImageMB = 0
-        OCRProcessor.textColumns = 1
+        // Pass it explicitly so the functional path exercises W16.cfg2's immutable run dependency instead
+        // of mutating the process globals that this migration is retiring.
+        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+        runConfig.standardImageMB = 0.5
+        runConfig.ocrWorkerCount = 2
+        runConfig.pdfImageMB = 0
+        runConfig.textColumns = 1
 
         // ── 1. renderAllPages: count + per-page decodability, and nil on a non-PDF. ─────────────────
         let renderDir = root.appendingPathComponent("render", isDirectory: true)
@@ -121,7 +126,8 @@ enum MultiPageReOCRTestDriver {
         let model = LLMModel.geminiModels[0]   // only feeds the text-page subheader; OCR is injected
         await processor.performMultiPagePDFReOCR(
             files: [src], provider: .gemini, model: model, thinkingLevel: nil,
-            apiKey: "", outputDirectory: outDir, ocrOverride: makeInjectedOCR())
+            apiKey: "", outputDirectory: outDir, runConfig: runConfig,
+            ocrOverride: makeInjectedOCR())
 
         let outURL = processor.outputURLMap[src]
         check("output PDF mapped and on disk",
@@ -144,7 +150,8 @@ enum MultiPageReOCRTestDriver {
         inplaceProc.jobs = [OCRJob(sourceURL: inplace)]
         await inplaceProc.performMultiPagePDFReOCR(
             files: [inplace], provider: .gemini, model: model, thinkingLevel: nil,
-            apiKey: "", outputDirectory: sameDir, ocrOverride: makeInjectedOCR())
+            apiKey: "", outputDirectory: sameDir, runConfig: runConfig,
+            ocrOverride: makeInjectedOCR())
         let inplaceOut = inplaceProc.outputURLMap[inplace]
         check("output reserved a non-colliding name (doc (2).pdf), not the input's",
               inplaceOut?.lastPathComponent == "doc (2).pdf")
@@ -180,7 +187,8 @@ enum MultiPageReOCRTestDriver {
         mixProc.jobs = [OCRJob(sourceURL: mixIMG), OCRJob(sourceURL: mixPDF)]
         await mixProc.performMultiPagePDFReOCR(
             files: [mixIMG, mixPDF], provider: .gemini, model: model, thinkingLevel: nil,
-            apiKey: "", outputDirectory: mixOut, ocrOverride: makeInjectedOCR())
+            apiKey: "", outputDirectory: mixOut, runConfig: runConfig,
+            ocrOverride: makeInjectedOCR())
 
         let imgJob = mixProc.jobs.first { $0.sourceURL == mixIMG }
         let pdfJob = mixProc.jobs.first { $0.sourceURL == mixPDF }

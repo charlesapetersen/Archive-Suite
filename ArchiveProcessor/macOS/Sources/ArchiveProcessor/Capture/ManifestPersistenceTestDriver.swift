@@ -41,10 +41,18 @@ enum ManifestPersistenceTestDriver {
         // overwrite all three, and later Process Files writes could change Live Capture mid-session.
         let originalRotation = OCRProcessor.rotationModeForRun
         let originalStandardImageMB = OCRProcessor.standardImageMB
+        let originalOCRWorkerCount = OCRProcessor.ocrWorkerCount
+        let originalPDFImageMB = OCRProcessor.pdfImageMB
+        let originalTextColumns = OCRProcessor.textColumns
+        let originalExportedImageMB = OCRProcessor.exportedImageMB
         let originalStampUnread = MacOSTagger.stampUnread
         defer {
             OCRProcessor.rotationModeForRun = originalRotation
             OCRProcessor.standardImageMB = originalStandardImageMB
+            OCRProcessor.ocrWorkerCount = originalOCRWorkerCount
+            OCRProcessor.pdfImageMB = originalPDFImageMB
+            OCRProcessor.textColumns = originalTextColumns
+            OCRProcessor.exportedImageMB = originalExportedImageMB
             MacOSTagger.stampUnread = originalStampUnread
         }
         OCRProcessor.rotationModeForRun = .off
@@ -95,6 +103,45 @@ enum ManifestPersistenceTestDriver {
               && processFilesConfig.pdfImageMB == 20
               && processFilesConfig.exportedImageMB == 3
               && processFilesConfig.textColumns == 4)
+
+        // --- W16.cfg2: injected scheduling/PDF settings win; nil retains the migration fallback. ---
+        OCRProcessor.ocrWorkerCount = 2
+        OCRProcessor.pdfImageMB = 3
+        OCRProcessor.textColumns = 1
+        let fallbackPDF = OCRProcessor.pdfGenerationSettings(for: nil)
+        check("W16.cfg2: nil config retains worker/PDF static fallbacks for resume migration",
+              OCRProcessor.schedulingWorkerCount(for: nil) == 2
+              && fallbackPDF.imageMB == 3
+              && fallbackPDF.textColumns == 1)
+        var injectedConfig = processFilesConfig
+        injectedConfig.standardImageMB = 7
+        injectedConfig.ocrWorkerCount = 9
+        injectedConfig.pdfImageMB = 8
+        injectedConfig.textColumns = 3
+        injectedConfig.exportedImageMB = 6
+        let injectedPDF = OCRProcessor.pdfGenerationSettings(for: injectedConfig)
+        check("W16.cfg2: immutable config overrides conflicting worker/PDF statics",
+              OCRProcessor.schedulingWorkerCount(for: injectedConfig) == 9
+              && injectedPDF.imageMB == 8
+              && injectedPDF.textColumns == 3)
+        let persistedConfig = OCRProcessor().makePendingRunRuntimeConfig(
+            imageScale: 0.75, gatewayConfig: nil, runConfig: injectedConfig)
+        check("W16.cfg2: resume snapshot records the exact injected sizing/scheduling values",
+              persistedConfig.standardImageMB == 7
+              && persistedConfig.ocrWorkerCount == 9
+              && persistedConfig.pdfImageMB == 8
+              && persistedConfig.textColumns == 3
+              && persistedConfig.exportedImageMB == 6)
+        let retryProcessor = OCRProcessor()
+        retryProcessor.activeRunConfig = injectedConfig
+        let retainedRetryConfig = retryProcessor.runConfigForRetry(nil)
+        var explicitRetryConfig = injectedConfig
+        explicitRetryConfig.pdfImageMB = 5
+        let explicitRetryResult = retryProcessor.runConfigForRetry(explicitRetryConfig)
+        check("W16.cfg2: post-run per-item retry retains the original config; an explicit retry config wins",
+              retainedRetryConfig?.standardImageMB == 7
+              && retainedRetryConfig?.pdfImageMB == 8
+              && explicitRetryResult?.pdfImageMB == 5)
 
         let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
         try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)

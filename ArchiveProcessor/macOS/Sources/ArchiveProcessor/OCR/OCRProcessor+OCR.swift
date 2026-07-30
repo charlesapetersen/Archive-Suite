@@ -3,6 +3,23 @@ import UserNotifications
 import os
 
 extension OCRProcessor {
+    /// Resolve the settings used by PDF generation. The optional fallback is deliberate during the
+    /// W16.cfg2/3/5 migration: fresh Process Files runs pass their immutable snapshot, while resume and
+    /// older call sites continue to use the existing write-once statics until they can construct one.
+    nonisolated static func pdfGenerationSettings(
+        for runConfig: SessionProcessingConfig?
+    ) -> (imageMB: Double, textColumns: Int) {
+        (
+            runConfig?.pdfImageMB ?? pdfImageMB,
+            runConfig?.textColumns ?? textColumns
+        )
+    }
+
+    /// Resolve the bounded worker count for OCR scheduling, retaining the static only as a migration fallback.
+    nonisolated static func schedulingWorkerCount(for runConfig: SessionProcessingConfig?) -> Int {
+        min(12, max(1, runConfig?.ocrWorkerCount ?? ocrWorkerCount))
+    }
+
     /// Convert any PDF files in the input list to temporary JPEG images.
     /// Returns a new array where PDF URLs have been replaced with temp JPEG URLs.
     /// Non-PDF files are returned unchanged. The jobs array still references the
@@ -232,12 +249,14 @@ extension OCRProcessor {
         customPrompt: String? = nil,
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil,
+        runConfig: SessionProcessingConfig? = nil,
         ocrOverride: (@Sendable (URL) async -> OCRResult)? = nil
     ) async {
         let total = files.count
         guard total > 0 else { return }
-        let pdfMB = Self.pdfImageMB
-        let txtCols = Self.textColumns
+        let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
+        let pdfMB = pdfSettings.imageMB
+        let txtCols = pdfSettings.textColumns
         let gatewayName = currentGateway?.displayName
 
         for (index, pdfURL) in files.enumerated() {
@@ -295,7 +314,8 @@ extension OCRProcessor {
                         imageURL: img, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: pageResults.last?.text, previousImageURL: nil,
-                        customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent
+                        customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
+                        standardImageMB: runConfig?.standardImageMB
                     )
                 }
                 pageResults.append(result)
@@ -507,7 +527,8 @@ extension OCRProcessor {
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
         customPrompt: String? = nil,
-        imageScale: Double = 1.0
+        imageScale: Double = 1.0,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         let total = fileURLs.count
 
@@ -617,7 +638,8 @@ extension OCRProcessor {
         await pollBatchUntilComplete(
             batchId: batchId, provider: provider, model: model,
             thinkingLevel: thinkingLevel, apiKey: apiKey,
-            fileURLs: fileURLs, outputDirectory: outputDirectory
+            fileURLs: fileURLs, outputDirectory: outputDirectory,
+            runConfig: runConfig
         )
 
         // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
@@ -636,7 +658,8 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         fileURLs: [URL],
-        outputDirectory: URL
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         var pollCount = 0
         var consecutiveErrors = 0
@@ -673,7 +696,7 @@ extension OCRProcessor {
                             let results = try await client.retrieveResults(resultsURL: url)
                             guard await processBatchResults(
                                 results, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                outputDirectory: outputDirectory) else { return }
+                                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
                         } else {
                             statusMessage = "Batch completed but no results available"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -696,7 +719,7 @@ extension OCRProcessor {
                             let results = try await client.retrieveResults(outputFileId: fileId)
                             guard await processBatchResults(
                                 results, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                outputDirectory: outputDirectory) else { return }
+                                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
                         } else {
                             statusMessage = "Batch \(status.status.lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -738,12 +761,12 @@ extension OCRProcessor {
                                 if let inlineResults = status.inlineResults {
                                     materialized = await processBatchResults(
                                         inlineResults, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                        outputDirectory: outputDirectory)
+                                        outputDirectory: outputDirectory, runConfig: runConfig)
                                 } else if let fileName = status.resultFileName {
                                     let results = try await client.retrieveResults(resultFileName: fileName)
                                     materialized = await processBatchResults(
                                         results, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                        outputDirectory: outputDirectory)
+                                        outputDirectory: outputDirectory, runConfig: runConfig)
                                 }
                                 guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
                                 consumedChunkIds.insert(singleBatchId)
@@ -812,7 +835,7 @@ extension OCRProcessor {
             )
             guard await handleOCRResult(
                 synthetic, index: i, url: url, model: model,
-                outputDirectory: outputDirectory) else { return }
+                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
         }
     }
     private func processBatchResults(
@@ -820,7 +843,8 @@ extension OCRProcessor {
         fileURLs: [URL],
         model: LLMModel,
         apiKey: String,
-        outputDirectory: URL
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
         // Parse valid entries upfront so the task group doesn't need to touch fileURLs.
         // A resumed paid batch restores these keys from disk. Skip them before output-path allocation so
@@ -862,7 +886,7 @@ extension OCRProcessor {
             for await (index, url, resolved) in group {
                 guard await handleOCRResult(
                     resolved, index: index, url: url, model: model,
-                    outputDirectory: outputDirectory) else {
+                    outputDirectory: outputDirectory, runConfig: runConfig) else {
                     allPersisted = false
                     group.cancelAll()
                     return
@@ -883,7 +907,8 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        segmentationContext: SegmentationContext
+        segmentationContext: SegmentationContext,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
@@ -896,7 +921,8 @@ extension OCRProcessor {
                 outputDirectory: outputDirectory,
                 sendPreviousImage: segmentationContext.sendPreviousImage,
                 customPrompt: segmentationContext.customPrompt,
-                imageScale: segmentationContext.imageScale
+                imageScale: segmentationContext.imageScale,
+                runConfig: runConfig
             )
         } else {
             // Need prior page's OCR text — must be sequential
@@ -907,7 +933,8 @@ extension OCRProcessor {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
-                segmentationContext: segmentationContext
+                segmentationContext: segmentationContext,
+                runConfig: runConfig
             )
         }
     }
@@ -918,7 +945,8 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        segmentationContext: SegmentationContext
+        segmentationContext: SegmentationContext,
+        runConfig: SessionProcessingConfig?
     ) async {
         let total = fileURLs.count
         let gateway = currentGateway
@@ -951,7 +979,8 @@ extension OCRProcessor {
                 previousImageURL: contextImageURL,
                 customPrompt: segmentationContext.customPrompt,
                 imageScale: segmentationContext.imageScale,
-                gatewayConfig: gateway, localAgent: localAgent
+                gatewayConfig: gateway, localAgent: localAgent,
+                standardImageMB: runConfig?.standardImageMB
             )
 
             // If timed out, retry once without context
@@ -967,13 +996,14 @@ extension OCRProcessor {
                     previousImageURL: nil,
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
-                    gatewayConfig: gateway, localAgent: localAgent
+                    gatewayConfig: gateway, localAgent: localAgent,
+                    standardImageMB: runConfig?.standardImageMB
                 )
             }
 
             guard await handleOCRResult(
                 result, index: index, url: url, model: model,
-                outputDirectory: outputDirectory) else { return }
+                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
             previousText = result.text
             previousImageURL = url
 
@@ -990,12 +1020,13 @@ extension OCRProcessor {
         outputDirectory: URL,
         sendPreviousImage: Bool,
         customPrompt: String? = nil,
-        imageScale: Double = 1.0
+        imageScale: Double = 1.0,
+        runConfig: SessionProcessingConfig?
     ) async {
         let total = fileURLs.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
-        let concurrency = max(1, Self.ocrWorkerCount)
+        let concurrency = Self.schedulingWorkerCount(for: runConfig)
         var completed = 0
 
         // Mark all as processing
@@ -1017,7 +1048,8 @@ extension OCRProcessor {
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: prevImageURL,
                         customPrompt: customPrompt, imageScale: imageScale,
-                        gatewayConfig: gateway, localAgent: localAgent
+                        gatewayConfig: gateway, localAgent: localAgent,
+                        standardImageMB: runConfig?.standardImageMB
                     )
                     return (index, result)
                 }
@@ -1029,7 +1061,7 @@ extension OCRProcessor {
                 let url = fileURLs[index]
                 guard await handleOCRResult(
                     result, index: index, url: url, model: model,
-                    outputDirectory: outputDirectory) else {
+                    outputDirectory: outputDirectory, runConfig: runConfig) else {
                     group.cancelAll()
                     return
                 }
@@ -1050,7 +1082,8 @@ extension OCRProcessor {
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: customPrompt, imageScale: imageScale,
-                            gatewayConfig: gateway, localAgent: localAgent
+                            gatewayConfig: gateway, localAgent: localAgent,
+                            standardImageMB: runConfig?.standardImageMB
                         )
                         return (idx, result)
                     }
@@ -1059,7 +1092,8 @@ extension OCRProcessor {
         }
     }
     func handleOCRResult(
-        _ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL
+        _ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
         guard index >= 0 && index < jobs.count else { return false }
         let sourceURL = jobs[index].sourceURL
@@ -1082,8 +1116,9 @@ extension OCRProcessor {
         // suspends at the await but is free to service UI events while the work runs on .utility.
         let originalFileName = sourceURL.lastPathComponent
         let gatewayName = currentGateway?.displayName
-        let pdfMB = Self.pdfImageMB
-        let txtCols = Self.textColumns
+        let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
+        let pdfMB = pdfSettings.imageMB
+        let txtCols = pdfSettings.textColumns
         let shouldPassTags = passSourceTags
         let pdfResult: (success: Bool, tags: [String]?) = await Task.detached(priority: .utility) {
             let pdfGen = PDFGenerator()
@@ -1149,8 +1184,8 @@ extension OCRProcessor {
         return false
     }
     /// Single-image OCR + concurrent rotation detection, merged into one result. Live Capture passes
-    /// its immutable session values explicitly; Process Files uses the static defaults until its
-    /// per-run dependency-injection refactor is complete.
+    /// its immutable session values explicitly; W16.cfg2 does the same for fresh Process Files runs,
+    /// with the static retained only for resume/legacy callers until W16.cfg5/6 complete the migration.
     nonisolated static func performOCRCall(
         imageURL: URL,
         provider: LLMProvider,
@@ -1266,7 +1301,8 @@ extension OCRProcessor {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
-        outputDirectory: URL
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         let retryIndices = jobs.indices.filter { isRetryableError(jobs[$0].result) }
         guard !retryIndices.isEmpty else { return }
@@ -1291,7 +1327,8 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 previousText: nil,
                 previousImageURL: nil,
-                gatewayConfig: gateway, localAgent: localAgent
+                gatewayConfig: gateway, localAgent: localAgent,
+                standardImageMB: runConfig?.standardImageMB
             )
 
             // Update failed files list if retry succeeded
@@ -1301,7 +1338,7 @@ extension OCRProcessor {
             }
             guard await handleOCRResult(
                 result, index: index, url: url, model: model,
-                outputDirectory: outputDirectory) else { return }
+                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
         }
     }
     /// Run a single OCR call at a given image scale for resolution testing. Public so the UI can call it.

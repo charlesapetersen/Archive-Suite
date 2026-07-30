@@ -16,6 +16,10 @@ class OCRProcessor: ObservableObject {
 
     /// When true, copy macOS tags from source images to output PDFs instead of LLM tagging
     var passSourceTags = false
+    /// Immutable Process Files settings retained for post-run per-item retries. Fresh runs set this once
+    /// before any work starts; W16.cfg5 will populate it from resume state. MainActor isolation keeps the
+    /// snapshot and all retry consumers serialized.
+    var activeRunConfig: SessionProcessingConfig?
 
     // MARK: Live Capture staging (set by LiveCaptureView, consumed by OCRView → startProcessing)
     /// Ordered captured photo URLs waiting to be loaded as the input file list.
