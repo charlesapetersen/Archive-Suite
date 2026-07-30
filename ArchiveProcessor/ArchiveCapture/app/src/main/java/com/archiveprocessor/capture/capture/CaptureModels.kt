@@ -1,5 +1,9 @@
 package com.archiveprocessor.capture.capture
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Mirrors the Mac's CaptureGroupType (X-Type wire values). */
@@ -7,10 +11,54 @@ enum class GroupType(val wire: String) { DOCUMENT("document"), BOX("box"), FOLDE
 
 enum class UploadState { PENDING, UPLOADING, UPLOADED, FAILED }
 
+/** True while this photo exists ONLY on the phone: the Mac either hasn't confirmed it, or has confirmed
+ *  bytes that a pending metadata resend has since made stale. Deleting such a page locally is
+ *  irrecoverable — an archival photo can't be re-taken — so the delete gesture must confirm first. Same
+ *  predicate as the un-sent heartbeat below, deliberately: "the Mac still needs this" and "losing this
+ *  loses it forever" are the same condition. */
+internal fun requiresDeleteConfirmation(item: CapturedItem): Boolean =
+    item.state != UploadState.UPLOADED || item.needsResend
+
 /** Count pages the Mac must still expect. FAILED is included because the background retry loop sends it
  * automatically; reporting zero while such a page exists can let the Mac finish a session too early. */
 internal fun pendingReportCount(items: Iterable<CapturedItem>): Int =
-    items.count { it.state != UploadState.UPLOADED || it.needsResend }
+    items.count { requiresDeleteConfirmation(it) }
+
+/** What a confirmed delete actually did to the local file. */
+internal enum class DeleteOutcome {
+    /** Copied into the phone's shared gallery, then removed from the queue — recoverable. */
+    RETIRED_TO_GALLERY,
+    /** Removed outright (the operator chose "Delete permanently", or the Mac already has it). */
+    DELETED,
+    /** The gallery copy failed, so the photo was KEPT. Never delete the only copy of an un-sent page. */
+    KEPT_RETIRE_FAILED
+}
+
+/** Retire one capture's local file. When [retire] is supplied (the operator chose the recoverable
+ *  "Save to gallery & delete" action) the file is removed ONLY after that copy is confirmed written —
+ *  a failed copy keeps the photo, because an un-uploaded page has no other copy anywhere. */
+internal fun retireCaptureFile(file: File, retire: ((File) -> Boolean)?): DeleteOutcome {
+    if (retire != null) {
+        if (!retire(file)) return DeleteOutcome.KEPT_RETIRE_FAILED
+        runCatching { file.delete() }
+        return DeleteOutcome.RETIRED_TO_GALLERY
+    }
+    runCatching { file.delete() }
+    return DeleteOutcome.DELETED
+}
+
+/** Delete a capture safely: cancel its upload and WAIT for that coroutine to finish BEFORE the bytes go
+ *  away. The upload opens the file itself, so a delete that wins that race leaves the page nowhere — not
+ *  on the phone, not on the Mac. Joining first means the upload either completed (bytes are on the Mac)
+ *  or unwound while the file was still readable; either way the loss is a decision, not a race. */
+internal suspend fun retireCapture(
+    uploadJob: Job?,
+    file: File,
+    retire: ((File) -> Boolean)?
+): DeleteOutcome {
+    uploadJob?.cancelAndJoin()
+    return withContext(Dispatchers.IO) { retireCaptureFile(file, retire) }
+}
 
 /** Atomically expose a deferred metadata resend as pending before the next drain heartbeat is emitted. */
 internal fun CapturedItem.prepareDeferredResend(): CapturedItem =
