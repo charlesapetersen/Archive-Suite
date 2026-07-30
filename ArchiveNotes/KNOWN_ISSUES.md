@@ -36,8 +36,19 @@ old error-path behaviour so appending to a missing extract still can't leave a p
 Notes store — Prime Directive #1). 9 new fixtures in `NotesItemTransactionTests` — the four RED cases
 above all GREEN (24/24 appends survive), plus concurrent different-field edits compose, a throwing
 `mutate` leaves the `.md` byte-untouched, a missing item throws and creates no phantom dir, and
-`withTemplate` is atomic over `Templates/`. Full Notes suite **530 tests / 63 suites pass**; build clean,
+`withTemplate` is atomic over `Templates/`. Full Notes suite **532 tests / 63 suites pass**; build clean,
 **0 new warnings**.
+
+**Independently corroborated.** An earlier daemon session (2026-07-29) had started this item and died with
+uncommitted work; its WIP — preserved at gitignored `old/w23h2-stray-worktree-20260729/` — had arrived at the
+**same design** from scratch (`withItem`/`withTemplate` over a private synchronous `withEntry`). Three things
+from it were adopted: doc warnings on `save`/`saveTemplate` pointing editors at `withItem`; a **"do not add an
+`await` to this function"** invariant note on `withEntry` (one `await` there silently re-opens the bug with
+nothing failing obviously); and a cheaper `mdURL` pre-flight probe in `append` (locates the `.md`, no read or
+parse) plus the test that locks it in — a bad id still throws *before* any asset byte is written, so it cannot
+leave a phantom `items/<uuid>/assets/` with no `.md`. Also adopted: a deterministic **pinned-hazard** test that
+spells the old two-load/two-save interleaving out by hand and asserts the loss on purpose, so routing any edit
+path back through a `load` + `save` pair fails loudly.
 
 **Two residuals, recorded honestly (neither is data loss — the `.md` on disk is now always correct):**
 1. **The FTS index row can go transiently stale** (LOW). Two concurrent `mutateItem`s commit their disk

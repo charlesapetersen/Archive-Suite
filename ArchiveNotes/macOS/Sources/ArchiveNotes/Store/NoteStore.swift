@@ -79,6 +79,11 @@ actor NoteStore {
 
     func create(_ item: Item) throws -> ItemRef { try createEntry(item, in: itemDir(item.id)) }
     func load(_ id: UUID) throws -> Item { try loadEntry(id, in: itemDir(id)) }
+
+    /// Whole-item overwrite. ⚠️ **W23.h2 — to EDIT an existing item, use `withItem` instead.** Pairing
+    /// `load` with `save` re-opens the lost-update window this store now closes: the save writes the
+    /// *whole* item, so it silently discards every field a concurrent edit changed in between. This
+    /// primitive is for callers that already hold the authoritative item (tests, a full re-write).
     func save(_ item: Item) throws -> ItemRef { try saveEntry(item, in: itemDir(item.id)) }
 
     /// Move the item directory to the Trash (recoverable). Never `removeItem`.
@@ -114,6 +119,9 @@ actor NoteStore {
         try withEntry(id, in: templateDir(id), mutate)
     }
 
+    /// The atomic load→mutate→save worker behind `withItem` / `withTemplate`. **Do not add an `await`
+    /// to this function** — its atomicity IS the absence of a suspension point between the read and the
+    /// write, so one `await` here silently re-opens W23.h2 with no test failing anywhere obvious.
     private func withEntry(_ id: UUID, in dir: URL,
                            _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
         var item = try loadEntry(id, in: dir)
@@ -151,6 +159,7 @@ actor NoteStore {
 
     func createTemplate(_ item: Item) throws -> ItemRef { try createEntry(item, in: templateDir(item.id)) }
     func loadTemplate(_ id: UUID) throws -> Item { try loadEntry(id, in: templateDir(id)) }
+    /// Whole-template overwrite — see `save`'s warning; to EDIT a template use `withTemplate`.
     func saveTemplate(_ item: Item) throws -> ItemRef { try saveEntry(item, in: templateDir(item.id)) }
 
     /// Move the template directory to the Trash (recoverable). Never `removeItem`.

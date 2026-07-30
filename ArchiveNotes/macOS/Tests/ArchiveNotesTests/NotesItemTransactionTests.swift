@@ -40,6 +40,35 @@ struct NotesItemTransactionTests {
              unknownFrontMatter: [], trailingBodyRaw: body)
     }
 
+    // MARK: - The hazard, pinned
+
+    /// The PRE-FIX pattern written out explicitly — two loads, two divergent edits, two saves. No race
+    /// is needed: the interleaving is spelled by hand, so this is deterministic. The second whole-item
+    /// save wins wholesale and the first edit is gone from disk with no error raised anywhere.
+    ///
+    /// It asserts the LOSS **on purpose.** This is the premise `withItem` exists to remove, so it fails
+    /// loudly if anyone ever "simplifies" an edit path back to a `load` + `save` pair.
+    @Test("PINNED HAZARD: a load…save pair silently drops the other edit (why withItem exists)")
+    func rawLoadSavePairLosesAnUpdate() async throws {
+        let root = try Self.scratchRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = NoteStore(root: root)
+        let id = UUID()
+        _ = try await store.create(Self.blankItem(id: id, body: "Original body."))
+
+        // Both readers see the same old item — exactly what two awaits in two tasks produce.
+        var a = try await store.load(id)
+        var b = try await store.load(id)
+        a.quality = 3                          // e.g. the metadata inspector
+        b.trailingBodyRaw = "Edited body."     // e.g. the editor's autosave
+        _ = try await store.save(a)
+        _ = try await store.save(b)
+
+        let onDisk = try await store.load(id)
+        #expect(onDisk.trailingBodyRaw == "Edited body.")
+        #expect(onDisk.quality == nil, "the quality edit is silently lost — the W23.h2 defect")
+    }
+
     // MARK: - The primitive: contention on ONE item
 
     @Test("24 concurrent withItem transactions on one item ALL survive")
@@ -253,6 +282,28 @@ struct NotesItemTransactionTests {
         #expect(r.blocks.count == 2)
         #expect(r.blocks.last?.markdown.contains("two") == true)
         #expect(r.quality == 3)
+        await Self.tearDown(env)
+    }
+
+    /// Hoisting the asset copies OUT of the transaction must not lose `append`'s fail-fast contract: a
+    /// bad id still throws *before* any asset byte is written, so it can't leave a phantom
+    /// `items/<uuid>/assets/` with no `.md` (which `allItemIDs` would list but `allItemRefs` would skip).
+    /// This is the test that locks in the pre-flight `mdURL` probe.
+    @Test("append to a MISSING extract writes no asset bytes and leaves no phantom dir")
+    @MainActor
+    func appendToMissingExtractWritesNothing() async throws {
+        let env = try await Self.makeEnv()
+        let ghost = UUID()
+        let incoming = ExtractPassageBlock(
+            block: Block(kind: .notePassage, source: nil, markdown: "Orphan.", unknownHeaderFields: []),
+            pendingAssets: ["shot.png": Data([0x89, 0x50, 0x4E, 0x47])])
+
+        await #expect(throws: (any Error).self) {
+            _ = try await ExtractBuilder(store: env.store).append(toExtract: ghost, passages: [incoming])
+        }
+
+        let dir = NoteStore.itemDir(root: env.store.rootURL, id: ghost)
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
         await Self.tearDown(env)
     }
 }

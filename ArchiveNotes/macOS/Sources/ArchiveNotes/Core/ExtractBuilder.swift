@@ -246,10 +246,12 @@ struct ExtractBuilder {
     /// write into `assets/`, never the `.md`, and don't depend on the item's current state.
     @discardableResult
     func append(toExtract id: UUID, passages: [ExtractPassageBlock]) async throws -> Item {
-        // Pre-flight existence check: `persist` creates `<item>/assets/` on demand, so appending to a
-        // missing extract would otherwise leave a phantom item dir with no `.md`. The authoritative
-        // read is the one inside the transaction below.
-        _ = try await store.load(id)
+        // Pre-flight existence probe: `persist` creates `<item>/assets/` on demand, so appending to a
+        // missing extract would otherwise leave a phantom item dir with no `.md`. `mdURL` only locates
+        // the `.md` (no read, no parse) — it is purely an early-out that keeps the old fail-fast
+        // contract; the authoritative read is the one inside the transaction below, so a delete racing
+        // the probe still fails the append rather than resurrecting the item.
+        _ = try await store.mdURL(for: id)
         let blocks = try await persist(passages, into: id)
         let when = now()
         return try await store.withItem(id) { item in
