@@ -28,6 +28,11 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
    **full-codebase review**, use the paced method in [`REVIEW.md`](REVIEW.md) — one subsystem per session,
    lean fan-out, refute-verify; **never** one giant fan-out (it blows a usage window). Use the `/code-review`
    skill for the working diff.
+   ⏸ **Paced *whole-project* reviews are PAUSED for the daemon (owner, 2026-07-29)** while it drains the
+   `SUITE_TODO.md` **Wave 23** bug queue — see [`REVIEW.md`](REVIEW.md). **This does NOT relax this step:** the
+   per-change Tier-2 gate (adversarial self-review + a functional test on anything with no undo) is
+   unchanged and still mandatory. What's paused is *proactively hunting for new findings*, not reviewing
+   your own change.
 4. **Docs move with the code — in the SAME commit** (→ *Docs & backlog convention*, below): flip the
    shipped `SUITE_TODO.md` checkbox, update `KNOWN_ISSUES.md`, delete a shipped `execution-plans/` plan.
    `SUITE_TODO.md` is the tracker of record; an unattended run reconciles it **before it ends**.

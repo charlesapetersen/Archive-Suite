@@ -3,6 +3,15 @@
 A **durable, resumable** way to code-review this monorepo **without burning a whole usage window at once**.
 Reach for this whenever you'd otherwise "do a full code review" — do NOT fire one giant fan-out.
 
+> **⏸ STATUS: paced reviews are PAUSED for the autonomous daemon (owner directive, 2026-07-29).**
+> `ops/autonomous/next-review-unit.sh` has a master switch (`REVIEW_ENABLED_DEFAULT=0`) that makes the WS11
+> cadence always report "none due", so **no daemon session will start a review** — it drains bugs instead. The
+> reason is supply, not doubt in the method: the owner-commissioned Codex full-suite review of 2026-07-29 filed
+> **24 confirmed findings** as `SUITE_TODO.md` **Wave 23**, so the bottleneck is fixing, not finding.
+> **Everything in this document remains current and correct** — it's the method to use when reviews resume, and
+> the `lean-review` / `review-sweep` skills still work for an **owner-initiated** review at any time. See
+> `ops/autonomous/README.md` §"Paced reviews are currently OFF" for how to turn the cadence back on.
+
 ## Why this exists (the lesson)
 
 A single monolithic review (`~15 finders × up to ~270 verifier agents`, the old

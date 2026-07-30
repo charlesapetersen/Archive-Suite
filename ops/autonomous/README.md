@@ -304,6 +304,18 @@ in the same commit. See the plan's PRIME DIRECTIVES for the full list.
 For the paced **code-review** portion, see `REVIEW.md` (root) — one subsystem unit per session, lean
 fan-out, refute-verify; never the retired 15-finder monolith.
 
+**⏸ Paced reviews are currently OFF (owner directive, 2026-07-29).** `next-review-unit.sh` carries a **master
+switch** (`REVIEW_ENABLED_DEFAULT=0`, overridable per-run with `AUTONOMOUS_REVIEW_ENABLED=1`) that makes it
+always report `none due` / exit 3 — the path STEP 2.0 of the resume prompt already handles, so sessions simply
+go on to pick a normal queue item. **Nothing was removed:** the unit table, risk-ordered never-reviewed-first
+ranking, cooldown, fail-open stale-sha handling, `--status` and `--record` are all intact and still proven by
+`tests/prove-review-cadence.sh` (17 assertions, which forces the switch on for the machinery cases and has a
+dedicated case [10] for the switch itself). **Why:** the owner-commissioned Codex full-suite review of
+2026-07-29 filed 24 confirmed findings as `SUITE_TODO.md` **Wave 23** (5 HIGH / 15 MED / 4 LOW) — the
+bottleneck is fixing those, not finding more. **To re-enable:** flip `REVIEW_ENABLED_DEFAULT=1`, then
+re-install from the **primary checkout** (`git merge --ff-only origin/main` there first — `arm.sh` installs
+from `$REPO`'s working tree, not `origin/main`) and re-arm.
+
 **Needs-owner HOLD QUEUE (WS10, 2026-07-17).** The daemon **never auto-executes** irreversible / highest-
 blast-radius work: **Tier-3 releases** (DMG / `gh release` / version tags), **SPEC / `tag-format` changes**
 (the cross-app data contract), anything that **writes the real corpus**, and any **HIGH review finding on an

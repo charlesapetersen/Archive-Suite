@@ -106,6 +106,397 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
+## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
+
+**Source.** An owner-commissioned static full-suite review by Codex, 2026-07-29, against remote `main`
+`bfcb38e`. Read-only: nothing was fixed, built, or run. Scope = Processor (macOS + Android; iOS only for severe
+parity), Reader, Notes, `packages/ArchiveCore`, suite scripts/release tooling. 24 findings survived its own
+refute pass: **5 HIGH · 15 MEDIUM · 4 LOW**. The report itself is archived (gitignored) at
+`old/Codex_Review_July_29.md`; **every finding is transcribed below in full, so this queue is self-sufficient —
+you do not need the report.**
+
+**Owner routing decisions (2026-07-29).** (a) **W23 drains FIRST**, ahead of the remaining W16/W3.cap/W17–W22
+work — these are confirmed bugs, several with silent data loss. (b) All **5 HIGH findings are daemon-AUTHORIZED
+per item** via named entries in the plan's `## OWNER AUTHORIZATIONS`, rather than parked in the hold queue —
+they are the most valuable findings and the authorization text carries each one's hard constraints. The normal
+Tier-2 gate is unchanged, and **scratch-copy-only** still binds absolutely (Reader Core Directive).
+
+**⚠️ LINE NUMBERS ARE STALE — RE-LOCATE BY SYMBOL, NOT LINE.** The review baseline `bfcb38e` is five commits
+behind current `main` (`62a10d1`), and W16.cfg1/cfg2/cfg3/cfg5 **substantially rewrote**
+`OCR/OCRProcessor+{OCR,Pipeline}.swift`, `OCR/OCRProcessor.swift`, `Capture/SessionProcessingConfig.swift` and
+`Views/ToolsView.swift`. Cites in those files have drifted by tens of lines. Every item below names the
+**function/symbol**; find that, and treat the line number as a hint only. Re-confirm each premise before fixing
+it (Tier-2 requires this anyway).
+
+**Independently re-verified while queueing (2026-07-29, against `62a10d1`)** — so these three are not
+taken on trust: **W23.h1** (confirmed, and *worse* than reported — see the item), **W23.h5** (confirmed
+verbatim), **W23.m5** (confirmed; 9 `_ = try? MacOSTagger.applyTags` sites, not 3). The other 21 carry Codex's
+refute-verified confidence and must be re-confirmed by the fixing session.
+
+**Codex deduped against** `SUITE_TODO.md`, all three `KNOWN_ISSUES.md`/`CLAUDE.md`/`AGENTS.md`, the Notes
+`00-overview.md` + `09-gap-closure.md` plans, `devonthink-import.md`, and the gitignored maintenance material.
+It deliberately did **not** re-report: W3.cap-r1…r6, W3.net-r1, W16/W17/W19/W20/W21/W22, the owner-closed
+immutable-staging-generation proposal, Notes W9 gap-closure, DEVONthink import, the fixed ArchiveCore
+lost-update/duplicate-tag work, known Notes asset-write failures, or the parked iOS backlog. It also explicitly
+**refuted and dropped** five candidates: the non-ASCII/APFS filename-cap claim, Processor receiver
+stale-callback ordering, ArchiveCore partial Finder-tag mutation (already documented), and Reader header
+stripping / case-only tag convergence / smart-folder flattening (all intentional, tested behaviour). Do **not**
+re-promote those.
+
+**iOS parity is PARKED** (§Project focus): where a finding has an iOS twin (`W23.m1`), fix **Android only** and
+record the iOS parity as parked — do not revive the iOS build to chase it.
+
+### HIGH — all five daemon-AUTHORIZED per item (plan §OWNER AUTHORIZATIONS); Tier-2, scratch copies only
+
+- [ ] **W23.h1 — launch-time `pruneEmptySessions` recursively HARD-deletes unrecognized content under the
+  visible Live Capture root, including pending relay objects [M · HIGH · data loss · no undo].**
+  `Capture/CaptureSession.swift` → `pruneEmptySessions(under:)`, called unconditionally from `init()` before
+  recovery. **Re-verified 2026-07-29 against `62a10d1` and it is worse than the report says:**
+  1. The function treats **every** child directory of `~/Pictures/Archive Processor Live Capture/` as an app
+     session. It recognizes only a **top-level `.jpg`** (`hasPhoto`) or a `pdf|jpg|jpeg|json` file directly
+     inside `_processed` (`hasProcessed`). Anything else → `try? fm.removeItem(at: folder)`, a **recursive
+     permanent delete**. It never positively identifies the directory as an Archive Processor session.
+  2. **The relay is a direct child of the pruned root.** `CaptureSession.relayDir(token:)` defaults to
+     `backupRoot.appendingPathComponent("_relay")` + `/<token>/`. So `_relay/` contains *only a nested token
+     directory* — no top-level `.jpg`, no `_processed` → it reads as empty and **every pending relay object is
+     hard-deleted at the next launch.** That is precisely the crash-recovery case the relay exists to survive.
+  3. ⚠️ **It contradicts the Recovery Core Directive declared in the same file.** `CaptureSession` defines a
+     `trashItem` helper documented as *"the app never permanently deletes an irreplaceable capture"* — and
+     prune bypasses it for a raw `removeItem`. **The fix must route through `trashItem`** so anything reclaimed
+     stays Finder → Put Back recoverable.
+  4. Extra gap found while verifying: the top-level check accepts only `jpg`, while `_processed` accepts
+     `jpeg` too. A **HEIC-only or `.jpeg`-only** operator folder is therefore also deleted.
+  **Fix:** (a) require **positive session identification** (session-id name shape and/or a session marker
+  file) before a folder is ever a prune candidate; (b) **hard-exclude `_relay`** and any configured
+  `liveRelayDir`/`LIVECAPTURE_RELAYDIR` path; (c) treat **unknown content as non-disposable** — never delete a
+  folder containing files you don't recognize (HEIC, notes, nested recovery material, an unrecognized
+  journal); (d) route every reclaim through `trashItem`, never `removeItem`; (e) widen the image-extension set
+  to match `_processed`. Functional test on a scratch `ARCHIVEPROC_TEST_BACKUP_ROOT` covering all five cases
+  (relay dir with pending objects, HEIC-only, `.jpeg`-only, unknown-journal, genuinely-empty session).
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift | M | **high** | none
+
+- [ ] **W23.h2 — two concurrent edits to the same Notes item silently overwrite each other [M · HIGH · silent
+  data loss].** `Core/NotesModel.swift` (the body/date/quality edit paths), `Store/NoteStore.swift`,
+  `Core/ExtractBuilder.swift` → `append`. Every edit is a **load-whole-item → mutate → save-whole-item** pair
+  of separate actor calls. `NoteStore` serializes each *individual* call but **not the read-modify-write
+  transaction**; `NotesModel` is `@MainActor` but **reentrant at every `await`**. Two tasks can both load the
+  same old item, apply different edits, and save in either order — the later whole-item save silently drops
+  the other's body, metadata, or source blocks. Reachable via: two windows on one item; body autosave racing
+  a metadata edit; `ExtractBuilder.append` racing an ordinary mutation.
+  **Fix:** make the transaction the unit of serialization — a per-item lock/serialized executor inside
+  `NoteStore` that spans load→mutate→save (a `withItem(id) { mutate }` closure API), or optimistic
+  concurrency (compare-and-swap on a revision/mtime, retry on conflict). Do **not** just add another `await`.
+  **Not covered by W15.tu3/tu4** — those are Finder-tag metadata lost-updates, a different seam. Existing
+  editor tests cover cross-item selection/autosave races, not two edits to one item; add a deterministic
+  same-item race fixture. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Store/NoteStore,Core/ExtractBuilder}.swift | M | **high** | none
+
+- [ ] **W23.h3 — confirming a STALE folder-removal alert trashes a note that still has a valid membership
+  [S–M · HIGH · destructive].** `Index/OrganizationStore.swift` → `removeMembership(item:folder:)`;
+  `Core/NotesNavigationModel.swift` (the confirmation path). `removeMembership` decides `.wasLastInstance`
+  **solely from the item's total membership count**, without first verifying that the requested
+  `(item, folder)` pair still exists. The confirm path then force-removes the stale pair and
+  **unconditionally trashes the note**. Two-window repro: a delete alert opens for the sole membership in
+  folder A → the other window moves the note A→B → the user confirms the stale A alert. Fresh count is 1
+  (because B exists) so the stale removal is called "last instance"; force-removing A is a no-op; the note
+  goes to Trash **despite a valid B membership.**
+  **Fix:** `removeMembership` must **verify the specific `(item, folder)` membership still exists** and return
+  a distinct "membership no longer present — nothing removed" outcome; the caller must treat that as a
+  no-op + refresh, never as `.wasLastInstance`. Compute last-instance from *the set the removal actually
+  applied to*, not a bare count. The existing test adds B while A remains (count 2) — add the case where **A
+  is removed/moved while the alert is open**. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S–M | **high** | none
+
+- [ ] **W23.h4 — Android permanently deletes an un-uploaded capture with no confirmation and no upload-job
+  cancel [M · HIGH · data loss · Android].** `ui/CaptureScreen.kt` (thumbnail gesture) →
+  `capture/CaptureViewModel.kt` (select → arm → delete cycle). The final tap deletes the local file **and**
+  the model item regardless of whether the photo is pending, uploading, or failed. It **neither confirms the
+  destructive action nor cancels/joins the item's upload job** — so if the delete wins the race before the
+  upload coroutine opens the file, **no Mac copy can ever exist.**
+  **Fix:** (a) require an explicit confirmation for any item not yet acknowledged-uploaded; (b) cancel-and-join
+  (or refuse) the item's in-flight upload job before deleting; (c) prefer a recoverable local retire over an
+  unconditional file delete. **Parity note:** `ArchiveProcessor/KNOWN_ISSUES.md` covers and fixes this bug
+  class **for iOS only** — port the guard's *shape* to Android; there is no Android equivalent today.
+  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{ui/CaptureScreen,capture/CaptureViewModel}.kt | M | **high** | none
+
+- [ ] **W23.h5 — a placeholder-only PDF counts as successfully archived, and finalize then retires the source
+  image [M · HIGH · data loss · tag/PDF SPEC-adjacent].** `OCR/PDFGenerator.swift` → `generate(...)`;
+  `Capture/LiveCaptureProcessor.swift` (filed-set + finalize); `Capture/CaptureSession.swift`.
+  **Re-verified verbatim 2026-07-29:** when `makeImagePage` returns nil, `generate` inserts
+  `makePlaceholderImagePage(note: "Original image could not be embedded (…)")` and **returns normally** — a
+  successfully-written 2-page PDF whose image page contains **no scan**. Live Capture treats the PDF's
+  existence as a complete page, includes it in the filed set, and **finalization moves the corresponding raw
+  capture to Trash / drops it from the active session.** A source that becomes unreadable after OCR, or is
+  regenerated from a cached OCR result after its bytes go corrupt/unsupported, therefore yields an apparently
+  filed archival document with no image — **and the recovery source is retired.** Output-content validity is
+  never established.
+  ⚠️ The placeholder itself is deliberate (it keeps the 2-page contract + `PDFTextExtractor`'s `pageCount>=2`
+  heuristic valid) — **do not delete it.** The defect is that it is **indistinguishable from success** to
+  every caller.
+  **Fix:** make placeholder-substitution an explicit, propagated outcome — have `generate` return/throw a
+  result that says *"image page is a placeholder"*, thread it to the filed-set decision, and make finalize
+  **never retire a source whose PDF carries a placeholder image page** (surface it instead, as W3.cap-r1 does
+  for tags: still count the bytes, but do not destroy the original). **Not covered by W17.stg1** (that is
+  staging-manifest integrity, not per-PDF content validity); the closed immutable-generation proposal does not
+  address malformed bytes. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/PDFGenerator,Capture/LiveCaptureProcessor,Capture/CaptureSession}.swift | M | **high** | none
+
+### MEDIUM
+
+- [ ] **W23.m1 — re-pairing Capture leaves an upload owned by the OLD Mac; the phone copy is deleted on the
+  wrong acknowledgement [M · MED · misroute · Android].** `capture/CaptureViewModel.kt` (disconnect/re-pair,
+  `inFlightUploads`, the upload coroutine). Disconnect/re-pair clears the current client but **does not cancel
+  upload jobs or invalidate `inFlightUploads`** — so a newly paired client refuses to re-enqueue the same item
+  while the existing coroutine keeps using its **captured old client**. If the old Mac is still reachable and
+  acknowledges, the model marks the item uploaded and **schedules removal of the phone file**, though the
+  newly selected Mac/session never received it. Not classified as data loss (the old Mac does hold a durable
+  copy) but a **silent destination mismatch** — and it contradicts the Capture requirement that disconnected
+  items re-upload to the **new** endpoint.
+  **Fix:** make endpoint identity **generational** — stamp each upload job with the pairing generation, cancel
+  (or hard-invalidate) jobs on disconnect/re-pair, drop `inFlightUploads` entries for the dead generation, and
+  **ignore an acknowledgement from a stale generation** for the purpose of "uploaded → delete local".
+  **iOS twin is PARKED** (`ArchiveCaptureiOS/.../CaptureViewModel.swift`) — record the parity gap, do not fix
+  it. The existing re-pair known issue is about Mac QR/status/USB UX, not endpoint-generation ownership.
+  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/capture/CaptureViewModel.kt | M | med | none
+
+- [ ] **W23.m2 — Reader cannot display or find page 3+ of Processor's intentional merged-PDF format
+  [M · MED · CROSS-APP].** Processor merges multi-page documents as `image1, text1, image2, text2, …`
+  (`OCR/PDFGenerator.swift` merge path; `OCR/OCRProcessor+Tagging.swift` transfers Finder tags to the merged
+  PDF), but Reader exposes **only PDF pages 0 and 1**: `Views/DocumentViewerModel.swift` hard-pairs two pages,
+  next/previous move between **selected file URLs** rather than internal page pairs, and
+  `Core/DocumentFind.swift` **explicitly discards every match on PDF page index ≥ 2**. So for any merged
+  document with 2+ source pages, later scans and their OCR text are unreachable in Reader — even though
+  Reader's full-text index already extracts all pages.
+  **Fix:** teach Reader the interleaved image/text **page-pair** model — derive pair count from
+  `pageCount / 2`, make next/previous walk pairs within a document before moving to the next file, and let
+  Find return matches on any text page (mapping match → pair). **`SPEC/tag-format.md` says consumers must not
+  hard-assume two pages** — this is that assumption. Distinct from **W18** (switching between PDF and
+  separately exported JPEG references). | files: ArchiveReader/macOS/Sources/ArchiveReader/{Views/DocumentViewerModel,Core/DocumentFind}.swift | M | med | none
+
+- [ ] **W23.m3 — Notes inline-image resolution escapes the item directory and reads another item's asset
+  [S–M · MED · provenance corruption].** `Editor/MarkdownBridge.swift`, `Editor/InlineImageAttachment.swift`,
+  `Core/NotePassageSource.swift` → `ItemAssetStore.resolveAsset`. Markdown image paths are passed **unchanged**
+  to `resolveAsset`, which appends the value to the item directory and only checks that the result **exists**
+  — no `assets/` restriction, no component-boundary check, no canonical/symlink containment check. A raw or
+  synced note containing `![](../OTHER_UUID/assets/private.png)` renders **another note's image**; more `..`
+  components leave `items/` wherever the sandbox grant permits. Copy/extract code can then snapshot those
+  bytes into a different item — **corrupting provenance**, not just the visual boundary.
+  **Fix:** resolve then **canonically contain** — reject any path escaping `<item>/assets/` after
+  `resolvingSymlinksInPath` + component check; return a typed "out of bounds" result the renderer shows as a
+  broken image. Existing Notes asset items cover async write failure + same-name write reservation; the
+  path-traversal tests protect the **write** seam — this is the **read** seam. Add read-seam tests.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Editor/MarkdownBridge,Editor/InlineImageAttachment,Core/NotePassageSource}.swift | S–M | med | none
+
+- [ ] **W23.m4 — Reader page-level durable links are broken at command, creation AND reveal time
+  [M · MED · shipped-contract regression].** Three independent defects break the feature end to end:
+  1. **Unreachable command.** "Copy Archive Link to This Page" (`ArchiveReaderCommands.swift`) requires both a
+     focused `NavigationModel` **and** `DocumentViewerModel`. The full document window
+     (`Views/DocumentWindowView.swift`) publishes **only the viewer**, so the command is disabled exactly where
+     the user reads a document; it may only be reachable inside the navigation window's `PreviewSheet`.
+  2. **Wrong page written.** Direct invocation always writes `page=1` regardless of the focused text/image pane.
+  3. **Reveal drops the page.** An incoming link stores `page` in `pendingRevealPage`
+     (`Views/NavigationModel.swift`), then **clears it after selecting a row** without ever opening the viewer
+     or navigating to that page.
+  **Fix all three together** (fixing one alone leaves the feature broken): give the command a viewer-only
+  focus path, pass the actually-focused pane's page, and make reveal open the viewer + navigate before
+  clearing `pendingRevealPage`. `execution-plans/archive-notes/00-overview.md` §"reveal" is the **shipped
+  contract** requiring the page be passed to reveal — this is an implementation regression against it. Not
+  W20 (test isolation), not W18 (dual reference).
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/{ArchiveReaderCommands,Views/NavigationWindowView,Views/PreviewSheet,Views/DocumentWindowView,Views/DocumentViewerModel,Views/NavigationModel}.swift | M | med | none
+
+- [ ] **W23.m5 — Process Files reports Finder tags as applied after silently discarding tag-write failures
+  [M · MED · tag/PDF SPEC] (blocked-on: W3.cap-r1).** `OCR/OCRProcessor+Tagging.swift`,
+  `OCR/OCRProcessor+OCR.swift`, `OCR/OCRProcessor+Pipeline.swift`. Automatic tagging, **both** manual tagging
+  paths, and copy-source tag pass-through all discard `MacOSTagger.applyTags` errors with `try?`, then populate
+  `jobs[].appliedTags` **as though the output were tagged**. On an xattr / coordination / verification /
+  permission / filesystem failure the PDF succeeds and the UI+model report tags that are **absent on disk** —
+  and Reader then silently omits the file from tag-driven triage.
+  **Re-verified 2026-07-29:** **9** `_ = try? MacOSTagger.applyTags(...)` sites, not 3 —
+  `+Tagging.swift` ×6, `+OCR.swift` ×2, `+Pipeline.swift` ×1. (Line numbers drifted with W16.cfg*; grep the
+  literal.) **W3.cap-r1 is scoped to the three *Live Capture* sites in `LiveCaptureProcessor.swift` only** —
+  these ordinary Process Files sites are the remainder. **Blocked-on W3.cap-r1 deliberately: reuse its
+  per-artifact `tagsApplied` + finalize-summary warning mechanism, do not invent a second one.** Same owner
+  decision applies — warn, but the file still counts as filed.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+{Tagging,OCR,Pipeline}.swift | M | med | none
+
+- [ ] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
+  [S–M · MED · broken citations · SHARED CORE].** `packages/ArchiveCore/.../Links/RootMarker.swift` →
+  `read` / `ensure`; `ArchiveReader/.../Search/RootFolderStore.swift`; `Views/NavigationModel.swift`.
+  `RootMarker.read` converts **every** non-ENOENT, non-decoding read failure into "marker absent", and
+  `ensure` returns its **newly generated in-memory marker after any write failure or failed confirmation**.
+  Reader accepts that as a normal `rootMarker` and mints archive links from it. On a read-only root, disk-full,
+  permission failure, or transient marker I/O error, copied links carry a GUID that **changes after relaunch
+  and can never resolve** — and a transient read error on an *existing* marker can be mistaken for absence
+  before a replacement write. The declared `RootMarkerError.readOnly` is **never used**.
+  **Fix:** distinguish *absent* from *unreadable* (propagate the real error; use `.readOnly`), and make
+  `ensure` return a **provisional/non-durable** marker that Reader must **refuse to mint links from** —
+  degrade visibly instead. ⚠️ **Shared-Core rule** (memory `shared-core-change-rebuild-all-apps`):
+  `RootMarker` is ArchiveCore — build+test **all three** app bundles plus `swift test` in
+  `packages/ArchiveCore`. Historical W4 material calls read-only operation "degraded" but no live task makes
+  Reader distinguish transient from durable. | files: packages/ArchiveCore/Sources/ArchiveCore/Links/RootMarker.swift, ArchiveReader/macOS/Sources/ArchiveReader/{Search/RootFolderStore,Views/NavigationModel}.swift | S–M | med | none
+
+- [ ] **W23.m7 — Mac tag-card Apply/Skip begins finalization before proving the manifest decision is durable
+  [S–M · MED · manifest/finalize].** `Capture/CaptureSession.swift` (Apply/Skip), `Views/LiveCaptureView.swift`.
+  Apply/Skip mutates `macTags` + `resolvedGroupIds`, schedules `liveProcessor.segmentResolved`, and
+  **discards the `Bool` result of `writeManifest`**. The card vanishes immediately (it is derived from the
+  in-memory resolved set) and the UI has **no failure channel**. If the manifest replacement fails and the app
+  then crashes, recovery reloads the **old unresolved** state: stage-for-later loses the operator's decision,
+  and live processing may already have baked/staged output from volatile tags while relaunch resurfaces the
+  group as unresolved — recovered state inconsistent with the produced artifact, and possibly a second
+  decision prompt. **Neighbouring sender controls already roll memory back when their manifest write fails —
+  follow that pattern.** The "fixed" B9 known issue claimed Apply/Skip persistence but did not handle this
+  ignored failure; update that entry. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/CaptureSession,Views/LiveCaptureView}.swift | S–M | med | none
+
+- [ ] **W23.m8 — Android's crash-durable `SessionStore` silently ignores current-manifest publication failure
+  [M · MED · metadata loss · Android].** `data/ManifestFileWriter.kt`, `data/SessionStore.kt`,
+  `capture/CaptureViewModel.kt`. `ManifestFileWriter` **reports** replacement failure, but `SessionStore.save`
+  returns **no result**, ignores that Boolean, and swallows exceptions — so the writer cannot tell the view
+  model that the current snapshot was never committed. After an I/O failure + app termination, a new raw JPEG
+  absent from the old manifest is **re-adopted into a fresh default Document group**, losing box/folder
+  classification, group boundaries, priority/date/tags, replacement provenance and segment-completion state;
+  known files can return with stale metadata.
+  **Fix:** propagate the failure up through `SessionStore.save` to the view model, surface it, and **prevent
+  lossy orphan adoption** when the current manifest is known-stale. The existing Android manifest fix
+  preserves the *previous valid* manifest on failed replacement — it does not propagate failure of the *new*
+  snapshot. | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{data/ManifestFileWriter,data/SessionStore,capture/CaptureViewModel}.kt | M | med | none
+
+- [ ] **W23.m9 — Reader and Notes indexers report successful completion after SQLite failures, and can
+  poison the DB handle until restart [M · MED · CROSS-APP].** Reader `Search/ContentIndexer.swift` +
+  `Search/ContentIndex.swift`; Notes `Index/NotesIndexer.swift` + `Index/NotesIndex.swift` +
+  `Core/NotesModel.swift`. Two failure modes:
+  1. Both indexers suppress `open` and batch-upsert errors with `try?` then **unconditionally finish** — Notes
+     reloads the partial index and marks it **Ready**; Reader clears progress and serves partial/empty search
+     and format-health results.
+  2. **Half-open database:** in both SQLite actors, if `sqlite3_open_v2` succeeds but a PRAGMA, migration, or
+     schema-creation step then fails, `db` is left **non-nil**. Every future `open()` returns immediately
+     without completing setup or closing the handle — **poisoning the index until process restart.**
+  **Fix:** propagate open/batch errors to a typed failure state the UI can show (never "Ready" on a partial
+  index); on any setup failure **close the handle and null `db`** so a later `open()` retries cleanly; report
+  partial-batch counts. Notes W9 C6 is a scale harness and Reader's index work is scheduling/pruning —
+  neither covers error propagation or half-open recovery.
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/{ContentIndexer,ContentIndex}.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/NotesIndexer,Index/NotesIndex,Core/NotesModel}.swift | M | med | none
+
+- [ ] **W23.m10 — `organization.json` export failure is reported as a successful organization change
+  [S · MED · durable-mirror rot].** `Index/OrganizationFile.swift`, `Index/OrganizationStore.swift`.
+  `organization.json` is documented as **the authoritative durable mirror** that survives DB wipes and
+  computer moves — but its export function returns `Void` and **suppresses both encode and atomic-write
+  failures**, and every organization mutation commits SQLite/in-memory **first** then calls that nonthrowing
+  exporter. On a full, read-only or unavailable Notes volume the UI reports folder / membership /
+  template-assignment changes as successful while the mirror stays **stale** — and a later DB loss or
+  migration restores obsolete organization state.
+  **Fix:** make the exporter `throws`, propagate to the mutation's result, and surface failure (the mutation
+  is not "done" until its durable mirror is). The existing DB-first shadowing note is about which source wins
+  at startup/under test — not export failure after an interactive mutation.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Index/{OrganizationFile,OrganizationStore}.swift | S | med | none
+
+- [ ] **W23.m11 — the app-wide inline-image cache can display another note's same-named image
+  [S · MED · wrong content shown] (blocked-on: W23.m3).** `Editor/InlineImageAttachment.swift`,
+  `Editor/MarkdownBridge.swift`. The **static app-wide** thumbnail cache is keyed **only by the
+  markdown-relative path** — normally `assets/name.png`. Neither item identity nor the resolved absolute URL
+  is part of the key. If notes A and B each own a *different* `assets/x.png`, rendering A caches its thumbnail
+  and rendering B **displays A's image without ever reading B's bytes**. Same-named assets across item
+  directories are **normal and explicitly supported by the store**, so no malformed data is required.
+  **Fix:** key the cache by the **resolved, canonical absolute URL** (plus item UUID), and invalidate per item.
+  Blocked-on W23.m3 on purpose: that item makes `resolveAsset` return a canonical contained URL — which is
+  exactly the key this needs, so doing m3 first means one correct key instead of two. Not W9 B4 (Reader-page
+  thumbnails). | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/{InlineImageAttachment,MarkdownBridge}.swift | S | med | none
+
+- [ ] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note
+  disappears].** `Core/NotesModel.swift` → `trashItems`. It **logs** each `NoteStore.delete` failure but then
+  deletes **every requested ID** from `NotesIndex` and reloads the list. A note whose directory is still on
+  disk therefore vanishes from **All Notes for the rest of the run** — there is no watcher to restore it, and
+  the full disk rebuild runs only at bootstrap. This **contradicts the method's own stated safety invariant**
+  that a trash failure leaves the note on disk *and discoverable* under All Notes.
+  **Fix:** only remove IDs whose delete actually succeeded; surface the failures. Add a test that a failed
+  delete leaves the note in All Notes.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift | S | med | none
+
+- [ ] **W23.m13 — several multi-step Notes organization operations leave partial state after a failure
+  [M · MED · fault atomicity] (blocked-on: W23.m10).** `Index/OrganizationStore.swift`,
+  `Core/NotesModel.swift`, `Core/NotesNavigationModel.swift`. The Notes façade **claims organization mutations
+  are atomic**, but three span independent awaited writes with no transaction or rollback:
+  - `deleteFolder` mutates each child **in memory** before its individual DB update, then separately deletes
+    memberships, assignments and the folder — a later SQLite failure leaves a partially reparented/deleted
+    graph in memory **and** on disk.
+  - `deleteTemplate` clears **every** folder assignment before attempting to move the template to Trash — if
+    Trash fails the template survives but its assignments are gone.
+  - `move` adds the target membership first then **suppresses source-removal failure** — the UI reports a move
+    while the item is actually **replicated in both folders**.
+  **Fix:** wrap each in a real SQLite transaction (or an explicit compensating rollback), and only mutate
+  in-memory state after the durable write commits. Blocked-on W23.m10 because that item makes the export leg
+  of these same mutations failable — do the error-propagation seam once. No active item covers this.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesModel,Core/NotesNavigationModel}.swift | M | med | none
+
+- [ ] **W23.m14 — resolving a missing Reader link synchronously scans the whole archive on the main actor
+  [S–M · MED · UI freeze].** `Links/ReaderLinkResolver.swift`. The resolver is `@MainActor`; when an exact
+  relative path is missing, `resolve` **synchronously enumerates every descendant** of the granted Reader root
+  looking for a matching basename. Clicking **one** broken or moved source link therefore freezes all Notes UI
+  for the duration of a **100k–150k-file** archive walk, with **no cancellation**. (The basename fallback is
+  intended behaviour — doing it synchronously on the UI actor is the defect.)
+  **Fix:** move the fallback off the main actor into a cancellable async task with progress + a bound, and
+  keep the resolver's fast exact-path hit synchronous. Notes W9 C6 covers Notes-index scale, not Reader-root
+  fallback scanning. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | S–M | med | none
+
+- [ ] **W23.m15 — deleting the Inbox or Extracts system folder is permanent and creates ghost memberships
+  forever [S–M · MED].** `Views/NotesFolderTreeView.swift`, `Index/OrganizationStore.swift`,
+  `Core/NotesModel.swift`, `Index/NotesIndex.swift`. Every folder — **including the fixed-ID Inbox and
+  Extracts** — gets Rename and Delete actions, and `deleteFolder` accepts those IDs. System folders are
+  reseeded **only when the entire folder table is empty**, so deleting one is **permanent**. Worse, new notes
+  and extracts keep filing memberships under the deleted fixed IDs: `addMembership` **does not verify the
+  folder exists** and SQLite declares **no foreign key** — so the graph accumulates memberships to a folder
+  that can never appear in the tree or be restored by normal startup.
+  **Fix:** (a) refuse Rename/Delete on the two system folder IDs in both the UI *and* `deleteFolder`
+  (defence in depth); (b) reseed a missing system folder at startup by **ID**, not only on an empty table;
+  (c) make `addMembership` reject a nonexistent folder, and add the FK/constraint.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NotesFolderTreeView,Index/OrganizationStore,Core/NotesModel,Index/NotesIndex}.swift | S–M | med | none
+
+### LOW
+
+- [ ] **W23.l1 — the Notes Reader-link containment check is bypassable through a symlink [S · LOW · scope
+  bypass] (blocked-on: W23.m14).** `Links/ReaderLinkResolver.swift`, `Views/ReaderPreviewPopover.swift`. The
+  resolver uses `standardizedFileURL`, which normalizes `..` **lexically but does not resolve symlinks**, then
+  calls `fileExists`, which **does** follow them. A symlink under the granted Reader root pointing at an
+  otherwise-accessible PDF **outside** the root is returned as `.resolved`, violating the resolver's stated
+  granted-root containment contract. (The app sandbox may independently deny some targets — this is a semantic
+  scope bypass, not a claim that every symlink escapes the sandbox.)
+  **Fix:** contain on `resolvingSymlinksInPath` / `realpath`, not `standardizedFileURL`. Blocked-on W23.m14 —
+  same function, and m14 restructures it. Tests cover `../../` traversal but not symlink/real-path containment.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Links/ReaderLinkResolver,Views/ReaderPreviewPopover}.swift | S | low | none
+
+- [ ] **W23.l2 — a cancelled prune task can still defeat the two-emission absence gate [S · LOW · residual
+  race] (blocked-on: W23.m9).** Reader `Search/ContentIndexer.swift`, Notes `Index/NotesIndexer.swift`.
+  Starting a prune cancels the prior detached task, but **cancellation is cooperative**: after the old task's
+  final cancellation check it can still read `pendingPrune`, delete rows, and later overwrite pending state in
+  separate main-actor hops. A newer emission can interleave in that window, so an old task compares against
+  **stale absence state** and deletes after what is effectively only **one** current consecutive absence. The
+  source files are safe (these are disposable indexes) but search results can vanish until reindexing.
+  **Fix:** add the missing **post-cancellation generation gate** — stamp each prune task with a generation and
+  make every write (row delete + `pendingPrune` update) a no-op if the generation is no longer current.
+  W6.1b and the Notes prune work are marked fixed by cancellation + a two-emission gate; this is a **residual
+  race in that fix**, not a duplicate. ⚠️ Codex confirmed the missing gate **by inspection only** — it did not
+  run a deterministic race fixture; re-confirm, ideally with one.
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/Index/NotesIndexer.swift | S | low | none
+
+- [ ] **W23.l3 — concurrent first-time root-marker creation can orphan newly copied links [S · LOW · SHARED
+  CORE].** `packages/ArchiveCore/.../Links/RootMarker.swift` → `ensure`. It checks for absence **before**
+  entering write coordination, generates a UUID, then blindly writes it. Two processes can both observe
+  absence and serialize writes of **different** markers: process A can re-read and return A before process B
+  writes B as the final disk value — so A-based links get copied even though the root ultimately identifies as
+  **B**. Sequential idempotency + the final re-read do **not** close this cross-process check-then-write race.
+  **Fix:** do the absence check **inside** the write coordination and create exclusively
+  (`O_EXCL`-equivalent / coordinated read-then-write in one critical section); on losing the race, adopt the
+  winner's marker. ⚠️ Shared-Core rule: build+test all three apps + `swift test` in `packages/ArchiveCore`.
+  W15's per-path serialization is Finder-tag writes and in-process callers only. Natural companion to
+  **W23.m6** (same file) — if m6 lands first, fold this in.
+  | files: packages/ArchiveCore/Sources/ArchiveCore/Links/RootMarker.swift | S | low | none
+
+- [ ] **W23.l4 — Notes accepts impossible day-precision calendar dates [XS–S · LOW].**
+  `Views/NoteMetadataInspector.swift`, `Store/Item.swift`. The UI and normalization logic validate month as
+  1…12 and day as 1…31 **independently**, never validating the combination against a calendar — so
+  `2026-02-31` is persisted as a day-precision date and receives a normal chronological sort key.
+  **Fix:** validate the (year, month, day) triple against `Calendar` before accepting/normalizing; reject or
+  clamp with a visible message. ⚠️ Sort keys come from ArchiveCore's shared
+  `DocumentTags.sortDateKey(year:month:day:decade:)` — **validate at the input seam, do not change the shared
+  sort formula.** No current Notes date-validation item covers impossible combinations.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NoteMetadataInspector,Store/Item}.swift | XS–S | low | none
+
 ## Provider expansion — Wave 13 (Processor; daemon-buildable) — queued 2026-07-16
 The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
 can build them: each sub-task below is **unattended, $0, no key, no GUI** (build clean + fake-CLI/unit tests +

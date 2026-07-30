@@ -22,7 +22,15 @@ STEP 1 — RECOVER STATE (always, first):
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
 STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
-  * `none due …` (exit 3) → skip this step; go to STEP 2.
+  ⏸ PAUSED (owner directive 2026-07-29): paced code reviews are DISABLED at the source — the script's master
+  switch makes it ALWAYS report `none due` / exit 3, so in practice this step is a no-op and you go straight to
+  STEP 2. Reason: the 2026-07-29 Codex full-suite review already filed 24 confirmed findings as SUITE_TODO
+  **Wave 23**; the daemon's job now is DRAINING those, not discovering more. Keep running the script anyway
+  (one cheap call, and the switch can be flipped back without editing this prompt) — but do NOT try to "help"
+  by running the `lean-review` / `review-sweep` skills or any ad-hoc review fan-out on your own initiative
+  while this is paused. If you think a review is genuinely needed, say so in Morning Review and move on. The
+  rest of this step is the still-correct procedure for when it is re-enabled.
+  * `none due …` (exit 3) → skip this step; go to STEP 2. (Currently ALWAYS this — see the pause above.)
   * `UNIT=… PATHS=… …` → a paced re-review is DUE, and THAT is your ONE item this session (do NOT also pick a
     queue item). It is a normal item: it flows through the SAME steps as anything else — STEP 3 makes your
     fresh WORKTREE, STEP 4 commits **and pushes**, STEP 5/6 record + stop. Do NOT edit or commit in the

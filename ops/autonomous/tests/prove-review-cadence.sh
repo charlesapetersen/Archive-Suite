@@ -10,7 +10,13 @@ R="$T/repo with space"; mkdir -p "$R"    # space: mirrors the real repo path
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
-run() { AUTONOMOUS_REPO="$R" AUTONOMOUS_REVIEW_EVERY="${EVERY:-3}" bash "$HELPER" "$@"; }
+# AUTONOMOUS_REVIEW_ENABLED=1 is FORCED here on purpose: paced reviews are currently DISABLED by default
+# (owner directive 2026-07-29 — see the master switch in next-review-unit.sh). This harness proves the PICKER
+# MACHINERY, which must keep working while the deployment default is off, so every case below runs with the
+# switch ON. Case [10] is the one that asserts the switch itself (it deliberately does NOT set the var).
+run() { AUTONOMOUS_REPO="$R" AUTONOMOUS_REVIEW_EVERY="${EVERY:-3}" AUTONOMOUS_REVIEW_ENABLED=1 bash "$HELPER" "$@"; }
+# Same, minus the enable override — exercises the SHIPPED default (disabled).
+run_default() { AUTONOMOUS_REPO="$R" AUTONOMOUS_REVIEW_EVERY="${EVERY:-3}" bash "$HELPER" "$@"; }
 
 git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.name t
 echo neutral > "$R/README"; git -C "$R" add -A; git -C "$R" commit -qm seed   # seed touches NO unit path
@@ -82,6 +88,31 @@ OUT="$(run --status 2>&1)"
 printf '%s' "$OUT" | grep -qE 'Processor/Net .* last=never' && ok "bad unit sha treated as never-reviewed (not 0)" || bad "bad sha not failing open: $(printf '%s' "$OUT" | grep Net)"
 OUT="$(run)"; rc=$?
 [ "$rc" = 0 ] && ok "bad __any__ sha fails open -> a review is due (cadence not silently stalled)" || bad "bad __any__ sha stalled the cadence (rc=$rc: $OUT)"
+
+echo "[10] MASTER SWITCH (owner directive 2026-07-29): reviews DISABLED by default, machinery intact"
+# State is left from [9] where a review IS due with the switch on — so this isolates the switch, nothing else.
+OUT="$(run)"; rc=$?
+[ "$rc" = 0 ] || bad "precondition: expected a review DUE with the switch on (rc=$rc: $OUT)"
+OUT="$(run_default)"; rc=$?
+[ "$rc" = 3 ] && printf '%s' "$OUT" | grep -q 'none due' \
+  && ok "shipped default reports 'none due' + exit 3 — the path resume-prompt STEP 2.0 already handles ($OUT)" \
+  || bad "switch did not disable: expected rc3 'none due'; got rc=$rc '$OUT'"
+printf '%s' "$OUT" | grep -qi 'DISABLED' && ok "the 'none due' line SAYS it's disabled (not mistakable for a cooldown)" || bad "disabled reason not stated: '$OUT'"
+# The two read/write side-channels must survive the pause, or a manual review can't be stamped.
+OUT="$(run_default --status 2>&1)"; rc=$?
+[ "$rc" = 0 ] && printf '%s' "$OUT" | grep -q 'unreviewed commit' && printf '%s' "$OUT" | grep -qi 'DISABLED' \
+  && ok "--status still prints the real coverage table, with a DISABLED banner" \
+  || bad "--status broke while disabled (rc=$rc)"
+run_default --record "Processor/OCR" >/dev/null 2>&1 \
+  && grep -q 'Processor/OCR' "$R/.maintenance/review/last-reviewed.tsv" \
+  && ok "--record still stamps while disabled (a manual review can be recorded)" \
+  || bad "--record broke while disabled"
+# And the switch is a one-line flip back, not a rewrite: prove the env override alone re-enables.
+# NB: the --record above stamped __any__ at HEAD, so the cooldown is now 0 — churn a unit first, or this
+# asserts the cooldown instead of the switch (it did, on the first draft of this test).
+cm "$NET" 2
+OUT="$(AUTONOMOUS_REPO="$R" AUTONOMOUS_REVIEW_EVERY=1 AUTONOMOUS_REVIEW_ENABLED=1 bash "$HELPER" 2>&1)"; rc=$?
+[ "$rc" = 0 ] && printf '%s' "$OUT" | grep -q 'UNIT=' && ok "AUTONOMOUS_REVIEW_ENABLED=1 alone re-enables ($OUT)" || bad "env override failed to re-enable (rc=$rc: $OUT)"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

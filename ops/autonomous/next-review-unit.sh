@@ -26,6 +26,27 @@ REVIEW_EVERY="${AUTONOMOUS_REVIEW_EVERY:-20}"      # global cooldown: ≥ this m
                                                    #   (of any unit) before another is due — keeps review from
                                                    #   dominating feature work.
 
+# ---- MASTER SWITCH: paced code reviews are OFF (owner directive, 2026-07-29) --------------------------------
+# WHY: an owner-commissioned Codex full-suite review (2026-07-29) filed 24 confirmed findings as SUITE_TODO
+# Wave 23 (5 HIGH / 15 MED / 4 LOW). The bottleneck is now FIXING those, not discovering more — so the daemon
+# should spend every cycle draining W23 instead of generating findings it won't get to. This is a deliberate
+# pause, not a retirement.
+#
+# EVERYTHING BELOW IS INTACT AND UNCHANGED — this is one switch, not a removal. The unit table, the two-tier
+# never-reviewed-first ranking, the cooldown, the fail-open stale-sha handling and `--record` all still work,
+# and `--status` still reports honestly (it prints a DISABLED banner but the real table underneath).
+#
+# TO RE-ENABLE: set REVIEW_ENABLED_DEFAULT=1 below (or export AUTONOMOUS_REVIEW_ENABLED=1 for a one-off run),
+# then re-install + re-arm from the PRIMARY checkout (`arm.sh` installs from $REPO's working tree, not
+# origin/main — so `git merge --ff-only origin/main` there FIRST or you'll re-install the old copy).
+#
+# HOW IT DISABLES: the script reports `none due …` and exits 3 — the *existing*, already-handled path in the
+# resume prompt's STEP 2.0 ("`none due …` (exit 3) → skip this step; go to STEP 2"). So a session just picks a
+# normal queue item. No caller changes, no new failure mode; `prove-review-cadence.sh` exercises the machinery
+# by exporting AUTONOMOUS_REVIEW_ENABLED=1, so the harness keeps passing.
+REVIEW_ENABLED_DEFAULT=0
+REVIEW_ENABLED="${AUTONOMOUS_REVIEW_ENABLED:-$REVIEW_ENABLED_DEFAULT}"
+
 # Canonical review units — KEEP IN SYNC WITH REVIEW.md's unit table. iOS (unit 7) is intentionally absent
 # (ON HOLD, maintain-only). Format: "name<TAB>space-separated repo-relative paths".
 UNITS="Processor/Capture	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/
@@ -78,6 +99,17 @@ if [ "${1:-}" = "--record" ]; then
   exit 0
 fi
 
+# ---- master switch (top of file): reviews paused by owner directive -> always "not due" ----
+# Placed HERE deliberately: after `--record` (stamping a manual review must keep working while paused) but
+# BEFORE the ranking loop, which costs ~15 `git rev-list --count` walks over full history. Every daemon session
+# calls this script, so short-circuiting after the loop would burn that cost on every cycle for a result that
+# is fixed. `--status` is exempted so the owner can still see real coverage — it falls through to the loop and
+# prints the table under a DISABLED banner.
+if [ "$REVIEW_ENABLED" != "1" ] && [ "${1:-}" != "--status" ]; then
+  echo "none due (paced reviews DISABLED — owner directive 2026-07-29; draining SUITE_TODO Wave 23. Re-enable via REVIEW_ENABLED_DEFAULT=1 or AUTONOMOUS_REVIEW_ENABLED=1)"
+  exit 3
+fi
+
 # ---- rank units, TWO-TIER (the review finding): a NEVER-REVIEWED unit with changes ALWAYS outranks any
 #      already-reviewed one, and never-reviewed units are taken in the canonical table order (= REVIEW.md's
 #      RISK order: Capture, Net, OCR, …). Otherwise a low-churn but high-risk unit (Net has the FEWEST commits
@@ -112,6 +144,8 @@ else
 fi
 
 if [ "${1:-}" = "--status" ]; then
+  [ "$REVIEW_ENABLED" = "1" ] || echo "⏸  PACED REVIEWS DISABLED (owner directive 2026-07-29 — draining SUITE_TODO Wave 23 instead).
+   Nothing below is due; the table is shown for reference. Re-enable: REVIEW_ENABLED_DEFAULT=1 in this script."
   echo "review units (never-reviewed picked first in this order; then most-changed since last review):"
   printf '%s' "$report"
   any_sha="$(last_sha __any__)"
