@@ -4,6 +4,35 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.h1): launch-time `pruneEmptySessions` hard-deleted the relay dir + any unrecognized content under the visible backup root
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; re-verified against `62a10d1` — worse than
+reported). `CaptureSession.pruneEmptySessions(under:)`, called unconditionally from `init()` **before**
+recovery, treated **every** child directory of `~/Pictures/Archive Processor Live Capture/` as a spent
+session and `try? fm.removeItem(at: folder)`-**recursively hard-deleted** any that lacked a top-level `.jpg`
+or a `_processed/{pdf,jpg,jpeg,json}` output. Three concrete data-loss paths:
+1. **The relay object store is a direct child of the pruned root** (`_relay/<token>/…`, `relayDir(token:)`),
+   with no top-level `.jpg` and no `_processed` → it read as "empty" and **every pending relay object was
+   hard-deleted on the next launch** — exactly the crash-recovery case the Drive/USB relay exists to survive.
+2. **HEIC-/`.jpeg`-only sessions** were deleted (the top-level check accepted only `jpg`, though `_processed`
+   accepted `jpeg`), losing recoverable source photos.
+3. It **bypassed the Recovery Core Directive's `trashOrRemove`** (Finder → Put Back), so a wrong call was
+   unrecoverable.
+
+**Fixed** — prune is now conservative *by construction* (deletes strictly less, never more):
+`isReclaimableEmptySession(_:relayBases:fm:)` reclaims a folder only when it is (a) POSITIVELY a session (the
+launch-created ISO-8601 session-id name shape, `isSessionIdName`), (b) NOT the relay store (default `_relay`
+or a `LIVECAPTURE_RELAYDIR`/`liveRelayDir` override), (c) free of any recoverable capture data (no top-level
+source image in {jpg,jpeg,png,tif,tiff,heic,heif}, no `_processed/` output), and (d) free of any
+**unrecognized** content (any file that isn't spent session metadata → the folder is KEPT). Every reclaim now
+routes through `trashOrRemove` (the Trash, never `removeItem`). Regression coverage:
+`LiveCaptureRecoveryTestDriver` Test 8 (`scripts/test-recovery.sh`, $0/no-OCR/no-GUI) asserts the relay dir +
+its pending object, HEIC-/`.jpeg`-/`.jpg`-only sessions, `_processed`-output sessions, unknown-content
+folders and non-session (operator) folders all survive, while a spent manifest-only session and a
+genuinely-empty session are reclaimed **to the Trash**.
+
+---
+
 ## ⚠️ OPEN (routing) / ✅ FIXED (silence): a mixed drop containing a multi-page PDF discards every non-PDF file
 
 **Found the hard way 2026-07-29** — the owner dropped two `.jpg` files alongside one 3-page PDF. The PDF

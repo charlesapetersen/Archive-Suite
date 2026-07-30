@@ -851,24 +851,85 @@ final class CaptureSession: ObservableObject {
         }
     }
 
-    /// Remove stale session folders under the backup root that no longer hold any RECOVERABLE data — i.e.
-    /// neither a captured photo (`.jpg`) NOR any staged/processed output (the visible `_processed` subfolder
-    /// where the streamed PDFs/JPGs/JSON are kept until finalize). Their sources were filed and their
-    /// processed outputs moved into collections at a successful finalize, so the folder holds nothing worth
-    /// recovering. NEVER removes a folder that still contains a photo OR a processed output, so it cannot
-    /// lose received or in-progress data. Called at launch, before recovery, so it can't touch the active
-    /// session. The empty folder itself carries no recovery value, so it's a plain remove (not the Trash).
-    private static func pruneEmptySessions(under root: URL) {
+    /// Reclaim stale, spent session folders under the backup root — those whose sources were filed and whose
+    /// processed outputs were moved into collections at a successful finalize, so the folder holds nothing
+    /// worth recovering — WITHOUT ever destroying data that isn't demonstrably disposable. Runs at launch,
+    /// before recovery, so it never touches the active session (which has photos, or is fresh).
+    ///
+    /// The bar is deliberately CONSERVATIVE (W23.h1): the old version treated *every* child directory of the
+    /// visible root as a spent session and `removeItem`-hard-deleted any that lacked a top-level `.jpg` or a
+    /// recognized `_processed` output — which recursively purged the `_relay` directory's pending relay
+    /// objects on the next launch (the exact crash-recovery case the relay exists to survive), lost
+    /// HEIC-/`.jpeg`-only sessions, and bypassed the Recovery Core Directive's Trash guarantee. So a folder is
+    /// reclaimed ONLY when `isReclaimableEmptySession` positively identifies it as a spent Archive Processor
+    /// session, and every reclaim goes through `trashOrRemove` (Finder → Put Back). Returns what it reclaimed.
+    @discardableResult
+    static func pruneEmptySessions(under root: URL) -> [URL] {
         let fm = FileManager.default
-        guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        // Never a candidate: the relay object store (default `<root>/_relay`, or a Settings/CI override). It
+        // holds pending phone uploads as nested `<token>/` dirs — no top-level image → it would read "empty".
+        var relayBases: Set<String> = [root.appendingPathComponent("_relay", isDirectory: true).standardizedFileURL.path]
+        if let env = ProcessInfo.processInfo.environment["LIVECAPTURE_RELAYDIR"] {
+            relayBases.insert(URL(fileURLWithPath: env, isDirectory: true).standardizedFileURL.path)
+        }
+        if let configured = UserDefaults.standard.string(forKey: DefaultsKeys.liveRelayDir) {
+            relayBases.insert(URL(fileURLWithPath: configured, isDirectory: true).standardizedFileURL.path)
+        }
+        var reclaimed: [URL] = []
         for folder in subdirs {
             guard (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
-            let contents = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-            let hasPhoto = contents.contains { $0.pathExtension.lowercased() == "jpg" }
-            let processed = folder.appendingPathComponent("_processed", isDirectory: true)
-            let hasProcessed = ((try? fm.contentsOfDirectory(at: processed, includingPropertiesForKeys: nil)) ?? [])
-                .contains { ["pdf", "jpg", "jpeg", "json"].contains($0.pathExtension.lowercased()) }
-            if !hasPhoto && !hasProcessed { try? fm.removeItem(at: folder) }
+            guard isReclaimableEmptySession(folder, relayBases: relayBases, fm: fm) else { continue }
+            // Recovery Core Directive: to the Trash (Put Back), NEVER a hard `removeItem`.
+            Self.trashOrRemove(folder)
+            reclaimed.append(folder)
         }
+        return reclaimed
+    }
+
+    /// True iff `folder` is a spent Live Capture session safe to move to the Trash. CONSERVATIVE by
+    /// construction — anything we cannot positively account for is KEPT, so this only ever deletes *less*
+    /// than the naive "no recognized output" test, never more (W23.h1). All four guards must hold:
+    ///   (a) POSITIVE session identification — the launch-created ISO-8601 session-id name shape only
+    ///       (`isSessionIdName`); a relay/`_`/hidden/operator-named folder is never a candidate.
+    ///   (b) NOT a relay object store (`relayBases`) — belt-and-suspenders over (a).
+    ///   (c) NO recoverable capture data — no top-level source image (jpg/jpeg/png/tif/tiff/heic/heif — the
+    ///       accepted archive-photo formats, so a HEIC-only or `.jpeg`-only session is kept) and no output
+    ///       staged under `_processed/`.
+    ///   (d) NO unrecognized content — every remaining entry is spent session metadata (`manifest.json`,
+    ///       `_epoch.json`, the relay bookkeeping JSONs, an empty `_processed/`, `.DS_Store`, a `.*.part`
+    ///       upload temp). Any other file (notes, an unknown journal, nested recovery material) → KEEP.
+    nonisolated static func isReclaimableEmptySession(_ folder: URL, relayBases: Set<String>,
+                                                      fm: FileManager = .default) -> Bool {
+        let name = folder.lastPathComponent
+        if name.hasPrefix("_") || name.hasPrefix(".") { return false }        // (a) reserved / hidden sibling
+        if relayBases.contains(folder.standardizedFileURL.path) { return false } // (b)
+        guard isSessionIdName(name) else { return false }                     // (a) positive identification
+
+        let sourceImageExts: Set<String> = ["jpg", "jpeg", "png", "tif", "tiff", "heic", "heif"]
+        let knownMetadata: Set<String> = ["manifest.json", "_epoch.json",
+                                          "relay-processed.json", "relay-processed-cloud.json"]
+        let entries = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        for entry in entries {
+            let entryName = entry.lastPathComponent
+            if entryName == "_processed" {                                    // (c) any staged output → keep
+                let hasOutput = ((try? fm.contentsOfDirectory(at: entry, includingPropertiesForKeys: nil)) ?? [])
+                    .contains { !$0.lastPathComponent.hasPrefix(".") }
+                if hasOutput { return false }
+                continue                                                      // an empty _processed is spent
+            }
+            if sourceImageExts.contains(entry.pathExtension.lowercased()) { return false }  // (c) recoverable
+            if knownMetadata.contains(entryName) { continue }                 // (d) spent metadata → disposable
+            if entryName == ".DS_Store" || (entryName.hasPrefix(".") && entryName.hasSuffix(".part")) { continue }
+            return false                                                      // (d) UNKNOWN content → keep
+        }
+        return true
+    }
+
+    /// The launch-created Live Capture session-id name shape: an ISO-8601 timestamp with `:` → `-`
+    /// (e.g. `2026-07-29T19-20-11Z`; see `init()`). Distinctive enough that the relay dir, per-token relay
+    /// subfolders, and any operator-created folder never match — so prune only ever considers real sessions.
+    nonisolated static func isSessionIdName(_ name: String) -> Bool {
+        name.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}"#, options: .regularExpression) != nil
     }
 }

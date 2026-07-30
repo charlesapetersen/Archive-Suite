@@ -164,8 +164,13 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### HIGH — all five daemon-AUTHORIZED per item (plan §OWNER AUTHORIZATIONS); Tier-2, scratch copies only
 
-- [ ] **W23.h1 — launch-time `pruneEmptySessions` recursively HARD-deletes unrecognized content under the
-  visible Live Capture root, including pending relay objects [M · HIGH · data loss · no undo].**
+- [x] **W23.h1 — launch-time `pruneEmptySessions` recursively HARD-deletes unrecognized content under the
+  visible Live Capture root, including pending relay objects [M · HIGH · data loss · no undo].** ✅ FIXED —
+  conservative positive-ID prune (`isReclaimableEmptySession` + `isSessionIdName`): only an ISO-8601-named,
+  spent session with no recoverable data and no unrecognized content is reclaimed; `_relay` + its pending
+  objects, HEIC-/`.jpeg`-only sessions, and unknown-content folders are all kept; every reclaim routes through
+  `trashOrRemove` (Trash → Put Back), never `removeItem`. Regression: `LiveCaptureRecoveryTestDriver` Test 8 /
+  `scripts/test-recovery.sh` ($0, no OCR/GUI). See `ArchiveProcessor/KNOWN_ISSUES.md`.
   `Capture/CaptureSession.swift` → `pruneEmptySessions(under:)`, called unconditionally from `init()` before
   recovery. **Re-verified 2026-07-29 against `62a10d1` and it is worse than the report says:**
   1. The function treats **every** child directory of `~/Pictures/Archive Processor Live Capture/` as an app

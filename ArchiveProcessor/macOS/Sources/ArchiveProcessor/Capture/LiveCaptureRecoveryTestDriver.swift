@@ -14,6 +14,9 @@ import AppKit
 ///   5. Legacy staging-manifest migration (KNOWN_ISSUES #1) drops a re-processable segment (sources present →
 ///      stale output deleted so resume regenerates it) but KEEPS one whose source is gone (never deletes
 ///      output it can no longer rebuild).
+///   6. Launch-time `pruneEmptySessions` (W23.h1) reclaims ONLY a positively-identified, spent session folder
+///      and only via the Trash — never the `_relay` dir + its pending objects, a HEIC-/`.jpeg`-only session,
+///      a folder holding unrecognized content, or a non-session (operator) folder.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -136,6 +139,54 @@ enum LiveCaptureRecoveryTestDriver {
         let trashed = CaptureSession.trashOrRemove(victim)
         check("trashOrRemove removes the file from its original path", !fm.fileExists(atPath: victim.path))
         check("trashOrRemove reports it went to the Trash (not a fallback hard delete)", trashed)
+
+        // --- Test 8 (W23.h1): launch-time pruneEmptySessions must never hard-delete non-session or
+        // recoverable content. It reclaims ONLY positively-identified, spent session folders, via the Trash.
+        // Fixtures cover all five failure cases from the finding + happy-path regression guards. ---
+        let pruneRoot = tmp.appendingPathComponent("prune", isDirectory: true)
+        let tk = String(UUID().uuidString.prefix(8))   // unique suffix → safe Trash lookup + cleanup
+        func mk(_ rel: String, _ body: String = "x") {
+            let u = pruneRoot.appendingPathComponent(rel)
+            try? fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? Data(body.utf8).write(to: u)
+        }
+        func survives(_ rel: String) -> Bool { fm.fileExists(atPath: pruneRoot.appendingPathComponent(rel).path) }
+        let spent = "2026-07-04T10-00-00Z-\(tk)"   // spent session: only a manifest left → RECLAIM
+        let empty = "2026-07-05T10-00-00Z-\(tk)"   // genuinely-empty session → RECLAIM
+        mk("_relay/AB12CD/photo-0001.json", "{}")                    // (1) pending relay object — KEEP
+        mk("2026-07-01T10-00-00Z-\(tk)/IMG_0001.heic")              // (2) HEIC-only session — KEEP
+        mk("2026-07-02T10-00-00Z-\(tk)/IMG_0002.jpeg")             // (3) .jpeg-only session — KEEP
+        mk("2026-07-03T10-00-00Z-\(tk)/manifest.json", "{}")        // (4) unknown-content session — KEEP
+        mk("2026-07-03T10-00-00Z-\(tk)/recovery.journal", "notes")
+        mk("\(spent)/manifest.json", "{}")
+        try? fm.createDirectory(at: pruneRoot.appendingPathComponent(empty, isDirectory: true), withIntermediateDirectories: true)
+        mk("2026-07-06T10-00-00Z-\(tk)/IMG_0003.jpg")              // (6) classic .jpg session — KEEP
+        mk("2026-07-07T10-00-00Z-\(tk)/_processed/00001 Coll.pdf") // (7) staged _processed output — KEEP
+        mk("My Notes/whatever.txt")                                  // (8) non-session operator folder — KEEP
+        let reclaimed = Set(CaptureSession.pruneEmptySessions(under: pruneRoot).map { $0.lastPathComponent })
+        check("prune KEEPS the relay dir + its pending object", survives("_relay/AB12CD/photo-0001.json"))
+        check("prune KEEPS a HEIC-only session (recoverable source)", survives("2026-07-01T10-00-00Z-\(tk)/IMG_0001.heic"))
+        check("prune KEEPS a .jpeg-only session (recoverable source)", survives("2026-07-02T10-00-00Z-\(tk)/IMG_0002.jpeg"))
+        check("prune KEEPS a session with unrecognized content", survives("2026-07-03T10-00-00Z-\(tk)/recovery.journal"))
+        check("prune KEEPS a .jpg session (happy-path regression)", survives("2026-07-06T10-00-00Z-\(tk)/IMG_0003.jpg"))
+        check("prune KEEPS a session with staged _processed output", survives("2026-07-07T10-00-00Z-\(tk)/_processed/00001 Coll.pdf"))
+        check("prune KEEPS a non-session operator folder", survives("My Notes/whatever.txt"))
+        check("prune RECLAIMS the spent manifest-only session", !survives(spent) && reclaimed.contains(spent))
+        check("prune RECLAIMS the genuinely-empty session", !survives(empty) && reclaimed.contains(empty))
+        check("prune reclaims ONLY the two spent sessions", reclaimed == Set([spent, empty]))
+        // (d) recoverability: prune's ONLY deletion path is `trashOrRemove` (Trash → Put Back), never a hard
+        // `removeItem`, so the reclaims above (spent + empty, gone from root) are Finder-recoverable. Prove
+        // that path actually trashes a DIRECTORY in this runtime: trashItem returning success means the folder
+        // went to the Trash (recoverable), not deleted. We assert the success/return contract rather than
+        // scanning a guessed `~/.Trash` — the physical Trash location varies under the app's launch context.
+        let dprobe = pruneRoot.appendingPathComponent("2026-07-09T09-09-09Z-\(tk)DP", isDirectory: true)
+        try? fm.createDirectory(at: dprobe, withIntermediateDirectories: true)
+        try? Data("x".utf8).write(to: dprobe.appendingPathComponent("manifest.json"))
+        var probeDest: NSURL?
+        let dpTrashed = (try? fm.trashItem(at: dprobe, resultingItemURL: &probeDest)) != nil
+        check("reclaim path trashes a directory to the Trash — recoverable, not a hard delete",
+              dpTrashed && !fm.fileExists(atPath: dprobe.path))
+        if let dest = probeDest.map({ $0 as URL }) { try? fm.removeItem(at: dest) }   // tidy the probe
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
