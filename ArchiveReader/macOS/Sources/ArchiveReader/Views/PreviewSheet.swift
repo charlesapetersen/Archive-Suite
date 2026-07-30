@@ -44,15 +44,15 @@ struct PreviewSheet: View {
             Button { nav.moveSelectionInList(1) } label: { Image(systemName: "chevron.down") }
                 .keyboardShortcut(.downArrow, modifiers: [])
                 .help("Next file in the list (↓)")
-            // ←/→ cycle within a multi-file selection that was opened together.
+            // ←/→ cycle the page pairs of this document, then across a multi-file selection opened together.
             Button { model.previous() } label: { Image(systemName: "chevron.left") }
                 .keyboardShortcut(.leftArrow, modifiers: [])
-                .disabled(model.index <= 0)
-                .help("Previous document in the selection (←)")
+                .disabled(!model.canGoPrevious)
+                .help("Previous page in the selection (←)")
             Button { model.next() } label: { Image(systemName: "chevron.right") }
                 .keyboardShortcut(.rightArrow, modifiers: [])
-                .disabled(model.index >= model.urls.count - 1)
-                .help("Next document in the selection (→)")
+                .disabled(!model.canGoNext)
+                .help("Next page in the selection (→)")
             Button { model.copyPlainSelection() } label: { Image(systemName: "doc.on.doc") }
                 .keyboardShortcut("c", modifiers: .command)
                 .help("Copy selected text exactly (⌘C)")
@@ -77,11 +77,16 @@ struct PreviewSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             HStack(spacing: 0) {
+                // `.id(pageIdentity)` — a fresh PDFView per displayed pair/document (DV-3). Needed for the
+                // image pane in particular: `updateNSView`'s reuse check compares page text, which is nil
+                // on every image page, so without this the pane keeps showing the previous scan.
                 PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane")
+                    .id(model.pageIdentity)
                     .frame(maxWidth: .infinity)
                 Divider()
                 if model.hasTextPage {
                     PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.preview.textPane")
+                        .id(model.pageIdentity)
                         .frame(maxWidth: .infinity)
                 } else if let text = model.embeddedText {
                     ScrollView {
@@ -95,7 +100,9 @@ struct PreviewSheet: View {
                     .accessibilityIdentifier("ar.preview.textPane")
                 } else {
                     ContentUnavailableView("No OCR text page", systemImage: "text.slash",
-                                           description: Text("This document has a single page."))
+                                           description: Text(model.pairCount > 1
+                                                             ? "This scan has no OCR text page."
+                                                             : "This document has a single page."))
                         .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("ar.preview.noText")
                 }

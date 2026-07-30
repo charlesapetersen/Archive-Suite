@@ -4,10 +4,18 @@ import ArchiveCore
 
 /// Drives the document window: the selected files, the current document, and page cycling.
 /// Loads one document at a time (never materializes the whole selection).
+///
+/// Cycling is two-level: within a document the viewer walks its image/OCR-text **page pairs**
+/// (`DocumentPagePairs`), and only past the last pair does it move to the next file. An archival PDF may
+/// interleave image, text, image, text, … (`SPEC/tag-format.md` §"Interleaved multi-page variant" —
+/// merged multi-page documents and Re-OCR output), so pinning the panes to pages 0/1 made every later
+/// scan of such a document unreachable; pairs are what make the whole document readable.
 @MainActor
 final class DocumentViewerModel: ObservableObject {
     @Published private(set) var urls: [URL] = []
     @Published var index = 0 { didSet { if index != oldValue { loadCurrent() } } }
+    /// Which page pair of the current document the two panes show. Reset to 0 by every document load.
+    @Published private(set) var pair = 0
     @Published private(set) var current: PDFDocument?
     @Published private(set) var loadError: String?
     @Published var showingFind = false   // driven by the toolbar and the Document menu
@@ -18,8 +26,8 @@ final class DocumentViewerModel: ObservableObject {
     private var findNavigator = FindNavigator()
     private var lastFoundQuery: String?  // the query the navigator was last built for (avoids rescanning)
 
-    let leftController: PDFPaneController     // image page (page 0)
-    let rightController: PDFPaneController   // OCR text page (page 1)
+    let leftController: PDFPaneController     // the current pair's image page (PDF page 2·pair)
+    let rightController: PDFPaneController   // the current pair's OCR text page (PDF page 2·pair + 1)
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     init(persists: Bool = true) {
@@ -38,9 +46,35 @@ final class DocumentViewerModel: ObservableObject {
         loadCurrent()
     }
 
-    /// Move to the previous / next document within the current segment (the opened run/selection).
-    func next()     { if index < urls.count - 1 { prepareFindForManualCycle(); index += 1 } }
-    func previous() { if index > 0 { prepareFindForManualCycle(); index -= 1 } }
+    /// Step forward one page pair; past the current document's last pair, move to the next file.
+    func next() {
+        if pair + 1 < pairCount { prepareFindForManualCycle(); setPair(pair + 1); return }
+        guard index < urls.count - 1 else { return }
+        prepareFindForManualCycle()
+        index += 1                          // didSet → loadCurrent() → pair 0 of the new document
+    }
+
+    /// Step back one page pair; before the current document's first pair, move to the previous file and
+    /// land on its LAST pair, so walking backwards visits every pair rather than skipping to page 1.
+    func previous() {
+        if pair > 0 { prepareFindForManualCycle(); setPair(pair - 1); return }
+        guard index > 0 else { return }
+        prepareFindForManualCycle()
+        index -= 1                          // didSet → loadCurrent() → pair 0 of the previous document…
+        setPair(pairCount - 1)              // …then to its last pair (clamped; a load failure gives 0)
+    }
+
+    /// Whether `next()` / `previous()` would move at all — either within this document's pairs or across
+    /// files. The toolbar/header buttons disable on these, so a multi-pair document stays navigable.
+    var canGoNext: Bool { pair + 1 < pairCount || index < urls.count - 1 }
+    var canGoPrevious: Bool { pair > 0 || index > 0 }
+
+    /// Move to a pair of the CURRENT document, clamped into range. Keyboard focus follows: a pair with no
+    /// OCR text page has no right pane, so leaving focus there would point zoom/scroll at nothing.
+    private func setPair(_ p: Int) {
+        pair = min(max(0, p), max(0, pairCount - 1))
+        if focusedPane == .right, textPage == nil { focusedPane = .left }
+    }
 
     /// When the user manually cycles documents while find is active, keep the query's highlights on the
     /// newly-shown pages but drop the "current match" selection (its ordinal belonged to the old document),
@@ -62,24 +96,46 @@ final class DocumentViewerModel: ObservableObject {
     func fitFocused()     { controller(focusedPane).fit() }
 
     var title: String { urls.indices.contains(index) ? urls[index].lastPathComponent : "Document View" }
-    var positionLabel: String { urls.isEmpty ? "" : "\(index + 1) of \(urls.count)" }
 
-    /// Left pane = the image page (page 0). Present for any non-empty PDF.
-    var imagePage: PDFPage? { current?.page(at: 0) }
-    /// Right pane = the OCR text page (page 1) when the document has one.
-    var textPage: PDFPage? {
-        guard let doc = current, doc.pageCount > 1 else { return nil }
-        return doc.page(at: 1)
+    /// "3 of 12" across the open selection, plus " · page 2 of 4" when the current document holds more
+    /// than one page pair — so a merged multi-page document says where you are inside it. Single-pair
+    /// documents (the overwhelming majority) keep the original label exactly.
+    var positionLabel: String {
+        guard !urls.isEmpty else { return "" }
+        let file = "\(index + 1) of \(urls.count)"
+        guard pairCount > 1 else { return file }
+        return "\(file) · page \(pair + 1) of \(pairCount)"
     }
+
+    /// How many image/OCR-text page pairs the loaded document has (1 for a standard 2-page archival PDF).
+    var pairCount: Int { DocumentPagePairs.pairCount(pageCount: current?.pageCount ?? 0) }
+
+    /// Left pane = the current pair's image page. Present for any non-empty PDF.
+    var imagePage: PDFPage? { page(at: DocumentPagePairs.imagePageIndex(pair: pair)) }
+    /// Right pane = the current pair's OCR text page, when the pair has one (a trailing odd image page
+    /// has none).
+    var textPage: PDFPage? { page(at: DocumentPagePairs.textPageIndex(pair: pair)) }
     var hasTextPage: Bool { textPage != nil }
 
-    /// The text extracted from the first page's embedded text layer, when the document is a
-    /// single-page PDF with selectable text but no OCR page-2. `nil` for multi-page (processed)
-    /// PDFs or image-only documents.
+    /// Bounds-checked page lookup — `pair` can outrun a freshly-loaded shorter document for one
+    /// publish cycle, and PDFKit is happier not being asked for a page it doesn't have.
+    private func page(at pageIndex: Int) -> PDFPage? {
+        guard let doc = current, pageIndex >= 0, pageIndex < doc.pageCount else { return nil }
+        return doc.page(at: pageIndex)
+    }
+
+    /// Identity of the displayed page pair. The panes use it for `.id(…)` so stepping between pairs gives
+    /// each a FRESH PDFView (DV-3), exactly as cycling documents does. Required, not cosmetic:
+    /// `PDFPaneView.updateNSView`'s reuse fallback compares `page.string`, which is `nil` for both an old
+    /// and a new *image* page — so without the pair in the identity the left pane would keep showing the
+    /// previous scan.
+    var pageIdentity: String { "\(index)#\(pair)" }
+
+    /// The text extracted from the current pair's image page, when that pair has no OCR text page (a
+    /// single-page PDF with selectable text, or an odd trailing scan). `nil` when a text page exists or
+    /// the image page has no text layer.
     var embeddedText: String? {
-        guard textPage == nil,
-              let page = current?.page(at: 0),
-              let text = page.string, !text.isEmpty else { return nil }
+        guard textPage == nil, let text = imagePage?.string, !text.isEmpty else { return nil }
         return text
     }
 
@@ -114,8 +170,8 @@ final class DocumentViewerModel: ObservableObject {
 
     // MARK: In-document find (⌘F) — highlight all matches, next/prev across every open PDF
 
-    /// Rebuild the match list for `findQuery` across ALL open documents (each document's page 0 + page 1,
-    /// which is what the two-pane viewer can display), start on the first match, and reveal it. Scanning
+    /// Rebuild the match list for `findQuery` across ALL open documents — every page pair of each, which
+    /// is everything the viewer can now navigate to — start on the first match, and reveal it. Scanning
     /// opens each not-currently-loaded PDF once, so this runs on submit / next / prev — not per keystroke.
     /// (A very large multi-document selection therefore pauses briefly on the first search; acceptable
     /// because the viewer opens one document at a time and selections are bounded in practice.)
@@ -128,14 +184,15 @@ final class DocumentViewerModel: ObservableObject {
             applyCurrentMatch()
             return
         }
-        var perPane: [(doc: Int, pane: Pane, count: Int)] = []
+        var perPane: [(doc: Int, pair: Int, pane: Pane, count: Int)] = []
         for i in urls.indices {
             // Reuse the already-loaded document for the current index; open the rest read-only.
             let doc = (i == index) ? current : PDFDocument(url: urls[i])
             guard let doc else { continue }
-            let counts = DocumentFindScanner.paneMatchCounts(in: doc, query: query)
-            perPane.append((doc: i, pane: .left, count: counts.left))
-            perPane.append((doc: i, pane: .right, count: counts.right))
+            for (p, counts) in DocumentFindScanner.pairMatchCounts(in: doc, query: query).enumerated() {
+                perPane.append((doc: i, pair: p, pane: .left, count: counts.left))
+                perPane.append((doc: i, pair: p, pane: .right, count: counts.right))
+            }
         }
         findNavigator = FindNavigator(perPane: perPane)
         refreshFindPublished()
@@ -181,9 +238,10 @@ final class DocumentViewerModel: ObservableObject {
         findTotal = findNavigator.total
     }
 
-    /// Push the navigator's current match down to the panes. A same-document move applies immediately; a
-    /// cross-document move sets each pane's target FIRST, then changes `index` so the pane rebuild
-    /// re-applies it (via `applyToView` → `applyFind`) with no timing race.
+    /// Push the navigator's current match down to the panes. A move within the displayed pair applies
+    /// immediately; a move to another pair or another document sets each pane's target FIRST, then changes
+    /// `pair`/`index` so the pane rebuild re-applies it (via `applyToView` → `applyFind`) with no timing
+    /// race — the pane's `.id(pageIdentity)` covers a pair change exactly as it covers a document change.
     private func applyCurrentMatch() {
         guard let loc = findNavigator.current else {
             // No current match (empty query or zero matches): clear the current selection but still push
@@ -197,13 +255,18 @@ final class DocumentViewerModel: ObservableObject {
         // The current match owns exactly one pane; the other highlights its matches but holds no selection.
         leftController.setFindTarget(query: findQuery, currentIndex: loc.pane == .left ? loc.index : nil)
         rightController.setFindTarget(query: findQuery, currentIndex: loc.pane == .right ? loc.index : nil)
-        focusedPane = loc.pane   // move the focus border (not keyboard focus — the find field keeps that)
-        if loc.doc == index {
+        if loc.doc != index {
+            index = loc.doc     // → loadCurrent() (pair 0) + pane rebuild → applyToView() re-applies it
+            setPair(loc.pair)
+        } else if loc.pair != pair {
+            setPair(loc.pair)   // same document, different pair → pane `.id` changes → rebuild re-applies
+        } else {
             leftController.applyFind()
             rightController.applyFind()
-        } else {
-            index = loc.doc   // → loadCurrent() + pane rebuild → applyToView() re-applies the stored target
         }
+        // Move the focus border (not keyboard focus — the find field keeps that). Set last: `setPair`
+        // pulls focus off a text pane that doesn't exist, and the match's own pane always does.
+        focusedPane = loc.pane
     }
 
     /// Copy an archive link for the current page (1-based) to the pasteboard.
@@ -212,8 +275,11 @@ final class DocumentViewerModel: ObservableObject {
         guard urls.indices.contains(index) else { return }
         let fileURL = urls[index]
         // Page is 1-based in the link format; `index` here is the doc index (not the PDF page).
-        // For the document viewer, "this page" means the current document at page 1 (image page).
-        let page = 1
+        // "This page" is the image page of the pair on screen — which is page 1 only on the first pair.
+        // (Pinning it to 1 was harmless while pairs past the first were unreachable; now they aren't.
+        // Making the number follow the FOCUSED pane, plus the other two defects of this command, is
+        // W23.m4's job — this only keeps the link pointing at the pair the reader is actually looking at.)
+        let page = DocumentPagePairs.imagePageIndex(pair: pair) + 1
         Task {
             let item = await ArchiveLinkWriter.pageLink(
                 fileURL: fileURL, page: page,
@@ -229,6 +295,7 @@ final class DocumentViewerModel: ObservableObject {
     ]
 
     private func loadCurrent() {
+        pair = 0   // a newly loaded document always opens on its first page pair
         guard urls.indices.contains(index) else { current = nil; loadError = nil; return }
         let url = urls[index]
         if let doc = PDFDocument(url: url) {

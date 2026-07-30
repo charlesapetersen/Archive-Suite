@@ -25,7 +25,7 @@ final class DocumentFindTests: XCTestCase {
     }
 
     func testEmptyPerPaneCountsProduceEmptyNavigator() {
-        let nav = FindNavigator(perPane: [(0, .left, 0), (0, .right, 0)])
+        let nav = FindNavigator(perPane: [(0, 0, .left, 0), (0, 0, .right, 0)])
         XCTAssertEqual(nav.total, 0)
         XCTAssertNil(nav.ordinal)
         XCTAssertNil(nav.current)
@@ -34,102 +34,140 @@ final class DocumentFindTests: XCTestCase {
     func testBuildOrdersByDocThenLeftBeforeRightAndSkipsZeroCounts() {
         // doc 0: 2 left + 1 right; doc 1: 0 left (skipped) + 3 right.
         let nav = FindNavigator(perPane: [
-            (0, .left, 2), (0, .right, 1),
-            (1, .left, 0), (1, .right, 3),
+            (0, 0, .left, 2), (0, 0, .right, 1),
+            (1, 0, .left, 0), (1, 0, .right, 3),
         ])
         XCTAssertEqual(nav.total, 6)
         XCTAssertEqual(nav.ordinal, 1)                       // starts on the first match
-        XCTAssertEqual(nav.current, Loc(doc: 0, pane: .left, index: 0))
+        XCTAssertEqual(nav.current, Loc(doc: 0, pair: 0, pane: .left, index: 0))
         XCTAssertEqual(nav.locations, [
-            Loc(doc: 0, pane: .left,  index: 0),
-            Loc(doc: 0, pane: .left,  index: 1),
-            Loc(doc: 0, pane: .right, index: 0),
-            Loc(doc: 1, pane: .right, index: 0),             // doc-1 left skipped (zero count)
-            Loc(doc: 1, pane: .right, index: 1),
-            Loc(doc: 1, pane: .right, index: 2),
+            Loc(doc: 0, pair: 0, pane: .left,  index: 0),
+            Loc(doc: 0, pair: 0, pane: .left,  index: 1),
+            Loc(doc: 0, pair: 0, pane: .right, index: 0),
+            Loc(doc: 1, pair: 0, pane: .right, index: 0),    // doc-1 left skipped (zero count)
+            Loc(doc: 1, pair: 0, pane: .right, index: 1),
+            Loc(doc: 1, pair: 0, pane: .right, index: 2),
+        ])
+    }
+
+    /// W23.m2: pairs order between doc and pane — a match on a LATER pair of the same document is a
+    /// distinct, addressable location, not a duplicate of the first pair's.
+    func testBuildKeepsPairOrderWithinADocument() {
+        let nav = FindNavigator(perPane: [
+            (0, 0, .left, 1), (0, 0, .right, 1),
+            (0, 1, .left, 1), (0, 1, .right, 2),
+            (0, 2, .left, 1), (0, 2, .right, 0),
+        ])
+        XCTAssertEqual(nav.total, 6)
+        XCTAssertEqual(nav.locations, [
+            Loc(doc: 0, pair: 0, pane: .left,  index: 0),
+            Loc(doc: 0, pair: 0, pane: .right, index: 0),
+            Loc(doc: 0, pair: 1, pane: .left,  index: 0),
+            Loc(doc: 0, pair: 1, pane: .right, index: 0),
+            Loc(doc: 0, pair: 1, pane: .right, index: 1),
+            Loc(doc: 0, pair: 2, pane: .left,  index: 0),
         ])
     }
 
     func testNextAdvancesThroughEveryMatchThenWraps() {
-        var nav = FindNavigator(perPane: [(0, .left, 2), (1, .right, 1)])   // 3 matches
+        var nav = FindNavigator(perPane: [(0, 0, .left, 2), (1, 0, .right, 1)])   // 3 matches
         XCTAssertEqual(nav.ordinal, 1)
-        XCTAssertEqual(nav.next(), Loc(doc: 0, pane: .left, index: 1)); XCTAssertEqual(nav.ordinal, 2)
-        XCTAssertEqual(nav.next(), Loc(doc: 1, pane: .right, index: 0)); XCTAssertEqual(nav.ordinal, 3)
-        XCTAssertEqual(nav.next(), Loc(doc: 0, pane: .left, index: 0)); XCTAssertEqual(nav.ordinal, 1)  // wrap
+        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, pane: .left, index: 1)); XCTAssertEqual(nav.ordinal, 2)
+        XCTAssertEqual(nav.next(), Loc(doc: 1, pair: 0, pane: .right, index: 0)); XCTAssertEqual(nav.ordinal, 3)
+        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, pane: .left, index: 0)); XCTAssertEqual(nav.ordinal, 1)  // wrap
     }
 
     func testPreviousFromFirstWrapsToLast() {
-        var nav = FindNavigator(perPane: [(0, .left, 1), (0, .right, 1), (2, .left, 1)])   // 3 matches
+        var nav = FindNavigator(perPane: [(0, 0, .left, 1), (0, 0, .right, 1), (2, 0, .left, 1)])   // 3 matches
         XCTAssertEqual(nav.ordinal, 1)
-        XCTAssertEqual(nav.previous(), Loc(doc: 2, pane: .left, index: 0))   // wrap back to the last
+        XCTAssertEqual(nav.previous(), Loc(doc: 2, pair: 0, pane: .left, index: 0))   // wrap back to the last
         XCTAssertEqual(nav.ordinal, 3)
-        XCTAssertEqual(nav.previous(), Loc(doc: 0, pane: .right, index: 0))
+        XCTAssertEqual(nav.previous(), Loc(doc: 0, pair: 0, pane: .right, index: 0))
         XCTAssertEqual(nav.ordinal, 2)
     }
 
     func testSingleMatchWrapsToItself() {
-        var nav = FindNavigator(perPane: [(4, .right, 1)])
+        var nav = FindNavigator(perPane: [(4, 0, .right, 1)])
         XCTAssertEqual(nav.total, 1)
-        XCTAssertEqual(nav.current, Loc(doc: 4, pane: .right, index: 0))
-        XCTAssertEqual(nav.next(), Loc(doc: 4, pane: .right, index: 0))
-        XCTAssertEqual(nav.previous(), Loc(doc: 4, pane: .right, index: 0))
+        XCTAssertEqual(nav.current, Loc(doc: 4, pair: 0, pane: .right, index: 0))
+        XCTAssertEqual(nav.next(), Loc(doc: 4, pair: 0, pane: .right, index: 0))
+        XCTAssertEqual(nav.previous(), Loc(doc: 4, pair: 0, pane: .right, index: 0))
         XCTAssertEqual(nav.ordinal, 1)
     }
 
-    // MARK: DocumentFindScanner — count matches on page 0 (left) / page 1 (right)
+    // MARK: DocumentPagePairs — the interleaved image/OCR-text page-pair arithmetic (W23.m2)
 
-    func testPaneMatchCountsBucketsByPageAndIgnoresPageTwoPlus() {
-        // page 0: "Alpha" ×2, page 1: "Alpha" ×1, page 2: "Alpha" ×1 (must be ignored — not displayable).
-        let doc = makeTextPDF(pages: ["Alpha Alpha bravo", "Alpha charlie", "Alpha delta"])
-        XCTAssertEqual(doc.pageCount, 3, "precondition: synthesized 3-page PDF")
-        XCTAssertTrue(doc.page(at: 0)?.string?.lowercased().contains("alpha") == true,
-                      "precondition: PDFKit can extract the drawn text")
-
-        let counts = DocumentFindScanner.paneMatchCounts(in: doc, query: "alpha")   // case-insensitive
-        XCTAssertEqual(counts.left, 2)
-        XCTAssertEqual(counts.right, 1)
+    func testPairCountRoundsUpSoATrailingScanIsNotLost() {
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 0), 0)
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 1), 1)   // image only, no OCR page
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 2), 1)   // the standard archival PDF
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 3), 2)   // merged: 2-page doc + bare scan
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 4), 2)
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 9), 5)
+        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: -1), 0, "a negative count must not go negative")
     }
 
-    func testPaneMatchCountsEmptyQueryIsZero() {
+    func testPageIndexMappingIsSelfConsistent() {
+        for pair in 0..<6 {
+            let image = DocumentPagePairs.imagePageIndex(pair: pair)
+            let text = DocumentPagePairs.textPageIndex(pair: pair)
+            XCTAssertEqual(text, image + 1)
+            XCTAssertTrue(DocumentPagePairs.isImagePage(image))
+            XCTAssertFalse(DocumentPagePairs.isImagePage(text))
+            XCTAssertEqual(DocumentPagePairs.pair(ofPageIndex: image), pair)
+            XCTAssertEqual(DocumentPagePairs.pair(ofPageIndex: text), pair)
+        }
+    }
+
+    // MARK: DocumentFindScanner — matches bucketed per pair (page 2p → left, page 2p+1 → right)
+
+    /// W23.m2 REGRESSION GUARD: the scanner used to `default: break` every match on page ≥ 2, so the OCR
+    /// text of every scan after the first in a merged document was unfindable. Now each pair reports its
+    /// own counts.
+    func testPairMatchCountsBucketsEveryPageIncludingPastPageTwo() {
+        // pair 0 → pages 0/1; pair 1 → pages 2/3; pair 2 → page 4 (image only, odd trailing page).
+        let doc = makeTextPDF(pages: ["Alpha Alpha bravo", "Alpha charlie",
+                                      "Alpha delta", "Alpha echo Alpha",
+                                      "Alpha foxtrot"])
+        XCTAssertEqual(doc.pageCount, 5, "precondition: synthesized 5-page PDF")
+        XCTAssertTrue(doc.page(at: 4)?.string?.lowercased().contains("alpha") == true,
+                      "precondition: PDFKit can extract the drawn text from the LAST page")
+
+        let counts = DocumentFindScanner.pairMatchCounts(in: doc, query: "alpha")   // case-insensitive
+        XCTAssertEqual(counts.count, 3, "one entry per page pair")
+        XCTAssertEqual(counts[0].left, 2)
+        XCTAssertEqual(counts[0].right, 1)
+        XCTAssertEqual(counts[1].left, 1, "page 2 — silently discarded before W23.m2")
+        XCTAssertEqual(counts[1].right, 2, "page 3 — silently discarded before W23.m2")
+        XCTAssertEqual(counts[2].left, 1, "page 4 — the odd trailing scan")
+        XCTAssertEqual(counts[2].right, 0, "the trailing pair has no text page")
+    }
+
+    func testPairMatchCountsEmptyQueryIsEmpty() {
         let doc = makeTextPDF(pages: ["Alpha", "Alpha"])
-        let counts = DocumentFindScanner.paneMatchCounts(in: doc, query: "")
-        XCTAssertEqual(counts.left, 0)
-        XCTAssertEqual(counts.right, 0)
+        XCTAssertTrue(DocumentFindScanner.pairMatchCounts(in: doc, query: "").isEmpty)
     }
 
-    func testPaneMatchCountsNoMatchIsZero() {
-        let doc = makeTextPDF(pages: ["Alpha", "Bravo"])
-        let counts = DocumentFindScanner.paneMatchCounts(in: doc, query: "zulu")
-        XCTAssertEqual(counts.left, 0)
-        XCTAssertEqual(counts.right, 0)
+    func testPairMatchCountsNoMatchIsZeroForEveryPair() {
+        let doc = makeTextPDF(pages: ["Alpha", "Bravo", "Charlie", "Delta"])
+        let counts = DocumentFindScanner.pairMatchCounts(in: doc, query: "zulu")
+        XCTAssertEqual(counts.count, 2)
+        XCTAssertTrue(counts.allSatisfy { $0.left == 0 && $0.right == 0 })
     }
 
-    func testPaneMatchCountsSinglePageHasNoRight() {
+    func testPairMatchCountsSinglePageHasNoRight() {
         let doc = makeTextPDF(pages: ["Alpha alpha"])   // one page only
-        let counts = DocumentFindScanner.paneMatchCounts(in: doc, query: "alpha")
-        XCTAssertEqual(counts.left, 2)
-        XCTAssertEqual(counts.right, 0)
+        let counts = DocumentFindScanner.pairMatchCounts(in: doc, query: "alpha")
+        XCTAssertEqual(counts.count, 1)
+        XCTAssertEqual(counts[0].left, 2)
+        XCTAssertEqual(counts[0].right, 0)
+    }
+
+    func testPairMatchCountsEmptyDocumentIsEmpty() {
+        XCTAssertTrue(DocumentFindScanner.pairMatchCounts(in: PDFDocument(), query: "alpha").isEmpty)
     }
 
     // MARK: helper — render selectable text into a real multi-page PDFDocument
 
-    private func makeTextPDF(pages: [String]) -> PDFDocument {
-        let pageRect = CGRect(x: 0, y: 0, width: 400, height: 400)
-        let data = NSMutableData()
-        let consumer = CGDataConsumer(data: data as CFMutableData)!
-        var box = pageRect
-        let ctx = CGContext(consumer: consumer, mediaBox: &box, nil)!
-        for text in pages {
-            ctx.beginPDFPage(nil)
-            let attr = NSAttributedString(string: text,
-                                          attributes: [.font: NSFont.systemFont(ofSize: 14)])
-            let framesetter = CTFramesetterCreateWithAttributedString(attr)
-            let path = CGPath(rect: pageRect.insetBy(dx: 20, dy: 20), transform: nil)
-            let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, 0), path, nil)
-            CTFrameDraw(frame, ctx)
-            ctx.endPDFPage()
-        }
-        ctx.closePDF()
-        return PDFDocument(data: data as Data)!
-    }
+    private func makeTextPDF(pages: [String]) -> PDFDocument { TestPDFBuilder.textPDF(pages: pages) }
 }

@@ -1,20 +1,22 @@
 import PDFKit
 
 /// One matched occurrence of the find query, located by document (index into the viewer's open
-/// selection), which pane it lives in (left = image page 0, right = OCR text page 1), and its ordinal
-/// among that pane's matches. The document viewer only ever displays a document's first two pages, so
-/// matches are scoped to those two pages — you can navigate only to what the viewer can actually show.
+/// selection), by which image/OCR-text **page pair** of that document it sits in
+/// (`DocumentPagePairs`), by which pane of that pair (left = the pair's image page, right = its OCR
+/// text page), and by its ordinal among that pane's matches. Every page of an interleaved multi-page
+/// PDF is addressable this way, so a match is never dropped for being "past page 2".
 struct FindMatchLocation: Equatable, Sendable {
     var doc: Int
+    var pair: Int    // which image/text page pair within that document (page 2·pair / 2·pair+1)
     var pane: DocumentViewerModel.Pane
-    var index: Int   // 0-based ordinal within that (doc, pane)
+    var index: Int   // 0-based ordinal within that (doc, pair, pane)
 }
 
 /// Pure, view-free navigation over all find matches across the viewer's open documents. Holds the
-/// ordered match list (reading order: document ascending, left/image pane before right/text pane) and a
-/// wrap-around cursor. All the fiddly logic — ordering, wrap-around, empty/one-match edge cases, the
-/// 1-based "N of M" position — lives here so it can be unit-tested without a live `PDFView`. The model
-/// applies `current` to PDFKit; this type never touches a view.
+/// ordered match list (reading order: document ascending, then page pair ascending, then left/image
+/// pane before right/text pane) and a wrap-around cursor. All the fiddly logic — ordering, wrap-around,
+/// empty/one-match edge cases, the 1-based "N of M" position — lives here so it can be unit-tested
+/// without a live `PDFView`. The model applies `current` to PDFKit; this type never touches a view.
 struct FindNavigator: Equatable, Sendable {
     private(set) var locations: [FindMatchLocation]
     private(set) var cursor: Int?   // index into `locations`; nil when there are no matches
@@ -24,13 +26,13 @@ struct FindNavigator: Equatable, Sendable {
         cursor = nil
     }
 
-    /// Build the flat match list from per-`(doc, pane)` counts, kept in the caller's order (which is
-    /// reading order). Zero-count entries contribute nothing. The cursor starts on the first match.
-    init(perPane: [(doc: Int, pane: DocumentViewerModel.Pane, count: Int)]) {
+    /// Build the flat match list from per-`(doc, pair, pane)` counts, kept in the caller's order (which
+    /// is reading order). Zero-count entries contribute nothing. The cursor starts on the first match.
+    init(perPane: [(doc: Int, pair: Int, pane: DocumentViewerModel.Pane, count: Int)]) {
         var locs: [FindMatchLocation] = []
         for entry in perPane where entry.count > 0 {
             for k in 0..<entry.count {
-                locs.append(FindMatchLocation(doc: entry.doc, pane: entry.pane, index: k))
+                locs.append(FindMatchLocation(doc: entry.doc, pair: entry.pair, pane: entry.pane, index: k))
             }
         }
         locations = locs
@@ -64,25 +66,29 @@ struct FindNavigator: Equatable, Sendable {
     }
 }
 
-/// Counts find matches on a document's displayable pages (page 0 → left pane, page 1 → right pane),
-/// matching how `PDFView.highlightedSelections` / `findString` report matches so the counts line up
-/// with what gets highlighted. Read-only: never mutates the document.
+/// Counts find matches per displayable pane of every page pair in a document, matching how
+/// `PDFView.highlightedSelections` / `findString` report matches so the counts line up with what gets
+/// highlighted. Read-only: never mutates the document.
 enum DocumentFindScanner {
-    /// Number of case-insensitive matches for `query` on page 0 (`left`) and page 1 (`right`). Matches on
-    /// any page ≥ 2 of a merged multi-page PDF are ignored — the two-pane viewer can't display them, so
-    /// there's nowhere to navigate them to. A single `findString` pass is bucketed by page.
-    static func paneMatchCounts(in document: PDFDocument, query: String) -> (left: Int, right: Int) {
-        guard !query.isEmpty else { return (0, 0) }
-        var left = 0
-        var right = 0
+    /// Case-insensitive match counts for `query`, one entry per page pair in reading order: entry `p`
+    /// holds the matches on PDF page `2p` (`left`, the image page) and page `2p + 1` (`right`, the OCR
+    /// text page). A single `findString` pass is bucketed by page, so **every** page of an interleaved
+    /// multi-page PDF contributes — matches past page 2 used to be discarded, which made the later
+    /// scans of a merged document unfindable even though the viewer can now navigate to them.
+    /// Empty array for an empty query or an empty document.
+    static func pairMatchCounts(in document: PDFDocument, query: String) -> [(left: Int, right: Int)] {
+        let pairs = DocumentPagePairs.pairCount(pageCount: document.pageCount)
+        guard !query.isEmpty, pairs > 0 else { return [] }
+        var counts = [(left: Int, right: Int)](repeating: (0, 0), count: pairs)
         for selection in document.findString(query, withOptions: [.caseInsensitive]) {
             guard let page = selection.pages.first else { continue }
-            switch document.index(for: page) {
-            case 0: left += 1
-            case 1: right += 1
-            default: break
-            }
+            let pageIndex = document.index(for: page)
+            // `index(for:)` answers NSNotFound for a page that isn't in this document; the bounds check
+            // below rejects that (and any future surprise) rather than trusting the arithmetic.
+            let pair = DocumentPagePairs.pair(ofPageIndex: pageIndex)
+            guard pageIndex >= 0, counts.indices.contains(pair) else { continue }
+            if DocumentPagePairs.isImagePage(pageIndex) { counts[pair].left += 1 } else { counts[pair].right += 1 }
         }
-        return (left, right)
+        return counts
     }
 }

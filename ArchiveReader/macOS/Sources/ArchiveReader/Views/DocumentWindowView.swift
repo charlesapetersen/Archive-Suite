@@ -48,16 +48,18 @@ struct DocumentWindowView: View {
                 let total = geo.size.width
                 let leftW = max(minPane, min(total - minPane - handleWidth, fraction * total))
                 HStack(spacing: 0) {
-                    // `.id(index)` gives each page a fresh PDFView (DV-3: a reused view loses text
-                    // selection after the document is swapped). Zoom persists via the controller.
+                    // `.id(pageIdentity)` gives each page a fresh PDFView (DV-3: a reused view loses text
+                    // selection after the document is swapped). Zoom persists via the controller. The
+                    // identity covers the page PAIR, not just the file, so stepping within an interleaved
+                    // multi-page document rebuilds the panes too.
                     PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.doc.imagePane")
-                        .id(model.index)
+                        .id(model.pageIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
                         PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.doc.textPane")
-                            .id(model.index)
+                            .id(model.pageIdentity)
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
                     } else if let text = model.embeddedText {
@@ -73,7 +75,9 @@ struct DocumentWindowView: View {
                         .accessibilityIdentifier("ar.doc.textPane")
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
-                                               description: Text("This document has a single page."))
+                                               description: Text(model.pairCount > 1
+                                                                 ? "This scan has no OCR text page."
+                                                                 : "This document has a single page."))
                             .frame(maxWidth: .infinity)
                             .accessibilityIdentifier("ar.doc.noText")
                     }
@@ -158,10 +162,10 @@ struct DocumentWindowView: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
             Button { model.previous() } label: { Label("Previous", systemImage: "chevron.up") }
-                .disabled(model.index <= 0)
+                .disabled(!model.canGoPrevious)
                 .help("Previous page in this segment (⌘⇧↑)")
             Button { model.next() } label: { Label("Next", systemImage: "chevron.down") }
-                .disabled(model.index >= model.urls.count - 1)
+                .disabled(!model.canGoNext)
                 .help("Next page in this segment (⌘⇧↓)")
 
             Divider()
