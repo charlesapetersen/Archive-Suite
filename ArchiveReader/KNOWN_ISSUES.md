@@ -114,6 +114,34 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   through one `applyVerifiedWrites` pass (batch O(N+M), one publish; undo displays the inverse-apply's
   fresh `.after`, Safety §9).
 
+## Interleaved merged PDFs: pages 3+ were unviewable AND unfindable (W23.m2 — fixed 2026-07-30)
+- Processor merges a multi-page document as `image1, text1, image2, text2, …` (`PDFGenerator.mergeDocumentPDFs`,
+  and its "Re-OCR multi-page PDF" mode), and `SPEC/tag-format.md` §"Interleaved multi-page variant" states
+  outright that **consumers must not hard-assume two pages**. Reader assumed exactly that in three places at
+  once: `DocumentViewerModel.imagePage`/`textPage` were `page(at: 0)`/`page(at: 1)`, `next()`/`previous()`
+  stepped **file URLs** rather than pages within a document, and `DocumentFindScanner` had a literal
+  `default: break` discarding every match on page index ≥ 2. Net effect for any merged document with 2+ source
+  pages: every scan after the first, and all of its OCR text, was unreachable at every affordance — no
+  scrolling, no cycling, no find, no menu command — **even though the full-text index had already extracted it**,
+  so search would lead you to a document whose matching page you then could not open.
+- Fix: a **page-pair** model. New pure `Core/DocumentPagePairs` — pair `p` is PDF page `2p` (image) + `2p+1`
+  (OCR text) — is the single home for that arithmetic, shared by the viewer and the find scanner so they
+  cannot drift. `pairCount` rounds **up**, so a merge of a 2-page document and a bare scan doesn't lose the
+  trailing scan. `DocumentViewerModel` publishes `pair`: cycling walks pairs then files (backwards lands on the
+  previous document's **last** pair), `canGoNext`/`canGoPrevious` gate the buttons, `positionLabel` gains
+  "· page 2 of 4" only when there IS more than one pair, and `DocumentFindScanner.pairMatchCounts` buckets
+  every page so `FindNavigator` can address a match by `(doc, pair, pane)`.
+- **Gotcha worth remembering:** both viewers must key their panes on `model.pageIdentity` (index + pair), not
+  on the file index. `PDFPaneView.updateNSView`'s reuse fallback compares `page.string`, which is `nil` for
+  both the old and the new **image** page — so without the pair in the `.id`, stepping to the next pair leaves
+  the previous scan on screen. `PreviewSheet` had no `.id` at all, which was the same latent bug for document
+  cycling there; it is keyed now too.
+- Not a SPEC change: the SPEC already documented the interleaved variant and the no-2-page-assumption rule.
+  This is Reader coming into conformance with it.
+- Still open (separate item): `copyArchivePageLink` now names the pair on screen rather than a hardcoded page 1,
+  but making it follow the **focused pane** — plus the command's unreachability from the document window and
+  reveal dropping the page — is `W23.m4`.
+
 ## Reactive/eventual-consistency bugs found by adversarial review (fixed 2026-07-05)
 A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:
 - **`extendSelectionToDocumentRun` selection race:** the `Task` mixed a *pre-await* `selected` snapshot

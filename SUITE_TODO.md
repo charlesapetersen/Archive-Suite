@@ -384,8 +384,35 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   can still deliver one conflated count to the Mac just unpaired from (no bytes, no deletion licensed).
   | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/capture/{CaptureViewModel,CaptureModels}.kt + app/src/test/.../CapturePairingGenerationTest.kt | M | med | none
 
-- [ ] **W23.m2 — Reader cannot display or find page 3+ of Processor's intentional merged-PDF format
-  [M · MED · CROSS-APP].** Processor merges multi-page documents as `image1, text1, image2, text2, …`
+- [x] **W23.m2 — Reader cannot display or find page 3+ of Processor's intentional merged-PDF format
+  [M · MED · CROSS-APP].** ✅ DONE `2689739` (model + find seam) + this commit (functional gate). Premise
+  re-confirmed by symbol first — all three defects were live: `imagePage`/`textPage` were `page(at: 0)`/
+  `page(at: 1)`, `next()`/`previous()` stepped file URLs, and `DocumentFindScanner` had a literal
+  `default: break` on page index ≥ 2. Fixed with a **page-pair** model: new pure `Core/DocumentPagePairs`
+  (pair `p` = PDF page `2p` image + `2p+1` OCR text) is the ONE home for that arithmetic, shared by the
+  viewer and the find scanner so they can't drift; `pairCount` rounds **up** so a merge of a 2-page doc and a
+  bare scan doesn't lose the trailing scan. `DocumentViewerModel` publishes `pair` — cycling walks pairs then
+  files (backwards lands on the previous document's LAST pair), `canGoNext`/`canGoPrevious` gate the buttons,
+  `positionLabel` adds "· page 2 of 4" only when there is more than one pair (single-pair documents keep the
+  original string), and `DocumentFindScanner.pairMatchCounts` buckets every page so `FindNavigator` addresses
+  a match by `(doc, pair, pane)` and `applyCurrentMatch` moves the viewer to it. Both viewers now key their
+  panes on `pageIdentity` (index+pair) — **required, not cosmetic**: `PDFPaneView`'s reuse fallback compares
+  `page.string`, which is nil for both an old and a new *image* page, so a file-index-only `.id` would leave
+  the previous scan on screen; `PreviewSheet` had no `.id` at all, so that latent cycling bug is closed too.
+  No SPEC change — the SPEC already documented the interleaved variant and the no-2-page-assumption rule;
+  this is Reader conforming. `copyArchivePageLink` now names the pair on screen instead of a hardcoded page 1
+  (so making pairs reachable doesn't create a NEW wrongness); the focused-pane refinement stays **W23.m4**.
+  Tier-2: adversarial self-review (clamped `setPair` for a short/failed load, guarded every `page(at:)`,
+  checked `index(for:)`'s NSNotFound path, kept keyboard focus off a non-existent text pane) + 25 functional
+  tests on **scratch `mktemp` PDFs only** — 11 new `DocumentViewerPagePairTests` driving the real model over
+  real on-disk PDFs, incl. a **pixel render guard** (pair 1's image page rasterizes non-blank AND differs from
+  pair 0's, so a non-nil-but-blank `PDFPage` can't pass) and find end-to-end onto page 5. **Non-vacuous, per
+  half:** neutering the display half → 4 test cases RED; neutering the find half back to `default: break` →
+  3 RED. Reader unit suite **230 tests, 1 failure** = the pre-existing `DeepLinkTests.testRevealAndSelectNoRoot`
+  environment artifact (queued as `W20.deeplink-isolation`), unrelated. Clean build, **0 new warnings**, and
+  **15/15 Reader UITests pass in the headless Tart VM** (incl. the 5 `ViewerUITests`) — off the owner's screen.
+  Full write-up: `ArchiveReader/KNOWN_ISSUES.md`.
+  Original report: Processor merges multi-page documents as `image1, text1, image2, text2, …`
   (`OCR/PDFGenerator.swift` merge path; `OCR/OCRProcessor+Tagging.swift` transfers Finder tags to the merged
   PDF), but Reader exposes **only PDF pages 0 and 1**: `Views/DocumentViewerModel.swift` hard-pairs two pages,
   next/previous move between **selected file URLs** rather than internal page pairs, and
