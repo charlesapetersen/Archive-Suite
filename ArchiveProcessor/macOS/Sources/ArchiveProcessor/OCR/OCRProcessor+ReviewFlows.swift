@@ -44,7 +44,8 @@ extension OCRProcessor {
         apiKey: String,
         outputDirectory: URL,
         confirmBeforeOrganizing: Bool = false,
-        reviewDocumentSegmentation: Bool = false
+        reviewDocumentSegmentation: Bool = false,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         statusMessage = "Identifying collections from box labels…"
 
@@ -92,7 +93,7 @@ extension OCRProcessor {
                 collectionSegments = [CollectionSegment(collectionName: name.isEmpty ? "Uncategorized" : name, fileURLs: files)]
             } else {
                 // Apply user edits: rebuild collectionSegments from reviewItems
-                applyReviewEdits(files: files)
+                applyReviewEdits(files: files, runConfig: runConfig)
             }
         }
 
@@ -100,7 +101,8 @@ extension OCRProcessor {
 
         // Document segmentation review: present per-collection dialogs sequentially
         if reviewDocumentSegmentation {
-            await performDocumentSegmentationReview(files: files, outputDirectory: outputDirectory)
+            await performDocumentSegmentationReview(
+                files: files, outputDirectory: outputDirectory, runConfig: runConfig)
             guard !Task.isCancelled else { return }
         }
 
@@ -135,7 +137,8 @@ extension OCRProcessor {
     /// Apply user edits from review items back into collectionSegments.
     /// Rebuilds segmentation from scratch using the confirmed box/folder identifications.
     /// Also updates macOS Finder tags to reflect reclassifications.
-    private func applyReviewEdits(files: [URL]) {
+    private func applyReviewEdits(files: [URL], runConfig: SessionProcessingConfig?) {
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
         // Build a lookup from file index to the reviewed item
         var reviewByIndex: [Int: CollectionReviewItem] = [:]
         for item in collectionReviewItems {
@@ -177,7 +180,7 @@ extension OCRProcessor {
                         if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
                     }
                     _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                                   stampUnread: taggingMode.stampsUnread)
+                                                   stampUnread: stampUnread)
                     jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
@@ -221,7 +224,11 @@ extension OCRProcessor {
         collectionConfirmationContinuation = nil
     }
     /// Present document segmentation review dialogs for each collection sequentially.
-    private func performDocumentSegmentationReview(files: [URL], outputDirectory: URL) async {
+    private func performDocumentSegmentationReview(
+        files: [URL],
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig?
+    ) async {
         var needsCollectionRebuild = false
 
         // Iterate over a snapshot of collections (may change if user reclassifies)
@@ -262,7 +269,8 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
 
             // Apply changes from review
-            let changed = applyDocumentReviewEdits(outputDirectory: outputDirectory)
+            let changed = applyDocumentReviewEdits(
+                outputDirectory: outputDirectory, runConfig: runConfig)
             if changed { needsCollectionRebuild = true }
         }
 
@@ -290,7 +298,11 @@ extension OCRProcessor {
         finalReviewContinuation = nil
     }
     /// Update classification for a single file (used by inline editing from the file pane).
-    func updateClassification(at index: Int, to newClassification: DocumentClassification) {
+    func updateClassification(
+        at index: Int,
+        to newClassification: DocumentClassification,
+        runConfig: SessionProcessingConfig? = nil
+    ) {
         guard index < jobs.count else { return }
         let oldClassification = jobs[index].classification
         jobs[index].classification = newClassification
@@ -319,14 +331,17 @@ extension OCRProcessor {
                 if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
             }
             _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                           stampUnread: taggingMode.stampsUnread)
+                                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             jobs[index].appliedTags = existingTags
         }
     }
     /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
     /// Shows every page with a rotation control; on confirm, writes the chosen rotation into each job
     /// and regenerates the output PDF where it changed, so the exported JPG (written later) matches.
-    func showRotationReview(files: [URL]) async {
+    func showRotationReview(
+        files: [URL],
+        runConfig: SessionProcessingConfig? = nil
+    ) async {
         documentReviewItems = files.enumerated().map { (index, url) in
             let cls = index < jobs.count ? jobs[index].result?.classification : nil
             let rot = index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
@@ -366,6 +381,7 @@ extension OCRProcessor {
                let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
                let model = currentModel {
                 let pdfGen = PDFGenerator()
+                let pdfSettings = lateRunOutputSettings(for: runConfig)
                 // Use the temp JPEG if this was a PDF input, otherwise the original file.
                 let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
                 do {
@@ -376,8 +392,8 @@ extension OCRProcessor {
                         outputURL: outputURL,
                         originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
                         gatewayDisplayName: currentGateway?.displayName,
-                        pdfImageMB: Self.pdfImageMB,
-                        textColumns: Self.textColumns
+                        pdfImageMB: pdfSettings.pdfImageMB,
+                        textColumns: pdfSettings.textColumns
                     )
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
@@ -398,7 +414,10 @@ extension OCRProcessor {
     /// Populates documentReviewItems with every file and suspends until user confirms.
     /// Rotation is NOT edited here — it is a separate, earlier pass (`showRotationReview`); the
     /// already-chosen rotation is carried on each item purely so the thumbnails preview upright.
-    func showFullSegmentationReview(files: [URL]) async {
+    func showFullSegmentationReview(
+        files: [URL],
+        runConfig: SessionProcessingConfig? = nil
+    ) async {
         documentReviewItems = files.enumerated().map { (index, url) in
             let cls = index < jobs.count ? jobs[index].result?.classification : nil
             let rot = index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
@@ -415,7 +434,9 @@ extension OCRProcessor {
         // LLM-segmented tagging mode is used. In manual-segmentation modes the dedicated
         // grouping UI owns segmentation, so the review shows only box/folder.
         reviewRotationOnly = false
-        reviewShowsDocumentClasses = mergeDocuments || taggingMode.showsDocumentClassesInReview
+        let effectiveRunConfig = runConfig ?? activeRunConfig
+        reviewShowsDocumentClasses = (effectiveRunConfig?.mergeDocuments ?? mergeDocuments)
+            || (effectiveRunConfig?.taggingMode ?? taggingMode).showsDocumentClassesInReview
         currentReviewCollectionName = "All Files"
         statusMessage = "Review document segmentation."
         awaitingDocumentReview = true
@@ -453,7 +474,10 @@ extension OCRProcessor {
     }
     /// Present a final confirmation of every box/folder identification (after the rotation
     /// review). Reclassifications are written back into jobs, updating Red/Purple tags.
-    func showBoxFolderConfirmation(files: [URL]) async {
+    func showBoxFolderConfirmation(
+        files: [URL],
+        runConfig: SessionProcessingConfig? = nil
+    ) async {
         let items: [DocumentReviewItem] = files.enumerated().compactMap { (index, url) in
             guard !removedSourceURLs.contains(url), index < jobs.count else { return nil }
             let cls = jobs[index].result?.classification
@@ -484,7 +508,7 @@ extension OCRProcessor {
         for item in boxFolderConfirmItems where item.fileIndex < jobs.count {
             let newCls = item.classification ?? .documentStart
             if jobs[item.fileIndex].classification != newCls {
-                updateClassification(at: item.fileIndex, to: newCls)
+                updateClassification(at: item.fileIndex, to: newCls, runConfig: runConfig)
             }
         }
     }
@@ -553,7 +577,10 @@ extension OCRProcessor {
     /// Apply document segmentation review edits: update job classifications, re-tag, and rebuild collection segments if needed.
     /// Returns true if any files were reclassified as box or folder (requiring collection re-segmentation).
     @discardableResult
-    private func applyDocumentReviewEdits(outputDirectory: URL) -> Bool {
+    private func applyDocumentReviewEdits(
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig?
+    ) -> Bool {
         var collectionChanged = false
 
         for item in documentReviewItems {
@@ -586,7 +613,7 @@ extension OCRProcessor {
                     break
                 }
                 _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                               stampUnread: taggingMode.stampsUnread)
+                                               stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
                 jobs[item.fileIndex].appliedTags = existingTags
             }
 

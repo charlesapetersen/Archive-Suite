@@ -531,12 +531,20 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   `Test Files`. Tier-2 adversarial review approved after the per-item retry gap was fixed.
   | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
     Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver,MultiPageReOCRTestDriver}.swift | M | med | none
-- [ ] **W16.cfg3 — thread the run config into review/regeneration + tagging reads** (blocked-on: W16.cfg1,
-  W16.cfg2) **[M].**
-  `OCRProcessor+ReviewFlows.swift:377-378` and `OCRProcessor+Tagging.swift:81, :448`. **Highest-value sites** —
-  they fire well after the main OCR pass, which is exactly when a resume can race a still-finalizing prior run.
-  Thread the exact `runConfig` already captured by `startProcessing` in Pipeline; do not rebuild it from mutable
-  defaults. | files: OCR/{OCRProcessor+Pipeline,OCRProcessor+ReviewFlows,OCRProcessor+Tagging}.swift | M | med | none
+- [x] **W16.cfg3 — thread the run config into review/regeneration + tagging reads** (blocked-on: W16.cfg1,
+  W16.cfg2) **[M].** DONE 2026-07-29 (this commit). Fresh standard-image and pre-OCRed runs now pass the
+  same immutable snapshot through rotation/manual PDF regeneration, segmentation and collection review
+  reclassification, automatic/manual tag writes, Live Capture priority layering, sized-original export, and
+  merged-PDF tag transfer. The late-stage resolver uses explicit config first, then the retained active-run
+  config for post-run UI edits; resume deliberately supplies nil and preserves its current validated
+  static/instance fallback until W16.cfg5. Process Files snapshots the controller's exact tagging/merge/export policy,
+  so headless `.none`/`.copySource` runs cannot inherit unrelated UserDefaults values; every copy-source
+  write remains explicitly non-stamping. Processor Debug build plus scratch manifest/config, merge-safety, and
+  batch/non-batch resume regressions passed. Tier-2 adversarial review found and closed the remaining live
+  tagging/merge/export decision gates, then approved call-path coverage, copy-source behavior,
+  trailing-closure compatibility, and the MainActor/detached-task boundary.
+  | files: OCR/{OCRProcessor+OCR,OCRProcessor+Pipeline,OCRProcessor+ReviewFlows,OCRProcessor+Tagging}.swift,
+    Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift | M | med | none
 - [ ] **W16.cfg5 — resume constructs a run config instead of fanning out to globals** (blocked-on: W16.cfg2, W16.cfg3) **[M].**
   Replace the six assignments at `OCRProcessor+Pipeline.swift:280-285` (the only remaining global-write on a
   non-run-start path) with construction of the run config from `PendingRunRuntimeConfig`; store it in

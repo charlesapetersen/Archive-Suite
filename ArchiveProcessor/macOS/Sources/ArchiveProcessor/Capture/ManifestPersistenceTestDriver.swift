@@ -143,6 +143,48 @@ enum ManifestPersistenceTestDriver {
               && retainedRetryConfig?.pdfImageMB == 8
               && explicitRetryResult?.pdfImageMB == 5)
 
+        // --- W16.cfg3: late review/regeneration/tagging reads retain the same immutable snapshot. ---
+        let lateStageProcessor = OCRProcessor()
+        lateStageProcessor.taggingMode = .none
+        lateStageProcessor.mergeDocuments = true
+        lateStageProcessor.exportOriginals = false
+        lateStageProcessor.activeRunConfig = injectedConfig
+        let retainedLateSettings = lateStageProcessor.lateRunOutputSettings(for: nil)
+        var explicitLateConfig = injectedConfig
+        explicitLateConfig.pdfImageMB = 5
+        explicitLateConfig.textColumns = 2
+        explicitLateConfig.exportedImageMB = 4
+        explicitLateConfig.taggingMode = .human
+        explicitLateConfig.mergeDocuments = true
+        explicitLateConfig.outputImageFile = false
+        let explicitLateSettings = lateStageProcessor.lateRunOutputSettings(for: explicitLateConfig)
+        check("W16.cfg3: retained/explicit configs override conflicting late-stage mutable settings",
+              retainedLateSettings.pdfImageMB == 8
+              && retainedLateSettings.textColumns == 3
+              && retainedLateSettings.exportedImageMB == 6
+              && retainedLateSettings.stampUnread
+              && retainedLateSettings.taggingMode == .automatic
+              && !retainedLateSettings.mergeDocuments
+              && retainedLateSettings.exportOriginals
+              && explicitLateSettings.pdfImageMB == 5
+              && explicitLateSettings.textColumns == 2
+              && explicitLateSettings.exportedImageMB == 4
+              && explicitLateSettings.stampUnread
+              && explicitLateSettings.taggingMode == .human
+              && explicitLateSettings.mergeDocuments
+              && !explicitLateSettings.exportOriginals)
+        lateStageProcessor.activeRunConfig = nil
+        OCRProcessor.exportedImageMB = 11
+        let fallbackLateSettings = lateStageProcessor.lateRunOutputSettings(for: nil)
+        check("W16.cfg3: nil config preserves late-stage fallback until resume migration",
+              fallbackLateSettings.pdfImageMB == 3
+              && fallbackLateSettings.textColumns == 1
+              && fallbackLateSettings.exportedImageMB == 11
+              && !fallbackLateSettings.stampUnread
+              && fallbackLateSettings.taggingMode == .none
+              && fallbackLateSettings.mergeDocuments
+              && !fallbackLateSettings.exportOriginals)
+
         let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
         try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)
         let explicitScale = OCRProcessor.targetDimensionScale(

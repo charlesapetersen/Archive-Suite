@@ -781,6 +781,7 @@ extension OCRProcessor {
         // cfg2's static fallback so batch-resume behavior is unchanged in this migration checkpoint.
         let runConfig: SessionProcessingConfig? = nil
         activeRunConfig = runConfig
+        let runOutputSettings = lateRunOutputSettings(for: runConfig)
         // Jobs carry the ORIGINAL source URLs (correct output names + tag targets). For PDF inputs the
         // persisted temp JPEGs are long gone, so regenerate them from the originals — exactly like
         // resumeRun — and feed the temp images (not the .pdf) to the result/PDF-embed + retry paths.
@@ -877,7 +878,7 @@ extension OCRProcessor {
             segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
-            switch pending.taggingMode {
+            switch runOutputSettings.taggingMode {
             case .automatic:
                 // Batch resume intentionally uses performTaggingPhase (NOT performAutomaticTaggingWithReview):
                 // a resumed batch has no interactive session to drive the redo-review loop, so it tags straight
@@ -886,20 +887,23 @@ extension OCRProcessor {
                     provider: pending.provider, model: pending.model,
                     thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
                     outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON
+                    enableSegmentJSON: pending.enableSegmentJSON,
+                    runConfig: runConfig
                 )
             case .autoDate:
                 await performManualTaggingPhase(
-                    mode: pending.taggingMode, provider: pending.provider, model: pending.model,
+                    mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
                     thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON
+                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
+                    runConfig: runConfig
                 )
             case .human, .autoDateManualSeg:
                 await performManualSegmentAndTag(
-                    autoDate: pending.taggingMode.autoFillsDate,
+                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
                     provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
                     apiKey: apiKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs
+                    enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs,
+                    runConfig: runConfig
                 )
             case .none, .copySource:
                 break
@@ -918,10 +922,11 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 outputDirectory: pending.outputDirectory,
                 confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
+                runConfig: runConfig
             )
 
-            applyBoxFolderLabelTags(enableTagging: pending.enableTagging)
+            applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
         }
 
         guard !Task.isCancelled else { return }
@@ -929,10 +934,12 @@ extension OCRProcessor {
         // Dual output: write each original image beside its PDF (same base + tags) BEFORE merge repoints
         // outputURLMap and before organization moves files — exactly as startProcessing does. Skipped
         // unless exportOriginals is set (restored above), so the non-dual-output path is unchanged.
-        await exportOriginalImages()
+        await exportOriginalImages(runConfig: runConfig)
 
-        if mergeDocuments {
-            performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
+        if runOutputSettings.mergeDocuments {
+            performDocumentMerging(
+                files: pending.fileURLs, outputDirectory: pending.outputDirectory,
+                runConfig: runConfig)
         }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
@@ -944,7 +951,7 @@ extension OCRProcessor {
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
-                    moveSiblingImages: exportOriginals,
+                    moveSiblingImages: runOutputSettings.exportOriginals,
                     exportedImageMap: exportedImageMap
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
@@ -1014,6 +1021,7 @@ extension OCRProcessor {
             resumeImageScale = Self.liveImageScaleFraction()
             resumeGatewayUpstream = Self.gatewayUpstreamProviderFromDefaults()
         }
+        let runOutputSettings = lateRunOutputSettings(for: runConfig)
         removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
@@ -1203,26 +1211,29 @@ extension OCRProcessor {
             segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
             statusMessage = "Found \(segments.count) segments. Tagging…"
 
-            switch taggingMode {
+            switch runOutputSettings.taggingMode {
             case .automatic:
                 await performAutomaticTaggingWithReview(
                     provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
                     apiKey: apiKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs
+                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs,
+                    runConfig: runConfig
                 )
             case .autoDate:
                 await performManualTaggingPhase(
-                    mode: taggingMode, provider: pending.provider, model: pending.model,
+                    mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
                     thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON
+                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
+                    runConfig: runConfig
                 )
             case .human, .autoDateManualSeg:
                 await performManualSegmentAndTag(
-                    autoDate: taggingMode.autoFillsDate,
+                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
                     provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
                     apiKey: apiKey, outputDirectory: pending.outputDirectory,
                     enableSegmentJSON: pending.enableSegmentJSON,
-                    preOCRed: pending.preOCRedInput, files: pending.fileURLs
+                    preOCRed: pending.preOCRedInput, files: pending.fileURLs,
+                    runConfig: runConfig
                 )
             case .none, .copySource:
                 break
@@ -1241,10 +1252,11 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 outputDirectory: pending.outputDirectory,
                 confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation
+                reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
+                runConfig: runConfig
             )
 
-            applyBoxFolderLabelTags(enableTagging: pending.enableTagging)
+            applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
         }
 
         guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -1252,10 +1264,12 @@ extension OCRProcessor {
         // Dual output: write each original image beside its PDF BEFORE merge repoints outputURLMap and
         // before organization moves files — exactly as startProcessing does. No-op unless exportOriginals
         // is set (restored above), so the non-dual-output path is unchanged.
-        await exportOriginalImages()
+        await exportOriginalImages(runConfig: runConfig)
 
-        if mergeDocuments {
-            performDocumentMerging(files: pending.fileURLs, outputDirectory: pending.outputDirectory)
+        if runOutputSettings.mergeDocuments {
+            performDocumentMerging(
+                files: pending.fileURLs, outputDirectory: pending.outputDirectory,
+                runConfig: runConfig)
         }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
@@ -1267,7 +1281,7 @@ extension OCRProcessor {
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
-                    moveSiblingImages: exportOriginals,
+                    moveSiblingImages: runOutputSettings.exportOriginals,
                     exportedImageMap: exportedImageMap
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
@@ -1615,8 +1629,15 @@ extension OCRProcessor {
         removedSourceURLs = []
         Self.rotationModeForRun = rotationMode
         Self.loadStandardImageMB()
-        let runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+        // The Process Files controller is the authoritative run input (headless drivers intentionally
+        // configure it without mutating UserDefaults), so late review/output policy snapshots these
+        // exact controller values rather than rebuilding them after the OCR pass.
+        runConfig.taggingMode = taggingMode
+        runConfig.mergeDocuments = mergeDocuments
+        runConfig.outputImageFile = exportOriginals
         activeRunConfig = runConfig
+        let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig
         currentLocalAgent = localAgent
@@ -1683,7 +1704,8 @@ extension OCRProcessor {
                 enableCollectionSegmentation: enableCollectionSegmentation,
                 confirmCollectionIDs: confirmCollectionIDs,
                 reviewDocumentSegmentation: reviewDocumentSegmentation,
-                customPrompt: segmentationContext.customPrompt
+                customPrompt: segmentationContext.customPrompt,
+                runConfig: runConfig
             )
         } else {
             // --- Standard image OCR path ---
@@ -1807,7 +1829,7 @@ extension OCRProcessor {
             // the segmentation/tagging review, and run in EVERY tagging mode. It bakes the corrected
             // rotation into each output PDF; the exported JPG then picks up the same value.
             if reviewRotation && rotationMode != .off {
-                await showRotationReview(files: files)
+                await showRotationReview(files: files, runConfig: runConfig)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
             }
 
@@ -1816,15 +1838,15 @@ extension OCRProcessor {
                 // Groups were defined on the phone — apply them directly, skip LLM segmentation.
                 applyPreGroupedClassifications(files: files)
                 rebuildSegments(files: files)
-            } else if taggingMode.usesManualSegmentationUI {
+            } else if runOutputSettings.taggingMode.usesManualSegmentationUI {
                 // Manual modes: the combined segment+tag window owns rotation, box/folder, and
                 // segmentation, so skip the separate review here (it rebuilds segments itself).
             } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-                await showFullSegmentationReview(files: files)
+                await showFullSegmentationReview(files: files, runConfig: runConfig)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
 
                 // Final confirmation of box/folder identifications
-                await showBoxFolderConfirmation(files: files)
+                await showBoxFolderConfirmation(files: files, runConfig: runConfig)
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
 
                 // Rebuild segments from user-confirmed classifications (excluding removed files)
@@ -1835,25 +1857,28 @@ extension OCRProcessor {
 
             // Phase 2: Tagging (mode-dependent)
             if enableTagging && !passSourceTags {
-                switch taggingMode {
+                switch runOutputSettings.taggingMode {
                 case .automatic:
                     await performAutomaticTaggingWithReview(
                         provider: provider, model: model, thinkingLevel: thinkingLevel,
                         apiKey: apiKey, outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON, files: files
+                        enableSegmentJSON: enableSegmentJSON, files: files,
+                        runConfig: runConfig
                     )
                 case .autoDate:
                     await performManualTaggingPhase(
-                        mode: taggingMode, provider: provider, model: model,
+                        mode: runOutputSettings.taggingMode, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
-                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON
+                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
+                        runConfig: runConfig
                     )
                 case .human, .autoDateManualSeg:
                     await performManualSegmentAndTag(
-                        autoDate: taggingMode.autoFillsDate,
+                        autoDate: runOutputSettings.taggingMode.autoFillsDate,
                         provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                         outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files
+                        enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files,
+                        runConfig: runConfig
                     )
                 case .none, .copySource:
                     break
@@ -1873,25 +1898,27 @@ extension OCRProcessor {
                     apiKey: apiKey,
                     outputDirectory: outputDirectory,
                     confirmBeforeOrganizing: confirmCollectionIDs,
-                    reviewDocumentSegmentation: false
+                    reviewDocumentSegmentation: false,
+                    runConfig: runConfig
                 )
 
-                applyBoxFolderLabelTags(enableTagging: enableTagging)
+                applyBoxFolderLabelTags(enableTagging: enableTagging, runConfig: runConfig)
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
             // Live Capture: layer per-page phone priority on top now that box/folder Red/Purple is
             // final, and before merge folds appliedTags into merged PDFs.
-            applyCapturePriorityTags()
+            applyCapturePriorityTags(runConfig: runConfig)
 
             // Live Capture dual output: write each original image next to its PDF (same base + tags),
             // before merge repoints outputURLMap and before organization moves files.
-            await exportOriginalImages()
+            await exportOriginalImages(runConfig: runConfig)
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
-            if mergeDocuments {
-                performDocumentMerging(files: files, outputDirectory: outputDirectory)
+            if runOutputSettings.mergeDocuments {
+                performDocumentMerging(
+                    files: files, outputDirectory: outputDirectory, runConfig: runConfig)
             }
 
             // Phase 5: Organize into collection folders (after merge so merged PDFs get moved)
@@ -1903,7 +1930,7 @@ extension OCRProcessor {
                         collections: collectionSegments,
                         outputDirectory: outputDirectory,
                         outputURLMap: outputURLMap,
-                        moveSiblingImages: exportOriginals,
+                        moveSiblingImages: runOutputSettings.exportOriginals,
                         exportedImageMap: exportedImageMap
                     )
                     statusMessage = "Collections organized into \(collectionSegments.count) folders."

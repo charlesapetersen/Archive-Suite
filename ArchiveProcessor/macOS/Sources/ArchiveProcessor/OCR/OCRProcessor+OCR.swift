@@ -62,9 +62,11 @@ extension OCRProcessor {
         enableCollectionSegmentation: Bool,
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
-        customPrompt: String? = nil
+        customPrompt: String? = nil,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         let total = files.count
+        let runOutputSettings = lateRunOutputSettings(for: runConfig)
         statusMessage = "Extracting text from \(total) PDFs…"
 
         // Step 1: Extract text from PDFs (no API calls)
@@ -136,14 +138,14 @@ extension OCRProcessor {
 
         // Interactive Review: document segmentation (rotation + classification) review. Manual
         // modes skip it — the combined segment+tag window owns rotation, box/folder, and segmentation.
-        if taggingMode.usesManualSegmentationUI {
+        if runOutputSettings.taggingMode.usesManualSegmentationUI {
             // no-op: handled in the combined manual window
         } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-            await showFullSegmentationReview(files: files)
+            await showFullSegmentationReview(files: files, runConfig: runConfig)
             guard !Task.isCancelled else { return }
 
             // Final confirmation of box/folder identifications
-            await showBoxFolderConfirmation(files: files)
+            await showBoxFolderConfirmation(files: files, runConfig: runConfig)
             guard !Task.isCancelled else { return }
 
             // Rebuild segments from user-confirmed classifications (excluding removed files)
@@ -154,25 +156,28 @@ extension OCRProcessor {
 
         // Step 3: Tagging (mode-dependent)
         if enableTagging && !passSourceTags {
-            switch taggingMode {
+            switch runOutputSettings.taggingMode {
             case .automatic:
                 await performAutomaticTaggingWithReview(
                     provider: provider, model: model, thinkingLevel: thinkingLevel,
                     apiKey: apiKey, outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON, files: files
+                    enableSegmentJSON: enableSegmentJSON, files: files,
+                    runConfig: runConfig
                 )
             case .autoDate:
                 await performManualTaggingPhase(
-                    mode: taggingMode, provider: provider, model: model,
+                    mode: runOutputSettings.taggingMode, provider: provider, model: model,
                     thinkingLevel: thinkingLevel, apiKey: apiKey,
-                    outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON
+                    outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
+                    runConfig: runConfig
                 )
             case .human, .autoDateManualSeg:
                 await performManualSegmentAndTag(
-                    autoDate: taggingMode.autoFillsDate,
+                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
                     provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                     outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files
+                    enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files,
+                    runConfig: runConfig
                 )
             case .none, .copySource:
                 break
@@ -203,10 +208,11 @@ extension OCRProcessor {
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 confirmBeforeOrganizing: confirmCollectionIDs,
-                reviewDocumentSegmentation: false
+                reviewDocumentSegmentation: false,
+                runConfig: runConfig
             )
 
-            applyBoxFolderLabelTags(enableTagging: enableTagging)
+            applyBoxFolderLabelTags(enableTagging: enableTagging, runConfig: runConfig)
         }
 
         // Organize into collection folders (after all processing)
@@ -218,7 +224,7 @@ extension OCRProcessor {
                     collections: collectionSegments,
                     outputDirectory: outputDirectory,
                     outputURLMap: outputURLMap,
-                    moveSiblingImages: exportOriginals
+                    moveSiblingImages: runOutputSettings.exportOriginals
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
             } catch {

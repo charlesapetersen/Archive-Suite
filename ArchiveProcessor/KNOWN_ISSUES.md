@@ -292,8 +292,16 @@ and PDF generation. The instance retains the same snapshot for post-run per-item
 caught and closed the initial gap there. Non-batch manifests record the exact config values that were actually
 used. Resume continues through explicit nil/static fallbacks until cfg5, preserving schema and legacy behavior.
 Scratch config/manifest, multi-page PDF, and batch/non-batch resume regressions passed with a clean Debug build.
-The remaining work is cfg3 (review/tagging consumers), cfg5 (construct/store config on resume), and cfg6 (delete
-the fallback statics).
+
+**W16.cfg3 DONE 2026-07-29 (this commit):** the same snapshot now reaches every late review/output consumer:
+rotation and manual PDF regeneration, review-driven reclassification tag writes, automatic/manual tagging,
+priority layering, sized-original export, and merged-PDF tag transfer. Fresh and pre-OCRed paths inject it
+explicitly; retained post-run UI actions resolve the active snapshot; resume keeps the old nil fallback until
+cfg5. The Process Files snapshot takes its exact tagging/merge/export policy from the configured controller, preserving
+headless `.none`/`.copySource` behavior and every explicit non-stamping copy-source write. Debug build plus
+scratch manifest/config, merge-safety, and batch/non-batch resume regressions passed; Tier-2 adversarial review
+found and closed the remaining live decision gates, then approved. The remaining work is cfg5 (construct/store
+config on resume) and cfg6 (delete the fallback statics).
 
 **Two claims below are STALE — corrected here so they aren't re-derived:**
 - *"`MacOSTagger` retains a global fallback for older call sites"* — the global exists (~13 sites use the

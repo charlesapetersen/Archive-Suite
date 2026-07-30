@@ -4,16 +4,49 @@ import UserNotifications
 import os
 
 extension OCRProcessor {
+    /// Resolve every output setting consumed after the main OCR pass. An explicit config wins, then
+    /// the retained fresh/resumed-run snapshot; nil preserves the migration fallback until W16.cfg5/6.
+    func lateRunOutputSettings(
+        for explicitRunConfig: SessionProcessingConfig?
+    ) -> (
+        pdfImageMB: Double,
+        textColumns: Int,
+        exportedImageMB: Double,
+        stampUnread: Bool,
+        taggingMode: TaggingMode,
+        mergeDocuments: Bool,
+        exportOriginals: Bool
+    ) {
+        let runConfig = explicitRunConfig ?? activeRunConfig
+        let pdf = Self.pdfGenerationSettings(for: runConfig)
+        let runTaggingMode = runConfig?.taggingMode ?? taggingMode
+        return (
+            pdf.imageMB,
+            pdf.textColumns,
+            runConfig?.exportedImageMB ?? Self.exportedImageMB,
+            runTaggingMode.stampsUnread,
+            runTaggingMode,
+            runConfig?.mergeDocuments ?? mergeDocuments,
+            runConfig?.outputImageFile ?? exportOriginals
+        )
+    }
+
     /// Applies Red/Purple color tags to box/folder label PDFs when full LLM tagging
     /// is disabled (or when passing source tags through). When automatic tagging is enabled
     /// these tags are already applied by the normal tagging pass, so this is a no-op.
-    func applyBoxFolderLabelTags(enableTagging: Bool) {
+    func applyBoxFolderLabelTags(
+        enableTagging: Bool,
+        runConfig: SessionProcessingConfig? = nil
+    ) {
         guard !enableTagging || passSourceTags else { return }
-        applyBoxFolderLabelTagsUnconditionally()
+        applyBoxFolderLabelTagsUnconditionally(runConfig: runConfig)
     }
     /// Applies Red/Purple color tags to every box/folder label output PDF, unconditionally.
     /// Used by manual tagging modes, which don't run the automatic tagging pass.
-    private func applyBoxFolderLabelTagsUnconditionally() {
+    private func applyBoxFolderLabelTagsUnconditionally(
+        runConfig: SessionProcessingConfig? = nil
+    ) {
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
         for job in jobs {
             guard let classification = job.result?.classification else { continue }
             let tags: GeneratedTags
@@ -26,7 +59,7 @@ extension OCRProcessor {
                 // Mode-dependent: reached BOTH from `applyBoxFolderLabelTags` (only when tagging is
                 // off or copy-source → verbatim) AND unconditionally from the manual tagging modes
                 // (→ real-tagging, label written + trailing Unread). Must follow the run's mode.
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: taggingMode.stampsUnread)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: stampUnread)
             }
         }
     }
@@ -43,8 +76,9 @@ extension OCRProcessor {
     /// Live Capture: layer each page's phone-set priority ("P10"…"P7") onto whatever the tagging
     /// phase applied. macOS tag application replaces, so read → append → re-apply; also record it in
     /// the job's appliedTags so document merging carries it. No-op outside a pre-grouped run.
-    func applyCapturePriorityTags() {
+    func applyCapturePriorityTags(runConfig: SessionProcessingConfig? = nil) {
         guard !preGroupedPriorities.isEmpty else { return }
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
         for i in jobs.indices where i < preGroupedPriorities.count {
             guard let raw = preGroupedPriorities[i]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty,
                   let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
@@ -53,7 +87,7 @@ extension OCRProcessor {
                 tags.append(raw)
                 // Read-append-rewrite of whatever the tagging phase already applied — follow the
                 // run's mode so a real-tagging output keeps "Unread" last and its label intact.
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: taggingMode.stampsUnread)
+                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: stampUnread)
             }
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
@@ -81,9 +115,10 @@ extension OCRProcessor {
     /// Live Capture dual output: write each page's original image next to its PDF (same base name),
     /// tagged identically, so the final folder holds BOTH the image and the PDF. Runs before merge/
     /// organization so `outputURLMap` is still per-page; `organizeOutput` moves the sibling image too.
-    func exportOriginalImages() async {
-        guard exportOriginals else { return }
-        let exportedMB = Self.exportedImageMB
+    func exportOriginalImages(runConfig: SessionProcessingConfig? = nil) async {
+        let outputSettings = lateRunOutputSettings(for: runConfig)
+        guard outputSettings.exportOriginals else { return }
+        let exportedMB = outputSettings.exportedImageMB
         // Snapshot the work on the main actor… The exported image is always a .jpg sized toward the
         // exported-image target (independent of the source/camera size).
         var imageMap: [URL: URL] = [:]
@@ -111,7 +146,7 @@ extension OCRProcessor {
         exportedImageMap = imageMap
         // Capture the run's stamping mode on the MainActor — the detached task below must not touch
         // the @MainActor `taggingMode` (same pattern as `exportedMB` above).
-        let isStamping = taggingMode.stampsUnread
+        let isStamping = outputSettings.stampUnread
         // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
         // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
         await Task.detached(priority: .utility) {
@@ -140,7 +175,8 @@ extension OCRProcessor {
         apiKey: String,
         outputDirectory: URL,
         enableSegmentJSON: Bool,
-        files: [URL]
+        files: [URL],
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         var shouldRedoTagging = true
         while shouldRedoTagging {
@@ -152,7 +188,8 @@ extension OCRProcessor {
                 thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
-                enableSegmentJSON: enableSegmentJSON
+                enableSegmentJSON: enableSegmentJSON,
+                runConfig: runConfig
             )
 
             guard !Task.isCancelled else { return }
@@ -189,10 +226,12 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        enableSegmentJSON: Bool
+        enableSegmentJSON: Bool,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         // Apply Red/Purple color tags to box/folder segments (they aren't manually tagged).
-        applyBoxFolderLabelTagsUnconditionally()
+        applyBoxFolderLabelTagsUnconditionally(runConfig: runConfig)
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
 
         // Build one manual-tag entry per taggable (non-box/folder) segment.
         func rotation(for url: URL) -> Int {
@@ -264,7 +303,7 @@ extension OCRProcessor {
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
-                                                   stampUnread: taggingMode.stampsUnread)
+                                                   stampUnread: stampUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = tags.allTags
@@ -377,7 +416,8 @@ extension OCRProcessor {
         outputDirectory: URL,
         enableSegmentJSON: Bool,
         preOCRed: Bool,
-        files: [URL]
+        files: [URL],
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         // Capture params for on-demand LLM date fetching from the UI.
         manualSegAutoDate = autoDate
@@ -438,6 +478,7 @@ extension OCRProcessor {
         // for pre-OCRed input, where the "output" IS the user's original source PDF (regen would
         // overwrite it). Must run before merge (which deletes per-page PDFs) and before tag apply
         // (regen overwrites the PDF, which would clobber freshly-applied Finder tags).
+        let outputSettings = lateRunOutputSettings(for: runConfig)
         if !preOCRed, let model = currentModel {
             for idx in manualSegImages.indices where !manualSegRemoved.contains(idx) {
                 let img = manualSegImages[idx]
@@ -455,7 +496,8 @@ extension OCRProcessor {
                             imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                             originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
                             gatewayDisplayName: currentGateway?.displayName,
-                            pdfImageMB: Self.pdfImageMB, textColumns: Self.textColumns
+                            pdfImageMB: outputSettings.pdfImageMB,
+                            textColumns: outputSettings.textColumns
                         )
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
@@ -488,7 +530,7 @@ extension OCRProcessor {
 
         // (d) Rebuild segments from the corrected classifications; apply box/folder color tags.
         rebuildSegments(files: files)
-        applyBoxFolderLabelTagsUnconditionally()
+        applyBoxFolderLabelTagsUnconditionally(runConfig: runConfig)
 
         // (e) Apply each identified segment's tags to its output PDFs, keyed by the segment's
         // first-page URL (a stable key that survives consumption).
@@ -512,7 +554,7 @@ extension OCRProcessor {
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     _ = try? MacOSTagger.applyTags(gtags, to: outputPDF,
-                                                   stampUnread: taggingMode.stampsUnread)
+                                                   stampUnread: outputSettings.stampUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = gtags.allTags
@@ -654,7 +696,8 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
-        enableSegmentJSON: Bool = true
+        enableSegmentJSON: Bool = true,
+        runConfig: SessionProcessingConfig? = nil
     ) async {
         let generator = TagGenerator()
         let snapshot = segments
@@ -704,7 +747,8 @@ extension OCRProcessor {
             for await (i, rawTags) in group {
                 if Task.isCancelled { break }
                 applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
-                                   enableSegmentJSON: enableSegmentJSON, outputDirectory: outputDirectory)
+                                   enableSegmentJSON: enableSegmentJSON, outputDirectory: outputDirectory,
+                                   runConfig: runConfig)
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
                 statusMessage = "Tagging \(completed)/\(total)…"
@@ -729,7 +773,8 @@ extension OCRProcessor {
     /// Apply generated tags to one segment's output PDFs, layering the Live Capture phone date on top
     /// and writing the segment JSON. Runs on the main actor (called from the tagging task group).
     private func applyGeneratedTags(_ rawTags: GeneratedTags, toSegmentAt i: Int, in snapshot: [DocumentSegment],
-                                    enableSegmentJSON: Bool, outputDirectory: URL) {
+                                    enableSegmentJSON: Bool, outputDirectory: URL,
+                                    runConfig: SessionProcessingConfig?) {
         guard i < snapshot.count else { return }
         let segment = snapshot[i]
         var tags = rawTags
@@ -742,7 +787,7 @@ extension OCRProcessor {
         for sourceURL in segment.pdfURLs {
             if let outputPDF = outputURLMap[sourceURL] {
                 _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
-                                               stampUnread: taggingMode.stampsUnread)
+                                               stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             }
             if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                 jobs[jobIndex].appliedTags = tags.allTags
@@ -778,6 +823,7 @@ extension OCRProcessor {
     func performDocumentMerging(
         files: [URL],
         outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil,
         tagWriter: MergedTagWriter? = nil
     ) {
         // Build segments from current classifications if not already built
@@ -796,6 +842,7 @@ extension OCRProcessor {
 
         statusMessage = "Merging \(multiPageSegments.count) multi-page documents…"
         let pdfGen = PDFGenerator()
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
 
         for (segIdx, segment) in multiPageSegments.enumerated() {
             // Collect the individual output PDFs for this segment
@@ -835,7 +882,7 @@ extension OCRProcessor {
                 // Empty generated tags still mean `Unread` in real-tagging modes. Select a segment job
                 // even when its explicit array is empty whenever the adapter is stamping that implicit tag.
                 let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty })
-                    ?? (taggingMode.stampsUnread ? segmentJobs.first : nil)
+                    ?? (stampUnread ? segmentJobs.first : nil)
                 if let tagged {
                     // Derive the authoritative color from the classification so a subject
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
@@ -846,7 +893,7 @@ extension OCRProcessor {
                     } else {
                         _ = try MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
                                                      appColor: color, colorIsAuthoritative: true,
-                                                     stampUnread: taggingMode.stampsUnread)
+                                                     stampUnread: stampUnread)
                     }
                 }
 
