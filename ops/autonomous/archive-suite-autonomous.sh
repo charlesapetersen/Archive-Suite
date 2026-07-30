@@ -759,6 +759,12 @@ tick() {
   # operator edit to that file can't accidentally unset it. The owner's own interactive sessions never
   # set it, so host GUI work stays available to a human who is actually watching the screen.
   export ARCHIVE_UNATTENDED=1
+  # …and put the xcodebuild SHIM ahead of Xcode's on the child's PATH. The hook above matches the Bash
+  # tool's command STRING, which a wrapper script defeats: on 2026-07-30 a session ran
+  # `./ArchiveNotes/test-smoke.sh` — no `xcodebuild` in the string — and the script's own whole-scheme
+  # `xcodebuild test` ran ArchiveNotesUITests on the owner's screen. The shim intercepts the exec itself,
+  # at any nesting depth, and refuses only a `test` action with no `-only-testing:` (see its header).
+  export PATH="$REPO/ops/autonomous/bin:$PATH"
 
   log "launching fresh resume session (backstop ${MAXRUN}s, budget \$$BUDGET, health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }

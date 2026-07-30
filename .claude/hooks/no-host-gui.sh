@@ -68,6 +68,19 @@ case "$cmd" in
       "launch it inside the VM — 'tart exec archive-gui-runner …' (ops/gui/README.md §3)." ;; esac ;;
 esac
 
+# ---- 1b. Wrapper scripts that run a whole-scheme `xcodebuild test` ----
+# The hook only sees the command STRING, so a script is a blind spot: `./ArchiveNotes/test-smoke.sh`
+# contains no `xcodebuild` and no `-only-testing`, yet on 2026-07-30 it ran ArchiveNotesUITests on the
+# owner's screen. Those scripts now restrict themselves to the unit bundle under ARCHIVE_UNATTENDED=1 and
+# the PATH shim (ops/autonomous/bin/xcodebuild) catches the exec regardless — this pattern is the fast,
+# legible third layer, so the model is told at the tool boundary rather than deep in a build log.
+case "$cmd" in
+  *test-smoke.sh*)
+    deny "a whole-scheme smoke script (its 'xcodebuild test' includes the UITest bundle → host XCUITest)" \
+         "run the unit bundle directly — 'xcodebuild test -only-testing:<App>Tests …' (windowless) — and
+'ops/gui/vm-gui-runner.sh <reader|notes> xcuitest' for the UITests, off-screen in the VM." ;;
+esac
+
 # ---- 2. Host UITest runs ----
 # A UITest bundle drives real clicks/keys for minutes and pops the "Enable UI Automation" prompt. It is
 # the single worst screen-takeover, and it is ALWAYS available off-screen in the VM. Denied on the host

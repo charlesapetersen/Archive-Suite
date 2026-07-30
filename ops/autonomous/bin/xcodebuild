@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# xcodebuild — a PATH SHIM for unattended sessions. Not a build tool: it inspects the argv, refuses the
+# one form that takes over the owner's physical screen, and otherwise execs the real xcodebuild untouched.
+#
+# WHY A SHIM AND NOT (JUST) A HOOK. `.claude/hooks/no-host-gui.sh` matches the Bash tool's COMMAND STRING,
+# so it only ever sees what the model typed. On 2026-07-30 a daemon session ran `./ArchiveNotes/test-smoke.sh`
+# — a string containing no `xcodebuild` and no `-only-testing` — and the script's own
+#     xcodebuild test -scheme ArchiveNotes -destination platform=macOS
+# ran the scheme's UITest bundle on the host: ArchiveNotesUITests-Runner.app driving the real app, the
+# "Automation Running" banner, minutes of the owner's screen. A wrapper script defeats a string matcher at
+# any depth. This shim sits on the child's PATH instead, so it catches the exec itself no matter how many
+# scripts deep it happens. (Both test-smoke.sh scripts call bare `xcodebuild`, which is what makes this
+# work; a caller using an absolute Xcode path would bypass it, hence hook + shim + source guard, not one.)
+#
+# ACTIVE ONLY when ARCHIVE_UNATTENDED=1 — the owner's interactive sessions get the real tool, unchanged.
+#
+# THE RULE: a `test` action must name a bundle with `-only-testing:`. Without one, xcodebuild runs the
+# scheme's whole test action, which for ArchiveReader/ArchiveNotes includes the *UITests bundle. Refused.
+# Everything else — build, build-for-testing, archive, -showBuildSettings, clean, and any
+# `-only-testing:<App>Tests` unit run (windowless since ArchiveCore ArchiveTestHost) — passes straight through.
+
+REAL="${ARCHIVE_REAL_XCODEBUILD:-/usr/bin/xcodebuild}"
+[ -x "$REAL" ] || REAL="$(/usr/bin/which -a xcodebuild 2>/dev/null | grep -v "ops/autonomous/bin" | head -1)"
+
+if [ "${ARCHIVE_UNATTENDED:-0}" != "1" ]; then exec "$REAL" "$@"; fi
+
+has_test_action=0 has_only_testing=0
+for a in "$@"; do
+  case "$a" in
+    test|test-without-building) has_test_action=1 ;;
+    -only-testing|-only-testing:*) has_only_testing=1 ;;
+  esac
+done
+
+if [ "$has_test_action" = 1 ] && [ "$has_only_testing" = 0 ]; then
+  cat >&2 <<'EOF'
+BLOCKED by ops/autonomous/bin/xcodebuild (host-GUI shim, active because ARCHIVE_UNATTENDED=1)
+
+A bare `xcodebuild test` runs the scheme's ENTIRE test action. For ArchiveReader and ArchiveNotes that
+includes the UITest bundle, which drives the real app on the owner's physical display for minutes and
+raises the macOS "Automation Running" banner. That is not allowed in an unattended session.
+
+Do this instead:
+  * unit tests  ->  xcodebuild test -only-testing:<App>Tests ...
+                    (app-hosted, but windowless since ArchiveCore `ArchiveTestHost`)
+  * UITests     ->  ops/gui/vm-gui-runner.sh <reader|notes> xcuitest
+                    (the same tests, off-screen in the headless Tart VM)
+
+If you got here through a wrapper script (e.g. `./ArchiveNotes/test-smoke.sh`), that script has an
+unattended mode that runs only the unit bundle — it should have been used. Do not work around this shim;
+if a check genuinely cannot run off-screen, leave it for the owner in the Morning Review list.
+EOF
+  exit 74
+fi
+
+exec "$REAL" "$@"

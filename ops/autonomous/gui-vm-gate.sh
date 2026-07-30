@@ -21,6 +21,13 @@
 #   0 = GREEN   every selected app's UITests ran and passed
 #   1 = RED     a reproducible UITest failure (park)
 #   3 = SKIPPED nothing conclusive ran (infra) — caller must SAY SO, never print a checkmark
+#   4 = WARN    a warn-tier app's UITests reproducibly FAILED (don't park, but never call this green)
+#
+# 4 exists because the first version of the warn tier reintroduced the very bug above through another
+# door: warn-tier failures fell through to `exit 0`, so health-gate printed "✓ gui-vm" and a summary
+# claiming "+ GUI-VM UITests" for a suite that had just failed twice — and the failure list, written to
+# the gate's stdout, was captured into health-gate's $LOG, which is shown only on RED and deleted on exit.
+# A failing suite must never be reported as a checkmark. Found by an adversarial audit, 2026-07-30.
 #
 # Knobs: AUTONOMOUS_GUI_VM_NAME (default archive-gui-runner), AUTONOMOUS_GUI_VM_MAXRUN (per-app, 1200s),
 #        AUTONOMOUS_GUI_VM_APPS (default "reader notes"), AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s).
@@ -34,55 +41,21 @@ APPS="${AUTONOMOUS_GUI_VM_APPS:-reader notes}"
 # Apps whose UITest failures WARN instead of REDding the gate. The point of the warn tier is that a suite
 # with known failures still RUNS and reports every gate — visibility without parking a multi-day run on a
 # regression that is already tracked. An app graduates out of this list the moment its suite is green.
-#   notes: 5/12 fail in the VM as of 2026-07-30 (first run there) — G3 raw-markdown toggle, G5 paste-as-
-#   source-block, G6/G11 "seam must be drivable" (an.editor.test.reveal / .zoteroOpen), G8 delete-last-
-#   instance guard; the count moves run to run, so they are flaky as well as failing. Tracked as W21.vmgui-c.
+#   notes: 4/12 fail in the VM as of 2026-07-30 — G3 raw-markdown toggle + G8 delete-last-instance
+#   ("… is not hittable"), G6/G11 "seam must be drivable" (an.editor.test.reveal / .zoteroOpen). Identical
+#   across both attempts, so deterministic. It read as 5/12 and "flaky" until the fixture was rebuilt per
+#   run: G5 was this gate's own staleness bug, not a Notes defect. Tracked as W21.vmgui-c.
 WARN_APPS="${AUTONOMOUS_GUI_VM_WARN_APPS:-notes}"
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}"
 GLOG="$ART/gui-vm-gate.log"
-GUEST_REPO="/Volumes/My Shared Files/repo"
-GUEST_CORPUS="/Volumes/My Shared Files/corpus"
-GUEST_HOME="/Users/admin"
-
-# The scratch GUI fixtures are built from a handful of real PDFs, and that corpus is GITIGNORED — it
-# exists only in the primary checkout, never in a worktree. Mounting it as its own share (rather than
-# reaching for it under $ROOT) makes the gate work identically from the primary checkout and from any
-# worktree. Read-only by intent: the fixture builders `ditto` out of it and never write back.
-CORPUS_SRC=""
-for c in "$ROOT/ArchiveProcessor/Test Files/DeaverLLM" \
-         "$HOME/Claude/Archive Suite/ArchiveProcessor/Test Files/DeaverLLM"; do
-  [ -d "$c" ] && { CORPUS_SRC="$c"; break; }
-done
+# Per-app table, the guest-agent wait and the corpus resolution are SHARED with ops/gui/vm-gui-runner.sh
+# via ops/gui/tart-lib.sh. That sharing is deliberate and load-bearing: on 2026-07-30 the guest-agent race
+# was fixed HERE and not in the runner, leaving the interactive entry point broken in exactly the way this
+# one had just been fixed. One copy, so a fix cannot land in only half the lane.
+. "$ROOT/ops/gui/tart-lib.sh"
+CORPUS_SRC="$(archive_corpus_src "$ROOT")"
 
 skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
-
-# ---- per-app table -----------------------------------------------------------------------------
-# Everything app-specific lives here, so adding the next app is one block, not a fork of the script.
-# `mkfixture` runs IN THE GUEST with $GR = the mounted repo; blank means the app needs no fixture.
-app_field() {  # $1 = app, $2 = field
-  case "$1:$2" in
-    reader:spec)      echo "ArchiveReader/macOS/project.yml" ;;
-    reader:proj)      echo "ArchiveReader/macOS/ArchiveReader.xcodeproj" ;;
-    reader:scheme)    echo "ArchiveReader" ;;
-    reader:tests)     echo "ArchiveReaderUITests" ;;
-    reader:dd)        echo "$GUEST_HOME/dd-reader" ;;
-    reader:fixture)   echo "$GUEST_HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture" ;;
-    reader:mkfixture) echo 'AR_FIXTURE_SRC="$GC" bash "$GR/ArchiveReader/scripts/make-gui-fixture.sh"' ;;
-    notes:spec)       echo "ArchiveNotes/macOS/project.yml" ;;
-    notes:proj)       echo "ArchiveNotes/macOS/ArchiveNotes.xcodeproj" ;;
-    notes:scheme)     echo "ArchiveNotes" ;;
-    notes:tests)      echo "ArchiveNotesUITests" ;;
-    notes:dd)         echo "$GUEST_HOME/dd-notes" ;;
-    notes:fixture)    echo "$GUEST_HOME/Library/Application Support/ArchiveNotes/AN-GUI-Fixture" ;;
-    notes:mkfixture)  echo 'NOTES_FIXTURE_CORPUS="$GC" bash "$GR/ArchiveNotes/scripts/make-notes-fixture.sh"' ;;
-    # Notes only: wipe the GUEST app container before each run. organization.json is loaded ONLY when the
-    # container's index DB has no folders, so a container left over from a previous run shadows the fixture's
-    # folder graph and makes the folder-tree UITests (G7/G8) nondeterministic — the INDEX-DB CAVEAT in
-    # make-notes-fixture.sh. This is the VM's throwaway container (/Users/admin), never the owner's.
-    notes:prerun)     echo 'rm -rf "$HOME/Library/Containers/com.archivenotes.app"' ;;
-    *) echo "" ;;
-  esac
-}
 
 # ---- guards (each SKIPs; a missing prereq must never RED) --------------------------------------
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
@@ -92,8 +65,20 @@ command -v xcodegen >/dev/null || skip "xcodegen not on the host PATH (it genera
 mkdir -p "$ART"
 if command -v gtimeout >/dev/null; then TO=(gtimeout "$MAXRUN"); else TO=(); fi
 
-cleanup() { tart stop "$VM" >/dev/null 2>&1 || true; }
+# Only stop the VM if WE booted it, and always drop the lock. The old unconditional `tart stop` fired even
+# on the pre-boot skips below, which on a shared machine means killing a VM another run legitimately owns.
+VM_BOOTED=0
+cleanup() {
+  [ "$VM_BOOTED" = 1 ] && tart stop "$VM" >/dev/null 2>&1
+  tart_lock_release
+  return 0
+}
 trap cleanup EXIT
+
+# One writer at a time (see tart_lock_acquire). Waiting a few minutes then SKIPping is the right posture:
+# a busy VM is infra, and infra must never park the run.
+tart_lock_acquire "${AUTONOMOUS_GUI_VM_LOCKWAIT:-300}" \
+  || skip "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?}) — not competing for it"
 
 # ---- boot ---------------------------------------------------------------------------------------
 # WHY the guest-agent wait exists (the 2026-07-29 failure, root-caused 2026-07-30): `tart ip --wait`
@@ -108,14 +93,11 @@ boot_vm() {
   tart stop "$VM" >/dev/null 2>&1 || true
   local mounts=(--dir=repo:"$ROOT" --dir=out:"$ART")
   [ -n "$CORPUS_SRC" ] && mounts+=(--dir=corpus:"$CORPUS_SRC")
+  VM_BOOTED=1
   tart run "$VM" --no-graphics "${mounts[@]}" >>"$GLOG" 2>&1 &
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 1
-  local waited=0
-  until tart exec "$VM" true >/dev/null 2>&1; do
-    [ "$waited" -ge "$AGENTWAIT" ] && return 2
-    sleep 5; waited=$(( waited + 5 ))
-  done
-  echo "guest agent ready after ${waited}s" >>"$GLOG"
+  tart_wait_agent "$VM" "$AGENTWAIT" || return 2
+  echo "guest agent ready after ${TART_AGENT_WAITED}s" >>"$GLOG"
   return 0
 }
 
@@ -130,10 +112,10 @@ is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/n
 run_app_once() {   # $1 = app, $2 = attempt number
   local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle
   log="$(applog "$app" "$attempt")"; : > "$log"
-  proj="$(app_field "$app" proj)";   scheme="$(app_field "$app" scheme)"
-  tests="$(app_field "$app" tests)"; dd="$(app_field "$app" dd)"
-  fixture="$(app_field "$app" fixture)"; mk="$(app_field "$app" mkfixture)"
-  prerun="$(app_field "$app" prerun)"
+  proj="$(archive_app_field "$app" proj)";   scheme="$(archive_app_field "$app" scheme)"
+  tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
+  fixture="$(archive_app_field "$app" fixture)"; mk="$(archive_app_field "$app" mkfixture)"
+  prerun="$(archive_app_field "$app" prerun)"
   [ -n "$prerun" ] && tart exec "$VM" bash -lc "$prerun" >>"$log" 2>&1
 
   # Fixtured UITests XCTSkip themselves when their scratch fixture is missing — which would let the
@@ -141,12 +123,21 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # (idempotent, scratch-only, persists on the VM disk between runs) and shout if it still isn't there.
   if [ -n "$mk" ]; then
     if [ -z "$CORPUS_SRC" ]; then
-      echo "WARN[$app]: no source corpus found on the host — cannot build the GUI fixture; fixtured UITests will SKIP." | tee -a "$log"
+      echo "WARN[$app]: no source corpus found on the host — cannot build the GUI fixture; fixtured UITests will XCTSkip." | tee -a "$log"
     else
-      tart exec "$VM" bash -lc "GR='$GUEST_REPO'; GC='$GUEST_CORPUS'; [ -d '$fixture' ] || { $mk ; }" >>"$log" 2>&1 || true
+      # REBUILD EVERY ATTEMPT — not "only if absent". The UITests MUTATE the fixture and are written
+      # against a fresh one: NotesGUITests.swift:81-88 says the fixture "is (re)built EXTERNALLY … before
+      # each GUI run" and "the next pre-run rebuild returns the fixture to 4 items"; G8 trashes the Zotero
+      # note ("the next pre-run fixture rebuild restores it") and G5 pastes a reader-page block into it.
+      # With a build-if-absent guard those two can pass at most ONCE and then fail forever — which is
+      # exactly what happened on 2026-07-30: two of the five "Notes UITest failures" were this bug, not
+      # app defects, and they had already been written up as tracked product bugs. Both builders are
+      # idempotent and rm -rf only their own scratch dir, so rebuilding is safe and cheap.
+      tart exec "$VM" bash -lc "GR='$GUEST_REPO'; GC='$GUEST_CORPUS'; $mk" >>"$log" 2>&1 \
+        || echo "WARN[$app]: GUI fixture rebuild FAILED (see $log) — fixtured UITests will XCTSkip." | tee -a "$log"
     fi
     tart exec "$VM" bash -lc "[ -d '$fixture' ]" >/dev/null 2>&1 \
-      || echo "WARN[$app]: GUI fixture still absent after a build attempt — fixtured UITests will SKIP." | tee -a "$log"
+      || echo "WARN[$app]: GUI fixture absent after the rebuild — fixtured UITests will XCTSkip, so a GREEN run would NOT mean what you think." | tee -a "$log"
   fi
 
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath ("Existing file at …"), so a fixed path
@@ -165,8 +156,8 @@ run_app_once() {   # $1 = app, $2 = attempt number
 : > "$GLOG"
 # Generate every selected app's .xcodeproj on the HOST — the guest image has no xcodegen.
 for app in $APPS; do
-  spec="$(app_field "$app" spec)"
-  [ -n "$spec" ] || skip "unknown app '$app' in AUTONOMOUS_GUI_VM_APPS"
+  archive_app_known "$app" || skip "unknown app '$app' in AUTONOMOUS_GUI_VM_APPS (known: reader notes)"
+  spec="$(archive_app_field "$app" spec)"
   xcodegen generate --spec "$ROOT/$spec" >>"$GLOG" 2>&1 || skip "xcodegen failed for '$app' (see $GLOG)"
 done
 
@@ -209,15 +200,27 @@ show_failures() {   # $1 = app — the failing test names from both attempts
 }
 
 echo "GUI-VM gate: passed[${green:- none} ] warned[${warned:- none} ] skipped[${skipped:- none} ] failed[${red:- none} ]"
-for app in $warned; do
-  echo "GUI-VM gate: WARN — known-failing UITests in '$app' (warn-tier, not parking; see W21.vmgui-c):"
-  show_failures "$app"
+
+# Preserve the evidence. Each attempt log is truncated at the start of the next run, so without this the
+# only record of WHY a suite failed is gone by the following gate — and the owner is left with a summary
+# line and nothing to act on.
+for app in $red $warned; do
+  keep="$ART/gui-vm-$app-LAST-FAILURE.log"
+  { echo "=== $app — failing run captured $(date '+%F %T') ==="; show_failures "$app"; } > "$keep" 2>/dev/null || true
 done
+
 if [ -n "$red" ]; then
   echo "GUI-VM gate: RED — reproducible UITest failure in:$red"
   for app in $red; do show_failures "$app"; done
   exit 1
 fi
+if [ -n "$warned" ]; then
+  # NOT green. Exit 4 so the caller prints a warning, not a checkmark (see the exit-code note in the header).
+  echo "GUI-VM gate: WARN — reproducible UITest failures in warn-tier app(s):$warned (not parking; see W21.vmgui-c)"
+  for app in $warned; do show_failures "$app"; done
+  echo "GUI-VM gate: passed:${green:- none}  |  detail kept in $ART/gui-vm-<app>-LAST-FAILURE.log"
+  exit 4
+fi
 [ -n "$skipped" ] && skip "inconclusive for:$skipped (boot, timeout, or infra — not a regression)"
-echo "GUI-VM gate: GREEN —$green${warned:+ (warn-tier still failing:$warned)}"
+echo "GUI-VM gate: GREEN —$green"
 exit 0

@@ -148,7 +148,11 @@ asking the owner for anything:
 daemon always sets it), `.claude/hooks/no-host-gui.sh` hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/
 `capture-window.sh`/`cliclick`/`osascript`, a windowed Android emulator (use `-no-window`), and the iOS
 Simulator — always naming the VM route to take instead. Don't engineer around a denial: take the VM lane, or
-leave the item for the owner. Interactive sessions are unaffected. Related: the unit suites are app-hosted
+leave the item for the owner. Interactive sessions are unaffected. **A hook only sees the command string, so
+a wrapper script slips past it** — that is how `./ArchiveNotes/test-smoke.sh` put ArchiveNotesUITests on the
+owner's screen on 2026-07-30. Two more layers close it: the smoke scripts restrict themselves to the unit
+bundle when unattended, and `ops/autonomous/bin/xcodebuild` (a PATH shim the daemon prepends) refuses any
+`xcodebuild test` without `-only-testing:`, at any nesting depth. Related: the unit suites are app-hosted
 (they launch the real `.app`) but draw nothing since 2026-07-30 — ArchiveCore `ArchiveTestHost`.
 
 Rules while driving: point the app at a **scratch copy, never the real corpus** (choosing a folder clobbers the

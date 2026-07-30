@@ -3,15 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ⚠️ OPEN: 5/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
+## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
 
 **Found 2026-07-30**, on the suite's first-ever run in the Tart VM (`ops/autonomous/gui-vm-gate.sh` gained
 a Notes lane that day; the 13/13 baseline was a **host, GUI-on** run from mid-July, so this is new
 information, not a regression from that day's work). Reader is 15/15 in the same VM run, so the lane
 itself is sound.
 
-Failing (identical across both attempts of the same run → **deterministic**, not flake; an earlier run
-without the guest container reset showed 4, so the reset matters):
+Failing (identical across both attempts → **deterministic**, not flake):
 
 | Test | Symptom |
 |---|---|
@@ -19,7 +18,6 @@ without the guest container reset showed 4, so the reset matters):
 | `testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes` | `Element Button, {{1032.5, 185.5}, {10.0, 10.0}}, identifier: 'an.locations.remove' … is not hittable` |
 | `testG6_RevealSourceBlockDispatchesReaderDeepLink` | `XCTAssertTrue failed - the reveal seam must be drivable (an.editor.test.reveal)` |
 | `testG11_ZoteroChipDispatchesSelectLink` | `XCTAssertTrue failed - the zotero seam must be drivable (an.editor.test.zoteroOpen)` |
-| `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` | `XCTAssertFalse failed - the Zotero fixture note should start without a reader-page block` |
 
 **Leads, not conclusions** — none of this is diagnosed yet, and nobody should conclude the app is broken
 from this entry alone:
@@ -29,8 +27,15 @@ from this entry alone:
   independent bugs. Check the persisted `@AppStorage` panel widths in the guest container first.
 - The two *seam must be drivable* failures mean the hidden a11y probes aren't queryable — plausibly editor
   focus / first-responder, not logic.
-- G5 is different in kind: it's a **fixture-state** assertion (the Zotero note isn't starting clean), so
-  look at `make-notes-fixture.sh` output in the guest, not at the app.
+**Corrected count (read this before trusting an older note).** This was first written up as **5/12**, adding
+`testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` ("the Zotero fixture note should start without a
+reader-page block"), and described as flaky because the count moved between runs. Both were wrong, and the
+cause was the harness, not the app: the gate built the scratch fixture only *when absent*, but this suite
+**mutates** it — G5 pastes a reader-page block into the Zotero note and G8 trashes that note — and
+`NotesGUITests.swift:81-88` states the fixture is "(re)built EXTERNALLY … before each GUI run". So G5 could
+pass exactly once and failed forever after. With a per-run rebuild the count is a steady 4 and G5 passes.
+Infra masquerading as a product bug is the thing to watch for here — an adversarial audit caught it, not the
+gate.
 
 **Why it isn't parking the run.** The gate has a warn tier (`AUTONOMOUS_GUI_VM_WARN_APPS`, default
 `notes`): the suite still **runs and reports every gate**, but its failures WARN instead of RED, so a

@@ -15,7 +15,11 @@ working inside a subdirectory:
 The whole per-change checklist in one place, so no rule hides inside a longer section. Every change, in order:
 
 1. **Isolate** — work in your own git worktree, never the primary checkout (→ *Worktree-first*, below).
-2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test. For a **view /
+2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test — but note the
+   smoke script runs the app's WHOLE scheme, and the scheme contains the UITest bundle, so on the host it
+   drives the real app on screen. `test-smoke.sh` therefore restricts itself to the unit bundle whenever
+   `ARCHIVE_UNATTENDED=1`, and the UITests run off-screen in the VM instead (`ops/gui/vm-gui-runner.sh
+   <app> xcuitest`). For a **view /
    PDF-render** change, also confirm it *actually drew*: XCUITest sees only the accessibility tree, not pixels —
    use a headless render guard (`RenderProbe` / `DocumentRenderGuardTests`, no launch/TCC). For **interaction /
    whole-window** checks, run them **off-screen in the Tart VM** (`ops/gui/vm-gui-runner.sh` — XCUITest + a VNC

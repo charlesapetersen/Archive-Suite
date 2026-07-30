@@ -48,7 +48,8 @@ interactive check on *this* machine, and #3 (below) for full GUI tests **unatten
 macOS VM has its *own* virtual display, so XCUITest **and** the sighted pixel loop run entirely off your
 monitor. This is the daemon-safe GUI lane.
 
-**Run:** `ops/gui/vm-gui-runner.sh [xcuitest|sighted|both]`. Artifacts (`.xcresult`, PNGs) land in
+**Run:** `ops/gui/vm-gui-runner.sh [reader|notes] [xcuitest|sighted|both]` (default `reader both`; the app
+argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "reader"). Artifacts (`.xcresult`, PNGs) land in
 `~/.tart-mirror/vm-artifacts/` — `Read` the PNGs to eyeball renders. Drive the VM with `tart exec <vm> …`
 (no SSH — Cirrus images ship the guest agent).
 
@@ -80,7 +81,7 @@ at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/st
 
 **Status (2026-07-30):** the gate covers **every app with a UITest bundle** — Reader *and* Notes (Processor has
 no test target). Pick a subset with `AUTONOMOUS_GUI_VM_APPS="reader"`. **Reader is 15/15 in the VM; Notes is
-5/12 failing** on its first run there (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c), so Notes sits in the
+4/12 failing** on its first run there (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c), so Notes sits in the
 **warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`, default `notes`): it runs and reports every gate, but its
 failures WARN instead of RED so they can't park a multi-day run. Empty that list once a suite is green — a
 permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
@@ -90,7 +91,14 @@ Sessions also verify view/interaction changes here off-screen — the old `gui-m
 unattended now (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces*
 that for unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
 
-Two bugs found on 2026-07-30 that are worth not re-introducing:
+**One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/UITest bundle/guest
+DerivedData/app bundle/fixture + its builder/launch arg/pre-run), the guest-agent wait, and the corpus
+resolution are **shared** by `vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,
+not tidiness: the guest-agent fix below originally landed in the gate *only*, leaving the interactive
+runner — the script this README, the resume prompt, CLAUDE.md and AGENTS.md all point people at — broken in
+exactly the way the gate had just been fixed. Adding an app is one block in that table.
+
+Bugs found on 2026-07-30 that are worth not re-introducing:
 
 - **The guest-agent race (why the gate silently ran nothing).** `tart ip --wait` returns when the guest has
   *networking*, but `tart exec` talks over a separate vsock control socket served by the Tart Guest Agent, which
@@ -102,6 +110,14 @@ Two bugs found on 2026-07-30 that are worth not re-introducing:
   bare `✓ gui-vm` for a lane that had executed **zero tests**, and the reason went to a temp log shown only on
   RED. It now exits **3 = SKIPPED**, and `health-gate.sh` prints `⊘ … SKIPPED — <reason>` and appends
   `— but NOT VERIFIED: gui-vm` to the summary. Don't collapse that back into a two-state exit.
+
+- **The sighted lane needs `vncdotool`, and its venv is not tracked.** `~/.tart-mirror/vncenv` had gone
+  missing by 2026-07-30, so `vm-gui-runner.sh sighted` could not run at all. It is a plain venv — recreate
+  with `python3 -m venv ~/.tart-mirror/vncenv && ~/.tart-mirror/vncenv/bin/pip install vncdotool`. The
+  runner now fails with that exact command in the message instead of a bare "not found".
+- **A failed in-VM fixture build is now LOUD.** It used to be `>/dev/null 2>&1 || true`, which is how the
+  unmounted-path bug above stayed invisible: the fixtured UITests just XCTSkipped and the suite still
+  reported success. Same class as the silent green.
 
 **Fixtures** are built inside the VM on demand (idempotent, scratch-only, persisting on the VM disk):
 `ArchiveReader/scripts/make-gui-fixture.sh` → `AR-GUI-Fixture`, `ArchiveNotes/scripts/make-notes-fixture.sh` →

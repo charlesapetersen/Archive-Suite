@@ -46,6 +46,8 @@ t "emulator -avd windowed"   deny "emulator -avd Pixel_7 -netdelay none"
 t "emulator @name windowed"  deny "emulator @Pixel_7"
 t "iOS Simulator"            deny "open -a Simulator"
 t "simctl boot"              deny "xcrun simctl boot 'iPhone 15'"
+t "test-smoke.sh wrapper"    deny "./ArchiveNotes/test-smoke.sh"
+t "test-smoke via root"      deny "bash test-smoke.sh notes"
 
 echo "== 2. legitimate neighbours must survive (unattended) =="
 t "unit bundle only"         allow "xcodebuild test -scheme ArchiveNotes -only-testing:ArchiveNotesTests -derivedDataPath ./build/DD"
@@ -57,10 +59,17 @@ t "simctl list (read-only)"  allow "xcrun simctl list devices"
 t "plain open <file>"        allow "git log --oneline -5 && open README.md"
 t "xcodegen"                 allow "xcodegen generate"
 
+echo "== 2b. the wrapper-script hole (2026-07-30): a script name hides the xcodebuild inside it =="
+# ./ArchiveNotes/test-smoke.sh contains no "xcodebuild" and no "-only-testing", yet its whole-scheme
+# `xcodebuild test` ran ArchiveNotesUITests on the owner's screen. The hook is only ONE of three layers
+# (script self-guard + PATH shim are the others) but it must still catch the literal command.
+t "smoke wrapper is named"   deny "cd /tmp && bash \"/Users/x/ArchiveReader/test-smoke.sh\""
+
 echo "== 3. interactive sessions keep host GUI (ARCHIVE_UNATTENDED unset) =="
 t "launch.sh"                allow "./launch.sh reader" 0
 t "host UITest"              allow "xcodebuild test -only-testing:ArchiveReaderUITests" 0
 t "cliclick"                 allow "cliclick c:10,10" 0
+t "test-smoke.sh"            allow "./ArchiveNotes/test-smoke.sh" 0
 
 echo
 echo "prove-no-host-gui: $PASS passed, $FAIL failed"

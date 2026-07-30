@@ -1291,6 +1291,23 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
      the VM (`AUTONOMOUS_GUI_VM_APPS`), builds each app's fixture in the guest, mounts the gitignored fixture
      corpus as its own `corpus:` share (so it works from a worktree), and wipes the guest Notes container
      before each run (the `organization.json` INDEX-DB caveat).
+  5. **Second escape, same morning — the wrapper-script hole.** With all of the above shipped, a daemon
+     session still put `ArchiveNotesUITests` on the owner's screen by running `./ArchiveNotes/test-smoke.sh`:
+     the hook matches the Bash **command string**, and that string contains no `xcodebuild` and no
+     `-only-testing`, while the script's own whole-scheme `xcodebuild test` includes the UITest bundle. The
+     repo's own loop step 2 ("run the touched app's smoke test") pointed straight at it. Closed with two
+     layers a string matcher can't provide: both `test-smoke.sh` scripts now run **only the unit bundle**
+     under `ARCHIVE_UNATTENDED=1` (so the documented command is *correct*, not just blocked), and
+     `ops/autonomous/bin/xcodebuild` — a **PATH shim** the daemon prepends — refuses any `test` action
+     without `-only-testing:` at any nesting depth. Hook pattern added too, as the fast third layer.
+  6. **Adversarial audit of the whole lane** (2026-07-30) — 14 findings raised, 5 survived refutation, all
+     fixed here: the warn tier had reintroduced the silent green (a reproducibly-failing suite exited 0 and
+     printed `✓ gui-vm` with the failure list discarded → now **exit 4 = WARN**, rendered as `⚠ KNOWN
+     FAILURES` with the test names, and detail kept in `gui-vm-<app>-LAST-FAILURE.log`); the fixture was
+     built only when absent although the suite **mutates** it (→ rebuilt every run; this alone was two of
+     the "Notes failures"); no lock around a single shared VM (→ `tart_lock_*`, and the VM is only stopped
+     by whoever booted it); plus the runner's two. New harness `ops/autonomous/tests/prove-vm-lane.sh` (31
+     checks) pins the exit-code→owner-text mapping, the lock, the shim and the smoke-script guards.
 - [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
   three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
   scratch fixture builder and a 13/13 GUI-on baseline; Processor is greenfield **and** carries the Keychain risk).
@@ -1318,12 +1335,15 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     pages) so the lane is corpus-independent. If a real sample is ever wanted, mount it as a **read-only** third
     share — **never** mount anything under `~/Desktop/Google Drive`.
   - [ ] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** ⚠️ **Wiring is
-    DONE (2026-07-30, W21.screen): the Notes suite now runs in the gate — and it is NOT green: 5/12 fail**
-    (`ArchiveNotes/KNOWN_ISSUES.md` has the table). G6/G11 report "the reveal/zotero seam must be drivable"
-    (the hidden a11y probes aren't queryable in the VM — smells like editor focus / first-responder, not
-    logic); G3, G5, G8 fail without a captured message. The set **moves run to run** (4 then 5), so treat
-    flakiness as part of the bug. Held in the gate's **warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS=notes`) so it
-    reports every gate without parking the run — **remove `notes` from that list as the definition of done**.
+    DONE (2026-07-30, W21.screen): the Notes suite now runs in the gate — and it is NOT green: 4/12 fail**
+    (`ArchiveNotes/KNOWN_ISSUES.md` has the table + leads). G3 and G8 fail "… is not hittable" on tiny controls
+    that are **both at x ≈ 1033** — likely one window-geometry problem under the VM's 1920×1200 display, not two
+    bugs; G6/G11 report "the reveal/zotero seam must be drivable" (the hidden a11y probes aren't queryable —
+    smells like editor focus / first-responder, not logic). Deterministic across both attempts. **It was first
+    logged as 5/12 and "flaky"; that was the gate's own stale-fixture bug** (build-if-absent vs a suite that
+    mutates its fixture) — fixed, G5 passes, don't re-derive the old number. Held in the gate's **warn tier**
+    (`AUTONOMOUS_GUI_VM_WARN_APPS=notes`) so it reports every gate without parking the run — **remove `notes`
+    from that list as the definition of done**.
     The remaining original scope below (guest fixture, container reset) is already implemented in the gate.
     `ArchiveNotesUITests`
     already exists (`macOS/project.yml`: `bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveNotes`, ad-hoc sign +

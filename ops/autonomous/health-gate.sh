@@ -26,16 +26,29 @@ step() { local name="$1"; shift; printf '── %s ──\n' "$name"; if "$@" >>
 # including a GUI lane that had never executed, and the reason was buried in $LOG, which is only shown
 # on RED. A gate that says ✓ for work it did not do is worse than no gate. Never collapse this back
 # into step().
-skips=""
+skips=""; warns=""
 step_skippable() {
-  local name="$1"; shift; printf '── %s ──\n' "$name"
-  "$@" >>"$LOG" 2>&1; local rc=$?
+  local name="$1"; shift
+  printf '── %s ──\n' "$name"
+  # Capture THIS step's output separately. Reading the shared $LOG would report the first 'SKIPPED:'
+  # anywhere in the file — including one left by an earlier step — as this step's reason.
+  local out; out="$(mktemp)"
+  "$@" >"$out" 2>&1; local rc=$?
+  cat "$out" >>"$LOG"
   case "$rc" in
     0) echo "  ✓ $name" ;;
-    3) local why; why="$(grep -m1 'SKIPPED:' "$LOG" | tail -1)"
+    3) local why; why="$(grep 'SKIPPED:' "$out" | tail -1)"
        echo "  ⊘ $name SKIPPED — ${why:-no reason reported}"; skips="$skips $name" ;;
+    # 4 = ran, reproducibly FAILED, but the failures are known/tracked so they must not park the run.
+    # The detail is echoed HERE, to the gate's own stdout, which is what lands in last-gate.log — not
+    # buried in $LOG, which is only shown on RED and deleted on exit. The first cut of the warn tier got
+    # this wrong and printed a bare "✓", which is the silent-green bug wearing a different hat.
+    4) echo "  ⚠ $name — KNOWN FAILURES (ran, did not pass; not parking):"
+       grep -E 'GUI-VM gate: (WARN|passed)|Test Case .*failed|error:' "$out" | sed 's/^/      /' | head -20
+       warns="$warns $name" ;;
     *) echo "  ✗ $name (rc=$rc)"; fails="$fails $name" ;;
   esac
+  rm -f "$out"
 }
 
 # UNIT tests only — `-only-testing:<UnitBundle>`, NOT the whole scheme. This is load-bearing for an UNATTENDED
@@ -95,9 +108,10 @@ fi
 # A skip never REDs the gate (infra must not park a healthy run) but it MUST be visible here — this
 # line is what lands in last-gate.log and what the owner reads. "GREEN" alone would claim coverage the
 # run does not have.
-if [ -n "$skips" ]; then
-  echo "HEALTH GATE: GREEN (builds + Reader/Notes suites + coherence) — but NOT VERIFIED:$skips"
-  echo "  ↳ the skipped lane(s) ran ZERO tests. Reason above; artifacts in ~/.tart-mirror/vm-artifacts/."
+if [ -n "$skips" ] || [ -n "$warns" ]; then
+  echo "HEALTH GATE: GREEN (builds + Reader/Notes unit suites + coherence)${skips:+ — NOT VERIFIED:$skips}${warns:+ — KNOWN FAILURES:$warns}"
+  [ -n "$skips" ] && echo "  ↳ the skipped lane(s) ran ZERO tests. Reason above; artifacts in ~/.tart-mirror/vm-artifacts/."
+  [ -n "$warns" ] && echo "  ↳ the warned lane(s) RAN and FAILED; they are tracked, so they don't park the run. Detail above + ~/.tart-mirror/vm-artifacts/gui-vm-<app>-LAST-FAILURE.log."
   exit 0
 fi
 echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + coherence + GUI-VM UITests)"

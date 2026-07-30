@@ -158,7 +158,7 @@ paid Processor OCR smoke.
     (`AUTONOMOUS_GUI_VM_AGENTWAIT`, 240s).
   - **Warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`, default `notes`): an app with known-failing UITests still
     RUNS and reports every gate, but WARNs instead of REDding — visibility without parking a multi-day run on
-    an already-tracked regression. Notes is 5/12 in the VM (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c);
+    an already-tracked regression. Notes is 4/12 in the VM (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c);
     Reader is 15/15. Empty the list as a suite goes green: a permanent warn tier is a disabled test.
   - **Per-attempt result bundles + logs.** `xcodebuild` refuses to overwrite an existing `-resultBundlePath`,
     so a fixed path made every *retry* fail before running a test — laundering a real RED into a skip. Each
@@ -168,7 +168,15 @@ paid Processor OCR smoke.
   `.claude/hooks/no-host-gui.sh` (PreToolUse/Bash) hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/
   `capture-window.sh`/`cliclick`/`osascript`, a windowed Android emulator, and the iOS Simulator — each denial
   naming the VM route instead. Interactive owner sessions are unaffected. Regression harness:
-  `ops/autonomous/tests/prove-no-host-gui.sh`. The other half of that guarantee is in the apps themselves: the
+  `ops/autonomous/tests/prove-no-host-gui.sh`.
+  **A hook matches the command STRING, so a wrapper script defeats it** — proven on 2026-07-30 when a
+  session ran `./ArchiveNotes/test-smoke.sh`, whose own whole-scheme `xcodebuild test` drove
+  ArchiveNotesUITests on the owner's display while the hook saw a string with no `xcodebuild` in it. Two
+  layers behind it now: (a) both `test-smoke.sh` scripts run **only the unit bundle** when
+  `ARCHIVE_UNATTENDED=1`, pointing at the VM for the UITests — the documented command is now *correct*, not
+  merely blocked; (b) `ops/autonomous/bin/xcodebuild`, a **PATH shim** the daemon prepends for the child,
+  refuses any `test` action lacking `-only-testing:` no matter how many scripts deep it is invoked.
+  Covered by `ops/autonomous/tests/prove-vm-lane.sh`. The other half of that guarantee is in the apps themselves: the
   unit bundles are app-hosted, so `xcodebuild test -only-testing:<App>Tests` launches the real `.app` — it now
   draws nothing under a test host (ArchiveCore `ArchiveTestHost` + `TestHostWindowSuppressionTests`).
 - **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
@@ -284,6 +292,9 @@ ops/autonomous/tests/prove-keepalive.sh        # WS1 launchd half: a THROWAWAY L
                                                # bash-only harness). Run interactively; auto-cleans.
 ops/autonomous/tests/prove-review-cadence.sh   # WS11 review picker: delta-aware unit choice, cooldown,
                                                # record-resets, never-reviewed coverage, iOS skipped ($0).
+ops/autonomous/tests/prove-vm-lane.sh          # the VM lane: per-app table, VM lock, corpus resolution, the
+                                               # exit-code -> owner-text mapping (the silent-green regression,
+                                               # twice), the xcodebuild PATH shim, smoke-script self-guards.
 ops/autonomous/tests/prove-no-host-gui.sh      # the host-GUI firewall (.claude/hooks/no-host-gui.sh): all four
                                                # blocked lanes deny, their legitimate neighbours (VM lane,
                                                # unit-only tests, `emulator -no-window`, read-only simctl) still
