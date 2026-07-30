@@ -146,6 +146,22 @@ re-promote those.
 **iOS parity is PARKED** (§Project focus): where a finding has an iOS twin (`W23.m1`), fix **Android only** and
 record the iOS parity as parked — do not revive the iOS build to chase it.
 
+**Prior-art audit — CLOSED 2026-07-29. Do not go re-mining the archive.** A removed Codex worktree (work dated
+2026-07-17, preserved as branch `wt/codex-processor-bugfixes-20260712` + patches in
+`old/codex-processor-fixes-20260717/`, ~2,900 uncommitted lines over 8 unpushed commits, **76 commits behind
+`main`**) was audited against every W23 defect symbol. **This is the complete list of overlaps — the rest is
+superseded** (its run-config work was re-implemented on `main` as `W16.cfg1`–`cfg5`):
+- **`W23.h5` — prior art EXISTS** (`PDFGenerator.generateRequiringEmbeddedImage()` + `PDFError.imageEmbeddingFailed`). See the item.
+- **`W23.m7` — prior art EXISTS** (`3ea3221`: checked `writeManifest()` + memory rollback). See the item.
+- **`W23.h1` — NONE.** Only the `pruneEmptySessions(under: root)` *call site* moved; the function's
+  delete-unknown-content logic is untouched. The most severe finding has no head start.
+- **`W23.m5` — NONE, and worse than none:** its new call sites are themselves written
+  `_ = try? MacOSTagger.applyTags(…)`, i.e. they *repeat* the swallowing bug. Don't copy that code.
+- Everything else queued in W23 (all Notes, Reader, ArchiveCore and Android items): **no overlap at all** — that
+  branch is Processor-macOS only.
+In both "EXISTS" cases: **re-derive against current `main`, never cherry-pick.** Neither was ever build-verified
+in this repo, and both predate the W16.cfg* rewrite of the same files.
+
 ### HIGH — all five daemon-AUTHORIZED per item (plan §OWNER AUTHORIZATIONS); Tier-2, scratch copies only
 
 - [ ] **W23.h1 — launch-time `pruneEmptySessions` recursively HARD-deletes unrecognized content under the
@@ -352,7 +368,16 @@ record the iOS parity as parked — do not revive the iOS build to chase it.
   group as unresolved — recovered state inconsistent with the produced artifact, and possibly a second
   decision prompt. **Neighbouring sender controls already roll memory back when their manifest write fails —
   follow that pattern.** The "fixed" B9 known issue claimed Apply/Skip persistence but did not handle this
-  ignored failure; update that entry. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/CaptureSession,Views/LiveCaptureView}.swift | S–M | med | none
+  ignored failure; update that entry.
+  💡 **PRIOR ART EXISTS (found 2026-07-29 by symbol-auditing the preserved Codex branch).** Commit `3ea3221`
+  *"fix(capture): persist completion before acknowledgment"* on branch **`wt/codex-processor-bugfixes-20260712`**
+  (patches: `old/codex-processor-fixes-20260717/`, both off `main`) converts the discarded `writeManifest()`
+  calls in `CaptureSession.swift` into checked ones **with memory rollback** — e.g.
+  `guard writeManifest() else { let restoredManifest = writeManifest(); … }`,
+  `if changed || newlyCompleted, !writeManifest() { … }` — in exactly the completion-set / tag-card region this
+  item names. That is the "follow the neighbouring roll-back pattern" fix, already drafted. ⚠️ 76 commits
+  behind and never build-verified here: **re-derive against current `main`, don't cherry-pick.**
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/CaptureSession,Views/LiveCaptureView}.swift | S–M | med | none
 
 - [ ] **W23.m8 — Android's crash-durable `SessionStore` silently ignores current-manifest publication failure
   [M · MED · metadata loss · Android].** `data/ManifestFileWriter.kt`, `data/SessionStore.kt`,
