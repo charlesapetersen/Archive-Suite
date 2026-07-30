@@ -7,6 +7,14 @@ struct ItemRef: Sendable {
     let mtime: Double
 }
 
+/// The outcome of one atomic item transaction (`NoteStore.withItem`/`withTemplate`): the item
+/// exactly as it was written, plus its on-disk ref. Callers index/publish `item` rather than
+/// re-reading the store, so what they show is what landed.
+struct ItemTransaction: Sendable {
+    let item: Item
+    let ref: ItemRef
+}
+
 /// The single persistence layer for Archive Notes' UUID-folder store.
 ///
 /// Every note lives in `<root>/items/<uuid>/<Title>.md` with an optional `assets/` subfolder.
@@ -75,6 +83,44 @@ actor NoteStore {
 
     /// Move the item directory to the Trash (recoverable). Never `removeItem`.
     func delete(_ id: UUID) throws { try deleteEntry(id, in: itemDir(id)) }
+
+    // MARK: - Atomic edit transactions (W23.h2)
+    //
+    // `load` + `save` are two SEPARATE actor calls, so a caller that spells its edit out as
+    // load → mutate → save has a suspension point in the middle: two tasks can both load the same
+    // old item, apply different edits, and save in either order, and the later whole-item save
+    // silently drops the other's body, metadata or source blocks. (Measured before the fix: 24
+    // concurrent same-item appends left exactly ONE survivor.) `@MainActor` does not help — it is
+    // reentrant at every `await`.
+    //
+    // `withItem` makes the TRANSACTION the unit of serialization: the whole read-modify-write runs
+    // inside one actor-isolated call, and because `mutate` is **synchronous** there is no suspension
+    // point between the read and the write — no other transaction can interleave. Prefer it over
+    // `load` + `save` for every edit to an existing item; a bare `load`/`save` pair is now only for
+    // read-only reads and whole-item replacements that do not depend on prior on-disk state.
+
+    /// Atomically load → mutate → save one note. `mutate` sees the CURRENT on-disk item (never a
+    /// caller's stale copy) and must be synchronous, which is what makes the transaction atomic —
+    /// do the async part (asset copies, parsing, clock reads) *before* the call and capture the
+    /// result. A throwing `mutate` aborts the transaction and leaves the `.md` untouched.
+    func withItem(_ id: UUID,
+                  _ mutate: @Sendable (inout Item) throws -> Void) throws -> ItemTransaction {
+        try withEntry(id, in: itemDir(id), mutate)
+    }
+
+    /// `withItem` for a template (same atomicity, `Templates/<uuid>/` container).
+    func withTemplate(_ id: UUID,
+                      _ mutate: @Sendable (inout Item) throws -> Void) throws -> ItemTransaction {
+        try withEntry(id, in: templateDir(id), mutate)
+    }
+
+    private func withEntry(_ id: UUID, in dir: URL,
+                           _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
+        var item = try loadEntry(id, in: dir)
+        try mutate(&item)
+        let ref = try saveEntry(item, in: dir)
+        return ItemTransaction(item: item, ref: ref)
+    }
 
     func allItemIDs() -> [UUID] {
         let itemsDir = root.appendingPathComponent("items", isDirectory: true)
