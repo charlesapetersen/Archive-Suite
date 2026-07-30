@@ -18,6 +18,10 @@ struct ArchiveReaderApp: App {
     @AppStorage(SettingsKey.viewerWinH) private var viewerWinH = 0.0
 
     @StateObject private var deepLinkRouter = DeepLinkRouter()
+    /// W23.m4: the granted root + its marker, mirrored out of the navigation window so a DOCUMENT
+    /// window (a separate scene, which owns no `NavigationModel`) can publish the focused link target
+    /// the "Copy Archive Link to This Page" command needs.
+    @StateObject private var linkContext = ArchiveLinkContext()
 
     /// Demote the process when it is only acting as a unit-test host, so `xcodebuild test
     /// -only-testing:ArchiveReaderTests` never takes the owner's screen (→ `ArchiveTestHost`).
@@ -35,6 +39,7 @@ struct ArchiveReaderApp: App {
             } else {
                 NavigationWindowView()
                     .environmentObject(deepLinkRouter)
+                    .environmentObject(linkContext)
                     .onOpenURL { url in
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)
@@ -45,6 +50,7 @@ struct ArchiveReaderApp: App {
 
         WindowGroup(id: WindowID.document, for: DocumentSelection.self) { $selection in
             DocumentWindowView(selection: selection)
+                .environmentObject(linkContext)   // W23.m4: page links are writable from here too
         }
         .defaultSize(documentDefaultSize)   // DV-1: open at the remembered size (or the full screen) — no post-show resize flash
 
@@ -72,4 +78,8 @@ enum WindowID {
 /// stable, security-scoped bookmark identity as the file layer matures.
 struct DocumentSelection: Codable, Hashable {
     var filePaths: [String]
+    /// The **1-based PDF page** an incoming `archivereader://reveal?…&page=` link cited, so the window
+    /// opens on it (W23.m4 defect 3). `nil` for an ordinary open, and **additive**: it decodes as `nil`
+    /// from any window value persisted before this field existed, so scene restoration is unaffected.
+    var initialPage: Int? = nil
 }

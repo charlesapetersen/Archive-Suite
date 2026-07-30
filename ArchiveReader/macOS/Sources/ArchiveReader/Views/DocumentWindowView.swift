@@ -8,6 +8,7 @@ import AppKit
 struct DocumentWindowView: View {
     let selection: DocumentSelection?
     @StateObject private var model = DocumentViewerModel()
+    @EnvironmentObject private var linkContext: ArchiveLinkContext
 
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @FocusState private var findFocused: Bool
@@ -31,7 +32,19 @@ struct DocumentWindowView: View {
         .navigationTitle(model.title)
         .toolbar { toolbar }
         .focusedSceneObject(model)   // so the Document menu commands act on this window
-        .onAppear { fraction = defaultFraction; if let selection { model.load(selection) } }
+        // W23.m4: publish the link target here too, so "Copy Archive Link to This Page" is ENABLED in
+        // the document window — it used to require a focused NavigationModel this scene never has.
+        .focusedSceneValue(\.archiveLinkTarget, linkContext.target)
+        .onAppear {
+            fraction = defaultFraction
+            if let selection { model.load(selection) }
+            // A deep link that cited a page opens straight on it (W23.m4 defect 3). Deferred first
+            // responder: the pane's PDFView isn't in a window yet on the first `onAppear`.
+            if let page = selection?.initialPage {
+                model.goToPDFPage(page)
+                DispatchQueue.main.async { model.focusPane(model.focusedPane) }
+            }
+        }
         // DV-2: the split width + per-pane zoom now persist across ↑/↓ cycling — no per-document reset.
         .onChange(of: model.showingFind) { if model.showingFind { findFocused = true } }
         // DV-1: on close, the current window size becomes the default for the next viewer.

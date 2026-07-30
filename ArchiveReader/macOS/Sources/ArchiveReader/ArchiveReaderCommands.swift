@@ -17,6 +17,10 @@ struct ArchiveReaderCommands: Commands {
     @FocusedObject private var nav: NavigationModel?
     @FocusedObject private var doc: DocumentViewerModel?
     @FocusedValue(\.openSelection) private var openSelection: (() -> Void)?
+    // W23.m4: the root + marker a page link needs, published by EVERY window that shows a document.
+    // Reading it as a focused value (instead of reaching through `nav`) is what makes
+    // "Copy Archive Link to This Page" work in the document window, where there is no NavigationModel.
+    @FocusedValue(\.archiveLinkTarget) private var linkTarget: ArchiveLinkTarget?
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
@@ -135,13 +139,9 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
             Divider()
             Button("Copy Archive Link to This Page") {
-                if let doc, let nav {
-                    if let root = nav.rootStore.root, let marker = nav.rootStore.rootMarker {
-                        doc.copyArchivePageLink(root: root, marker: marker)
-                    }
-                }
+                if let doc, let linkTarget { doc.copyArchivePageLink(target: linkTarget) }
             }
-            .disabled(doc == nil || nav == nil)
+            .disabled(doc == nil || linkTarget == nil)
             Button("Copy") { doc?.copyPlainSelection() }
                 .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
             Button("Copy Cleaned for Prose") { doc?.copySelection() }

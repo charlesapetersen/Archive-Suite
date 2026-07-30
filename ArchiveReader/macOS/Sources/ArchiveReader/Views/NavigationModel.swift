@@ -75,11 +75,21 @@ final class NavigationModel: ObservableObject {
     // its ScrollViewReader to reveal `scrollTargetID`. Pure UI hint — never a file operation.
     @Published private(set) var scrollRequest = 0
     private(set) var scrollTargetID: ArchiveFile.ID?
+    // W23.m4: bumped when a deep link that cited a PAGE wants the document window opened on it. Same
+    // shape as `scrollRequest` — the window observes the counter (so two links to the same page both
+    // fire) and calls `openWindow`, which only a View can do. Read-only w.r.t. the corpus.
+    @Published private(set) var openViewerRequest = 0
+    private(set) var openViewerSelection: DocumentSelection?
 
     // Deep-link reveal: stashed until the target is visible in library.files (gather deferral).
     private var pendingReveal: String?
     private var pendingRevealPage: Int?
     private var pendingRevealSettledMisses = 0
+
+    /// W23.m4: app-level carrier so a DOCUMENT window can write page links. This model is the single
+    /// writer (see `publishLinkTarget`), so a root switch can never leave another window citing the old
+    /// archive. Weak — the context is owned by the app scene, which outlives this model.
+    private weak var linkContext: ArchiveLinkContext?
 
     /// One undoable tag write plus the `FileIdentity` captured at the edit. Undo re-verifies §6 against
     /// this identity, so a file replaced under its path BETWEEN the edit and the undo aborts rather than
@@ -156,7 +166,27 @@ final class NavigationModel: ObservableObject {
                 self.pruneExcludedFromIndex()
             } }
             .store(in: &cancellables)
+        // W23.m4: keep the app-level link target in step with the granted root — a re-grant, a switch
+        // (`chooseRoot`) or a clear (Options) all flow through `rootStore`. Async on main so the sink
+        // reads the COMMITTED value (`@Published` emits in willSet), same reason as the library sink.
+        rootStore.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
+            .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
+    }
+
+    /// Adopt the app-level link context and seed it with the current root (the store resolved its saved
+    /// bookmark in `init`, before the subscription above existed). Called by the navigation window.
+    func attach(linkContext: ArchiveLinkContext) {
+        self.linkContext = linkContext
+        publishLinkTarget()
+    }
+
+    /// Mirror the granted root + marker into the app-level context, so any window can build a durable
+    /// link. Clears it when either is missing — a link with no marker GUID isn't portable.
+    private func publishLinkTarget() {
+        linkContext?.update(root: rootStore.root, marker: rootStore.rootMarker)
     }
 
     // MARK: Saved searches / scope
@@ -665,6 +695,14 @@ final class NavigationModel: ObservableObject {
             selection = [file.id]
             requestScroll(to: file.id)
             statusMessage = ""
+            // W23.m4 defect 3: a link that cited a PAGE has to land ON that page. Selecting the row and
+            // dropping `pendingRevealPage` — which is all this did — silently discarded the page half of
+            // every `reader-page` citation Notes writes (the reveal contract in
+            // `execution-plans/archive-notes/00-overview.md` §8.3 requires it be passed on). Ask the
+            // window to open the viewer there; a link with no page keeps the plain select-and-scroll.
+            if let page = pendingRevealPage {
+                requestOpenViewer(DocumentSelection(filePaths: [file.url.path], initialPage: page))
+            }
             pendingReveal = nil
             pendingRevealPage = nil
             pendingRevealSettledMisses = 0
@@ -819,6 +857,13 @@ final class NavigationModel: ObservableObject {
     // helpers are pure selection math (`TriageNavigation`) and never touch a file.
 
     private func requestScroll(to id: ArchiveFile.ID) { scrollTargetID = id; scrollRequest &+= 1 }
+
+    /// W23.m4: ask the navigation window to open a document window on this selection (page included).
+    /// A counter, like `requestScroll`, so two links to the same page both fire.
+    private func requestOpenViewer(_ selection: DocumentSelection) {
+        openViewerSelection = selection
+        openViewerRequest &+= 1
+    }
 
     /// Select the next document still tagged `Unread` (after the current selection), scrolling it in.
     func selectNextUnread()     { advanceToUnread(forward: true) }

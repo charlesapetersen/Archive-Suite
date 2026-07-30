@@ -269,22 +269,52 @@ final class DocumentViewerModel: ObservableObject {
         focusedPane = loc.pane
     }
 
-    /// Copy an archive link for the current page (1-based) to the pasteboard.
-    /// Needs the root + marker from the navigation model to build a durable link.
-    func copyArchivePageLink(root: URL, marker: RootMarker) {
-        guard urls.indices.contains(index) else { return }
-        let fileURL = urls[index]
-        // Page is 1-based in the link format; `index` here is the doc index (not the PDF page).
-        // "This page" is the image page of the pair on screen — which is page 1 only on the first pair.
-        // (Pinning it to 1 was harmless while pairs past the first were unreachable; now they aren't.
-        // Making the number follow the FOCUSED pane, plus the other two defects of this command, is
-        // W23.m4's job — this only keeps the link pointing at the pair the reader is actually looking at.)
-        let page = DocumentPagePairs.imagePageIndex(pair: pair) + 1
+    // MARK: Page-level durable links (W23.m4)
+
+    /// The **1-based PDF page number** a page link should cite: the page shown in the pane that has
+    /// focus. Citing the OCR text page while reading it, and the scan while looking at the scan, is what
+    /// makes a link round-trip — `goToPDFPage` puts the reader back on exactly that pane.
+    ///
+    /// Falls back to the pair's image page when the focused pane holds no page at all (a trailing scan
+    /// with no OCR text page, or a document that failed to load), so the number always names a page the
+    /// document plausibly has rather than one past its end.
+    var focusedPageNumber: Int {
+        guard focusedPane == .right, textPage != nil else {
+            return DocumentPagePairs.imagePageIndex(pair: pair) + 1
+        }
+        return DocumentPagePairs.textPageIndex(pair: pair) + 1
+    }
+
+    /// Move the panes to a **1-based PDF page number** (what a durable page link carries) and put the
+    /// focus border on the pane that page occupies — the inverse of `focusedPageNumber`. Clamped by
+    /// `setPair`, so a link whose page is past the end of a since-shortened document lands on the last
+    /// pair instead of showing nothing. A cited OCR text page that no longer exists degrades to its
+    /// pair's image page rather than focusing an empty pane.
+    func goToPDFPage(_ page: Int) {
+        let pageIndex = max(0, page - 1)
+        setPair(DocumentPagePairs.pair(ofPageIndex: pageIndex))
+        // Set after `setPair` — which pulls focus off a text pane that doesn't exist — and re-check
+        // `textPage`, which is a function of the pair we just moved to.
+        focusedPane = (!DocumentPagePairs.isImagePage(pageIndex) && textPage != nil) ? .right : .left
+    }
+
+    /// Build the pasteboard item for a page link to the page on screen, without touching the pasteboard
+    /// — so the *contents* of the link (in particular which page it names) are testable.
+    /// `nil` when no document is loaded.
+    func archivePageLink(target: ArchiveLinkTarget) async -> NSPasteboardItem? {
+        guard urls.indices.contains(index) else { return nil }
+        return await ArchiveLinkWriter.pageLink(
+            fileURL: urls[index], page: focusedPageNumber,
+            root: target.root, marker: target.marker, thumbnailer: nil
+        )
+    }
+
+    /// Copy an archive link for the page on screen to the pasteboard. Takes the root + marker as an
+    /// `ArchiveLinkTarget` focused value rather than a `NavigationModel`, so the command is available in
+    /// the document window too (W23.m4 defect 1).
+    func copyArchivePageLink(target: ArchiveLinkTarget) {
         Task {
-            let item = await ArchiveLinkWriter.pageLink(
-                fileURL: fileURL, page: page,
-                root: root, marker: marker, thumbnailer: nil
-            )
+            guard let item = await archivePageLink(target: target) else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])
         }

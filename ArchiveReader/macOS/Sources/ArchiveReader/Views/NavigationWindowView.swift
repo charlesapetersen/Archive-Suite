@@ -5,6 +5,7 @@ import ArchiveCore
 struct NavigationWindowView: View {
     @StateObject private var model = NavigationModel()
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var linkContext: ArchiveLinkContext
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
@@ -85,7 +86,10 @@ struct NavigationWindowView: View {
         .navigationTitle("Archive Reader")
         .focusedSceneObject(model)
         .focusedSceneValue(\.openSelection) { openSelection() }
-        .onAppear { deepLinkRouter.nav = model }
+        // W23.m4 — page-link publication + the deep-link "open the viewer ON the cited page" bridge.
+        // Extracted into one modifier: adding them inline blew this body's type-check budget.
+        .archivePageLinkBridge(model: model, target: linkContext.target, openWindow: openWindow)
+        .onAppear { deepLinkRouter.nav = model; model.attach(linkContext: linkContext) }
     }
 
     // MARK: Table (AppKit NSTableView for virtualized, high-performance scrolling at scale)
@@ -579,6 +583,25 @@ struct FlowLayout: Layout {
 }
 
 /// NSObject trampoline for the AppKit context menu — routes `NSMenuItem` actions to
+/// W23.m4 — the navigation window's two page-link duties, kept off the main `body` (which is already at
+/// the compiler's type-check limit):
+///  * publish the `ArchiveLinkTarget` for this scene, so "Copy Archive Link to This Page" is enabled
+///    over the preview sheet exactly as it now is in a document window;
+///  * turn a `revealAndSelect` page request into an actual `openWindow`, since only a View holds that
+///    Environment action. Observing the COUNTER (not the payload) means two links to the same page both
+///    open, and the payload carries the 1-based PDF page the link cited.
+private extension View {
+    func archivePageLinkBridge(model: NavigationModel,
+                               target: ArchiveLinkTarget?,
+                               openWindow: OpenWindowAction) -> some View {
+        focusedSceneValue(\.archiveLinkTarget, target)
+            .onChange(of: model.openViewerRequest) {
+                guard let sel = model.openViewerSelection, !sel.filePaths.isEmpty else { return }
+                openWindow(id: WindowID.document, value: sel)
+            }
+    }
+}
+
 /// `NavigationModel` methods. Retained by the `NSMenu` via `objc_setAssociatedObject`.
 @MainActor
 final class ContextMenuActions: NSObject {
