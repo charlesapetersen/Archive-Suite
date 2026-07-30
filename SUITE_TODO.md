@@ -353,21 +353,36 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### MEDIUM
 
-- [ ] **W23.m1 — re-pairing Capture leaves an upload owned by the OLD Mac; the phone copy is deleted on the
-  wrong acknowledgement [M · MED · misroute · Android].** `capture/CaptureViewModel.kt` (disconnect/re-pair,
-  `inFlightUploads`, the upload coroutine). Disconnect/re-pair clears the current client but **does not cancel
-  upload jobs or invalidate `inFlightUploads`** — so a newly paired client refuses to re-enqueue the same item
-  while the existing coroutine keeps using its **captured old client**. If the old Mac is still reachable and
-  acknowledges, the model marks the item uploaded and **schedules removal of the phone file**, though the
-  newly selected Mac/session never received it. Not classified as data loss (the old Mac does hold a durable
-  copy) but a **silent destination mismatch** — and it contradicts the Capture requirement that disconnected
-  items re-upload to the **new** endpoint.
-  **Fix:** make endpoint identity **generational** — stamp each upload job with the pairing generation, cancel
-  (or hard-invalidate) jobs on disconnect/re-pair, drop `inFlightUploads` entries for the dead generation, and
-  **ignore an acknowledgement from a stale generation** for the purpose of "uploaded → delete local".
-  **iOS twin is PARKED** (`ArchiveCaptureiOS/.../CaptureViewModel.swift`) — record the parity gap, do not fix
-  it. The existing re-pair known issue is about Mac QR/status/USB UX, not endpoint-generation ownership.
-  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/capture/CaptureViewModel.kt | M | med | none
+- [x] **W23.m1 — re-pairing Capture leaves an upload owned by the OLD Mac; the phone copy is deleted on the
+  wrong acknowledgement [M · MED · misroute · Android].** ✅ FIXED — endpoint identity is now **generational**,
+  exactly as prescribed (policy layer `f8d35fa`). Premise re-confirmed by symbol first, against `b31aa03`:
+  `enqueueUpload` captures `val c = client` for the whole send, `disconnect()` touched neither `uploadJobs`
+  nor `inFlightUploads`, so a re-pair left `resumeUploads()`'s re-enqueue a **no-op** (the stale in-flight id)
+  while the orphaned coroutine kept uploading to the old Mac — and any `ok` it returned ran the unconditional
+  confirm path (`UPLOADED` → `sentCount` → `delay(650); removeConfirmed`), deleting the phone's copy of a page
+  the newly paired Mac never received. `trySendSegmentComplete` had the same hole (`endedSegments.remove` on
+  any `ok`), so the new Mac never heard of the document at all.
+  New pure layer in `CaptureModels.kt`: **`PairingGeneration`** (a token rotated by every pair *and* unpair via
+  `retirePreviousPairing()`, which also cancels the outstanding upload/segment jobs — best-effort, since a POST
+  already on the wire finishes, which is precisely why the *generation check* is what makes this safe);
+  **`OutstandingSends<K>`** (the in-flight guard, generation-stamped — `claim` still refuses a second send for
+  a key **even across a re-pair**, preserving W23.h4's one-coroutine-per-file invariant that the delete join
+  depends on, and `release` frees only the caller's OWN claim so a dead send can't free the live one's); and
+  **`sendAck(ok, tokenIsCurrent)`** — the ownership rule in ONE place, shared by both kinds of send so they
+  can't drift, with staleness outranking success. The upload handler bails out **before** `setState(UPLOADED)`
+  (so a crash in that window can't persist a false confirmation either) and its `finally` returns the page to
+  the queue via `markSendableAgain` (PENDING, marker cleared, heartbeat re-counted) for the endpoint paired
+  now. Absent a re-pair the decisions are bit-for-bit the old ones.
+  Tier-2, scratch only (JVM temp files): `CapturePairingGenerationTest`, 8 cases incl. a coroutine driver that
+  runs the shipped objects through the real misroute sequence and asserts the phone copy survives, the page
+  re-queues, and the NEW Mac then receives it; **non-vacuous** — dropping `sendAck`'s staleness arm turns 4 of
+  the 8 RED, the driver among them. Android **33/33** (was 25), `assembleDebug` + `testDebugUnitTest` clean,
+  **0 warnings**, no device/emulator. Full write-up: `ArchiveProcessor/KNOWN_ISSUES.md`.
+  **iOS twin recorded as PARKED, not fixed** (verified still present by symbol:
+  `ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift` `disconnect()` nils `endpoint`/`client` and leaves
+  `inFlightUploads` + the upload task alone). Also deliberately left alone: the display-only status heartbeat
+  can still deliver one conflated count to the Mac just unpaired from (no bytes, no deletion licensed).
+  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/capture/{CaptureViewModel,CaptureModels}.kt + app/src/test/.../CapturePairingGenerationTest.kt | M | med | none
 
 - [ ] **W23.m2 — Reader cannot display or find page 3+ of Processor's intentional merged-PDF format
   [M · MED · CROSS-APP].** Processor merges multi-page documents as `image1, text1, image2, text2, …`

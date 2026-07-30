@@ -80,6 +80,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private var nextId = 1L
     private var sessionGeneration = 0L
 
+    /** Which Mac owns the queue right now (W23.m1). Rotated by every pair/unpair, and stamped onto each
+     *  send, so an acknowledgement can be attributed to an endpoint rather than taken on faith: a page is
+     *  recorded as uploaded — and so becomes one the phone may delete — only if the Mac that answered is
+     *  still the Mac we are paired with. */
+    private val pairing = PairingGeneration()
+
     /** CaptureScreen snapshots this before asking CameraX to write. Clear invalidates all prior tokens. */
     fun beginCaptureToken(): Long? = captureStartToken(sessionGeneration, isClearing)
     fun isCaptureTokenCurrent(token: Long): Boolean =
@@ -95,7 +101,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private val endedSegments = LinkedHashMap<String, SegTags>()
     /** Group ids whose completion signal is being sent right now, so the auto-retry loop, the
      *  upload-success hook, and resume can't fire the same one concurrently. */
-    private val inFlightSegments = mutableSetOf<String>()
+    private val inFlightSegments = OutstandingSends<String>()
     private val segmentJobs = mutableMapOf<String, Job>()
 
     private fun newGroupId() = "g" + UUID.randomUUID().toString().take(8)
@@ -205,7 +211,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId, ended)))
     }
 
-    /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace). */
+    /** Re-enqueue anything not confirmed uploaded. Idempotent on the Mac (same group+seq → replace).
+     *  A page whose send from the PREVIOUS pairing is still unwinding is deliberately skipped here (its
+     *  guard is still claimed, so only one coroutine ever holds the file — see [OutstandingSends]); that
+     *  send returns it to PENDING as it finishes and [startAutoRetry] delivers it moments later. */
     private fun resumeUploads() {
         if (client == null) return
         // Re-send anything not confirmed on the Mac (in-flight/failed, or still-PENDING). Document pages
@@ -255,6 +264,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val r = withContext(Dispatchers.IO) { MacClient(ep).reachability() }
             if (r == com.archiveprocessor.capture.net.Reachability.OK) {
+                retirePreviousPairing()   // W23.m1: the Mac we were paired with owns nothing from here on
                 endpoint = ep
                 client = transportFor(ep)
                 prefs.saveEndpoint(ep)
@@ -290,6 +300,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  never-lose contract holds, so nothing is ever dropped waiting for the Mac. */
     fun connectCloud(ep: MacEndpoint, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
+            retirePreviousPairing()   // W23.m1: the Mac we were paired with owns nothing from here on
             endpoint = ep
             client = transportFor(ep)
             prefs.saveEndpoint(ep)
@@ -303,9 +314,22 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Best-effort: tell the Mac we're re-pairing so it re-shows the QR (there's no persistent
         // connection for it to notice the drop). Fire before clearing the client; ignore failure.
         client?.let { c -> viewModelScope.launch { withContext(Dispatchers.IO) { runCatching { c.sessionDisconnect() } } } }
+        retirePreviousPairing()
         prefs.clearEndpoint()
         endpoint = null
         client = null
+    }
+
+    /** W23.m1 — hand ownership of the queue to the next endpoint. Rotating the generation invalidates every
+     *  outstanding send: an acknowledgement arriving afterwards can no longer confirm a page, so it can
+     *  never license deleting the phone's only copy, and each dead send returns its page to the queue as it
+     *  unwinds. Cancelling stops those sends from uploading to a Mac that is no longer the destination —
+     *  best-effort, since a blocking POST already on the wire runs to completion (which is exactly why the
+     *  generation check, not the cancel, is what makes this safe). The reads and the cancels share one
+     *  main-thread turn, so a send started by the new endpoint can't be caught by them. */
+    private fun retirePreviousPairing() {
+        pairing.rotate()
+        (uploadJobs.values + segmentJobs.values).distinct().forEach { it.cancel() }
     }
 
     // ---- Capture ----
@@ -378,6 +402,19 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change. */
     private fun resendOrEnqueue(item: CapturedItem) {
         if (inFlightUploads.contains(item.id)) markNeedsResend(item.id) else enqueueUpload(item)
+    }
+
+    /** Return a page to the queue after a send that the pairing outlived (W23.m1): PENDING with no stale
+     *  resend marker, which is the state both [resumeUploads] and the auto-retry loop act on. Not a bare
+     *  state flip — [prepareDeferredResend] also clears a marker set while that dead send was in flight,
+     *  so the page is re-sent once, carrying its CURRENT fields, to the endpoint paired now. */
+    private fun markSendableAgain(id: Long) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i < 0) return
+        if (items[i].state == UploadState.PENDING && !items[i].needsResend) return
+        items[i] = items[i].prepareDeferredResend()
+        persist()
+        sendStatusReport()   // the newly paired Mac must count this page again — it still has to receive it
     }
 
     private fun markNeedsResend(id: Long) {
@@ -614,7 +651,8 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         val c = client ?: return
         // Gate: any page of this group not yet UPLOADED (PENDING/UPLOADING/FAILED) → wait for it.
         if (items.any { it.groupId == group && it.state != UploadState.UPLOADED }) return
-        if (!inFlightSegments.add(group)) return   // a send for this group is already running
+        val token = pairing.current
+        if (!inFlightSegments.claim(group, token)) return   // a send for this group is already running
         val segmentJob = viewModelScope.launch {
             try {
                 var ok = false; var attempt = 0
@@ -622,9 +660,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     ok = withContext(Dispatchers.IO) { c.segmentComplete(group, tags.priority, tags.year, tags.month, tags.seqs) }
                     attempt++
                 }
-                if (ok) { endedSegments.remove(group); persist() }
+                // Same ownership rule as the photo upload (W23.m1), same predicate so they can't drift: an
+                // ack from a Mac we have since unpaired from must NOT drop the segment — the Mac paired now
+                // has never heard of it, and only [endedSegments] would still make it deliver.
+                if (sendAck(ok, pairing.isCurrent(token)) == SendAck.CONFIRM) { endedSegments.remove(group); persist() }
             } finally {
-                inFlightSegments.remove(group)
+                inFlightSegments.release(group, token)
                 segmentJobs.remove(group)
             }
         }
@@ -656,13 +697,18 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Upload ----
 
     /** Ids currently being uploaded, so the auto-retry loop and a manual Retry can't both fire the same
-     *  item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). */
-    private val inFlightUploads = mutableSetOf<Long>()
+     *  item concurrently (double bandwidth + a racing ingest of the same filename on the Mac). Each claim
+     *  carries the pairing generation that started it, so a send the pairing outlived can be told apart
+     *  from the live one and can never free the live one's guard. */
+    private val inFlightUploads = OutstandingSends<Long>()
     private val uploadJobs = mutableMapOf<Long, Job>()
 
     private fun enqueueUpload(item: CapturedItem) {
         val c = client ?: return
-        if (!inFlightUploads.add(item.id)) return   // already uploading this id — don't double-send
+        // Stamp this send with the endpoint that owns it. `c` is captured for the whole send, so without
+        // the stamp a re-pair mid-upload leaves a coroutine talking to the old Mac with no way to tell.
+        val token = pairing.current
+        if (!inFlightUploads.claim(item.id, token)) return   // already uploading this id — don't double-send
         // Durable on the item, so retry / resume / autoRetry keep sending X-Replaces until it lands.
         val replaces = item.replacesGroupId
         setState(item.id, UploadState.UPLOADING)
@@ -682,6 +728,12 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                         attempt++
                     }
                 }
+                // W23.m1 — an acknowledgement is only the CURRENT Mac's to give. If the pairing rotated
+                // while this send was in flight (disconnect / re-pair), the endpoint that answered is not
+                // the destination any more: recording UPLOADED would both hide the page from the new Mac's
+                // queue and license deleting the phone's only copy. Bail out unconfirmed — the `finally`
+                // below returns the page to the queue for whichever Mac is paired now.
+                if (sendAck(ok, pairing.isCurrent(token)) == SendAck.REQUEUE_STALE) return@launch
                 setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
                 if (ok) {
                     sentCount += 1
@@ -714,8 +766,15 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 statusMessage = uploadSummary()
                 sendStatusReport()   // reflect the new un-sent count promptly (this upload just settled)
             } finally {
-                inFlightUploads.remove(item.id)
+                // Release only OUR claim: a send belonging to a retired pairing must never free the guard
+                // the current endpoint's send is holding. Both removals are in one main-thread turn (no
+                // suspension between them), so no newer send can be registered in the gap.
+                val wasOurs = inFlightUploads.release(item.id, token)
                 uploadJobs.remove(item.id)
+                // A send the pairing outlived — a stale ack, or one the re-pair cancelled — would otherwise
+                // leave the page UPLOADING, which neither resumeUploads nor the auto-retry loop re-sends.
+                // Put it back in the queue so it reaches the Mac that is actually paired now.
+                if (wasOurs && !pairing.isCurrent(token)) markSendableAgain(item.id)
             }
             resendItem?.let { enqueueUpload(it) }
         }

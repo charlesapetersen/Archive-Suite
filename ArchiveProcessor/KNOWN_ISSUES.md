@@ -4,6 +4,65 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.m1): re-pairing left an upload owned by the OLD Mac, and the phone deleted its copy on that Mac's ack
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
+2026-07-30 against `b31aa03` before a line was changed).
+
+**The defect.** Android `CaptureViewModel` had no notion of *which* Mac owned a send:
+1. `enqueueUpload` captures `val c = client` for the life of the coroutine (3 POST attempts).
+2. `disconnect()` cleared `prefs` / `endpoint` / `client` but cancelled **no** `uploadJobs`, cancelled no
+   `segmentJobs`, and invalidated **no** `inFlightUploads` entry.
+3. So after re-pairing, `resumeUploads()` → `enqueueUpload(item)` hit `inFlightUploads.add(item.id)` →
+   `false` (the id was still held by the dead send) and **returned immediately: the newly paired Mac was
+   never sent the page**, while the orphaned coroutine kept uploading through its captured old client.
+4. If that old Mac was still reachable and acknowledged, the handler ran unconditionally: `UPLOADED`,
+   `sentCount += 1`, and `delay(650); removeConfirmed(item)` → **the phone's copy was deleted** although the
+   Mac now paired had never received it. Not classified as data loss (the old Mac does hold a durable copy)
+   but a silent destination mismatch that contradicts the Capture requirement that disconnected items
+   re-upload to the **new** endpoint.
+5. The same hole existed for the segment-completion signal: `trySendSegmentComplete` dropped a group from
+   `endedSegments` on any `ok`, so an old-Mac ack meant the new Mac never heard about the document at all.
+
+**The fix — endpoint identity is now generational.** New pure, JVM-testable layer in `CaptureModels.kt`:
+- `PairingGeneration` — a monotonic token rotated by every pair **and** unpair (`retirePreviousPairing()`,
+  called from `disconnect()`, `connect()`'s success branch and `connectCloud()`), which also cancels every
+  outstanding upload/segment job. Cancelling is best-effort by nature (a blocking POST already on the wire
+  runs to completion), which is exactly why the *generation check*, not the cancel, is what makes this safe.
+- `OutstandingSends<K>` — the in-flight guard, now generation-stamped. `claim` still refuses a second send
+  for a key **even across a re-pair**, preserving W23.h4's invariant that only one coroutine ever holds a
+  photo file (the delete path's cancel-and-join depends on it). `release` frees only the caller's own claim,
+  so a retired send unwinding can never free the live endpoint's guard.
+- `sendAck(ok, tokenIsCurrent)` — the ownership rule in ONE place, shared by both kinds of send so they
+  cannot drift. Staleness deliberately outranks success: an `ok` from a Mac we are no longer paired with is
+  `REQUEUE_STALE`, never `CONFIRM` — because `CONFIRM` is what marks a page uploaded and therefore
+  deletable. The upload handler bails out before `setState(UPLOADED)` (so a crash in that window can't
+  persist a false confirmation either), and its `finally` returns the page to the queue via
+  `markSendableAgain` (`PENDING`, resend marker cleared, heartbeat re-counted) for the endpoint paired now.
+
+**No behaviour change when nothing re-pairs:** with the generation constant, `claim`/`release` are exactly
+the old `add`/`remove` and `sendAck` always yields the old CONFIRM/RETRY decision.
+
+**Regression:** `CapturePairingGenerationTest`, 8 cases (scratch only — one JVM temp file; the tests cannot
+see a corpus, a session, a Mac or the gallery), including a coroutine driver that runs the shipped objects
+through the real misroute sequence (upload on the wire → re-pair → old Mac acks) and asserts the phone copy
+survives, the page returns to `PENDING`, and the **new** Mac then receives it. Proven **non-vacuous** by
+neutering: dropping the staleness arm of `sendAck` turns 4 of the 8 RED, the driver test among them.
+Android suite **33/33** (was 25); `assembleDebug` + `testDebugUnitTest` BUILD SUCCESSFUL, **0 warnings**.
+No device or emulator was needed or used.
+
+**Two things deliberately left alone.** (a) The **iOS twin is PARKED** per §Project focus — verified still
+present by symbol (`ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift`: `disconnect()` nils
+`endpoint`/`client` without touching the `inFlightUploads` set or any upload task), recorded here rather
+than fixed. (b) The status **heartbeat** (`sendStatusReport` → conflated `statusChannel`) can still deliver
+one queued count to the Mac we just unpaired from; it is display-only on the Mac, carries no page bytes and
+licenses no deletion, so it is outside this fix. **Inherent, not a bug:** re-pairing part-way through a
+document leaves the already-confirmed pages on the old Mac and sends the rest to the new one — the phone's
+guarantee is that no page is destroyed without the Mac that is *currently* paired confirming it, and the
+old Mac's still-open group is closed by its own "Finish session" backstop.
+
+---
+
 ## ✅ FIXED (W23.h5): a placeholder-only PDF counted as archived, and finalize then retired the source photo
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed verbatim by symbol
