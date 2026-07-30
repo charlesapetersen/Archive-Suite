@@ -42,6 +42,52 @@ gate.
 multi-day unattended run isn't parked by an already-tracked issue. Remove `notes` from that list the
 moment the suite is green — a permanent warn tier is just a disabled test with extra steps.
 
+## ✅ FIXED (W23.m3): a note's inline image could be another note's file — Tier-2
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review); **premise re-confirmed on a scratch
+fixture 2026-07-30** before any code changed. Both asset stores resolved a Markdown image reference by
+`itemDir.appendingPathComponent(reference)` + `fileExists` — no `assets/` restriction, no component check,
+no canonical containment. A note body is a hand-editable, syncable `.md` file, so that reference is
+untrusted input: `![](../<OTHER_UUID>/assets/private.png)` returned the other item's bytes (asserted, not
+assumed). Worse than a visual boundary break — `EditorPassageSource.snapshotMarkdown` re-keys a passage's
+assets by **bare filename**, so copy → paste-into-extract could import those foreign bytes into a third
+item under a name that looks native. That is provenance corruption.
+
+**The fix** is one choke point, `Editor/AssetPathResolver.swift`, returning a typed `AssetResolution`
+(`resolved` / `missing` / `outOfBounds`) rather than an optional URL, behind two gates:
+1. **syntactic** — `assets/`-rooted, no `..`, not absolute / `~` / remote. Catches the reported traversal
+   before any file system access.
+2. **canonical containment** — `resolvingSymlinksInPath()` plus **component-wise** ancestry. This is the gate
+   a *symlink inside* `assets/` hits: `FileManager.fileExists` follows symlinks and `standardizedFileURL`
+   does **not** resolve them, so `assets/leak.png` → another item passes every string check. Component-wise
+   (not `hasPrefix`) so a sibling `assets-elsewhere/` can't masquerade as `assets`.
+
+`resolved` carries the **canonical** URL, so the byte read follows the already-resolved target — a symlink
+swapped in at the original path afterwards cannot redirect it. `EditorAssetStore` now requires `resolve`;
+`resolveAsset` remains a protocol-extension convenience returning nil for both `missing` and `outOfBounds`,
+which is what makes the extract path embed no foreign bytes. The renderer shows a refused reference as a
+distinct **"Blocked"** placeholder (vs "Missing" for a dangling one), with the rel-path preserved, so
+re-serializing never rewrites the note body.
+
+**Verified** (scratch temp stores only, never the real Notes store or the corpus): 19 tests —
+`AssetPathResolverTests` (11) and `InlineImageReadSeamTests` (8). Every escape case first asserts the bytes
+**are** reachable under the old rule, so each test documents the hole it closes: the reported `../OTHER`
+traversal, a traversal starting inside `assets/`, an escaping symlink, a symlink into `assets-elsewhere/`,
+non-`assets` / absolute / `~` / remote refs. In-bounds behaviour is pinned too (own asset, nested subdir,
+same-item symlink, symlink-aliased item dir, dangling ref still `missing`). 559/559 `ArchiveNotesTests`
+green, no new warnings.
+
+**Consequences worth knowing, not bugs:**
+- A **hand-authored reference outside `assets/`** — an image at the item root (`![](photo.png)`), or a
+  mis-cased `Assets/x.png` — now renders "Blocked" instead of loading. Deliberate: `<item>/assets/` is the
+  boundary this item specifies, every in-app writer (`addAsset` / `importAsset` / block thumbs) emits
+  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost.
+- **Hard links are undetectable** by any path-containment rule. An `assets/x.png` hard-linked to another
+  item's file still reads those bytes. Nothing in the app creates one.
+- **`W23.m11` is still open** and is now unblocked: the app-wide thumbnail cache is keyed by the *relative*
+  path, so two items' same-named assets still collide in the cache. `resolved`'s canonical URL is the key it
+  needs — this item deliberately did not change the cache key.
+
 ## ✅ FIXED (W23.h3): confirming a STALE folder-removal alert trashed a live note — Tier-2
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review); **premise re-confirmed empirically

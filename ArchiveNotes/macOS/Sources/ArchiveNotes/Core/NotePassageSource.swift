@@ -72,7 +72,10 @@ struct EditorPassageSource: PassageSelectionSource {
     /// Selected character ranges (UTF-16) in `rendered`; zero-length ranges ⟹ no selection.
     let selectedRanges: [NSRange]
     /// Resolve an `assets/…` relative path to its snapshot bytes (from the source note's asset
-    /// store), or nil when the asset is unavailable. Called on the main actor.
+    /// store), or nil when the asset is unavailable — including when the store **refuses** a reference
+    /// that escapes the source item's own `assets/` (W23.m3): an extract must never embed bytes this
+    /// note doesn't own, since `snapshotMarkdown` re-keys assets by bare filename. Called on the main
+    /// actor.
     let assetBytes: @MainActor (_ relativePath: String) -> Data?
 
     var blockRanges: [(blockIndex: Int, range: NSRange)] {

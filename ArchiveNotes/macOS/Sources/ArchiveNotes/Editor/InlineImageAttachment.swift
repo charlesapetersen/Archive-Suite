@@ -1,14 +1,26 @@
 import AppKit
 
 /// Protocol abstracting asset storage for the editor. The editor calls `addAsset` to persist
-/// pasted/dragged images and `resolveAsset` to load thumbnails from relative paths.
+/// pasted/dragged images and `resolve` to load thumbnails from relative paths.
 /// In production, backed by `NoteStore`; in tests, by a scratch-temp implementation.
 @MainActor
 protocol EditorAssetStore: AnyObject {
     /// Write `data` into the item's assets folder; returns the `assets/…` relative path.
     func addAsset(_ data: Data, preferredName: String) throws -> String
-    /// Resolve a relative asset path (e.g. `assets/photo.png`) to an absolute file URL, or nil.
-    func resolveAsset(_ relativePath: String) -> URL?
+    /// Resolve a Markdown asset reference (e.g. `assets/photo.png`) **contained** to the item's own
+    /// `assets/` directory — see `AssetPathResolver`. The reference is untrusted (a note body is a
+    /// hand-editable file), so an escape must come back as `.outOfBounds`, never as a URL (W23.m3).
+    func resolve(_ relativePath: String) -> AssetResolution
+}
+
+extension EditorAssetStore {
+    /// Convenience for callers that only want a readable URL: a `missing` **or** refused reference is
+    /// nil. On the passage/extract path that means no bytes are embedded — the Markdown reference still
+    /// survives, so nothing is silently rewritten.
+    func resolveAsset(_ relativePath: String) -> URL? {
+        if case .resolved(let url) = resolve(relativePath) { return url }
+        return nil
+    }
 }
 
 // MARK: - Inline image attachment
@@ -18,23 +30,37 @@ protocol EditorAssetStore: AnyObject {
 /// re-serializing never loses the reference.
 final class InlineImageAttachment: NSTextAttachment {
 
+    /// Why no thumbnail is shown. The two cases look different on screen so the operator can tell a
+    /// dangling reference from one the read seam **refused** (W23.m3) — a refusal is a data-provenance
+    /// signal, not a missing file.
+    enum Placeholder: Equatable {
+        /// Nothing readable at an in-bounds `assets/…` path (dangling ref, or a write still in flight).
+        case missing
+        /// The reference points outside this item's `assets/` — never opened, never read.
+        case outOfBounds
+    }
+
     /// The `assets/…` relative path stored on disk.
     let relativePath: String
 
     /// Alt text for the Markdown `![alt](path)` syntax.
     let altText: String
 
-    init(relativePath: String, altText: String = "", thumbnail: NSImage? = nil) {
+    /// Which placeholder is being shown, or nil when a real thumbnail loaded.
+    let placeholder: Placeholder?
+
+    init(relativePath: String, altText: String = "", thumbnail: NSImage? = nil,
+         placeholder: Placeholder = .missing) {
         self.relativePath = relativePath
         self.altText = altText
+        self.placeholder = thumbnail == nil ? placeholder : nil
         super.init(data: nil, ofType: nil)
         if let thumbnail {
             self.image = thumbnail
             let size = constrainedSize(thumbnail.size)
             self.bounds = CGRect(origin: .zero, size: size)
         } else {
-            // Missing-asset placeholder
-            self.image = Self.placeholderImage
+            self.image = Self.placeholderImage(placeholder)
             self.bounds = CGRect(origin: .zero, size: CGSize(width: 64, height: 64))
         }
     }
@@ -55,7 +81,17 @@ final class InlineImageAttachment: NSTextAttachment {
         return CGSize(width: original.width * ratio, height: original.height * ratio)
     }
 
-    private static let placeholderImage: NSImage = {
+    private static func placeholderImage(_ kind: Placeholder) -> NSImage {
+        switch kind {
+        case .missing: return missingImage
+        case .outOfBounds: return outOfBoundsImage
+        }
+    }
+
+    private static let missingImage = makePlaceholderImage(labelled: "Missing")
+    private static let outOfBoundsImage = makePlaceholderImage(labelled: "Blocked")
+
+    private static func makePlaceholderImage(labelled label: String) -> NSImage {
         let size = NSSize(width: 64, height: 64)
         let img = NSImage(size: size)
         img.lockFocus()
@@ -65,14 +101,14 @@ final class InlineImageAttachment: NSTextAttachment {
             .font: NSFont.systemFont(ofSize: 11),
             .foregroundColor: NSColor.secondaryLabelColor
         ]
-        let text = "Missing" as NSString
+        let text = label as NSString
         let textSize = text.size(withAttributes: attrs)
         text.draw(at: NSPoint(x: (size.width - textSize.width) / 2,
                               y: (size.height - textSize.height) / 2),
                   withAttributes: attrs)
         img.unlockFocus()
         return img
-    }()
+    }
 }
 
 // MARK: - Thumbnail generation + cache
@@ -164,9 +200,10 @@ final class ScratchAssetStore: EditorAssetStore {
         return "assets/\(target.lastPathComponent)"
     }
 
-    func resolveAsset(_ relativePath: String) -> URL? {
-        let url = root.appendingPathComponent(relativePath)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    /// Contained to `<root>/assets/` — the scratch store stands in for one item's directory, so it
+    /// enforces the same read-seam boundary the production store does (W23.m3).
+    func resolve(_ relativePath: String) -> AssetResolution {
+        AssetPathResolver.resolve(relativePath, inItemDirectory: root)
     }
 }
 
@@ -231,10 +268,14 @@ final class ItemAssetStore: EditorAssetStore {
         return "assets/\(name)"
     }
 
-    func resolveAsset(_ relativePath: String) -> URL? {
-        guard let id = itemID else { return nil }
-        let url = NoteStore.itemDir(root: root, id: id).appendingPathComponent(relativePath)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    /// Contained to the *targeted* item's own `assets/` (W23.m3): a note body is a hand-editable file,
+    /// so `![](../OTHER_UUID/assets/x.png)` must not resolve — it would render, and let copy/extract
+    /// snapshot, another item's bytes. With no target item there is no boundary to check against, so
+    /// nothing resolves.
+    func resolve(_ relativePath: String) -> AssetResolution {
+        guard let id = itemID else { return .missing }
+        return AssetPathResolver.resolve(relativePath,
+                                         inItemDirectory: NoteStore.itemDir(root: root, id: id))
     }
 
     /// Await all in-flight asset byte-writes (used by tests; a natural flush seam for a future

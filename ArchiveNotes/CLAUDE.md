@@ -204,10 +204,18 @@ macOS/Sources/ArchiveNotes/
                                    title/missing resolve into BlockHeaderAttachment (W7-S3)
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
-    InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path),
-                                   EditorAssetStore protocol, ScratchAssetStore (test impl),
-                                   ItemAssetStore (production: @MainActor sync name-reserve → async
-                                   NoteStore.writeReservedAsset byte-write; single name arbiter) (W7-S5)
+    InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path,
+                                   Missing/Blocked placeholder kinds), EditorAssetStore protocol
+                                   (resolve → AssetResolution; resolveAsset convenience),
+                                   ScratchAssetStore (test impl), ItemAssetStore (production:
+                                   @MainActor sync name-reserve → async NoteStore.writeReservedAsset
+                                   byte-write; single name arbiter) (W7-S5)
+    AssetPathResolver.swift        THE inline-image READ seam: resolves one ![](…) reference inside one
+                                   item's assets/ dir or refuses it — syntactic gate (assets/-rooted,
+                                   no .., not absolute/remote) + canonical containment
+                                   (resolvingSymlinksInPath + component-wise ancestry, so a symlink
+                                   inside assets/ can't escape). Typed AssetResolution; `resolved`
+                                   carries the canonical URL (W23.m3)
     NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
@@ -362,6 +370,18 @@ macOS/Tests/ArchiveNotesTests/
                                    attributed→md→attributed structural idempotency (per-char
                                    fingerprint), mid-paragraph unsupported-attr degrade, relative
                                    image-ref through bridge
+  AssetPathResolverTests.swift     11 tests (W23.m3): the read-seam resolver in isolation, on mktemp
+                                   items/{A,B} — reported ../OTHER traversal, traversal from inside
+                                   assets/, escaping symlink, symlink into a sibling assets-elsewhere/,
+                                   non-assets / absolute / ~ / remote refs all refused; own asset,
+                                   nested subdir, same-item symlink, symlink-aliased item dir resolve;
+                                   dangling ref stays .missing. Each escape case first asserts the bytes
+                                   ARE reachable under the pre-fix rule
+  InlineImageReadSeamTests.swift   8 tests (W23.m3): the resolver's two consumers honour it — renderer
+                                   shows Blocked (not another item's image) with rel-path + serialization
+                                   intact, Missing stays distinct, both placeholders draw differently;
+                                   ItemAssetStore/ScratchAssetStore containment, nil-itemID resolves
+                                   nothing; a passage snapshot embeds only the item's OWN bytes
   NotesFrontMatterTests.swift      9 tests (W8-S1): all-known-keys round-trip, unknown-key byte-for-byte
                                    (canonical) + repositioned-preserved, minimal-defaults, missing-id
                                    typed-throw, edge-whitespace-scalar characterization, + seeded

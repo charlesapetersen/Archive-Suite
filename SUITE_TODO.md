@@ -425,8 +425,30 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   hard-assume two pages** — this is that assumption. Distinct from **W18** (switching between PDF and
   separately exported JPEG references). | files: ArchiveReader/macOS/Sources/ArchiveReader/{Views/DocumentViewerModel,Core/DocumentFind}.swift | M | med | none
 
-- [ ] **W23.m3 — Notes inline-image resolution escapes the item directory and reads another item's asset
-  [S–M · MED · provenance corruption].** `Editor/MarkdownBridge.swift`, `Editor/InlineImageAttachment.swift`,
+- [x] **W23.m3 — Notes inline-image resolution escapes the item directory and reads another item's asset
+  [S–M · MED · provenance corruption].** ✅ DONE `6e72d33` (resolver + its tests) + this commit (wiring +
+  read-seam gate). Premise re-confirmed by symbol first, and both defects were live: `ItemAssetStore.resolveAsset`
+  and `ScratchAssetStore.resolveAsset` each did `appendingPathComponent(relativePath)` + `fileExists`, and a
+  scratch fixture proved `../<OTHER_UUID>/assets/private.png` really did return the other item's bytes.
+  Fixed with a new single choke point, `Editor/AssetPathResolver.swift`, returning a typed `AssetResolution`
+  (`resolved` / `missing` / `outOfBounds`) instead of a bare optional URL, behind **two** gates: (1) syntactic —
+  `assets/`-rooted, no `..`, not absolute/`~`/remote, which catches the reported traversal with no disk access;
+  (2) canonical containment — `resolvingSymlinksInPath()` + **component-wise** ancestry, which catches a symlink
+  *inside* `assets/` (invisible to every string check, since `fileExists` follows symlinks and
+  `standardizedFileURL` does not resolve them) and the `assets-elsewhere/` string-prefix trap. `resolved` carries
+  the **canonical** URL, so the byte read follows the already-resolved target (a later symlink swap at the
+  original path can't redirect it) — and that canonical URL is exactly the cache key **W23.m11** now needs.
+  `EditorAssetStore` requires `resolve` (both stores wired); `resolveAsset` survives as a protocol-extension
+  convenience so a refusal reads as nil on the copy/extract path — an extract embeds no foreign bytes, which is
+  the provenance half of the finding (`snapshotMarkdown` re-keys assets by *bare filename*). The renderer shows
+  a refused reference as a distinct **"Blocked"** placeholder (vs "Missing"), rel-path preserved, so serializing
+  never rewrites the note body. Tier-2 gate, scratch fixtures only: **19 new tests** (`AssetPathResolverTests`
+  11 + `InlineImageReadSeamTests` 8) — every escape case first asserts the bytes ARE reachable under the old
+  rule, so each test documents the hole it closes; 559/559 `ArchiveNotesTests` green, no new warnings.
+  Consequence recorded in `ArchiveNotes/KNOWN_ISSUES.md`: a hand-authored ref *outside* `assets/` (item-root, or
+  `Assets/` mis-cased) now renders Blocked rather than loading — deliberate per this item's fix spec, and
+  recoverable (move the file into `assets/`; nothing is rewritten).
+  `Editor/MarkdownBridge.swift`, `Editor/InlineImageAttachment.swift`,
   `Core/NotePassageSource.swift` → `ItemAssetStore.resolveAsset`. Markdown image paths are passed **unchanged**
   to `resolveAsset`, which appends the value to the item directory and only checks that the result **exists**
   — no `assets/` restriction, no component-boundary check, no canonical/symlink containment check. A raw or

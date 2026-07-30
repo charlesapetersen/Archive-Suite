@@ -239,17 +239,20 @@ enum MarkdownBridge {
             let tokenRange = (styled.string as NSString).range(of: ref.token)
             guard tokenRange.location != NSNotFound else { continue }
 
-            let thumbnail: NSImage?
-            if let store = assetStore, let url = store.resolveAsset(ref.path) {
-                thumbnail = InlineImageAttachment.loadThumbnail(
-                    from: url, cacheKey: ref.path
-                )
-            } else {
-                thumbnail = nil
+            // W23.m3 — the reference is untrusted input, so the store's containment verdict decides
+            // whether any bytes are read at all. A refused reference renders as a distinct "Blocked"
+            // placeholder (never another item's image), with the rel-path preserved either way.
+            let resolution = assetStore?.resolve(ref.path) ?? .missing
+            let thumbnail: NSImage? = switch resolution {
+            case .resolved(let url):
+                InlineImageAttachment.loadThumbnail(from: url, cacheKey: ref.path)
+            case .missing, .outOfBounds:
+                nil
             }
 
             let attachment = InlineImageAttachment(
-                relativePath: ref.path, altText: ref.alt, thumbnail: thumbnail
+                relativePath: ref.path, altText: ref.alt, thumbnail: thumbnail,
+                placeholder: resolution == .outOfBounds ? .outOfBounds : .missing
             )
             let attachStr = NSMutableAttributedString(attachment: attachment)
             attachStr.addAttribute(.noteImageRelPath, value: ref.path,
