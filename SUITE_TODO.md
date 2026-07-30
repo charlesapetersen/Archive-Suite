@@ -1197,6 +1197,33 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   bookmark store) — adversarial review; daemon-buildable (build + Reader unit tests, scratch-only). Restores
   coverage + removes the skip. | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/RootFolderStore.swift, Tests/ArchiveReaderTests/DeepLinkTests.swift, ops/autonomous/health-gate.sh | S–M | low | none
 
+## Notes test hardening (from the 2026-07-29 health-gate RED)
+- [x] **W23.flake1 — de-flake `NoteBodyEditorModelTests.supersededLoadIgnored` (it RED'd the health gate).**
+  The 2026-07-29 19:10 periodic gate went **RED on Notes** (708 passed / **1 failed**) and then **GREEN on the
+  daemon's retry against the identical commit `baa970a` with a clean tree** — same code, different result, i.e.
+  nondeterminism, not a regression. Cause: the test raced the two selections with `async let first = m.select(a)`
+  / `async let second = m.select(b)`, but **Swift does not specify which child task starts first.** When B started
+  first the model did the *correct* thing — B loaded, then A superseded it as the genuinely newest selection and
+  won — so the assertions (`loadedID == b`) failed spuriously with
+  `Expectation failed: (m.loadedID → …) == (b → …)`. **`NoteBodyEditorModel` was never at fault; the supersede
+  guard (monotonic `loadGeneration` re-checked after each `await`) is correct and is unchanged by this item.**
+  Fix (test-only): order the race deterministically — start A's slow `select` in a `Task`, spin on
+  `Recorder.loadCount` (bumped at the top of `load` *before* its sleep) until A is parked mid-load with
+  generation 1 captured, and only then `await m.select(b)`; assert `loadCount == 1` so a never-set-up race fails
+  loudly instead of vacuously passing. Also **added `slowUnsupersededLoadStillWins`**, which pins the mirror
+  ordering the old test hit by accident (a slow load that nothing supersedes must still win) — so the generation
+  guard is now proven to drop *superseded* loads only, never merely late ones. Net: the hazard keeps its coverage
+  and gains the complement. Verified: `NoteBodyEditorModelTests` **30/30 consecutive** runs green; full
+  `ArchiveNotesTests` bundle green (710 tests, was 709); test bundle builds with **0 new warnings**. Rarity is why
+  it surfaced only now — pre-fix, the single test passed **25/25** in isolation and the full bundle **4/4**, so
+  the gate's retry-once is what caught it. Tier-2 not triggered (no product code touched, no write path changed).
+  ⚠️ **Follow-up left open on purpose:** `NoteBodyEditorModel.flushPending`'s doc comment justifies keeping
+  `select`'s flush sequence *inline* because "the extra async frame ... perturbs the actor scheduling its
+  superseded-load race relies on" — that rationale was resting on the flaky test and is now stale. Whether
+  `select` should call `flushPending()` instead of duplicating the sequence is a real (small) Tier-2 refactor
+  decision on a note-body write path, so it is **not** bundled here.
+  | files: ArchiveNotes/macOS/Tests/ArchiveNotesTests/NoteBodyEditorModelTests.swift | S | low | none | done
+
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Morning Review walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
 Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended on this machine — but it is

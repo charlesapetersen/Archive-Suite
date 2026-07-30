@@ -122,12 +122,42 @@ struct NoteBodyEditorModelTests {
         rec.loadDelays[a] = .milliseconds(80)       // A loads slowly; B is fast
         let m = makeModel(rec)
 
-        async let first: Void = m.select(a)
-        async let second: Void = m.select(b)
-        _ = await (first, second)
+        // Order the two selections DETERMINISTICALLY: A's slow load must already be in flight when B
+        // supersedes it — that's the hazard. Swift does not specify which `async let` child starts
+        // first, so the previous `async let first/second` pair could run B→A instead, in which case A
+        // legitimately wins as the newest selection and the assertions below fail spuriously (it RED'd
+        // the 2026-07-29 health gate, which then passed on retry against the identical commit).
+        // `loadCount` ticks at the top of `Recorder.load` BEFORE its sleep, so seeing 1 means A is
+        // parked inside its load with generation 1 already captured.
+        let slowSelect = Task { await m.select(a) }
+        var spins = 0
+        while rec.loadCount == 0 && spins < 10_000 { await Task.yield(); spins += 1 }
+        #expect(rec.loadCount == 1, "A's load never started — the race was never set up")
+
+        await m.select(b)                           // supersedes the in-flight A (generation 1 → 2)
+        await slowSelect.value                      // let A's late load return and be dropped
 
         #expect(m.loadedID == b)
         #expect(m.markdown == "B-body")             // A's late load must not overwrite B
+    }
+
+    /// The mirror image of `supersededLoadIgnored`, and the ordering the old `async let` version of it
+    /// hit whenever the scheduler started B first. It is NOT a hazard — the newest selection is meant to
+    /// win even when it is the slow one — so pin it explicitly: the generation guard must drop only
+    /// *superseded* loads, never merely late ones.
+    @Test("a slow load that is NOT superseded still wins")
+    func slowUnsupersededLoadStillWins() async {
+        let a = UUID(), b = UUID()
+        let rec = Recorder([a: "A-body", b: "B-body"])
+        rec.loadDelays[a] = .milliseconds(80)       // the SECOND selection is the slow one
+        let m = makeModel(rec)
+
+        await m.select(b)
+        #expect(m.loadedID == b)
+        await m.select(a)                           // newest selection, slow load, nothing supersedes it
+
+        #expect(m.loadedID == a)
+        #expect(m.markdown == "A-body")
     }
 
     @Test("rapid edits coalesce into a single debounced save")
