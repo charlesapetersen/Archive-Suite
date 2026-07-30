@@ -83,9 +83,20 @@ above, now GREEN, asserting the note dir survives *and* that the valid F2 member
 cases covering both stale-pair variants and all three confirmed outcomes. Full Notes suite **540 tests / 64
 suites + 189 XCTest pass**; build clean, **0 new warnings**.
 
-**Residual (not data loss).** Two windows can still disagree *visually* for an instant — the losing window's
-folder list is stale until its `rebuild()`/`recompute()` lands. That is a refresh lag, not a destructive
-outcome: no path trashes a note without a proven `.deletedLastInstance`.
+**Residuals — recorded, not hidden.**
+
+1. *Refresh lag (harmless).* Two windows can still disagree *visually* for an instant — the losing window's
+   folder list is stale until its `rebuild()`/`recompute()` lands. Not a destructive outcome: no path trashes a
+   note without a proven `.deletedLastInstance`.
+2. *A replicate can still land in the gap before the trash* — queued as **W23.h3-fu** in `SUITE_TODO.md`.
+   `confirmDeletion` gets `.deletedLastInstance` and then `await`s `trashItems`; `@MainActor` is reentrant at
+   that `await` (the very mechanism this item turned on), so another window's drag-to-folder can add a
+   membership in between. The note is still trashed — correctly, it had zero memberships at verdict time — but
+   the new membership row is left pointing at a trashed note. **Strictly narrower than the bug fixed above:**
+   the window is sub-millisecond and the trash is recoverable (§5), whereas W23.h3 proper destroyed a note
+   whose other membership had been valid all along. The prototyped fix (a `hardDeleting` refcount guard on
+   `OrganizationStore` that makes `addMembership` refuse an item whose confirmed delete is in flight) is
+   preserved with the item.
 
 ## ✅ FIXED (W23.h2): two concurrent edits to one note silently overwrote each other — Tier-2
 

@@ -255,6 +255,27 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   confirmed outcomes. Full Notes suite **540 tests / 64 suites + 189 XCTest pass**; build clean, **0 new
   warnings**. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S–M | **high** | none
 
+- [ ] **W23.h3-fu — a replicate can still slip a live membership onto a note already on its way to the Trash
+  [S · LOW–MED · residual of W23.h3].** Filed 2026-07-30 while closing W23.h3 (`ae0e6eb`); **not** covered by
+  that fix. `NotesNavigationModel.confirmDeletion` gets `.deletedLastInstance` from
+  `OrganizationStore.removeConfirmedLastMembership` and then `await model.trashItems([id])`. Both are
+  `@MainActor`, but **`@MainActor` is reentrant at every `await`** — the same mechanism W23.h3 itself turned on —
+  so another window's drag-to-folder can run `addMembership(item:folder:)` in the gap between the verdict and
+  the trash. The note is still trashed (correctly: at verdict time it genuinely had zero memberships), leaving a
+  **membership row pointing at a trashed note** — the same dangling-org-graph symptom W23.h3's RED fixture
+  caught, in a much smaller window. Strictly narrower than W23.h3: the trash is recoverable (§5) and the window
+  is sub-millisecond, which is why it did not block that item.
+  **Fix (design already prototyped — do not redesign from scratch):** a hard-delete guard on `OrganizationStore`
+  — a `[UUID: Int]` refcount with `beginHardDelete` / `endHardDelete` / `isHardDeleting`, held across the whole
+  confirmed delete via `defer`, with `addMembership` **refusing** a guarded item (`MembershipError
+  .itemBeingDeleted`). The refcount (not a Bool) is what lets nested/overlapping guards compose. A working
+  version of exactly this exists in the preserved WIP at gitignored
+  `old/w23h3-stray-worktrees-20260730/suite-wt-20260730-074048-10923.patch` (an abandoned W23.h3 attempt whose
+  core fix was superseded by `8d68e13`, but whose guard is additive to it) — **lift the guard, re-verify it, and
+  make sure the caller balances every `begin` with an `end` on every exit path**, including the error path where
+  `trashItems` fails. Needs a deterministic fixture that replicates into the gap. Tier-2 (destructive seam,
+  scratch fixtures only, never the real store). | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S | low–med | none
+
 - [ ] **W23.h4 — Android permanently deletes an un-uploaded capture with no confirmation and no upload-job
   cancel [M · HIGH · data loss · Android].** `ui/CaptureScreen.kt` (thumbnail gesture) →
   `capture/CaptureViewModel.kt` (select → arm → delete cycle). The final tap deletes the local file **and**
