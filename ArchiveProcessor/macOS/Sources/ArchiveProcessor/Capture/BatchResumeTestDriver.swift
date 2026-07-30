@@ -375,22 +375,89 @@ enum BatchResumeTestDriver {
         check("non-finite/out-of-range runtime values fail closed",
               !OCRProcessor.pendingRunIsSelfConsistent(badScale))
 
+        // W16.cfg5: resume constructs the same SessionProcessingConfig every downstream seam consumes.
+        // Modern manifests overlay the persisted runtime snapshot; legacy run/batch records deliberately
+        // use current defaults for fields their old schemas never captured.
+        let resumeDefaultsSuite = "APBatchResume-\(UUID().uuidString)"
+        let resumeDefaults = UserDefaults(suiteName: resumeDefaultsSuite)!
+        defer { resumeDefaults.removePersistentDomain(forName: resumeDefaultsSuite) }
+        resumeDefaults.set(TaggingMode.none.rawValue, forKey: DefaultsKeys.taggingModeRaw)
+        resumeDefaults.set(RotationMode.llmMajority.rawValue, forKey: DefaultsKeys.rotationModeRaw)
+        resumeDefaults.set(false, forKey: DefaultsKeys.mergeDocuments)
+        resumeDefaults.set(42.0, forKey: DefaultsKeys.imageResolutionPercent)
+        resumeDefaults.set(9.0, forKey: DefaultsKeys.standardImageSizeMB)
+        resumeDefaults.set(6, forKey: DefaultsKeys.ocrWorkerCount)
+        resumeDefaults.set(7.0, forKey: DefaultsKeys.pdfImageSizeMB)
+        resumeDefaults.set(2, forKey: DefaultsKeys.textColumns)
+        resumeDefaults.set(8.0, forKey: DefaultsKeys.exportedImageSizeMB)
+        resumeDefaults.set(false, forKey: DefaultsKeys.outputImageFile)
+        resumeDefaults.set("Live Default", forKey: DefaultsKeys.tagVocabulary)
+
+        resumeDefaults.set(500.0, forKey: DefaultsKeys.imageResolutionPercent)
+        let clampedHighLegacyRunConfig = processor.makePendingRunResumeConfig(
+            run, apiKey: "legacy-key", defaults: resumeDefaults)
+        resumeDefaults.set(0.0, forKey: DefaultsKeys.imageResolutionPercent)
+        let clampedLowLegacyBatchConfig = processor.makePendingBatchResumeConfig(
+            batch, apiKey: "batch-key", defaults: resumeDefaults)
+        check("legacy resume configs retain the prior 1%...100% image-scale clamp",
+              clampedHighLegacyRunConfig.imageScale == 1.0
+              && clampedLowLegacyBatchConfig.imageScale == 0.01)
+        resumeDefaults.set(42.0, forKey: DefaultsKeys.imageResolutionPercent)
+
+        let resumedV2Config = processor.makePendingRunResumeConfig(
+            v2, apiKey: "resume-key", defaults: resumeDefaults)
+        check("v2 resume config restores persisted runtime values over contradictory current defaults",
+              resumedV2Config.provider == v2.provider
+              && resumedV2Config.model == v2.model
+              && resumedV2Config.apiKey == "resume-key"
+              && resumedV2Config.outputDirectory == outDir
+              && resumedV2Config.taggingMode == .copySource
+              && resumedV2Config.rotationMode == .off
+              && resumedV2Config.mergeDocuments
+              && !resumedV2Config.outputImageFile
+              && resumedV2Config.imageScale == 0.37
+              && resumedV2Config.standardImageMB == 4.5
+              && resumedV2Config.ocrWorkerCount == 2
+              && resumedV2Config.pdfImageMB == 1.5
+              && resumedV2Config.textColumns == 3
+              && resumedV2Config.exportedImageMB == 2.5)
+
+        let legacyRunConfig = processor.makePendingRunResumeConfig(
+            run, apiKey: "legacy-key", defaults: resumeDefaults)
+        check("legacy PendingRun resume config uses current normalized defaults plus persisted identity",
+              legacyRunConfig.provider == run.provider
+              && legacyRunConfig.model == run.model
+              && legacyRunConfig.apiKey == "legacy-key"
+              && legacyRunConfig.outputDirectory == outDir
+              && legacyRunConfig.taggingMode == .none
+              && legacyRunConfig.rotationMode == .llmMajority
+              && !legacyRunConfig.mergeDocuments
+              && !legacyRunConfig.outputImageFile
+              && legacyRunConfig.imageScale == 0.42
+              && legacyRunConfig.standardImageMB == 9
+              && legacyRunConfig.ocrWorkerCount == 6
+              && legacyRunConfig.pdfImageMB == 7
+              && legacyRunConfig.textColumns == 2
+              && legacyRunConfig.exportedImageMB == 8)
+
+        let legacyBatchConfig = processor.makePendingBatchResumeConfig(
+            batch, apiKey: "batch-key", defaults: resumeDefaults)
+        check("legacy PendingBatch resume config combines current defaults with persisted batch policy",
+              legacyBatchConfig.provider == batch.provider
+              && legacyBatchConfig.model == batch.model
+              && legacyBatchConfig.apiKey == "batch-key"
+              && legacyBatchConfig.outputDirectory == outDir
+              && legacyBatchConfig.taggingMode == .automatic
+              && legacyBatchConfig.outputImageFile
+              && legacyBatchConfig.rotationMode == .llmMajority
+              && legacyBatchConfig.standardImageMB == 9
+              && legacyBatchConfig.ocrWorkerCount == 6
+              && legacyBatchConfig.pdfImageMB == 7
+              && legacyBatchConfig.textColumns == 2
+              && legacyBatchConfig.exportedImageMB == 8)
+
         // Apply through the same method resumeRun uses, after deliberately setting contradictory live
-        // values. Restore process-global statics afterward so this env-gated test is self-contained.
-        let oldStandard = OCRProcessor.standardImageMB
-        let oldWorkers = OCRProcessor.ocrWorkerCount
-        let oldPDF = OCRProcessor.pdfImageMB
-        let oldColumns = OCRProcessor.textColumns
-        let oldExported = OCRProcessor.exportedImageMB
-        let oldRotation = OCRProcessor.rotationModeForRun
-        defer {
-            OCRProcessor.standardImageMB = oldStandard
-            OCRProcessor.ocrWorkerCount = oldWorkers
-            OCRProcessor.pdfImageMB = oldPDF
-            OCRProcessor.textColumns = oldColumns
-            OCRProcessor.exportedImageMB = oldExported
-            OCRProcessor.rotationModeForRun = oldRotation
-        }
+        // values. The process globals must remain untouched: cfg5 carries these values in the config.
         processor.taggingMode = .automatic
         processor.passSourceTags = false
         processor.rotationMode = .llmMajority
@@ -399,6 +466,14 @@ enum BatchResumeTestDriver {
         processor.tagVocabulary = []
         processor.exportOriginals = true
         processor.preGroupedBoundaries = []
+        let staticValuesBeforeApply = (
+            OCRProcessor.rotationModeForRun,
+            OCRProcessor.standardImageMB,
+            OCRProcessor.ocrWorkerCount,
+            OCRProcessor.pdfImageMB,
+            OCRProcessor.textColumns,
+            OCRProcessor.exportedImageMB
+        )
         processor.applyPendingRunRuntimeConfig(runtimeConfig())
         check("resume applies instance runtime settings instead of contradictory live UI values",
               processor.taggingMode == .copySource && processor.passSourceTags
@@ -407,13 +482,16 @@ enum BatchResumeTestDriver {
               && processor.tagVocabulary == ["Correspondence", "Receipts"]
               && processor.preGroupedBoundaries == [true, false]
               && processor.preGroupedTypes.map(\.rawValue) == ["box", "document"])
-        check("resume applies captured sizing/concurrency values instead of changed UserDefaults",
-              OCRProcessor.rotationModeForRun == .off
-              && OCRProcessor.standardImageMB == 4.5 && OCRProcessor.ocrWorkerCount == 2
-              && OCRProcessor.pdfImageMB == 1.5 && OCRProcessor.textColumns == 3
-              && OCRProcessor.exportedImageMB == 2.5)
-        let recaptured = processor.makePendingRunRuntimeConfig(imageScale: 0.37, gatewayConfig: nil)
-        check("run start captures every applied instance/static setting into one immutable snapshot",
+        check("resume no longer fans the six run settings back out to process-global statics",
+              OCRProcessor.rotationModeForRun == staticValuesBeforeApply.0
+              && OCRProcessor.standardImageMB == staticValuesBeforeApply.1
+              && OCRProcessor.ocrWorkerCount == staticValuesBeforeApply.2
+              && OCRProcessor.pdfImageMB == staticValuesBeforeApply.3
+              && OCRProcessor.textColumns == staticValuesBeforeApply.4
+              && OCRProcessor.exportedImageMB == staticValuesBeforeApply.5)
+        let recaptured = processor.makePendingRunRuntimeConfig(
+            imageScale: 0.37, gatewayConfig: nil, runConfig: resumedV2Config)
+        check("run config recaptures every applied instance/injected setting into one immutable snapshot",
               recaptured.taggingMode == .copySource && recaptured.passSourceTags
               && recaptured.rotationMode == .off && recaptured.reviewRotation
               && recaptured.mergeDocuments && !recaptured.exportOriginals

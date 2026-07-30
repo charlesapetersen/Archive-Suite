@@ -60,15 +60,9 @@ class OCRProcessor: ObservableObject {
     var reviewRotation = false
     // MARK: - Per-run configuration statics
     //
-    // Concurrency contract: these statics are WRITE-ONCE-per-run on the MainActor (via
-    // `loadStandardImageMB()` or direct assignment in `startProcessing`) BEFORE any child
-    // Task or `withTaskGroup` reads them. Because the writes happen on the @MainActor class
-    // and child tasks are spawned strictly after, Swift's structured-concurrency model
-    // guarantees a happens-before edge — the child task observes the written value. Only one
-    // processing run executes at a time (`isProcessing` gate), so no concurrent write is
-    // possible. `nonisolated(unsafe)` is intentional: the values must be readable from
-    // nonisolated `Task.detached` / `withTaskGroup` closures that perform OCR and PDF
-    // generation off the MainActor.
+    // W16.cfg5 moved every production run/diagnostic to explicit `SessionProcessingConfig` values.
+    // These compatibility fallbacks remain only for isolated drivers/legacy helper signatures and are
+    // deleted by W16.cfg6; production no longer writes them at run start or resume.
 
     /// The active run's rotation mode, readable from the nonisolated OCR call.
     nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
@@ -88,8 +82,8 @@ class OCRProcessor: ObservableObject {
     /// Target size (MB) for the separately-exported image file in two-file output (0 = full resolution).
     nonisolated(unsafe) static var exportedImageMB: Double = 0
 
-    /// Load run-time knobs from UserDefaults (standard size 3 MB, OCR workers 4, PDF-image 2 MB,
-    /// exported-image 3 MB) — call at run start, on @MainActor, before spawning any child task.
+    /// Compatibility helper retained for W16.cfg6 cleanup. Production uses
+    /// `SessionProcessingConfig.fromProcessFilesRunStart()` instead.
     static func loadStandardImageMB() {
         let v = UserDefaults.standard.double(forKey: DefaultsKeys.standardImageSizeMB)
         standardImageMB = v.isFinite && v > 0 ? min(20, max(0.5, v)) : 3.0

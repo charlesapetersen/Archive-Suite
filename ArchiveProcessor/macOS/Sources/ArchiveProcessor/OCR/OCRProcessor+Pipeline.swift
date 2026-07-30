@@ -233,8 +233,8 @@ extension OCRProcessor {
             && optionalParallelCounts.allSatisfy { $0 == 0 || $0 == fileCount }
     }
 
-    /// Capture the effective runtime values used by this run. Fresh runs supply their immutable config;
-    /// nil retains the static migration fallback for legacy callers until W16.cfg5/6.
+    /// Capture the effective runtime values used by this run. Production callers supply their immutable
+    /// config; nil retains only the compatibility fallback that W16.cfg6 will delete with the statics.
     func makePendingRunRuntimeConfig(
         imageScale: Double,
         gatewayConfig: GatewayConfig?,
@@ -266,8 +266,89 @@ extension OCRProcessor {
         )
     }
 
-    /// Apply exactly the values captured above. `pendingRunIsSelfConsistent` validates the snapshot before
-    /// this is called; the direct assignments intentionally avoid reading relaunch-time UserDefaults.
+    /// Build the single run config used by a resumed non-batch run. A v2 manifest overlays every persisted
+    /// runtime value onto the current builder; a legacy manifest has no such snapshot, so it intentionally
+    /// keeps the historical current-default fallback while restoring the identity fields it did persist.
+    func makePendingRunResumeConfig(
+        _ pending: PendingRun,
+        apiKey: String,
+        defaults: UserDefaults = .standard
+    ) -> SessionProcessingConfig {
+        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart(defaults)
+        runConfig.provider = pending.provider
+        runConfig.model = pending.model
+        runConfig.thinkingLevel = pending.thinkingLevel ?? .low
+        runConfig.apiKey = apiKey
+        runConfig.outputDirectory = pending.outputDirectory
+        runConfig.contextCharCount = pending.previousTextCharCount
+        runConfig.sendPreviousImage = pending.sendPreviousImage
+        runConfig.customOCRPrompt = pending.customPrompt ?? ""
+        runConfig.enableSegmentJSON = pending.enableSegmentJSON
+        runConfig.gateway = pending.gatewayConfig
+        runConfig.localAgent = pending.localAgent
+
+        if let runtime = pending.runtimeConfig {
+            runConfig.taggingMode = runtime.taggingMode
+            runConfig.rotationMode = runtime.rotationMode
+            runConfig.mergeDocuments = runtime.mergeDocuments
+            runConfig.tagVocabulary = runtime.tagVocabulary
+            runConfig.imageScale = runtime.imageScale
+            runConfig.standardImageMB = runtime.standardImageMB
+            runConfig.ocrWorkerCount = runtime.ocrWorkerCount
+            runConfig.outputImageFile = runtime.exportOriginals
+            runConfig.pdfImageMB = runtime.pdfImageMB
+            runConfig.exportedImageMB = runtime.exportedImageMB
+            runConfig.textColumns = runtime.textColumns
+        } else {
+            runConfig.imageScale = Self.liveImageScaleFraction(defaults)
+            if let exportOriginals = pending.exportOriginals {
+                runConfig.outputImageFile = exportOriginals
+            }
+        }
+        return runConfig
+    }
+
+    /// Paid-batch manifests predate the complete runtime snapshot. Rebuild their run config from current
+    /// defaults, then overlay every identity/output value the legacy format does persist.
+    func makePendingBatchResumeConfig(
+        _ pending: PendingBatch,
+        apiKey: String,
+        defaults: UserDefaults = .standard
+    ) -> SessionProcessingConfig {
+        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart(defaults)
+        runConfig.provider = pending.provider
+        runConfig.model = pending.model
+        runConfig.thinkingLevel = pending.thinkingLevel ?? .low
+        runConfig.apiKey = apiKey
+        runConfig.taggingMode = pending.taggingMode
+        runConfig.outputDirectory = pending.outputDirectory
+        runConfig.contextCharCount = 0
+        runConfig.sendPreviousImage = pending.sendPreviousImage
+        runConfig.customOCRPrompt = pending.customPrompt ?? ""
+        runConfig.imageScale = Self.liveImageScaleFraction(defaults)
+        runConfig.enableSegmentJSON = pending.enableSegmentJSON
+        runConfig.gateway = nil
+        runConfig.localAgent = nil
+        if let exportOriginals = pending.exportOriginals {
+            runConfig.outputImageFile = exportOriginals
+        }
+        return runConfig
+    }
+
+    /// Mirror a constructed legacy resume config onto the MainActor-owned controller state used by the
+    /// remaining UI/review code. The run's actual OCR/output consumers receive the config explicitly.
+    func applyResumeConfig(_ runConfig: SessionProcessingConfig) {
+        taggingMode = runConfig.taggingMode
+        passSourceTags = runConfig.taggingMode == .copySource
+        rotationMode = runConfig.rotationMode
+        mergeDocuments = runConfig.mergeDocuments
+        tagVocabulary = runConfig.tagVocabulary
+        exportOriginals = runConfig.outputImageFile
+    }
+
+    /// Apply exactly the instance/runtime-only values captured above. `pendingRunIsSelfConsistent`
+    /// validates the snapshot before this is called; sizing, scheduling, and rotation now travel through
+    /// `SessionProcessingConfig` instead of being fanned back out to process-global statics.
     func applyPendingRunRuntimeConfig(_ config: PendingRunRuntimeConfig) {
         taggingMode = config.taggingMode
         passSourceTags = config.passSourceTags
@@ -282,12 +363,6 @@ extension OCRProcessor {
         preGroupedYears = config.preGroupedYears
         preGroupedMonths = config.preGroupedMonths
         preGroupedSubjects = config.preGroupedSubjects
-        Self.rotationModeForRun = config.rotationMode
-        Self.standardImageMB = config.standardImageMB
-        Self.ocrWorkerCount = config.ocrWorkerCount
-        Self.pdfImageMB = config.pdfImageMB
-        Self.textColumns = config.textColumns
-        Self.exportedImageMB = config.exportedImageMB
     }
 
     /// The input file indices a resume must still process: everything NOT already in the manifest's
@@ -527,8 +602,8 @@ extension OCRProcessor {
     /// Live image-size-target fraction (0–1) from the resolution `@AppStorage`, defaulting to full size
     /// when unset. Used by batch resumes and legacy non-batch manifests that predate the v2 runtime
     /// snapshot; new non-batch resumes use their persisted scale instead.
-    static func liveImageScaleFraction() -> Double {
-        let pct = (UserDefaults.standard.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double) ?? 100
+    static func liveImageScaleFraction(_ defaults: UserDefaults = .standard) -> Double {
+        let pct = (defaults.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double) ?? 100
         return max(0.01, min(1.0, pct / 100.0))
     }
 
@@ -767,19 +842,8 @@ extension OCRProcessor {
         _takenOutputPaths = []
         exportedImageMap = [:]
         currentModel = pending.model
-        taggingMode = pending.taggingMode   // restore the mode used at submit (may differ from the live default after relaunch)
-        // Restore the dual-output (export sized original beside each PDF) behavior the run was submitted
-        // with. Only when the manifest persisted it — a legacy manifest (nil) keeps the live setting the
-        // caller already applied (resumePendingBatch), matching how PendingRun/resumeRun restore it.
-        if let e = pending.exportOriginals { exportOriginals = e }
-        // Apply this run's rotation mode + standard image size, exactly as resumeRun/startProcessing do —
-        // otherwise a resumed batch runs Vision/LLM rotation even when the user's mode is Off, and sizes
-        // against the wrong standard-image target.
-        Self.rotationModeForRun = rotationMode
-        Self.loadStandardImageMB()
-        // W16.cfg5 will construct this from persisted resume state. Until then, nil deliberately selects
-        // cfg2's static fallback so batch-resume behavior is unchanged in this migration checkpoint.
-        let runConfig: SessionProcessingConfig? = nil
+        let runConfig = makePendingBatchResumeConfig(pending, apiKey: apiKey)
+        applyResumeConfig(runConfig)
         activeRunConfig = runConfig
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         // Jobs carry the ORIGINAL source URLs (correct output names + tag targets). For PDF inputs the
@@ -815,7 +879,7 @@ extension OCRProcessor {
 
         // History snapshot for the resumed batch (see RunHistorySnapshot.init(resuming batch:…)).
         activeRunHistory = RunHistorySnapshot(
-            resuming: pending, rotationMode: rotationMode, imageScale: Self.liveImageScaleFraction())
+            resuming: pending, rotationMode: runConfig.rotationMode, imageScale: runConfig.imageScale)
 
         activeBatch = BatchContext(
             batchId: pending.batchId, apiKey: apiKey,
@@ -1000,27 +1064,21 @@ extension OCRProcessor {
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
         currentLocalAgent = pending.localAgent
-        let resumeImageScale: Double
-        let resumeGatewayUpstream: LLMProvider
-        // W16.cfg5 will construct this from `pending.runtimeConfig`. Keeping it nil in cfg2 intentionally
-        // preserves the already-validated static restoration below while every consumer becomes injectable.
-        let runConfig: SessionProcessingConfig? = nil
+        let runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
         activeRunConfig = runConfig
+        let resumeGatewayUpstream: LLMProvider
         if let config = pending.runtimeConfig {
             // V2: replay the immutable start-time snapshot. Self-consistency above has already validated
             // its version, ranges, parallel-array alignment, and identity fingerprint.
             applyPendingRunRuntimeConfig(config)
-            resumeImageScale = config.imageScale
             resumeGatewayUpstream = config.gatewayUpstreamProvider ?? .anthropic
         } else {
             // Legacy manifests did not record these settings, so preserve their historical live-setting
             // fallback. There is no honest way to reconstruct the values that were active before relaunch.
-            if let e = pending.exportOriginals { exportOriginals = e }
-            Self.rotationModeForRun = rotationMode
-            Self.loadStandardImageMB()
-            resumeImageScale = Self.liveImageScaleFraction()
+            applyResumeConfig(runConfig)
             resumeGatewayUpstream = Self.gatewayUpstreamProviderFromDefaults()
         }
+        let resumeImageScale = runConfig.imageScale
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
@@ -1145,7 +1203,8 @@ extension OCRProcessor {
                     enableCollectionSegmentation: pending.enableCollectionSegmentation,
                     confirmCollectionIDs: pending.confirmCollectionIDs,
                     reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
-                    customPrompt: pending.customPrompt
+                    customPrompt: pending.customPrompt,
+                    runConfig: runConfig
                 )
                 // Pre-OCRed path handles its own post-processing; skip to finalization
                 activePendingRun = nil
@@ -1357,6 +1416,7 @@ extension OCRProcessor {
                             customPrompt: segmentationContext.customPrompt,
                             imageScale: scale,
                             gatewayConfig: gateway, localAgent: localAgent,
+                            rotationMode: runConfig?.rotationMode,
                             standardImageMB: runConfig?.standardImageMB
                         )
                         return (index, result)
@@ -1389,6 +1449,7 @@ extension OCRProcessor {
                                 customPrompt: segmentationContext.customPrompt,
                                 imageScale: scale,
                                 gatewayConfig: gateway, localAgent: localAgent,
+                                rotationMode: runConfig?.rotationMode,
                                 standardImageMB: runConfig?.standardImageMB
                             )
                             return (idx, result)
@@ -1419,6 +1480,7 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
+                    rotationMode: runConfig?.rotationMode,
                     standardImageMB: runConfig?.standardImageMB
                 )
 
@@ -1431,6 +1493,7 @@ extension OCRProcessor {
                         customPrompt: segmentationContext.customPrompt,
                         imageScale: segmentationContext.imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
+                        rotationMode: runConfig?.rotationMode,
                         standardImageMB: runConfig?.standardImageMB
                     )
                 }
@@ -1627,15 +1690,27 @@ extension OCRProcessor {
         exportedImageMap = [:]
         pdfToImageMap = [:]
         removedSourceURLs = []
-        Self.rotationModeForRun = rotationMode
-        Self.loadStandardImageMB()
         var runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
-        // The Process Files controller is the authoritative run input (headless drivers intentionally
-        // configure it without mutating UserDefaults), so late review/output policy snapshots these
-        // exact controller values rather than rebuilding them after the OCR pass.
+        // The Process Files controller/arguments are the authoritative run input (headless drivers
+        // intentionally configure them without mutating UserDefaults), so every explicitly-threaded
+        // consumer observes this exact start-time snapshot.
+        runConfig.provider = provider
+        runConfig.model = model
+        runConfig.thinkingLevel = thinkingLevel ?? .low
+        runConfig.apiKey = apiKey
         runConfig.taggingMode = taggingMode
+        runConfig.rotationMode = rotationMode
         runConfig.mergeDocuments = mergeDocuments
+        runConfig.outputDirectory = outputDirectory
+        runConfig.contextCharCount = segmentationContext.previousTextCharCount
+        runConfig.sendPreviousImage = segmentationContext.sendPreviousImage
+        runConfig.customOCRPrompt = segmentationContext.customPrompt ?? ""
+        runConfig.imageScale = segmentationContext.imageScale
+        runConfig.enableSegmentJSON = enableSegmentJSON
+        runConfig.tagVocabulary = tagVocabulary
+        runConfig.gateway = gatewayConfig
         runConfig.outputImageFile = exportOriginals
+        runConfig.localAgent = localAgent
         activeRunConfig = runConfig
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
@@ -2063,7 +2138,8 @@ extension OCRProcessor {
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
             apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway,
-            localAgent: currentLocalAgent, standardImageMB: effectiveRunConfig?.standardImageMB)
+            localAgent: currentLocalAgent, rotationMode: effectiveRunConfig?.rotationMode,
+            standardImageMB: effectiveRunConfig?.standardImageMB)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

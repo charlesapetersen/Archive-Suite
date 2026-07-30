@@ -545,16 +545,21 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   trailing-closure compatibility, and the MainActor/detached-task boundary.
   | files: OCR/{OCRProcessor+OCR,OCRProcessor+Pipeline,OCRProcessor+ReviewFlows,OCRProcessor+Tagging}.swift,
     Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift | M | med | none
-- [ ] **W16.cfg5 — resume constructs a run config instead of fanning out to globals** (blocked-on: W16.cfg2, W16.cfg3) **[M].**
-  Replace the six assignments at `OCRProcessor+Pipeline.swift:280-285` (the only remaining global-write on a
-  non-run-start path) with construction of the run config from `PendingRunRuntimeConfig`; store it in
-  `activeRunConfig` and pass it through the cfg2/cfg3 seams. A legacy `PendingRun` and `PendingBatch` have no
-  persisted runtime config, so their `Pipeline:773, :997` paths must build one from current defaults (the same
-  values their present `loadStandardImageMB()` fallback uses), while fresh-run `Pipeline:1591` deletes its
-  redundant static fan-out. **Leave `pendingRunRuntimeConfigIsValid` (Pipeline:204-233)
-  unchanged — the manifest schema does NOT change, so do NOT bump `schemaVersion`.** `BatchResumeTestDriver.swift:411-426`
-  assertions will need rewriting to assert on the config rather than the statics.
-  | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- [x] **W16.cfg5 — resume constructs a run config instead of fanning out to globals** (blocked-on: W16.cfg2,
+  W16.cfg3) **[M].** DONE 2026-07-29 (this commit). Modern `PendingRun` resumes now reconstruct one
+  `SessionProcessingConfig` from the validated runtime snapshot; legacy `PendingRun` and `PendingBatch`
+  resumes combine their persisted identity/policy with the same current normalized defaults as before
+  (including the prior 1%…100% image-scale clamp). Every resume stores the non-nil snapshot in
+  `activeRunConfig` and threads it through OCR/PDF/retry/pre-OCRed/review/tag/export/merge seams. The six
+  resume assignments and fresh-run static fan-out are gone; fresh runs and standalone Tools diagnostics
+  pass rotation/size explicitly, so no production path depends on a stale process-global value. The
+  manifest validator and schema version are unchanged. `BatchResumeTestDriver` now asserts modern,
+  legacy-run, legacy-batch, malformed-default, and no-global-fan-out behavior. Debug build plus scratch
+  batch/non-batch recovery, manifest/config isolation, multi-page PDF, and merge/tag safety suites passed.
+  Tier-2 adversarial review found and closed the Tools static escape hatch, two missed run-config seams,
+  and the legacy image-scale clamp mismatch, then approved.
+  | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
+    Capture/{BatchResumeTestDriver,SessionProcessingConfig}.swift, Views/ToolsView.swift | M | med | none
 - [ ] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2, W16.cfg3, W16.cfg5) **[S].**
   The payoff commit: remove `OCRProcessor.swift:70/73/76/79/82/85`; delete the now-redundant
   `loadStandardImageMB()` and make every run start use cfg1's already-normalized

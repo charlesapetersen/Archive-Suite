@@ -34,8 +34,8 @@ struct SessionProcessingConfig: Sendable {
     /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
     var localAgent: LocalAgentConfig? = nil
 
-    /// Preserve the Process Files run-start normalization while the mutable statics are migrated to this
-    /// config in W16.cfg2/3/5/6.
+    /// Preserve the Process Files run-start normalization now used by every fresh and resumed production
+    /// path. W16.cfg6 only removes the remaining compatibility statics and optional fallbacks.
     static func normalizedImageMB(_ value: Double, fallback: Double) -> Double {
         value.isFinite && value > 0 ? min(20, max(0.5, value)) : fallback
     }
@@ -108,9 +108,9 @@ struct SessionProcessingConfig: Sendable {
         )
     }
 
-    /// Build the Process Files run snapshot with the exact normalization currently performed by
-    /// `OCRProcessor.loadStandardImageMB()`. W16.cfg2/3 use it across OCR, PDF generation, review,
-    /// tagging, export, and merge; W16.cfg5/6 remove the remaining resume/static fallbacks.
+    /// Build the Process Files run snapshot with the exact normalization historically performed by
+    /// `OCRProcessor.loadStandardImageMB()`. Fresh runs, resumes, and standalone diagnostics now inject
+    /// these values across OCR, PDF generation, review, tagging, export, and merge.
     static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         var config = fromDefaults(d)
         config.standardImageMB = normalizedImageMB(

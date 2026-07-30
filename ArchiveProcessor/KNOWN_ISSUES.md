@@ -303,6 +303,15 @@ scratch manifest/config, merge-safety, and batch/non-batch resume regressions pa
 found and closed the remaining live decision gates, then approved. The remaining work is cfg5 (construct/store
 config on resume) and cfg6 (delete the fallback statics).
 
+**W16.cfg5 DONE 2026-07-29 (this commit):** every modern or legacy resume now constructs, stores, and threads a
+non-nil `SessionProcessingConfig`; the six resume-time global assignments and the fresh-run static fan-out are
+gone. Modern runs replay the validated persisted snapshot. Legacy run/batch records retain current-default
+fallback behavior, including the exact 1%…100% image-scale clamp, while persisted identity/output policy wins
+where available. Fresh OCR, retry, paid-batch materialization, pre-OCRed resume, and standalone Tools diagnostics
+all receive rotation/size explicitly. The manifest schema and validator did not change. Debug build and all
+targeted scratch regressions passed; adversarial review caught and closed the remaining call-path/default-edge
+gaps. Only cfg6 remains: remove the now-production-unused fallback statics and compatibility parameters/drivers.
+
 **Two claims below are STALE — corrected here so they aren't re-derived:**
 - *"`MacOSTagger` retains a global fallback for older call sites"* — the global exists (~13 sites use the
   implicit default) but it is **no longer `nonisolated(unsafe)`**: commit `5b58da8` made it an

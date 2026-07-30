@@ -194,13 +194,15 @@ struct ToolsView: View {
         let model = gateway?.asLLMModel() ?? selectedModel
         let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil
         let key = apiKey
+        let runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
         resolutionTask = Task {
             for scale in scales {
                 if Task.isCancelled { break }
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: provider, model: model,
                     thinkingLevel: thinking, apiKey: key,
-                    imageScale: Double(scale) / 100.0, gatewayConfig: gateway, localAgent: localAgent)
+                    imageScale: Double(scale) / 100.0, gatewayConfig: gateway, localAgent: localAgent,
+                    rotationMode: runConfig.rotationMode, standardImageMB: runConfig.standardImageMB)
                 if Task.isCancelled { break }
                 resolutionTestResults.append((scale: scale, text: result.text))
             }
@@ -215,13 +217,15 @@ struct ToolsView: View {
         showModelTestResults = true
         let entries = modelTestSelections
         let scale = imageScale / 100.0
+        let runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
         modelTestTask = Task {
             for entry in entries {
                 if Task.isCancelled { break }
                 let result = await OCRProcessor.performResolutionTestCall(
                     imageURL: imageURL, provider: entry.provider, model: entry.model,
                     thinkingLevel: entry.model.supportsThinking ? .low : nil,
-                    apiKey: entry.apiKey, imageScale: scale)
+                    apiKey: entry.apiKey, imageScale: scale,
+                    rotationMode: runConfig.rotationMode, standardImageMB: runConfig.standardImageMB)
                 if Task.isCancelled { break }
                 modelTestResults.append(ModelTestResult(
                     provider: entry.provider, model: entry.model,

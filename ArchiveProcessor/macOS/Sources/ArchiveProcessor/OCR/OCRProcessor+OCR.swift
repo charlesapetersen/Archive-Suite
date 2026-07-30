@@ -321,6 +321,7 @@ extension OCRProcessor {
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: pageResults.last?.text, previousImageURL: nil,
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
+                        rotationMode: runConfig?.rotationMode,
                         standardImageMB: runConfig?.standardImageMB
                     )
                 }
@@ -867,7 +868,7 @@ extension OCRProcessor {
         // M4 perf fix: detect rotation concurrently (bounded) instead of serially.
         // handleOCRResult runs back on MainActor (serialized) for state updates;
         // its PDF gen is off-MainActor via M3.
-        let rotationMode = Self.rotationModeForRun
+        let rotationMode = runConfig?.rotationMode ?? Self.rotationModeForRun
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
@@ -986,6 +987,7 @@ extension OCRProcessor {
                 customPrompt: segmentationContext.customPrompt,
                 imageScale: segmentationContext.imageScale,
                 gatewayConfig: gateway, localAgent: localAgent,
+                rotationMode: runConfig?.rotationMode,
                 standardImageMB: runConfig?.standardImageMB
             )
 
@@ -1003,6 +1005,7 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
+                    rotationMode: runConfig?.rotationMode,
                     standardImageMB: runConfig?.standardImageMB
                 )
             }
@@ -1055,6 +1058,7 @@ extension OCRProcessor {
                         previousText: nil, previousImageURL: prevImageURL,
                         customPrompt: customPrompt, imageScale: imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
+                        rotationMode: runConfig?.rotationMode,
                         standardImageMB: runConfig?.standardImageMB
                     )
                     return (index, result)
@@ -1089,6 +1093,7 @@ extension OCRProcessor {
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: customPrompt, imageScale: imageScale,
                             gatewayConfig: gateway, localAgent: localAgent,
+                            rotationMode: runConfig?.rotationMode,
                             standardImageMB: runConfig?.standardImageMB
                         )
                         return (idx, result)
@@ -1189,9 +1194,9 @@ extension OCRProcessor {
         if let code = result.errorCode, code == "408" || code == "504" { return true }
         return false
     }
-    /// Single-image OCR + concurrent rotation detection, merged into one result. Live Capture passes
-    /// its immutable session values explicitly; W16.cfg2 does the same for fresh Process Files runs,
-    /// with the static retained only for resume/legacy callers until W16.cfg5/6 complete the migration.
+    /// Single-image OCR + concurrent rotation detection, merged into one result. Live Capture, Process
+    /// Files, resumes, retries, and Tools diagnostics pass immutable run values explicitly. The optional
+    /// static fallback remains only as W16.cfg6 migration compatibility.
     nonisolated static func performOCRCall(
         imageURL: URL,
         provider: LLMProvider,
@@ -1334,6 +1339,7 @@ extension OCRProcessor {
                 previousText: nil,
                 previousImageURL: nil,
                 gatewayConfig: gateway, localAgent: localAgent,
+                rotationMode: runConfig?.rotationMode,
                 standardImageMB: runConfig?.standardImageMB
             )
 
@@ -1353,7 +1359,9 @@ extension OCRProcessor {
         thinkingLevel: ThinkingLevel?, apiKey: String,
         imageScale: Double,
         gatewayConfig: GatewayConfig? = nil,
-        localAgent: LocalAgentConfig? = nil
+        localAgent: LocalAgentConfig? = nil,
+        rotationMode: RotationMode,
+        standardImageMB: Double
     ) async -> OCRResult {
         await performOCRCall(
             imageURL: imageURL, provider: provider, model: model,
@@ -1361,7 +1369,9 @@ extension OCRProcessor {
             previousText: nil, previousImageURL: nil,
             imageScale: imageScale,
             gatewayConfig: gatewayConfig,
-            localAgent: localAgent
+            localAgent: localAgent,
+            rotationMode: rotationMode,
+            standardImageMB: standardImageMB
         )
     }
 }
