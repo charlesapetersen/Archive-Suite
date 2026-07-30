@@ -54,9 +54,24 @@ move: same root GUID, new absolute path, one re-grant — never a silent wrong f
   → unknown-GUID negative → guarded teardown. `rm -rf` refuses any path that is not the exact scratch
   fixture or a `mktemp` copy.
 
+## Where these run (2026-07-30)
+
+`ArchiveNotesUITests` runs **off-screen in the headless Tart VM**, not on the owner's display —
+`ops/gui/vm-gui-runner.sh` interactively, and `ops/autonomous/gui-vm-gate.sh` in the periodic health gate
+(Notes joined the Reader lane on 2026-07-30). The scratch fixture is built **inside the VM** on demand by
+`scripts/make-notes-fixture.sh`, so none of the rules above are relaxed: it is still a sibling of the real
+store, still never the corpus.
+
+The **unit** suite (`ArchiveNotesTests`) is app-hosted — it launches `ArchiveNotes.app` — but the app renders
+nothing when it is only a unit-test host (ArchiveCore `ArchiveTestHost`, pinned by
+`TestHostWindowSuppressionTests`). That is a *screen*-safety guarantee, not a file-safety one; every rule above
+still applies unchanged.
+
 ## Permissions caveat (do not false-pass)
 
 `cliclick` pointer input silently no-ops unless the **controlling process holds macOS Accessibility
 permission** (and Screen Recording for window capture). An unattended run without these must **skip** the
 cliclick-only checks and flag them, never report them as passed. XCUITest additionally needs the
-`taskport` debugger right password-free to run unattended (see the run's plan).
+`taskport` debugger right password-free to run unattended (see the run's plan). This is now moot for
+unattended runs in practice — they cannot reach the host cliclick path at all
+(`.claude/hooks/no-host-gui.sh`), and VNC-injected input in the VM bypasses guest TCC entirely.

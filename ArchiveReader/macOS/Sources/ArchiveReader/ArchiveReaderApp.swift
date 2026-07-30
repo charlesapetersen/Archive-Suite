@@ -19,14 +19,27 @@ struct ArchiveReaderApp: App {
 
     @StateObject private var deepLinkRouter = DeepLinkRouter()
 
+    /// Demote the process when it is only acting as a unit-test host, so `xcodebuild test
+    /// -only-testing:ArchiveReaderTests` never takes the owner's screen (→ `ArchiveTestHost`).
+    init() { MainActor.assumeIsolated { ArchiveTestHost.suppressWindowsIfUnitTestHost() } }
+
     var body: some Scene {
+        // Under a unit-test host the navigation window renders `HiddenWindowStub` instead of its real
+        // content, so nothing reaches the owner's screen (→ `ArchiveTestHost`). The branch has to live
+        // here in the `ViewBuilder` rather than around the scenes: `SceneBuilder` has no `buildEither`,
+        // so a conditional at scene level doesn't compile. The document `WindowGroup` below needs no
+        // guard — it never auto-opens at launch.
         Window("Archive Reader", id: WindowID.navigation) {
-            NavigationWindowView()
-                .environmentObject(deepLinkRouter)
-                .onOpenURL { url in
-                    NSApp.activate(ignoringOtherApps: true)
-                    deepLinkRouter.handle(url)
-                }
+            if ArchiveTestHost.isUnitTestHost {
+                ArchiveTestHost.HiddenWindowStub()
+            } else {
+                NavigationWindowView()
+                    .environmentObject(deepLinkRouter)
+                    .onOpenURL { url in
+                        NSApp.activate(ignoringOtherApps: true)
+                        deepLinkRouter.handle(url)
+                    }
+            }
         }
         .commands { ArchiveReaderCommands() }
 

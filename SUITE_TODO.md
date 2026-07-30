@@ -1266,6 +1266,31 @@ Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended
 Review": the Anthropic key-wizard visual, the multi-page-PDF auto-re-OCR visuals, the three Notes **W14.4
 b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. Generalizing drains them off-screen.
 
+- [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
+  reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
+  command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine
+  `xcodebuild test -only-testing:<App>Tests` the daemon runs on nearly every session **launched the real app**
+  and parked a window on the owner's screen — measured from the health gate's `.xcresult`: **Reader 2m52s,
+  Notes 49s**, every session and every gate. The guardrails all aimed elsewhere, and two asserted the
+  opposite ("plain unit tests … no VM, no window"). Four layers shipped:
+  1. **Source fix** — ArchiveCore `ArchiveTestHost`: under `XCTestConfigurationFilePath` the app sets
+     `activationPolicy(.prohibited)` and every auto-opening `Window` renders `HiddenWindowStub` instead of its
+     real content (the branch lives in the `ViewBuilder`, because `SceneBuilder` has no `buildEither`). Pinned
+     by `TestHostWindowSuppressionTests` in **both** suites. Side effect: with no UI to build, the Reader unit
+     suite went **172s → ~2s**.
+  2. **Enforcement** — `.claude/hooks/no-host-gui.sh` (PreToolUse/Bash, live when `ARCHIVE_UNATTENDED=1`, which
+     the daemon now exports) hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/`capture-window.sh`/
+     `cliclick`/`osascript`, a windowed Android emulator, and the iOS Simulator — each denial naming the VM
+     route. Interactive sessions unaffected. Harness: `ops/autonomous/tests/prove-no-host-gui.sh` (24 cases).
+  3. **Honesty** — the GUI-VM gate had been reporting `✓ gui-vm` for a lane that ran **zero** tests since
+     2026-07-28: `tart ip --wait` returns on *networking*, but `tart exec` needs the Tart Guest Agent's vsock
+     socket, which comes up later, so every exec failed and the gate fail-opened with `exit 0`. Fixed both
+     halves — poll `tart exec true` until the agent answers, and exit **3 = SKIPPED** so `health-gate.sh`
+     prints `⊘ … SKIPPED — <reason>` and `— but NOT VERIFIED:` instead of a checkmark.
+  4. **Coverage** — `gui-vm-gate.sh` generalized to a per-app table and now runs **Reader + Notes** UITests in
+     the VM (`AUTONOMOUS_GUI_VM_APPS`), builds each app's fixture in the guest, mounts the gitignored fixture
+     corpus as its own `corpus:` share (so it works from a worktree), and wipes the guest Notes container
+     before each run (the `organization.json` INDEX-DB caveat).
 - [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
   three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
   scratch fixture builder and a 13/13 GUI-on baseline; Processor is greenfield **and** carries the Keychain risk).
@@ -1292,7 +1317,15 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     (Reader already writes a raw minimal PDF inline for its no-text-layer fixture — extend that to N text-bearing
     pages) so the lane is corpus-independent. If a real sample is ever wanted, mount it as a **read-only** third
     share — **never** mount anything under `~/Desktop/Google Drive`.
-  - [ ] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** `ArchiveNotesUITests`
+  - [ ] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** ⚠️ **Wiring is
+    DONE (2026-07-30, W21.screen): the Notes suite now runs in the gate — and it is NOT green: 5/12 fail**
+    (`ArchiveNotes/KNOWN_ISSUES.md` has the table). G6/G11 report "the reveal/zotero seam must be drivable"
+    (the hidden a11y probes aren't queryable in the VM — smells like editor focus / first-responder, not
+    logic); G3, G5, G8 fail without a captured message. The set **moves run to run** (4 then 5), so treat
+    flakiness as part of the bug. Held in the gate's **warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS=notes`) so it
+    reports every gate without parking the run — **remove `notes` from that list as the definition of done**.
+    The remaining original scope below (guest fixture, container reset) is already implemented in the gate.
+    `ArchiveNotesUITests`
     already exists (`macOS/project.yml`: `bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveNotes`, ad-hoc sign +
     `ENABLE_HARDENED_RUNTIME: NO`) and is in the scheme's test action; Debug already uses
     `ArchiveNotes.uitest.entitlements` and the fixture builder + `-ANUITestStorePath` override are shipped — so

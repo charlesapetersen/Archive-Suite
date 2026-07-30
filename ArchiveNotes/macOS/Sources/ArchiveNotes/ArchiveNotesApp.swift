@@ -17,18 +17,30 @@ struct ArchiveNotesApp: App {
     @StateObject private var zoteroStatus = ZoteroStatusModel(
         client: ZoteroClient(config: ZoteroSettingsStore.current.clientConfig))
 
+    /// Demote the process when it is only acting as a unit-test host, so `xcodebuild test
+    /// -only-testing:ArchiveNotesTests` never takes the owner's screen (→ `ArchiveTestHost`).
+    init() { MainActor.assumeIsolated { ArchiveTestHost.suppressWindowsIfUnitTestHost() } }
+
     var body: some Scene {
+        // Under a unit-test host both auto-opening windows render `HiddenWindowStub` instead of their
+        // real content, so nothing reaches the owner's screen (→ `ArchiveTestHost`). The branch has to
+        // live here in the `ViewBuilder` rather than around the scenes: `SceneBuilder` has no
+        // `buildEither`, so a conditional at scene level doesn't compile.
         Window("Archive Notes", id: NotesWindowID.notes) {
-            NotesBrowserView(kind: .note, model: notesModel)
-                .environmentObject(notesModel)
-                .environmentObject(deepLinkRouter)
-                .environmentObject(previewState)
-                .environmentObject(zoteroStatus)
-                .environmentObject(appDelegate.flushRegistry)   // W7-S6
-                .onOpenURL { url in
-                    NSApp.activate(ignoringOtherApps: true)
-                    deepLinkRouter.handle(url)
-                }
+            if ArchiveTestHost.isUnitTestHost {
+                ArchiveTestHost.HiddenWindowStub()
+            } else {
+                NotesBrowserView(kind: .note, model: notesModel)
+                    .environmentObject(notesModel)
+                    .environmentObject(deepLinkRouter)
+                    .environmentObject(previewState)
+                    .environmentObject(zoteroStatus)
+                    .environmentObject(appDelegate.flushRegistry)   // W7-S6
+                    .onOpenURL { url in
+                        NSApp.activate(ignoringOtherApps: true)
+                        deepLinkRouter.handle(url)
+                    }
+            }
         }
         .commands {
             FormatCommands()
@@ -40,11 +52,15 @@ struct ArchiveNotesApp: App {
             #endif
         }
         Window("Extracts", id: NotesWindowID.extracts) {
-            NotesBrowserView(kind: .extract, model: notesModel)
-                .environmentObject(notesModel)
-                .environmentObject(previewState)
-                .environmentObject(zoteroStatus)
-                .environmentObject(appDelegate.flushRegistry)   // W7-S6
+            if ArchiveTestHost.isUnitTestHost {
+                ArchiveTestHost.HiddenWindowStub()
+            } else {
+                NotesBrowserView(kind: .extract, model: notesModel)
+                    .environmentObject(notesModel)
+                    .environmentObject(previewState)
+                    .environmentObject(zoteroStatus)
+                    .environmentObject(appDelegate.flushRegistry)   // W7-S6
+            }
         }
         Settings { NotesSettingsView() }
     }

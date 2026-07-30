@@ -78,15 +78,32 @@ It parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log.
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
 at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/strided corpus.
 
-**Status (both follow-ups done 2026-07-28):** (a) ✅ the 5 toolbar UITests (`sidebar`/`tagCloud`/`preview`)
-that failed "multiple matching elements" (the app opens **two windows** → two toolbars) are fixed by a
-`toolbarButton(_:)` helper in `FixtureUITestCase` (window-scope to "Archive Reader" + prefer the hittable
-match) → **suite is 15/15 in the VM**. (b) ✅ daemon wiring landed as a **fail-open** health-gate step —
-`ops/autonomous/gui-vm-gate.sh` + a hook in `health-gate.sh`, **ON by default** (owner enabled 2026-07-28; set
-`AUTONOMOUS_GUI_VM=0` to disable): a missing VM / boot failure / timeout **skips** (never parks, so it's inert
-where no VM is built), and it REDs only on a reproducible `** TEST FAILED **` (retry-once). The gate's
-`GATE_MAXRUN` was raised to 50 min to absorb the ~15–20 min VM step. Sessions also verify view/interaction
-changes here off-screen — the old `gui-mode` flag was retired, GUI is unattended now (CLAUDE.md loop step 2 +
-resume-prompt STEP 3.5). Before relying
-on it, build the VM + run `gui-vm-gate.sh` once by hand. VM TCC grants live on the VM's disk (re-apply if the
-VM is rebuilt).
+**Status (2026-07-30):** the gate covers **every app with a UITest bundle** — Reader *and* Notes (Processor has
+no test target). Pick a subset with `AUTONOMOUS_GUI_VM_APPS="reader"`. **Reader is 15/15 in the VM; Notes is
+5/12 failing** on its first run there (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c), so Notes sits in the
+**warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`, default `notes`): it runs and reports every gate, but its
+failures WARN instead of RED so they can't park a multi-day run. Empty that list once a suite is green — a
+permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
+(`AUTONOMOUS_GUI_VM=0` disables); a missing VM / boot failure / guest-agent timeout **skips** (never parks), and
+it REDs only on a reproducible `** TEST FAILED **` (retry-once). `GATE_MAXRUN` is 50 min to absorb the VM step.
+Sessions also verify view/interaction changes here off-screen — the old `gui-mode` flag was retired, GUI is
+unattended now (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces*
+that for unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
+
+Two bugs found on 2026-07-30 that are worth not re-introducing:
+
+- **The guest-agent race (why the gate silently ran nothing).** `tart ip --wait` returns when the guest has
+  *networking*, but `tart exec` talks over a separate vsock control socket served by the Tart Guest Agent, which
+  comes up **later**. The gate exec'd immediately and got *"Failed to connect to the VM using its control socket
+  … is the Tart Guest Agent running?"*. Every exec in that run failed — including the fixture probe, which is why
+  the log also claimed the fixture was missing. The gate now **polls `tart exec true` until the agent answers**
+  (`AUTONOMOUS_GUI_VM_AGENTWAIT`, default 240s).
+- **Skip ≠ pass.** The gate used to `exit 0` for "skipped" as well as "passed", so `health-gate.sh` printed a
+  bare `✓ gui-vm` for a lane that had executed **zero tests**, and the reason went to a temp log shown only on
+  RED. It now exits **3 = SKIPPED**, and `health-gate.sh` prints `⊘ … SKIPPED — <reason>` and appends
+  `— but NOT VERIFIED: gui-vm` to the summary. Don't collapse that back into a two-state exit.
+
+**Fixtures** are built inside the VM on demand (idempotent, scratch-only, persisting on the VM disk):
+`ArchiveReader/scripts/make-gui-fixture.sh` → `AR-GUI-Fixture`, `ArchiveNotes/scripts/make-notes-fixture.sh` →
+`AN-GUI-Fixture`. Their source PDFs are **gitignored** (primary checkout only), so the gate mounts that corpus as
+its own `corpus:` share rather than reaching under the repo mount — which is what lets it run from a worktree.

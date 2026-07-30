@@ -38,8 +38,11 @@ this file is authoritative for Notes‑specific work.
   `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (notes + reader-page/Zotero/extract items,
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
-  library (scratch-only; reads tags to assert, never drives the store picker). The `ArchiveNotesUITests`
-  XCUITest suite (G0–G11) runs GUI-on. **README + check catalog + the owner-eye checks (G2 typing, G6/G11
+  library (scratch-only; reads tags to assert, never drives the store picker — **host-only, so unattended
+  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G11) runs **off-screen in the
+  Tart VM** — it joined the VM lane on 2026-07-30, so it is part of the periodic health gate
+  (`AUTONOMOUS_GUI_VM_APPS="reader notes"`) and the fixture is built inside the VM on demand.
+  **README + check catalog + the owner-eye checks (G2 typing, G6/G11
   external launch, chip-button clicks): [`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md).**
 - **Visual / render verification:** `ArchiveNotesUITests` asserts the accessibility tree, not pixels — it
   won't catch a PDF pane / page-thumbnail that renders blank. For the running app use the live sighted loop

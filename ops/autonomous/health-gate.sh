@@ -18,11 +18,37 @@ trap 'rm -f "$LOG"' EXIT
 # Run a named check; capture its output to $LOG; record a failure without aborting (no set -e).
 step() { local name="$1"; shift; printf '── %s ──\n' "$name"; if "$@" >>"$LOG" 2>&1; then echo "  ✓ $name"; else echo "  ✗ $name (rc=$?)"; fails="$fails $name"; fi; }
 
+# Like step(), but for a check that can legitimately be INCONCLUSIVE (exit 3 = skipped). A skip is not
+# a pass: it prints ⊘ with the reason and is named in the final summary line.
+#
+# WHY (2026-07-29, root-caused 2026-07-30): the GUI-VM lane failed to reach the VM's guest agent, ran
+# ZERO tests, fail-opened with exit 0 — and plain step() printed "✓ gui-vm". The gate reported GREEN
+# including a GUI lane that had never executed, and the reason was buried in $LOG, which is only shown
+# on RED. A gate that says ✓ for work it did not do is worse than no gate. Never collapse this back
+# into step().
+skips=""
+step_skippable() {
+  local name="$1"; shift; printf '── %s ──\n' "$name"
+  "$@" >>"$LOG" 2>&1; local rc=$?
+  case "$rc" in
+    0) echo "  ✓ $name" ;;
+    3) local why; why="$(grep -m1 'SKIPPED:' "$LOG" | tail -1)"
+       echo "  ⊘ $name SKIPPED — ${why:-no reason reported}"; skips="$skips $name" ;;
+    *) echo "  ✗ $name (rc=$rc)"; fails="$fails $name" ;;
+  esac
+}
+
 # UNIT tests only — `-only-testing:<UnitBundle>`, NOT the whole scheme. This is load-bearing for an UNATTENDED
 # gate: the schemes also contain UITest bundles (ArchiveReaderUITests / ArchiveNotesUITests), and running a
 # UITest pops the macOS "Enable UI Automation" / taskport prompt — which would HANG this gate (and, since the
 # daemon runs the gate synchronously, the whole daemon) and wake the owner. `./test-smoke.sh reader|notes`
 # runs the FULL scheme, so the gate does NOT use it; it invokes the unit bundle directly. (build is implied.)
+# NOTE — `-only-testing:<UnitBundle>` does NOT mean "no GUI". Both unit bundles are APP-HOSTED
+# (TEST_HOST = the .app), so this LAUNCHES the real app. Until 2026-07-30 that put a window on the owner's
+# screen for the whole run (Reader 2m52s, Notes 49s) on every gate — the daemon's single biggest screen
+# intrusion. Fixed at the source, not here: ArchiveCore `ArchiveTestHost` makes each app draw nothing when
+# it is only a unit-test host, pinned by TestHostWindowSuppressionTests in both suites. Side effect worth
+# knowing: with no UI to build, the Reader suite went 172s → ~2s. Don't "simplify" that away.
 # -skip-testing the ONE known-environmental failure: DeepLinkTests.testRevealAndSelectNoRoot fails whenever
 # this machine's shared com.archivereader.app defaults hold a persisted archiveRootBookmark (NavigationModel
 # resolves a root, so the "No archive folder" assertion fails) — it's env, not a regression, and without the
@@ -51,12 +77,14 @@ else
   echo "  ✓ coherence (clean tree)"
 fi
 
-# Run the Reader UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
+# Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
 # Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
-# set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / timeout SKIPs (so it's
-# inert where no VM is built); only a reproducible UITest failure REDs (park). The VM step adds ~15-20 min,
-# which is why the daemon's GATE_MAXRUN is 50 min. See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
-[ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
+# set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
+# (so it's inert where no VM is built); only a reproducible UITest failure REDs (park). Runs via
+# step_skippable, NOT step — a lane that ran zero tests must never print ✓ (see its comment).
+# The VM step adds ~15-20 min, which is why the daemon's GATE_MAXRUN is 50 min.
+# See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
+[ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
 
 echo
 if [ -n "$fails" ]; then
@@ -64,5 +92,13 @@ if [ -n "$fails" ]; then
   echo "--- failing output (tail) ---"; tail -40 "$LOG"
   exit 1
 fi
-echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + coherence)"
+# A skip never REDs the gate (infra must not park a healthy run) but it MUST be visible here — this
+# line is what lands in last-gate.log and what the owner reads. "GREEN" alone would claim coverage the
+# run does not have.
+if [ -n "$skips" ]; then
+  echo "HEALTH GATE: GREEN (builds + Reader/Notes suites + coherence) — but NOT VERIFIED:$skips"
+  echo "  ↳ the skipped lane(s) ran ZERO tests. Reason above; artifacts in ~/.tart-mirror/vm-artifacts/."
+  exit 0
+fi
+echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + coherence + GUI-VM UITests)"
 exit 0

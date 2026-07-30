@@ -16,8 +16,9 @@ STEP 1 — RECOVER STATE (always, first):
   checkbox directives describe the older single-commit "complete-then-tick" or "revert-on-blocker" flow, THIS
   PROMPT's checkpoint model supersedes them. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
   **GUI is unattended now — there is no `gui-mode` flag.** GUI work runs OFF the owner's screen in the headless
-  Tart VM (XCUITest + pixel capture; STEP 3.5), and Live-Capture E2E runs on the Android emulator — neither needs
-  the owner or the physical display. The only things the daemon must NOT auto-do are the hold-queue (owner-gated:
+  Tart VM (XCUITest + pixel capture; STEP 3.5), and Live-Capture E2E runs on the Android emulator with
+  `-no-window` — neither needs the owner or the physical display. **Nothing you run may draw on that display**;
+  a PreToolUse hook enforces it (STEP 3.5). The only things the daemon must NOT auto-do are the hold-queue (owner-gated:
   releases / SPEC / real-corpus / HIGH-risk findings) and `(blocked-on:)`-dependent items — both below.
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
@@ -128,7 +129,7 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
   For a change with a visible UI effect, verify it without ever touching the host display:
   * RENDER ("did the PDF / thumbnail / view actually draw"): the headless render guards
     (`DocumentRenderGuardTests` / `RenderProbe` in `ArchiveReaderTests`) render to pixels and assert non-blank —
-    plain unit tests in your build (no VM, no window). Always run these for a render change; never defer them.
+    plain unit tests in your build. Always run these for a render change; never defer them.
   * INTERACTION / whole-window: run the app's UITests in the headless Tart VM (off-screen, via VNC — never the
     host display). Reader: `ops/gui/vm-gui-runner.sh xcuitest` (builds + runs `ArchiveReaderUITests` in the VM;
     screenshots land in `~/.tart-mirror/vm-artifacts/` — READ them to eyeball a render). Any other app: the SAME
@@ -138,7 +139,14 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
   Never point a test at the real corpus — scratch/TESTOUT/mktemp only (file safety).
   Do NOT drive the app on the HOST screen — `./launch.sh` + `scripts/gui-drive.sh` / `ops/gui/capture-window.sh`
   (the retired host cliclick/osascript path) hijack the owner's physical display and are for INTERACTIVE owner
-  debugging only. The unattended daemon uses the VM (above) for every interaction check.
+  debugging only. The unattended daemon uses the VM (above) for every interaction check. This is now ENFORCED,
+  not just asked: `.claude/hooks/no-host-gui.sh` (a PreToolUse Bash hook, live whenever ARCHIVE_UNATTENDED=1 —
+  which the daemon always sets) hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/`capture-window.sh`/
+  `cliclick`/`osascript`, a windowed Android emulator (use `-no-window`), and the iOS Simulator. If you hit that
+  denial, do NOT engineer around it — take the VM route, or leave the item for the owner with a Morning Review
+  note. NOTE on the unit lane: `xcodebuild test -only-testing:<App>Tests` is app-HOSTED (it launches the .app),
+  but since 2026-07-30 the app draws nothing under a unit-test host (ArchiveCore `ArchiveTestHost`), so the unit
+  suites are screen-free — do not "fix" that by reintroducing a window.
 
 STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
   commit + push. This completing commit MUST also flip the shipped SUITE_TODO.md checkbox (cite the sha)

@@ -3,6 +3,40 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ OPEN: 5/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
+
+**Found 2026-07-30**, on the suite's first-ever run in the Tart VM (`ops/autonomous/gui-vm-gate.sh` gained
+a Notes lane that day; the 13/13 baseline was a **host, GUI-on** run from mid-July, so this is new
+information, not a regression from that day's work). Reader is 15/15 in the same VM run, so the lane
+itself is sound.
+
+Failing (identical across both attempts of the same run → **deterministic**, not flake; an earlier run
+without the guest container reset showed 4, so the reset matters):
+
+| Test | Symptom |
+|---|---|
+| `testG3_RawMarkdownToggleShowsSourceAndIsLossless` | `Element Button, {{1033.0, 425.0}, {11.0, 14.0}}, identifier: 'an.editor.rawToggle' … is not hittable` |
+| `testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes` | `Element Button, {{1032.5, 185.5}, {10.0, 10.0}}, identifier: 'an.locations.remove' … is not hittable` |
+| `testG6_RevealSourceBlockDispatchesReaderDeepLink` | `XCTAssertTrue failed - the reveal seam must be drivable (an.editor.test.reveal)` |
+| `testG11_ZoteroChipDispatchesSelectLink` | `XCTAssertTrue failed - the zotero seam must be drivable (an.editor.test.zoteroOpen)` |
+| `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` | `XCTAssertFalse failed - the Zotero fixture note should start without a reader-page block` |
+
+**Leads, not conclusions** — none of this is diagnosed yet, and nobody should conclude the app is broken
+from this entry alone:
+- The two *not hittable* elements are both tiny (11×14, 10×10) and both at **x ≈ 1033** — the same
+  horizontal band. That smells like window geometry / pane widths under the VM's 1920×1200 display
+  (`tart set … --display`) putting them under a divider or off the hittable area, rather than five
+  independent bugs. Check the persisted `@AppStorage` panel widths in the guest container first.
+- The two *seam must be drivable* failures mean the hidden a11y probes aren't queryable — plausibly editor
+  focus / first-responder, not logic.
+- G5 is different in kind: it's a **fixture-state** assertion (the Zotero note isn't starting clean), so
+  look at `make-notes-fixture.sh` output in the guest, not at the app.
+
+**Why it isn't parking the run.** The gate has a warn tier (`AUTONOMOUS_GUI_VM_WARN_APPS`, default
+`notes`): the suite still **runs and reports every gate**, but its failures WARN instead of RED, so a
+multi-day unattended run isn't parked by an already-tracked issue. Remove `notes` from that list the
+moment the suite is green — a permanent warn tier is just a disabled test with extra steps.
+
 ## ✅ FIXED (W23.h2): two concurrent edits to one note silently overwrote each other — Tier-2
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review). Every note edit was a

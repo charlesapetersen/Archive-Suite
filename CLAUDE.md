@@ -21,7 +21,10 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
    whole-window** checks, run them **off-screen in the Tart VM** (`ops/gui/vm-gui-runner.sh` — XCUITest + a VNC
    pixel capture; unattended-safe, never touches your display) in preference to the host sighted loop
    (`ops/gui/capture-window.sh` + `cliclick`, which hijacks the screen → interactive use only). See
-   [`ops/gui/README.md`](ops/gui/README.md).
+   [`ops/gui/README.md`](ops/gui/README.md). **The owner's screen is theirs**: an unattended session may not
+   draw on it at all, and `.claude/hooks/no-host-gui.sh` enforces that (→ [`AGENTS.md`](AGENTS.md) *GUI
+   verification*). Note the unit bundles are app-**hosted** — `xcodebuild test -only-testing:<App>Tests`
+   launches the real `.app` — but it renders nothing under a test host (ArchiveCore `ArchiveTestHost`).
 3. **Review by risk** — Tier-2 (adversarial review + a functional test) for anything with **no undo**:
    `Capture/`·`Net/`, file-writing tag/output, manifest/finalize, actor isolation, or the tag/PDF SPEC.
    Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*. For a

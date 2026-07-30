@@ -752,6 +752,13 @@ tick() {
   # alert credential. Strip the export attribute only — notify() (this shell) keeps the value, the child
   # cannot see it. Mirrors the CLAUDE*-scrub rationale below.
   export -n ALERT_URL ALERT_AUTH 2>/dev/null || true
+  # The session's "you are unattended" marker. `.claude/hooks/no-host-gui.sh` (a PreToolUse Bash hook)
+  # keys off this to hard-DENY anything that would put a GUI on the owner's physical display — host
+  # UITests, cliclick/osascript/launch.sh, a windowed Android emulator, the iOS Simulator — and points
+  # the session at the headless Tart VM lane instead. Exported LAST, after $STATE/env is sourced, so an
+  # operator edit to that file can't accidentally unset it. The owner's own interactive sessions never
+  # set it, so host GUI work stays available to a human who is actually watching the screen.
+  export ARCHIVE_UNATTENDED=1
 
   log "launching fresh resume session (backstop ${MAXRUN}s, budget \$$BUDGET, health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
