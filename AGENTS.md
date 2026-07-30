@@ -151,8 +151,12 @@ Simulator — always naming the VM route to take instead. Don't engineer around 
 leave the item for the owner. Interactive sessions are unaffected. **A hook only sees the command string, so
 a wrapper script slips past it** — that is how `./ArchiveNotes/test-smoke.sh` put ArchiveNotesUITests on the
 owner's screen on 2026-07-30. Two more layers close it: the smoke scripts restrict themselves to the unit
-bundle when unattended, and `ops/autonomous/bin/xcodebuild` (a PATH shim the daemon prepends) refuses any
-`xcodebuild test` without `-only-testing:`, at any nesting depth. Related: the unit suites are app-hosted
+bundle when unattended, and **`ops/autonomous/bin/` holds a PATH shim per screen-reaching binary** —
+`xcodebuild`, `open`, `osascript`, `cliclick`, `emulator` — which the daemon prepends, so the exec is caught
+at any nesting depth. Each refuses only the argv forms that draw (a whole-scheme `xcodebuild test`,
+`open -a`/`open *.app`, an AppleScript that drives an app, any `cliclick`, a windowed `emulator`) and passes
+everything else straight through. The **health gate** sets `ARCHIVE_UNATTENDED=1` itself, because it runs in
+the daemon loop where no PreToolUse hook applies. Related: the unit suites are app-hosted
 (they launch the real `.app`) but draw nothing since 2026-07-30 — ArchiveCore `ArchiveTestHost`.
 
 Rules while driving: point the app at a **scratch copy, never the real corpus** (choosing a folder clobbers the

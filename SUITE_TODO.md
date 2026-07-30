@@ -1445,6 +1445,18 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
      under `ARCHIVE_UNATTENDED=1` (so the documented command is *correct*, not just blocked), and
      `ops/autonomous/bin/xcodebuild` — a **PATH shim** the daemon prepends — refuses any `test` action
      without `-only-testing:` at any nesting depth. Hook pattern added too, as the fast third layer.
+  7. **Generalization pass across the whole suite (2026-07-30).** Audit of every app + script, not just the
+     two touched: the Processor's `scripts/test-smoke.sh` **launches the app with `open` and drives it with
+     `osascript`** and had no unattended guard; the **health gate runs in the daemon LOOP**, where no hook
+     applies and the session env is out of scope, so `AUTONOMOUS_GATE_OCR=1` would have opened the Processor
+     on the owner's screen with nothing in the way; and the PATH shim covered **`xcodebuild` only**, leaving
+     the wrapper hole open for every other mechanism. Fixed: `ops/autonomous/bin/` is now one shim per
+     screen-reaching binary (`xcodebuild`/`open`/`osascript`/`cliclick`/`emulator`), the gate declares
+     `ARCHIVE_UNATTENDED=1`, and the Processor smoke skips its launch step unattended. Clean by comparison:
+     `android-ui-drive.sh` already boots the emulator `-no-window`, and all three `launch.sh` are hook-matched.
+     A FORWARD tripwire in `prove-vm-lane.sh` (48 checks) now fails any app whose `project.yml` declares an
+     app-hosted unit-test bundle without adopting `ArchiveTestHost` — verified to actually fire against a
+     synthetic app, so the Processor is covered the day it gains a test target.
   6. **Adversarial audit of the whole lane** (2026-07-30) — 14 findings raised, 5 survived refutation, all
      fixed here: the warn tier had reintroduced the silent green (a reproducibly-failing suite exited 0 and
      printed `✓ gui-vm` with the failure list discarded → now **exit 4 = WARN**, rendered as `⚠ KNOWN

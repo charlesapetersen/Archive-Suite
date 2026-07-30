@@ -118,10 +118,10 @@ grep -q "\[ -d '\$fixture' \] ||" "$GATE" \
 echo "== 6. the xcodebuild PATH shim (catches a whole-scheme test at ANY nesting depth) =="
 # The hook sees only the Bash command string, so a wrapper script hides the xcodebuild inside it. The shim
 # sits on the child's PATH and intercepts the exec instead. Stub the real tool so nothing actually builds.
-SHIM="$ROOT/ops/autonomous/bin/xcodebuild"
+SHIM="$ROOT/ops/autonomous/bin/_gui-shim"
 [ -x "$SHIM" ] || no "shim missing/not executable at $SHIM"
 printf '#!/usr/bin/env bash\necho REAL_XCODEBUILD_RAN "$@"\n' > "$TMP/real"; chmod +x "$TMP/real"
-shim() { ARCHIVE_UNATTENDED="$1" ARCHIVE_REAL_XCODEBUILD="$TMP/real" bash "$SHIM" "${@:2}" 2>&1; }
+shim() { ARCHIVE_UNATTENDED="$1" ARCHIVE_REAL_TOOL="$TMP/real" bash "$ROOT/ops/autonomous/bin/xcodebuild" "${@:2}" 2>&1; }
 
 o="$(shim 1 test -scheme ArchiveNotes -destination platform=macOS)"
 case "$o" in *BLOCKED*) ok "unattended: whole-scheme 'test' refused" ;; *) no "unattended whole-scheme test was ALLOWED (got: ${o:0:80})" ;; esac
@@ -161,6 +161,49 @@ grep -q 'SS_WAS_RUNNING' "$RUNNER" \
   && ok "…but only if it did not exist before the boot (never kills the owner's own session)" \
   || no "viewer close is unscoped — it would quit a screen-share the owner had open"
 grep -q 'tart run "\$VM" --no-graphics' "$GATEF" && ok "gate boots --no-graphics (always silent)" || no "gate is not booting --no-graphics"
+
+echo "== 9. FORWARD tripwire: any app-hosted test bundle must suppress its window =="
+# The window-suppression fix is per-app opt-in (each App calls ArchiveTestHost in init()), so it does NOT
+# automatically cover an app that GAINS a test target later — and SUITE_TODO W21.vmgui-d plans exactly that
+# for the Processor. Rather than trust a future author to remember, assert the invariant: if a generated
+# project has a TEST_HOST, that app must adopt ArchiveTestHost and ship the suppression test. Skips apps
+# whose .xcodeproj isn't generated in this checkout (it's gitignored) — those are covered on any machine
+# that has built them.
+hosted_test_bundle() {   # $1 = project.yml — 0 if it declares an app-hosted unit-test target
+  python3 -c 'import re,sys
+t=open(sys.argv[1]).read()
+i=t.find("targets:")
+blocks=re.split(r"\n  (?=\S)", t[i:]) if i>=0 else []
+sys.exit(0 if any("bundle.unit-test" in b and "- target:" in b for b in blocks) else 1)' "$1"
+}
+for app in ArchiveReader ArchiveNotes ArchiveProcessor; do
+  spec="$ROOT/$app/macOS/project.yml"
+  [ -f "$spec" ] || { no "$app: no project.yml"; continue; }
+  # project.yml is authoritative and TRACKED. Reading the generated .xcodeproj instead would make this
+  # tripwire silently pass in a fresh clone — precisely where it must not.
+  if ! hosted_test_bundle "$spec"; then
+    ok "$app: no app-hosted unit-test bundle (nothing to suppress)"; continue
+  fi
+  grep -rq "ArchiveTestHost" "$ROOT/$app/macOS/Sources" 2>/dev/null \
+    && ok "$app: app-hosted -> adopts ArchiveTestHost" \
+    || no "$app has an app-hosted test bundle but never calls ArchiveTestHost — its unit suite will open a window on the owner's screen"
+  [ -f "$ROOT/$app/macOS/Tests/${app}Tests/TestHostWindowSuppressionTests.swift" ] \
+    && ok "$app: ships TestHostWindowSuppressionTests" \
+    || no "$app is app-hosted but has no TestHostWindowSuppressionTests — the suppression is unpinned"
+done
+
+echo "== 10. every host-GUI mechanism has a PATH shim (not just xcodebuild) =="
+BIN="$ROOT/ops/autonomous/bin"
+for t in xcodebuild open osascript cliclick emulator; do
+  [ -e "$BIN/$t" ] && ok "shim present: $t" || no "no shim for '$t' — a wrapper script can reach the screen through it"
+done
+# The health gate runs in the daemon LOOP, where no PreToolUse hook applies; it must declare itself.
+grep -q 'export ARCHIVE_UNATTENDED=1' "$ROOT/ops/autonomous/health-gate.sh" \
+  && ok "health-gate declares ARCHIVE_UNATTENDED (script self-guards apply to it)" \
+  || no "health-gate does not set ARCHIVE_UNATTENDED — AUTONOMOUS_GATE_OCR=1 would open the Processor on screen"
+grep -q 'ARCHIVE_UNATTENDED' "$ROOT/ArchiveProcessor/scripts/test-smoke.sh" \
+  && ok "Processor smoke skips its host launch step when unattended" \
+  || no "Processor smoke still runs 'open \$APP' + osascript unattended"
 
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"

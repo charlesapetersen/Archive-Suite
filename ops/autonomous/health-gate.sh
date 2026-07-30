@@ -12,6 +12,13 @@
 set -uo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "cannot cd to repo root $ROOT"; exit 2; }
+# The gate runs in the DAEMON LOOP, not in a `claude` session — so the PreToolUse hook does not apply to it
+# and the session's ARCHIVE_UNATTENDED is not in scope. Nothing was protecting it. But the gate is
+# unattended BY DEFINITION, so declare it: this activates every script-level self-guard it invokes (both
+# test-smoke.sh scripts, and the Processor's host launch step), and the PATH shims below catch the rest.
+# Concretely, without this `AUTONOMOUS_GATE_OCR=1` would open the Processor on the owner's screen.
+export ARCHIVE_UNATTENDED=1
+export PATH="$ROOT/ops/autonomous/bin:$PATH"
 LOG="$(mktemp)"; fails=""
 trap 'rm -f "$LOG"' EXIT
 

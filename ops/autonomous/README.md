@@ -174,9 +174,19 @@ paid Processor OCR smoke.
   ArchiveNotesUITests on the owner's display while the hook saw a string with no `xcodebuild` in it. Two
   layers behind it now: (a) both `test-smoke.sh` scripts run **only the unit bundle** when
   `ARCHIVE_UNATTENDED=1`, pointing at the VM for the UITests — the documented command is now *correct*, not
-  merely blocked; (b) `ops/autonomous/bin/xcodebuild`, a **PATH shim** the daemon prepends for the child,
-  refuses any `test` action lacking `-only-testing:` no matter how many scripts deep it is invoked.
-  Covered by `ops/autonomous/tests/prove-vm-lane.sh`. The other half of that guarantee is in the apps themselves: the
+  merely blocked; (b) **`ops/autonomous/bin/` — one PATH shim per screen-reaching binary** (`xcodebuild`,
+  `open`, `osascript`, `cliclick`, `emulator`, all symlinks to `_gui-shim`), prepended for the child, so the
+  exec is caught no matter how many scripts deep it happens. Shimming `xcodebuild` alone was the first cut
+  and left the same hole for every other mechanism — the Processor's smoke test reaches the screen with
+  `open` + `osascript`, not xcodebuild.
+  Two more places this had to generalize: the **health gate** runs in the daemon LOOP, where no PreToolUse
+  hook applies and the session's env is out of scope, so it now exports `ARCHIVE_UNATTENDED=1` itself
+  (without which `AUTONOMOUS_GATE_OCR=1` opens the Processor on the owner's screen); and the **Processor
+  smoke** skips its host launch step when unattended, as Reader's and Notes' already do.
+  Covered by `ops/autonomous/tests/prove-vm-lane.sh`, which also carries a FORWARD tripwire: any app whose
+  `project.yml` declares an app-hosted unit-test bundle must adopt `ArchiveTestHost` and ship
+  `TestHostWindowSuppressionTests`. Window suppression is per-app opt-in, so that assertion is what makes it
+  cover the Processor the day it gains a test target (W21.vmgui-d). The other half of that guarantee is in the apps themselves: the
   unit bundles are app-hosted, so `xcodebuild test -only-testing:<App>Tests` launches the real `.app` — it now
   draws nothing under a test host (ArchiveCore `ArchiveTestHost` + `TestHostWindowSuppressionTests`).
 - **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is

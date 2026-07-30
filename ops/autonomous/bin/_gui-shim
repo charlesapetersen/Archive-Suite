@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# _gui-shim — PATH shims for unattended sessions. Symlinked as xcodebuild, open, osascript, cliclick and
+# emulator; it dispatches on $0. Not a tool: it inspects argv, refuses only the forms that draw on the
+# owner's physical display, and otherwise execs the real binary untouched.
+#
+# WHY A SHIM AND NOT (JUST) A HOOK. `.claude/hooks/no-host-gui.sh` matches the Bash tool's COMMAND STRING,
+# so it only sees what the model typed. On 2026-07-30 a session ran `./ArchiveNotes/test-smoke.sh` — no
+# `xcodebuild`, no `-only-testing` in that string — and the script's own whole-scheme `xcodebuild test`
+# drove ArchiveNotesUITests on the owner's screen. A wrapper defeats a string matcher at any depth. These
+# shims sit on the child's PATH and catch the exec itself.
+#
+# WHY FIVE NAMES, NOT ONE. The first cut shimmed `xcodebuild` alone, which left the identical wrapper hole
+# open for every other way of reaching the screen — and the suite really has them: the Processor's smoke
+# test launches the app with `open` and drives it with `osascript`. One shim per screen-reaching mechanism,
+# so the exec layer is closed for the whole class rather than for one instance of it.
+#
+# ACTIVE ONLY when ARCHIVE_UNATTENDED=1 — the owner's interactive sessions get the real tools, unchanged.
+#
+# A shim is still not a hard boundary (an absolute path like /usr/bin/open bypasses it), which is why the
+# scripts owning each dangerous step ALSO guard themselves. Hook + shim + source guard: increasing order of
+# reliability, decreasing order of how early you find out.
+
+TOOL="$(basename "$0")"
+
+# Resolve the real binary, excluding this directory so the shim can never recurse into itself.
+real_tool() {
+  local self_dir c
+  self_dir="$(cd "$(dirname "$0")" && pwd)"
+  for c in $(/usr/bin/which -a "$TOOL" 2>/dev/null); do
+    [ -x "$c" ] || continue
+    case "$(cd "$(dirname "$c")" 2>/dev/null && pwd)" in "$self_dir") continue ;; esac
+    echo "$c"; return 0
+  done
+  for c in "/usr/bin/$TOOL" "/opt/homebrew/bin/$TOOL"; do [ -x "$c" ] && { echo "$c"; return 0; }; done
+  return 1
+}
+REAL="${ARCHIVE_REAL_TOOL:-$(real_tool)}"
+[ -n "$REAL" ] || { echo "$TOOL: no real binary found behind the shim" >&2; exit 127; }
+
+# Interactive owner session -> get out of the way entirely.
+if [ "${ARCHIVE_UNATTENDED:-0}" != "1" ]; then exec "$REAL" "$@"; fi
+
+deny() {   # $1 = what happened, $2 = the off-screen route to take instead
+  cat >&2 <<EOF
+BLOCKED by ops/autonomous/bin/$TOOL (host-GUI shim, active because ARCHIVE_UNATTENDED=1)
+
+$1
+
+This is an unattended session; it may not draw on the owner's physical display.
+
+Do this instead: $2
+
+Do not work around this shim. If a check genuinely cannot run off-screen, leave it for the owner in the
+Morning Review list and pick another item.
+EOF
+  exit 74
+}
+
+case "$TOOL" in
+
+  xcodebuild)
+    # A `test` action with no `-only-testing:` runs the scheme's WHOLE test action, which for
+    # ArchiveReader/ArchiveNotes includes the *UITests bundle -> XCUITest on the host WindowServer.
+    # Everything else passes: build, build-for-testing, archive, clean, -showBuildSettings, and any
+    # `-only-testing:<App>Tests` unit run (app-hosted but windowless via ArchiveCore `ArchiveTestHost`).
+    has_test=0; has_only=0
+    for a in "$@"; do
+      case "$a" in
+        test|test-without-building) has_test=1 ;;
+        -only-testing|-only-testing:*) has_only=1 ;;
+      esac
+    done
+    if [ "$has_test" = 1 ] && [ "$has_only" = 0 ]; then
+      deny "A bare \`xcodebuild test\` runs the scheme's ENTIRE test action, including the UITest bundle —
+that drives the real app on the owner's display for minutes and raises the \"Automation Running\" banner." \
+"unit tests -> add '-only-testing:<App>Tests' (app-hosted, but windowless).
+  UITests   -> ops/gui/vm-gui-runner.sh <reader|notes> xcuitest — the same tests, in the headless VM."
+    fi
+    ;;
+
+  open)
+    # `open -a Foo` / `open Foo.app` launches a GUI app. Plain `open <file>` is fine and common.
+    for a in "$@"; do
+      case "$a" in
+        -a)  deny "\`open -a\` launches a macOS app on the owner's display." \
+                  "launch it inside the VM — 'tart exec archive-gui-runner …' (ops/gui/README.md §3)." ;;
+        *.app|*.app/) deny "Opening a .app launches it on the owner's display." \
+                  "ops/gui/vm-gui-runner.sh <app> sighted launches and captures it off-screen." ;;
+      esac
+    done
+    ;;
+
+  osascript)
+    # Refuse only the forms that reach out and touch a running app. A pure computation is harmless, and
+    # blocking those wholesale would break unrelated scripting for no safety gain.
+    if printf '%s ' "$@" | grep -qiE 'tell application|System Events|activate|quit app|keystroke|click '; then
+      deny "This AppleScript drives a running application (tell application / System Events / activate /
+keystroke), which acts on the owner's screen and input focus." \
+"drive the app in the VM instead — ops/gui/vm-gui-runner.sh <app> sighted injects input over VNC."
+    fi
+    ;;
+
+  cliclick)
+    deny "cliclick injects real mouse/keyboard events into the owner's session. There is no safe
+unattended form of it." \
+"ops/gui/vm-gui-runner.sh <app> sighted — VNC-injected input, inside the VM."
+    ;;
+
+  emulator)
+    # The Live-Capture E2E needs a real Android emulator, but never a visible one: -no-window gives an
+    # identical, fully adb-driveable device. (android-ui-drive.sh already gets this right.)
+    if printf '%s ' "$@" | grep -qE '(^| )(@|-avd )' && ! printf '%s ' "$@" | grep -q -- '-no-window'; then
+      deny "Booting the Android emulator without -no-window puts a device window on the owner's display." \
+"add '-no-window' — adb injection and screenshots work identically headless."
+    fi
+    ;;
+esac
+
+exec "$REAL" "$@"

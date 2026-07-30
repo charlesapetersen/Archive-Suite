@@ -49,7 +49,15 @@ fi
 
 # ---------- 2. LAUNCH ----------
 say ""; say "[2/4] Launch smoke…"
-if [ -d "$APP" ]; then
+# This step LAUNCHES the Processor on the host display and drives it with System Events. That is fine when
+# a human is at the machine and useless-to-harmful when one isn't, so it is skipped for unattended runs
+# (2026-07-30, after the daemon put two different apps on the owner's screen the same morning). The build
+# check above and the OCR round-trip below — the parts that actually catch regressions — still run.
+if [ "${ARCHIVE_UNATTENDED:-0}" = "1" ]; then
+  say "  ⊘ SKIPPED (unattended): the launch smoke opens the app on the owner's display."
+  say "    Off-screen equivalent: ops/gui/vm-gui-runner.sh — but Processor has no UITest target yet"
+  say "    (SUITE_TODO W21.vmgui-d), so window-level verification is genuinely owner-only for now."
+elif [ -d "$APP" ]; then
   pkill -x ArchiveProcessor 2>/dev/null; sleep 1
   open "$APP"; sleep 5
   if pgrep -x ArchiveProcessor >/dev/null; then
