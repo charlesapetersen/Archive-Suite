@@ -236,7 +236,17 @@ record the iOS parity as parked — do not revive the iOS build to chase it.
   **never retire a source whose PDF carries a placeholder image page** (surface it instead, as W3.cap-r1 does
   for tags: still count the bytes, but do not destroy the original). **Not covered by W17.stg1** (that is
   staging-manifest integrity, not per-PDF content validity); the closed immutable-generation proposal does not
-  address malformed bytes. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/PDFGenerator,Capture/LiveCaptureProcessor,Capture/CaptureSession}.swift | M | **high** | none
+  address malformed bytes.
+  💡 **PRIOR ART EXISTS — read it before designing the fix (found 2026-07-29).** A 2026-07-17 Codex worktree,
+  removed on 2026-07-29 but preserved, already implements essentially the fix described above: a
+  `PDFGenerator.generateRequiringEmbeddedImage()` overload plus `PDFError.imageEmbeddingFailed(URL)`, which
+  **keeps** the deliberate placeholder for Process Files but makes the **Live Capture** path *throw* instead of
+  emitting a placeholder-only PDF that finalize would treat as grounds to retire the raw source. Two copies,
+  neither on `main`: branch **`wt/codex-processor-bugfixes-20260712`** and the patch series
+  `old/codex-processor-fixes-20260717/` (gitignored). ⚠️ It is **76 commits behind** and predates W16.cfg1–cfg5,
+  which rewrote these files — **re-derive against current `main`, do not merge or cherry-pick it blind.** Treat
+  it as a design reference that a second author already reached the same conclusion, not as a tested patch.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/PDFGenerator,Capture/LiveCaptureProcessor,Capture/CaptureSession}.swift | M | **high** | none
 
 ### MEDIUM
 
