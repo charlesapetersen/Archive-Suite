@@ -4,6 +4,45 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.h4): Android deleted an un-uploaded capture with no confirmation and no upload-job cancel
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol before
+fixing). The Android twin of the iOS bug closed on 2026-07-09 (further down this file) — the iOS fix was
+never ported, so `ArchiveCapture` still had no guard at all. `CaptureViewModel.deleteItem(id)` ran
+`runCatching { items[i].file.delete() }; items.removeAt(i)` unconditionally, on the third tap of the
+thumbnail select → arm → delete gesture. Two independent losses:
+1. **No confirmation.** A `PENDING`/`UPLOADING`/`FAILED` page exists ONLY on the phone, and an archival
+   photo can't be re-taken — one mistimed tap destroyed it silently.
+2. **No upload-job cancel.** The delete never touched `uploadJobs`. The upload coroutine opens the file
+   itself (`item.file.readBytes()` inside its own `withContext(Dispatchers.IO)`), so a delete that won that
+   race left `readBytes()` returning null → `ok=false` → **no Mac copy could ever exist**, and the `FAILED`
+   state write landed on an item already removed from the model, so nothing surfaced the loss.
+
+**Fixed** in three parts, with the policy pulled into pure `CaptureModels.kt` seams so it is provable on the
+JVM with no device:
+- **Confirm.** `requiresDeleteConfirmation(item)` — true unless the Mac has confirmed the bytes AND no
+  metadata resend is outstanding. Deliberately the SAME predicate `pendingReportCount` uses (it now
+  delegates to it), so "the Mac still needs this" and "losing this loses it forever" cannot drift apart.
+  An already-uploaded page still deletes on the third tap; anything else opens an `AlertDialog`.
+- **Cancel-and-join.** `retireCapture(uploadJob, file, retire)` `cancelAndJoin`s the item's upload BEFORE
+  the bytes go away, so the upload either completed or unwound while the file was still readable. The
+  `uploadJobs[id]` read and the `cancel()` happen in one main-thread turn (`viewModelScope` is
+  `Main.immediate`), so nothing can enqueue a replacement job into the gap.
+- **Recoverable retire.** The dialog's primary action is "Save to gallery & delete": the photo is copied to
+  Pictures/Archive Capture via the existing `PhoneBackup`, and the local file is removed ONLY once that copy
+  is confirmed written. A failed copy returns `KEPT_RETIRE_FAILED`, **keeps the photo**, and re-queues it
+  (its upload had been cancelled). "Delete permanently" remains available for a genuinely bad shot.
+
+Regression coverage: `CaptureDeletePolicyTest` (8 JVM cases, scratch temp files only). The cancel-and-join
+case is proven non-vacuous — swapping `cancelAndJoin()` for a bare `cancel()` turns it RED. Full Android
+unit suite 25/25; `assembleDebug` + `testDebugUnitTest` clean, 0 warnings.
+(`capture/{CaptureModels,CaptureViewModel}.kt`, `ui/CaptureScreen.kt`.)
+
+**Not covered here:** W23.m1 (re-pairing leaves an upload owned by the OLD Mac) is a separate finding on the
+same file and stays open.
+
+---
+
 ## ✅ FIXED (W23.h1): launch-time `pruneEmptySessions` hard-deleted the relay dir + any unrecognized content under the visible backup root
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; re-verified against `62a10d1` — worse than

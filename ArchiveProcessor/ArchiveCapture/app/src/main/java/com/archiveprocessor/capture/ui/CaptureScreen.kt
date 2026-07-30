@@ -87,16 +87,22 @@ fun CaptureScreen(vm: CaptureViewModel) {
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCam = it }
     LaunchedEffect(Unit) { if (!hasCam) permLauncher.launch(Manifest.permission.CAMERA) }
 
-    // "Save to phone" → shared gallery. API 29+ needs no permission; API ≤28 needs WRITE_EXTERNAL_STORAGE,
-    // requested here on tap, then the save runs on grant.
+    // Both gallery writers — "Save to phone" and the recoverable "Save to gallery & delete" — go through
+    // here. API 29+ needs no permission; API ≤28 needs WRITE_EXTERNAL_STORAGE, requested on tap and then
+    // the action runs on grant (held in pendingGalleryAction across the permission round-trip).
+    var pendingGalleryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val writeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) vm.saveToPhone() else vm.reportCaptureError("Storage permission denied — can't save a backup to the gallery. Enable it in Settings.")
+        val action = pendingGalleryAction
+        pendingGalleryAction = null
+        if (granted) (action ?: { vm.saveToPhone() }).invoke()
+        else vm.reportCaptureError("Storage permission denied — can't save a backup to the gallery. Enable it in Settings.")
     }
-    fun requestSaveToPhone() {
+    fun withGalleryAccess(action: () -> Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            vm.saveToPhone()
+            action()
         } else {
+            pendingGalleryAction = action
             writeLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
@@ -158,7 +164,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 Spacer(Modifier.weight(1f))
                 // Backup safety net: copy what's on the phone to the gallery if it won't transfer.
                 if (vm.items.isNotEmpty()) {
-                    TextButton(onClick = { requestSaveToPhone() }) { Text("Save to phone", color = Color.White) }
+                    TextButton(onClick = { withGalleryAccess { vm.saveToPhone() } }) { Text("Save to phone", color = Color.White) }
                 }
                 TextButton(
                     onClick = { showRepairConfirm = true },
@@ -279,6 +285,39 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 onCancel = { vm.cancelTagSheet() }
             )
         }
+    }
+
+    // W23.h4 — confirm before deleting a photo the Mac hasn't confirmed. The tap → X → delete gesture used
+    // to destroy it outright, so a mistimed third tap could take the only copy of an un-retakeable archival
+    // page. "Save to gallery & delete" is the recoverable route: the photo is copied to Pictures/Archive
+    // Capture first and KEPT if that copy fails. (An already-uploaded page never reaches this dialog — its
+    // bytes are durably on the Mac, so it still deletes on the third tap.)
+    val pendingDelete = vm.pendingDeleteId?.let { id -> vm.items.firstOrNull { it.id == id } }
+    if (pendingDelete != null) {
+        val what = when (pendingDelete.type) {
+            GroupType.DOCUMENT -> "page"
+            GroupType.BOX -> "box marker"
+            GroupType.FOLDER -> "folder marker"
+        }
+        AlertDialog(
+            onDismissRequest = { vm.cancelPendingDelete() },
+            title = { Text("Delete this $what?") },
+            text = {
+                Text("It hasn't reached the Mac yet, so deleting it here loses it forever — an archival " +
+                     "photo can't be re-taken. Save a copy to your gallery first, or delete it permanently.")
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { withGalleryAccess { vm.confirmDelete(retireToGallery = true) } }) {
+                        Text("Save to gallery & delete")
+                    }
+                    TextButton(onClick = { vm.confirmDelete(retireToGallery = false) }) {
+                        Text("Delete permanently", color = Color(0xFFD32F2F))
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { vm.cancelPendingDelete() }) { Text("Cancel") } }
+        )
     }
 
     // Confirm before clearing (deletes photos from the phone — destructive).

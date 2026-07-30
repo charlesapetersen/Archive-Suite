@@ -61,6 +61,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     var armed by mutableStateOf(false)   // second tap: delete-armed (shows an X)
         private set
 
+    /** The capture whose delete is waiting on the operator's confirmation (null = no dialog). A photo the
+     *  Mac hasn't confirmed exists ONLY on this phone and an archival page can't be re-taken, so the third
+     *  tap asks instead of destroying it. Mirrors the iOS guard (ArchiveProcessor/KNOWN_ISSUES.md,
+     *  2026-07-09); Android had no equivalent until W23.h4. */
+    var pendingDeleteId by mutableStateOf<Long?>(null)
+        private set
+
     /** Running count of photos confirmed received by the Mac this session (they then leave the phone). */
     var sentCount by mutableStateOf(0)
         private set
@@ -378,7 +385,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (i >= 0 && !items[i].needsResend) { items[i] = items[i].copy(needsResend = true); persist() }
     }
 
-    private fun clearSelection() { selectedItemId = null; armed = false }
+    /** Also drops any waiting delete confirmation: whatever cleared the selection (a new capture, a
+     *  reclassify, a Clear, the page leaving for the Mac) has invalidated the dialog's subject. */
+    private fun clearSelection() { selectedItemId = null; armed = false; pendingDeleteId = null }
 
     /** Show a brief transfer banner (auto-clears after a couple of seconds). */
     private fun flash(message: String) {
@@ -396,14 +405,94 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Third tap on an armed thumbnail. A page the Mac has already confirmed still goes immediately — its
+     *  bytes are durably on the Mac. Anything else exists ONLY here, so it stops for a confirmation. */
     fun deleteItem(id: Long) {
         val i = items.indexOfFirst { it.id == id }
-        if (i >= 0) {
-            runCatching { items[i].file.delete() }
-            items.removeAt(i)
+        if (i < 0) { clearSelection(); return }
+        if (requiresDeleteConfirmation(items[i])) { pendingDeleteId = id; return }
+        performDelete(id, retireToGallery = false)
+    }
+
+    /** Confirmation dismissed / Cancel — nothing is destroyed and the thumbnail stays armed. */
+    fun cancelPendingDelete() { pendingDeleteId = null }
+
+    /** Confirmation dialog action. [retireToGallery] copies the photo into the phone's shared gallery
+     *  (Pictures/Archive Capture) first and removes it only once that copy is written; false is the
+     *  operator explicitly choosing "Delete permanently". */
+    fun confirmDelete(retireToGallery: Boolean) {
+        val id = pendingDeleteId ?: return
+        pendingDeleteId = null
+        performDelete(id, retireToGallery)
+    }
+
+    /** Ids whose delete is running, so a fast re-tap can't start a second one against the same file. */
+    private val deletingItems = mutableSetOf<Long>()
+
+    /** Destroy one capture, safely. The item's upload is cancelled AND JOINED before the bytes go away
+     *  (see [retireCapture]): the upload coroutine opens the file itself, so a delete that wins that race
+     *  is the one way this app can lose a page with no copy anywhere — not on the phone, not on the Mac.
+     *  Runs off the main thread because the gallery copy is real file I/O. */
+    private fun performDelete(id: Long, retireToGallery: Boolean) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i < 0) { clearSelection(); return }
+        if (!deletingItems.add(id)) return   // a delete for this page is already running
+        val target = items[i]
+        val job = uploadJobs[id]
+        val app = getApplication<Application>()
+        clearSelection()                     // un-arm now: the X must not stay tappable during the join
+        if (retireToGallery) statusMessage = "Saving a copy to your gallery…"
+        else if (job != null) statusMessage = "Stopping the transfer…"
+        viewModelScope.launch {
+            try {
+                val outcome = retireCapture(job, target.file,
+                    retire = if (retireToGallery) { f -> PhoneBackup.saveJpegToGallery(app, f) } else null)
+                if (isClearing) return@launch   // Clear took the whole session while we were joining
+                when (outcome) {
+                    // The gallery copy failed, so this is still the only copy in existence — keep it.
+                    DeleteOutcome.KEPT_RETIRE_FAILED -> {
+                        statusMessage = "Couldn't save a copy to your gallery — the photo was kept. " +
+                            "Try \"Save to phone\", then delete again."
+                        requeueAfterKeptDelete(id)
+                    }
+                    DeleteOutcome.RETIRED_TO_GALLERY -> {
+                        removeDeleted(id, target.file)
+                        statusMessage = "Copied to your gallery (Pictures/Archive Capture) and removed"
+                    }
+                    DeleteOutcome.DELETED -> {
+                        removeDeleted(id, target.file)
+                        statusMessage = uploadSummary()
+                    }
+                }
+            } finally {
+                deletingItems.remove(id)
+            }
         }
-        clearSelection()
+    }
+
+    /** Drop a just-deleted capture from the model. Guarded by identity (id AND file) like
+     *  [removeConfirmed], so a delete that raced a Clear can never evict a different, newer photo. */
+    private fun removeDeleted(id: Long, file: File) {
+        val i = items.indexOfFirst { it.id == id && it.file == file }
+        if (i >= 0) items.removeAt(i)
+        if (selectedItemId == id) clearSelection()
         persist()
+        sendStatusReport()   // the Mac's "phone still has N to send" must not keep counting this page
+    }
+
+    /** A delete that ended up KEEPING the photo still cancelled its upload to get there — put it back in
+     *  the queue, or the page would sit in UPLOADING forever (auto-retry only re-sends PENDING/FAILED).
+     *  [prepareDeferredResend] rather than a bare state flip, so a page carrying a stale metadata marker
+     *  re-sends its CURRENT fields exactly once instead of twice. */
+    private fun requeueAfterKeptDelete(id: Long) {
+        val i = items.indexOfFirst { it.id == id }
+        if (i < 0) return
+        // If the upload actually landed before the cancel did, the Mac already has it — don't re-send.
+        if (!requiresDeleteConfirmation(items[i])) return
+        val restored = items[i].prepareDeferredResend()
+        items[i] = restored
+        persist()
+        enqueueUpload(restored)
     }
 
     /** A photo confirmed received by the Mac is durably safe there, so remove it from the phone

@@ -276,17 +276,32 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   `trashItems` fails. Needs a deterministic fixture that replicates into the gap. Tier-2 (destructive seam,
   scratch fixtures only, never the real store). | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S | low–med | none
 
-- [ ] **W23.h4 — Android permanently deletes an un-uploaded capture with no confirmation and no upload-job
-  cancel [M · HIGH · data loss · Android].** `ui/CaptureScreen.kt` (thumbnail gesture) →
-  `capture/CaptureViewModel.kt` (select → arm → delete cycle). The final tap deletes the local file **and**
-  the model item regardless of whether the photo is pending, uploading, or failed. It **neither confirms the
-  destructive action nor cancels/joins the item's upload job** — so if the delete wins the race before the
-  upload coroutine opens the file, **no Mac copy can ever exist.**
-  **Fix:** (a) require an explicit confirmation for any item not yet acknowledged-uploaded; (b) cancel-and-join
-  (or refuse) the item's in-flight upload job before deleting; (c) prefer a recoverable local retire over an
-  unconditional file delete. **Parity note:** `ArchiveProcessor/KNOWN_ISSUES.md` covers and fixes this bug
-  class **for iOS only** — port the guard's *shape* to Android; there is no Android equivalent today.
-  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{ui/CaptureScreen,capture/CaptureViewModel}.kt | M | **high** | none
+- [x] **W23.h4 — Android permanently deletes an un-uploaded capture with no confirmation and no upload-job
+  cancel [M · HIGH · data loss · Android].** ✅ **DONE** (policy layer `9281fcb`, wiring + trackers in this
+  commit). **Premise re-confirmed by symbol before fixing** (the review was 5 commits stale): `deleteItem(id)`
+  ran `runCatching { items[i].file.delete() }; items.removeAt(i)` unconditionally on the third tap of the
+  select → arm → delete gesture, and never touched `uploadJobs`. The upload coroutine opens the file itself
+  (`item.file.readBytes()` in its own IO context), so a delete winning that race left `ok=false` and **no Mac
+  copy could ever exist** — while the resulting `FAILED` state write landed on an item already gone from the
+  model, so nothing surfaced the loss. iOS has had this guard since 2026-07-09; Android had none.
+  All three prescribed parts landed, with the policy pulled into pure `CaptureModels.kt` seams so it is
+  provable on the JVM with no device: (a) `requiresDeleteConfirmation(item)` gates an `AlertDialog` on
+  anything the Mac hasn't confirmed — including an UPLOADED page with a pending metadata resend — and is
+  deliberately the SAME predicate `pendingReportCount` counts (which now delegates to it), so the two can't
+  drift; an already-confirmed page still deletes on the third tap. (b) `retireCapture` **cancel-AND-JOINs**
+  the item's upload before the bytes go away; the `uploadJobs[id]` read and the `cancel()` share one
+  main-thread turn (`viewModelScope` is `Main.immediate`), so no replacement job can slip into the gap, and a
+  delete that ends up keeping the photo re-queues it via `prepareDeferredResend`. (c) the dialog's primary
+  action is the **recoverable retire** — copy to Pictures/Archive Capture through the existing `PhoneBackup`,
+  delete the local file only once that copy is confirmed written, and **KEEP the photo** if it fails
+  (`KEPT_RETIRE_FAILED`); "Delete permanently" stays available for a genuinely bad shot.
+  Tier-2, scratch only (JVM temp files — the tests cannot see a corpus, a session or the gallery):
+  adversarial self-review (it caught a duplicate re-send on the keep path, fixed) + `CaptureDeletePolicyTest`,
+  8 new cases. The cancel-and-join case is proven **non-vacuous** — swapping `cancelAndJoin()` for a bare
+  `cancel()` turns it RED, GREEN with the join. Android unit suite **25/25**; `assembleDebug` +
+  `testDebugUnitTest` BUILD SUCCESSFUL, **0 warnings**. No device/emulator needed or used. Full write-up:
+  `ArchiveProcessor/KNOWN_ISSUES.md`. W23.m1 is a separate finding on the same file and stays open.
+  | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{ui/CaptureScreen,capture/{CaptureViewModel,CaptureModels}}.kt + app/src/test/.../CaptureDeletePolicyTest.kt | M | **high** | none
 
 - [ ] **W23.h5 — a placeholder-only PDF counts as successfully archived, and finalize then retires the source
   image [M · HIGH · data loss · tag/PDF SPEC-adjacent].** `OCR/PDFGenerator.swift` → `generate(...)`;
