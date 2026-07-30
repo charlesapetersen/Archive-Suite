@@ -83,9 +83,15 @@ all. So:
 - **xcuitest → `--no-graphics`** ("Don't open a UI window") — completely silent. The guest still has its own
   virtual display, which is why XCUITest works there; this only suppresses a *host* window. The health gate
   has always booted this way, which is why the gate never showed anything.
-- **sighted → `--vnc-experimental`**, and the runner then **closes the auto-opened viewer** (we read the
-  framebuffer over VNC ourselves) — but only if Screen Sharing was *not* already running before the boot, so
-  a screen-share session of your own is never torn down.
+- **sighted → `--no-graphics --vnc-experimental`.** The two flags **compose**, which is the clean answer:
+  tart still prints `VNC server is running at vnc://…` so `vncdotool` has a framebuffer to grab, and **no
+  viewer is ever opened** — better than opening a window and closing it, which flashes. (A scoped
+  `close_vm_viewer` remains as a guard in case a future tart reverts that behaviour; it only quits Screen
+  Sharing if it was not already running before the boot, so a session of your own is never torn down.)
+
+Both verified end to end on 2026-07-30 with no window on the host at any point: `xcuitest` →
+ArchiveReaderUITests **15/15** in the VM; `sighted` → `sighted-reader.png`, a real 2048×1536 capture of the
+Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).
 
 **GUI fixture:** fixtured Reader UITests need `ArchiveReader/scripts/make-gui-fixture.sh` (a tagged scratch
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it

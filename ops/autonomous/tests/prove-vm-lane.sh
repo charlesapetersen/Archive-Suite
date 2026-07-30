@@ -153,8 +153,9 @@ GATEF="$ROOT/ops/autonomous/gui-vm-gate.sh"
 # tart then opens Screen Sharing.app at it — a visible VM window (owner-reported 2026-07-30). The xcuitest
 # lane needs no pixels at all, so it must boot --no-graphics; only the sighted lane may use VNC.
 grep -q 'gfx=(--no-graphics)' "$RUNNER" && ok "runner defaults to --no-graphics" || no "runner does not default to --no-graphics"
-grep -q '\[ "\$LANE" = "xcuitest" \] || gfx=(--vnc-experimental)' "$RUNNER" \
-  && ok "runner uses VNC ONLY for the sighted lane" || no "runner boot mode is not per-lane"
+grep -q 'gfx=(--no-graphics --vnc-experimental)' "$RUNNER" \
+  && ok "sighted lane keeps --no-graphics alongside VNC (framebuffer, but no viewer ever opens)" \
+  || no "sighted lane drops --no-graphics — tart will auto-open Screen Sharing on the owner's display"
 grep -q 'close_vm_viewer' "$RUNNER" && ok "runner closes the auto-opened viewer" || no "runner leaves the Screen Sharing viewer open"
 grep -q 'SS_WAS_RUNNING' "$RUNNER" \
   && ok "…but only if it did not exist before the boot (never kills the owner's own session)" \

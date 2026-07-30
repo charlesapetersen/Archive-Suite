@@ -70,8 +70,9 @@ ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
 CORPUS_SRC="$(archive_corpus_src "$REPO")"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
-# Close the Screen Sharing window tart auto-opens at the VM's VNC endpoint (sighted lane only). We grab
-# the framebuffer with vncdotool from the host, so that viewer is pure noise on the owner's display.
+# Belt-and-braces: close a Screen Sharing window if one appears anyway. With `--no-graphics
+# --vnc-experimental` tart opens none (verified 2026-07-30), so this should be a no-op — it stays as a
+# guard in case a future tart changes that behaviour back.
 #
 # ONLY if WE caused it. Screen Sharing is a single app process shared by every session, so an unconditional
 # quit would tear down a screen-share the owner had open to another machine. So: snapshot whether it was
@@ -117,12 +118,18 @@ ensure_vm() {
   #              always used it, never put anything on screen.
   #   sighted  — needs a real framebuffer for the VNC pixel grab, so it must NOT be --no-graphics.
   #
-  # `--vnc-experimental` is NOT headless. Per `tart run --help` it uses "Virtualization.Framework's VNC
-  # server INSTEAD OF the built-in UI" — and tart then opens macOS **Screen Sharing.app** at that endpoint,
-  # so a VM window appears on the owner's display. Harmless (it steals no input) but unasked-for, and this
-  # script previously used it for BOTH lanes, including the one that needs no pixels whatsoever.
+  # `--vnc-experimental` ALONE is not headless. Per `tart run --help` it uses "Virtualization.Framework's
+  # VNC server INSTEAD OF the built-in UI" — and tart then opens macOS **Screen Sharing.app** at that
+  # endpoint, so a VM window appears on the owner's display. Harmless (it steals no input) but unasked-for,
+  # and this script used to pass it for BOTH lanes, including the one that needs no pixels whatsoever.
+  #
+  # The two flags COMPOSE, which is the clean answer for the sighted lane — verified 2026-07-30:
+  #   tart run … --no-graphics --vnc-experimental
+  #   -> "VNC server is running at vnc://:***@127.0.0.1:54949", and NO viewer process.
+  # So the framebuffer exists for vncdotool to grab while nothing is ever drawn on the owner's screen.
+  # Better than opening a window and closing it, which flashes.
   local gfx=(--no-graphics)
-  [ "$LANE" = "xcuitest" ] || gfx=(--vnc-experimental)
+  [ "$LANE" = "xcuitest" ] || gfx=(--no-graphics --vnc-experimental)
   log "booting $VM (${gfx[*]}) + repo/artifact shares…"
   VM_BOOTED=1
   tart run "$VM" "${gfx[@]}" "${mounts[@]}" >>"$runlog" 2>&1 &
