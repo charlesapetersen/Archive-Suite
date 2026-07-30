@@ -169,7 +169,46 @@ struct OrganizationStoreTests {
         #expect(store.membershipCount(item: itemId) == 1)
     }
 
-    @Test func forceRemoveLastMembership() async throws {
+    /// W23.h3: a pair that is already gone must report `.notPresent`, NOT `.wasLastInstance` — even
+    /// though the bare count is 1, because that 1 is a *different* (live) folder.
+    @Test func removeMembershipNotPresentWhenPairIsStale() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let a = try await store.createFolder(name: "A")
+        let b = try await store.createFolder(name: "B")
+        let itemId = UUID()
+        try await store.addMembership(item: itemId, folder: b.id)     // the note lives in B only
+
+        #expect(store.membershipCount(item: itemId) == 1)             // the count a stale check trusts
+        let result = try await store.removeMembership(item: itemId, folder: a.id)
+
+        #expect(result == .notPresent)
+        #expect(store.foldersContaining(item: itemId) == [b.id])      // B untouched
+    }
+
+    /// W23.h3: a stale pair must not be reported as a successful removal either — with ≥2 memberships
+    /// the old code deleted nothing and still answered `.removed`.
+    @Test func removeMembershipNotPresentEvenWithOtherMemberships() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let a = try await store.createFolder(name: "A")
+        let b = try await store.createFolder(name: "B")
+        let c = try await store.createFolder(name: "C")
+        let itemId = UUID()
+        try await store.addMembership(item: itemId, folder: b.id)
+        try await store.addMembership(item: itemId, folder: c.id)
+
+        let result = try await store.removeMembership(item: itemId, folder: a.id)
+
+        #expect(result == .notPresent)
+        #expect(store.membershipCount(item: itemId) == 2)             // nothing removed
+    }
+
+    // MARK: - Confirmed delete-last-instance (W23.h3)
+
+    @Test func removeConfirmedLastMembershipDeletesTheLastInstance() async throws {
         let (store, index, root) = try await makeTempEnv()
         defer { Task { await cleanup(root, index) } }
 
@@ -177,8 +216,46 @@ struct OrganizationStoreTests {
         let itemId = UUID()
         try await store.addMembership(item: itemId, folder: folder.id)
 
-        try await store.forceRemoveLastMembership(item: itemId, folder: folder.id)
+        let result = try await store.removeConfirmedLastMembership(item: itemId, folder: folder.id)
+
+        #expect(result == .deletedLastInstance)                       // caller may trash the note
         #expect(store.membershipCount(item: itemId) == 0)
+        #expect(await index.allMemberships().isEmpty)                 // and it left the DB
+    }
+
+    /// The pair existed but another membership appeared in between: unlink only, never trash.
+    @Test func removeConfirmedLastMembershipUnlinksWhenNotActuallyLast() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let a = try await store.createFolder(name: "A")
+        let b = try await store.createFolder(name: "B")
+        let itemId = UUID()
+        try await store.addMembership(item: itemId, folder: a.id)
+        try await store.addMembership(item: itemId, folder: b.id)
+
+        let result = try await store.removeConfirmedLastMembership(item: itemId, folder: a.id)
+
+        #expect(result == .unlinkedNotLast)                           // caller must KEEP the file
+        #expect(store.foldersContaining(item: itemId) == [b.id])
+    }
+
+    /// The confirm arrives after the pair is gone (the stale-alert case): nothing removed, nothing to
+    /// trash. This is the case the removed `forceRemoveLastMembership` had no way to express — it
+    /// force-removed a no-op pair and let the caller trash a live note.
+    @Test func removeConfirmedLastMembershipReportsStalePair() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let a = try await store.createFolder(name: "A")
+        let b = try await store.createFolder(name: "B")
+        let itemId = UUID()
+        try await store.addMembership(item: itemId, folder: b.id)     // moved out of A already
+
+        let result = try await store.removeConfirmedLastMembership(item: itemId, folder: a.id)
+
+        #expect(result == .notPresent)
+        #expect(store.foldersContaining(item: itemId) == [b.id])      // the live membership survives
     }
 
     // MARK: - Templates

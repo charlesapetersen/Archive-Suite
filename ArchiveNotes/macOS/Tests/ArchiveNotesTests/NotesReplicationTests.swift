@@ -162,6 +162,31 @@ struct NotesReplicationTests {
         #expect(env.org.foldersContaining(item: b) == [f2])         // F1 unlinked, F2 replica survives
     }
 
+    /// W23.h3 (Tier-2 — the destructive seam). The existing fresh-recheck above only catches a
+    /// concurrent **replicate** (count 1 → 2). A concurrent **move** leaves the count at 1 while making
+    /// the pair the alert refers to *stale*, so a decision taken from a bare count still says "last
+    /// instance": the force-remove of `(b, F1)` is a no-op and the note is trashed even though its F2
+    /// membership is perfectly valid. The confirm must key off the pair it actually removed.
+    @Test("confirming a STALE alert (the note was MOVED away) must NOT trash it")
+    func confirmAfterConcurrentMoveKeepsFile() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let ids = try await makeItems(env, ["B"]); let b = ids[0]
+        let f1 = try await makeFolder(env, "F1"); let f2 = try await makeFolder(env, "F2")
+        try await env.org.addMembership(item: b, folder: f1)
+        await env.nav.removeMembership(b, from: f1)      // → pending on (b, F1)
+
+        // The OTHER window MOVES B out of F1 into F2 while the modal is open (add-then-remove), so the
+        // total count is back to 1 and only the (b, F1) pair the alert names is stale.
+        await env.nav.move([b], to: f2, from: f1)
+        #expect(env.org.foldersContaining(item: b) == [f2])
+        #expect(env.org.membershipCount(item: b) == 1)   // the bare count a stale check would trust
+
+        await env.nav.confirmPendingDeletion()
+
+        #expect(itemDirExists(env, b))                             // MUST NOT be trashed
+        #expect(env.org.foldersContaining(item: b) == [f2])        // the valid F2 membership survives
+    }
+
     @Test("cancelling the delete-last-instance leaves the note + membership intact")
     func cancelKeepsEverything() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

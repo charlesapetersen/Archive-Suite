@@ -29,8 +29,25 @@ struct TemplateAssignment: Sendable, Equatable, Codable {
 
 /// Result of `removeMembership`: `.removed` if the membership was deleted,
 /// `.wasLastInstance` if removing would leave the item with zero memberships
-/// (caller must show the §3.6 delete-last-instance confirmation).
-enum RemoveResult: Sendable { case removed; case wasLastInstance }
+/// (caller must show the §3.6 delete-last-instance confirmation), or `.notPresent` if the requested
+/// `(item, folder)` pair no longer exists at all — **nothing was removed**, so the caller must treat
+/// it as a no-op + refresh and never as a last instance (W23.h3).
+enum RemoveResult: Sendable { case removed; case wasLastInstance; case notPresent }
+
+/// Outcome of a **confirmed** §3.6 delete-last-instance (`removeConfirmedLastMembership`). Every case
+/// is decided from the membership set the removal *actually applied to* — never from a bare count —
+/// because only `.deletedLastInstance` licenses the caller to trash the note (W23.h3).
+enum ConfirmedRemoveResult: Sendable {
+    /// The pair existed, was removed, and the item now has **zero** memberships: really the last
+    /// instance. The caller completes the deletion (trash the note + drop its index row).
+    case deletedLastInstance
+    /// The pair existed and was removed, but the item still holds other memberships (a concurrent
+    /// replicate or move). Unlinked only — the caller must **keep** the file.
+    case unlinkedNotLast
+    /// The pair was already gone when the confirm arrived — a **stale** alert. Nothing was removed and
+    /// the note may well be filed elsewhere; the caller must keep the file and refresh.
+    case notPresent
+}
 
 // MARK: - OrganizationStore
 
@@ -162,9 +179,18 @@ enum RemoveResult: Sendable { case removed; case wasLastInstance }
         exportOrganization()
     }
 
-    /// Returns `.removed` if the membership was deleted, or `.wasLastInstance` **without
-    /// mutating** if removing would delete the item's only instance (§3.6 guard).
+    /// Returns `.removed` if the membership was deleted, `.wasLastInstance` **without mutating** if
+    /// this pair is the item's only instance (§3.6 guard), or `.notPresent` if the pair is already gone.
+    ///
+    /// The pair-existence check comes FIRST and is what makes the count meaningful: a bare
+    /// `membershipCount <= 1` cannot tell "this is the last membership" from "this membership is stale
+    /// and some *other* one is the last", and answering `.wasLastInstance` to the second question is
+    /// what let a stale confirmation trash a live note (W23.h3). With the pair proven present,
+    /// `count == 1` provably means *this* pair is the only one.
     func removeMembership(item: UUID, folder: UUID) async throws -> RemoveResult {
+        guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
+            return .notPresent
+        }
         if membershipCount(item: item) <= 1 {
             return .wasLastInstance
         }
@@ -174,13 +200,23 @@ enum RemoveResult: Sendable { case removed; case wasLastInstance }
         return .removed
     }
 
-    /// Force-remove the last membership after the caller confirmed the §3.6 guard.
-    /// The caller is responsible for also calling `NoteStore.delete(id)` and
-    /// `NotesIndex.deleteItems([id])` to complete the deletion.
-    func forceRemoveLastMembership(item: UUID, folder: UUID) async throws {
+    /// Complete a **confirmed** §3.6 delete-last-instance: verify the pair, remove it, and report what
+    /// the removal actually applied to. The caller must trash the note only for `.deletedLastInstance`.
+    ///
+    /// This is deliberately ONE call rather than the old check-then-force-remove pair. `NotesIndex` is an
+    /// actor, so the caller's `await` between a "was it the last instance?" question and an unconditional
+    /// force-remove was a suspension point the other window could interleave at — and `@MainActor` is
+    /// reentrant there. Deciding inside the store, *after* the removal, closes that window: the
+    /// last-instance verdict is read from what survives, so a membership that appeared while the DB write
+    /// was in flight counts too and downgrades the outcome to `.unlinkedNotLast` (keep the file).
+    func removeConfirmedLastMembership(item: UUID, folder: UUID) async throws -> ConfirmedRemoveResult {
+        guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
+            return .notPresent
+        }
         try await index.deleteMembership(item: item, folder: folder)
         memberships.removeAll { $0.itemId == item && $0.folderId == folder }
         exportOrganization()
+        return membershipCount(item: item) == 0 ? .deletedLastInstance : .unlinkedNotLast
     }
 
     func foldersContaining(item: UUID) -> [UUID] {

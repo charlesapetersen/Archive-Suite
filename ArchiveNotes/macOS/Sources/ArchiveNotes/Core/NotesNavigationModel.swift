@@ -234,13 +234,18 @@ final class NotesNavigationModel: ObservableObject {
 
     /// Remove `itemId` from `folderId`, guarding the delete-last-instance case (§3.6). A replicant
     /// (≥2 memberships) is removed quietly; the LAST membership sets `pendingDeletion` (**no mutation
-    /// yet**) so the view shows the mandatory confirmation. `OrganizationStore.removeMembership` reads
-    /// the count FRESH and returns `.wasLastInstance` without mutating, so a concurrent replicate in
-    /// the other window can't cause a false "last instance."
+    /// yet**) so the view shows the mandatory confirmation. `OrganizationStore.removeMembership` verifies
+    /// the `(item, folder)` pair still exists and reads the count FRESH, so neither a concurrent
+    /// replicate nor a concurrent move in the other window can cause a false "last instance."
     func removeMembership(_ itemId: UUID, from folderId: UUID) async {
         do {
             switch try await model.organization.removeMembership(item: itemId, folder: folderId) {
             case .removed:
+                model.rebuild(); recompute()
+            case .notPresent:
+                // The other window already moved or removed this membership. Nothing to remove — resync
+                // this window's view. NEVER a last instance: some *other* folder may hold the note
+                // (W23.h3).
                 model.rebuild(); recompute()
             case .wasLastInstance:
                 let title = model.allItems.first { $0.id == itemId }?.title ?? ""
@@ -261,21 +266,26 @@ final class NotesNavigationModel: ObservableObject {
         await confirmDeletion(pending)
     }
 
-    /// Perform a confirmed delete-last-instance for a specific pending item. **Re-checks the membership
-    /// count FRESH at confirm time**, not just when the modal opened: if a replicate in the other
-    /// window added another instance in between, this is no longer the last one → we quietly unlink and
-    /// KEEP the file (trashing it would strand the new replicant on a trashed note). Only when it is
-    /// *still* the last instance do we force-remove the final membership and move the note to Trash
-    /// (recoverable) + drop its index row. Membership first, file second — a trash failure leaves a
+    /// Perform a confirmed delete-last-instance for a specific pending item. The alert may be **stale**
+    /// by the time it is confirmed — the other window can replicate, move, or remove the note while it
+    /// sits open — so the verdict is taken from the membership the removal *actually applied to*, in one
+    /// `OrganizationStore` call, and only a genuine `.deletedLastInstance` licenses the trash. The other
+    /// two outcomes KEEP the file: trashing a note that still has a live membership would strand that
+    /// membership on a trashed note. Membership first, file second — a trash failure leaves a
     /// recoverable, still-findable note (§5).
     func confirmDeletion(_ pending: PendingDeletion) async {
         do {
-            switch try await model.organization.removeMembership(item: pending.itemId, folder: pending.folderId) {
-            case .removed:
+            switch try await model.organization.removeConfirmedLastMembership(
+                item: pending.itemId, folder: pending.folderId) {
+            case .unlinkedNotLast:
                 // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
                 model.rebuild(); recompute(); return
-            case .wasLastInstance:
-                try await model.organization.forceRemoveLastMembership(item: pending.itemId, folder: pending.folderId)
+            case .notPresent:
+                // A STALE alert: the other window already moved or removed this membership, so nothing
+                // was removed here and the note may still be filed elsewhere. Keep it (W23.h3).
+                model.rebuild(); recompute(); return
+            case .deletedLastInstance:
+                break                                   // genuinely the last — fall through to the trash
             }
         } catch { model.statusMessage = "Couldn't remove the note from the folder."; return }
         await model.trashItems([pending.itemId])
@@ -312,7 +322,8 @@ final class NotesNavigationModel: ObservableObject {
             do { try await model.organization.addMembership(item: id, folder: target) }
             catch { model.statusMessage = "Couldn't move the note to the folder."; continue }
             if let source, source != target {
-                // Safe: the add above guarantees ≥2 memberships, so this returns `.removed` (never last).
+                // Safe: the add above guarantees ≥2 memberships, so this returns `.removed` — or
+                // `.notPresent` if the item was never in `source` (a stale drag). Never last.
                 _ = try? await model.organization.removeMembership(item: id, folder: source)
             }
         }
