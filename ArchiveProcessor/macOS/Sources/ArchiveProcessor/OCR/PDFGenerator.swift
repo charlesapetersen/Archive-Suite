@@ -6,16 +6,35 @@ import ImageIO
 
 struct PDFGenerator {
 
-    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0, textColumns: Int = 1) throws {
+    /// W23.h5 — what the written PDF's **image page** actually contains. `generate` succeeds either way (the
+    /// 2-page archival contract and `PDFTextExtractor`'s `pageCount >= 2` heuristic are preserved on purpose),
+    /// so a caller that only checks "did it throw / does the file exist" cannot tell the two apart. It must:
+    /// the placeholder PDF holds **no scan**, which means the source image is still the ONLY copy of the page.
+    /// Any caller that retires a source on success (Live Capture finalize) MUST keep the source when this is
+    /// `.placeholder`. The bytes are real and the file still counts as filed — only the deletion is withheld.
+    enum ImagePageOutcome: Equatable {
+        /// The source image was decoded and embedded — the PDF carries the actual scan.
+        case embedded
+        /// The source image could not be decoded/embedded; the image page is the visible placeholder.
+        case placeholder
+
+        var isPlaceholder: Bool { self == .placeholder }
+    }
+
+    @discardableResult
+    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0, textColumns: Int = 1) throws -> ImagePageOutcome {
         let pdfDocument = PDFDocument()
+        let outcome: ImagePageOutcome
 
         if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB) {
             pdfDocument.insert(imagePage, at: 0)
+            outcome = .embedded
         } else {
             // The source image couldn't be decoded/embedded. Insert a visible placeholder rather than
             // silently emitting a 1-page (text-only) PDF — that preserves the 2-page archival contract,
             // keeps PDFTextExtractor's pageCount>=2 heuristic valid, and surfaces the failure.
             pdfDocument.insert(makePlaceholderImagePage(note: "Original image could not be embedded (\(imageURL.lastPathComponent))."), at: 0)
+            outcome = .placeholder
         }
 
         let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName, textColumns: textColumns)
@@ -24,6 +43,7 @@ struct PDFGenerator {
         guard pdfDocument.write(to: outputURL) else {
             throw PDFError.writeFailed
         }
+        return outcome
     }
 
     // MARK: - Image Page

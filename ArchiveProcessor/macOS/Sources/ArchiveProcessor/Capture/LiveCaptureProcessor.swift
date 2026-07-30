@@ -625,9 +625,9 @@ final class LiveCaptureProcessor: ObservableObject {
         for page in pages {
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
-            try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
-                                 outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
+            _ = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
+                                     outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
+                                     gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as

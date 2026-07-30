@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import PDFKit
 
 /// Headless, $0 self-test of the Live Capture DATA-SAFETY invariants, gated by
 /// `LIVECAPTURE_RECOVERYTEST=1` (does nothing in normal use). Uses synthetic files in a temp dir — no OCR,
@@ -17,6 +18,8 @@ import AppKit
 ///   6. Launch-time `pruneEmptySessions` (W23.h1) reclaims ONLY a positively-identified, spent session folder
 ///      and only via the Trash — never the `_relay` dir + its pending objects, a HEIC-/`.jpeg`-only session,
 ///      a folder holding unrecognized content, or a non-session (operator) folder.
+///   7. `PDFGenerator.generate` (W23.h5) REPORTS whether the PDF's image page holds the real scan or the
+///      deliberate placeholder, so finalize can refuse to retire a source whose PDF carries no scan.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -187,6 +190,51 @@ enum LiveCaptureRecoveryTestDriver {
         check("reclaim path trashes a directory to the Trash — recoverable, not a hard delete",
               dpTrashed && !fm.fileExists(atPath: dprobe.path))
         if let dest = probeDest.map({ $0 as URL }) { try? fm.removeItem(at: dest) }   // tidy the probe
+
+        // --- Test 9 (W23.h5): `PDFGenerator.generate` must REPORT whether the image page holds the real scan
+        // or the deliberate placeholder. The placeholder stays (it preserves the 2-page archival contract and
+        // PDFTextExtractor's pageCount>=2 heuristic) — the defect was that it is indistinguishable from
+        // success, so finalize retires a source whose only image copy is the source itself. ---
+        let gen = PDFGenerator()
+        let genDir = tmp.appendingPathComponent("pdfgen", isDirectory: true)
+        try? fm.createDirectory(at: genDir, withIntermediateDirectories: true)
+        let ocr = OCRResult(text: "page text", classification: nil, errorMessage: nil, errorCode: nil)
+        // Constructed inline (not pulled from a catalogue array) so the test can't break when the shipped
+        // model list changes — `generate` only prints this on the text page.
+        let stubModel = LLMModel(id: "test-model", displayName: "Test Model", provider: .gemini,
+                                 supportsThinking: false, returnsMd: false,
+                                 inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+
+        // (a) A real, decodable image → `.embedded`. Written here (not a checked-in fixture) so the test
+        // needs nothing on disk and can never touch the corpus.
+        let realJPEG = genDir.appendingPathComponent("real.jpg")
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64, bitsPerSample: 8,
+                                      samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        if let jpegData = bitmap?.representation(using: .jpeg, properties: [:]) {
+            try? jpegData.write(to: realJPEG)
+        }
+        let realOut = genDir.appendingPathComponent("real.pdf")
+        let realOutcome = try? gen.generate(imageURL: realJPEG, result: ocr, model: stubModel, outputURL: realOut)
+        check("generate reports .embedded for a decodable image", realOutcome == .embedded)
+        check("the embedded-image PDF still wrote 2 pages", PDFDocument(url: realOut)?.pageCount == 2)
+
+        // (b) A file that is NOT a decodable image → `.placeholder`, and the PDF is STILL written with both
+        // pages (the placeholder is deliberate — do not delete it; just make it detectable).
+        let junk = genDir.appendingPathComponent("corrupt.jpg")
+        try? Data("this is not a JPEG".utf8).write(to: junk)
+        let junkOut = genDir.appendingPathComponent("corrupt.pdf")
+        let junkOutcome = try? gen.generate(imageURL: junk, result: ocr, model: stubModel, outputURL: junkOut)
+        check("generate reports .placeholder for an undecodable image", junkOutcome == .placeholder)
+        check("placeholder outcome is flagged by isPlaceholder", junkOutcome?.isPlaceholder == true)
+        check("the placeholder PDF is STILL written (2-page contract preserved)",
+              fm.fileExists(atPath: junkOut.path) && PDFDocument(url: junkOut)?.pageCount == 2)
+
+        // (c) The pre-fix detector — "the PDF exists" — cannot tell (a) from (b). This is what made the bug
+        // silent, and asserting it keeps the new signal from being quietly replaced by a file-existence check.
+        check("file-existence alone does NOT distinguish a placeholder from a real scan",
+              fm.fileExists(atPath: realOut.path) && fm.fileExists(atPath: junkOut.path)
+                  && realOutcome != junkOutcome)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
