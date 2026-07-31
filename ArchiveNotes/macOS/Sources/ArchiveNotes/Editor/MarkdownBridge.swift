@@ -245,7 +245,10 @@ enum MarkdownBridge {
             let resolution = assetStore?.resolve(ref.path) ?? .missing
             let thumbnail: NSImage? = switch resolution {
             case .resolved(let url):
-                InlineImageAttachment.loadThumbnail(from: url, cacheKey: ref.path)
+                // W23.m11 — the thumbnail is cached under the resolved canonical URL, never under
+                // `ref.path`. Two notes each owning a different `assets/x.png` is ordinary, and the
+                // cache is app-wide, so a reference-shaped key served note A's image to note B.
+                InlineImageAttachment.loadThumbnail(from: url)
             case .missing, .outOfBounds:
                 nil
             }

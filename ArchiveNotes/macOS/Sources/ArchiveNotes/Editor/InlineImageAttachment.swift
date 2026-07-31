@@ -115,7 +115,8 @@ final class InlineImageAttachment: NSTextAttachment {
 
 extension InlineImageAttachment {
 
-    /// Bounded cache of decoded thumbnails keyed by asset relative path.
+    /// Bounded cache of decoded thumbnails, keyed by `cacheKey(for:maxPixels:)` — the canonical
+    /// absolute path of the file whose bytes were read, not the reference that named it.
     /// Evictable by the system; re-decoded on demand. Full-resolution PNGs are never
     /// loaded into the editor — only downsampled thumbnails.
     /// `nonisolated(unsafe)` — NSCache is thread-safe by design; the static let is
@@ -126,6 +127,37 @@ extension InlineImageAttachment {
         cache.totalCostLimit = 50 * 1024 * 1024  // ~50 MB
         return cache
     }()
+
+    /// The cache identity of one inline image: **the file whose bytes are decoded**, at the size they
+    /// are decoded to.
+    ///
+    /// **W23.m11.** The key used to be the *caller-supplied markdown-relative path* — normally
+    /// `assets/<name>` — while this cache is `static`, i.e. app-wide. Same-named assets in different
+    /// items are normal and explicitly supported by the store, so rendering note A cached its thumbnail
+    /// under `assets/x.png`, and rendering note B then **displayed A's image without ever reading B's
+    /// bytes**. The key is now *derived here* rather than passed in, so no call site can reintroduce a
+    /// key coarser than the file it describes.
+    ///
+    /// Why the resolved URL alone identifies the item too: a `.resolved` URL from `AssetPathResolver`
+    /// is canonical (symlinks resolved, `..` standardized) and, in the production store, spells out
+    /// `…/items/<uuid>/assets/<name>` (`NoteStore.itemDir`) — so the owning item is in the key by
+    /// construction, and no separate UUID is bolted on. Two items can therefore only collide by
+    /// *literally sharing the file*, in which case the bytes are the same and one shared entry is the
+    /// correct answer, not a bug; adding the UUID would only split that shared entry in two.
+    ///
+    /// Why no expiry: an asset path is **write-once** in this app — `NoteStore.writeReservedAsset`
+    /// throws rather than overwrite an existing name, and `importAsset` disambiguates — so the bytes
+    /// at a canonical path never change under us, and a UUID is never reissued to a second item.
+    ///
+    /// `maxPixels` is part of the key because it changes the decoded result; without it, the first
+    /// caller's size would be served to every later caller asking for a different one.
+    ///
+    /// Normalization here is **string-only** (`standardizedFileURL`), deliberately: a cache hit must
+    /// cost no disk I/O. Passing a non-canonical URL therefore degrades to a *duplicate* entry for the
+    /// same bytes — wasteful, never wrong — so production passes the resolver's canonical URL.
+    static func cacheKey(for url: URL, maxPixels: Int) -> String {
+        "\(maxPixels)\u{0000}\(url.standardizedFileURL.path)"
+    }
 
     /// Create a downsampled thumbnail from raw image data.
     /// Returns nil if the data isn't a recognized image format.
@@ -141,21 +173,22 @@ extension InlineImageAttachment {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    /// Load a thumbnail from a file URL, using the cache keyed by `cacheKey`.
-    /// If `cacheKey` is provided and a cached thumbnail exists, returns it without disk I/O.
+    /// Load a thumbnail for `url`, memoized in the app-wide `thumbnailCache`. A hit returns without
+    /// any disk I/O.
+    ///
+    /// `url` must be a **canonical, contained** file URL — in production, exactly the one
+    /// `AssetPathResolver` hands back as `.resolved`. The key is derived from it (W23.m11): callers
+    /// cannot supply one, because a caller-named key is how a note came to show another note's image.
+    /// Pass `cached: false` to force a fresh decode and leave the cache untouched.
     static func loadThumbnail(from url: URL, maxPixels: Int = 800,
-                              cacheKey: String? = nil) -> NSImage? {
-        if let key = cacheKey {
-            let nsKey = key as NSString
-            if let cached = thumbnailCache.object(forKey: nsKey) {
-                return cached
-            }
-        }
+                              cached: Bool = true) -> NSImage? {
+        let key = cacheKey(for: url, maxPixels: maxPixels) as NSString
+        if cached, let hit = thumbnailCache.object(forKey: key) { return hit }
         guard let data = try? Data(contentsOf: url) else { return nil }
         guard let thumb = downsampledThumbnail(from: data, maxPixels: maxPixels) else { return nil }
-        if let key = cacheKey {
+        if cached {
             let cost = Int(thumb.size.width * thumb.size.height * 4)
-            thumbnailCache.setObject(thumb, forKey: key as NSString, cost: cost)
+            thumbnailCache.setObject(thumb, forKey: key, cost: cost)
         }
         return thumb
     }

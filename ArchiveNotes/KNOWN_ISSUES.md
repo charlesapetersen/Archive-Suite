@@ -3,6 +3,48 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m11) — the inline-image cache showed one note's image inside another note
+
+**2026-07-30.** `InlineImageAttachment.thumbnailCache` is `static`, i.e. **one cache for the whole app**,
+and `MarkdownBridge` keyed it on the *markdown reference* the note author wrote — normally `assets/x.png`.
+Two notes each owning their own `assets/x.png` is ordinary and explicitly supported by the store
+(`addAsset` disambiguates only **within** an item), so rendering note A cached A's thumbnail under
+`assets/x.png` and rendering note B then **displayed A's image without ever opening B's file**. No
+malformed data, no hand-editing, no traversal — unlike W23.m3, which needed a crafted reference.
+
+**The fix:** the key is now derived from the **resolved canonical URL** — and derived *inside*
+`loadThumbnail`, which no longer accepts a caller-supplied key at all. A caller-named key is precisely how
+a coarse key got used, so the seam that allowed it is gone rather than merely used correctly.
+
+**Why that key needs no separate item UUID.** `AssetPathResolver`'s `.resolved` URL is canonical and, in
+the production store, spells out `…/items/<uuid>/assets/<name>` (`NoteStore.itemDir`, lowercased UUID) —
+the owning item is in the key by construction. Two items can only collide by *literally sharing the file*,
+and then the bytes are identical, so one shared entry is the right answer (pinned by a test: a same-item
+symlink and its target share an entry). Adding a UUID alongside would only split that legitimately shared
+entry in two.
+
+**Why there is no expiry or per-item invalidation.** An asset path is **write-once** in this app:
+`NoteStore.writeReservedAsset` throws rather than overwrite an existing name, and `importAsset`
+disambiguates — so the bytes at a canonical path never change under us, and a UUID is never reissued.
+A per-item purge would have had no caller. `maxPixels` *is* in the key, because it changes the decoded
+result; without it the first requested size would be served to every later caller asking for another.
+
+**Cost:** none on the hit path. Key normalization is string-only (`standardizedFileURL`, no disk I/O), so
+a cache hit still costs zero reads. A non-canonical URL therefore degrades to a *duplicate* entry for the
+same bytes — wasteful, never wrong.
+
+**Verified** (scratch temp stores only, never the real Notes store or the corpus): 8 tests,
+`InlineImageCacheKeyTests`, each written to be non-vacuous — the headline test proves note B renders its
+own blue pixels after note A warmed the cache with red ones under the same relative path, and a second
+test plants a red sentinel under the *exact* pre-fix key, asserts it is a live hit, then shows the render
+ignores it. Cache-hit behaviour is pinned too (a repeat render is served with the file's bytes replaced by
+garbage). 589/589 `ArchiveNotesTests` green, no new warnings.
+
+**Residual (`W23.m11-fu`, LOW):** because entries never expire, an asset replaced **outside the app** (a
+sync client writing new bytes at the same path) shows its stale thumbnail until the entry is evicted or
+the app restarts. Display only — the file on disk, the note body and the copy/extract path (which reads
+bytes fresh) are all unaffected.
+
 ## ✅ FIXED (W23.m10) — a failed `organization.json` write was reported as a saved organization change
 **2026-07-30.** `organization.json` is the **durable mirror** the folder graph is rebuilt from after a DB
 wipe or a move to another Mac (§4/§11). `OrganizationFile.export` swallowed both its encode and its atomic
@@ -154,9 +196,8 @@ green, no new warnings.
   `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost.
 - **Hard links are undetectable** by any path-containment rule. An `assets/x.png` hard-linked to another
   item's file still reads those bytes. Nothing in the app creates one.
-- **`W23.m11` is still open** and is now unblocked: the app-wide thumbnail cache is keyed by the *relative*
-  path, so two items' same-named assets still collide in the cache. `resolved`'s canonical URL is the key it
-  needs — this item deliberately did not change the cache key.
+- **`W23.m11` (the cache key) was the deliberate leftover** — this item did not change it, because
+  `resolved`'s canonical URL is exactly the key it needed. Now fixed; see its entry above.
 
 ## ✅ FIXED (W23.h3): confirming a STALE folder-removal alert trashed a live note — Tier-2
 

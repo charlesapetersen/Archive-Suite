@@ -710,17 +710,38 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   terminate), or make the sidebar line sticky while stale rather than dismissible. Notes
   `Index/OrganizationStore.swift`, `Core/NotesModel.swift`. | Tier-1 | XS | LOW
 
-- [ ] **W23.m11 — the app-wide inline-image cache can display another note's same-named image
-  [S · MED · wrong content shown] (blocked-on: W23.m3).** `Editor/InlineImageAttachment.swift`,
-  `Editor/MarkdownBridge.swift`. The **static app-wide** thumbnail cache is keyed **only by the
-  markdown-relative path** — normally `assets/name.png`. Neither item identity nor the resolved absolute URL
-  is part of the key. If notes A and B each own a *different* `assets/x.png`, rendering A caches its thumbnail
-  and rendering B **displays A's image without ever reading B's bytes**. Same-named assets across item
-  directories are **normal and explicitly supported by the store**, so no malformed data is required.
-  **Fix:** key the cache by the **resolved, canonical absolute URL** (plus item UUID), and invalidate per item.
-  Blocked-on W23.m3 on purpose: that item makes `resolveAsset` return a canonical contained URL — which is
-  exactly the key this needs, so doing m3 first means one correct key instead of two. Not W9 B4 (Reader-page
-  thumbnails). | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/{InlineImageAttachment,MarkdownBridge}.swift | S | med | none
+- [x] **W23.m11 — the app-wide inline-image cache can display another note's same-named image
+  [S · MED · wrong content shown].** ✅ DONE this commit. Premise re-confirmed by symbol first and it was
+  live: `MarkdownBridge.swift:248` passed `cacheKey: ref.path` into the **static** (app-wide)
+  `thumbnailCache`, so two notes each owning their own `assets/x.png` — ordinary, and explicitly supported
+  by the store — shared one entry, and note B displayed note A's image without ever opening B's file.
+  Fixed by deriving the key from the **resolved canonical URL** *inside* `loadThumbnail`, which no longer
+  accepts a caller-supplied key at all: a caller-named key is how the coarse key got used, so the seam is
+  gone rather than merely used correctly. **Two deliberate deviations from this item's fix sketch, both
+  documented at the symbol:** (1) *no separate item UUID* — the resolved URL already spells out
+  `…/items/<uuid>/assets/<name>` (`NoteStore.itemDir`), so the item is in the key by construction, and two
+  items can only collide by literally sharing the file, where one shared entry is the correct answer (a test
+  pins that a same-item symlink and its target share one); adding a UUID would only split it in two.
+  (2) *no per-item invalidation* — an asset path is **write-once** in this app (`writeReservedAsset` throws
+  rather than overwrite, `importAsset` disambiguates, UUIDs are never reissued), so a purge would have had
+  no caller. `maxPixels` **is** in the key, closing the same aliasing bug one size-shift away. Normalization
+  is string-only, so a cache hit still costs zero disk I/O. **8 new tests** (`InlineImageCacheKeyTests`),
+  each non-vacuous: note B renders its own blue pixels after A warmed the cache with red under the same
+  relative path; a red sentinel planted under the *exact* pre-fix key is asserted to be a live hit and then
+  shown to be ignored by the render; the hit path is proven by serving a warm entry with the file's bytes
+  replaced by garbage. 589/589 `ArchiveNotesTests` green, no new warnings. Residual filed as **W23.m11-fu**
+  (LOW). Write-up: `ArchiveNotes/KNOWN_ISSUES.md`.
+
+- [ ] **W23.m11-fu — an inline image replaced OUTSIDE the app keeps showing its old thumbnail
+  [XS · LOW · stale display].** Residual of W23.m11, filed 2026-07-30. Cache entries never expire, which is
+  sound for every in-app writer (asset paths are write-once — see m11), but the Notes store root can live in
+  a synced folder, and a sync client rewriting bytes at an existing `items/<uuid>/assets/<name>` leaves the
+  editor showing the previous thumbnail until the entry is evicted or the app restarts. **Display only** —
+  the file on disk, the note body, and the copy/extract path (which reads bytes fresh) are all correct, which
+  is why this is LOW and not a re-open. Options: fold size+mtime into `cacheKey` (costs one `stat` per
+  render — measure first, the cache exists so that a hit does *no* disk I/O), or drop an item's entries when
+  the store observes an external change.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/InlineImageAttachment.swift | Tier-1 | XS | LOW
 
 - [ ] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note
   disappears].** `Core/NotesModel.swift` → `trashItems`. It **logs** each `NoteStore.delete` failure but then
