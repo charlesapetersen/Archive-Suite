@@ -68,6 +68,9 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
+    /// Mirrored from `ContentIndexer.failure` — a degraded content index, so the status bar can say so
+    /// instead of going idle over a partial or unopenable one (W23.m9). `nil` = healthy.
+    @Published private(set) var indexFailure: ContentIndexer.Failure?
     @Published private(set) var undoDepth = 0
     @Published var statusMessage = ""
     // G4 keyboard triage: bumped whenever a triage action wants the newly-selected row scrolled into
@@ -130,6 +133,9 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 self?.runFullTextSearch()
             } }
+            .store(in: &cancellables)
+        indexer.$failure
+            .sink { [weak self] f in MainActor.assumeIsolated { self?.indexFailure = f } }
             .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated {

@@ -466,6 +466,15 @@ struct NavigationWindowView: View {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
                 Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.secondary)
             }
+            // A degraded content index says so here instead of leaving an idle status bar over an
+            // empty index, where "no results" is indistinguishable from "no matches" (W23.m9).
+            if let f = model.indexFailure {
+                Label(f.message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .lineLimit(1).truncationMode(.tail)
+                    .help(f.detail)
+                    .accessibilityIdentifier("ar.status.indexFailure")
+            }
             Button { showingHealth = true } label: { Image(systemName: "stethoscope") }
                 .buttonStyle(.borderless)
                 .help("Library health")
