@@ -3,6 +3,48 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.h3-fu) — a replicate could slip a live membership onto a note already bound for the Trash
+
+**2026-07-31.** W23.h3 closed the delete-last-instance *decision*: `removeConfirmedLastMembership` reads its
+verdict from what survives the removal, so a membership appearing during the DB write downgrades the outcome
+to `.unlinkedNotLast` and the file is kept. What it did not close is how long that verdict stays true.
+`.deletedLastInstance` means "zero memberships **now**", and the caller then `await`s the trash on a
+`@MainActor` that is reentrant at every suspension point — so the other window's drag-to-folder, landing in
+*that* gap, arrives after the verdict. Nothing downgrades; the note goes to the Trash carrying a live
+membership row that points at it. Same dangling-org-graph symptom W23.h3's fixture caught, in a much smaller
+window, which is why it was filed as a residual rather than blocking that item.
+
+**The fix is a window, not another check.** `OrganizationStore` grew `beginHardDelete` / `endHardDelete` /
+`isHardDeleting`, and both membership-**minting** seams refuse a guarded item
+(`OrganizationError.itemBeingDeleted`). It is a `[UUID: Int]` refcount rather than a flag because the windows
+nest: `NotesModel.trashItems` — the hard-delete primitive — holds one for its whole call, and each caller
+(`confirmDeletion`, `deleteFolderDeletingStranded`) nests a wider one that opens the instant the
+zero-memberships verdict lands. With a `Bool` the inner close would unguard the item while the outer window
+was still open, which is precisely the gap being closed. Every `begin` is balanced by a `defer`-ed `end`,
+including the path where the disk **refuses** the trash — a survivor left un-fileable for the rest of the
+session would be a worse bug than the one being fixed.
+
+**`moveMembership` had to be guarded too, and the prototype could not have known.** The guard was lifted from
+an abandoned W23.h3 attempt that predates `moveMembership` (W23.m13); that method also mints a membership, so
+a stale drag from the other window stranded one the same way — and *worse*, `move` reported no failure at
+all, so the UI said the note had moved while it went to the Trash. Nothing is lost by refusing: a guarded
+item is one the store just proved has zero memberships, so there is no source row to move.
+
+**State is in-memory only, deliberately.** A crash mid-window leaves nothing to repair — the next launch
+starts with no windows open. `load()` is the only other writer of `memberships`, and it is a bootstrap bulk
+read, not reachable mid-trash.
+
+**Not changed, deliberately:** `move`'s refusal message stays the aggregate *"Couldn't move a note to that
+folder — it's still where it was."* rather than the store's sentence. It is accurate about the move (nothing
+moved) and W23.m13 tuned that wording; the `replicate` path, which is the drag a user would actually hit
+here, now prefers the store's own *"That note is being deleted — it can't be filed into a folder."*
+
+**Also not covered, and it cannot be:** the two caller-level windows survive no neuter, because the only
+statements between the verdict and `trashItems`' first line are synchronous, so no test can interleave there.
+They are defense-in-depth against a future `await` being inserted into that stretch. What the 10 tests in
+`HardDeleteWindowTests` pin is the primitive's window, driven deterministically from a DEBUG-only hook rather
+than by racing tasks at a sub-millisecond gap. Fixed in `f40cf47` (guard) + `c3ea59c` (tests).
+
 ## ✅ FIXED (W23.l4) — an impossible day (`2026-02-31`) could be saved as a day-precision date
 
 **2026-07-31.** Notes' date seams validated month as `1…12` and day as `1…31` **independently**, never as a

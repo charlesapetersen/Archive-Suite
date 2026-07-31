@@ -255,8 +255,38 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   confirmed outcomes. Full Notes suite **540 tests / 64 suites + 189 XCTest pass**; build clean, **0 new
   warnings**. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesNavigationModel}.swift | S–M | **high** | none
 
-- [ ] **W23.h3-fu — a replicate can still slip a live membership onto a note already on its way to the Trash
-  [S · LOW–MED · residual of W23.h3].** Filed 2026-07-30 while closing W23.h3 (`ae0e6eb`); **not** covered by
+- [x] **W23.h3-fu — a replicate can still slip a live membership onto a note already on its way to the Trash
+  [S · LOW–MED · residual of W23.h3].** ✅ **DONE** — guard `f40cf47`, tests + trackers in this commit.
+  Premise re-confirmed by symbol first. The guard was lifted from the preserved prototype, not redesigned,
+  but three things about it had to change because they postdate it. (1) It guarded only `addMembership`;
+  **`moveMembership` shipped later (W23.m13) and mints a membership too**, so a stale drag stranded one the
+  same way — and worse, `move` reported **no failure at all**, so the UI said the note had moved while it went
+  to the Trash. Nothing is lost by refusing it: a guarded item provably has zero memberships, so there is no
+  source row to move. (2) The prototype **defined the mechanism but never wired it** — no caller ever opened a
+  window. It is now held by `NotesModel.trashItems`, the hard-delete *primitive*, so both existing callers and
+  any future one inherit it, and nested one level wider by each caller (`confirmDeletion`,
+  `deleteFolderDeletingStranded`) so the window opens the instant the zero-memberships verdict lands rather
+  than one `await` later. **That nesting is why it counts instead of flagging** — a `Bool` would let the inner
+  `end` unguard while the outer window is still open. (3) It minted a second error type; the store has since
+  grown `OrganizationError` for exactly this, so `itemBeingDeleted` is a case there. `replicate` now prefers
+  the store's own sentence, because this change introduces a refusal a user can actually provoke.
+  **Deterministic, as the item required:** the production window is sub-millisecond, so racing a confirm
+  against a replicate would pass on a green run whether or not it ever landed inside the gap. A DEBUG-only
+  `NotesModel.hardDeleteWindowHookForTesting` (same shape as `NotesIndex.executeForTesting`, W23.m13) is
+  awaited **inside** the open window before anything is trashed, and two tests assert `isHardDeleting` from
+  within the hook so a green result can't come from a replicate that never ran. **10 new tests**
+  (`HardDeleteWindowTests`), scratch stores only. **Non-vacuity by 4 neuters, each reddening a disjoint set:**
+  no `addMembership` guard → 5 RED, the finding test showing the exact original symptom (a live membership in
+  memory *and* SQLite pointing at a trashed note); no `moveMembership` guard → 2 RED with the silent-success
+  variant; refcount degraded to a flag → only the nesting test; no `defer`-ed `end` → only the balance test,
+  which fails twice over because a note the disk **refused** to trash then stayed un-fileable all session.
+  All reverted before shipping. **703/703** Notes tests (was 693) + 189 XCTest, clean build, 0 new warnings.
+  Notes-internal — no ArchiveCore type, no SPEC change → shared-core rebuild rule N/A. No new view code; the
+  only visible effect is the existing sidebar status line, asserted headlessly → nothing for the VM lane.
+  **Stated plainly rather than glossed:** the two *caller-level* windows survive no neuter and cannot — the
+  statements between the verdict and `trashItems`' first line are all synchronous, so no test can interleave
+  there; they are defense-in-depth against a future `await` in that stretch, and what the tests pin is the
+  primitive's window. Original finding follows. Filed 2026-07-30 while closing W23.h3 (`ae0e6eb`); **not** covered by
   that fix. `NotesNavigationModel.confirmDeletion` gets `.deletedLastInstance` from
   `OrganizationStore.removeConfirmedLastMembership` and then `await model.trashItems([id])`. Both are
   `@MainActor`, but **`@MainActor` is reentrant at every `await`** — the same mechanism W23.h3 itself turned on —

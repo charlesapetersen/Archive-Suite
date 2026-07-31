@@ -119,7 +119,11 @@ macOS/Sources/ArchiveNotes/
                                    subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope);
                                    deleteFolder + moveMembership (the MOVE seam, insert-before-delete so
                                    the item is never member-less) are all-or-nothing, and in-memory state
-                                   moves ONLY after the DB transaction commits (W23.m13)
+                                   moves ONLY after the DB transaction commits (W23.m13);
+                                   beginHardDelete/endHardDelete/isHardDeleting — a UUID refcount (nestable)
+                                   making BOTH minting seams (addMembership, moveMembership) refuse an item
+                                   whose confirmed delete is in flight, so nothing follows a note into the
+                                   Trash (W23.h3-fu)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Links/
     ReaderRootStore.swift          @MainActor — GUID-keyed security-scoped bookmarks to Reader roots
@@ -148,7 +152,9 @@ macOS/Sources/ArchiveNotes/
                                    search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
                                    (fresh read), trashItems (recoverable Trash; drops an index row only once
-                                   NoteStore.itemExists says the note is gone, returns the survivors — W23.m12),
+                                   NoteStore.itemExists says the note is gone, returns the survivors — W23.m12;
+                                   holds OrganizationStore's hard-delete window for the whole call, so no
+                                   replicate/move can follow a note into the Trash — W23.h3-fu),
                                    deleteFolderDeletingStranded
                                    (batched), titles(for:) (W6-S5); templates — @Published templates +
                                    reloadTemplates, assignTemplate/effectiveTemplate (resolver + lazy
@@ -405,6 +411,14 @@ macOS/Tests/ArchiveNotesTests/
                                    (an all-rows refusal can't tell a rollback from a half-applied batch);
                                    2 fixture-honesty tests; the divergence tests compare memory AGAINST
                                    the DB, since pre-fix memory alone looked correct
+  HardDeleteWindowTests.swift      10 tests (W23.h3-fu, Tier-2): nothing may be filed onto a note being
+                                   trashed. 5 on the refcount itself (both minting seams refused, nesting
+                                   composes, an unbalanced end is a no-op, per-item scope); 3 drive a real
+                                   replicate/move INTO the open window from the DEBUG-only
+                                   NotesModel.hardDeleteWindowHookForTesting seam (deterministic — the
+                                   production race is sub-millisecond, so racing tasks would prove nothing),
+                                   over both hard-delete callers; 2 on window balance, incl. a trash the
+                                   disk refuses (UF_IMMUTABLE) leaving the survivor still fileable
   VirtualFolderReplicationTests.swift  7 tests (W8-S4, §1.5, Tier-2): item-in-K-folders=K-memberships,
                                    replicate=membership-row-not-a-copy, remove-replicant-only, remove-
                                    last→.wasLastInstance (fires ONLY on the last, no mutation), moveFolder-
