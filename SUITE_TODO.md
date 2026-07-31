@@ -658,7 +658,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   through the same `openForQuery()` seam the indexer uses (or share one health-aware accessor), and let the
   banner re-arm. Notes `Core/NotesModel.swift`, `Index/NotesIndexer.swift`. | Tier-1 | XS–S | LOW
 
-- [ ] **W23.m10 — `organization.json` export failure is reported as a successful organization change
+- [x] **W23.m10 — `organization.json` export failure is reported as a successful organization change
   [S · MED · durable-mirror rot].** `Index/OrganizationFile.swift`, `Index/OrganizationStore.swift`.
   `organization.json` is documented as **the authoritative durable mirror** that survives DB wipes and
   computer moves — but its export function returns `Void` and **suppresses both encode and atomic-write
@@ -669,7 +669,46 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   **Fix:** make the exporter `throws`, propagate to the mutation's result, and surface failure (the mutation
   is not "done" until its durable mirror is). The existing DB-first shadowing note is about which source wins
   at startup/under test — not export failure after an interactive mutation.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Index/{OrganizationFile,OrganizationStore}.swift | S | med | none
+  — ✅ **DONE** (checkpoint `0b9ded1`): the exporter throws, and the failure is now something the app both
+  knows and says. **Premise re-confirmed by experiment first:** an atomic write into a missing directory
+  throws, into a read-only directory throws **and leaves the previous bytes in place** — so the mirror does
+  not go missing, it goes quietly *wrong* — and the old `try?` shape returned normally having written
+  nothing. `OrganizationFile.export` now `throws`; `OrganizationStore` publishes
+  `mirrorFailure` (`.writeFailed(detail:)` / `.noStoreRoot`) + `isMirrorStale`, cleared by any later
+  successful export — correct because the export is **whole-graph, not incremental**, so one working write
+  re-syncs the mirror *including* the changes whose own exports failed (proven, not assumed).
+  **The load-bearing decision:** this is observable STATE, not a `throws` out of each mutation, and the
+  reasoning is recorded in code so it isn't "simplified" back. The export is the LAST step, so by the time it
+  can fail the change HAS committed — throwing would make ~17 call sites report "Couldn't create the folder"
+  about a folder that exists and skip the `rebuild()` that shows it (a worse lie than the silence), and three
+  existing callers use `try?` (`clearDanglingAssignments`, `deleteTemplate`, `move`'s source removal), so a
+  thrown error would be swallowed on exactly the paths at issue. It is also the synchronous post-`await` seam
+  **W23.m13** needs. `NotesModel.adoptMirrorFailure()` surfaces it on the existing sidebar status line (the
+  W23.m9 `adoptIndexFailure` idiom), called LAST on all 17 organization-mutating paths in `NotesModel` +
+  `NotesNavigationModel`, so a real degradation outranks that path's own status text and no caller loses its
+  return value or its UI update. No trash/delete decision changed — mirror *atomicity* stays W23.m13.
+  Tier-2, scratch only (`temporaryDirectory` fixtures; no corpus, no network, $0): **9 new headless tests**
+  covering the seam, a healthy volume, the stale-mirror divergence read back off disk, whole-graph recovery,
+  no-store-root, **each of the 9 mutation kinds attributed individually**, and the façade + navigation
+  surfaces. The DB is deliberately placed OUTSIDE the store root so a read-only root breaks the mirror write
+  and nothing else (co-located, SQLite couldn't write its journal and the mutation would fail *before* the
+  export — testing the wrong thing). **Non-vacuous per mechanism, by neutering:** restoring `try?` → 6/9 RED
+  incl. all 9 mutation cases; dropping `adoptMirrorFailure` → the 2 UI-surface tests RED; dropping the
+  success-clear → the recovery test RED, each with the healthy-path checks correctly staying GREEN. All
+  neuters reverted. Notes **581/581**; clean build, 0 new warnings. No ArchiveCore/SPEC change → Reader and
+  Processor untouched, shared-core rebuild rule N/A. No new view code (the `an.sidebar.status` line already
+  existed and is GUI-covered), so nothing for the VM lane. Residual filed as **W23.m10-fu** (LOW).
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationFile,Index/OrganizationStore,Core/NotesModel,Core/NotesNavigationModel}.swift | S | med | none
+
+- [ ] **W23.m10-fu — a recovered volume doesn't re-mirror until the next organization mutation
+  [XS · LOW].** Residual of W23.m10, filed 2026-07-30. `mirrorFailure` is cleared by the next *successful
+  export*, and the only thing that exports is a mutation — so if the disk frees up (or the volume comes back)
+  and the operator never touches folders again, `organization.json` stays stale for the rest of the session
+  with nothing on screen saying so once the status line has been tap-dismissed. Not a re-open of m10: the
+  failure IS reported when it happens, and any later organization change self-heals the whole mirror. Fix:
+  retry the export opportunistically while `isMirrorStale` (on app activate / periodically / before
+  terminate), or make the sidebar line sticky while stale rather than dismissible. Notes
+  `Index/OrganizationStore.swift`, `Core/NotesModel.swift`. | Tier-1 | XS | LOW
 
 - [ ] **W23.m11 — the app-wide inline-image cache can display another note's same-named image
   [S · MED · wrong content shown] (blocked-on: W23.m3).** `Editor/InlineImageAttachment.swift`,

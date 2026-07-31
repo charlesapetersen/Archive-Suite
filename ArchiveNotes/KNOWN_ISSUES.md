@@ -3,6 +3,37 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m10) — a failed `organization.json` write was reported as a saved organization change
+**2026-07-30.** `organization.json` is the **durable mirror** the folder graph is rebuilt from after a DB
+wipe or a move to another Mac (§4/§11). `OrganizationFile.export` swallowed both its encode and its atomic
+write (`try?`, `Void` return), and every mutation commits SQLite/in-memory *first* and then calls it — so on
+a full, read-only or vanished volume the app said "saved" and the mirror stayed behind.
+
+**The part worth remembering: a failed atomic write is not a missing file.** Measured before anything
+changed — writing into a read-only directory throws *and leaves the previous bytes in place*. So the mirror
+doesn't disappear (which someone would notice); it quietly keeps describing an older organization, and a
+later DB loss restores that instead. Recovery has the mirror-image property: the export is **whole-graph,
+not incremental**, so the next write that succeeds re-syncs everything, including the changes whose own
+exports failed. Nothing has to be replayed, and a transient full disk can't leave a permanent warning.
+
+**Why this is published state and not a `throws` — do not "simplify" it back.** The export is the LAST step
+of every mutation, so by the time it can fail the change *has* committed. Throwing would make ~17 call sites
+report "Couldn't create the folder" about a folder that exists and skip the `rebuild()` that shows it — a
+worse lie than the silence it replaced. And three callers use `try?` (`clearDanglingAssignments`,
+`deleteTemplate`, `move`'s source removal), so a thrown error would be swallowed on exactly the paths at
+issue. Staleness also persists until a later export succeeds, which is a state, not an event. So:
+`OrganizationFile.export` throws, `OrganizationStore` turns that into `mirrorFailure` / `isMirrorStale`, and
+`NotesModel.adoptMirrorFailure()` puts it on the sidebar status line (the W23.m9 `adoptIndexFailure` idiom)
+from all 17 organization-mutating paths. `isMirrorStale` is readable synchronously right after a mutation's
+`await` — that is the seam **W23.m13** uses for its rollback decisions.
+
+**Testing gotcha:** the fixture puts the index DB *outside* the store root. With them co-located, chmod'ing
+the root read-only also stops SQLite creating its journal/WAL sidecars, so the mutation fails *before* the
+export and the test proves nothing about the mirror.
+
+**Residual (W23.m10-fu, LOW):** only a mutation exports, so if the volume recovers and the operator never
+touches folders again, the mirror stays stale for the session once the status line is dismissed.
+
 ## ✅ FIXED (W23.m9) — a failed `NotesIndex.open()` poisoned the DB until restart, and a dead index still read "Ready"
 **2026-07-30.** The cross-app twin of the Reader fix (`../ArchiveReader/KNOWN_ISSUES.md` has the shared
 mechanics). Two things are specific to Notes and worth knowing:

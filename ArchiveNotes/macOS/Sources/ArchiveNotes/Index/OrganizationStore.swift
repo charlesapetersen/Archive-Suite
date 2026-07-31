@@ -94,7 +94,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// Deliberately observable STATE rather than an error thrown out of each mutation. Three reasons,
     /// all load-bearing — do not "simplify" this back into a `throws`:
     /// 1. The export is the LAST step of every mutation, so by the time it can fail the SQLite and
-    ///    in-memory change has already committed. Throwing would make ~10 call sites report "Couldn't
+    ///    in-memory change has already committed. Throwing would make ~17 call sites report "Couldn't
     ///    create the folder" about a folder that *exists*, and skip the `rebuild()` that shows it — a
     ///    worse lie than the silence being fixed here.
     /// 2. Three existing callers use `try?` (`clearDanglingAssignments`, `deleteTemplate`, and `move`'s
