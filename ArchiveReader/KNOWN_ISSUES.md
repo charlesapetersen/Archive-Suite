@@ -2,6 +2,49 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ FIXED (W23.m9) — a failed `ContentIndex.open()` poisoned search until restart, silently
+**2026-07-30.** Two defects on the same path, both about silence.
+
+**The half-open handle.** `sqlite3_open_v2` is *lazy*: it returns a live handle for a file it hasn't read.
+So a corrupt or foreign `content-index-v2.sqlite3` opened with `SQLITE_OK` and died on the first PRAGMA
+("file is not a database", rc=26 — confirmed by experiment before any code changed). `open()` threw with
+`db` still non-nil, and since it short-circuits on `guard db == nil`, **every later `open()` returned
+"success" without completing setup**: the index was poisoned for the life of the process, and since the bad
+file is still there next launch, every launch after. `open()` is now all-or-nothing — the PRAGMA/schema half
+runs inside a `do` whose `catch` calls the new `discardHandle()` and rethrows. `discardHandle()` uses
+**`sqlite3_close_v2`, not `sqlite3_close`**: close_v2 never returns BUSY, so clearing `db` can't strand a
+live connection holding the file lock. That mattered — under the neutered build the stranded handle kept the
+`-shm` sidecar locked and even *replacing* the bad file failed.
+
+**The silent finish.** `ContentIndexer.launch` opened with `try?` and wrote every batch with `try?`, then
+finished like any other pass: a dead index produced a run that extracted every PDF in the library, threw all
+of it away, cleared `progress`, and left an idle status bar. Search answered `[]` — indistinguishable from
+"no matches" — and format health answered 0, i.e. "nothing needs attention". The driver now publishes a typed
+`Failure` (`.unavailable(detail:)` / `.incomplete(rows:)`), mapped from a pass `Outcome` in one place
+(`finish`), where `.ok` **clears** it so a transient corruption can't leave a permanent warning. The five
+query paths go through `openForQuery()`, which records the failure rather than answering empty.
+`NavigationModel.indexFailure` mirrors it; the status bar shows an amber line whose tooltip carries the
+SQLite reason (`ar.status.indexFailure`).
+
+Gotchas for whoever touches this next:
+- **`pruneIfSettled`'s `try?` is deliberate.** A failed open there makes `allPaths()` empty, so the diff finds
+  nothing absent and the prune deletes nothing — it degrades to a no-op. The asymmetry with the query paths is
+  intentional and commented in place.
+- **A failed open now STOPS the pass.** Continuing meant extracting 150k PDFs to discard them one batch at a
+  time; the honest path is also the cheap one.
+- **`.incomplete(rows:)` has no end-to-end test** and can't easily get one: post-fix a batch write can only
+  fail at *runtime* (disk full, corruption after open), and there is no portable way to make SQLite fail a
+  write on demand short of corrupting an open file (undefined behaviour). The outcome→state mapping is a pure
+  function that IS tested; the count itself is `batch.count` at two flush sites, exact because `upsertBatch`
+  rolls the whole batch back on any error.
+- `ContentIndexer` gained an `init(url:)` seam (the app path is now `convenience init()`), which is how the
+  failure paths are reachable without an Application Support file.
+
+Tests: `ContentIndexRecoveryTests` (3), `ContentIndexerFailureTests` (7) — scratch garbage sqlite3 files under
+the bundle temp dir; the `ArchiveFile` paths need not exist (an unreadable file is a legitimate row). Both
+mechanisms proven non-vacuous by neutering. The same fix shipped in Notes the same day — see
+`../ArchiveNotes/KNOWN_ISSUES.md`.
+
 ## `DeepLinkTests.testRevealAndSelectNoRoot` fails on a machine with a persisted archive root (environmental)
 The unit-test host shares the `com.archivereader.app` UserDefaults domain, so if this machine has a persisted
 `archiveRootBookmark` (e.g. left by a GUI/XCUITest session pointing at the `AR-GUI-Fixture`), `NavigationModel()`

@@ -349,8 +349,10 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        NSMetadataQuery over Read/Unread tags, scoped to the root; live updates.
   RootFolderStore.swift       Security-scoped bookmark to the archive root.
-  ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification.
-  ContentIndexer.swift        Background (detached) incremental indexing; async search/classification.
+  ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification; open() is
+                              ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9).
+  ContentIndexer.swift        Background (detached) incremental indexing; async search/classification;
+                              publishes `Failure` (unavailable/incomplete) → amber status-bar line (W23.m9).
   PDFTextExtractor.swift      PDFKit text + Classification-line extraction (guards corrupt/non-PDF).
   NotesStore.swift            Per-file note+flag in UserDefaults (outside the corpus).
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
@@ -406,8 +408,10 @@ A change here is **Tier-2** and must build+test all three apps (Reader + Process
 
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
-`ArchiveReader/Tests/ArchiveReaderTests/` — 16 test files (186 tests). `scripts/lint-write-surface.sh`
+`ArchiveReader/Tests/ArchiveReaderTests/` — 30 test files (266 tests). `scripts/lint-write-surface.sh`
 enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
+(Index health, W23.m9: `ContentIndexRecoveryTests` proves `open()` leaves no half-open handle;
+`ContentIndexerFailureTests` proves a dead index is *reported*, not answered as "no matches".)
 
 **Visual-render guards (the pixels XCUITest can't see).** `RenderProbe.swift` renders a SwiftUI view
 (`ImageRenderer`) or a PDF page (ArchiveCore `PDFThumbnailer`) to real pixels and asserts on them

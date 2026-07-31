@@ -18,7 +18,43 @@ final class NotesIndexer: ObservableObject {
     @Published private(set) var indexGeneration = 0
     /// `true` once the driver has settled at least once — i.e. the initial build has completed. Tests
     /// (and the hidden probe) await this deterministic state before asserting FTS / relevance results.
+    ///
+    /// **Settled, not healthy.** It must flip even when the build failed, or `awaitSettled()` would
+    /// never resume and `bootstrap()` would hang before first paint. Whether the settled index is any
+    /// good is `failure`, below (W23.m9).
     @Published private(set) var isIndexReady = false
+
+    /// Why the index is degraded, when it is (`nil` = healthy).
+    ///
+    /// The FTS half is a disposable cache, so this is never data loss — but without it the failure was
+    /// silent (W23.m9): a failed `open()` or a failed batch write was swallowed by `try?`, the driver
+    /// settled like any other pass, and `NotesModel` reloaded the partial index and marked it Ready.
+    /// A note missing from search is then indistinguishable from a note that doesn't match.
+    ///
+    /// Deliberately NOT shared with Reader's `ContentIndexer.Failure`: this driver is a fork, the
+    /// wording differs (notes vs files), and a shared type in ArchiveCore would couple both apps'
+    /// UI copy to a third module.
+    enum Failure: Equatable, Sendable {
+        /// The index could not be opened — nothing is searchable until it can be.
+        case unavailable(detail: String)
+        /// The pass ran, but `rows` extracted notes could not be written — results are incomplete.
+        case incomplete(rows: Int)
+
+        /// One line for the sidebar status banner.
+        var message: String {
+            switch self {
+            case .unavailable(let d):
+                return "Search index unavailable (\(d)) — search and the note list may be incomplete. "
+                     + "Your notes on disk are unaffected."
+            case .incomplete(let n):
+                return "Search index incomplete — \(n) note\(n == 1 ? "" : "s") couldn't be indexed, so "
+                     + "search may miss \(n == 1 ? "it" : "them")."
+            }
+        }
+    }
+
+    /// Published so `NotesModel` can surface a degraded index instead of a clean "Ready".
+    @Published private(set) var failure: Failure?
 
     private let index: NotesIndex
     private var task: Task<Void, Never>?
@@ -59,7 +95,15 @@ final class NotesIndexer: ObservableObject {
         let idx = index
         let workers = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         task = Task.detached(priority: .utility) { [weak self] in
-            try? await idx.open()
+            do {
+                try await idx.open()
+            } catch {
+                // Nothing is writable, so reading + decoding every .md would only throw the results
+                // away one batch at a time. Report it and stop — but STILL through `finish`, so the
+                // driver settles and `awaitSettled()`'s waiters (bootstrap included) resume (W23.m9).
+                await self?.finish(gen, .couldNotOpen(Self.detail(error)))
+                return
+            }
             let existing = await idx.existingMTimes()
             let work = refs.filter { ref in
                 guard let stored = existing[ref.id.uuidString] else { return true }
@@ -78,6 +122,8 @@ final class NotesIndexer: ObservableObject {
             batch.reserveCapacity(batchSize)
             var done = skipped
             var rowsIndexed = 0
+            /// Extracted rows a failed batch write dropped — surfaced as `.incomplete`, not swallowed.
+            var droppedRows = 0
 
             await withTaskGroup(of: NoteIndexRow?.self) { group in
                 var queued = 0
@@ -101,7 +147,7 @@ final class NotesIndexer: ObservableObject {
                     done += 1
 
                     if batch.count >= batchSize {
-                        try? await idx.upsertBatch(batch)
+                        do { try await idx.upsertBatch(batch) } catch { droppedRows += batch.count }
                         batch.removeAll(keepingCapacity: true)
                     }
 
@@ -120,24 +166,52 @@ final class NotesIndexer: ObservableObject {
             }
 
             if !batch.isEmpty {
-                try? await idx.upsertBatch(batch)
+                do { try await idx.upsertBatch(batch) } catch { droppedRows += batch.count }
             }
 
             await idx.performMaintenance(rowsIndexed: rowsIndexed)
-            await self?.finish(gen)
+            await self?.finish(gen, droppedRows > 0 ? .rowsDropped(droppedRows) : .ok)
         }
     }
 
     /// Full-text search -> matching item UUIDs in **bm25 relevance order**.
     func search(_ query: String) async -> [UUID] {
-        try? await index.open()
+        guard await openForQuery() else { return [] }
         return await index.search(query)
     }
 
     /// Load an ItemSummary by UUID from the index (no .md read needed).
     func summary(for id: UUID) async -> ItemSummary? {
-        try? await index.open()
+        guard await openForQuery() else { return nil }
         return await index.summary(for: id)
+    }
+
+    /// The SQLite message out of a `NotesIndex.IndexError`, for a `Failure`'s detail.
+    private nonisolated static func detail(_ error: Error) -> String {
+        switch error {
+        case NotesIndex.IndexError.open(let m), NotesIndex.IndexError.sql(let m): return m
+        default: return String(describing: error)
+        }
+    }
+
+    /// Open the index for a query, recording an `unavailable` failure (and returning false) when it
+    /// can't be opened — a query over a dead index otherwise degrades to an empty result the user
+    /// reads as "nothing matches" (W23.m9).
+    private func openForQuery() async -> Bool {
+        do {
+            try await index.open()
+            if case .unavailable = failure { setFailure(nil) }   // it opened; that claim is now false
+            return true
+        } catch {
+            setFailure(.unavailable(detail: Self.detail(error)))
+            return false
+        }
+    }
+
+    /// Assign `failure` only when it actually changes — `@Published` republishes on every set, and the
+    /// query paths run per keystroke.
+    private func setFailure(_ new: Failure?) {
+        if failure != new { failure = new }
     }
 
     // MARK: - Pruning (gated cache eviction)
@@ -160,6 +234,9 @@ final class NotesIndexer: ObservableObject {
         let idx = index
         pruneTask = Task.detached(priority: .utility) { [weak self] in
             guard !Task.isCancelled else { return }
+            // A failed open needs no `Failure` here (unlike the query paths): `allIndexedIDs()` then
+            // reads empty, so `pruneDecision` finds nothing absent and deletes nothing — it degrades
+            // to a no-op, and the build/query paths are what report the failure to the user.
             try? await idx.open()
             let indexed = await idx.allIndexedIDs()
             guard !Task.isCancelled else { return }
@@ -218,8 +295,33 @@ final class NotesIndexer: ObservableObject {
 
     private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return }; progress = p }
 
-    private func finish(_ gen: Int) {
+    /// How a pass ended, from the pass's own point of view. `finish` maps this to the published
+    /// `failure`, so health is decided in exactly one place — and the mapping is a pure function the
+    /// tests can check without having to make SQLite fail a write on demand.
+    enum Outcome: Equatable, Sendable {
+        /// Every extracted row was written (or there was no work).
+        case ok
+        /// The pass ran but `Int` extracted rows couldn't be written.
+        case rowsDropped(Int)
+        /// The index never opened, so nothing was attempted.
+        case couldNotOpen(String)
+
+        /// The state a pass ending this way leaves behind. `.ok` clears any earlier failure: a pass
+        /// that wrote everything it extracted is the strongest evidence the index is healthy.
+        var failure: Failure? {
+            switch self {
+            case .ok:                  return nil
+            case .rowsDropped(let n):  return .incomplete(rows: n)
+            case .couldNotOpen(let d): return .unavailable(detail: d)
+            }
+        }
+    }
+
+    private func finish(_ gen: Int, _ outcome: Outcome = .ok) {
         guard gen == generation else { return }
+        // A completed pass is the authority on health: it either wrote everything it extracted
+        // (so any earlier failure is stale) or it says what it couldn't write.
+        setFailure(outcome.failure)
         task = nil
         if let next = pending { pending = nil; launch(next) }
         else { progress = nil; markSettled() }

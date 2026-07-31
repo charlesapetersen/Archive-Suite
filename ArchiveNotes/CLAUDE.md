@@ -94,12 +94,15 @@ macOS/Sources/ArchiveNotes/
                                    both carry sourceCount/sourceNoteCount (distinct source notes) (W7-S4)
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
                                    allSummaries() list projection (W6-S3); items.source_count column +
-                                   additive migration (W7-S4)
+                                   additive migration (W7-S4); open() is ALL-OR-NOTHING — a failed
+                                   PRAGMA/migration/schema step discards the handle (W23.m9)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, search;
                                    prune via pure `pruneDecision` two-emission gate (empty-snapshot-safe,
                                    W8-S3) — refuses to prune on an empty/unsettled snapshot; init(index:)
                                    DI (one shared sqlite handle) + indexGeneration/isIndexReady completion
-                                   signal + awaitSettled() the app path awaits after the disk build (W8-S7 §3.4)
+                                   signal + awaitSettled() the app path awaits after the disk build (W8-S7 §3.4);
+                                   `failure` (unavailable/incomplete) — isIndexReady means SETTLED, not
+                                   healthy, so the health claim lives here → sidebar banner (W23.m9)
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
                                    subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
@@ -342,6 +345,14 @@ macOS/Tests/ArchiveNotesTests/
                                    empty-scope-settles, build-indexes+settles, awaitSettled idle fast-path,
                                    coalesced-chain-settles-once) + NotesModel.buildIndexFromDisk (populates
                                    list + flips ready; no-indexer store still ready)
+  NotesIndexRecoveryTests.swift    4 tests (W23.m9): open() is all-or-nothing — a corrupt file (SQLite opens
+                                   it, then fails on the first PRAGMA) must leave NO handle, so replacing the
+                                   file and reopening works; org tables reachable on the retry; close ×2 safe
+  NotesIndexerFailureTests.swift   9 tests (W23.m9): query/summary + build over a dead index report
+                                   `.unavailable` instead of an empty answer; a failed build STILL settles
+                                   (the guard against hanging awaitSettled/bootstrap); recovery clears it;
+                                   NotesModel surfaces it (real notes + dead index ⇒ Ready but reported);
+                                   Outcome→Failure mapping + message plurals
   OrganizationStoreTests.swift     13 tests: system-folder seeding, create/rename/move(cycle-guard)/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip

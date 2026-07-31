@@ -613,21 +613,50 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   preserves the *previous valid* manifest on failed replacement — it does not propagate failure of the *new*
   snapshot. | files: ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/{data/ManifestFileWriter,data/SessionStore,capture/CaptureViewModel}.kt | M | med | none
 
-- [ ] **W23.m9 — Reader and Notes indexers report successful completion after SQLite failures, and can
-  poison the DB handle until restart [M · MED · CROSS-APP].** Reader `Search/ContentIndexer.swift` +
-  `Search/ContentIndex.swift`; Notes `Index/NotesIndexer.swift` + `Index/NotesIndex.swift` +
-  `Core/NotesModel.swift`. Two failure modes:
-  1. Both indexers suppress `open` and batch-upsert errors with `try?` then **unconditionally finish** — Notes
-     reloads the partial index and marks it **Ready**; Reader clears progress and serves partial/empty search
-     and format-health results.
-  2. **Half-open database:** in both SQLite actors, if `sqlite3_open_v2` succeeds but a PRAGMA, migration, or
-     schema-creation step then fails, `db` is left **non-nil**. Every future `open()` returns immediately
-     without completing setup or closing the handle — **poisoning the index until process restart.**
-  **Fix:** propagate open/batch errors to a typed failure state the UI can show (never "Ready" on a partial
-  index); on any setup failure **close the handle and null `db`** so a later `open()` retries cleanly; report
-  partial-batch counts. Notes W9 C6 is a scale harness and Reader's index work is scheduling/pruning —
-  neither covers error propagation or half-open recovery.
+- [x] **W23.m9 — Reader and Notes indexers report successful completion after SQLite failures, and can
+  poison the DB handle until restart [M · MED · CROSS-APP].** ✅ **DONE 2026-07-30** (checkpoints `d24b8da`
+  half-open recovery + `4ee909a` Reader propagation, then this completing commit). Both modes, both apps.
+  **Premise re-confirmed by experiment first:** `sqlite3_open_v2` is lazy, so a 1 KiB garbage file opens
+  with `SQLITE_OK` and dies on the first PRAGMA with rc=26 "file is not a database" — the exact half-open
+  window. (2) `open()` is now **all-or-nothing** in `ContentIndex` and `NotesIndex`: the PRAGMA/migration/
+  schema half runs inside a `do`, whose `catch` releases the handle and clears `db` before rethrowing, so
+  the next `open()` re-reads the file. Teardown goes through one `discardHandle()` using
+  **`sqlite3_close_v2`**, not `sqlite3_close`: close_v2 never returns BUSY, so clearing `db` can't strand a
+  live connection holding the file lock — not theoretical, under the neutered build the stranded handle kept
+  the `-shm` sidecar locked and even *replacing* the bad file failed. It reaches further in Notes, whose
+  same file holds the app-owned `folders`/`memberships` tables, not just the disposable FTS cache.
+  (1) Each driver now publishes a typed `Failure` — `.unavailable(detail:)` / `.incomplete(rows:)` — mapped
+  from a pass's `Outcome` in ONE place (`finish`), and `.ok` **clears** it so a transient corruption doesn't
+  leave a permanent warning. Reader's five query paths + Notes' two go through `openForQuery()`, which
+  records the failure instead of returning a bare empty result (empty ≡ "no matches" to a user); Reader
+  shows an amber status-bar line + tooltip carrying the SQLite reason (`ar.status.indexFailure`), Notes
+  mirrors to `NotesModel.indexFailure` → the sidebar `statusMessage` banner. Notes' `isIndexReady`
+  deliberately still flips on failure — it is the *settled* signal `awaitSettled()`/`bootstrap()` resume
+  off, so gating it on health would hang the app before first paint; the health claim is `indexFailure`.
+  Fell out: a failed open now **stops** the pass instead of extracting the whole library to discard it batch
+  by batch. `pruneIfSettled`'s `try?` deliberately stays (a failed open makes the diff empty → deletes
+  nothing), noted in place. Tier-2, scratch only (garbage sqlite3 files + real scratch `.md` notes; no
+  corpus, no network, $0): **16 new headless tests** (Reader 3+7, Notes 4+9 → 23; 7 recovery + 16
+  propagation), incl. the full arc corrupt → unavailable → replace the file → pass succeeds → failure
+  cleared AND the row actually written, and the end-to-end Notes shape (real notes on disk + dead index →
+  settled but NOT presented as healthy). **Non-vacuous per mechanism, by neutering:** dropping
+  `discardHandle()` → Reader 2/3 + Notes 3/4 RED ("no such table: items"/"folders", "an error was expected
+  but none was thrown"); restoring `try?` in `launch`/`openForQuery` → Reader 4/7 + Notes 4/9 RED, each on
+  its own mechanism. All reverted. Reader 266/266 but for the known `DeepLinkTests.testRevealAndSelectNoRoot`
+  environment flake (W20.deeplink-isolation); Notes **572/572**; clean builds, 0 new warnings, write-surface
+  lint clean. `ContentIndexer` gained an `init(url:)` seam (app path is now `convenience init()`). Residual
+  filed as **W23.m9-fu** (LOW). Write-ups: `ArchiveReader/KNOWN_ISSUES.md`, `ArchiveNotes/KNOWN_ISSUES.md`.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/{ContentIndexer,ContentIndex}.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/NotesIndexer,Index/NotesIndex,Core/NotesModel}.swift | M | med | none
+
+- [ ] **W23.m9-fu — Notes' *model-level* search still can't report an unavailable index [XS–S · LOW].**
+  Residual of W23.m9, filed 2026-07-30. `NotesModel.search(_:)`/`summary(for:)` query the shared
+  `NotesIndex` **directly** rather than through `NotesIndexer`'s wrappers, so they never attempt an open and
+  never set a `Failure`: after the banner is dismissed, a session whose index died at launch answers every
+  search with `[]` and says nothing more. Not a re-open of m9 — the launch-time failure *is* surfaced (the
+  build reports it and the sidebar shows it), so this is residual visibility for the rest of the session,
+  plus the missed chance to recover if the bad file is replaced while the app runs. Fix: route those two
+  through the same `openForQuery()` seam the indexer uses (or share one health-aware accessor), and let the
+  banner re-arm. Notes `Core/NotesModel.swift`, `Index/NotesIndexer.swift`. | Tier-1 | XS–S | LOW
 
 - [ ] **W23.m10 — `organization.json` export failure is reported as a successful organization change
   [S · MED · durable-mirror rot].** `Index/OrganizationFile.swift`, `Index/OrganizationStore.swift`.

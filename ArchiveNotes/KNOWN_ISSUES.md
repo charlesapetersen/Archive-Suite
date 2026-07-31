@@ -3,6 +3,45 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m9) — a failed `NotesIndex.open()` poisoned the DB until restart, and a dead index still read "Ready"
+**2026-07-30.** The cross-app twin of the Reader fix (`../ArchiveReader/KNOWN_ISSUES.md` has the shared
+mechanics). Two things are specific to Notes and worth knowing:
+
+**It isn't only a cache here.** `notes-index-v1.sqlite3` also holds the app-owned `folders`, `memberships` and
+`template_assignments` tables. So the half-open handle — `sqlite3_open_v2` is lazy, a corrupt/foreign file
+opens with `SQLITE_OK` and dies on the first PRAGMA, and `open()` used to throw leaving `db` non-nil, turning
+every later `open()` into a silent no-op — took the organization graph down with search. `open()` is now
+all-or-nothing: the PRAGMA/migration/schema half moved into `openSchema()`, and `open()`'s `catch` calls
+`discardHandle()` (which uses **`sqlite3_close_v2`**, so clearing `db` can never strand a locked handle) and
+rethrows. A test asserts a folder + membership write works on the retry, not just an FTS write.
+
+**`isIndexReady` means SETTLED, not HEALTHY — do not "fix" that.** It has to flip even when the build failed,
+because `awaitSettled()` resumes off it and `bootstrap()` awaits that before first paint; gating it on health
+would hang the app on a broken index. What was actually wrong is that nothing else said anything: `launch`
+swallowed the open and every batch write with `try?`, the driver settled, and `NotesModel` reloaded the empty
+index and presented it as Ready. Now `NotesIndexer.failure` (`.unavailable(detail:)` / `.incomplete(rows:)`)
+is mapped from a pass `Outcome` in one place (`finish`, where `.ok` clears it), `NotesModel.indexFailure`
+mirrors it after the build settles, and its message goes to `statusMessage` — the existing sidebar banner
+(`an.sidebar.status`). The failure path still exits **through `finish`** for exactly the reason above; a bail
+that skipped it would hang `bootstrap()`, and `NotesIndexerFailureTests` is the guard on that (it would hang
+rather than fail).
+
+Other notes:
+- `adoptIndexFailure` sets `statusMessage` but never clears it — `statusMessage` is shared with other
+  degradations, so clearing a message it didn't set would be worse. In practice the build runs once per launch.
+- `pruneIfSettled`'s `try?` is deliberate: a failed open makes `allIndexedIDs()` empty, `pruneDecision` finds
+  nothing absent, and the prune degrades to a no-op.
+- `Failure` is deliberately NOT shared with Reader's `ContentIndexer.Failure`: this driver is a fork, the copy
+  differs (notes vs files), and hoisting a UI-facing type into ArchiveCore would couple both apps' wording to
+  a third module (and make every such tweak a three-app rebuild).
+- **Residual, filed as `W23.m9-fu` (LOW):** `NotesModel.search`/`summary` query the shared `NotesIndex`
+  *directly*, not through the indexer's wrappers, so they never attempt an open or set a `Failure`. Once the
+  launch banner is dismissed, a session whose index died answers every search with `[]` and says no more.
+
+Tests: `NotesIndexRecoveryTests` (4), `NotesIndexerFailureTests` (9), incl. the end-to-end shape — real `.md`
+notes on disk plus a dead index → settled, list genuinely empty, and that emptiness *reported*. Scratch only.
+Both mechanisms proven non-vacuous by neutering; Notes suite 572/572.
+
 ## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
 
 **Found 2026-07-30**, on the suite's first-ever run in the Tart VM (`ops/autonomous/gui-vm-gate.sh` gained

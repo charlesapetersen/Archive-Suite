@@ -57,6 +57,11 @@ final class NotesModel: ObservableObject {
     /// Completion token mirrored from `NotesIndexer` — flips `0 → ≥1` once the initial build settles.
     /// Surfaced to XCUITest via the hidden `an.status.indexReady` element (08-testing §3.4).
     @Published private(set) var indexGeneration = 0
+    /// Why the index is degraded, when it is (`nil` = healthy) — mirrored from `NotesIndexer.failure`
+    /// after the build settles. `isIndexReady` above means *settled*, not *healthy*: it has to flip
+    /// even on failure or `awaitSettled()` would never resume, so this is the honest health claim, and
+    /// `bootstrap()` puts its message in `statusMessage` where the sidebar shows it (W23.m9).
+    @Published private(set) var indexFailure: NotesIndexer.Failure?
 
     // MARK: Current scope (drives the item list in W6-S3/S4)
 
@@ -265,6 +270,16 @@ final class NotesModel: ObservableObject {
         await indexer.awaitSettled()
         await reloadItems()
         markIndexReady(generation: indexer.indexGeneration)
+        // Settled ≠ healthy: adopt whatever the build actually achieved, so a partial or unopenable
+        // index is visible rather than presented as a Ready one (W23.m9).
+        adoptIndexFailure(indexer.failure)
+    }
+
+    /// Mirror the indexer's health onto the model and, when degraded, into the sidebar status line.
+    /// Never clears a message it didn't set — `statusMessage` is shared with other degradations.
+    private func adoptIndexFailure(_ failure: NotesIndexer.Failure?) {
+        indexFailure = failure
+        if let failure { statusMessage = failure.message }
     }
 
     private func markIndexReady(generation: Int) {
