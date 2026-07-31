@@ -14,14 +14,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-BIN="$REPO/ArchiveProcessor/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+BIN="$REPO/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 GT="$REPO/Test Files/Ground Truth Segmentation"
 OUTBASE="$REPO/.maintenance/test-results/tier2-$(date +%Y%m%d-%H%M%S)"
 LOG="$OUTBASE/tier2.log"
 mkdir -p "$OUTBASE"
 say(){ echo "$@" | tee -a "$LOG"; }
 
-[ -x "$BIN" ] || { say "no built app at $BIN — run: (cd ArchiveProcessor && xcodegen generate && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build)"; exit 1; }
+[ -x "$BIN" ] || { say "no built app at $BIN — run: (cd macOS && xcodegen generate && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build)"; exit 1; }
 GKEY="${AP_GEMINI_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a Gemini -w 2>/dev/null)}"
 [ -n "$GKEY" ] || { say "no Gemini key (Keychain acct 'Gemini' or AP_GEMINI_KEY) — approve the Keychain prompt"; exit 1; }
 

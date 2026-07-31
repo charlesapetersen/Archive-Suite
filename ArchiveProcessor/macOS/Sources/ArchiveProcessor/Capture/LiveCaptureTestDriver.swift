@@ -60,7 +60,12 @@ enum LiveCaptureTestDriver {
                                priority: nil, year: nil, month: nil, deviceName: "TestDriver")
                 seq += 1
             }
-            if seg.type == .document { session.skipMacTags(groupId: gid) }   // resolve card → finalize (LLM tags)
+            // Resolve the card → finalize (LLM tags). W23.m7: a resolve is now REFUSED when its manifest
+            // write fails, and the segment then never finalizes — say so here, or the run just times out
+            // later with an unexplained "staged 0/N".
+            if seg.type == .document, !session.skipMacTags(groupId: gid) {
+                NSLog("TESTDRIVER: tag-card resolve for \(gid) was NOT durable (manifest write failed) — this segment will not finalize")
+            }
         }
 
         // Wait for all segments to finalize (staged), up to ~180s.

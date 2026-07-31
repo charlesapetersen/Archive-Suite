@@ -8,8 +8,8 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-BIN="$REPO/ArchiveProcessor/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-[ -x "$BIN" ] || { echo "no built app at $BIN — run: (cd ArchiveProcessor && xcodegen generate && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build)"; exit 1; }
+BIN="$REPO/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+[ -x "$BIN" ] || { echo "no built app at $BIN — run: (cd macOS && xcodegen generate && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build)"; exit 1; }
 
 OUT="$REPO/.maintenance/test-results/filerelay-$(date +%Y%m%d-%H%M%S)"
 ROOT="$OUT/relay"
