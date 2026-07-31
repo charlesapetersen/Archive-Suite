@@ -801,7 +801,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   batch test. All neuters reverted (`git diff` empty). 614/614 Notes green, clean build, 0 new warnings.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Index/NotesIndex,Core/NotesModel,Core/NotesNavigationModel}.swift | M | med | none
 
-- [ ] **W23.m14 — resolving a missing Reader link synchronously scans the whole archive on the main actor
+- [x] **W23.m14 — resolving a missing Reader link synchronously scans the whole archive on the main actor
   [S–M · MED · UI freeze].** `Links/ReaderLinkResolver.swift`. The resolver is `@MainActor`; when an exact
   relative path is missing, `resolve` **synchronously enumerates every descendant** of the granted Reader root
   looking for a matching basename. Clicking **one** broken or moved source link therefore freezes all Notes UI
@@ -809,7 +809,45 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   intended behaviour — doing it synchronously on the UI actor is the defect.)
   **Fix:** move the fallback off the main actor into a cancellable async task with progress + a bound, and
   keep the resolver's fast exact-path hit synchronous. Notes W9 C6 covers Notes-index scale, not Reader-root
-  fallback scanning. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | S–M | med | none
+  fallback scanning.
+  ✅ **DONE 2026-07-30** (checkpoint `71cb722` = the split + the popover; completing commit = tests +
+  trackers). Premise re-confirmed by symbol first. Resolution is now two stages: `resolveExact` keeps the
+  cheap answers (unknown root, containment refusal, exact hit) synchronous on the main actor and returns
+  `.needsBasenameSearch` **instead of** searching, and `nonisolated static scanForBasename` does the walk on
+  the cooperative pool. **The synchronous full-walk API is gone rather than deprecated** — the defect was not
+  that one call site was slow, it was that the resolver *offered* a main-actor walk over a 100k–150k-file
+  archive, so `resolve` is async-only and a future caller cannot re-introduce the freeze.
+  **A search that did not finish is never reported as absence:** the new `.searchIncomplete(scanned:)` case
+  covers cancellation, the entry bound, and an unwalkable root, and the popover says the file "may still be
+  there" instead of "not found". The bound is `1_000_000` entries — an order of magnitude clear of the real
+  corpus (~102k PDFs + JPEG partners + folders), because it exists to stop a pathological mount, not to cap a
+  legitimate archive. A root that **doesn't exist** still reports `.notFound` (nothing can be under it), which
+  is what keeps the shipped W8-S9 computer-move contract intact — a distinction the E2E suite caught.
+  Cancellation is checked every 64 entries; the popover cancels on dismiss/re-show and shows a live
+  "N items checked" readout, generation-scoped so a finished search's straggler ticks can't inflate the next
+  one's count. **10 new tests** (`ReaderLinkScanTests`), scratch temp trees only, `readerRootBookmarks`
+  snapshot/restored so host defaults are left byte-identical. **Non-vacuity measured by 3 neuters, each
+  reddening a disjoint set:** pre-fix main-actor walk → 4 tests; unfinished-search-reported-as-`notFound` →
+  the 2 honesty tests; `@MainActor` scanner → the 2 off-actor tests. The off-actor proof is structural, not
+  timing-based — the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it
+  answers the question directly. **624/624** `ArchiveNotesTests` green, clean build, 0 new warnings. Notes-only
+  — no ArchiveCore type touched, so the shared-core rebuild rule is N/A. VM UITest lane re-run: the same 4
+  pre-existing failures as the 19:44 baseline (G3/G6/G8/G11, already tabled in `ArchiveNotes/KNOWN_ISSUES.md`),
+  no regression. Containment still uses `standardizedFileURL` **on purpose** — W23.l1 (blocked-on this item)
+  is the symlink-containment fix and stays a clean one-line change on this seam, now unblocked.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | S–M | med | none
+
+- [ ] **W23.m14-fu — a Reader root on an *unmounted* volume reports its files as missing from the archive
+  [XS · LOW · misleading absence].** Residual noticed while shipping W23.m14 (2026-07-30); **not** a re-open —
+  m14's contract for a root directory that is *gone* is deliberate and load-bearing for the W8-S9
+  computer-move promise. The gap is narrower: `scanForBasename` cannot tell "this root was deleted" from
+  "this root's volume is unplugged", and both take the `.exhausted` branch, so the popover says *"Source file
+  not found in the archive"* about files that are merely offline. **Re-confirm the premise first** — it turns
+  on whether `ReaderRootStore.loadSaved` / `root(for:)` hand back a URL at all for an unmounted volume
+  (`URL(resolvingBookmarkData:)` may throw, in which case the resolver already says `needsRootGrant` and there
+  is nothing to fix). If it is reachable: distinguish the two with a volume-reachability check and report the
+  offline case as its own outcome, not as absence. Notes `Links/{ReaderLinkResolver,ReaderRootStore}`,
+  `Views/ReaderPreviewPopover`. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | XS | low | none
 
 - [ ] **W23.m15 — deleting the Inbox or Extracts system folder is permanent and creates ghost memberships
   forever [S–M · MED].** `Views/NotesFolderTreeView.swift`, `Index/OrganizationStore.swift`,

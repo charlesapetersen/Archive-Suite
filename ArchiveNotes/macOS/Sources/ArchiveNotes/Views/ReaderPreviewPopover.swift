@@ -43,19 +43,26 @@ final class ReaderPreviewPopover {
         case .decided(let resolution):
             present(resolution, page: page, relativeTo: view)
         case .needsBasenameSearch:
-            searchModel.reset()
+            let search = searchModel.beginSearch()
             showSearching(relativeTo: view)
             searchTask = Task { [weak self] in
                 guard let self else { return }
                 let resolution = await self.resolver.resolve(
                     rootGUID: guid,
                     relativePath: rel,
-                    progress: { [weak self] scanned in self?.searchModel.advance(to: scanned) }
+                    progress: { [weak self] scanned in
+                        self?.searchModel.advance(to: scanned, generation: search)
+                    }
                 )
                 // A cancelled search's answer is stale by construction — the popover was
                 // dismissed or replaced, so it must not reopen one.
-                guard !Task.isCancelled, let target = self.anchorView, target === view,
-                      target.window != nil else { return }
+                guard !Task.isCancelled else { return }
+                // The chip went away while we searched: take the "searching" popover with
+                // it rather than leaving it up forever.
+                guard let target = self.anchorView, target === view, target.window != nil else {
+                    self.closePopover()
+                    return
+                }
                 self.present(resolution, page: page, relativeTo: target)
             }
         }
@@ -176,16 +183,24 @@ private struct PreviewContentView: View {
 
 /// Live entry count for an in-flight basename search (W23.m14).
 ///
-/// Progress ticks are relayed from the scanning thread and can therefore land out of
-/// order; `advance(to:)` keeps the displayed count monotonic.
+/// Ticks are relayed from the scanning thread through the main actor, so they can land
+/// out of order — and a finished search's stragglers can land after the next one starts.
+/// The generation token drops those; the count itself only ever rises.
 @MainActor
 final class PreviewSearchModel: ObservableObject {
     @Published private(set) var scanned = 0
+    private var generation = 0
 
-    func reset() { scanned = 0 }
+    /// Start a new search: zero the readout, and return the token that scopes its ticks.
+    func beginSearch() -> Int {
+        generation += 1
+        scanned = 0
+        return generation
+    }
 
-    func advance(to count: Int) {
-        if count > scanned { scanned = count }
+    func advance(to count: Int, generation token: Int) {
+        guard token == generation, count > scanned else { return }
+        scanned = count
     }
 }
 

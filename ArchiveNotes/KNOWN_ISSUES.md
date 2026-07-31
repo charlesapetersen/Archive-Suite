@@ -3,6 +3,44 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m14) — one broken source link froze the whole app for an archive walk
+
+**2026-07-30.** `ReaderLinkResolver` is `@MainActor`, and when a link's exact relative path was missing its
+basename fallback enumerated **every descendant of the granted Reader root right there on the UI actor**.
+Clicking one moved-or-deleted source chip therefore hung all of Notes for the length of a 100k–150k-file
+walk, with nothing to cancel it and nothing on screen to say why.
+
+Resolution is now two stages. `resolveExact` answers the cheap cases (unknown root, containment refusal,
+exact hit) synchronously and otherwise returns `.needsBasenameSearch` **instead of searching**;
+`nonisolated static scanForBasename` does the walk on the cooperative pool, checking cancellation every 64
+entries and yielding periodically.
+
+**The synchronous full-walk API was deleted, not deprecated.** The defect was never that one call site was
+slow — it was that the resolver *offered* a main-actor walk over the archive. `resolve` is async-only now, so
+the freeze cannot be reintroduced by a future caller doing the obvious thing.
+
+**A search that did not finish is never reported as absence.** The new `.searchIncomplete(scanned:)` covers
+cancellation, the entry bound and an unwalkable root; the popover says the file "may still be there" rather
+than "not found in the archive". Two boundaries worth not re-litigating:
+- The bound is `1_000_000` entries — an order of magnitude clear of the real corpus (~102k PDFs plus JPEG
+  partners plus folders). It exists to stop a pathological mount from searching forever, **not** to cap a
+  legitimate archive, so it must stay far above any plausible corpus. Shrinking it to something "reasonable"
+  would silently turn real fallback hits into `.searchIncomplete`.
+- A root directory that **does not exist** still reports `.notFound`, because nothing can be under a
+  directory that isn't there. That keeps the shipped W8-S9 computer-move contract (a stale root reports the
+  file missing, never a wrong file) — `DurableLinkE2ETests` caught the first attempt, which reported the
+  vanished root as an incomplete search. The narrower case it still cannot distinguish — a root whose
+  *volume* is unplugged — is filed as **W23.m14-fu** (LOW).
+
+Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
+timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it
+answers the question directly. Three neuters measured non-vacuity, each reddening a disjoint set (pre-fix
+main-actor walk → 4 tests; unfinished-search-as-`notFound` → the 2 honesty tests; `@MainActor` scanner → the
+2 off-actor tests).
+
+**Containment still uses `standardizedFileURL` on purpose.** W23.l1 (symlink containment) was blocked on this
+item because it edits the same function; it is now unblocked and remains a one-line change on that seam.
+
 ## ✅ FIXED (W23.m13) — three "atomic" organization operations were not, and the loss was silent
 
 **2026-07-30.** `OrganizationStore` documents its mutations as atomic, but three of them spanned several

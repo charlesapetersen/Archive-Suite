@@ -54,16 +54,20 @@ struct BasenameScan: Sendable, Equatable {
 
     /// Upper bound on entries examined by one basename search.
     ///
-    /// Sized well above the ~100k–150k-file archive this app targets, so the fallback
-    /// behaves on a real corpus exactly as it always has; the bound exists to stop a
-    /// pathological tree (a large network mount) from searching forever. Hitting it
-    /// reports `.searchIncomplete`, never `.notFound`.
-    static let defaultLimit = 250_000
+    /// Deliberately far above any real corpus, so the fallback behaves exactly as it
+    /// always has: the archive is ~100k–150k PDFs, and counting their JPEG partners and
+    /// the folders holding them the walk still sees only a few hundred thousand entries.
+    /// The bound exists to stop a pathological tree (a large network mount) searching
+    /// forever, NOT to cap a legitimate archive — so it is set an order of magnitude
+    /// clear of one. Hitting it reports `.searchIncomplete`, never `.notFound`.
+    static let defaultLimit = 1_000_000
 }
 
 /// Each a multiple of the one before, so a single modulo gates the rest.
 /// File-scope (not members of the `@MainActor` resolver) so the off-actor walk can read them.
-private let cancellationStride = 256
+/// The cancellation check is the tightest of the three: on a slow volume an entry can cost
+/// milliseconds, and this is how long a dismissed popover keeps a thread walking.
+private let cancellationStride = 64
 private let progressStride = 2_048
 private let yieldStride = 8_192
 
@@ -188,6 +192,18 @@ final class ReaderLinkResolver {
         // A private FileManager: the enumerator is driven off-actor and must not share
         // state with whatever the main actor is doing to `FileManager.default`.
         let fm = FileManager()
+        var isDirectory: ObjCBool = false
+        if fm.fileExists(atPath: root.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else {
+                // The root exists but cannot be walked, so absence is NOT established.
+                return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
+            }
+        } else {
+            // The root itself is gone: nothing can be under a directory that isn't there,
+            // so absence IS established. (This is the shipped W8-S9 computer-move
+            // contract — a stale root reports the file missing, never a wrong file.)
+            return BasenameScan(match: nil, scanned: 0, stop: .exhausted)
+        }
         guard let enumerator = fm.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],

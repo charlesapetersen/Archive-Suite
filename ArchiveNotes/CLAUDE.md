@@ -112,6 +112,18 @@ macOS/Sources/ArchiveNotes/
                                    the item is never member-less) are all-or-nothing, and in-memory state
                                    moves ONLY after the DB transaction commits (W23.m13)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
+  Links/
+    ReaderRootStore.swift          @MainActor — GUID-keyed security-scoped bookmarks to Reader roots
+                                   (grant / look-up / stop-scope); the only writer of readerRootBookmarks
+    ReaderLinkResolver.swift       THE archivereader:// resolve seam, in TWO stages (W23.m14): resolveExact
+                                   is the walk-free main-actor stage (unknown root / containment refusal /
+                                   exact hit, else .needsBasenameSearch) and `nonisolated static
+                                   scanForBasename` is the off-actor basename walk — cancellable (checked
+                                   every 64 entries), bounded (BasenameScan.defaultLimit, an order of
+                                   magnitude above the real corpus), progress-reporting. There is NO
+                                   synchronous full-walk API by design; `resolve` is async-only so a
+                                   main-actor archive walk cannot be reintroduced. A search that did not
+                                   finish is .searchIncomplete(scanned:), NEVER .notFound
   Core/
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
@@ -291,7 +303,11 @@ macOS/Sources/ArchiveNotes/
     ThumbnailImageCache.swift      @MainActor NSCache<NSString, NSImage> (300 count / 64 MB)
     NotesPDFPaneView.swift         Notes-side PDFPaneController + PDFPaneView (read-only, no-persist)
     ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for
-                                   needsRootGrant / renamedCandidate / notFound.
+                                   needsRootGrant / renamedCandidate / notFound / searchIncomplete.
+                                   Shows the walk-free answer immediately and, when a basename search is
+                                   needed, a live "N items checked" state it cancels on dismiss/re-show
+                                   (PreviewSearchModel, generation-scoped so a finished search's straggler
+                                   ticks can't inflate the next one's count) (W23.m14).
                                    SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject)
   Zotero/
     ZoteroRef.swift                ZoteroRef/ZoteroLibrary/ZoteroRefKind value types (§D.1)
@@ -454,6 +470,15 @@ macOS/Tests/ArchiveNotesTests/
                                    ignore / extract target / missing-on-note-window-only)
   ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
                                    grant/wrong-guid/special-chars + router + root-store
+  ReaderLinkScanTests.swift        10 tests (W23.m14): resolveExact defers the walk (and still answers
+                                   the cheap cases); the walk runs OFF the main thread even when started
+                                   from it (proved structurally — the raw progress callback runs on the
+                                   scanning thread, so Thread.isMainThread answers directly); bound and
+                                   cancellation both report .searchIncomplete, NEVER .notFound; cancel
+                                   lands mid-walk and stops it early (gated on a parked progress tick, so
+                                   it's deterministic, not a race); an unwalkable root isn't absence; the
+                                   fallback still finds a moved file; progress reaches the main actor and
+                                   its readout is monotonic + generation-scoped
   DurableLinkE2ETests.swift        4 tests (W8-S9): the durable-link scenario — link round-trip +
                                    resolve, computer-move re-grant by GUID, unknown-GUID/wrong-folder
                                    needs-regrant (never silent), renamed-candidate; hermetic (scratch

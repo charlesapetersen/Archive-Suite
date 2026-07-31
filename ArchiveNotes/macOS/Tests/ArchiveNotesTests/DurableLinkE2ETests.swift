@@ -126,8 +126,8 @@ struct DurableLinkE2ETests {
     }
 
     @Test("Unknown root GUID asks for a re-grant — never a silent failure")
-    func unknownGUIDRequestsRegrant() async throws {
-        try await withHermeticBookmarks {
+    func unknownGUIDRequestsRegrant() async {
+        await withHermeticBookmarks {
             let store = ReaderRootStore()
             let resolver = ReaderLinkResolver(rootStore: store)
             let unknown = UUID()
