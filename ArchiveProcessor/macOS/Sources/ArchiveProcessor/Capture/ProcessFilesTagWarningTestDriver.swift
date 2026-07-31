@@ -378,6 +378,50 @@ enum ProcessFilesTagWarningTestDriver {
         check("a job carrying its classification only on the OCR result still resolves its colour",
               OCRProcessor.authoritativeColor(forJob: resultOnlyJob) == "Red")
 
+        // --- 8. W23.m5-fu2 — a RECLASSIFICATION takes back only what the app added. ---
+        // The three review flows cleared the way with `removeAll { $0 == "Red" || … || $0 == "Folder" }`,
+        // so a document whose genuine SUBJECT is one of those words lost it the moment anyone changed the
+        // classification. 8a is the rule in isolation; 8b drives the real production functions.
+
+        // 8a. The pure rule. The structure word is the companion of the colour, and between them they are
+        // the complete set a classification contributes — so they are the complete set it may take back.
+        check("box → \"Box\", folder → \"Folder\", ordinary document → no structure tag",
+              OCRProcessor.structureTag(for: .boxLabel) == "Box"
+              && OCRProcessor.structureTag(for: .folderLabel) == "Folder"
+              && OCRProcessor.structureTag(for: .documentStart) == nil
+              && OCRProcessor.structureTag(for: .documentContinuation) == nil
+              && OCRProcessor.structureTag(for: nil) == nil)
+        check("demoting a box label drops the words the app added for it",
+              OCRProcessor.reclassifiedTags(["Box", "1948", "Red"],
+                                            from: .boxLabel, to: .documentStart) == ["1948"])
+        check("...and promoting one adds them back in the FRESH write's shape (subject first, colour last)",
+              OCRProcessor.reclassifiedTags(["1948"], from: .documentStart, to: .boxLabel)
+              == ["Box", "1948", "Red"])
+        check("a folder label round-trips through box and back with nothing gained or lost",
+              OCRProcessor.reclassifiedTags(
+                OCRProcessor.reclassifiedTags(["Folder", "1948", "Purple"],
+                                              from: .folderLabel, to: .boxLabel),
+                from: .boxLabel, to: .folderLabel) == ["Folder", "1948", "Purple"])
+        // The defect itself, in both directions.
+        check("a genuine SUBJECT tag \"Box\" survives a reclassification the app never added it for",
+              OCRProcessor.reclassifiedTags(["Box", "1948"], from: .documentStart, to: .documentContinuation)
+              == ["Box", "1948"])
+        check("...and \"Red\" survives being demoted from a folder label",
+              OCRProcessor.reclassifiedTags(["Folder", "Red", "Purple"],
+                                            from: .folderLabel, to: .documentStart) == ["Red"])
+        check("a page that is BOTH a box label and about boxes keeps the operator's copy",
+              OCRProcessor.reclassifiedTags(["Box", "Box", "1948", "Red"],
+                                            from: .boxLabel, to: .documentStart) == ["Box", "1948"])
+        check("a reclassification between two ordinary kinds takes nothing at all",
+              OCRProcessor.reclassifiedTags(["Red", "Purple", "Box", "Folder"],
+                                            from: .documentStart, to: .documentContinuation)
+              == ["Red", "Purple", "Box", "Folder"])
+        check("an unclassified page promoted to a box gains exactly one Box and one Red",
+              OCRProcessor.reclassifiedTags([], from: nil, to: .boxLabel) == ["Box", "Red"])
+        check("stripping a word the page never carried is a harmless no-op",
+              OCRProcessor.reclassifiedTags(["1948"], from: .boxLabel, to: .folderLabel)
+              == ["Folder", "1948", "Purple"])
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["PROCESSFILES_TAGWARN_TEST_OUT"]

@@ -104,6 +104,52 @@ extension OCRProcessor {
         authoritativeColor(for: job.classification ?? job.result?.classification)
     }
 
+    // MARK: - W23.m5-fu2 — a reclassification takes back what the APP added, not every word that looks like it
+
+    /// The subject tag the app itself adds for a structure page: "Box" for a box label, "Folder" for a
+    /// folder label, nil for an ordinary document. The exact companion of `authoritativeColor(for:)` —
+    /// between them they are the *complete* set of tags a classification contributes to a page, and so
+    /// the complete set a **re**-classification is entitled to take away again.
+    nonisolated static func structureTag(for classification: DocumentClassification?) -> String? {
+        switch classification {
+        case .boxLabel: return "Box"
+        case .folderLabel: return "Folder"
+        default: return nil            // ordinary document, or not classified → no structure tag
+        }
+    }
+
+    /// Rewrite one page's tag array for a classification change.
+    ///
+    /// The three review flows used to clear the way with
+    /// `removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }` — matching the
+    /// literal word, whatever the page had ever been classified as. Dropping the OLD classification's
+    /// words is right; matching on the *word* is not. A document whose genuine SUBJECT is one of those
+    /// words (a photo OF a box, a "Red Scare" memo, a "Folder" of loose prints) lost that subject from
+    /// the file and from `jobs[].appliedTags` the moment anyone reclassified it — tag LOSS, the mirror
+    /// image of W23.m5-fu's misfile.
+    ///
+    /// So: remove ONE occurrence of each word the app added for `old` — a second, genuine copy of the
+    /// same word survives, because macOS persists duplicate tag strings and the vocabulary is a multiset
+    /// (`SPEC/tag-format.md`) — then add exactly one of each word for `new`, in the shape a fresh
+    /// `GeneratedTags` write uses: subject word first, colour last. Adding unconditionally is what keeps
+    /// the round trip stable: one app copy in, one app copy out, so box → folder → box neither piles up
+    /// duplicates nor eats the operator's own tag.
+    ///
+    /// Callers must pair this with `colorIsAuthoritative: true` + `authoritativeColor(for: new)`. Once a
+    /// subject word can survive the strip, raw-array detection would promote a surviving "Red" straight
+    /// back to the box label — the two halves are one fix.
+    nonisolated static func reclassifiedTags(_ tags: [String],
+                                             from old: DocumentClassification?,
+                                             to new: DocumentClassification?) -> [String] {
+        var out = tags
+        for word in [structureTag(for: old), authoritativeColor(for: old)].compactMap({ $0 }) {
+            if let idx = out.firstIndex(of: word) { out.remove(at: idx) }
+        }
+        if let color = authoritativeColor(for: new) { out.append(color) }
+        if let structure = structureTag(for: new) { out.insert(structure, at: 0) }
+        return out
+    }
+
     /// Main-actor convenience: write, then record the verdict against the INPUT file that produced this
     /// output. Use this at every main-actor tag site; the detached sites call `writeOutputTags` and hand
     /// the Bool to `recordTagWrite(succeeded:forSource:)` themselves.
