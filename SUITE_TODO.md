@@ -558,8 +558,8 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   Build clean, 0 new warnings. Residual colour-detection finding filed as **W23.m5-fu**.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor{,+Tagging,+OCR,+Pipeline,+ReviewFlows}.swift, Capture/ProcessFilesTagWarningTestDriver.swift, scripts/test-processfiles-tagwarn.sh | M | med | none
 
-- [ ] **W23.m5-fu — two read-append-rewrite tag sites still infer the Finder colour from the tag text
-  [XS–S · LOW · misfile].** Found 2026-07-31 while fixing W23.m5 (the audit of the sites it rewrote, not
+- [x] **W23.m5-fu — two read-append-rewrite tag sites still infer the Finder colour from the tag text
+  [XS–S · LOW · misfile].** ✅ DONE this commit (checkpoint `5342d2b` code+tests). Found 2026-07-31 while fixing W23.m5 (the audit of the sites it rewrote, not
   a new review). `applyCapturePriorityTags` and `exportOriginalImages` both READ a PDF's tags back off
   disk and re-apply them as a raw `[String]`, so `MacOSTagger` runs its Red/Purple DETECTION over the
   array — the same defect W3.cap-r1 fixed on the Live Capture staging path and KNOWN_ISSUES #5 fixed on
@@ -574,7 +574,53 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   Both sites iterate `jobs`, so the classification is already in hand. Test: extend
   `scripts/test-processfiles-tagwarn.sh` — a "Red"-subject document keeps the tag and takes no label
   through a rewrite; a box PDF still reads label 6 afterwards.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift | XS–S | low | W23.m5
+  **Shipped exactly that, via one seam.** New `OCRProcessor.authoritativeColor(for:)` states the rule in
+  one place — box → Red, folder → Purple, anything else → no colour — and both sites now pass its result
+  with `colorIsAuthoritative: true`. The `forJob:` overload coalesces `job.classification ??
+  job.result?.classification`: every writer keeps the two in sync, but a failed re-OCR can blank the
+  result's copy, and falling back to "no colour" is precisely the strip this item warned about. Checked
+  the invariant that makes classification trustworthy here rather than assuming it: `preGroupedPriorities`
+  is cleared whenever the boundary count mismatches, so a phone priority implies
+  `applyPreGroupedClassifications` ran (it sets BOTH fields) and every such job carries a classification.
+  Copy-source mode is untouched by construction — `applyTags` passes names through verbatim and never
+  writes a label there, so the colour argument is dead in that mode.
+  **One correction to this entry's own text, found by driving it:** the subject tag "Red" was **not**
+  lost. Detection moves it to the front of the array and re-adds it, so it stayed searchable; the defect
+  is the Finder **label** alone (and the Reader's box mis-read that follows from it). The neutered run
+  confirms it — with the old code restored, "…and 'Red' is still a searchable subject tag" PASSES while
+  only the label checks go RED.
+  Tier-2, scratch only: 12 new checks in `ProcessFilesTagWarningTestDriver` (**47 total, ALL PASS**),
+  synthetic files in a temp dir — no corpus, no OCR, no network, no GUI, $0. Both REAL production
+  functions are driven (`applyCapturePriorityTags`, `exportOriginalImages`), not just the seam, and both
+  directions are covered on both sites: a "Red"-subject document takes no label, a box PDF keeps label 6,
+  a folder's exported image keeps label 3. **Non-vacuous by two neuters, each reddening exactly the
+  expected pair:** restoring detection at both sites → the two "subject Red must not become a label"
+  checks RED (this IS the premise re-confirmation, since that is the pre-fix code); the naive
+  `appColor: nil` variant → the two "a genuine box/folder KEEPS its label" checks RED. Build clean, 0 new
+  warnings; seven sibling regressions green (merge-safety, collection-organize, recovery, batch-resume,
+  multipage-reocr, segment-json, output-file-safety). Processor-internal — nothing in ArchiveCore
+  changed, so the all-three-app rebuild rule is N/A; no view code, nothing for the VM lane to see.
+  **Adjacent finding, filed not fixed: W23.m5-fu2** (below) — the reclassification re-tag in
+  `+ReviewFlows` strips the literal words "Red"/"Purple"/"Box"/"Folder" from the tag array, which for a
+  document whose SUBJECT is one of those words really does delete it. Different site, different
+  mechanism, out of this item's two-site scope.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift, Capture/ProcessFilesTagWarningTestDriver.swift | XS–S | low | W23.m5
+
+- [ ] **W23.m5-fu2 — reclassifying a document DELETES a subject tag that happens to be a structure word
+  [XS · LOW · tag loss].** Found 2026-07-31 while fixing W23.m5-fu (audit of the neighbouring rewrite
+  sites, not a new review). `OCRProcessor+ReviewFlows` re-tags an output whenever the operator changes
+  its classification (two sites: the collection review at ~`:164` and the single-item change at ~`:317`).
+  Both rebuild the array with `existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" ||
+  $0 == "Folder" }` before appending the new classification's words. The intent is right — drop the OLD
+  structure tags so they can be replaced — but the filter matches on the literal word, so a document
+  whose genuine subject tag is "Red" (Red Scare/Red Cross), "Box" (a ballot box file) or "Folder" loses
+  it from both the file and `jobs[].appliedTags`, and it never comes back. The Finder LABEL is correct
+  here (the colour is classification-derived and appended), so this is tag loss, not misfile — the
+  mirror image of m5-fu. Fix: track which structure tags the app itself added (or strip only the words
+  matching the OLD classification) instead of pattern-matching the vocabulary. Test: extend
+  `scripts/test-processfiles-tagwarn.sh` — reclassify a document tagged `["Red", "1948"]` and assert
+  "Red" survives.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift | XS | low | none
 
 - [x] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
   [S–M · MED · broken citations · SHARED CORE].** ✅ DONE `fa8bc02` (ArchiveCore) + `1e0af47` (Reader) + this
