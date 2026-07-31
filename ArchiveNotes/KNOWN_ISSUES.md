@@ -3,6 +3,40 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m13) — three "atomic" organization operations were not, and the loss was silent
+
+**2026-07-30.** `OrganizationStore` documents its mutations as atomic, but three of them spanned several
+independent awaited writes with no transaction and no rollback. `deleteFolder` reparented each child **in
+memory before** its own DB update and then issued three more separate deletes; `deleteTemplate` cleared
+**every** folder assignment before it even attempted the trash; `move` added the target membership and then
+swallowed a failed source removal with `try?`, so the item stayed **replicated in both folders** while the UI
+said it had moved.
+
+**The property that made this dangerous was the silence.** In the folder case the memberships delete commits,
+the folder delete then fails, and the throw skips the caller's in-memory cleanup — so memory *and*
+`organization.json` still list memberships SQLite no longer has, and every in-memory check still looks right.
+`load()` prefers the DB whenever it holds folders, so the **next launch** adopts the lossy half as durable
+truth and those notes are orphaned with no §3.6 confirmation ever shown.
+
+Fixed with three real transactions in `NotesIndex` (`deleteFolderGraph`, `moveMembership`,
+`deleteTemplateAssignments`) plus the rule that in-memory state only moves after the commit. They are whole
+methods rather than an exposed BEGIN/COMMIT for the reason `upsertBatch` already documents: no suspension
+between BEGIN and COMMIT, and `OrganizationStore` is `@MainActor`, which is reentrant at every `await`.
+
+**Two decisions worth not re-litigating:**
+- `move` keeps the insert **before** the delete inside the transaction. That is not incidental ordering — it
+  is what guarantees the item is never transiently member-less, so a move can still never trip the §3.6
+  delete-last-instance guard. The old code bought the same property with a `try?`, which is what broke it.
+- `deleteTemplate` now trashes **first**, the reverse of the order its own comment argued for. A refused trash
+  changes nothing at all; the opposite failure leaves only a dangling assignment, which
+  `TemplateResolution.resolve` already skips and `effectiveTemplate` lazily clears. The old order traded an
+  unrecoverable loss of every assignment for a tidiness the fallback already provided.
+
+Pinned by 16 scratch tests (`OrganizationAtomicityTests`) using real SQLite fault injection — a
+`BEFORE DELETE … RAISE(ABORT)` trigger, **targeted by row** where a batch needs its first delete to succeed
+and its second to fail (an all-rows refusal cannot distinguish a rollback from a half-applied batch). Two of
+the 16 assert the fixture's own honesty; four neuters measured non-vacuity, each reddening a disjoint set.
+
 ## ✅ FIXED (W23.m12) — a note the disk refused to trash disappeared from All Notes anyway
 
 **2026-07-30.** `NotesModel.trashItems` logged each `NoteStore.delete` failure and then deleted **every

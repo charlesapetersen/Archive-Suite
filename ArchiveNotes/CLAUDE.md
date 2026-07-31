@@ -95,7 +95,10 @@ macOS/Sources/ArchiveNotes/
     NotesIndex.swift               actor — FTS5 + items table + org CRUD (folders/memberships/templates);
                                    allSummaries() list projection (W6-S3); items.source_count column +
                                    additive migration (W7-S4); open() is ALL-OR-NOTHING — a failed
-                                   PRAGMA/migration/schema step discards the handle (W23.m9)
+                                   PRAGMA/migration/schema step discards the handle (W23.m9);
+                                   multi-row org transactions deleteFolderGraph / moveMembership /
+                                   deleteTemplateAssignments — whole methods, NOT an exposed BEGIN/COMMIT
+                                   (invariant: no suspension between BEGIN and COMMIT) (W23.m13)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, search;
                                    prune via pure `pruneDecision` two-emission gate (empty-snapshot-safe,
                                    W8-S3) — refuses to prune on an empty/unsettled snapshot; init(index:)
@@ -104,7 +107,10 @@ macOS/Sources/ArchiveNotes/
                                    `failure` (unavailable/incomplete) — isIndexReady means SETTLED, not
                                    healthy, so the health claim lives here → sidebar banner (W23.m9)
     OrganizationStore.swift        @MainActor — folder tree + memberships + templates + organization.json;
-                                   subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope)
+                                   subtreeItemIDs(of:) cycle-safe subtree membership union (W6-S4 scope);
+                                   deleteFolder + moveMembership (the MOVE seam, insert-before-delete so
+                                   the item is never member-less) are all-or-nothing, and in-memory state
+                                   moves ONLY after the DB transaction commits (W23.m13)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Core/
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
@@ -359,6 +365,13 @@ macOS/Tests/ArchiveNotesTests/
                                    delete(reparent+orphans), replication add/remove/wasLastInstance/
                                    forceRemove, template assignment+inheritance, JSON+DB round-trip
   OrganizationFileTests.swift      3 tests: round-trip, loadMissing, atomicWrite
+  OrganizationAtomicityTests.swift 16 tests (W23.m13, Tier-2): deleteFolder / move / deleteTemplate are
+                                   all-or-nothing, memory never ahead of the disk. Real SQLite fault
+                                   injection — a BEFORE DELETE…RAISE(ABORT) trigger via the DEBUG-only
+                                   NotesIndex.executeForTesting seam, TARGETED BY ROW for the batch case
+                                   (an all-rows refusal can't tell a rollback from a half-applied batch);
+                                   2 fixture-honesty tests; the divergence tests compare memory AGAINST
+                                   the DB, since pre-fix memory alone looked correct
   VirtualFolderReplicationTests.swift  7 tests (W8-S4, §1.5, Tier-2): item-in-K-folders=K-memberships,
                                    replicate=membership-row-not-a-copy, remove-replicant-only, remove-
                                    last→.wasLastInstance (fires ONLY on the last, no mutation), moveFolder-

@@ -762,7 +762,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   598/598 Notes green, 0 new warnings.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift | S | med | none
 
-- [ ] **W23.m13 — several multi-step Notes organization operations leave partial state after a failure
+- [x] **W23.m13 — several multi-step Notes organization operations leave partial state after a failure
   [M · MED · fault atomicity] (blocked-on: W23.m10).** `Index/OrganizationStore.swift`,
   `Core/NotesModel.swift`, `Core/NotesNavigationModel.swift`. The Notes façade **claims organization mutations
   are atomic**, but three span independent awaited writes with no transaction or rollback:
@@ -776,7 +776,30 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   **Fix:** wrap each in a real SQLite transaction (or an explicit compensating rollback), and only mutate
   in-memory state after the durable write commits. Blocked-on W23.m10 because that item makes the export leg
   of these same mutations failable — do the error-propagation seam once. No active item covers this.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Core/NotesModel,Core/NotesNavigationModel}.swift | M | med | none
+  ✅ **DONE 2026-07-30** (checkpoint `59fc57c` = the three fixes; completing commit = tests + trackers): all
+  three are now real SQLite transactions, and **no in-memory state moves until the disk says it committed.**
+  `NotesIndex` gains `deleteFolderGraph` / `moveMembership` / `deleteTemplateAssignments` — whole methods, not
+  exposed BEGIN/COMMIT, because this actor's invariant is *no suspension between BEGIN and COMMIT* and
+  `OrganizationStore` is `@MainActor` (reentrant at every await). `deleteFolder` builds the reparented children
+  as copies and applies them after the commit; the folder-delete await count drops 4 → 1. `move` goes through
+  a new `OrganizationStore.moveMembership` that keeps **both** properties the old add-then-`try?`-remove order
+  existed for (the insert precedes the delete *inside* the transaction, so the item is never member-less and
+  MOVE can't trip the §3.6 guard) while making a failure total — and `NotesNavigationModel.move` now says
+  "it's still where it was", which only the rollback makes an honest thing to say. `deleteTemplate` **trashes
+  first** and clears assignments only once that succeeded (the reverse of its old order): a refused trash now
+  changes nothing, and the opposite failure leaves only a dangling assignment, which `TemplateResolution`
+  already skips and `effectiveTemplate` lazily clears. The measured surprise worth recording: the DB-side loss
+  was **silent, not loud** — memory was *also* unchanged (the throw skipped its own cleanup) while the
+  memberships were already gone from SQLite, and `load()` prefers the DB, so the next launch adopted the lossy
+  half and orphaned those notes with no §3.6 prompt ever shown. 16 new scratch tests
+  (`OrganizationAtomicityTests`) with **real SQLite fault injection** — a `BEFORE DELETE … RAISE(ABORT)`
+  trigger, targeted by row where a batch needs the first delete to succeed and the second to fail (an
+  all-rows refusal cannot tell a rollback from a half-applied batch); 2 assert the fixture's own honesty.
+  Non-vacuity measured by 4 neuters, each reddening a disjoint set: pre-fix `deleteFolder` → the 3 folder
+  tests (7 assertions); pre-fix `move` → the 2 move-failure tests (5); pre-fix `deleteTemplate` order → the
+  template test (assignments go to `[]` while the template survives); non-transactional batch clear → the
+  batch test. All neuters reverted (`git diff` empty). 614/614 Notes green, clean build, 0 new warnings.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationStore,Index/NotesIndex,Core/NotesModel,Core/NotesNavigationModel}.swift | M | med | none
 
 - [ ] **W23.m14 — resolving a missing Reader link synchronously scans the whole archive on the main actor
   [S–M · MED · UI freeze].** `Links/ReaderLinkResolver.swift`. The resolver is `@MainActor`; when an exact

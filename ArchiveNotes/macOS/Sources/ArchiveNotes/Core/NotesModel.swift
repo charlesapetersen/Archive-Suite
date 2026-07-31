@@ -395,13 +395,16 @@ final class NotesModel: ObservableObject {
     /// is itself one transaction, so it can't half-apply across folders.
     func deleteTemplate(_ id: UUID) async {
         guard let noteStore else { return }
-        let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
         do { try await noteStore.deleteTemplate(id) }
         catch {
             report(error, "delete the template")
             await reloadTemplates(); rebuild(); adoptMirrorFailure()
             return
         }
+        // Read AFTER the trash, not before: this method is `@MainActor` but reentrant at that await, so
+        // an assignment made to this template while the trash was in flight would be missed by a set
+        // captured earlier — and by then it is already an assignment to a trashed template.
+        let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
         do { try await organization.removeTemplateAssignments(folders: referencing) }
         catch { report(error, "clear the deleted template's folder assignments") }
         await reloadTemplates()
