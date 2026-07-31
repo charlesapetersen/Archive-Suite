@@ -101,7 +101,7 @@ final class NotesIndexer: ObservableObject {
                 // Nothing is writable, so reading + decoding every .md would only throw the results
                 // away one batch at a time. Report it and stop — but STILL through `finish`, so the
                 // driver settles and `awaitSettled()`'s waiters (bootstrap included) resume (W23.m9).
-                await self?.finish(gen, .couldNotOpen(Self.detail(error)))
+                await self?.finish(gen, .couldNotOpen(Self.failureDetail(error)))
                 return
             }
             let existing = await idx.existingMTimes()
@@ -186,8 +186,9 @@ final class NotesIndexer: ObservableObject {
         return await index.summary(for: id)
     }
 
-    /// The SQLite message out of a `NotesIndex.IndexError`, for a `Failure`'s detail.
-    private nonisolated static func detail(_ error: Error) -> String {
+    /// The SQLite message out of a `NotesIndex.IndexError`, for a `Failure`'s detail. Internal because
+    /// `NotesModel` builds the same `.unavailable` when it holds an index but no driver (W23.m9-fu).
+    nonisolated static func failureDetail(_ error: Error) -> String {
         switch error {
         case NotesIndex.IndexError.open(let m), NotesIndex.IndexError.sql(let m): return m
         default: return String(describing: error)
@@ -197,13 +198,18 @@ final class NotesIndexer: ObservableObject {
     /// Open the index for a query, recording an `unavailable` failure (and returning false) when it
     /// can't be opened — a query over a dead index otherwise degrades to an empty result the user
     /// reads as "nothing matches" (W23.m9).
-    private func openForQuery() async -> Bool {
+    ///
+    /// Internal, not private: `NotesModel`'s own index reads route through this too, so there is ONE
+    /// health-aware accessor and one owner of `failure` rather than a second, silent query path
+    /// (W23.m9-fu). Retrying the open on each query is also what lets a repaired file recover without
+    /// a relaunch.
+    func openForQuery() async -> Bool {
         do {
             try await index.open()
             if case .unavailable = failure { setFailure(nil) }   // it opened; that claim is now false
             return true
         } catch {
-            setFailure(.unavailable(detail: Self.detail(error)))
+            setFailure(.unavailable(detail: Self.failureDetail(error)))
             return false
         }
     }

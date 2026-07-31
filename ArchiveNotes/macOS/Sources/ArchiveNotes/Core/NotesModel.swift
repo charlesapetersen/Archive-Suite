@@ -237,8 +237,13 @@ final class NotesModel: ObservableObject {
 
     /// Reload the shared item set from the index (app path). A no-op for an injected (test) store,
     /// which seeds items via `replaceItems(_:)` instead.
+    ///
+    /// Routed through `openIndexForQuery()`, so a read the index couldn't answer is reported instead of
+    /// published: `allSummaries()` returns `[]` for an unopenable index exactly as it does for an empty
+    /// one, and publishing that would erase the visible library on the strength of a query that never
+    /// ran (W23.m9-fu). A *successful* read still publishes whatever it found, empty included.
     func reloadItems() async {
-        guard let index else { return }
+        guard let index = await openIndexForQuery() else { return }
         let items = await index.allSummaries()
         replaceItems(items)
     }
@@ -276,10 +281,59 @@ final class NotesModel: ObservableObject {
     }
 
     /// Mirror the indexer's health onto the model and, when degraded, into the sidebar status line.
-    /// Never clears a message it didn't set — `statusMessage` is shared with other degradations.
+    /// Never clears a message it didn't set — `statusMessage` is shared with other degradations, so
+    /// clearing one this model didn't post would swallow another subsystem's report.
+    ///
+    /// Two properties matter now that the query paths call this per search (W23.m9-fu):
+    /// a degraded index **re-posts** its line every time a read hits it, so a banner the operator
+    /// dismissed comes back rather than leaving the next empty result unexplained; and the assignment
+    /// to `@Published indexFailure` is change-guarded, since a 150 ms-debounced search would otherwise
+    /// republish the identical value on every keystroke.
     private func adoptIndexFailure(_ failure: NotesIndexer.Failure?) {
-        indexFailure = failure
-        if let failure { statusMessage = failure.message }
+        if indexFailure != failure { indexFailure = failure }
+        if let failure {
+            statusMessage = failure.message
+            postedIndexMessage = failure.message
+        } else {
+            // The claim is no longer true — retract it, but only if our own line is still the one showing.
+            if let posted = postedIndexMessage, statusMessage == posted { statusMessage = nil }
+            postedIndexMessage = nil
+        }
+    }
+
+    /// The index-health line this model last put in `statusMessage`, so it can be retracted when the
+    /// index recovers — and *only* it. Without this, a recovered index either left a false "unavailable"
+    /// banner up for the rest of the session or cleared a line some other failure had posted.
+    private var postedIndexMessage: String?
+
+    /// The shared index, but only once it has actually opened — the one health-aware accessor every
+    /// model-level read goes through (W23.m9-fu).
+    ///
+    /// `NotesIndex`'s reads answer `[]`/`nil` on a nil handle, so a read that skipped the open was
+    /// indistinguishable from "nothing matches": before this, `search`/`reloadItems` queried the index
+    /// directly, never attempted an open, and so never reported a dead index nor noticed a repaired one.
+    ///
+    /// Routed through `NotesIndexer.openForQuery()` whenever there is a driver, so the driver stays the
+    /// single owner of index health and this only mirrors it. A model injected with a bare index (tests,
+    /// previews) has no driver, so it opens under the same all-or-nothing contract and publishes the
+    /// same typed failure itself — the report must not depend on which initializer ran.
+    private func openIndexForQuery() async -> NotesIndex? {
+        guard let index else { return nil }          // pure injected store: no index to be unhealthy
+        if let indexer {
+            let opened = await indexer.openForQuery()
+            adoptIndexFailure(indexer.failure)
+            return opened ? index : nil
+        }
+        do {
+            try await index.open()
+            // It opened, so an `unavailable` claim is now false. An `incomplete` one still stands — a
+            // successful open says nothing about rows a previous pass failed to write.
+            if case .unavailable = indexFailure { adoptIndexFailure(nil) }
+            return index
+        } catch {
+            adoptIndexFailure(.unavailable(detail: NotesIndexer.failureDetail(error)))
+            return nil
+        }
     }
 
     private func markIndexReady(generation: Int) {
@@ -292,8 +346,13 @@ final class NotesModel: ObservableObject {
     /// Full-text search over the disposable index, in bm25 relevance order (best match first). Returns
     /// `[]` for a blank query or an injected (index-less) store. The per-window `NotesNavigationModel`
     /// intersects this with its filtered set and orders by rank (06-viewers §4, §11).
+    ///
+    /// An unopenable index answers `[]` too, so the read goes through `openIndexForQuery()`: an empty
+    /// result then means "no matches", and a dead index says so in the sidebar instead (W23.m9-fu). The
+    /// blank-query check stays first — not searching is not a failed search, and must raise no banner.
     func search(_ query: String) async -> [UUID] {
-        guard let index, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        guard let index = await openIndexForQuery() else { return [] }
         return await index.search(query)
     }
 
