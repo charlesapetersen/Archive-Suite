@@ -287,16 +287,93 @@ final class ContentIndexer: ObservableObject {
     /// overlapping detached tasks cannot race on `pendingPrune` and defeat the two-emission gate.
     private var pruneTask: Task<Void, Never>?
 
+    /// Epoch token for pruning — distinct from the indexing `generation` above. Every emission takes
+    /// a fresh one, and a task still holding an older one is *superseded*: all of its writes (the
+    /// `pendingPrune` update and the row delete) become no-ops.
+    ///
+    /// Cancelling the prior task is not enough on its own (W23.l2). Cancellation is cooperative, so a
+    /// task already past its last `Task.isCancelled` check runs to completion — and `MainActor.run` is
+    /// not cancellation-aware, so its late hops execute too. Verified against the runtime, not assumed:
+    /// a superseded task was observed reading a `pendingPrune` a NEWER emission had just written,
+    /// treating it as "the previous emission", and deleting after only ONE current absence; and in the
+    /// other interleaving, deleting a path the newest snapshot said was present. The source files are
+    /// never at risk (this index is a rebuildable cache) but the rows vanish from search until a
+    /// reindex.
+    private var pruneGeneration = 0
+
+    /// Open a new prune epoch, superseding any task holding an older one.
+    ///
+    /// Internal rather than private so a test can supersede an emission deterministically, without
+    /// having to win a real race against a detached task.
+    func beginPruneGeneration() -> Int {
+        pruneGeneration += 1
+        return pruneGeneration
+    }
+
+    /// True while `gen` is still the current prune epoch.
+    func isCurrentPruneGeneration(_ gen: Int) -> Bool { gen == pruneGeneration }
+
+    /// The in-flight prune task, so a test can await an emission rather than sleep on it.
+    var inFlightPruneTask: Task<Void, Never>? { pruneTask }
+
+    /// Apply one emission's prune decision: read the pending set, decide, and write the new pending
+    /// set — **all in one main-actor hop**, and only if `gen` is still current. Returns the rows to
+    /// delete (empty when superseded).
+    ///
+    /// The single hop is load-bearing, not tidiness: the old code read `pendingPrune` in one hop and
+    /// wrote it in another, and a newer emission's hop could land in between. The generation check and
+    /// the atomic read-decide-write together are what make a superseded task inert.
+    func commitPruneDecision(gen: Int,
+                             indexedUnderRoot: Set<String>,
+                             currentPaths: Set<String>) -> Set<String> {
+        guard gen == pruneGeneration else { return [] }
+        let decision = Self.pruneDecision(indexedUnderRoot: indexedUnderRoot,
+                                          currentPaths: currentPaths,
+                                          previousPending: pendingPrune)
+        pendingPrune = decision.newPending
+        return decision.delete
+    }
+
+    /// Pure two-emission prune gate (mirrors `NotesIndexer.pruneDecision`, whose fork this is).
+    /// Extracted so the data-safety guarantee is deterministically unit-testable — no async, no
+    /// `ContentIndex`, no corpus.
+    ///
+    /// - `currentPaths` empty → `([], nil)`: an empty snapshot is never a reason to prune (mid-gather
+    ///   or scope-cleared). `NavigationModel` already refuses to call with an empty set; holding the
+    ///   guarantee here too means it can't be lost to a future caller.
+    /// - nothing absent → `([], nil)`.
+    /// - first sighting of an absence → stash it, delete nothing.
+    /// - an absence confirmed across two consecutive emissions → delete it; carry the rest forward.
+    nonisolated static func pruneDecision(
+        indexedUnderRoot: Set<String>,
+        currentPaths: Set<String>,
+        previousPending: Set<String>?
+    ) -> (delete: Set<String>, newPending: Set<String>?) {
+        guard !currentPaths.isEmpty else { return ([], nil) }
+        let absent = indexedUnderRoot.subtracting(currentPaths)
+        guard !absent.isEmpty else { return ([], nil) }
+        guard let prev = previousPending else { return ([], absent) }   // first sighting: stash
+        let confirmed = absent.intersection(prev)
+        let remaining = absent.subtracting(confirmed)
+        return (confirmed, remaining.isEmpty ? nil : remaining)
+    }
+
     /// Evict index rows for files no longer under `rootPrefix` — but ONLY when the snapshot is
     /// settled and confirmed across two emissions:
-    ///   Gate 1: `isGathering == false && !currentPaths.isEmpty`  (caller ensures)
+    ///   Gate 1: `isGathering == false` (caller ensures) and `!currentPaths.isEmpty` (also enforced
+    ///           inside `pruneDecision`, so an empty snapshot can never wipe the index)
     ///   Gate 2: a path must be absent in two consecutive calls (transient-drop guard)
     ///   Gate 3: only paths under `rootPrefix` (component-boundary) are candidates
+    ///   Gate 4: the emission must still be the current one — a superseded task writes nothing
+    ///           (W23.l2; cancelling it is cooperative and can arrive too late)
     ///
     /// This is a separate call from `startIndexing` — a destructive delete must never ride the
     /// harmless-on-empty indexing emission.
     func pruneIfSettled(currentPaths: Set<String>, rootPrefix: String) {
         pruneTask?.cancel()
+        // Gate 4 (W23.l2): cancellation alone is cooperative and can arrive too late, so stamp this
+        // emission. Everything the task writes below is a no-op once the stamp goes stale.
+        let gen = beginPruneGeneration()
         let idx = index
         pruneTask = Task.detached(priority: .utility) { [weak self] in
             guard !Task.isCancelled else { return }
@@ -314,32 +391,28 @@ final class ContentIndexer: ObservableObject {
                 path == normalizedRoot || path.hasPrefix(normalizedRoot + "/")
             }
 
-            // Diff: indexed-under-root paths NOT in the current library set.
-            let absent = indexedUnderRoot.subtracting(currentPaths)
-            guard !absent.isEmpty else {
-                await MainActor.run { [weak self] in self?.pendingPrune = nil }
-                return
+            // Gates 2+4, atomically: diff against the current library set, confirm across two
+            // emissions, and carry the remainder forward — in one main-actor hop, and only if this
+            // emission is still the current one.
+            let toDelete = await MainActor.run { [weak self] () -> Set<String> in
+                self?.commitPruneDecision(gen: gen,
+                                          indexedUnderRoot: indexedUnderRoot,
+                                          currentPaths: currentPaths) ?? []
             }
+            guard !toDelete.isEmpty else { return }
 
-            // Gate 2: confirm across two emissions.
-            let previousPending: Set<String>? = await MainActor.run { [weak self] in self?.pendingPrune }
-            if let prev = previousPending {
-                // Only delete paths that were absent in BOTH this and the previous snapshot.
-                let confirmed = absent.intersection(prev)
-                if !confirmed.isEmpty {
-                    try? await idx.deletePaths(Array(confirmed))
-                    await idx.performMaintenance(rowsIndexed: 0) // checkpoint only
-                    try? await idx.open() // ensure WAL checkpoint worked; harmless if already open
-                }
-                await MainActor.run { [weak self] in
-                    // If there are still-pending paths (absent this time but not last time), keep them.
-                    let remaining = absent.subtracting(confirmed)
-                    self?.pendingPrune = remaining.isEmpty ? nil : remaining
-                }
-            } else {
-                // First sighting — stash for confirmation on the next emission.
-                await MainActor.run { [weak self] in self?.pendingPrune = absent }
+            // The decision was current when it was taken, but the delete is another suspension away.
+            // Re-check rather than evict rows a newer snapshot may already have said are present:
+            // skipping costs only that the rows survive one more two-emission cycle, while deleting
+            // them wrongly costs search hits until a reindex.
+            let stillCurrent = await MainActor.run { [weak self] in
+                self?.isCurrentPruneGeneration(gen) ?? false
             }
+            guard stillCurrent else { return }
+
+            try? await idx.deletePaths(Array(toDelete))
+            await idx.performMaintenance(rowsIndexed: 0) // checkpoint only
+            try? await idx.open() // ensure WAL checkpoint worked; harmless if already open
         }
     }
 
@@ -365,7 +438,14 @@ final class ContentIndexer: ObservableObject {
     }
 
     /// Reset the pending-prune state (e.g. on a scope/root change that invalidates the snapshot).
-    func resetPruneState() { pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil }
+    ///
+    /// Bumps the epoch as well as cancelling: an in-flight task from the OLD root can be past its last
+    /// cancellation check, and without the bump its late hop would re-stash that root's absences over
+    /// the state this call just cleared.
+    func resetPruneState() {
+        pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil
+        _ = beginPruneGeneration()
+    }
 
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).
     private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return } ; progress = p }
