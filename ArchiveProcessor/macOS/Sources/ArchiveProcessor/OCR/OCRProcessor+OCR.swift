@@ -191,7 +191,7 @@ extension OCRProcessor {
                 // label untouched. `false` is unconditional here, not `taggingMode.stampsUnread` —
                 // `passSourceTags` implies `.copySource` (OCRView.swift:27), so they agree today, but
                 // the verbatim semantics are what this path requires regardless of the run's mode.
-                _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL, stampUnread: false)
+                tagOutput(sourceTags, at: outputURL, stampUnread: false)
                 jobs[index].appliedTags = sourceTags
             }
         }
@@ -339,27 +339,34 @@ extension OCRProcessor {
             let originalName = pdfURL.lastPathComponent
             let pageWork: [(image: URL, result: OCRResult)] = Array(zip(pageImages, pageResults))
             let genModel = model
-            let ok: Bool = await Task.detached(priority: .utility) {
+            // W23.h5-fu — also report whether ANY page fell back to the placeholder image page; the
+            // merge copies those pages verbatim, so one undecodable page makes the merged output a
+            // partially scan-less PDF and the operator has to be told.
+            let assembly: (ok: Bool, anyPlaceholder: Bool) = await Task.detached(priority: .utility) {
                 let gen = PDFGenerator()
                 let fm = FileManager.default
                 var perPagePDFs: [URL] = []
+                var anyPlaceholder = false
                 defer { for u in perPagePDFs { try? fm.removeItem(at: u) } }
                 do {
                     for page in pageWork {
                         let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
-                        try gen.generate(imageURL: page.image, result: page.result, model: genModel,
-                                         outputURL: tmp, originalFileName: originalName,
-                                         gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                        let outcome = try gen.generate(imageURL: page.image, result: page.result, model: genModel,
+                                                       outputURL: tmp, originalFileName: originalName,
+                                                       gatewayDisplayName: gatewayName, pdfImageMB: pdfMB,
+                                                       textColumns: txtCols)
+                        if outcome.isPlaceholder { anyPlaceholder = true }
                         perPagePDFs.append(tmp)
                     }
                     try gen.mergeDocumentPDFs(sourcePDFs: perPagePDFs, outputURL: outputURL)
-                    return true
+                    return (true, anyPlaceholder)
                 } catch {
                     os_log(.error, "multi-page re-OCR PDF write failed for %{public}@: %{public}@",
                            originalName, error.localizedDescription)
-                    return false
+                    return (false, false)
                 }
             }.value
+            let ok = assembly.ok
 
             // Page-image temps are consumed either way.
             for u in pageImages { try? FileManager.default.removeItem(at: u) }
@@ -368,6 +375,7 @@ extension OCRProcessor {
                 // Map by the original source URL so downstream consumers (log, view-text) find it. Only
                 // set on a confirmed write — never a phantom entry pointing at a nonexistent file.
                 outputURLMap[pdfURL] = outputURL
+                recordImagePage(assembly.anyPlaceholder ? .placeholder : .embedded, for: outputURL)
                 let combinedText = pageResults.compactMap { $0.text }.joined(separator: "\n\n")
                 jobs[index].result = OCRResult(
                     text: combinedText.isEmpty ? nil : combinedText,
@@ -1131,26 +1139,35 @@ extension OCRProcessor {
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns
         let shouldPassTags = passSourceTags
-        let pdfResult: (success: Bool, tags: [String]?) = await Task.detached(priority: .utility) {
+        // W23.m5 / W23.h5-fu — the detached worker also reports whether the tag write landed and
+        // whether the PDF's image page holds the real scan, so the main actor can record both instead
+        // of the old "didn't throw ⇒ everything worked".
+        let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool,
+                        imagePage: PDFGenerator.ImagePageOutcome?)
+            = await Task.detached(priority: .utility) {
             let pdfGen = PDFGenerator()
             do {
-                try pdfGen.generate(imageURL: url, result: result, model: model, outputURL: outputURL,
-                                    originalFileName: originalFileName, gatewayDisplayName: gatewayName,
-                                    pdfImageMB: pdfMB, textColumns: txtCols)
+                let imagePage = try pdfGen.generate(imageURL: url, result: result, model: model,
+                                                    outputURL: outputURL,
+                                                    originalFileName: originalFileName,
+                                                    gatewayDisplayName: gatewayName,
+                                                    pdfImageMB: pdfMB, textColumns: txtCols)
                 var appliedTags: [String]? = nil
+                var tagWriteOK = true
                 if shouldPassTags {
                     if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
                         // Copy-source pass-through (verbatim, label untouched) — see the note at the
                         // sibling pre-OCRed site. `shouldPassTags` implies `.copySource`.
-                        _ = try? MacOSTagger.applyTags(sourceTags, to: outputURL, stampUnread: false)
+                        tagWriteOK = OCRProcessor.writeOutputTags(sourceTags, to: outputURL,
+                                                                  stampUnread: false)
                         appliedTags = sourceTags
                     }
                 }
-                return (true, appliedTags)
+                return (true, appliedTags, tagWriteOK, imagePage)
             } catch {
                 os_log(.error, "PDF write failed for %{public}@: %{public}@",
                        originalFileName, error.localizedDescription)
-                return (false, nil)
+                return (false, nil, true, nil)
             }
         }.value
         if pdfResult.success {
@@ -1161,6 +1178,8 @@ extension OCRProcessor {
             if let tags = pdfResult.tags {
                 jobs[index].appliedTags = tags
             }
+            recordTagWrite(succeeded: pdfResult.tagWriteOK, for: outputURL)
+            if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, for: outputURL) }
         } else {
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on
             // `PDFDocument.write(to:)` returning false; a bad image yields a placeholder page instead).

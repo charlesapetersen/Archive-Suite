@@ -179,8 +179,7 @@ extension OCRProcessor {
                     } else if newClassification == .folderLabel {
                         if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
                     }
-                    _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                                   stampUnread: stampUnread)
+                    tagOutput(existingTags, at: outputURL, stampUnread: stampUnread)
                     jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
@@ -330,8 +329,8 @@ extension OCRProcessor {
             } else if newClassification == .folderLabel {
                 if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
             }
-            _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
+            tagOutput(existingTags, at: outputURL,
+                      stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             jobs[index].appliedTags = existingTags
         }
     }
@@ -385,7 +384,10 @@ extension OCRProcessor {
                 // Use the temp JPEG if this was a PDF input, otherwise the original file.
                 let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
                 do {
-                    try pdfGen.generate(
+                    // W23.h5-fu — the regenerated PDF re-decides whether the scan is embedded, so its
+                    // outcome REPLACES any earlier verdict for this output (a rotation that fixes a
+                    // previously undecodable image clears the warning, and vice versa).
+                    let imagePage = try pdfGen.generate(
                         imageURL: imageURL,
                         result: result,
                         model: model,
@@ -395,6 +397,7 @@ extension OCRProcessor {
                         pdfImageMB: pdfSettings.pdfImageMB,
                         textColumns: pdfSettings.textColumns
                     )
+                    recordImagePage(imagePage, for: outputURL)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            jobs[item.fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
@@ -404,8 +407,7 @@ extension OCRProcessor {
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
                 if passSourceTags {
                     // Copy-source restore after rotation regen: verbatim, label untouched.
-                    _ = try? MacOSTagger.applyTags(jobs[item.fileIndex].appliedTags, to: outputURL,
-                                                   stampUnread: false)
+                    tagOutput(jobs[item.fileIndex].appliedTags, at: outputURL, stampUnread: false)
                 }
             }
         }
@@ -612,8 +614,8 @@ extension OCRProcessor {
                 default:
                     break
                 }
-                _ = try? MacOSTagger.applyTags(existingTags, to: outputURL,
-                                               stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
+                tagOutput(existingTags, at: outputURL,
+                          stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
                 jobs[item.fileIndex].appliedTags = existingTags
             }
 

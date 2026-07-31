@@ -31,6 +31,140 @@ extension OCRProcessor {
         )
     }
 
+    // MARK: - W23.m5 — the ONE audited tag-write seam for every Process Files output
+
+    /// Apply Finder tags to ONE output artifact and report whether the write actually landed.
+    ///
+    /// Every Process Files tag write goes through here. Before W23.m5 each site was its own
+    /// `_ = try? MacOSTagger.applyTags(…)`, which swallowed every xattr / coordination / verification /
+    /// permission / filesystem failure and then populated `jobs[].appliedTags` **as though the output
+    /// were tagged** — so the UI and the model reported tags that are absent on disk, and the Reader
+    /// silently omitted the file from tag-driven triage. The bytes were always fine; only the silence
+    /// was the bug.
+    ///
+    /// `nonisolated` because two of the call sites (`exportOriginalImages`, `handleOCRResult`) do their
+    /// tag I/O inside a detached task; they return the verdict to the main actor, which records it.
+    /// Parameters mirror `MacOSTagger.applyTags` exactly so no site changes its write semantics —
+    /// this commit records failures, it does not re-decide what gets written.
+    ///
+    /// Returns `true` when the write succeeded (including a legitimate no-op — copy-source mode with
+    /// no tags to write); `false` only when the primitive threw.
+    nonisolated static func writeOutputTags(
+        _ tags: [String], to url: URL,
+        appColor: String? = nil, colorIsAuthoritative: Bool = false,
+        stampUnread: Bool
+    ) -> Bool {
+        do {
+            _ = try MacOSTagger.applyTags(tags, to: url, appColor: appColor,
+                                          colorIsAuthoritative: colorIsAuthoritative,
+                                          stampUnread: stampUnread)
+            return true
+        } catch {
+            os_log(.error, "Finder-tag write FAILED for %{public}@: %{public}@",
+                   url.lastPathComponent, error.localizedDescription)
+            return false
+        }
+    }
+    /// `GeneratedTags` overload — the app's own colour is authoritative, so a *subject* tag that is
+    /// literally "Red"/"Purple" is never promoted to a Finder label (same guarantee as the primitive).
+    nonisolated static func writeOutputTags(
+        _ generatedTags: GeneratedTags, to url: URL, stampUnread: Bool
+    ) -> Bool {
+        writeOutputTags(generatedTags.allTags, to: url,
+                        appColor: generatedTags.colorTag, colorIsAuthoritative: true,
+                        stampUnread: stampUnread)
+    }
+
+    /// Main-actor convenience: write, then record the verdict against the output. Use this at every
+    /// main-actor tag site; the detached sites call `writeOutputTags` and hand the Bool to
+    /// `recordTagWrite(succeeded:for:)` themselves.
+    @discardableResult
+    func tagOutput(_ tags: [String], at url: URL,
+                   appColor: String? = nil, colorIsAuthoritative: Bool = false,
+                   stampUnread: Bool) -> Bool {
+        let ok = Self.writeOutputTags(tags, to: url, appColor: appColor,
+                                      colorIsAuthoritative: colorIsAuthoritative,
+                                      stampUnread: stampUnread)
+        recordTagWrite(succeeded: ok, for: url)
+        return ok
+    }
+    @discardableResult
+    func tagOutput(_ generatedTags: GeneratedTags, at url: URL, stampUnread: Bool) -> Bool {
+        tagOutput(generatedTags.allTags, at: url,
+                  appColor: generatedTags.colorTag, colorIsAuthoritative: true,
+                  stampUnread: stampUnread)
+    }
+
+    /// Record (or clear) one output's tag-write verdict. Self-healing by design: a rotation regen or a
+    /// review retry that re-tags the same output successfully REMOVES its earlier failure, so the
+    /// end-of-run warning only ever names files that are still untagged on disk.
+    func recordTagWrite(succeeded: Bool, for url: URL) {
+        untaggedOutputs = Self.updatedOutputWarnings(untaggedOutputs,
+                                                     name: url.lastPathComponent, present: !succeeded)
+    }
+    /// Record (or clear) whether one output's image page is the placeholder rather than the scan
+    /// (W23.h5-fu). Same self-healing semantics: a successful regen with a decodable image clears it.
+    func recordImagePage(_ outcome: PDFGenerator.ImagePageOutcome, for url: URL) {
+        placeholderOutputs = Self.updatedOutputWarnings(placeholderOutputs,
+                                                        name: url.lastPathComponent,
+                                                        present: outcome.isPlaceholder)
+    }
+    /// Insert-once / remove semantics for the two warning records, order-preserving. Pure + `static`
+    /// so the headless driver can prove the self-healing without standing up a processor.
+    nonisolated static func updatedOutputWarnings(
+        _ names: [String], name: String, present: Bool
+    ) -> [String] {
+        var out = names
+        if present {
+            if !out.contains(name) { out.append(name) }
+        } else {
+            out.removeAll { $0 == name }
+        }
+        return out
+    }
+    /// Drop `names` from both records — used by document merging, whose component PDFs are DELETED and
+    /// replaced by the merged output. Without this the summary would name files that no longer exist.
+    func forgetOutputWarnings(named names: [String]) {
+        let gone = Set(names)
+        untaggedOutputs.removeAll { gone.contains($0) }
+        placeholderOutputs.removeAll { gone.contains($0) }
+    }
+    /// Reset both records at the start of a run.
+    func clearOutputWarnings() {
+        untaggedOutputs = []
+        placeholderOutputs = []
+    }
+
+    /// The end-of-run warning text for both records, or "" when everything landed cleanly.
+    ///
+    /// Appended to the "Done. N succeeded, M failed." status line — deliberately NOT only to the batch
+    /// log, which is opt-in and defaults to OFF (the same reasoning recorded at the multi-page-routing
+    /// warning). Names up to three files so the warning is actionable without the log; the log lists
+    /// them all.
+    nonisolated static func outputWarningSuffix(untagged: [String], placeholders: [String]) -> String {
+        var suffix = ""
+        if !untagged.isEmpty {
+            let n = untagged.count
+            suffix += " ⚠️ \(n) output file\(n == 1 ? "" : "s") could NOT be tagged"
+                    + " (\(namesForWarning(untagged))) — \(n == 1 ? "it is" : "they are") in the output"
+                    + " folder, but \(n == 1 ? "carries" : "carry") NO Finder tags, so tag searches in the"
+                    + " Reader will not find \(n == 1 ? "it" : "them"). Re-run \(n == 1 ? "that file" : "those files")"
+                    + " or check the output folder's permissions."
+        }
+        if !placeholders.isEmpty {
+            let n = placeholders.count
+            suffix += " ⚠️ \(n) output PDF\(n == 1 ? "" : "s") could NOT embed the original image"
+                    + " (\(namesForWarning(placeholders))) — \(n == 1 ? "its" : "their") first page is a"
+                    + " placeholder, not the scan. The source image\(n == 1 ? " was" : "s were") NOT touched;"
+                    + " re-run \(n == 1 ? "it" : "them") to get the image into the archive."
+        }
+        return suffix
+    }
+    private nonisolated static func namesForWarning(_ names: [String]) -> String {
+        let shown = names.prefix(3).joined(separator: ", ")
+        return names.count > 3 ? "\(shown) +\(names.count - 3) more" : shown
+    }
+
     /// Applies Red/Purple color tags to box/folder label PDFs when full LLM tagging
     /// is disabled (or when passing source tags through). When automatic tagging is enabled
     /// these tags are already applied by the normal tagging pass, so this is a no-op.
@@ -59,7 +193,7 @@ extension OCRProcessor {
                 // Mode-dependent: reached BOTH from `applyBoxFolderLabelTags` (only when tagging is
                 // off or copy-source → verbatim) AND unconditionally from the manual tagging modes
                 // (→ real-tagging, label written + trailing Unread). Must follow the run's mode.
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: stampUnread)
+                tagOutput(tags, at: outputPDF, stampUnread: stampUnread)
             }
         }
     }
@@ -87,7 +221,9 @@ extension OCRProcessor {
                 tags.append(raw)
                 // Read-append-rewrite of whatever the tagging phase already applied — follow the
                 // run's mode so a real-tagging output keeps "Unread" last and its label intact.
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF, stampUnread: stampUnread)
+                // Raw [String] read back off disk: colour detection stays ON here deliberately, so a
+                // box/folder PDF keeps its label through the rewrite (W23.m5-fu tracks the residual).
+                tagOutput(tags, at: outputPDF, stampUnread: stampUnread)
             }
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
@@ -106,6 +242,8 @@ extension OCRProcessor {
         do {
             try OutputFileSafety.removeGeneratedOutput(outputURL, for: sourceURL)
             outputURLMap[sourceURL] = nil
+            // W23.m5 — the output is gone; drop any warning that would name it at the end of the run.
+            forgetOutputWarnings(named: [outputURL.lastPathComponent])
             return true
         } catch {
             statusMessage = "Could not remove generated output for \(sourceURL.lastPathComponent): \(error.localizedDescription)"
@@ -149,7 +287,10 @@ extension OCRProcessor {
         let isStamping = outputSettings.stampUnread
         // …then encode the sized JPEGs + mirror the PDF's tags OFF the main thread, so the UI never
         // stalls on large files. writeSizedJPEG copies already-small unrotated JPEGs byte-for-byte.
-        await Task.detached(priority: .utility) {
+        // W23.m5 — the detached worker can't touch the main-actor record, so it returns one verdict per
+        // exported image and the main actor files them below.
+        let verdicts: [(url: URL, ok: Bool)] = await Task.detached(priority: .utility) {
+            var verdicts: [(url: URL, ok: Bool)] = []
             for w in work {
                 // Never write onto the source itself: when the output dir == the input dir and the source
                 // is a same-base .jpg, the exported-image path equals the original photo, and writeSizedJPEG
@@ -161,10 +302,17 @@ extension OCRProcessor {
                 guard ImageEncoding.writeSizedJPEG(from: w.src, to: w.img, targetMB: exportedMB, rotationDegrees: w.rot) else { continue }
                 // Mirror the PDF's tags onto the image (applyTags re-stamps the trailing "Unread"
                 // in real-tagging modes, so the image always matches the PDF, ending with "Unread").
-                guard let tags = try? MacOSTagger.readTags(from: w.pdf) else { continue }
-                _ = try? MacOSTagger.applyTags(tags, to: w.img, stampUnread: isStamping)
+                // An unreadable PDF is itself an untagged-image outcome — record it rather than
+                // skipping silently, which is what left this half of the dual output invisible.
+                guard let tags = try? MacOSTagger.readTags(from: w.pdf) else {
+                    verdicts.append((w.img, false))
+                    continue
+                }
+                verdicts.append((w.img, Self.writeOutputTags(tags, to: w.img, stampUnread: isStamping)))
             }
+            return verdicts
         }.value
+        for v in verdicts { recordTagWrite(succeeded: v.ok, for: v.url) }
     }
     /// Automatic (LLM) tagging with the redo-review loop. Extracted so the standard and
     /// pre-OCRed pipelines share one implementation.
@@ -302,8 +450,7 @@ extension OCRProcessor {
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
-                    _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
-                                                   stampUnread: stampUnread)
+                    tagOutput(tags, at: outputPDF, stampUnread: stampUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = tags.allTags
@@ -492,13 +639,16 @@ extension OCRProcessor {
                 if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
                     do {
-                        try PDFGenerator().generate(
+                        // W23.h5-fu — the regen re-decides whether the scan embedded; record the fresh
+                        // verdict so a rotation fix clears (or raises) the placeholder warning.
+                        let imagePage = try PDFGenerator().generate(
                             imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                             originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
                             gatewayDisplayName: currentGateway?.displayName,
                             pdfImageMB: outputSettings.pdfImageMB,
                             textColumns: outputSettings.textColumns
                         )
+                        recordImagePage(imagePage, for: outputURL)
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
                                jobs[fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
@@ -553,8 +703,7 @@ extension OCRProcessor {
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
-                    _ = try? MacOSTagger.applyTags(gtags, to: outputPDF,
-                                                   stampUnread: outputSettings.stampUnread)
+                    tagOutput(gtags, at: outputPDF, stampUnread: outputSettings.stampUnread)
                 }
                 if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                     jobs[jobIndex].appliedTags = gtags.allTags
@@ -786,8 +935,8 @@ extension OCRProcessor {
         }
         for sourceURL in segment.pdfURLs {
             if let outputPDF = outputURLMap[sourceURL] {
-                _ = try? MacOSTagger.applyTags(tags, to: outputPDF,
-                                               stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
+                tagOutput(tags, at: outputPDF,
+                          stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             }
             if let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }) {
                 jobs[jobIndex].appliedTags = tags.allTags
@@ -912,6 +1061,15 @@ extension OCRProcessor {
                 for pdfURL in sourcePDFs {
                     try? FileManager.default.removeItem(at: pdfURL)
                 }
+
+                // W23.m5 — the components are gone, so a warning recorded against one of them would name
+                // a file that no longer exists. Hand the bookkeeping to the merged output: its own tag
+                // write is the `try` above (reaching here means it landed, so nothing to record), but a
+                // placeholder image page is COPIED into the merge and must survive the transfer.
+                let componentNames = sourcePDFs.map { $0.lastPathComponent }
+                let mergedCarriesPlaceholder = placeholderOutputs.contains { componentNames.contains($0) }
+                forgetOutputWarnings(named: componentNames)
+                if mergedCarriesPlaceholder { recordImagePage(.placeholder, for: mergedURL) }
 
                 // Update outputURLMap: point all source URLs in this segment to the merged PDF
                 for sourceURL in segment.pdfURLs {

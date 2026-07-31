@@ -219,6 +219,22 @@ class OCRProcessor: ObservableObject {
     var exportedImageMap: [URL: URL] = [:]
     /// Maps original PDF source URL → temporary JPEG URL (for cleanup)
     var pdfToImageMap: [URL: URL] = [:]
+    /// W23.m5 — output artifacts (PDF / exported JPEG / merged PDF) whose Finder-tag write THREW, by
+    /// output file name. The bytes are complete and the file still counts as processed — the owner's
+    /// recorded decision for the equivalent Live Capture case (W3.cap-r1): tags are re-derivable, so
+    /// withholding "done" over metadata would help nobody. What a tag failure DOES cost is findability:
+    /// the Reader's tag-driven triage silently omits an untagged file, so it must be said out loud at
+    /// the end of the run instead of discarded into a `try?`.
+    /// Names, not URLs, because `CollectionSegmenter.organizeOutput` MOVES outputs into collection
+    /// folders after tagging — a recorded URL would be a stale path by the time the summary is written.
+    /// Maintained by `recordTagWrite(succeeded:for:)`: a later successful re-write clears the entry, so
+    /// a rotation-regen or review retry self-heals the record.
+    var untaggedOutputs: [String] = []
+    /// W23.h5-fu — outputs whose PDF carries the visible PLACEHOLDER image page instead of the scan
+    /// (`PDFGenerator.ImagePageOutcome.placeholder`), by output file name. Unlike Live Capture this path
+    /// never trashes the source image, so nothing is lost — but "didn't throw" is not "the scan is in
+    /// there", and only the operator can decide to re-shoot or re-run. Same self-healing record.
+    var placeholderOutputs: [String] = []
     /// The model used for the current processing run (for PDF regeneration headers)
     var currentModel: LLMModel?
     /// Gateway configuration for the current run (nil = direct API mode)

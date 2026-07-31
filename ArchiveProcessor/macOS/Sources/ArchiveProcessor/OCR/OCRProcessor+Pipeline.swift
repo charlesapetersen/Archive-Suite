@@ -836,6 +836,7 @@ extension OCRProcessor {
         isProcessing = true
         pendingBatchInfo = nil
         failedFiles = []
+        clearOutputWarnings()
         segments = []
         collectionSegments = []
         outputURLMap = [:]
@@ -1033,6 +1034,10 @@ extension OCRProcessor {
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
+        // placeholder instead of the scan. Both are silent failures otherwise: the file is
+        // there and looks processed, but tag search will not find it / the scan is missing.
+        statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
         }
@@ -1055,6 +1060,7 @@ extension OCRProcessor {
         isProcessing = true
         pendingRunInfo = nil
         failedFiles = []
+        clearOutputWarnings()
         segments = []
         collectionSegments = []
         outputURLMap = [:]
@@ -1143,20 +1149,26 @@ extension OCRProcessor {
                 let pdfMB = pdfSettings.imageMB
                 let txtCols = pdfSettings.textColumns
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
-                failedRegenURLs = await Task.detached(priority: .utility) {
+                // W23.h5-fu — carry each regenerated PDF's image-page verdict back too, so a rebuilt
+                // output that could not embed its scan is reported instead of counting as a clean redo.
+                let regen: (failed: Set<URL>, placeholders: Set<URL>) = await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
                     var failed = Set<URL>()
+                    var placeholders = Set<URL>()
                     for g in toGenerate {
                         do {
-                            try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
+                            let outcome = try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
                                               outputURL: g.outputURL, originalFileName: g.fileName,
                                               gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                            if outcome.isPlaceholder { placeholders.insert(g.outputURL) }
                         } catch {
                             failed.insert(g.outputURL)
                         }
                     }
-                    return failed
+                    return (failed, placeholders)
                 }.value
+                failedRegenURLs = regen.failed
+                for u in regen.placeholders { recordImagePage(.placeholder, for: u) }
             }
             // Apply the (cheap) state updates back on the main actor.
             for r in restores {
@@ -1171,7 +1183,7 @@ extension OCRProcessor {
                     if passSourceTags {
                         if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
                             // Copy-source pass-through on resume: verbatim, label untouched.
-                            _ = try? MacOSTagger.applyTags(sourceTags, to: r.outputURL, stampUnread: false)
+                            tagOutput(sourceTags, at: r.outputURL, stampUnread: false)
                             jobs[r.index].appliedTags = sourceTags
                         }
                     }
@@ -1217,6 +1229,10 @@ extension OCRProcessor {
                 let succeeded = jobs.filter { $0.status == .succeeded }.count
                 recordRunHistory(succeeded: succeeded)
                 statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+                // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
+                // placeholder instead of the scan. Both are silent failures otherwise: the file is
+                // there and looks processed, but tag search will not find it / the scan is missing.
+                statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
                 postCompletionNotification()
                 return
             }
@@ -1363,6 +1379,10 @@ extension OCRProcessor {
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
+        // placeholder instead of the scan. Both are silent failures otherwise: the file is
+        // there and looks processed, but tag search will not find it / the scan is missing.
+        statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
         }
@@ -1640,6 +1660,7 @@ extension OCRProcessor {
             files = decision.toProcess
             guard !files.isEmpty else {
                 jobs = []; failedFiles = []; segments = []; collectionSegments = []
+                clearOutputWarnings()
                 progress = 1.0
                 statusMessage = "All \(incrementalSkipped) file(s) already processed — nothing to do."
                 return
@@ -1683,6 +1704,7 @@ extension OCRProcessor {
 
         isProcessing = true
         failedFiles = []
+        clearOutputWarnings()
         segments = []
         collectionSegments = []
         outputURLMap = [:]
@@ -2030,6 +2052,10 @@ extension OCRProcessor {
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
         statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
+        // placeholder instead of the scan. Both are silent failures otherwise: the file is
+        // there and looks processed, but tag search will not find it / the scan is missing.
+        statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         // Make the multi-page-re-OCR routing skip UNMISSABLE. "N failed" alone reads as an OCR/model problem,
         // and the per-row reason requires inspecting a row — so an operator whose images were skipped for a
         // pure ROUTING reason had no way to know. (2026-07-29: an owner dropped two .jpg files alongside one
@@ -2193,6 +2219,21 @@ extension OCRProcessor {
                 let code = job?.result?.errorCode.map { " [\($0)]" } ?? ""
                 lines.append("  \u{2022} \(f)\(code): \(reason)")
             }
+        }
+
+        // W23.m5 / W23.h5-fu — the two failures that leave a file looking fine. The status line names
+        // at most three; this log is the complete list, so it is the one place an operator can work
+        // through them file by file.
+        if !untaggedOutputs.isEmpty {
+            lines.append("")
+            lines.append("Output files written WITHOUT Finder tags (tag search will not find them):")
+            for name in untaggedOutputs { lines.append("  \u{2022} \(name)") }
+        }
+        if !placeholderOutputs.isEmpty {
+            lines.append("")
+            lines.append("Output PDFs whose image page is a PLACEHOLDER, not the original scan"
+                       + " (the source image was not touched):")
+            for name in placeholderOutputs { lines.append("  \u{2022} \(name)") }
         }
 
         let content = lines.joined(separator: "\n")
