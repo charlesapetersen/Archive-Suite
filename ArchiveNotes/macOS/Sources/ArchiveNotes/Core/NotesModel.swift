@@ -786,28 +786,72 @@ final class NotesModel: ObservableObject {
         // (0 memberships) — `deleteFolder` returns the fresh orphan set, so a replicate between the
         // modal and this confirm rescues its item from deletion (it keeps its other membership).
         let confirmed = Set(stranded)
-        await trashItems(orphaned.filter { confirmed.contains($0) })   // trashes + drops rows + reloads
+        // Trashes, drops the rows of the ones that really went, reloads, and says so when the disk
+        // refused one — that refusal is what makes this method's "still discoverable" promise real.
+        await trashItems(orphaned.filter { confirmed.contains($0) })
         rebuild()                                                      // covers the empty case
         adoptMirrorFailure()
     }
 
     /// Move the given items' folders to the macOS Trash (recoverable — `NoteStore.delete` never
-    /// `removeItem`s) and drop their index rows. The caller must have already removed the items'
-    /// memberships (0 remaining) — the §3.6 guard passed. A per-item trash failure is logged and the
-    /// rest proceed (best-effort; the org graph is already consistent). Reloads the shared item list +
-    /// rebuilds the tree. A no-op with no `noteStore` (injected test store without one) beyond the
-    /// index/reload bookkeeping.
-    func trashItems(_ ids: [UUID]) async {
-        guard !ids.isEmpty else { return }
+    /// `removeItem`s) and drop the index rows of the ones that are **actually gone**. The caller must
+    /// have already removed the items' memberships (0 remaining) — the §3.6 guard passed. Reloads the
+    /// shared item list + rebuilds the tree. Returns the ids that SURVIVED (still on disk), so a
+    /// caller can react; the empty array is the all-clear.
+    ///
+    /// W23.m12 — this used to drop the row of every *requested* id no matter what the disk said, which
+    /// broke the invariant its own callers document ("a trash failure leaves the note on disk **and**
+    /// discoverable under All Notes"): `reloadItems` serves the list from the index, nothing watches
+    /// the store, and the full disk rebuild only runs at bootstrap — so a note the disk refused to
+    /// trash vanished from All Notes for the rest of the run while sitting safe on disk, un-findable.
+    /// A row now goes only once its note is provably absent.
+    @discardableResult
+    func trashItems(_ ids: [UUID]) async -> [UUID] {
+        guard !ids.isEmpty else { return [] }
+        var removed: [UUID] = []          // provably no longer on disk ⟹ their rows must go
+        var survived: [UUID] = []         // the disk refused ⟹ still on disk, so keep them findable
         if let noteStore {
             for id in ids {
-                do { try await noteStore.delete(id) }
-                catch { NSLog("NotesModel: could not move note \(id) to Trash: \(error)") }
+                do { try await noteStore.delete(id); removed.append(id) }
+                catch {
+                    NSLog("NotesModel: could not move note \(id) to Trash: \(error)")
+                    // Ask the disk instead of classifying the error: `delete` also throws when the
+                    // directory was ALREADY gone (`StoreError.notFound`, e.g. the other window got
+                    // there first), and keeping THAT row would strand a phantom note pointing at
+                    // nothing. So the row goes whenever the item is absent, whatever the reason, and
+                    // stays only while the file is genuinely still there.
+                    if await noteStore.itemExists(id) { survived.append(id) } else { removed.append(id) }
+                }
+            }
+        } else {
+            removed = ids                 // injected test store with no `noteStore`: bookkeeping only
+        }
+        var indexWriteFailed = false
+        if let index, !removed.isEmpty {
+            do { try await index.deleteItems(removed) }
+            catch {
+                // The files ARE in the Trash but their rows outlived them, so the list still offers
+                // notes that no longer exist until the next launch rebuilds from disk. Same rule as
+                // above, opposite direction: don't present a half-done delete as a clean one (W23.m9).
+                NSLog("NotesModel: trashed \(removed.count) note(s) but could not delete their index rows: \(error)")
+                indexWriteFailed = true
             }
         }
-        if let index { try? await index.deleteItems(ids) }
         await reloadItems()
         rebuild()
+        // Last, so neither `reloadItems` nor `rebuild` can outrun it. A survivor outranks a stale
+        // index because the note is still there to be found; `adoptMirrorFailure()` still wins in the
+        // folder-delete path, which is the m10 precedence ("a real degradation wins") — both are
+        // logged, and either way the note stays listed under All Notes.
+        if !survived.isEmpty {
+            let n = survived.count
+            statusMessage = "Couldn't move \(n) note\(n == 1 ? "" : "s") to the Trash — "
+                + "\(n == 1 ? "it is" : "they are") still on disk, under All Notes."
+        } else if indexWriteFailed {
+            statusMessage = "Moved \(removed.count) note\(removed.count == 1 ? "" : "s") to the Trash, "
+                + "but the note list couldn't be updated — it will catch up on the next launch."
+        }
+        return survived
     }
 
     // MARK: Pure helpers (unit-tested)

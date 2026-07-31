@@ -87,7 +87,20 @@ actor NoteStore {
     func save(_ item: Item) throws -> ItemRef { try saveEntry(item, in: itemDir(item.id)) }
 
     /// Move the item directory to the Trash (recoverable). Never `removeItem`.
+    ///
+    /// Throws `StoreError.notFound` when the directory is **already** absent, and whatever
+    /// `trashItem` raised when the disk refused (full/read-only volume, no permission, a locked
+    /// entry) — two outcomes a caller must not conflate, because only the second one leaves the note
+    /// on disk. Ask `itemExists` rather than classifying the error (W23.m12).
     func delete(_ id: UUID) throws { try deleteEntry(id, in: itemDir(id)) }
+
+    /// Is this item's directory still on disk? Read-only ground truth, for a caller that has to
+    /// decide whether a failed `delete` left the note behind (W23.m12): the note's index row may only
+    /// be dropped once the note is genuinely gone, and the *fact* is more trustworthy than the error
+    /// type — `trashItem` can fail for reasons that neither leave nor remove the directory reliably.
+    func itemExists(_ id: UUID) -> Bool {
+        FileManager.default.fileExists(atPath: itemDir(id).path)
+    }
 
     // MARK: - Atomic edit transactions (W23.h2)
     //
