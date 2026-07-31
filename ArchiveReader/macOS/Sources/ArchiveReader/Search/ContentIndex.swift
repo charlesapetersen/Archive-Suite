@@ -32,30 +32,48 @@ actor ContentIndex {
 
     init(url: URL) { self.url = url }
 
+    /// Open (creating if needed) and bring the schema up to date. **All-or-nothing:** it either
+    /// returns with `db` fully set up, or it throws with `db` back to nil. That nil is as load-bearing
+    /// as the throw — the `guard db == nil` below is what makes this idempotent, so a handle left
+    /// behind by a failed PRAGMA/schema step would turn every later `open()` into a silent no-op and
+    /// poison the index for the life of the process (W23.m9).
     func open() throws {
         guard db == nil else { return }   // idempotent — callers open() before every use
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
             let message = lastMessage
-            sqlite3_close(db); db = nil   // SQLite may allocate a handle even on failure — free it so a retry works
+            discardHandle()               // SQLite may allocate a handle even on failure — free it so a retry works
             throw IndexError.open(message)
         }
-        sqlite3_busy_timeout(db, 3000)
-        // WAL + relaxed sync: cheaper batched writes, fewer fsyncs. Safe because the DB is a
-        // disposable cache — a crash just means re-indexing. performMaintenance truncates the
-        // -wal/-shm sidecars after each pass.
-        try exec("PRAGMA journal_mode = WAL;")
-        try exec("PRAGMA synchronous = NORMAL;")
-        // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.
-        // `page_count`/`has_text`/`readable` carry the non-standard-PDF detection (display + triage);
-        // a fresh v2 DB filename (see ContentIndexer) means every row is written with these columns.
-        try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, page_count INTEGER, has_text INTEGER, readable INTEGER);")
-        try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, path UNINDEXED);")
+        do {
+            sqlite3_busy_timeout(db, 3000)
+            // WAL + relaxed sync: cheaper batched writes, fewer fsyncs. Safe because the DB is a
+            // disposable cache — a crash just means re-indexing. performMaintenance truncates the
+            // -wal/-shm sidecars after each pass.
+            try exec("PRAGMA journal_mode = WAL;")
+            try exec("PRAGMA synchronous = NORMAL;")
+            // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.
+            // `page_count`/`has_text`/`readable` carry the non-standard-PDF detection (display + triage);
+            // a fresh v2 DB filename (see ContentIndexer) means every row is written with these columns.
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, page_count INTEGER, has_text INTEGER, readable INTEGER);")
+            try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, path UNINDEXED);")
+        } catch {
+            // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
+            // FIRST statement ("file is not a database"). Drop the handle so the next open() re-reads
+            // the file instead of inheriting a connection every query fails on.
+            discardHandle()
+            throw error
+        }
     }
 
-    func close() {
-        if db != nil { sqlite3_close(db); db = nil }
+    func close() { discardHandle() }
+
+    /// Release the connection and clear `db`. Uses `sqlite3_close_v2`, which — unlike `sqlite3_close`
+    /// — never returns BUSY: it hands the handle back even if a statement outlived a mid-setup
+    /// failure, so clearing `db` can't strand a live connection still holding the file lock.
+    private func discardHandle() {
+        if db != nil { sqlite3_close_v2(db); db = nil }
     }
 
     /// True if `path` is absent or its stored mtime differs (needs (re)indexing).

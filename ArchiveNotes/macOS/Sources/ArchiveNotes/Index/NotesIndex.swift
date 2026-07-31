@@ -20,15 +20,35 @@ actor NotesIndex {
 
     init(url: URL) { self.url = url }
 
+    /// Open (creating if needed) and bring the schema up to date. **All-or-nothing:** it either
+    /// returns with `db` fully set up, or it throws with `db` back to nil. That nil is as load-bearing
+    /// as the throw — the `guard db == nil` below is what makes this idempotent, so a handle left
+    /// behind by a failed PRAGMA/migration/schema step would turn every later `open()` into a silent
+    /// no-op and poison the DB for the life of the process (W23.m9). It costs more here than in
+    /// Reader: this file also holds the app-owned `folders`/`memberships` tables, not only the
+    /// disposable FTS cache.
     func open() throws {
         guard db == nil else { return }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
             let message = lastMessage
-            sqlite3_close(db); db = nil
+            discardHandle()
             throw IndexError.open(message)
         }
+        do {
+            try openSchema()
+        } catch {
+            // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
+            // FIRST statement ("file is not a database"). Drop the handle so the next open() re-reads
+            // the file instead of inheriting a connection every query fails on.
+            discardHandle()
+            throw error
+        }
+    }
+
+    /// The PRAGMA + schema half of `open()`, split out so one `catch` covers every step of it.
+    private func openSchema() throws {
         sqlite3_busy_timeout(db, 3000)
         try exec("PRAGMA journal_mode = WAL;")
         try exec("PRAGMA synchronous = NORMAL;")
@@ -95,8 +115,13 @@ actor NotesIndex {
             """)
     }
 
-    func close() {
-        if db != nil { sqlite3_close(db); db = nil }
+    func close() { discardHandle() }
+
+    /// Release the connection and clear `db`. Uses `sqlite3_close_v2`, which — unlike `sqlite3_close`
+    /// — never returns BUSY: it hands the handle back even if a statement outlived a mid-setup
+    /// failure, so clearing `db` can't strand a live connection still holding the file lock.
+    private func discardHandle() {
+        if db != nil { sqlite3_close_v2(db); db = nil }
     }
 
     // MARK: - Mtime checks (incremental indexing)
