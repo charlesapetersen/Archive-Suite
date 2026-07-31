@@ -85,20 +85,54 @@ extension RootMarker: Codable {
 public enum RootMarkerError: Error, Sendable {
     /// An existing marker file was found but could not be decoded.
     case malformed(url: URL, underlying: Error)
-    /// The directory is read-only; a transient in-memory marker is returned instead.
-    case readOnly(url: URL)
+    /// A marker file may well exist, but could not be READ — no permission, an I/O error, a
+    /// coordination failure. Deliberately distinct from absence: a root whose identity is merely
+    /// *unreadable right now* must never be treated as a root that has *no* identity, because the
+    /// repair for absence is to mint a new GUID, and that orphans every link already copied from
+    /// this root. (W23.m6)
+    case unreadable(url: URL, underlying: Error)
+    /// No **durable** identity could be established: the marker write failed (read-only volume, no
+    /// permission, disk full) or could not be confirmed on disk afterwards. `provisional` is the
+    /// marker that *would* have been written — it lives only in memory, so it is a different GUID
+    /// after the next launch and any link minted from it can never resolve. Callers must degrade
+    /// visibly rather than accept it as a normal marker. (W23.m6)
+    case readOnly(url: URL, provisional: RootMarker, underlying: Error?)
 }
 
 extension RootMarker {
 
+    /// Decode the marker file at `fileURL` **without** taking a coordination claim — the caller
+    /// already holds one. (Nesting a second `NSFileCoordinator` inside an accessor block deadlocks,
+    /// which is why `ensure` cannot simply call `read` from inside its write claim.)
+    ///
+    /// - Returns: the marker, or `nil` **only** when the file is genuinely absent.
+    private static func decode(atFile fileURL: URL) throws -> RootMarker? {
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain
+            && error.code == NSFileReadNoSuchFileError {
+            return nil
+        } catch {
+            throw RootMarkerError.unreadable(url: fileURL, underlying: error)
+        }
+        do {
+            return try JSONDecoder().decode(RootMarker.self, from: data)
+        } catch {
+            throw RootMarkerError.malformed(url: fileURL, underlying: error)
+        }
+    }
+
     /// Read the marker at `directory/.archive-suite-root.json`, if present.
-    /// Returns `nil` when the file is absent. Throws `RootMarkerError.malformed`
-    /// if the file exists but cannot be decoded (never silently overwrites it).
+    ///
+    /// Returns `nil` **only** when the file is absent. A file that exists but cannot be read throws
+    /// `.unreadable`, and one that cannot be decoded throws `.malformed` — neither is reported as
+    /// absence, and neither is ever silently overwritten.
     public static func read(at directory: URL) throws -> RootMarker? {
         let fileURL = directory.appendingPathComponent(filename)
 
         var coordinatorError: NSError?
-        var result: Result<RootMarker?, Error>?
+        var outcome: Result<RootMarker?, Error>?
 
         let coordinator = NSFileCoordinator()
         coordinator.coordinate(
@@ -106,42 +140,36 @@ extension RootMarker {
             options: .withoutChanges,
             error: &coordinatorError
         ) { coordURL in
-            do {
-                let data = try Data(contentsOf: coordURL)
-                let marker = try JSONDecoder().decode(RootMarker.self, from: data)
-                result = .success(marker)
-            } catch let error as NSError where error.domain == NSCocoaErrorDomain
-                && error.code == NSFileReadNoSuchFileError {
-                result = .success(nil)
-            } catch let decodingError as DecodingError {
-                result = .failure(RootMarkerError.malformed(url: fileURL, underlying: decodingError))
-            } catch {
-                // Other read error (permissions, etc.) — treat as absent
-                result = .success(nil)
-            }
+            outcome = Result { try decode(atFile: coordURL) }
         }
 
         if let coordinatorError {
-            throw coordinatorError
+            throw RootMarkerError.unreadable(url: fileURL, underlying: coordinatorError)
         }
-        switch result {
-        case .success(let marker): return marker
-        case .failure(let error): throw error
-        case .none: return nil
+        guard let outcome else {
+            // The accessor never ran and coordination reported no error: we know nothing about the
+            // file, which is emphatically not the same as knowing it is absent.
+            throw RootMarkerError.unreadable(url: fileURL, underlying: CocoaError(.fileReadUnknown))
         }
+        return try outcome.get()
     }
 
-    /// Idempotent: read an existing marker if present (never overwrite its guid);
-    /// else create one. A malformed existing file is left untouched and surfaced as
-    /// `.malformed` (never silently overwritten). On a read-only directory the write
-    /// is skipped and a fresh in-memory marker is returned (caller should note
-    /// degraded portability).
+    /// Idempotent: read an existing marker if present (never overwrite its guid); else create one.
+    ///
+    /// The returned marker is always **durable** — read from disk, or written to disk and read back.
+    /// Anything less throws, because the only thing callers do with a marker is mint links that must
+    /// still resolve after a relaunch:
+    /// - `.malformed` — an existing file that will not decode (left untouched, never overwritten);
+    /// - `.unreadable` — an existing file that will not read (so we must not mint a replacement);
+    /// - `.readOnly` — the write failed or could not be confirmed. The in-memory marker rides along
+    ///   as `provisional` so a caller can say *which* identity was lost, but it is not on disk and
+    ///   must never be used to mint a link.
     ///
     /// - Parameters:
     ///   - directory: The granted root URL. Caller must have started any security scope.
     ///   - kind: `.reader` or `.notes`.
     ///   - name: Human label (typically `directory.lastPathComponent`).
-    /// - Returns: The effective marker (existing or newly created).
+    /// - Returns: The effective, durable marker (existing or newly created).
     public static func ensure(
         at directory: URL,
         kind: RootKind,
@@ -149,22 +177,27 @@ extension RootMarker {
     ) throws -> RootMarker {
         let fileURL = directory.appendingPathComponent(filename)
 
-        // 1. Try to read an existing marker first.
+        // 1. Fast path — an existing marker is the answer, and that is every launch after the
+        //    first. A read failure propagates instead of falling through to step 2: minting a
+        //    replacement over a marker we merely failed to read is the data loss. (W23.m6)
         if let existing = try read(at: directory) {
             return existing
         }
 
-        // 2. No marker on disk — create one.
-        let marker = RootMarker(
+        // 2. Nothing visible — create one. The absence re-check, the write and the confirmation all
+        //    happen INSIDE one write claim, because two processes that each saw absence must not
+        //    each mint a GUID: the loser would hand out links naming a root the disk no longer
+        //    identifies as, and those links resolve nowhere. (W23.l3)
+        let provisional = RootMarker(
             guid: UUID(),
             name: name,
             kind: kind,
             createdAt: Date()
         )
-        let data = try JSONEncoder().encode(marker)
+        let data = try JSONEncoder().encode(provisional)
 
         var coordinatorError: NSError?
-        var writeError: Error?
+        var outcome: Result<RootMarker, Error>?
 
         let coordinator = NSFileCoordinator()
         coordinator.coordinate(
@@ -172,27 +205,36 @@ extension RootMarker {
             options: [],
             error: &coordinatorError
         ) { coordURL in
-            do {
-                try data.write(to: coordURL, options: .atomic)
-            } catch {
-                writeError = error
+            outcome = Result {
+                // Re-check under the claim: a racing process may have created it since step 1.
+                if let winner = try decode(atFile: coordURL) {
+                    return winner   // adopt the winner rather than overwrite it
+                }
+                do {
+                    try data.write(to: coordURL, options: .atomic)
+                } catch {
+                    throw RootMarkerError.readOnly(
+                        url: fileURL, provisional: provisional, underlying: error
+                    )
+                }
+                // A write that "succeeded" but left nothing readable behind is not an identity.
+                guard let confirmed = try decode(atFile: coordURL) else {
+                    throw RootMarkerError.readOnly(
+                        url: fileURL, provisional: provisional, underlying: nil
+                    )
+                }
+                return confirmed
             }
         }
 
         if let coordinatorError {
-            throw coordinatorError
+            throw RootMarkerError.readOnly(
+                url: fileURL, provisional: provisional, underlying: coordinatorError
+            )
         }
-
-        if writeError != nil {
-            // Read-only volume / permission denied — return the in-memory marker
-            // (degraded portability; caller should surface a note to the user).
-            return marker
+        guard let outcome else {
+            throw RootMarkerError.readOnly(url: fileURL, provisional: provisional, underlying: nil)
         }
-
-        // 3. Re-read to confirm (idempotency: another process might have beaten us).
-        if let confirmed = try read(at: directory) {
-            return confirmed
-        }
-        return marker
+        return try outcome.get()
     }
 }
