@@ -96,8 +96,10 @@ GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-3000}"      # wall-clock cap on the gate 
                                                    # Set it back to 1800 if you run with AUTONOMOUS_GUI_VM=0.
 GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts before PARK (a persistent hang)
 
-# STATUS digest (WS5) — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a
-# 5-second read (run state, backlog, commits/day, disk, last gate, owner-needed). Overridable (harness stub).
+# STATUS — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a few seconds of
+# reading: is it running, what has it done, how much is left, is the code healthy, does it need the owner.
+# ONE renderer (ops/autonomous/status-digest.sh), shared with `arm.sh status`; it suppresses colour when
+# stdout is not a terminal, so the file written here stays clean text. Overridable (harness stub).
 STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
 
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The

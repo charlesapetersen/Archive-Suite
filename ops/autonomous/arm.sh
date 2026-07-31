@@ -47,69 +47,26 @@ else
   idle_explanation() { printf 'running, BACKING OFF (idle %ss — reason undetermined: run-state-lib.sh not in this checkout)' "${1:-?}"; }
 fi
 
+# status — ONE renderer, in status-digest.sh. This function only forwards to it.
+#
+# It used to print six sections of its own (process, run state, plan, GUI, keychain, log tail) and THEN
+# paste the whole digest underneath: the run state and the plan line appeared twice in two different
+# wordings, and the GUI/keychain lines were fixed text that had long since stopped telling anyone anything.
+# A reader had to know which of the two copies was the current one. So: no formatting lives here any more.
+# `status --details` passes straight through for the diagnostics (keychain, disk, worktrees, log tail).
 status() {
-  echo "== daemon process =="
-  pgrep -fl archive-suite-autonomous.sh || echo "  (not running)"
-  # WS1: is it launchd-managed (crash-restart) or plain nohup (no restart)?
-  if launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
-    echo "  supervisor: launchd KeepAlive (crash-restart ON) — stop with '$0 stop'"
-    # Job loaded but no process = relaunching, or crash-looping (throttled 60s). Surface it — otherwise a
-    # crash-loop reads identical to healthy here.
-    if ! pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
-      lec=$(launchctl print "$GUI_DOMAIN/$JOB" 2>/dev/null | awk -F'= ' '/last exit code/{gsub(/[^0-9-]/,"",$2); print $2; exit}')
-      echo "  ⚠ job loaded but NO process right now — relaunching, or crash-looping (last exit ${lec:-?}; see $STATE/launchd.err.log)"
-    fi
+  local digest="$REPO/ops/autonomous/status-digest.sh"
+  if [ -x "$digest" ]; then
+    "$digest" "$@"
   else
-    echo "  supervisor: nohup / none (a crash will NOT restart; '$0 keepalive' for crash-restart)"
-  fi
-  echo "== run state =="
-  # Distinguish PARKED (daemon auto-stopped after a long idle stretch — blocked on you, nothing lost) from a
-  # crash, and show whether a live daemon is backing off. All derived from files the daemon writes; read-only.
-  local since idle
-  since=$(cat "$STATE/idle.since" 2>/dev/null)
-  if pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
-    case "$since" in
-      ''|*[!0-9]*) echo "  running, productive (last cycle advanced the run)" ;;
-      *) idle=$(( $(date +%s) - since ))
-         printf '  %s\n' "$(idle_explanation "$idle")" ;;
-    esac
-  elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
-    echo "  PARKED — auto-stopped after a long no-progress stretch; every queue item looks blocked on you."
-    echo "  Nothing lost, plan intact. Unblock (arm the next queue item) then re-arm: '$0'."
-    [ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && echo "  see: ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt"
-  else
-    echo "  stopped (normal stop, or the launching session closed — not parked). Re-arm with '$0'."
-  fi
-  echo "== plan RUN STATUS =="
-  runstatus || echo "  (no plan at $PLAN)"
-  echo "== GUI =="
-  echo "  runs off-screen in the Tart VM (unattended) — no flag. See ops/gui/README §3."
-  echo "== keychain =="
-  # The daemon's test-smoke gate reads the OCR key via /usr/bin/security, which re-prompts until the item's
-  # partition list includes Apple's tool partitions. fix-keychain-access.sh sets that + drops this marker
-  # (which records the accounts it fixed). Reading item ATTRIBUTES (no -w) never prompts, so we can also flag
-  # a provider key that's present but NOT in the marker — e.g. one added after the fix was last run.
-  local kmark="$STATE/keychain-partition-fixed" ksvc="com.archiveprocessor.app" klc="$HOME/Library/Keychains/login.keychain-db"
-  if [ -f "$kmark" ]; then
-    local fixed; fixed="$(cat "$kmark" 2>/dev/null)"
-    echo "  partition-list fix applied ($fixed)"
-    local newkeys=""
-    for a in Gemini Anthropic Mistral OpenAI Gateway; do
-      if security find-generic-password -s "$ksvc" -a "$a" "$klc" >/dev/null 2>&1 && ! printf '%s' "$fixed" | grep -qw "$a"; then
-        newkeys="$newkeys $a"
-      fi
-    done
-    [ -n "$newkeys" ] && echo "  ⚠ new key(s) not yet fixed:$newkeys — re-run ./ops/autonomous/fix-keychain-access.sh"
-  else
-    echo "  ⚠ partition-list fix NOT applied — the daemon may wake you with 'security wants to use your keychain'."
-    echo "    Run once:  ./ops/autonomous/fix-keychain-access.sh   (then re-run after rotating/adding any API key)"
-  fi
-  echo "== recent daemon.log =="
-  tail -n 6 "$LOG" 2>/dev/null || echo "  (no log yet)"
-  echo "== digest (WS5) =="
-  # The rich one-screen digest — generated fresh here, and the daemon writes it to $STATE/STATUS.md each cycle.
-  if [ -x "$REPO/ops/autonomous/status-digest.sh" ]; then
-    "$REPO/ops/autonomous/status-digest.sh" 2>/dev/null | sed 's/^/  /' || echo "  (digest unavailable)"
+    # Never leave the owner with nothing — this is the command you run when things are already broken.
+    echo "status-digest.sh is missing or not executable at:"
+    echo "  $digest"
+    echo
+    pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1 \
+      && echo "The worker IS running (pid $(pgrep -f archive-suite-autonomous.sh | head -1))." \
+      || echo "The worker is NOT running. Start it: $0"
+    tail -n 6 "$LOG" 2>/dev/null
   fi
 }
 
@@ -122,7 +79,7 @@ DRYRUN=""
 if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
 
 case "${1:-arm}" in
-  status) status; exit 0 ;;
+  status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest
   stop)
     # bootout FIRST — under `keepalive` (launchd KeepAlive=true) a plain pkill would just be relaunched, so we
     # must remove the launchd job before killing anything. Harmless no-op if the run is the plain nohup mode

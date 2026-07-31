@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
-# status-digest.sh (WS5) — print a ONE-SCREEN digest of the autonomous run so a check-in is a 5-second read
-# instead of grepping daemon.log + the plan + git + df + worktrees by hand. READ-ONLY (no prompts, no edits,
-# no network). The daemon regenerates $STATE/STATUS.md each cycle + on park; `arm.sh status` also runs this.
-# All fields degrade gracefully (a missing source prints "?"/"—", never an error).
+# status-digest.sh — "what is the overnight worker doing?", answered in about ten seconds of reading.
+#
+# THE ONE STATUS RENDERER. `arm.sh status` calls this and adds nothing of its own; the daemon writes its
+# output to $STATE/STATUS.md every cycle and on park. There is deliberately no second copy of this
+# formatting anywhere — arm.sh used to print its own six sections and THEN paste this digest underneath,
+# so the run state and the plan line appeared twice, in two different wordings, and a fix to one never
+# reached the other. (Same failure as ops/gui/tart-lib.sh: two copies of one fact is how they drift.)
+#
+# AUDIENCE: the owner, at a glance, not an engineer reading logs. So the default view answers only the
+# five questions actually worth waking up to —
+#     is it running? · what has it done? · how much is left? · is the code healthy? · does it need me?
+# — in plain words, with no jargon, no internal workstream numbers and no raw log tails. Everything else
+# (keychain state, GUI lane, disk, review coverage, the log tail, launchd internals) is real but it is
+# DIAGNOSTIC, so it lives behind `--details` and is only surfaced by default when it is actually a problem.
+#
+# READ-ONLY: no prompts, no edits, no network. Every field degrades to "?"/"—" rather than erroring, because
+# this is the thing you run WHEN something is already wrong.
 set -uo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
 REPO="${AUTONOMOUS_REPO:-/Users/<user>/Claude/Archive Suite}"
@@ -10,93 +23,184 @@ STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 JOB="com.archivesuite.autonomous"; GUI_DOMAIN="gui/$(id -u)"
 LOG="$STATE/daemon.log"
+ARM="./ops/autonomous/arm.sh"
+
+DETAILS=0
+case "${1:-}" in -d|--details|--detail|-v|--verbose|full) DETAILS=1 ;; esac
+
 g() { git -C "$REPO" "$@" 2>/dev/null; }
-num() { case "$1" in ''|*[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
-# Why the daemon is idle is decided in ONE place, shared with arm.sh — see run-state-lib.sh's header.
-# Guarded for the same reason arm.sh guards it: the daemon runs this script from $REPO, which may predate
-# the lib. Degrade to the old wording rather than emitting nothing.
+num() { case "${1:-}" in ''|*[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
+
+# Colour only when a human is watching. The daemon redirects this into STATUS.md, and escape codes in a
+# file are worse than no colour at all.
+if [ -t 1 ]; then
+  B=$'\033[1m'; DIM=$'\033[2m'; GRN=$'\033[32m'; AMB=$'\033[33m'; RED=$'\033[31m'; OFF=$'\033[0m'
+else B=""; DIM=""; GRN=""; AMB=""; RED=""; OFF=""; fi
+
+# "3 hours"/"12 minutes" from a number of seconds — for people, not for parsing.
+human_secs() {
+  local s; s="$(num "${1:-0}")"
+  if   [ "$s" -lt 90 ]    ; then plural "$s" second
+  elif [ "$s" -lt 5400 ]  ; then plural "$(( s / 60 ))" minute
+  elif [ "$s" -lt 172800 ]; then plural "$(( s / 3600 ))" hour
+  else                           plural "$(( s / 86400 ))" day; fi
+}
+# plural N word -> "1 change" / "3 changes". Writing "change(s)" at a human is a small rudeness.
+plural() { [ "$(num "${1:-0}")" = 1 ] && printf '1 %s' "$2" || printf '%s %ss' "$(num "${1:-0}")" "$2"; }
+# Cut to N chars on a WORD boundary, so a truncated commit subject does not end mid-syllable.
+clip() {
+  local s="${1:-}" n="${2:-60}"
+  [ "${#s}" -le "$n" ] && { printf '%s' "$s"; return; }
+  s="${s:0:$n}"; s="${s% *}"; printf '%s…' "$s"
+}
+
+# Why the daemon is idle is decided in run-state-lib.sh, shared with arm.sh. Guarded because arm.sh may run
+# from a checkout that predates the lib (memory `arm-installs-from-primary-checkout`).
 if [ -r "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh" ]; then
   . "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh"
 else
-  idle_explanation() { printf 'running, BACKING OFF (idle %ss — reason undetermined: run-state-lib.sh not in this checkout)' "${1:-?}"; }
+  ratelimit_reset_epoch() { return 1; }
+  ratelimit_phrase() { printf 'usage cap'; }
 fi
 
-# ---- run state (mirrors arm.sh) ----
-run_state() {
-  local since
-  # STATUS_PARKED is set by the daemon's write_status when it regenerates the digest DURING park_run — at
-  # that instant the daemon process is still alive (bootout hasn't fired), so the pgrep branch below would
-  # wrongly say "running". Honor the explicit flag first.
-  if [ -n "${STATUS_PARKED:-}" ]; then
-    echo "PARKED — $(printf '%s' "$STATUS_PARKED" | cut -c1-60) (blocked on you; re-arm after fixing)"; return
-  fi
-  if pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
-    since=$(cat "$STATE/idle.since" 2>/dev/null)
-    case "$since" in ''|*[!0-9]*) echo "running, productive" ;;
-      *) idle_explanation "$(( $(date +%s) - since ))"; echo ;; esac
-  elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
-    echo "PARKED — $(tail -n 40 "$LOG" 2>/dev/null | grep -m1 'PARKED' | sed 's/.*PARKED (\([^)]*\)).*/\1/;s/.*PARKED/parked/' | cut -c1-60) (blocked on you)"
-  else echo "stopped (re-arm: ./ops/autonomous/arm.sh keepalive)"; fi
-}
-supervisor() { launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1 && echo "launchd KeepAlive (crash-restart)" || echo "nohup/none"; }
+# ---------------------------------------------------------------------------------------------------
+# STATE 1 — is it running, and if not, why? Sets: STATE_ICON, STATE_LINE, STATE_HINT (may be empty).
+# ---------------------------------------------------------------------------------------------------
+running=0; pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1 && running=1
+supervised=0; launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1 && supervised=1
+since="$(cat "$STATE/idle.since" 2>/dev/null)"
+STATE_HINT=""
 
-# ---- backlog counts ----
-qcount() { g log >/dev/null 2>&1 || { echo "?"; return; }; grep -cE "$1" "$2" 2>/dev/null || echo 0; }
-wq() { awk '/^## WORK QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null; }
+if [ -n "${STATUS_PARKED:-}" ]; then
+  # Set by the daemon while it is parking: the process is still alive for another moment, so the pgrep
+  # check below would say "working" for a run that has actually given up. The flag wins.
+  STATE_ICON="${AMB}◆${OFF}"; STATE_LINE="Stopped itself — everything left needs a decision from you"
+  STATE_HINT="reason: $(printf '%s' "$STATUS_PARKED" | tr -d '\n' | cut -c1-70)"
+elif [ "$running" = 1 ]; then
+  case "$since" in
+    ''|*[!0-9]*)
+      STATE_ICON="${GRN}●${OFF}"; STATE_LINE="Working now"
+      # How long it has been on the CURRENT task. "Working now" on its own cannot distinguish a healthy
+      # session from one wedged for three hours, and that is the whole reason to look. engine.lock is
+      # created when a session starts and removed when it ends, so its age is the session's age.
+      lock_m="$(stat -f %m "$STATE/engine.lock" 2>/dev/null || stat -c %Y "$STATE/engine.lock" 2>/dev/null)"
+      case "$lock_m" in
+        ''|*[!0-9]*) : ;;
+        *) STATE_LINE="Working now — $(human_secs "$(( $(date +%s) - lock_m ))") into its current task" ;;
+      esac ;;
+    *)
+      idle=$(( $(date +%s) - since ))
+      if reset="$(ratelimit_reset_epoch)"; then
+        STATE_ICON="${AMB}◐${OFF}"
+        STATE_LINE="Paused — it hit the $(ratelimit_phrase "$reset")"
+        STATE_HINT="This is NOT out of work; it retries by itself. Idle $(human_secs "$idle")."
+      else
+        STATE_ICON="${AMB}◐${OFF}"
+        STATE_LINE="Running, but not finding anything it can do ($(human_secs "$idle"))"
+        STATE_HINT="Usually means the remaining tasks are waiting on you — see 'Needs you' below."
+      fi ;;
+  esac
+elif [ "$supervised" = 1 ]; then
+  # Job loaded but no process: either between restarts, or crash-looping. Never let those read alike.
+  lec="$(launchctl print "$GUI_DOMAIN/$JOB" 2>/dev/null | awk -F'= ' '/last exit code/{gsub(/[^0-9-]/,"",$2); print $2; exit}')"
+  STATE_ICON="${RED}✕${OFF}"; STATE_LINE="Set to run, but not running right now"
+  STATE_HINT="Restarting, or failing to start (last exit ${lec:-?}). If this persists: $ARM stop, then $ARM"
+elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
+  STATE_ICON="${AMB}◆${OFF}"; STATE_LINE="Stopped itself — everything left needs a decision from you"
+  STATE_HINT="Nothing is lost. Clear what it is waiting on, then restart: $ARM"
+  [ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && STATE_HINT="$STATE_HINT  (see ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt)"
+else
+  STATE_ICON="${DIM}○${OFF}"; STATE_LINE="Not running"
+  STATE_HINT="Nothing is working on the project right now. Start it: $ARM"
+fi
+
+# ---------------------------------------------------------------------------------------------------
+# STATE 2 — what has it done, how much is left, is the code healthy?
+# ---------------------------------------------------------------------------------------------------
+commits24="$(num "$(g log --since='24 hours ago' --oneline 2>/dev/null | wc -l | tr -d ' ')")"
+lastwhen="$(g log -1 --format='%cr')"; lastwhen="${lastwhen:-—}"
+lastsubj="$(clip "$(g log -1 --format='%s')" 62)"
 open_todo="$(num "$(grep -cE '^\s*[-*].*\[ \]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
 done_todo="$(num "$(grep -cE '^\s*[-*].*\[[xX]\]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
-open_wq="$(num "$(wq | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]')")"
-hold="$(num "$( { awk '/^## HOLD QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]'; } )")"
+hold="$(num "$(awk '/^## HOLD QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]')")"
 
-# ---- health gate ----
-gate_line() {
-  local last; last="$(cat "$STATE/last-gate" 2>/dev/null)"
-  if [ -n "$last" ] && g cat-file -e "$last^{commit}"; then
-    echo "last GREEN @ ${last:0:12} ($(num "$(g rev-list --count "$last..HEAD")") commits since)"
-  else echo "not yet run (or stale marker → will run next cadence)"; fi
-}
-# ---- review coverage ----
-review_line() {
-  local tsv="$REPO/.maintenance/review/last-reviewed.tsv"      # WS11 state (gitignored, primary checkout)
-  [ -f "$tsv" ] || { echo "no unit reviewed yet"; return; }
-  # num() guards the count (BSD `grep -c` prints 0 AND exits 1 on no match — a `|| echo 0` would double-print).
-  echo "$(num "$(grep -cvE '^__any__' "$tsv" 2>/dev/null)")/9 units reviewed (last: $(awk -F'\t' '$1!="__any__"{print $1}' "$tsv" 2>/dev/null | tail -1))"
-}
-
-# ---- owner-needed ----
-# Accumulate with REAL newlines (via add_need) and print with `printf %s`, NOT `%b` — plan-derived content
-# (the Morning-Review snippet) may contain backslashes, and %b would expand a stray \n/\c and mangle/truncate
-# the section. Strip any control chars from the snippet too, belt-and-braces.
-needs=""
-add_need() { needs="$needs"$'\n'"  • $1"; }
-[ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && add_need "PARKED — see ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt, then re-arm"
-security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>' && add_need "taskport is 'allow' (password-free) — revert: see ~/Desktop/REVERT-TASKPORT-SECURITY.txt"
-[ -f "$STATE/keychain-partition-fixed" ] || add_need "keychain partition-fix not applied — run ./ops/autonomous/fix-keychain-access.sh (stops 'security' prompts)"
-[ "$hold" -gt 0 ] 2>/dev/null && add_need "$hold hold-queue item(s) await you (Tier-3/SPEC/corpus/irreversible) — see the plan's ## HOLD QUEUE"
-# Morning Review — count OPEN checkboxes, then show the first one.
-# The 2026-07-28 triage replaced ~29 prose entries with a "### Outstanding owner checks" CHECKLIST, so
-# counting "- [ ]" is now the real signal; the old code only ever printed the first "- " line and would
-# report NOTHING once the section was reorganised. Both shapes are handled: `- [ ]` checklist rows AND
-# the legacy `- **[YYYY-MM-DD] …` prose entries. Sub-headings inside the section are ### by convention —
-# a ## there still (correctly) ends the section.
-mr_open="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
-case "$mr_open" in ''|*[!0-9]*) mr_open=0 ;; esac
-mr="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-72)"
-if [ "$mr_open" -gt 0 ] 2>/dev/null; then
-  add_need "$mr_open outstanding owner check(s) in Morning Review — first: ${mr}…"
-elif [ -n "$mr" ]; then
-  add_need "Morning Review has entries (top): ${mr}…"
+gate_last="$(cat "$STATE/last-gate" 2>/dev/null)"
+if [ -n "$gate_last" ] && g cat-file -e "${gate_last}^{commit}" 2>/dev/null; then
+  gate_behind="$(num "$(g rev-list --count "$gate_last..HEAD")")"
+  case "$gate_behind" in
+    0) HEALTH="Build and tests passed, on the current code" ;;
+    1) HEALTH="Build and tests passed, 1 change ago" ;;
+    *) HEALTH="Build and tests passed, $gate_behind changes ago" ;;
+  esac
+else
+  HEALTH="Not checked yet — the next run will do a full build and test"
 fi
 
-printf '=== Archive Suite — autonomous run STATUS (%s) ===\n' "$(date '+%F %T')"
-printf 'RUN:      %s   [%s]\n' "$(run_state)" "$(supervisor)"
-printf 'PLAN:     %s\n' "$(grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-88 || echo '(no plan)')"
-printf 'HEAD:     %s  |  commits last 24h: %s  |  last: %s\n' \
-  "$(g log -1 --format='%h %s' | cut -c1-66)" "$(num "$(g log --since='24 hours ago' --oneline | wc -l | tr -d ' ')")" "$(g log -1 --format='%cr')"
-printf 'BACKLOG:  SUITE_TODO %s open / %s done  |  plan WORK QUEUE %s open  |  hold-queue %s\n' "$open_todo" "$done_todo" "$open_wq" "$hold"
-printf 'GATE:     %s\n' "$(gate_line)"
-printf 'REVIEW:   %s\n' "$(review_line)"
-printf 'DISK:     %sGB free  |  worktrees: %s wt/*\n' \
-  "$(df -m "$REPO" 2>/dev/null | awk 'NR==2{printf "%.0f", $4/1024}')" "$(num "$(g worktree list | grep -c 'wt/')")"
-printf -- '--- NEEDS YOU: ---'
-if [ -n "$needs" ]; then printf '%s\n' "$needs"; else printf '\n  • nothing — the run is autonomous.\n'; fi
+# ---------------------------------------------------------------------------------------------------
+# STATE 3 — does it need me? Only genuine, actionable asks; each says what to DO, not what is wrong.
+# ---------------------------------------------------------------------------------------------------
+needs=""
+add_need() { needs="$needs"$'\n'"    • $1"; }
+[ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && \
+  add_need "It parked and left you a note: ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt — then restart it"
+security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<string>allow</string>' && \
+  add_need "A security setting is still relaxed (password-free taskport) — see ~/Desktop/REVERT-TASKPORT-SECURITY.txt"
+[ -f "$STATE/keychain-partition-fixed" ] || \
+  add_need "Keychain not set up — it may interrupt you with a password box. Run once: ./ops/autonomous/fix-keychain-access.sh"
+[ "$hold" -gt 0 ] 2>/dev/null && \
+  add_need "$hold task(s) are held back for you to decide (they touch things with no undo)"
+# Morning Review: count OPEN checkboxes, then quote the first. Handles both shapes — the `- [ ]` checklist
+# rows and the older `- **[YYYY-MM-DD] …` prose entries. Sub-headings inside the section must stay ###; a
+# `## ` there correctly ends the scan (and would silently empty this list, so it is worth knowing).
+mr_open="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
+mr_open="$(num "$mr_open")"
+# Real newlines via add_need, printed with %s not %b — plan text can contain backslashes that %b would eat.
+mr="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-64)"
+if [ "$mr_open" -gt 0 ] 2>/dev/null; then
+  add_need "$mr_open thing(s) waiting on your decision — first: ${mr}…"
+elif [ -n "$mr" ]; then
+  add_need "Notes are waiting for you to read — first: ${mr}…"
+fi
+
+# ---------------------------------------------------------------------------------------------------
+# RENDER — the default view. Five answers, nothing else.
+# ---------------------------------------------------------------------------------------------------
+printf '%s\n' "${B}Archive Suite — overnight worker${OFF}   ${DIM}$(date '+%a %-d %b, %H:%M')${OFF}"
+printf '\n  %s  %s\n' "$STATE_ICON" "${B}${STATE_LINE}${OFF}"
+[ -n "$STATE_HINT" ] && printf '     %s%s%s\n' "$DIM" "$STATE_HINT" "$OFF"
+
+if [ "$commits24" -gt 0 ] 2>/dev/null; then
+  printf '\n  %-10s %s in the last 24 hours · latest %s\n' "Done" "$(plural "$commits24" change)" "$lastwhen"
+else
+  printf '\n  %-10s nothing in the last 24 hours · latest change %s\n' "Done" "$lastwhen"
+fi
+[ -n "$lastsubj" ] && printf '  %-10s %s%s%s\n' "" "$DIM" "\"$lastsubj\"" "$OFF"
+printf '  %-10s %s to do · %s finished\n' "Left" "$(plural "$open_todo" task)" "$done_todo"
+printf '  %-10s %s\n' "Health" "$HEALTH"
+
+if [ -n "$needs" ]; then
+  printf '\n  %-10s%s\n' "Needs you" "$needs"
+else
+  printf '\n  %-10s %sNothing right now.%s\n' "Needs you" "$GRN" "$OFF"
+fi
+
+# ---------------------------------------------------------------------------------------------------
+# RENDER — --details. The diagnostics, for when the top-line view says something is wrong.
+# ---------------------------------------------------------------------------------------------------
+if [ "$DETAILS" = 1 ]; then
+  wt="$(num "$(g worktree list 2>/dev/null | grep -c 'wt/')")"
+  disk="$(df -m "$REPO" 2>/dev/null | awk 'NR==2{printf "%.0f", $4/1024}')"
+  printf '\n  %s\n' "${B}Details${OFF}"
+  printf '  %-18s %s\n' "current code" "$(g log -1 --format='%h %s' | cut -c1-62)"
+  printf '  %-18s %s\n' "plan" "$(grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-62 || echo '(no plan file)')"
+  printf '  %-18s %s\n' "restart on crash" "$([ "$supervised" = 1 ] && echo 'yes (launchd keeps it alive)' || echo 'no (plain background process)')"
+  printf '  %-18s %s\n' "disk free" "${disk:-?} GB"
+  printf '  %-18s %s\n' "spare worktrees" "$wt"
+  printf '  %-18s %s\n' "keychain" "$([ -f "$STATE/keychain-partition-fixed" ] && cat "$STATE/keychain-partition-fixed" 2>/dev/null || echo 'not set up')"
+  printf '  %-18s %s\n' "GUI checks" "run off-screen in the Tart VM (ops/gui/README §3)"
+  printf '  %-18s %s\n' "code reviews" "$(grep -q 'REVIEW_ENABLED_DEFAULT=0' "$REPO/ops/autonomous/next-review-unit.sh" 2>/dev/null && echo 'paused by you' || echo 'on')"
+  printf '\n  %s\n' "${B}Last few log lines${OFF}"
+  tail -n 6 "$LOG" 2>/dev/null | sed 's/^/    /' || printf '    (no log yet)\n'
+else
+  printf '\n  %smore: %s status --details%s\n' "$DIM" "$ARM" "$OFF"
+fi

@@ -70,10 +70,12 @@ tail -f ~/.local/state/archive-autonomous/last-session.log      # the most recen
 ./ops/autonomous/arm.sh stop                                    # STOP either mode (boots out the launchd job, THEN kills)
 ```
 `arm.sh stop` is the right stopper in both modes: under `keepalive` a bare `pkill` would just be relaunched by
-launchd, so `stop` boots out the job first. (`arm.sh status` shows the **supervisor**: launchd KeepAlive vs
-nohup.)
-`./arm.sh status` shows a **run state** line — *productive* / *backing off (idle Ns)* / *PARKED* / *stopped* —
-so a parked run is never mistaken for a crash. The daemon self-terminates when the plan's `RUN STATUS:` line
+launchd, so `stop` boots out the job first. (`arm.sh status --details` shows which mode is in force, under
+*restart on crash*.)
+`./arm.sh status` opens with a plain-language **state line** — *Working now* / *Paused — it hit the usage cap*
+/ *Running, but not finding anything it can do* / *Stopped itself* / *Set to run, but not running right now* /
+*Not running* — so a parked run is never mistaken for a crash, and a throttled one is never mistaken for an
+empty queue. The daemon self-terminates when the plan's `RUN STATUS:` line
 reads `COMPLETE`, **or** when it parks (see below).
 
 ## Idle backoff + auto-park (added 2026-07-16)
@@ -203,12 +205,47 @@ paid Processor OCR smoke.
   `xcodebuild test` doesn't prompt for the debugger. Run `ops/autonomous/health-gate.sh` yourself once to
   confirm it's green + prompt-free before arming a long run.
 
-**STATUS digest (WS5, 2026-07-17) — the check-in surface.** `ops/autonomous/status-digest.sh` prints a
-one-screen summary — run state, PLAN status, HEAD + commits/24h, backlog (SUITE_TODO / WORK QUEUE / hold),
-last health-gate, review coverage, disk, worktrees, and a **NEEDS YOU** section (park, taskport-still-open,
-keychain-not-fixed, hold-queue items, Morning-Review head). The daemon rewrites `$STATE/STATUS.md` from it
-every cycle + on park, and `arm.sh status` runs it. Read-only, non-fatal, degrades gracefully. Check in with:
-`cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/status-digest.sh`).
+**STATUS — the check-in surface (rewritten 2026-07-31 for readability).** `status-digest.sh` is **the one
+status renderer**; `arm.sh status` is a thin forwarder that adds no formatting of its own. The default view is
+written for the owner at a glance, not for an engineer reading logs, and answers only five questions:
+
+> **is it running? · what has it done? · how much is left? · is the code healthy? · does it need me?**
+
+```
+Archive Suite — overnight worker   Fri 31 Jul, 09:03
+
+  ○  Not running
+     Nothing is working on the project right now. Start it: ./ops/autonomous/arm.sh
+
+  Done       69 changes in the last 24 hours · latest 15 minutes ago
+             "feat(ops): daemon runs at effort=xhigh, and each session now…"
+  Left       51 tasks to do · 152 finished
+  Health     Build and tests passed, 13 changes ago
+
+  Needs you  Nothing right now.
+```
+
+The state line is the point of the whole thing, because each state implies a **different owner action**, and
+two of them were historically reported as each other:
+*Working now* · *Paused — it hit the usage cap* (wait; it retries itself) · *Running, but not finding anything
+it can do* (unblock it) · *Stopped itself* = parked (decide something) · *Set to run, but not running right
+now* (crash-looping) · *Not running*.
+
+`arm.sh status --details` adds the diagnostics that used to clutter the default view — current commit, plan
+line, restart-on-crash mode, disk, spare worktrees, keychain state, GUI lane, whether paced reviews are on,
+and the last log lines. Nothing was deleted, only demoted; anything genuinely *wrong* still surfaces under
+**Needs you** with no flag.
+
+Before this rewrite, `arm.sh status` printed six sections of its own and *then* pasted the digest underneath,
+so the run state and plan line each appeared twice in two different wordings — and the `GUI` and `keychain`
+sections were fixed text that had stopped telling anyone anything. One renderer, one wording.
+
+The daemon rewrites `$STATE/STATUS.md` from the same renderer every cycle + on park (colour is suppressed off
+a terminal, so the file stays clean text). Read-only, non-fatal, degrades gracefully — it exits 0 and still
+prints a report with no repo, plan or state at all, because it is what you run when something is already
+broken. Covered by `ops/autonomous/tests/prove-status.sh` (34 checks: every state, the jargon budget, and the
+no-ANSI-in-a-file rule). Check in with:
+`cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/arm.sh status`).
 
 ## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
 
@@ -256,7 +293,8 @@ productive session and wakes you.
 ```
 Then launch the app once (`./launch.sh processor`) and click **Always Allow** if *it* prompts, to confirm the
 app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
-re-created item gets a fresh, empty partition list). `arm.sh status` shows whether the fix is applied.
+re-created item gets a fresh, empty partition list). `arm.sh status --details` shows whether the fix is
+applied, and if it is *not*, the default view says so under **Needs you** without the flag.
 (Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
 
 ## Reading `daemon.log` when the run is down (exit reasons, added 2026-07-29)
