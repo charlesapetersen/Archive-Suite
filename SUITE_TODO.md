@@ -1211,6 +1211,21 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### Follow-ups discovered while fixing Wave 23
 
+- [ ] **W23.m9-fu3 — the index-failure UI in Reader and Notes has never been rendered; give the GUI fixture
+  a corrupt index so it can be [S].** Owner decision, 2026-07-31 Morning Review. W23.m9 shipped two warning
+  surfaces — Reader's amber status-bar line (`ar.status.indexFailure`) and Notes' reused sidebar banner —
+  each shown only when the search index cannot be opened or was not fully written. **Neither has ever been
+  drawn by anything.** This is NOT a skipped VM run: no fixture produces a corrupt index, so there is no path
+  to the state to drive. The state machine behind them is covered by 23 headless tests; only the drawing is
+  unproven. **Do:** teach the GUI fixture builders (`ops/gui/…make-gui-fixture.sh` and the Notes equivalent)
+  an opt-in mode that overwrites the scratch fixture's `content-index-v2.sqlite3` / `notes-index-v1.sqlite3`
+  with a kilobyte of junk, then add a UITest per app asserting the warning appears — **and, more importantly,
+  that the next attempt recovers on its own once the bad file is replaced**, which is the actual point of the
+  fix. Safe by construction: both files are rebuildable caches inside a scratch fixture, never the owner's
+  real store. Closes the two macOS surfaces; the Processor's equivalent red row (W23.m7) stays blocked on
+  `W21.vmgui-d`, and the Android ones are declined below.
+  | files: ops/gui/*, ArchiveReader UITests, ArchiveNotes UITests | Tier-1 | S
+
 - [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
   [S · LOW · UX].** Residual of W23.m4, filed 2026-07-31 from the Morning Review. Since m4, the cited page is
   part of the document window's `openWindow(id:value:)` value, so SwiftUI value identity gives two links to
@@ -3113,6 +3128,16 @@ the Capture re-pass); this unit was verified **INLINE** by the main-loop model. 
 ## Owner ideas — deferred, NOT for the daemon queue (do not start unprompted)
 Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must
 **skip** these: they need the owner's scoping before any code is written.
+
+### ⛔ DECLINED — settled, do NOT re-raise in Morning Review
+- **An `androidTest` source set + Compose UI-test lane for ArchiveCapture — DECLINED by the owner
+  2026-07-31.** ArchiveCapture has no instrumented-test lane, so every Compose line ships visually
+  unverified, and a session has now written this up **three times** (W23.h4's `AlertDialog`, W23.m1, and
+  W23.m8's two status rows) as "if you ever want this closed…". The owner considered it in the Morning
+  Review walkthrough and chose not to spend the build-config change on it. **So: ship Compose changes with
+  headless JVM coverage of the logic — which is what `./gradlew --offline testDebugUnitTest` already gives —
+  state plainly in the commit that the pixels are unverified, and do NOT open a new Morning Review entry
+  about the missing lane.** One line in the Session Log is enough. Revisit only if the owner asks.
 
 - [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
   Owner direction (2026-07-31 Morning Review, in response to the W23.l4 `Calendar` deviation). Two halves:

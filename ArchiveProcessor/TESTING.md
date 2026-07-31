@@ -203,7 +203,7 @@ Continuation calls to that folder's `test_results/` ground truth.
 
 ---
 
-## Tier 2C — Live Capture relay/cloud transport (`scripts/test-{filerelay,relay-golden,drive-*}.sh`)
+## Tier 2C — Live Capture relay/cloud transport (`scripts/test-{filerelay,relay-golden,relay-transport,drive-*}.sh`)
 
 The cloud-transport work (USB local relay + **Google Drive cloud relay**, the `RelayObjectStore` /
 `FileRelayReceiver` seam) has its own Tier-2 scripts. Each launches the built app (or a standalone
@@ -218,6 +218,9 @@ Most are **key-free / \$0 / offline**; only the live one touches Google:
   `RelayObjectFormat` must emit **byte-identical** canonical JSON to the committed golden in
   `SPEC/relay-golden/` (checks iOS via `swiftc` + Android via plain-JVM JUnit) — catches any
   Swift↔Kotlin escaping / key-order / hex-case drift.
+- **`test-relay-transport.sh`** — key-free. The phone-side never-lose contract of the iOS
+  `FileRelayTransport`: a photo is only considered sent once a matching receipt comes back, never on a
+  write alone.
 - **`test-drive-store.sh`** — key-free. Compiles the real `RelayObjectFormat` + `DriveClient` +
   `DriveObjectStore` against a **mock** Drive HTTP seam (no network/OAuth); asserts name→fileId mapping,
   idempotent overwrite, list-filtering, quarantine, and per-object delete.
@@ -227,6 +230,52 @@ Most are **key-free / \$0 / offline**; only the live one touches Google:
 - **`test-drive-live.sh`** — **owner-gated; needs a real Drive account + OAuth** (`drive.file` token in
   `$DRIVE_ACCESS_TOKEN`). The one thing the mocks can't cover: a create/list/read/overwrite/quarantine/
   delete round-trip against **live** Google Drive in a throwaway folder, then deletes everything it created.
+
+---
+
+## Tier 2D — headless `$0` regression drivers (key-free, no network, no GUI)
+
+**Read this section before writing a new test.** These are the cheapest and most-used suites in the
+Processor — and until 2026-07-31 they were the least discoverable, because this file indexed Tiers 1/2A/2B/2C
+and none of them. Each is a standalone shell driver that compiles or drives the *real* sources headlessly,
+asserts externally, and needs no API key, no network and no window. Nothing here touches a real corpus.
+
+Run one directly: `ArchiveProcessor/scripts/<name>.sh`. They are the right home for any invariant that does
+not need pixels — which, given the Processor still has **no test target at all** (`project.yml` declares
+neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearly all of its coverage lives.
+
+**Live Capture data safety**
+- **`test-recovery.sh`** — the DATA-SAFETY invariants: confirm-before-delete, keep-on-failed-backup, and the
+  recovered-photo hold. 45 checks as of 2026-07-31.
+- **`test-manifest-persistence.sh`** — manifest durability + completion acknowledgements: a session's record
+  survives a crash, and an ack is only emitted once the write is durable. 86 checks as of 2026-07-31.
+- **`test-network-session.sh`** — paid-POST retry safety and limiter cancellation accounting, injected so no
+  request leaves the machine. 7 checks as of 2026-07-31. **This is the suite that proves a retry cannot
+  double-charge you.**
+- **`test-segment-json.sh`** — byte-identity of the shared `SegmentJSONBuilder` output.
+
+**Process Files pipeline**
+- **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests.
+- **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
+- **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
+- **`test-processing-history.sh`** — cost tracking + the run log.
+- **`test-processfiles-tagwarn.sh`** — the OUTPUT-WARNING contract (W23.m5 + W23.h5-fu): the run may only
+  report tags it actually wrote.
+
+**File & tag safety (no undo → Tier-2 territory)**
+- **`test-output-file-safety.sh`** — `OutputFileSafety`, in a fresh temporary directory only.
+- **`test-merge-safety.sh`** — merged-PDF tag transfer.
+- **`test-collection-organize.sh`** — collision-safe collection organization.
+- **`test-controlled-vocabulary.sh`** — post-parse controlled-vocabulary enforcement.
+
+**Providers**
+- **`test-localagent.sh`** — drives the real `LocalAgentClient` against a fake CLI
+  (`scripts/localagent-fake-cli.sh`), so the Local Agent path is provable with no account and no spend.
+
+Counts drift as checks are added — treat the numbers above as a floor, not a contract, and read a script's
+header comment for what it actually covers. Related non-`test-*` drivers in the same directory:
+`localagent-{mechanism,pacing,validator,wiring}-test.swift` (compiled directly) and `android-ui-drive.sh`
+(the Android companion's emulator lane).
 
 ---
 
