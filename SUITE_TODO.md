@@ -927,8 +927,36 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   shared-core rebuild rule is N/A. No view or interaction code changed, so no VM UITest run was needed.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Links/ReaderLinkResolver,Views/ReaderPreviewPopover}.swift | S | low | none
 
-- [ ] **W23.l2 — a cancelled prune task can still defeat the two-emission absence gate [S · LOW · residual
-  race] (blocked-on: W23.m9).** Reader `Search/ContentIndexer.swift`, Notes `Index/NotesIndexer.swift`.
+- [x] **W23.l2 — a cancelled prune task can still defeat the two-emission absence gate [S · LOW · residual
+  race] (blocked-on: W23.m9).** ✅ DONE `ad5e5cb` (Reader) + this commit (Notes + trackers).
+  **Premise re-confirmed empirically first, and the first probe refuted itself** — which is the useful part.
+  Replaying the pre-fix shape under the real concurrency runtime showed back-to-back emissions are actually
+  **safe** (task A dies at its first cancellation check, never having started); the race needs A genuinely
+  mid-flight, which is the real case since `allPaths()` over a large index takes real time. Parked past A's
+  last check, all four questions confirmed: A observed `Task.isCancelled == true` and ran its hops anyway; a
+  superseded A overwrote state a newer emission had just written; that stale stash deleted a path after only
+  ONE current absence; and in the other interleaving A deleted a path the newest snapshot said was present.
+  **Fix = a prune epoch, with two load-bearing halves:** `commitPruneDecision` does read-decide-write in ONE
+  main-actor hop (a split read-then-write is the window the newer emission interleaved through, so the
+  generation check alone would not have closed it), and the row delete re-checks the epoch — skipping a
+  superseded delete costs only another two-emission cycle, while deleting wrongly costs search hits until a
+  reindex. `resetPruneState` bumps the epoch too, or an in-flight task from the OLD root re-stashes its
+  absences over the cleared state. Reader also gained a pure `pruneDecision` mirroring Notes', which moves the
+  empty-snapshot guarantee inside the decision (no reachable behaviour change — `NavigationModel` already
+  refuses to call with an empty set — it just can't be lost to a future caller). **Notes' half is preventive
+  and labelled as such:** `pruneIfSettled` there still has no production caller, but it is a fork of the
+  Reader file and both were fixed together so the day one is wired it inherits the gate, not the race.
+  **16 new tests** (Reader `ContentIndexerPruneRaceTests` 10, Notes `NotesIndexerPruneRaceTests` 6), scratch
+  sqlite / scratch store only. Both race interleavings are driven **deterministically through the epoch seam**
+  rather than by trying to win a real race, and each re-implements the PRE-FIX ungated logic against the same
+  fixture and asserts it produced the harmful outcome, so none can pass vacuously; plus a guard that
+  `pruneIfSettled` really opens a new epoch (so a future edit can't silently drop it), the reset case, and
+  four end-to-end passes over a real index and the real driver — awaited via `inFlightPruneTask`, not slept
+  on — since the refactor moved the delete after the state write. Clean builds, 0 new warnings; Notes
+  **660/660**, Reader green apart from the known `DeepLinkTests.testRevealAndSelectNoRoot` host-defaults flake
+  (tracked as W20.deeplink-isolation). No ArchiveCore type touched → shared-core rebuild rule N/A; no view or
+  interaction code → no VM UITest run needed. Original finding follows.
+  Reader `Search/ContentIndexer.swift`, Notes `Index/NotesIndexer.swift`.
   Starting a prune cancels the prior detached task, but **cancellation is cooperative**: after the old task's
   final cancellation check it can still read `pendingPrune`, delete rows, and later overwrite pending state in
   separate main-actor hops. A newer emission can interleave in that window, so an old task compares against

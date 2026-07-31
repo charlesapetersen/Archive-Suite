@@ -222,15 +222,64 @@ final class NotesIndexer: ObservableObject {
     private var pendingPrune: Set<UUID>?
     private var pruneTask: Task<Void, Never>?
 
+    /// Epoch token for pruning — distinct from the launch-epoch `generation` above. Every emission
+    /// takes a fresh one, and a task still holding an older one is *superseded*: both of its writes
+    /// (the `pendingPrune` update and the row delete) become no-ops.
+    ///
+    /// Cancelling the prior task is not enough on its own (W23.l2). Cancellation is cooperative, so a
+    /// task already past its last `Task.isCancelled` check runs to completion — and `MainActor.run` is
+    /// not cancellation-aware, so its late hops execute too. Confirmed against the runtime on the
+    /// Reader's copy of this code, where a superseded task was observed reading a `pendingPrune` a
+    /// NEWER emission had just written, treating it as "the previous emission", and deleting after
+    /// only ONE current absence — and, in the other interleaving, deleting a row the newest snapshot
+    /// said was present.
+    private var pruneGeneration = 0
+
+    /// Open a new prune epoch, superseding any task holding an older one.
+    ///
+    /// Internal rather than private so a test can supersede an emission deterministically, without
+    /// having to win a real race against a detached task.
+    func beginPruneGeneration() -> Int {
+        pruneGeneration += 1
+        return pruneGeneration
+    }
+
+    /// True while `gen` is still the current prune epoch.
+    func isCurrentPruneGeneration(_ gen: Int) -> Bool { gen == pruneGeneration }
+
+    /// The in-flight prune task, so a test can await an emission rather than sleep on it.
+    var inFlightPruneTask: Task<Void, Never>? { pruneTask }
+
+    /// Apply one emission's prune decision: read the pending set, decide, and write the new pending
+    /// set — **all in one main-actor hop**, and only if `gen` is still current. Returns the rows to
+    /// delete (empty when superseded).
+    ///
+    /// The single hop is load-bearing, not tidiness: the old code read `pendingPrune` in one hop and
+    /// wrote it in another, and a newer emission's hop could land in between. The generation check and
+    /// the atomic read-decide-write together are what make a superseded task inert.
+    func commitPruneDecision(gen: Int, indexed: Set<UUID>, currentIDs: Set<UUID>) -> Set<UUID> {
+        guard gen == pruneGeneration else { return [] }
+        let decision = Self.pruneDecision(indexed: indexed,
+                                          currentIDs: currentIDs,
+                                          previousPending: pendingPrune)
+        pendingPrune = decision.newPending
+        return decision.delete
+    }
+
     /// Evict index rows for items no longer present:
     ///   Gate 0 (empty-snapshot): an empty `currentIDs` is treated as "no reliable snapshot"
     ///     (mid-build / scope-cleared) and NEVER prunes, so a persistent empty snapshot can't wipe
     ///     the index. Enforced inside `pruneDecision`, so the guarantee holds without a caller check.
     ///   Gate 1: caller should still only call this on a settled, boundary-scoped snapshot.
     ///   Gate 2: a UUID must be absent in two consecutive calls (transient-drop guard).
+    ///   Gate 3: the emission must still be the current one — a superseded task writes nothing
+    ///     (W23.l2; cancelling it is cooperative and can arrive too late).
     /// The pure decision lives in `pruneDecision` (unit-tested; no async, no index, no real store).
     func pruneIfSettled(currentIDs: Set<UUID>) {
         pruneTask?.cancel()
+        // Gate 3 (W23.l2): cancellation alone is cooperative and can arrive too late, so stamp this
+        // emission. Everything the task writes below is a no-op once the stamp goes stale.
+        let gen = beginPruneGeneration()
         let idx = index
         pruneTask = Task.detached(priority: .utility) { [weak self] in
             guard !Task.isCancelled else { return }
@@ -241,15 +290,24 @@ final class NotesIndexer: ObservableObject {
             let indexed = await idx.allIndexedIDs()
             guard !Task.isCancelled else { return }
 
-            let previousPending: Set<UUID>? = await MainActor.run { [weak self] in self?.pendingPrune }
-            let decision = Self.pruneDecision(indexed: indexed,
-                                              currentIDs: currentIDs,
-                                              previousPending: previousPending)
-            if !decision.delete.isEmpty {
-                try? await idx.deleteItems(Array(decision.delete))
-                await idx.performMaintenance(rowsIndexed: 0)
+            // Gates 0+2+3, atomically: decide and carry the pending set forward in one main-actor
+            // hop, and only if this emission is still the current one.
+            let toDelete = await MainActor.run { [weak self] () -> Set<UUID> in
+                self?.commitPruneDecision(gen: gen, indexed: indexed, currentIDs: currentIDs) ?? []
             }
-            await MainActor.run { [weak self] in self?.pendingPrune = decision.newPending }
+            guard !toDelete.isEmpty else { return }
+
+            // The decision was current when it was taken, but the delete is another suspension away.
+            // Re-check rather than evict rows a newer snapshot may already have said are present:
+            // skipping costs only that the rows survive one more two-emission cycle, while deleting
+            // them wrongly costs search hits until a reindex.
+            let stillCurrent = await MainActor.run { [weak self] in
+                self?.isCurrentPruneGeneration(gen) ?? false
+            }
+            guard stillCurrent else { return }
+
+            try? await idx.deleteItems(Array(toDelete))
+            await idx.performMaintenance(rowsIndexed: 0)
         }
     }
 
@@ -278,7 +336,12 @@ final class NotesIndexer: ObservableObject {
         return (confirmed, remaining.isEmpty ? nil : remaining)
     }
 
-    func resetPruneState() { pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil }
+    /// Bumps the epoch as well as cancelling: an in-flight task can be past its last cancellation
+    /// check, and without the bump its late hop would re-stash the absences this call just cleared.
+    func resetPruneState() {
+        pruneTask?.cancel(); pruneTask = nil; pendingPrune = nil
+        _ = beginPruneGeneration()
+    }
 
     // MARK: - Extraction
 

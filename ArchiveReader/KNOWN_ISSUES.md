@@ -2,6 +2,47 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ FIXED (W23.l2) — a cancelled prune task could still defeat the two-emission absence gate
+
+**2026-07-31.** `ContentIndexer.pruneIfSettled` cancels the prior prune task before starting a new one,
+and that cancellation was doing more work than it can. **Cancellation is cooperative**: a task already
+past its last `Task.isCancelled` check runs to completion, and `MainActor.run` is *not* cancellation-aware,
+so its late hops execute too. The old code then read `pendingPrune` in one hop and wrote it in another,
+with nothing tying either to the emission it belonged to.
+
+**Re-confirmed empirically before anything changed** — the finding was inspection-only, and the first
+probe *refuted itself*, which is the useful part. Replaying the pre-fix shape under the real concurrency
+runtime, back-to-back emissions turned out to be **safe**: task A dies at its first cancellation check
+because it hasn't started running when B cancels it. The race needs A genuinely mid-flight — which is the
+real case, since `allPaths()` over a large index takes real time. With the probe parked past A's last
+check, all four questions confirmed: A observed `Task.isCancelled == true` and ran its hops anyway; a
+superseded A overwrote state a newer emission had just written; that stale stash then deleted a path
+after only **one** current absence; and in the other interleaving A deleted a path the newest snapshot
+said was **present**. Search results vanish until a reindex — the files themselves were never at risk
+(the content index is an explicitly rebuildable cache).
+
+**The fix is a prune epoch, and two halves of it are load-bearing:**
+- `commitPruneDecision` does read-decide-write in **one main-actor hop**. A split read-then-write is the
+  window a newer emission interleaved through, so a generation check alone would not have closed it.
+- The row delete **re-checks the epoch** before running. Skipping a superseded delete costs only that the
+  rows survive another two-emission cycle; deleting them wrongly costs search hits until a reindex.
+
+Gotchas for whoever touches this next:
+- **`resetPruneState` bumps the epoch, not just the task.** A root change invalidates the old root's
+  absences; without the bump an in-flight task from that root re-stashes them over the cleared state.
+- **The delete now happens AFTER the pending-state write** (it used to be before). That ordering is safe
+  because `pendingPrune` is in-memory only: if the `try?`'d delete fails, the next emission re-stashes the
+  absence and prunes a cycle later. Two end-to-end tests over a real scratch index pin the observable
+  contract so the reordering can't drift.
+- **`pruneDecision` is now a pure function here too**, mirroring `NotesIndexer`'s (this file is its
+  fork) — which moves the "an empty snapshot can never wipe the index" guarantee inside the decision.
+  `NavigationModel` already refuses to call with an empty set, so no reachable behaviour changed; the
+  point is that the guarantee can no longer be lost to a future caller.
+- **The race tests don't try to win a real race.** They drive the interleavings through the epoch seam
+  (`beginPruneGeneration` / `commitPruneDecision`), and each one re-implements the pre-fix ungated logic
+  against the same fixture and asserts it produced the harmful outcome — so a passing test can't be
+  vacuous. `inFlightPruneTask` exists so an end-to-end test can await an emission instead of sleeping.
+
 ## ✅ FIXED (W23.m9) — a failed `ContentIndex.open()` poisoned search until restart, silently
 **2026-07-30.** Two defects on the same path, both about silence.
 

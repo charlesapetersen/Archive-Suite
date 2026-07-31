@@ -3,6 +3,24 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ HARDENED (W23.l2) — `NotesIndexer`'s prune gate now survives a superseded task
+
+**2026-07-31.** `NotesIndexer` is a fork of Reader's `ContentIndexer` and carried the identical
+prune race: cancelling the prior prune task is cooperative, so a task past its last
+`Task.isCancelled` check still runs — and `MainActor.run` is not cancellation-aware, so its late
+hops land anyway. Reading `pendingPrune` in one hop and writing it in another let a newer emission
+interleave, after which a stale task could delete on only **one** current absence, or delete a row
+the newest snapshot said was present. The race and the fix are written up in full on the Reader side
+(`../ArchiveReader/KNOWN_ISSUES.md`, W23.l2), where it was empirically reproduced.
+
+**Here it is preventive, and worth being precise about why.** Notes' `pruneIfSettled` still has **no
+production caller** — `NotesModel` builds and re-indexes but never prunes — so nothing was reaching
+this code. (Note the older W8-S3 entry below says this "mirrors Reader's `ContentIndexer`"; that half
+is stale — Reader's *is* wired, from `NavigationModel`, which is why the race was live there.) The
+fix landed in both files together so the day a caller is wired up it inherits the gate rather than
+the race, and so the two forks don't drift. Six tests (`NotesIndexerPruneRaceTests`), scratch store +
+scratch index only. The pure `pruneDecision` properties stay where they were, in `NotesIndexTests`.
+
 ## ✅ FIXED (W23.l1) — a symlink could walk the Reader-link resolver out of the granted root
 
 **2026-07-31.** `ReaderLinkResolver` promised that anything it hands back lives inside the Reader root
