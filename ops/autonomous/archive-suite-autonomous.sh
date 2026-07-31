@@ -42,7 +42,19 @@ MAXRUN="${AUTONOMOUS_MAXRUN:-10800}"      # OUTER wall-clock backstop (3 h). The
                                           # 2026-07-12 so healthy long sessions (Notes waves ran 30–78 min)
                                           # stop getting guillotined by the clock alone.
 BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
-EFFORT="${AUTONOMOUS_EFFORT:-max}"        # reasoning effort for every resume session (low|medium|high|max)
+EFFORT="${AUTONOMOUS_EFFORT:-xhigh}"      # reasoning effort for every resume session (low|medium|high|xhigh|max).
+                                          # xhigh, not max, since 2026-07-31 (owner decision): xhigh is the
+                                          # documented sweet spot for coding/agentic work and Claude Code's own
+                                          # default, while max tends to overthink for diminishing returns and
+                                          # burns the usage window faster — on this laptop that costs COMPLETED
+                                          # ITEMS per window, not quality. `xhigh` was missing from the old
+                                          # low|medium|high|max list above; `claude --help` accepts all five.
+                                          # NOTE both this and --model are resolved BEFORE the session picks its
+                                          # item (resume prompt STEP 2), so per-ITEM model/effort is not
+                                          # expressible here — it would require moving item selection out of the
+                                          # session and into this script. What a session CAN vary per task is its
+                                          # SUBAGENTS' effort/model, which the resume prompt's Efficiency block
+                                          # now delegates to it explicitly.
 
 # Idle backoff — the loop's answer to "nothing is happening". $INTERVAL is the cadence while the run is
 # PRODUCTIVE; a cycle that advances nothing doubles the gap up to $MAXBACKOFF, and $IDLE_STOP of unbroken
@@ -92,7 +104,7 @@ STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
 # per token-delta during generation (verified: file flushes per-event on CLI 2.1.207). Token-delta streaming
-# is why a long effort=max generation is NOT mistaken for a hang: the log keeps growing while the model
+# is why a long high-effort generation is NOT mistaken for a hang: the log keeps growing while the model
 # thinks, so only the brief prefill/TTFT gap is truly silent. Signals, combined so no single false-positive
 # kills a healthy session (each backed by an adversarial review — see ops/autonomous/README.md):
 #   L1 (event heartbeat): the log's NON-rate_limit_event bytes stop growing for HB_STALL -> "quiet". (Filtered
@@ -776,7 +788,11 @@ tick() {
   # Run claude in the background so watchdogs can TERM/KILL it (macOS has no `timeout`). $cpid is claude's own
   # pid. --output-format stream-json --include-partial-messages makes $SLOG grow with a JSON event per
   # message/tool AND per token-delta during generation, IN REAL TIME — the health watchdog (Watchdog C) uses
-  # that as a liveness heartbeat (token-delta streaming keeps a long effort=max generation from looking hung).
+  # that as a liveness heartbeat (token-delta streaming keeps a long high-effort generation from looking hung).
+  # MODEL IS DELIBERATELY FIXED (opus, sonnet only as the overload fallback) and NOT chosen per item: this flag
+  # resolves before the session knows which item it will pick, and the Wave-23 queue is full of no-undo work
+  # (file-writing tag paths, the tag/PDF SPEC, shared ArchiveCore) where the Tier-2 gate — not a cost heuristic —
+  # decides. Per-task tuning lives one level down, in the session's SUBAGENTS (resume prompt, Efficiency).
   "$CLAUDE" -p "$(cat "$PROMPT")" \
       --permission-mode default \
       --model opus --fallback-model sonnet \

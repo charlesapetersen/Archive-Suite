@@ -199,5 +199,30 @@ ITEM-SPECIFIC NOTES:
     Workflow({name:'lean-review', args:{unit, paths}}), write .maintenance/review/<unit>.md, triage confirmed
     findings, mark the unit done in .maintenance/REVIEW_PROGRESS.md. Never run the retired 15-finder monolith.
 
-Efficiency: right-size subagents, read narrowly, keep this session lean — the goal is one solid committed
-increment, not maximal output.
+EFFICIENCY + SUBAGENT SIZING: right-size subagents, read narrowly, keep this session lean — the goal is one
+  solid committed increment, not maximal output. Don't spawn an agent for a single known-location lookup, and
+  never re-run a search you already delegated.
+  YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed — default `xhigh`
+  since 2026-07-31; you cannot change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
+  owner wants you to choose it deliberately. Optimize for the BEST OUTCOME on this item, not the cheapest run:
+  `--max-budget-usd` already bounds the cost, so under-powering a verification agent buys you nothing you're
+  allowed to want and can let a bug through into a path with no undo.
+  * WHERE THE LEVERS ARE (be exact — a wrong param name just errors): `Workflow`'s `agent()` takes
+    `{effort: 'low'|'medium'|'high'|'xhigh'|'max', model: …}` per call, and is the ONLY seam that sets a
+    subagent's EFFORT. The `Agent` tool takes a `model` override but has NO effort param. So: for ordinary
+    one-off delegation use `Agent` and pick the MODEL; when the item legitimately calls for a fan-out (the
+    `lean-review` skill, an adversarial review you were told to run) you are already in `Workflow` — set
+    `effort` per stage there. Do NOT stand up a Workflow merely to set an effort level, and keep any fan-out
+    tightly scoped per REVIEW.md (a wide one blows the usage window and kills its own verifiers).
+  * SPEND UP (`xhigh`/`max`, opus) wherever judgment meets irreversibility: the Tier-2 adversarial self-review
+    itself; anything touching Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the
+    tag/PDF SPEC, or shared ArchiveCore; refute-verify passes; and any agent whose WRONG answer would land
+    unnoticed because nothing downstream checks it.
+  * SPEND DOWN (`low`/`medium`, or a smaller model) on mechanical, self-checking work: locating code or call
+    sites, enumerating naming conventions, summarizing a build/test log, drafting a tracker or doc edit that you
+    will read in full before committing. These are cheap precisely BECAUSE you verify the output yourself.
+  * WHEN YOU CAN'T TELL, treat it as the expensive case. A misjudged `low` on a no-undo path is the exact
+    failure the Tier-2 gate exists to prevent; a misjudged `xhigh` on a grep costs pennies.
+  * This is a per-TASK choice, not a session policy: one item can rightly use a `low` finder and a `max`
+    reviewer. Don't average it out, and don't downgrade a whole session because the queue item reads "[XS · LOW]"
+    — size/severity describes the CHANGE, not the risk of getting the verification wrong.

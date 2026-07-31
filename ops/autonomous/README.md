@@ -324,7 +324,7 @@ build child is never orphaned):
 - **Watchdog C — health (the primary killer).** Two combined signals, so no single false-positive kills a
   healthy session:
   - **L1 event heartbeat:** the log's non-`rate_limit_event` bytes stop growing for `HB_STALL` (10 min) →
-    "quiet". Token-delta streaming keeps a long effort=max generation growing the log, so it isn't mistaken for
+    "quiet". Token-delta streaming keeps a long high-effort generation growing the log, so it isn't mistaken for
     a hang; a rate-limit *wait* (only `rate_limit_event` lines) reads as quiet.
   - **L2 liveness:** when quiet, spare the session if an active `claude` **descendant** exists (a running
     subagent/Workflow child, whose work doesn't stream into the parent log) OR the tree is CPU-busy (a long
@@ -374,6 +374,40 @@ reinforces the soft rule: the daemon's `--disallowedTools` blocks the **direct**
 process like `bash release/build-suite-dmg.sh` could still reach `hdiutil`), so the prompt rule — *leave
 release work for the owner* — is the primary control.
 
+## Model & effort — one fixed choice, plus per-task subagent sizing (2026-07-31)
+
+Every resume session launches as **`--model opus --fallback-model sonnet --effort xhigh`**
+(`EFFORT` = `AUTONOMOUS_EFFORT`, default `xhigh`; the CLI accepts `low|medium|high|xhigh|max`).
+
+**Why the session's own model/effort is FIXED, not chosen per queue item.** Both flags are resolved when the
+process launches — *before* the session picks its item, which happens inside the session at resume-prompt
+STEP 2 (`next-queue-item.sh`). A session cannot change its own model or effort mid-flight, so "let the daemon
+match the model to the task" would mean moving item selection out of the session and into this script — a
+Tier-2 change to the daemon, and one that risks divergence, since the resume prompt layers hold-queue and
+already-done skips *on top* of `next-queue-item.sh` (the daemon's guess at "the next item" wouldn't always be
+the item the session picks). The queue is also the wrong place to economize: Wave 23 is bug work in
+file-writing tag paths, the tag/PDF SPEC, actor isolation and shared `ArchiveCore`, where the **Tier-2 gate**
+decides what's enough — not a cost heuristic. `sonnet` stays what it already was: the *overload* fallback, the
+one model switch worth automating.
+
+**Why `xhigh` and not `max`.** `xhigh` is the documented sweet spot for coding/agentic work and Claude Code's
+own default; `max` tends to overthink for diminishing returns *and* reaches the usage cap sooner. On this
+laptop the cost of `max` was therefore paid in **completed items per usage window**, not collected in quality.
+(`xhigh` was also missing from this file's and the script's old `low|medium|high|max` lists — it postdates
+them.) Raise it back for a single hard run with `AUTONOMOUS_EFFORT=max`.
+
+**Where per-task tuning DOES live: subagents.** The session chooses each subagent's effort/model itself, per
+task, and the resume prompt's closing *EFFICIENCY + SUBAGENT SIZING* block directs it to optimize for the best
+outcome rather than the cheapest run (`--max-budget-usd` already bounds cost). The exact levers, because the
+two tools differ: `Workflow`'s `agent()` takes `{effort, model}` per call and is the **only** seam that sets
+subagent *effort*; the `Agent` tool takes a `model` override but **no** effort param. Spend up (`xhigh`/`max`)
+on judgment under irreversibility — the Tier-2 adversarial review, `Capture/`·`Net/`, file-writing tag/output,
+finalize/manifest, the SPEC, shared-Core, refute-verify, and any agent whose wrong answer nothing downstream
+would catch. Spend down (`low`/`medium`, smaller model) on mechanical self-checking work — locating call sites,
+enumerating conventions, summarizing a log, drafting an edit the session reads before committing. Ties go to
+the expensive case. A queue item's `[XS · LOW]` tag sizes the *change*, not the risk of getting its
+verification wrong.
+
 ## Reuse for another project (the daemon is a template)
 
 `archive-suite-autonomous.sh` is a reusable template — its top has a **PROJECT CONFIG** block. To stand up an
@@ -390,9 +424,7 @@ autonomous run for a different repo:
    adjust the repo path + any per-item notes.
 4. **Tune** `AUTONOMOUS_INTERVAL` / `STALE` / `MAXRUN` / `BUDGET` / `EFFORT` and the `ALLOW`/`DENY` tool lists
    for the project's risk surface (keep the destructive denylist; deny always wins over allow). `EFFORT`
-   defaults to **`max`** — every resume session runs Opus at max reasoning effort (highest quality; higher
-   token burn, so it reaches usage caps sooner and rides them out by retrying). Lower it (`high`/`medium`) if
-   you want cheaper, faster cycles.
+   defaults to **`xhigh`** — see *Model & effort* below for why that, and why the model is fixed.
 5. **Start** it detached (the standard way — `( nohup … & )`, under the launching session's grant); the
    per-project `.plist` (`Label` = `com.<LABEL>.autonomous`) is an optional reboot-durable extra, not required.
 
