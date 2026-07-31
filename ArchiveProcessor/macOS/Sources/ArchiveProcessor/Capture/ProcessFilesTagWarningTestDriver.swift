@@ -21,6 +21,9 @@ import ArchiveCore
 ///   5. The SUMMARY says so — silence when clean, names when not, and it never claims a file is untagged
 ///      and un-embedded in the same breath unless both are true.
 ///   6. `PDFGenerator`'s image-page outcome is really WIRED to the placeholder record (W23.h5-fu).
+///   7. A read-append-rewrite reproduces the label the FRESH write intended (W23.m5-fu) — the two sites
+///      that re-apply tags read back off disk take the colour from the page's classification, so a
+///      subject tag "Red" is never promoted to the box label and a real box/folder never loses one.
 ///
 /// Writes a PASS/FAIL report to `PROCESSFILES_TAGWARN_TEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -275,6 +278,105 @@ enum ProcessFilesTagWarningTestDriver {
                                                            placeholders: wiring.placeholderOutputs)
         check("the end-of-run summary names exactly that file", wiredSuffix.contains("corrupt.jpg")
               && !wiredSuffix.contains("real.jpg"))
+
+        // --- 7. W23.m5-fu — a READ-APPEND-REWRITE reproduces the label the FRESH write intended. ---
+        // Both remaining rewrite sites re-apply an array of tag NAMES read back off the PDF. Detection
+        // over those names stamped Finder label 6 on any document whose subject is literally "Red" —
+        // and the Reader reads a red label as a BOX photo. The other half matters just as much: a
+        // genuine box/folder PDF has to KEEP its label through the rewrite, which is exactly why
+        // "make the colour authoritative" alone (with no colour to pass) is NOT the fix.
+        let colourDir = tmp.appendingPathComponent("colour", isDirectory: true)
+        try? fm.createDirectory(at: colourDir, withIntermediateDirectories: true)
+        /// One processor holding a single job, wired the way the pre-grouped Live Capture path leaves it.
+        func wiredProcessor(source: URL, output: URL,
+                            classification: DocumentClassification?) -> OCRProcessor {
+            let p = OCRProcessor()
+            p.taggingMode = .automatic          // stampsUnread → a real-tagging rewrite, label written
+            var job = OCRJob(sourceURL: source)
+            job.classification = classification
+            p.jobs = [job]
+            p.outputURLMap = [source: output]
+            return p
+        }
+
+        // 7a. `applyCapturePriorityTags` — the phone's per-page priority, layered on after tagging.
+        let redSource = colourDir.appendingPathComponent("IMG_7001.jpg")
+        let redPDF = colourDir.appendingPathComponent("redscare.pdf")
+        writeOnePagePDF(redPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Red", "1948"]), to: redPDF,
+                                         stampUnread: true)
+        let redCapture = wiredProcessor(source: redSource, output: redPDF,
+                                        classification: .documentStart)
+        redCapture.preGroupedPriorities = ["P10"]
+        redCapture.applyCapturePriorityTags()
+        check("a phone-priority rewrite does NOT promote the subject tag \"Red\" to a Finder label",
+              labelOf(redPDF) == 0)
+        check("...and it still layered the phone's priority on", tagsOf(redPDF).contains("P10"))
+        check("...and \"Red\" is still a searchable subject tag", tagsOf(redPDF).contains("Red"))
+
+        let boxSource = colourDir.appendingPathComponent("IMG_7002.jpg")
+        let boxLabelPDF = colourDir.appendingPathComponent("box12.pdf")
+        writeOnePagePDF(boxLabelPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Box"], colorTag: "Red"),
+                                         to: boxLabelPDF, stampUnread: true)
+        let boxCapture = wiredProcessor(source: boxSource, output: boxLabelPDF,
+                                        classification: .boxLabel)
+        boxCapture.preGroupedPriorities = ["P9"]
+        boxCapture.applyCapturePriorityTags()
+        check("a genuine box label KEEPS its red Finder label through that rewrite",
+              labelOf(boxLabelPDF) == 6)
+        check("...with the priority added and \"Red\" still present exactly once",
+              tagsOf(boxLabelPDF).contains("P9")
+              && tagsOf(boxLabelPDF).filter { $0 == "Red" }.count == 1)
+
+        // 7b. `exportOriginalImages` — the dual output's image mirrors its PDF's tags.
+        let originalExportMB = OCRProcessor.exportedImageMB
+        OCRProcessor.exportedImageMB = 5     // a tiny synthetic JPEG takes the pristine byte-copy path
+        defer { OCRProcessor.exportedImageMB = originalExportMB }
+        let exportSource = makeJPEG("IMG_7003.jpg", in: colourDir)
+        // Name the PDF off the source's base and the exported image WOULD be the source itself, which
+        // the same-file guard skips; a distinct base is what a real run's dedup'd output looks like.
+        let exportPDF = colourDir.appendingPathComponent("page-7003.pdf")
+        writeOnePagePDF(exportPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Red", "1948"]), to: exportPDF,
+                                         stampUnread: true)
+        let exporter = wiredProcessor(source: exportSource, output: exportPDF,
+                                      classification: .documentStart)
+        exporter.exportOriginals = true
+        await exporter.exportOriginalImages()
+        let exportedImage = colourDir.appendingPathComponent("page-7003.jpg")
+        check("the dual output's image was written", fm.fileExists(atPath: exportedImage.path))
+        check("...and it mirrors the PDF's tags",
+              tagsOf(exportedImage).contains("Red") && tagsOf(exportedImage).contains("1948"))
+        check("...without inventing a Finder colour from the subject tag \"Red\"",
+              labelOf(exportedImage) == 0)
+
+        let folderSource = makeJPEG("IMG_7004.jpg", in: colourDir)
+        let folderPDF = colourDir.appendingPathComponent("page-7004.pdf")
+        writeOnePagePDF(folderPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Folder"], colorTag: "Purple"),
+                                         to: folderPDF, stampUnread: true)
+        let folderExporter = wiredProcessor(source: folderSource, output: folderPDF,
+                                            classification: .folderLabel)
+        folderExporter.exportOriginals = true
+        await folderExporter.exportOriginalImages()
+        let folderImage = colourDir.appendingPathComponent("page-7004.jpg")
+        check("a folder label's exported image carries the PURPLE label, matching its PDF",
+              labelOf(folderImage) == 3)
+        check("...and its tags match the PDF's", tagsOf(folderImage).contains("Folder"))
+
+        // 7c. The rule itself: the colour comes from the classification, and from nothing else.
+        check("box → Red, folder → Purple, ordinary document → no colour",
+              OCRProcessor.authoritativeColor(for: .boxLabel) == "Red"
+              && OCRProcessor.authoritativeColor(for: .folderLabel) == "Purple"
+              && OCRProcessor.authoritativeColor(for: .documentStart) == nil
+              && OCRProcessor.authoritativeColor(for: .documentContinuation) == nil
+              && OCRProcessor.authoritativeColor(for: nil) == nil)
+        var resultOnlyJob = OCRJob(sourceURL: colourDir.appendingPathComponent("IMG_7005.jpg"))
+        resultOnlyJob.result = OCRResult(text: "BOX 13", classification: .boxLabel,
+                                         errorMessage: nil, errorCode: nil)
+        check("a job carrying its classification only on the OCR result still resolves its colour",
+              OCRProcessor.authoritativeColor(forJob: resultOnlyJob) == "Red")
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

@@ -75,6 +75,35 @@ extension OCRProcessor {
                         stampUnread: stampUnread)
     }
 
+    // MARK: - W23.m5-fu — the colour a rewrite re-applies comes from the CLASSIFICATION, not the text
+
+    /// The one Finder colour the app assigns to a page: Red = box label, Purple = folder label,
+    /// nil = an ordinary document (label cleared).
+    ///
+    /// This is the same rule everything else already follows — `TagGenerator` when it builds a fresh
+    /// `GeneratedTags`, `applyBoxFolderLabelTags` on a label PDF, `performDocumentMerging` on a merged
+    /// PDF, the review flows on a reclassification. The two **read-append-rewrite** sites
+    /// (`applyCapturePriorityTags`, `exportOriginalImages`) had no such source: they re-applied an array
+    /// of tag NAMES read back off disk, so `MacOSTagger`'s raw-array colour DETECTION ran over it and a
+    /// document whose subject tag is literally "Red" was promoted to Finder label 6 — which the Reader
+    /// reads as a **box** photo. Deriving the colour here makes a rewrite land exactly the label the
+    /// fresh write intended, which is also why the fix is not simply `colorIsAuthoritative: true` with
+    /// no colour: that would STRIP the label off every genuine box/folder PDF.
+    nonisolated static func authoritativeColor(for classification: DocumentClassification?) -> String? {
+        switch classification {
+        case .boxLabel: return "Red"
+        case .folderLabel: return "Purple"
+        default: return nil            // ordinary document, or not classified → no colour
+        }
+    }
+    /// Same rule, reading whichever field carries the job's classification. Every writer keeps the two
+    /// in sync (`applyPreGroupedClassifications`, the OCR pass and the review flows all set both), and a
+    /// failed re-OCR can blank `result.classification` while the job's own value survives — so coalesce
+    /// rather than trust one field, because falling back to "no colour" strips a real label.
+    nonisolated static func authoritativeColor(forJob job: OCRJob) -> String? {
+        authoritativeColor(for: job.classification ?? job.result?.classification)
+    }
+
     /// Main-actor convenience: write, then record the verdict against the INPUT file that produced this
     /// output. Use this at every main-actor tag site; the detached sites call `writeOutputTags` and hand
     /// the Bool to `recordTagWrite(succeeded:forSource:)` themselves.
@@ -224,9 +253,12 @@ extension OCRProcessor {
                 tags.append(raw)
                 // Read-append-rewrite of whatever the tagging phase already applied — follow the
                 // run's mode so a real-tagging output keeps "Unread" last and its label intact.
-                // Raw [String] read back off disk: colour detection stays ON here deliberately, so a
-                // box/folder PDF keeps its label through the rewrite (W23.m5-fu tracks the residual).
-                tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL, stampUnread: stampUnread)
+                // W23.m5-fu: the tags are an array read back off DISK, so the colour must come from
+                // the page's classification (as the fresh write's did) — never from detection over
+                // those names, which promoted a subject tag "Red" to the box label.
+                tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL,
+                          appColor: Self.authoritativeColor(forJob: jobs[i]),
+                          colorIsAuthoritative: true, stampUnread: stampUnread)
             }
             if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
         }
@@ -264,7 +296,7 @@ extension OCRProcessor {
         // exported-image target (independent of the source/camera size).
         var imageMap: [URL: URL] = [:]
         var reservedImagePaths = Set<String>()
-        let work: [(src: URL, img: URL, pdf: URL, rot: Int, source: URL)] = jobs.compactMap { job in
+        let work: [(src: URL, img: URL, pdf: URL, rot: Int, source: URL, color: String?)] = jobs.compactMap { job in
             guard let pdfURL = outputURLMap[job.sourceURL],
                   FileManager.default.fileExists(atPath: job.sourceURL.path) else { return nil }
             // For PDF inputs, export from the converted temp JPEG (the same page image the PDF embeds),
@@ -281,8 +313,10 @@ extension OCRProcessor {
             )
             imageMap[job.sourceURL] = img
             // Snapshot the final (post-review) rotation so the exported .jpg matches the rotated PDF.
+            // W23.m5-fu: snapshot the classification's colour too — the detached worker mirrors tag
+            // NAMES read off the PDF, and only the job knows which colour those names came with.
             return (src: src, img: img, pdf: pdfURL, rot: job.result?.rotationDegrees ?? 0,
-                    source: job.sourceURL)
+                    source: job.sourceURL, color: Self.authoritativeColor(forJob: job))
         }
         guard !work.isEmpty else { return }
         exportedImageMap = imageMap
@@ -312,7 +346,13 @@ extension OCRProcessor {
                     verdicts.append((w.source, false))
                     continue
                 }
-                verdicts.append((w.source, Self.writeOutputTags(tags, to: w.img, stampUnread: isStamping)))
+                // W23.m5-fu: the tag NAMES mirror the PDF, but the COLOUR comes from the page's
+                // classification — the same one the PDF's own label was written from. Detecting
+                // "Red"/"Purple" inside the names would stamp the box label onto the image of any
+                // document whose subject happens to be that word.
+                verdicts.append((w.source, Self.writeOutputTags(tags, to: w.img, appColor: w.color,
+                                                                colorIsAuthoritative: true,
+                                                                stampUnread: isStamping)))
             }
             return verdicts
         }.value
