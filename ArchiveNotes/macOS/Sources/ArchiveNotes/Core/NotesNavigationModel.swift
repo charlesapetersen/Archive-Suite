@@ -314,22 +314,34 @@ final class NotesNavigationModel: ObservableObject {
     }
 
     /// **Move** items into `target` (default drag / "Move to Folder…"), removing them from `source`.
-    /// The target add happens FIRST (idempotent) so the item is never transiently member-less and the
-    /// source-removal can never be the "last instance" — moving a note between folders must never trip
-    /// the delete guard. When `source` is nil (drag from All Notes / a search — no single source
-    /// folder) MOVE degrades to a pure add. Refuses a non-normal target.
+    /// Each item moves as ONE transaction (`OrganizationStore.moveMembership`), whose insert precedes
+    /// its delete so the item is never transiently member-less and the source-removal can never be the
+    /// "last instance" — moving a note between folders must never trip the delete guard. When `source`
+    /// is nil (drag from All Notes / a search — no single source folder) MOVE degrades to a pure add.
+    /// Refuses a non-normal target.
+    ///
+    /// W23.m13: the source-removal failure is no longer swallowed. It used to be a bare `try?`, so a
+    /// refused removal left the item in BOTH folders — a replicate — while the UI said it had moved.
+    /// The transaction makes the failure total, which is what lets the message below promise the item
+    /// is still exactly where it was.
     func move(_ ids: [UUID], to target: UUID, from source: UUID?) async {
         guard isNormalFolder(target) else {
             model.statusMessage = "Smart folders can't hold items directly."; return
         }
+        var failed = 0
         for id in ids {
-            do { try await model.organization.addMembership(item: id, folder: target) }
-            catch { model.statusMessage = "Couldn't move the note to the folder."; continue }
-            if let source, source != target {
-                // Safe: the add above guarantees ≥2 memberships, so this returns `.removed` — or
-                // `.notPresent` if the item was never in `source` (a stale drag). Never last.
-                _ = try? await model.organization.removeMembership(item: id, folder: source)
-            }
+            do {
+                if let source, source != target {
+                    try await model.organization.moveMembership(item: id, from: source, to: target)
+                } else {
+                    try await model.organization.addMembership(item: id, folder: target)
+                }
+            } catch { failed += 1 }
+        }
+        if failed > 0 {
+            model.statusMessage = failed == 1
+                ? "Couldn't move a note to that folder — it's still where it was."
+                : "Couldn't move \(failed) notes to that folder — they're still where they were."
         }
         model.rebuild(); recompute(); model.adoptMirrorFailure()
     }

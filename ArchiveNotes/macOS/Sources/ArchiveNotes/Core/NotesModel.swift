@@ -385,16 +385,25 @@ final class NotesModel: ObservableObject {
     }
 
     /// Delete a template (to Trash) and clear every folder assignment that pointed at it (batched, §6).
-    /// Assignments are cleared FIRST so no folder is left referencing a since-trashed template (the
-    /// dangling-resolution fallback would also cover a stray, but keep the graph clean).
+    ///
+    /// **The trash goes FIRST, and the assignments are only cleared once it succeeded (W23.m13).** The
+    /// old order cleared every assignment before attempting the trash, so a refused trash reported a
+    /// failure about a template that was still there while its folder assignments were already,
+    /// silently and unrecoverably, gone. Reversed, a refused trash changes nothing at all. The cost of
+    /// the other direction — trashed, then the clear fails — is only a dangling assignment, which
+    /// `TemplateResolution.resolve` already skips and `effectiveTemplate` lazily clears; and the clear
+    /// is itself one transaction, so it can't half-apply across folders.
     func deleteTemplate(_ id: UUID) async {
         guard let noteStore else { return }
         let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
-        for folderId in referencing {
-            try? await organization.removeTemplateAssignment(folder: folderId)
-        }
         do { try await noteStore.deleteTemplate(id) }
-        catch { report(error, "delete the template") }
+        catch {
+            report(error, "delete the template")
+            await reloadTemplates(); rebuild(); adoptMirrorFailure()
+            return
+        }
+        do { try await organization.removeTemplateAssignments(folders: referencing) }
+        catch { report(error, "clear the deleted template's folder assignments") }
         await reloadTemplates()
         rebuild()
         adoptMirrorFailure()

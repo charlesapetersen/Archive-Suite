@@ -97,8 +97,11 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     ///    in-memory change has already committed. Throwing would make ~17 call sites report "Couldn't
     ///    create the folder" about a folder that *exists*, and skip the `rebuild()` that shows it — a
     ///    worse lie than the silence being fixed here.
-    /// 2. Three existing callers use `try?` (`clearDanglingAssignments`, `deleteTemplate`, and `move`'s
-    ///    source removal), so a thrown error would be swallowed on exactly the paths at issue.
+    /// 2. Callers swallow mutation errors on exactly the paths at issue, so a thrown error would go
+    ///    unseen there: `clearDanglingAssignments` still uses `try?` by design (it is a lazy background
+    ///    tidy off the resolve path). W23.m13 removed the other two — `deleteTemplate` and `move`'s
+    ///    source removal now report — but they report the *mutation's* failure; the mirror is a
+    ///    separate degradation that outlives the call, which is the next reason.
     /// 3. Staleness persists until a later export succeeds. That is a state, not an event.
     @Published private(set) var mirrorFailure: OrganizationMirrorFailure?
 
@@ -178,22 +181,34 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// Delete a folder. Children are reparented to the deleted folder's parent.
     /// Returns UUIDs of items that became orphaned (zero memberships remaining)
     /// so the caller can show the batch-delete confirmation (§3.6).
+    ///
+    /// **All-or-nothing, and memory never runs ahead of the disk (W23.m13).** This used to be four
+    /// independent awaited writes with the in-memory reparent applied *before* its own DB update, so a
+    /// SQLite failure part-way through left the graph half-deleted in memory and differently
+    /// half-deleted on disk. A throw from here now means nothing changed anywhere: the DB legs are one
+    /// transaction, and every in-memory mutation happens after it commits.
     @discardableResult
     func deleteFolder(_ id: UUID) async throws -> [UUID] {
         let deletedParent = folders.first(where: { $0.id == id })?.parentId
 
-        // Reparent children to the deleted folder's parent (or root)
-        for i in folders.indices where folders[i].parentId == id {
-            folders[i].parentId = deletedParent
-            try await index.updateFolder(folders[i])
+        // Reparent children to the deleted folder's parent (or root) — as COPIES. Nothing in `folders`
+        // moves until the transaction below says the whole deletion committed.
+        var reparented: [VFolder] = []
+        for f in folders where f.parentId == id {
+            var child = f
+            child.parentId = deletedParent
+            reparented.append(child)
         }
 
+        try await index.deleteFolderGraph(id: id, reparentedChildren: reparented)
+
+        // Committed. Now — and only now — move memory to match. `affectedMemberships` is read here
+        // rather than before the await so it reflects the same set the `DELETE … WHERE folder_id = ?`
+        // just removed, not a snapshot taken before this actor hop.
         let affectedMemberships = memberships.filter { $0.folderId == id }
-
-        try await index.deleteMembershipsForFolder(id)
-        try await index.deleteTemplateAssignment(folder: id)
-        try await index.deleteFolder(id: id)
-
+        for child in reparented {
+            if let i = folders.firstIndex(where: { $0.id == child.id }) { folders[i] = child }
+        }
         memberships.removeAll { $0.folderId == id }
         assignments.removeAll { $0.folderId == id }
         folders.removeAll { $0.id == id }
@@ -260,6 +275,31 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         return membershipCount(item: item) == 0 ? .deletedLastInstance : .unlinkedNotLast
     }
 
+    /// **Move** one item's membership from `source` to `target` as a single durable unit (W23.m13):
+    /// either it ends up in `target` and out of `source`, or nothing at all changed.
+    ///
+    /// This exists because the caller's old shape — `addMembership` then a `try?`-swallowed
+    /// `removeMembership` — reported a move while leaving the item **replicated in both folders**
+    /// whenever the removal failed. Suppressing the error there was not gratuitous: the removal cannot
+    /// be allowed to trip the §3.6 delete-last-instance guard, which is also why the add had to come
+    /// first. Both properties survive here — the insert precedes the delete *inside* the transaction,
+    /// so the item is never transiently member-less — but a failure is now honest and total.
+    ///
+    /// A no-op (not an error) when the item is already only in `target`, so a stale drag costs nothing.
+    func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
+        guard source != target else { return try await addMembership(item: item, folder: target) }
+        let inSource = memberships.contains { $0.itemId == item && $0.folderId == source }
+        let inTarget = memberships.contains { $0.itemId == item && $0.folderId == target }
+        guard inSource || !inTarget else { return }
+
+        let m = Membership(itemId: item, folderId: target, addedAt: Date())
+        try await index.moveMembership(item: item, from: source, to: target, addedAt: m.addedAt)
+
+        if !inTarget { memberships.append(m) }
+        memberships.removeAll { $0.itemId == item && $0.folderId == source }
+        exportOrganization()
+    }
+
     func foldersContaining(item: UUID) -> [UUID] {
         memberships.filter { $0.itemId == item }.map(\.folderId)
     }
@@ -308,6 +348,17 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func removeTemplateAssignment(folder: UUID) async throws {
         try await index.deleteTemplateAssignment(folder: folder)
         assignments.removeAll { $0.folderId == folder }
+        exportOrganization()
+    }
+
+    /// Clear several folders' template assignments as one durable unit, memory after the commit
+    /// (W23.m13) — so a failure part-way through a template deletion cannot leave some folders
+    /// pointing at the template and others not.
+    func removeTemplateAssignments(folders folderIds: [UUID]) async throws {
+        guard !folderIds.isEmpty else { return }
+        try await index.deleteTemplateAssignments(folders: folderIds)
+        let cleared = Set(folderIds)
+        assignments.removeAll { cleared.contains($0.folderId) }
         exportOrganization()
     }
 

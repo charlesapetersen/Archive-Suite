@@ -472,6 +472,77 @@ actor NotesIndex {
         try run("DELETE FROM template_assignments WHERE folder_id = ?;") { self.bindText($0, 1, folder.uuidString) }
     }
 
+    // MARK: - Multi-row organization transactions (W23.m13)
+
+    // Each of these is ONE method rather than BEGIN/COMMIT exposed to the caller, for the same reason
+    // `upsertBatch` is: this actor's transaction invariant is "no suspension between BEGIN and COMMIT".
+    // A caller awaiting each leg across the actor boundary could let another mutation interleave inside
+    // the open transaction — and `OrganizationStore` is `@MainActor`, which is reentrant at every await.
+
+    /// Delete a folder and everything that referenced it as ONE unit: the reparented children, the
+    /// folder's memberships, its template assignment, and the folder row. Either all of it lands or
+    /// none of it does.
+    ///
+    /// Before W23.m13 these were four independent writes. The nastiest ordering was real and silent: the
+    /// memberships delete commits, the folder delete then fails, and the caller's in-memory cleanup is
+    /// skipped by the throw — so memory (and `organization.json`, whose export never runs) still list
+    /// the memberships while the DB has none. `load()` prefers the DB whenever it holds folders, so the
+    /// next launch adopts the lossy half as the durable truth and the items are orphaned with no §3.6
+    /// confirmation ever shown.
+    func deleteFolderGraph(id: UUID, reparentedChildren: [VFolder]) throws {
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            for child in reparentedChildren { try insertFolder(child) }
+            try deleteMembershipsForFolder(id)
+            try deleteTemplateAssignment(folder: id)
+            try deleteFolder(id: id)
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Move one item's membership from `source` to `target` as ONE unit — the durable half of a MOVE.
+    ///
+    /// The insert precedes the delete inside the transaction, so the item is never transiently
+    /// member-less and a move can still never trip the §3.6 delete-last-instance guard. Because it is a
+    /// transaction, a failed source-removal no longer leaves the item **replicated in both folders**
+    /// while the UI reports a move (W23.m13): the target add rolls back with it.
+    func moveMembership(item: UUID, from source: UUID, to target: UUID, addedAt: Date) throws {
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try insertMembership(Membership(itemId: item, folderId: target, addedAt: addedAt))
+            try deleteMembership(item: item, folder: source)
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Clear several folders' template assignments as ONE unit, so a failure part-way through cannot
+    /// leave some folders pointing at a template and others not (W23.m13).
+    func deleteTemplateAssignments(folders: [UUID]) throws {
+        guard !folders.isEmpty else { return }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            for f in folders { try deleteTemplateAssignment(folder: f) }
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    #if DEBUG
+    /// Test-only fault-injection seam: run one raw statement on this index's connection.
+    /// `OrganizationAtomicityTests` (W23.m13) uses it to install a `RAISE(ABORT)` trigger that breaks
+    /// exactly ONE leg of a transaction, which is the only way to prove the other legs roll back.
+    /// Not compiled into Release.
+    func executeForTesting(_ sql: String) throws { try exec(sql) }
+    #endif
+
     // MARK: - Bulk organization replace (for JSON import on DB wipe)
 
     func replaceOrganization(folders: [VFolder], memberships: [Membership],
