@@ -647,6 +647,10 @@ private struct SegmentTagCard: View {
     @State private var yearText: String = ""
     @State private var month: Int? = nil
     @State private var priority: String? = nil
+    /// W23.m7: Save/Skip only resolve the card once the decision is durably in the session manifest. When
+    /// the write fails the session rolls its state back — the card stays up with everything typed still
+    /// here — so the operator needs to be TOLD, not left tapping a button that appears to do nothing.
+    @State private var persistFailure: String? = nil
 
     private let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -696,8 +700,17 @@ private struct SegmentTagCard: View {
             Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc clear draft")
                 .font(.caption2).foregroundStyle(.tertiary)
 
+            if let persistFailure {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(persistFailure)
+                }
+                .font(.caption).foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
-                Button("Skip") { session.skipMacTags(groupId: group.id) }
+                Button("Skip") { skip() }
                 Spacer()
                 Button("Save ▸") { save() }
                     .buttonStyle(.borderedProminent)
@@ -835,8 +848,19 @@ private struct SegmentTagCard: View {
     }
 
     private func save() {
-        session.applyMacTags(groupId: group.id, subjects: subjects,
-                             priority: priority, year: Int(yearText), month: month)
+        persistFailure = nil
+        let durable = session.applyMacTags(groupId: group.id, subjects: subjects,
+                                           priority: priority, year: Int(yearText), month: month)
+        if !durable { persistFailure = CaptureSession.tagDecisionNotDurableMessage }
+    }
+
+    /// Skip is a decision too — it must be as durable as Save, or a relaunch re-asks for a segment whose
+    /// output live processing already produced.
+    private func skip() {
+        persistFailure = nil
+        if !session.skipMacTags(groupId: group.id) {
+            persistFailure = CaptureSession.tagDecisionNotDurableMessage
+        }
     }
 }
 

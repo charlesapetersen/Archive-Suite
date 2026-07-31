@@ -18,6 +18,11 @@ final class CaptureSession: ObservableObject {
     /// unless the test explicitly writes them.
     var manifestWriteOverride: ((Data, URL) -> Bool)?
 
+    /// Headless test seam: fires at the exact point a resolved tag card is handed to live processing
+    /// (`notifySegmentResolved`), so a test can prove that point is never reached before the decision is
+    /// durable. Nil in production.
+    var resolvedNotifyHookForTest: ((String) -> Void)?
+
     /// How many photos the phone still has un-sent (its last heartbeat), + when we last heard it, so the
     /// Mac can surface "phone still has N to send" and hold Finish until the phone has drained.
     @Published private(set) var phonePendingCount = 0
@@ -63,7 +68,10 @@ final class CaptureSession: ObservableObject {
     /// `resolvedGroupIds`, so the loop terminates. No-op in production.
     private func headlessResolvePendingTags() {
         guard headlessAutoSkipTags || headlessAutoFinalize else { return }
-        while let g = pendingTagGroup { skipMacTags(groupId: g.id) }
+        // W23.m7: a failed manifest write now ROLLS the resolve back, so the same card stays pending —
+        // stop instead of spinning forever on a group that cannot be persisted. The caller re-enters this
+        // (the finalize autopilot polls), so a transient failure is still retried, just not in a hot loop.
+        while let g = pendingTagGroup, skipMacTags(groupId: g.id) {}
     }
 
     /// (b)+(c) Launch the headless finish→finalize autopilot once (guarded), when armed. Called from
@@ -709,17 +717,55 @@ final class CaptureSession: ObservableObject {
         return true
     }
 
-    func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) {
-        macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
-        resolvedGroupIds.insert(groupId)
+    /// Operator-visible reason a tag card refused to resolve. One string so the status line and the card's
+    /// own inline message can't drift apart.
+    static let tagDecisionNotDurableMessage =
+        "Could not save this segment's tag decision — check the backup folder and try Save/Skip again."
+
+    /// The ONE point where a resolved tag card is handed to live processing, reached only once the
+    /// decision is durably on disk (W23.m7). Ordering matters: `segmentResolved` bakes and stages output
+    /// from `macTags`, so telling it first would let a failed manifest write leave produced output that
+    /// no recovered state agrees with (relaunch would resurface the group as unresolved, or re-prompt).
+    /// `resolvedNotifyHookForTest` observes this point in a headless test; nil in production.
+    private func notifySegmentResolved(_ groupId: String) {
         if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
-        _ = writeManifest()   // B9: persist resolve state + Mac tags so a mid-session restart doesn't re-ask
+        resolvedNotifyHookForTest?(groupId)
     }
 
-    func skipMacTags(groupId: String) {
-        resolvedGroupIds.insert(groupId)
-        if processingMode == .live { liveProcessor.segmentResolved(groupId: groupId) }
-        _ = writeManifest()   // B9: persist that this card was resolved (skipped)
+    /// Apply the Mac tag card's tags to a completed segment. **Durability contract (W23.m7):** the
+    /// decision is persisted BEFORE anything acts on it, and a failed manifest write rolls memory back —
+    /// so the card (derived from the in-memory resolved set) stays up with the operator's entries intact
+    /// instead of vanishing into a decision the next launch will not remember. Returns whether the
+    /// decision is durable, so the caller can surface the failure. Mirrors the roll-back pattern the
+    /// sender-owned controls (`markSegmentComplete` / `completeAllOpenDocGroups`) already use.
+    @discardableResult
+    func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) -> Bool {
+        let previousTags = macTags[groupId]
+        macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
+        let newlyResolved = resolvedGroupIds.insert(groupId).inserted
+        // B9: persist resolve state + Mac tags so a mid-session restart doesn't re-ask.
+        guard writeManifest() else {
+            macTags[groupId] = previousTags   // nil restores "never tagged" (removes the key)
+            if newlyResolved { resolvedGroupIds.remove(groupId) }
+            statusMessage = Self.tagDecisionNotDurableMessage
+            return false
+        }
+        notifySegmentResolved(groupId)
+        return true
+    }
+
+    /// Resolve a tag card without Mac tags. Same durability contract as `applyMacTags`: persist first,
+    /// roll back and report failure rather than silently dropping the decision.
+    @discardableResult
+    func skipMacTags(groupId: String) -> Bool {
+        let newlyResolved = resolvedGroupIds.insert(groupId).inserted
+        guard writeManifest() else {   // B9: persist that this card was resolved (skipped)
+            if newlyResolved { resolvedGroupIds.remove(groupId) }
+            statusMessage = Self.tagDecisionNotDurableMessage
+            return false
+        }
+        notifySegmentResolved(groupId)
+        return true
     }
 
     /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.
