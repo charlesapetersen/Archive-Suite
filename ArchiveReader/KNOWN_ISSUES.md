@@ -138,9 +138,44 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   cycling there; it is keyed now too.
 - Not a SPEC change: the SPEC already documented the interleaved variant and the no-2-page-assumption rule.
   This is Reader coming into conformance with it.
-- Still open (separate item): `copyArchivePageLink` now names the pair on screen rather than a hardcoded page 1,
-  but making it follow the **focused pane** — plus the command's unreachability from the document window and
-  reveal dropping the page — is `W23.m4`.
+- ~~Still open (separate item)~~ **CLOSED by `W23.m4`** (below): the focused-pane page number, the command's
+  unreachability from the document window, and reveal dropping the page are all fixed.
+
+## Page-level durable links were broken at all three ends (W23.m4 — fixed 2026-07-30)
+`archivereader://reveal?…&page=N` is the citation Notes stores for a quoted page (the reveal contract in
+`execution-plans/archive-notes/00-overview.md` §8.3 requires the page be passed on). Three independent
+defects meant the feature could not work at all — each fixed here, together, because fixing one alone still
+leaves it broken:
+- **You could not make one where you read.** `ArchiveReaderCommands` reached for the archive root + marker
+  through `@FocusedObject NavigationModel` and disabled the command on `nav == nil`. A document window
+  publishes only `.focusedSceneObject(model)` (its `DocumentViewerModel`) — there is no `NavigationModel` in
+  that scene — so "Copy Archive Link to This Page" was **greyed out in the document window** and reachable
+  only over the navigation window's preview sheet.
+  Fix: `Core/ArchiveLinkTarget.swift` — the root + marker as one small `Sendable` value, published as a
+  **focused value** by every window that shows a document, plus an app-level `ArchiveLinkContext`
+  (`@StateObject` injected into both scenes) that carries it out of the navigation window. The nav model
+  stays the single writer (`attach(linkContext:)` + a `rootStore.objectWillChange` sink), so a root switch or
+  clear can never leave a document window citing the old archive. The command now needs only the focused
+  viewer + that target.
+- **It wrote the wrong page.** The page was `imagePageIndex(pair:) + 1` — the pair's **image** page — no
+  matter which pane you were reading, so citing a passage of OCR text produced a link to the scan.
+  Fix: `DocumentViewerModel.focusedPageNumber`, the 1-based PDF page of the **focused** pane, degrading to
+  the pair's image page when that pane holds no page (a trailing text-less scan, or a failed load).
+- **Reveal threw the page away.** `revealAndSelect` stored it in `pendingRevealPage`; the only other
+  mentions **cleared** it. The link selected the row and stopped — no viewer, no page.
+  Fix: `goToPDFPage(_:)` (the exact inverse of `focusedPageNumber`: page → pair + pane, clamped, a vanished
+  text page degrading to its image page), an additive optional `DocumentSelection.initialPage`, and
+  `openViewerRequest`/`openViewerSelection` — a counter+payload request in the shape of the existing
+  `requestScroll`, since `openWindow` is an Environment action only a View holds. A link **without** a page
+  still just selects and scrolls; that is unchanged.
+- **Gotchas worth remembering:** (a) adding those two modifiers inline to `NavigationWindowView.body`
+  overflowed the compiler's type-check budget ("unable to type-check this expression in reasonable time") —
+  they live in one extracted `archivePageLinkBridge` modifier. (b) `make-gui-fixture.sh` now writes a
+  `.archive-suite-root.json` with a FIXED GUID: with no marker at the fixture root there is no portable link
+  identity, so every archive-link command stays disabled and the GUI lane could not test them at all.
+  (c) `initialPage` is part of the `WindowGroup` value, so two links to different pages of one document open
+  two windows (same page → the existing window is brought forward). That is the value-identity semantics of
+  `openWindow(id:value:)`, and reasonable here: each cited page gets its own view.
 
 ## Reactive/eventual-consistency bugs found by adversarial review (fixed 2026-07-05)
 A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:

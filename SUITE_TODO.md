@@ -461,8 +461,37 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   path-traversal tests protect the **write** seam — this is the **read** seam. Add read-seam tests.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Editor/MarkdownBridge,Editor/InlineImageAttachment,Core/NotePassageSource}.swift | S–M | med | none
 
-- [ ] **W23.m4 — Reader page-level durable links are broken at command, creation AND reveal time
-  [M · MED · shipped-contract regression].** Three independent defects break the feature end to end:
+- [x] **W23.m4 — Reader page-level durable links are broken at command, creation AND reveal time
+  [M · MED · shipped-contract regression].** ✅ DONE `b6093bb` (the three fixes) + `e150234` (18 functional
+  tests) + this commit (GUI proof + trackers). Premise re-confirmed by symbol first — all three were live:
+  the command's `.disabled(doc == nil || nav == nil)` against a document window that publishes only its
+  viewer; `page = imagePageIndex(pair:) + 1` regardless of the focused pane; and `pendingRevealPage`
+  written in `revealAndSelect` and **read nowhere** (its only other mentions cleared it).
+  Fixed as one seam, since fixing any one alone leaves the feature broken: new `Core/ArchiveLinkTarget.swift`
+  carries the root + marker as one `Sendable` value published as a **focused value** by every window that
+  shows a document, with an app-level `ArchiveLinkContext` (one `@StateObject`, injected into both scenes)
+  ferrying it out of the navigation window — which stays the single writer (`attach(linkContext:)` + a
+  `rootStore.objectWillChange` sink), so a root switch can't leave a document window citing the old archive;
+  `DocumentViewerModel.focusedPageNumber` cites the **focused** pane's page (degrading to the pair's image
+  page when that pane holds none); and `goToPDFPage(_:)` + an additive optional `DocumentSelection.initialPage`
+  + `openViewerRequest`/`openViewerSelection` (counter+payload, in the shape of `requestScroll`, since
+  `openWindow` is an Environment action only a View holds) make reveal open the viewer ON the cited page
+  before clearing the pending state. A link with **no** page still just selects and scrolls.
+  Tier-2: adversarial self-review (clamped/out-of-range pages, a cited text page that no longer exists, a
+  marker-less root clearing rather than staling the target, no link at all with no document loaded) + **18
+  functional tests** (`DocumentPageLinkTests`) driving the real models over real `mktemp` scratch PDFs, incl.
+  the full copy → parse → reopen → re-cite round trip and the whole URL → router → nav path. **Non-vacuous,
+  per defect:** restoring the image-page-always rule → 3 cases RED; removing the reveal request and pinning
+  `goToPDFPage` to pair 0 → 7 RED (the three absence tests correctly stay GREEN). Reader unit suite
+  **248 tests, 1 failure** = the pre-existing `DeepLinkTests.testRevealAndSelectNoRoot` environment artifact
+  (`W20.deeplink-isolation`), unrelated. Clean build, **0 new warnings**. The menu-enablement half is the one
+  thing no unit test can see, so it is covered by a new `ViewerUITests` case that opens a document window and
+  asserts the Document-menu item is present AND enabled with only the viewer focused: **16/16 Reader UITests
+  pass in the headless Tart VM** (off the owner's screen). That needed `make-gui-fixture.sh` to write a
+  `.archive-suite-root.json` marker — without one no durable link exists, so every archive-link command stays
+  disabled and the GUI lane could not test them at all.
+  Full write-up: `ArchiveReader/KNOWN_ISSUES.md`.
+  Original report: three independent defects break the feature end to end:
   1. **Unreachable command.** "Copy Archive Link to This Page" (`ArchiveReaderCommands.swift`) requires both a
      focused `NavigationModel` **and** `DocumentViewerModel`. The full document window
      (`Views/DocumentWindowView.swift`) publishes **only the viewer**, so the command is disabled exactly where

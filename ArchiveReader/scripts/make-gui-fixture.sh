@@ -166,6 +166,15 @@ set_tags "IMG_PHOTO — Fixture.jpg" "Folder,Purple,Read"
 # Purple→labelNumber 3 automatically when the color name is in the tag array.
 # No extra step needed — verified in the Reader's Verified Facts.
 
+# --- root marker (W23.m4): give the fixture root a portable GUID ---
+# Without `.archive-suite-root.json` the Reader's root store reads no marker, so no durable link can be
+# built and every archive-link command stays disabled — which made the page-link commands untestable in
+# the GUI lane. Format per ArchiveCore `RootMarker`: lowercased UUID + ISO-8601 `createdAt`. The GUID is
+# FIXED so a UITest can assert the link it copies. Scratch fixture only; never written to a real corpus.
+cat > "$DST/.archive-suite-root.json" <<'JSON'
+{"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}
+JSON
+
 # --- force Spotlight indexing ---
 mdimport "$DST" >/dev/null 2>&1
 

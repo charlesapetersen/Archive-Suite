@@ -157,4 +157,41 @@ final class ViewerUITests: FixtureUITestCase {
         pressKey("a", modifiers: .command)
         app.typeKey(.delete, modifierFlags: [])
     }
+
+    // MARK: - Page links are reachable from the document window (W23.m4 defect 1)
+
+    /// The one part of W23.m4 no unit test can see: whether SwiftUI actually delivers the document
+    /// window's focused `ArchiveLinkTarget` to the menu. Before the fix the command read the root and
+    /// marker through a focused `NavigationModel`, which a document window never publishes — so
+    /// "Copy Archive Link to This Page" was disabled exactly where a reader has the page in front of
+    /// them. This asserts the menu item is present AND enabled with only the viewer focused.
+    func testCopyPageLinkIsEnabledInTheDocumentWindow() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+        pressKey("o", modifiers: .command)                 // open the full document window
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+
+        let item = documentMenuItem("Copy Archive Link to This Page")
+        XCTAssertTrue(item.exists, "the command should be in the Document menu")
+        XCTAssertTrue(item.isEnabled,
+                      "…and ENABLED with only the viewer focused (it required a NavigationModel before)")
+        app.typeKey(.escape, modifierFlags: [])            // close the menu without invoking it
+        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+
+        pressKey("w", modifiers: .command)                 // close the viewer
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    /// Open the Document menu and return one of its items. Menu items only join the accessibility tree
+    /// while their menu is open, so the click is part of the query.
+    private func documentMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let document = bar.menuBarItems["Document"]
+        XCTAssertTrue(document.waitForExistence(timeout: 5), "the Document menu should exist")
+        document.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 5)
+        return item
+    }
 }
