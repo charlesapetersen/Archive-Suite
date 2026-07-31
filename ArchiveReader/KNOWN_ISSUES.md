@@ -177,6 +177,42 @@ leaves it broken:
   two windows (same page → the existing window is brought forward). That is the value-identity semantics of
   `openWindow(id:value:)`, and reasonable here: each cited page gets its own view.
 
+## A root's identity could be a GUID the disk never had (W23.m6 + W23.l3 — fixed 2026-07-30)
+Every durable archive link names the root's `.archive-suite-root.json` GUID, so a GUID that isn't on disk is a
+link that can never resolve. `ArchiveCore/Links/RootMarker` handed one out three ways, and the Reader minted
+from it without knowing:
+- **Unreadable was reported as absent.** `read` mapped ENOENT *and every other read failure* (permissions, I/O)
+  to `nil`. "Absent" is precisely the answer that licenses minting a replacement, so a transient read error on
+  an **existing** marker invited `ensure` to write a new GUID over it — orphaning every link already copied
+  from that root. Now: `nil` means absent and nothing else; unreadable throws the new `.unreadable`, malformed
+  still throws `.malformed`, and `ensure` refuses to fall through to creation on either.
+- **A failed write returned the in-memory marker anyway.** Indistinguishable from a durable one, but it is a
+  different GUID after the next launch. On a read-only volume / no write permission / disk full, links copied
+  during that session were born broken. Now `ensure` throws the (declared-but-never-used) `.readOnly`, carrying
+  the marker as `provisional` so a caller can say *which* identity was lost without being able to mint from it.
+  Same for a write that reports success but leaves nothing readable.
+- **First-time creation was a check-then-write race (W23.l3).** The absence check sat *outside* the write
+  coordination, so two processes could both see absence and both write; the loser returned a GUID the disk had
+  already replaced. The re-check, write and confirmation now happen inside **one** write claim, and a racer that
+  finds a winner adopts it. (Codex confirmed this by inspection only — the new concurrency fixture reproduces
+  it: under the old ordering 8 racers get 8 different GUIDs with one on disk, 3 runs out of 3.)
+
+Reader side: `RootFolderStore.rootMarker` is now derived from `Core/RootMarkerState.swift` and is **nil unless
+the identity is durable** — one choke point, so `copyArchiveLinks`, the W23.m4 focused link target and
+`revealAndSelect` all refuse together instead of each remembering to check. It also degrades **visibly**:
+`RootMarkerDegradation` keeps the four distinguishable reasons and each says what is wrong and what would fix
+it. Copying a link from a degraded root used to say "Choose an archive folder first." with a folder plainly
+open; an incoming link used to be blamed for pointing at a different archive.
+
+Gotcha: `ensure` needs an **uncoordinated** `decode` helper for the in-claim re-check — calling `read` there
+would nest a second `NSFileCoordinator` inside an accessor block and deadlock.
+
+Audited while here: Notes does **not** share the defect. `ArchiveNotes/Store/RootMarkerStore.ensureMarker` is a
+separate (duplicated) implementation that throws `corruptRootMarker` when an existing file won't read or decode
+and propagates its write failure — it never hands back an unpersisted GUID. It is uncoordinated, though, so the
+W23.l3 race would apply to it if two Notes instances ever raced a first-time root; folding it onto
+`RootMarker.ensure` is the obvious future cleanup.
+
 ## Reactive/eventual-consistency bugs found by adversarial review (fixed 2026-07-05)
 A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:
 - **`extendSelectionToDocumentRun` selection race:** the `Task` mixed a *pre-await* `selected` snapshot

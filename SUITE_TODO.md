@@ -522,8 +522,16 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   decision applies — warn, but the file still counts as filed.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+{Tagging,OCR,Pipeline}.swift | M | med | none
 
-- [ ] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
-  [S–M · MED · broken citations · SHARED CORE].** `packages/ArchiveCore/.../Links/RootMarker.swift` →
+- [x] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
+  [S–M · MED · broken citations · SHARED CORE].** ✅ DONE `fa8bc02` (ArchiveCore) + `1e0af47` (Reader) + this
+  commit (all-three-app rebuild, GUI proof, trackers) — **W23.l3 folded in.** `read` now reports absence *only* for ENOENT
+  (new `.unreadable` otherwise), `ensure` throws `.readOnly` (carrying the `provisional` marker) instead of
+  returning an in-memory GUID, and first-time creation re-checks/writes/confirms inside **one** write claim.
+  Reader mints only from a **durable** identity — `RootFolderStore.rootMarker` is derived from the new
+  `Core/RootMarkerState.swift`, so every link path refuses together — and degrades **visibly** with four
+  distinguishable reasons instead of "Choose an archive folder first." on an open folder. 5 ArchiveCore + 8
+  Reader functional tests, each defect proven live by neutering (the concurrency fixture reproduces l3: 8
+  racers, 8 GUIDs, one on disk, 3/3 runs). All three apps rebuilt (shared-core rule). `packages/ArchiveCore/.../Links/RootMarker.swift` →
   `read` / `ensure`; `ArchiveReader/.../Search/RootFolderStore.swift`; `Views/NavigationModel.swift`.
   `RootMarker.read` converts **every** non-ENOENT, non-decoding read failure into "marker absent", and
   `ensure` returns its **newly generated in-memory marker after any write failure or failed confirmation**.
@@ -689,8 +697,12 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   run a deterministic race fixture; re-confirm, ideally with one.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/Index/NotesIndexer.swift | S | low | none
 
-- [ ] **W23.l3 — concurrent first-time root-marker creation can orphan newly copied links [S · LOW · SHARED
-  CORE].** `packages/ArchiveCore/.../Links/RootMarker.swift` → `ensure`. It checks for absence **before**
+- [x] **W23.l3 — concurrent first-time root-marker creation can orphan newly copied links [S · LOW · SHARED
+  CORE].** ✅ DONE `fa8bc02` + this commit — folded into **W23.m6** as this
+  entry anticipated. The absence check moved *inside* the write claim and a racer that finds a winner adopts
+  it. Codex's inspection-only finding is now reproduced by a deterministic fixture:
+  `RootMarkerDurabilityTests.concurrentFirstTimeEnsureAgreesWithWhatLandedOnDisk` — with the old ordering,
+  8 concurrent callers were handed 8 different GUIDs while one landed on disk (RED 3 runs out of 3). `packages/ArchiveCore/.../Links/RootMarker.swift` → `ensure`. It checks for absence **before**
   entering write coordination, generates a UUID, then blindly writes it. Two processes can both observe
   absence and serialize writes of **different** markers: process A can re-read and return A before process B
   writes B as the final disk value — so A-based links get copied even though the root ultimately identifies as
