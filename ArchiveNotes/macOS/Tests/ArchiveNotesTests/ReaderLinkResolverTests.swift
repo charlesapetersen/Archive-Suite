@@ -106,7 +106,7 @@ struct ReaderLinkResolverTests {
     }
 
     @Test("Resolves a file that exists under a known root")
-    func resolvesExistingFile() throws {
+    func resolvesExistingFile() async throws {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -116,7 +116,7 @@ struct ReaderLinkResolverTests {
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.resolve(rootGUID: marker.guid, relativePath: "folder/doc.pdf")
+        let result = await resolver.resolve(rootGUID: marker.guid, relativePath: "folder/doc.pdf")
         if case .resolved(let url) = result {
             #expect(url.lastPathComponent == "doc.pdf")
         } else {
@@ -125,16 +125,16 @@ struct ReaderLinkResolverTests {
     }
 
     @Test("Returns needsRootGrant for unknown GUID")
-    func unknownGUIDNeedsGrant() {
+    func unknownGUIDNeedsGrant() async {
         let store = ReaderRootStore()
         let resolver = ReaderLinkResolver(rootStore: store)
         let unknownGUID = UUID()
-        let result = resolver.resolve(rootGUID: unknownGUID, relativePath: "test.pdf")
+        let result = await resolver.resolve(rootGUID: unknownGUID, relativePath: "test.pdf")
         #expect(result == .needsRootGrant(guid: unknownGUID))
     }
 
     @Test("Returns notFound for missing file")
-    func missingFileNotFound() throws {
+    func missingFileNotFound() async throws {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -142,12 +142,12 @@ struct ReaderLinkResolverTests {
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.resolve(rootGUID: marker.guid, relativePath: "nonexistent.pdf")
+        let result = await resolver.resolve(rootGUID: marker.guid, relativePath: "nonexistent.pdf")
         #expect(result == .notFound)
     }
 
     @Test("Returns renamedCandidate when basename found elsewhere")
-    func renamedCandidateFound() throws {
+    func renamedCandidateFound() async throws {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -158,7 +158,7 @@ struct ReaderLinkResolverTests {
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.resolve(rootGUID: marker.guid, relativePath: "old-folder/doc.pdf")
+        let result = await resolver.resolve(rootGUID: marker.guid, relativePath: "old-folder/doc.pdf")
         if case .renamedCandidate(let url) = result {
             #expect(url.lastPathComponent == "doc.pdf")
             #expect(url.path.contains("new-folder"))
@@ -168,7 +168,7 @@ struct ReaderLinkResolverTests {
     }
 
     @Test("Rejects path traversal (../../) outside root")
-    func rejectsPathTraversal() throws {
+    func rejectsPathTraversal() async throws {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -176,12 +176,12 @@ struct ReaderLinkResolverTests {
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.resolve(rootGUID: marker.guid, relativePath: "../../etc/passwd")
+        let result = await resolver.resolve(rootGUID: marker.guid, relativePath: "../../etc/passwd")
         #expect(result == .notFound)
     }
 
     @Test("grantAndResolve succeeds with correct GUID")
-    func grantAndResolveSuccess() throws {
+    func grantAndResolveSuccess() async throws {
         let guid = UUID()
         let (root, _) = try makeScratchRoot(guid: guid)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -190,7 +190,7 @@ struct ReaderLinkResolverTests {
 
         let store = ReaderRootStore()
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.grantAndResolve(url: root, rootGUID: guid, relativePath: "test.pdf")
+        let result = await resolver.grantAndResolve(url: root, rootGUID: guid, relativePath: "test.pdf")
         if case .resolved(let url) = result {
             #expect(url.lastPathComponent == "test.pdf")
         } else {
@@ -199,19 +199,19 @@ struct ReaderLinkResolverTests {
     }
 
     @Test("grantAndResolve rejects wrong GUID")
-    func grantAndResolveWrongGUID() throws {
+    func grantAndResolveWrongGUID() async throws {
         let (root, _) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = ReaderRootStore()
         let resolver = ReaderLinkResolver(rootStore: store)
         let wrongGUID = UUID()
-        let result = resolver.grantAndResolve(url: root, rootGUID: wrongGUID, relativePath: "test.pdf")
+        let result = await resolver.grantAndResolve(url: root, rootGUID: wrongGUID, relativePath: "test.pdf")
         #expect(result == .needsRootGrant(guid: wrongGUID))
     }
 
     @Test("Resolves file with special characters (em-dash, NBSP, spaces)")
-    func resolvesSpecialCharacters() throws {
+    func resolvesSpecialCharacters() async throws {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -222,7 +222,7 @@ struct ReaderLinkResolverTests {
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
-        let result = resolver.resolve(rootGUID: marker.guid, relativePath: relPath)
+        let result = await resolver.resolve(rootGUID: marker.guid, relativePath: relPath)
         if case .resolved(let url) = result {
             #expect(url.lastPathComponent == "Doc\u{00A0}File.pdf")
         } else {

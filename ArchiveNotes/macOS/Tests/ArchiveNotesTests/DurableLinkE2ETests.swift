@@ -51,14 +51,14 @@ struct DurableLinkE2ETests {
     /// Run `body` with `readerRootBookmarks` snapshotted and restored, so the
     /// suite never leaves stale bookmarks (or clobbers a prior value) in the
     /// host's `UserDefaults.standard` — `grantRoot` persists there.
-    private func withHermeticBookmarks(_ body: () throws -> Void) rethrows {
+    private func withHermeticBookmarks(_ body: () async throws -> Void) async rethrows {
         let key = "readerRootBookmarks"
         let saved = UserDefaults.standard.dictionary(forKey: key)
         defer {
             if let saved { UserDefaults.standard.set(saved, forKey: key) }
             else { UserDefaults.standard.removeObject(forKey: key) }
         }
-        try body()
+        try await body()
     }
 
     private func isUnder(_ url: URL, _ root: URL) -> Bool {
@@ -70,8 +70,8 @@ struct DurableLinkE2ETests {
     // MARK: - The scenario
 
     @Test("Durable link round-trips and survives a computer move (re-grant by GUID)")
-    func linkResolvesThenSurvivesComputerMove() throws {
-        try withHermeticBookmarks {
+    func linkResolvesThenSurvivesComputerMove() async throws {
+        try await withHermeticBookmarks {
             let guid = UUID()
             let (corpusA, _) = try makeScratchCorpus(guid: guid, relFile: "sample.pdf")
             var deletedA = false
@@ -91,7 +91,7 @@ struct DurableLinkE2ETests {
             let resolver = ReaderLinkResolver(rootStore: store)
 
             // (a) Same machine: grant the root, resolve the link.
-            let r1 = resolver.grantAndResolve(url: corpusA, rootGUID: pGUID, relativePath: pRel)
+            let r1 = await resolver.grantAndResolve(url: corpusA, rootGUID: pGUID, relativePath: pRel)
             guard case let .resolved(url1) = r1 else {
                 Issue.record("expected .resolved on the granting machine, got \(r1)")
                 return
@@ -110,12 +110,12 @@ struct DurableLinkE2ETests {
 
             // The stale path no longer resolves — a missing file, NOT a silent
             // wrong file (the granting machine's scope now points at nothing).
-            let rStale = resolver.resolve(rootGUID: guid, relativePath: "sample.pdf")
+            let rStale = await resolver.resolve(rootGUID: guid, relativePath: "sample.pdf")
             #expect(rStale == .notFound)
 
             // (c) Re-grant the SAME GUID at the NEW path → resolves again
             // (00-overview §8.3 new-machine path: one re-grant, keyed by GUID).
-            let r2 = resolver.grantAndResolve(url: corpusB, rootGUID: guid, relativePath: "sample.pdf")
+            let r2 = await resolver.grantAndResolve(url: corpusB, rootGUID: guid, relativePath: "sample.pdf")
             guard case let .resolved(url2) = r2 else {
                 Issue.record("expected .resolved after computer-move re-grant, got \(r2)")
                 return
@@ -126,19 +126,19 @@ struct DurableLinkE2ETests {
     }
 
     @Test("Unknown root GUID asks for a re-grant — never a silent failure")
-    func unknownGUIDRequestsRegrant() throws {
-        try withHermeticBookmarks {
+    func unknownGUIDRequestsRegrant() async throws {
+        try await withHermeticBookmarks {
             let store = ReaderRootStore()
             let resolver = ReaderLinkResolver(rootStore: store)
             let unknown = UUID()
-            #expect(resolver.resolve(rootGUID: unknown, relativePath: "whatever.pdf")
+            #expect(await resolver.resolve(rootGUID: unknown, relativePath: "whatever.pdf")
                     == .needsRootGrant(guid: unknown))
         }
     }
 
     @Test("Re-granting the WRONG folder is rejected (GUID mismatch, never a wrong file)")
-    func regrantWrongFolderRejected() throws {
-        try withHermeticBookmarks {
+    func regrantWrongFolderRejected() async throws {
+        try await withHermeticBookmarks {
             // The folder carries some other GUID; the link wants `wanted`.
             let (corpus, marker) = try makeScratchCorpus(guid: UUID(), relFile: "sample.pdf")
             defer { try? FileManager.default.removeItem(at: corpus) }
@@ -147,14 +147,14 @@ struct DurableLinkE2ETests {
             let resolver = ReaderLinkResolver(rootStore: store)
             let wanted = UUID()
             #expect(wanted != marker.guid)
-            #expect(resolver.grantAndResolve(url: corpus, rootGUID: wanted, relativePath: "sample.pdf")
+            #expect(await resolver.grantAndResolve(url: corpus, rootGUID: wanted, relativePath: "sample.pdf")
                     == .needsRootGrant(guid: wanted))
         }
     }
 
     @Test("A file moved WITHIN the root is offered as a renamed candidate, not opened silently")
-    func renamedFileOffersCandidate() throws {
-        try withHermeticBookmarks {
+    func renamedFileOffersCandidate() async throws {
+        try await withHermeticBookmarks {
             let guid = UUID()
             // The file lives at a new sub-path; the link points at the old one.
             let (corpus, _) = try makeScratchCorpus(guid: guid, relFile: "new/place/sample.pdf")
@@ -164,7 +164,7 @@ struct DurableLinkE2ETests {
             store.grantRoot(corpus)
             let resolver = ReaderLinkResolver(rootStore: store)
 
-            let result = resolver.resolve(rootGUID: guid, relativePath: "old/place/sample.pdf")
+            let result = await resolver.resolve(rootGUID: guid, relativePath: "old/place/sample.pdf")
             guard case let .renamedCandidate(url) = result else {
                 Issue.record("expected .renamedCandidate for a moved-within-root file, got \(result)")
                 return

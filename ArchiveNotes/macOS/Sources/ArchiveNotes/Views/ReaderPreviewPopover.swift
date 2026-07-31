@@ -12,13 +12,25 @@ final class ReaderPreviewPopover {
     private var popover: NSPopover?
     private let resolver: ReaderLinkResolver
 
+    /// The in-flight basename search, if any. Cancelled on dismiss / re-show (W23.m14).
+    private var searchTask: Task<Void, Never>?
+    /// The view the current popover is anchored to, so a search that finishes later can
+    /// still put its answer in the right place.
+    private weak var anchorView: NSView?
+    private let searchModel = PreviewSearchModel()
+
     init(resolver: ReaderLinkResolver) {
         self.resolver = resolver
     }
 
     /// Show a preview popover for the given source anchor, anchored to `view`.
+    ///
+    /// Returns as soon as the walk-free stage of resolution is done. If the exact path is
+    /// missing, the basename search runs off the main actor and fills the popover in when
+    /// it lands — clicking a broken link no longer freezes the UI (W23.m14).
     func show(for anchor: SourceAnchor, relativeTo view: NSView) {
         dismiss()
+        anchorView = view
 
         guard let linkStr = anchor.link,
               let url = URL(string: linkStr),
@@ -27,7 +39,37 @@ final class ReaderPreviewPopover {
             return
         }
 
-        let resolution = resolver.resolve(rootGUID: guid, relativePath: rel)
+        switch resolver.resolveExact(rootGUID: guid, relativePath: rel) {
+        case .decided(let resolution):
+            present(resolution, page: page, relativeTo: view)
+        case .needsBasenameSearch:
+            searchModel.reset()
+            showSearching(relativeTo: view)
+            searchTask = Task { [weak self] in
+                guard let self else { return }
+                let resolution = await self.resolver.resolve(
+                    rootGUID: guid,
+                    relativePath: rel,
+                    progress: { [weak self] scanned in self?.searchModel.advance(to: scanned) }
+                )
+                // A cancelled search's answer is stale by construction — the popover was
+                // dismissed or replaced, so it must not reopen one.
+                guard !Task.isCancelled, let target = self.anchorView, target === view,
+                      target.window != nil else { return }
+                self.present(resolution, page: page, relativeTo: target)
+            }
+        }
+    }
+
+    func dismiss() {
+        searchTask?.cancel()
+        searchTask = nil
+        closePopover()
+    }
+
+    // MARK: - Private
+
+    private func present(_ resolution: LinkResolution, page: Int?, relativeTo view: NSView) {
         switch resolution {
         case .resolved(let fileURL):
             showPDF(fileURL: fileURL, page: page, relativeTo: view)
@@ -43,15 +85,32 @@ final class ReaderPreviewPopover {
             )
         case .notFound:
             showMessage("Source file not found in the archive.", relativeTo: view)
+        case .searchIncomplete(let scanned):
+            // Never report "not found" for a search that did not finish.
+            showMessage(
+                "Original file not found at its recorded path.\nThe search of the archive stopped after \(scanned) items, so the file may still be there.",
+                relativeTo: view
+            )
         }
     }
 
-    func dismiss() {
+    private func showSearching(relativeTo anchor: NSView) {
+        closePopover()
+        let content = PreviewSearchingView(model: searchModel)
+        let pop = NSPopover()
+        pop.contentSize = NSSize(width: 300, height: 120)
+        pop.behavior = .transient
+        pop.contentViewController = NSHostingController(rootView: content)
+        pop.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+        popover = pop
+    }
+
+    /// Close the current popover WITHOUT cancelling the search — used when swapping the
+    /// "searching" popover for its result.
+    private func closePopover() {
         popover?.performClose(nil)
         popover = nil
     }
-
-    // MARK: - Private
 
     private func showPDF(fileURL: URL, page: Int?, relativeTo anchorView: NSView) {
         guard let doc = PDFDocument(url: fileURL) else {
@@ -112,6 +171,42 @@ private struct PreviewContentView: View {
             Divider()
             NotesPDFPaneView(page: page, controller: controller)
         }
+    }
+}
+
+/// Live entry count for an in-flight basename search (W23.m14).
+///
+/// Progress ticks are relayed from the scanning thread and can therefore land out of
+/// order; `advance(to:)` keeps the displayed count monotonic.
+@MainActor
+final class PreviewSearchModel: ObservableObject {
+    @Published private(set) var scanned = 0
+
+    func reset() { scanned = 0 }
+
+    func advance(to count: Int) {
+        if count > scanned { scanned = count }
+    }
+}
+
+private struct PreviewSearchingView: View {
+    @ObservedObject var model: PreviewSearchModel
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Spacer(minLength: 0)
+            ProgressView().controlSize(.small)
+            Text("Original file not found at its recorded path.\nSearching the archive\u{2026}")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text(model.scanned > 0 ? "\(model.scanned) items checked" : " ")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(8)
     }
 }
 
