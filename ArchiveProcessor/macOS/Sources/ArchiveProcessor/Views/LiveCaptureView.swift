@@ -720,6 +720,7 @@ private struct SegmentTagCard: View {
         .frame(width: 460)
         .onChange(of: input) { _, _ in recompute() }
         .onAppear {
+            persistFailure = nil   // reset with the other fields, so one card's failure can't haunt the next
             let existing = session.macTags[group.id]
             subjects = existing?.subjects ?? []
             yearText = (existing?.year ?? group.year).map(String.init) ?? ""

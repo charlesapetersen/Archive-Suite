@@ -546,8 +546,32 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   `packages/ArchiveCore`. Historical W4 material calls read-only operation "degraded" but no live task makes
   Reader distinguish transient from durable. | files: packages/ArchiveCore/Sources/ArchiveCore/Links/RootMarker.swift, ArchiveReader/macOS/Sources/ArchiveReader/{Search/RootFolderStore,Views/NavigationModel}.swift | S–M | med | none
 
-- [ ] **W23.m7 — Mac tag-card Apply/Skip begins finalization before proving the manifest decision is durable
-  [S–M · MED · manifest/finalize].** `Capture/CaptureSession.swift` (Apply/Skip), `Views/LiveCaptureView.swift`.
+- [x] **W23.m7 — Mac tag-card Apply/Skip begins finalization before proving the manifest decision is durable
+  [S–M · MED · manifest/finalize].** ✅ DONE `1723331` (the fix) + `0bd8fcc` (18 headless checks) + this
+  commit (trackers). Premise re-confirmed by symbol first and it was live, both halves: `_ = writeManifest()`
+  at both sites, and `liveProcessor.segmentResolved` called BEFORE that write. Fixed by the neighbouring
+  roll-back pattern, re-derived against current `main` (the Codex prior art was read for shape, not
+  cherry-picked): both functions now stage the decision, write, and on failure restore
+  `macTags`/`resolvedGroupIds` and return `false` — so memory matches disk and the card (derived from the
+  in-memory resolved set) stays up with everything typed still in it. Live processing is told through one new
+  choke point, `notifySegmentResolved`, reached only after the write succeeds, because that step bakes
+  `macTags` into staged output. Failure channel: one shared `CaptureSession.tagDecisionNotDurableMessage`
+  drives both the session status line and a new inline red row in the card, so Save/Skip can never again look
+  like a no-op. The headless auto-skip loop now stops on a refused write (it would otherwise spin forever on a
+  card that rolls itself back). Tier-2: adversarial self-review (found + fixed a stale-`persistFailure`
+  carry-over onto the next card; confirmed `.atomic` means a failed write leaves the previous manifest intact,
+  so rollback really does restore agreement; no `await` inside either function, so no reentrancy window) +
+  **18 functional checks** in `ManifestPersistenceTestDriver` over a real scratch session manifest
+  (`ARCHIVEPROC_TEST_BACKUP_ROOT`, synthetic pages; no corpus, no OCR, no network, no GUI, $0), including a
+  fresh `CaptureSession()` restore after both the refusal and the retry, and — the ordering proof — a
+  notification hook that reads the real `manifest.json` from inside the notification itself. **Non-vacuous per
+  half:** restoring the old call order → 5 RED; swallowing the write failure as before → 10 RED; both neuters
+  reverted. 86/86 ALL PASS; `test-recovery.sh` 45/45, `test-network-session.sh` 7/7, `test-filerelay.sh` 10/10
+  (that last one runnable again — see `682bc7f`); build clean, 0 new warnings. **B9 entry updated** as this
+  item asks. Residual, deliberately not widened: `removePhoto`/`removePhotoIfSafe`/`clear`/`clearFiled` still
+  discard their `writeManifest` result — they trash photos, and restore skips manifest entries whose file is
+  absent, so those degrade safely rather than silently losing a decision. Original report below.
+  `Capture/CaptureSession.swift` (Apply/Skip), `Views/LiveCaptureView.swift`.
   Apply/Skip mutates `macTags` + `resolvedGroupIds`, schedules `liveProcessor.segmentResolved`, and
   **discards the `Bool` result of `writeManifest`**. The card vanishes immediately (it is derived from the
   in-memory resolved set) and the UI has **no failure channel**. If the manifest replacement fails and the app

@@ -4,6 +4,57 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.m7): the Mac tag card acted on a Save/Skip it had not proved was durable
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
+2026-07-30 against `5cc8616` before a line was changed — both halves were live).
+
+**The defect.** `CaptureSession.applyMacTags` / `skipMacTags` did two things in the wrong order and
+checked neither:
+
+1. `_ = writeManifest()` — the `Bool` was discarded at both sites, so a failed manifest replacement was
+   indistinguishable from a successful one. The card vanishes the instant `resolvedGroupIds` gains the
+   group (it is *derived* from that set), so the operator saw a completed action, and the UI had no
+   failure channel at all.
+2. `liveProcessor.segmentResolved(groupId:)` was called **before** the write. That is the step that bakes
+   `macTags` into staged output.
+
+Together: a failed write plus a crash reloads the **old unresolved** state. Stage-for-later loses the
+operator's decision outright; in live mode the artifact has already been produced from tags the recovered
+state doesn't have, and the segment is re-prompted — recovered state inconsistent with output on disk.
+
+**FIXED.** Both functions now stage the decision, write, and on failure restore `macTags` (nil restores
+"never tagged") and `resolvedGroupIds`, set the status message and return `false`. `writeManifest` writes
+`.atomic`, so a failed write leaves the previous manifest byte-intact — which is exactly why rolling memory
+back restores agreement with disk rather than papering over a divergence. The card therefore stays up with
+everything typed still in it (that lives in the view's own `@State`, not in `macTags`), and the operator can
+retry. Live processing is notified through one new choke point, `notifySegmentResolved`, reached only after
+the write succeeds. One shared string, `CaptureSession.tagDecisionNotDurableMessage`, drives both the
+session status line and a new inline red row in `SegmentTagCard`, so the two can't drift.
+
+Two smaller things fell out of it: the headless auto-skip loop (`headlessResolvePendingTags`) would have
+spun forever on a card that now rolls its own resolve back, so it stops on a refusal (the finalize autopilot
+re-enters it, so a transient failure is still retried); and `LiveCaptureTestDriver` now logs a refused
+resolve instead of letting the E2E time out later with an unexplained "staged 0/N".
+
+**Verified** (Tier-2, scratch only — `ARCHIVEPROC_TEST_BACKUP_ROOT` + synthetic pages; no corpus, no OCR,
+no network, no GUI, $0): 18 new checks in `ManifestPersistenceTestDriver` covering refusal, roll-back, the
+card staying up, the operator message, and a fresh `CaptureSession()` restore agreeing with memory after
+*both* the refusal and the retry — plus the ordering, asserted by a notification hook that reads the real
+`manifest.json` from inside the notification. Non-vacuous per half: restoring the old call order → 5 RED,
+swallowing the write failure → 10 RED, both neuters reverted. 86/86 ALL PASS, plus `test-recovery.sh`
+45/45, `test-network-session.sh` 7/7, `test-filerelay.sh` 10/10. Build clean, 0 new warnings.
+
+**Not widened (deliberate).** `removePhoto`, `removePhotoIfSafe`, `clear` and `clearFiled` still discard
+their `writeManifest` result. They trash photos, and restore skips any manifest entry whose file is absent,
+so a lost write there degrades to a stale-but-harmless manifest rather than a decision the app already acted
+on. If that ever needs closing it is a separate item, not a re-open of this one.
+
+`Capture/CaptureSession.swift`, `Views/LiveCaptureView.swift`,
+`Capture/{ManifestPersistenceTestDriver,LiveCaptureTestDriver}.swift`.
+
+---
+
 ## ✅ FIXED (W23.m1): re-pairing left an upload owned by the OLD Mac, and the phone deleted its copy on that Mac's ack
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
@@ -885,6 +936,11 @@ sidecar—and retains failed cleanup mappings for retry. `OCR/OutputFileSafety.s
 ---
 
 ## ✅ FIXED (2026-07-08): resolved tag cards re-surfaced after a mid-session Mac restart (B9) [LOW]
+
+> ⚠️ **Amended 2026-07-30 (W23.m7).** "Write the manifest on resolve" below was only half true: the write's
+> `Bool` was **discarded**, so a resolve that never reached disk still counted — and live processing was told
+> before the write besides. B9's round-trip claim (the manifest *format* carries `resolvedGroupIds`+`macTags`)
+> stands; its durability claim did not, and is fixed in the W23.m7 entry at the top of this file.
 
 **FIXED:** `SessionManifest` now also persists `resolvedGroupIds` + `macTags` (both optional → pre-B9
 manifests still decode, to empty); `applyMacTags`/`skipMacTags` write the manifest on resolve, and
