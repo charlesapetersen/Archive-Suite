@@ -219,21 +219,25 @@ class OCRProcessor: ObservableObject {
     var exportedImageMap: [URL: URL] = [:]
     /// Maps original PDF source URL → temporary JPEG URL (for cleanup)
     var pdfToImageMap: [URL: URL] = [:]
-    /// W23.m5 — output artifacts (PDF / exported JPEG / merged PDF) whose Finder-tag write THREW, by
-    /// output file name. The bytes are complete and the file still counts as processed — the owner's
-    /// recorded decision for the equivalent Live Capture case (W3.cap-r1): tags are re-derivable, so
-    /// withholding "done" over metadata would help nobody. What a tag failure DOES cost is findability:
-    /// the Reader's tag-driven triage silently omits an untagged file, so it must be said out loud at
-    /// the end of the run instead of discarded into a `try?`.
-    /// Names, not URLs, because `CollectionSegmenter.organizeOutput` MOVES outputs into collection
-    /// folders after tagging — a recorded URL would be a stale path by the time the summary is written.
-    /// Maintained by `recordTagWrite(succeeded:for:)`: a later successful re-write clears the entry, so
-    /// a rotation-regen or review retry self-heals the record.
+    /// W23.m5 — the INPUT files whose output artifact (PDF / exported JPEG / merged PDF) had its
+    /// Finder-tag write THROW, by source file name. The bytes are complete and the file still counts as
+    /// processed — the owner's recorded decision for the equivalent Live Capture case (W3.cap-r1): tags
+    /// are re-derivable, so withholding "done" over metadata would help nobody. What a tag failure DOES
+    /// cost is findability: the Reader's tag-driven triage silently omits an untagged file, so it must
+    /// be said out loud at the end of the run instead of discarded into a `try?`.
+    /// Keyed by SOURCE, not by output: `CollectionSegmenter.organizeOutput` both moves AND renumbers
+    /// outputs after tagging (`00003 Box 12.pdf`), so any output name or URL recorded during the run is
+    /// a file that no longer exists by the time the summary is written. The input name never changes,
+    /// and it is what the operator recognizes.
+    /// Maintained by `recordTagWrite(succeeded:forSource:)`: a later successful re-write clears the
+    /// entry, so a rotation-regen or review retry self-heals the record.
     var untaggedOutputs: [String] = []
-    /// W23.h5-fu — outputs whose PDF carries the visible PLACEHOLDER image page instead of the scan
-    /// (`PDFGenerator.ImagePageOutcome.placeholder`), by output file name. Unlike Live Capture this path
-    /// never trashes the source image, so nothing is lost — but "didn't throw" is not "the scan is in
-    /// there", and only the operator can decide to re-shoot or re-run. Same self-healing record.
+    /// W23.h5-fu — the INPUT files whose output PDF carries the visible PLACEHOLDER image page instead
+    /// of the scan (`PDFGenerator.ImagePageOutcome.placeholder`). Unlike Live Capture this path never
+    /// trashes the source image, so nothing is lost — but "didn't throw" is not "the scan is in there",
+    /// and only the operator can decide to re-shoot or re-run. Same source key, same self-healing.
+    /// The source name is the RIGHT key here twice over: after a merge the placeholder page lives inside
+    /// a combined PDF, and the page to re-run is identified by the photo it came from.
     var placeholderOutputs: [String] = []
     /// The model used for the current processing run (for PDF regeneration headers)
     var currentModel: LLMModel?

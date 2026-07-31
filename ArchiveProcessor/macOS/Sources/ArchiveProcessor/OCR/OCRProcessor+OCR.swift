@@ -191,7 +191,7 @@ extension OCRProcessor {
                 // label untouched. `false` is unconditional here, not `taggingMode.stampsUnread` —
                 // `passSourceTags` implies `.copySource` (OCRView.swift:27), so they agree today, but
                 // the verbatim semantics are what this path requires regardless of the run's mode.
-                tagOutput(sourceTags, at: outputURL, stampUnread: false)
+                tagOutput(sourceTags, at: outputURL, source: url, stampUnread: false)
                 jobs[index].appliedTags = sourceTags
             }
         }
@@ -375,7 +375,7 @@ extension OCRProcessor {
                 // Map by the original source URL so downstream consumers (log, view-text) find it. Only
                 // set on a confirmed write — never a phantom entry pointing at a nonexistent file.
                 outputURLMap[pdfURL] = outputURL
-                recordImagePage(assembly.anyPlaceholder ? .placeholder : .embedded, for: outputURL)
+                recordImagePage(assembly.anyPlaceholder ? .placeholder : .embedded, forSource: pdfURL)
                 let combinedText = pageResults.compactMap { $0.text }.joined(separator: "\n\n")
                 jobs[index].result = OCRResult(
                     text: combinedText.isEmpty ? nil : combinedText,
@@ -1178,8 +1178,8 @@ extension OCRProcessor {
             if let tags = pdfResult.tags {
                 jobs[index].appliedTags = tags
             }
-            recordTagWrite(succeeded: pdfResult.tagWriteOK, for: outputURL)
-            if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, for: outputURL) }
+            recordTagWrite(succeeded: pdfResult.tagWriteOK, forSource: sourceURL)
+            if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
         } else {
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on
             // `PDFDocument.write(to:)` returning false; a bad image yields a placeholder page instead).

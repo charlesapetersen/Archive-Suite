@@ -1168,7 +1168,9 @@ extension OCRProcessor {
                     return (failed, placeholders)
                 }.value
                 failedRegenURLs = regen.failed
-                for u in regen.placeholders { recordImagePage(.placeholder, for: u) }
+                for r in restores where regen.placeholders.contains(r.outputURL) {
+                    recordImagePage(.placeholder, forSource: r.sourceURL)
+                }
             }
             // Apply the (cheap) state updates back on the main actor.
             for r in restores {
@@ -1183,7 +1185,7 @@ extension OCRProcessor {
                     if passSourceTags {
                         if let sourceTags = try? MacOSTagger.readTags(from: r.sourceURL), !sourceTags.isEmpty {
                             // Copy-source pass-through on resume: verbatim, label untouched.
-                            tagOutput(sourceTags, at: r.outputURL, stampUnread: false)
+                            tagOutput(sourceTags, at: r.outputURL, source: r.sourceURL, stampUnread: false)
                             jobs[r.index].appliedTags = sourceTags
                         }
                     }
@@ -2226,12 +2228,13 @@ extension OCRProcessor {
         // through them file by file.
         if !untaggedOutputs.isEmpty {
             lines.append("")
-            lines.append("Output files written WITHOUT Finder tags (tag search will not find them):")
+            lines.append("Input files whose output was written WITHOUT Finder tags"
+                       + " (tag search will not find it):")
             for name in untaggedOutputs { lines.append("  \u{2022} \(name)") }
         }
         if !placeholderOutputs.isEmpty {
             lines.append("")
-            lines.append("Output PDFs whose image page is a PLACEHOLDER, not the original scan"
+            lines.append("Input files whose output PDF holds a PLACEHOLDER image page, not the scan"
                        + " (the source image was not touched):")
             for name in placeholderOutputs { lines.append("  \u{2022} \(name)") }
         }

@@ -179,7 +179,7 @@ extension OCRProcessor {
                     } else if newClassification == .folderLabel {
                         if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
                     }
-                    tagOutput(existingTags, at: outputURL, stampUnread: stampUnread)
+                    tagOutput(existingTags, at: outputURL, source: item.fileURL, stampUnread: stampUnread)
                     jobs[item.fileIndex].appliedTags = existingTags
                 }
             }
@@ -329,7 +329,7 @@ extension OCRProcessor {
             } else if newClassification == .folderLabel {
                 if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
             }
-            tagOutput(existingTags, at: outputURL,
+            tagOutput(existingTags, at: outputURL, source: jobs[index].sourceURL,
                       stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             jobs[index].appliedTags = existingTags
         }
@@ -397,7 +397,7 @@ extension OCRProcessor {
                         pdfImageMB: pdfSettings.pdfImageMB,
                         textColumns: pdfSettings.textColumns
                     )
-                    recordImagePage(imagePage, for: outputURL)
+                    recordImagePage(imagePage, forSource: jobs[item.fileIndex].sourceURL)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            jobs[item.fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
@@ -407,7 +407,8 @@ extension OCRProcessor {
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
                 if passSourceTags {
                     // Copy-source restore after rotation regen: verbatim, label untouched.
-                    tagOutput(jobs[item.fileIndex].appliedTags, at: outputURL, stampUnread: false)
+                    tagOutput(jobs[item.fileIndex].appliedTags, at: outputURL,
+                              source: jobs[item.fileIndex].sourceURL, stampUnread: false)
                 }
             }
         }
@@ -614,7 +615,7 @@ extension OCRProcessor {
                 default:
                     break
                 }
-                tagOutput(existingTags, at: outputURL,
+                tagOutput(existingTags, at: outputURL, source: jobs[item.fileIndex].sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
                 jobs[item.fileIndex].appliedTags = existingTags
             }

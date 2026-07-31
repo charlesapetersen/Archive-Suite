@@ -12,10 +12,12 @@ import ArchiveCore
 ///      untagged), while a write that lands returns `true` and the tags are readable back off disk.
 ///   2. The seam did not become a new way to guess a colour — the `GeneratedTags` overload keeps a subject
 ///      tag that is literally "Red" searchable and label-less, while the app's own colour still lands.
-///   3. The RECORD self-heals — a failure is recorded once, and a later successful re-write clears it, so
-///      a rotation regen or review retry does not leave a warning about a file that is now fine.
-///   4. Merge TRANSFERS the record — the component PDFs are deleted, so their entries must go with them,
-///      and a placeholder image page copied into the merged PDF must survive the transfer.
+///   3. The RECORD is keyed by the INPUT file (the one name `organizeOutput`'s move + renumber cannot
+///      invalidate) and self-heals — a later successful re-write clears an earlier failure, so a rotation
+///      regen or review retry does not leave a warning about work that is now fine.
+///   4. Merge keeps the record honest — one merged PDF now covers every page, so its successful tag write
+///      RESOLVES each page's earlier tag failure, while a placeholder page copied into the merge stays
+///      recorded against the photo it came from.
 ///   5. The SUMMARY says so — silence when clean, names when not, and it never claims a file is untagged
 ///      and un-embedded in the same breath unless both are true.
 ///   6. `PDFGenerator`'s image-page outcome is really WIRED to the placeholder record (W23.h5-fu).
@@ -115,25 +117,28 @@ enum ProcessFilesTagWarningTestDriver {
         check("...and \"Red\" appears exactly once in its tags",
               tagsOf(boxPDF).filter { $0 == "Red" }.count == 1)
 
-        // --- 3. The record self-heals, and it is keyed by NAME so `organizeOutput`'s move can't strand it. ---
+        // --- 3. The record is keyed by the INPUT file and self-heals. The key matters: `organizeOutput`
+        // both MOVES and RENUMBERS every output ("00003 Box 12.pdf"), so an output name or URL recorded
+        // during the run names a file that no longer exists by the time the summary is written. ---
         let recorder = OCRProcessor()
-        let a = verdictDir.appendingPathComponent("A.pdf")
-        recorder.recordTagWrite(succeeded: false, for: a)
-        recorder.recordTagWrite(succeeded: false, for: a)
-        check("a repeated failure is recorded exactly once", recorder.untaggedOutputs == ["A.pdf"])
-        recorder.recordTagWrite(succeeded: true, for: a)
+        let photo = verdictDir.appendingPathComponent("IMG_2043.jpg")
+        recorder.recordTagWrite(succeeded: false, forSource: photo)
+        recorder.recordTagWrite(succeeded: false, forSource: photo)
+        check("a repeated failure is recorded exactly once", recorder.untaggedOutputs == ["IMG_2043.jpg"])
+        check("the record names the INPUT file, which organizeOutput's renumbering cannot invalidate",
+              recorder.untaggedOutputs.allSatisfy { !$0.contains(".pdf") })
+        recorder.recordTagWrite(succeeded: true, forSource: photo)
         check("a later successful re-write CLEARS the earlier failure", recorder.untaggedOutputs.isEmpty)
-        recorder.recordTagWrite(succeeded: false, for: a)
-        let moved = verdictDir.appendingPathComponent("Collection 1/A.pdf")
-        recorder.recordTagWrite(succeeded: true, for: moved)
-        check("the record follows the file through organizeOutput's move (keyed by name)",
-              recorder.untaggedOutputs.isEmpty)
-        recorder.recordImagePage(.placeholder, for: a)
-        check("a placeholder image page is recorded", recorder.placeholderOutputs == ["A.pdf"])
-        recorder.recordImagePage(.embedded, for: a)
+        recorder.recordImagePage(.placeholder, forSource: photo)
+        check("a placeholder image page is recorded", recorder.placeholderOutputs == ["IMG_2043.jpg"])
+        recorder.recordImagePage(.embedded, forSource: photo)
         check("...and a regen that embeds the scan clears it", recorder.placeholderOutputs.isEmpty)
-        recorder.recordTagWrite(succeeded: false, for: a)
-        recorder.recordImagePage(.placeholder, for: a)
+        recorder.recordTagWrite(succeeded: false, forSource: photo)
+        recorder.recordImagePage(.placeholder, forSource: photo)
+        recorder.forgetOutputWarnings(forSources: [photo])
+        check("excluding a file from the run drops both of its warnings",
+              recorder.untaggedOutputs.isEmpty && recorder.placeholderOutputs.isEmpty)
+        recorder.recordTagWrite(succeeded: false, forSource: photo)
         recorder.clearOutputWarnings()
         check("a new run starts with both records empty",
               recorder.untaggedOutputs.isEmpty && recorder.placeholderOutputs.isEmpty)
@@ -156,10 +161,10 @@ enum ProcessFilesTagWarningTestDriver {
         wired.outputURLMap = [wireSource: wireOutput]
         wired.applyBoxFolderLabelTags(enableTagging: false)
         check("a production tag site records the refusal (the wiring)",
-              wired.untaggedOutputs == ["boxphoto.pdf"])
+              wired.untaggedOutputs == ["boxphoto.jpg"])
         check("...and the end-of-run summary carries it", OCRProcessor.outputWarningSuffix(
                 untagged: wired.untaggedOutputs, placeholders: wired.placeholderOutputs)
-                .contains("boxphoto.pdf"))
+                .contains("boxphoto.jpg"))
         try? fm.setAttributes([.immutable: false], ofItemAtPath: wireOutput.path)
         wired.applyBoxFolderLabelTags(enableTagging: false)
         check("...and re-running it once the file is writable clears the warning",
@@ -183,17 +188,17 @@ enum ProcessFilesTagWarningTestDriver {
         merger.jobs = [job1, OCRJob(sourceURL: src2)]
         merger.segments = [DocumentSegment(pdfURLs: [src1, src2])]
         merger.outputURLMap = [src1: page1, src2: page2]
-        merger.recordTagWrite(succeeded: false, for: page1)
-        merger.recordImagePage(.placeholder, for: page2)
+        merger.recordTagWrite(succeeded: false, forSource: src1)
+        merger.recordImagePage(.placeholder, forSource: src2)
         merger.performDocumentMerging(files: [src1, src2], outputDirectory: mergeDir)
         let mergedURL = merger.outputURLMap[src1]
         check("merge produced one durable output",
               mergedURL != nil && mergedURL == merger.outputURLMap[src2]
               && fm.fileExists(atPath: mergedURL?.path ?? "/nonexistent"))
-        check("merge drops the deleted components' tag record (no warning names a missing file)",
+        check("merge RESOLVES a page's earlier tag failure — the merged PDF's own write covers it",
               merger.untaggedOutputs.isEmpty)
-        check("merge CARRIES the placeholder record onto the merged output",
-              merger.placeholderOutputs == [mergedURL?.lastPathComponent ?? "?"])
+        check("merge KEEPS the placeholder warning against the page it belongs to",
+              merger.placeholderOutputs == ["source-2.jpg"])
 
         // --- 5. The summary. Silence when clean; specific when not; truncated past three. ---
         check("no warning at all when both records are empty",
@@ -211,7 +216,7 @@ enum ProcessFilesTagWarningTestDriver {
         let many = OCRProcessor.outputWarningSuffix(
             untagged: ["A.pdf", "B.pdf", "C.pdf", "D.pdf", "E.pdf"], placeholders: [])
         check("five untagged files report the count, three names and a remainder",
-              many.contains("5 output files") && many.contains("A.pdf, B.pdf, C.pdf +2 more")
+              many.contains("5 files' output") && many.contains("A.pdf, B.pdf, C.pdf +2 more")
               && !many.contains("D.pdf"))
         let both = OCRProcessor.outputWarningSuffix(untagged: ["A.pdf"], placeholders: ["B.pdf"])
         check("both failures on one run are reported together",
@@ -230,24 +235,24 @@ enum ProcessFilesTagWarningTestDriver {
         let realOut = genDir.appendingPathComponent("real.pdf")
         if let outcome = try? gen.generate(imageURL: realJPEG, result: ocr, model: stubModel,
                                            outputURL: realOut) {
-            wiring.recordImagePage(outcome, for: realOut)
+            wiring.recordImagePage(outcome, forSource: realJPEG)
         }
         check("a decodable image records NO placeholder warning", wiring.placeholderOutputs.isEmpty)
         let junk = genDir.appendingPathComponent("corrupt.jpg")
         try? Data("this is not a JPEG".utf8).write(to: junk)
         let junkOut = genDir.appendingPathComponent("corrupt.pdf")
         if let outcome = try? gen.generate(imageURL: junk, result: ocr, model: stubModel, outputURL: junkOut) {
-            wiring.recordImagePage(outcome, for: junkOut)
+            wiring.recordImagePage(outcome, forSource: junk)
         }
         check("an undecodable image records the placeholder warning (the wiring)",
-              wiring.placeholderOutputs == ["corrupt.pdf"])
+              wiring.placeholderOutputs == ["corrupt.jpg"])
         check("...and the PDF was still written with both pages — nothing is withheld",
               PDFDocument(url: junkOut)?.pageCount == 2)
         check("...and the source image was NOT touched", fm.fileExists(atPath: junk.path))
         let wiredSuffix = OCRProcessor.outputWarningSuffix(untagged: wiring.untaggedOutputs,
                                                            placeholders: wiring.placeholderOutputs)
-        check("the end-of-run summary names exactly that file", wiredSuffix.contains("corrupt.pdf")
-              && !wiredSuffix.contains("real.pdf"))
+        check("the end-of-run summary names exactly that file", wiredSuffix.contains("corrupt.jpg")
+              && !wiredSuffix.contains("real.jpg"))
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
