@@ -9,7 +9,13 @@ import ArchiveCore
 @MainActor
 final class RootFolderStore: ObservableObject {
     @Published private(set) var root: URL?
-    @Published private(set) var rootMarker: RootMarker?
+
+    /// The granted root's link identity, including *why* it is unusable when it is. (W23.m6)
+    @Published private(set) var markerState: RootMarkerState = .noRoot
+
+    /// The marker durable links may be minted from — `nil` whenever the identity is degraded, so a
+    /// GUID that only exists in memory (or one we failed to read) can never reach a copied link.
+    var rootMarker: RootMarker? { markerState.durableMarker }
 
     private var accessing: URL?
     private let key = "archiveRootBookmark"
@@ -51,7 +57,7 @@ final class RootFolderStore: ObservableObject {
         stopAccessing()
         UserDefaults.standard.removeObject(forKey: key)
         root = nil
-        rootMarker = nil
+        markerState = .noRoot
     }
 
     private func resolveSaved() {
@@ -84,15 +90,11 @@ final class RootFolderStore: ObservableObject {
     }
 
     /// Read or create the `.archive-suite-root.json` marker at the granted root.
-    /// On failure (read-only volume, malformed existing file), log and leave `rootMarker = nil`
-    /// — the app still reads normally; deep links degrade to path-only (no portable guid).
+    /// On failure (read-only volume, unreadable or malformed existing file) the state records *why*
+    /// and `rootMarker` stays nil — the app still reads normally, but link minting is refused and
+    /// the reason is shown when they try, rather than a link being copied that can never resolve.
     private func loadOrEnsureMarker(at url: URL) {
-        do {
-            rootMarker = try RootMarker.ensure(at: url, kind: .reader, name: url.lastPathComponent)
-        } catch {
-            NSLog("RootFolderStore: could not load/create root marker at \(url.path): \(error)")
-            rootMarker = nil
-        }
+        markerState = .ensuring(url)
     }
 
 #if DEBUG
@@ -104,7 +106,7 @@ final class RootFolderStore: ObservableObject {
         root = url
         // `accessing` stays nil — no scope to release. No bookmark persisted.
         // Read (but don't create) a marker if present — tests may provide one.
-        rootMarker = try? RootMarker.read(at: url)
+        markerState = .reading(url)
     }
 #endif
 }

@@ -671,7 +671,14 @@ final class NavigationModel: ObservableObject {
             statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"
             return
         }
-        guard rootStore.rootMarker?.guid == rootGUID else {
+        // An open root whose identity is degraded can't be compared against — say why, rather than
+        // blaming the link for pointing somewhere else. (W23.m6)
+        guard let marker = rootStore.rootMarker else {
+            statusMessage = rootStore.markerState.degradation?.message
+                ?? "This archive folder has no identity to match the link against."
+            return
+        }
+        guard marker.guid == rootGUID else {
             statusMessage = "This link points at a different archive. Choose it in File ▸ Choose Archive Folder…"
             return
         }
@@ -1085,8 +1092,15 @@ final class NavigationModel: ObservableObject {
 
     func copyArchiveLinks() {
         let files = selectedFiles
-        guard !files.isEmpty, let root = rootStore.root, let marker = rootStore.rootMarker else {
+        guard !files.isEmpty, let root = rootStore.root else {
             statusMessage = "Choose an archive folder first."
+            return
+        }
+        // A root with no DURABLE identity would mint links that can never resolve, so refuse — and
+        // say which of the several possible reasons it is. The old message claimed no folder was
+        // open, when one was. (W23.m6)
+        guard let marker = rootStore.rootMarker else {
+            statusMessage = rootStore.markerState.degradation?.message ?? "Choose an archive folder first."
             return
         }
         Task {
