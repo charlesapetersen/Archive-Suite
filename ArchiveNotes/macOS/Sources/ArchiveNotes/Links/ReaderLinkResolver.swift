@@ -255,13 +255,25 @@ final class ReaderLinkResolver {
             return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
         }
 
+        // Canonicalized ONCE, outside the loop: containment is only asked about an entry whose
+        // name already matched, so the walk pays one `realpath` per candidate (rare) rather
+        // than one per entry (100k–150k).
+        let canonicalRoot = ReaderRootContainment.canonical(root)
+
         var scanned = 0
         // `nextObject()` rather than `for … in enumerator`: NSEnumerator's Sequence
         // conformance is unavailable from an async context.
         while let entry = enumerator.nextObject() {
             guard let fileURL = entry as? URL else { continue }
             scanned += 1
-            if fileURL.lastPathComponent == name {
+            // A name match is a candidate only if it is really inside the root. The enumerator
+            // lists a symlink as an ordinary entry (it just won't descend into one), so
+            // `<root>/x/doc.pdf` → a PDF outside the root would otherwise be offered as the
+            // renamed candidate — the same escape the exact-path stage refuses, through a
+            // different door (W23.l1). Skipping rather than stopping keeps the walk honest:
+            // a genuine copy further on is still found, and absence is still established.
+            if fileURL.lastPathComponent == name,
+               ReaderRootContainment.isContained(fileURL, inCanonicalRoot: canonicalRoot) {
                 onProgress?(scanned)
                 return BasenameScan(match: fileURL, scanned: scanned, stop: .exhausted)
             }

@@ -123,7 +123,11 @@ macOS/Sources/ArchiveNotes/
                                    magnitude above the real corpus), progress-reporting. There is NO
                                    synchronous full-walk API by design; `resolve` is async-only so a
                                    main-actor archive walk cannot be reintroduced. A search that did not
-                                   finish is .searchIncomplete(scanned:), NEVER .notFound
+                                   finish is .searchIncomplete(scanned:), NEVER .notFound. Containment for
+                                   BOTH stages is ReaderRootContainment (same file): canonical
+                                   (resolvingSymlinksInPath) on both sides + component-wise ancestry, so a
+                                   symlink can't leave the granted root by either door — the exact path or
+                                   a basename match, which is skipped (walk continues) if it escapes (W23.l1)
   Core/
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
@@ -479,6 +483,14 @@ macOS/Tests/ArchiveNotesTests/
                                    it's deterministic, not a race); an unwalkable root isn't absence; the
                                    fallback still finds a moved file; progress reaches the main actor and
                                    its readout is monotonic + generation-scoped
+  ReaderLinkContainmentTests.swift 10 tests (W23.l1): a symlink can't leave the granted root by either
+                                   door — escaping file/dir symlink refused on the exact path, escaping
+                                   basename match skipped by the walk (and the contained twin still
+                                   offered); each escape case first asserts the PRE-FIX rule accepted the
+                                   fixture, so none is vacuous. No-regression side: in-root symlink
+                                   resolves, symlinked ANCESTOR root resolves, dangling symlink still
+                                   falls through to the search; plus the predicate itself (component-wise
+                                   ancestry, both path spellings of one file)
   DurableLinkE2ETests.swift        4 tests (W8-S9): the durable-link scenario — link round-trip +
                                    resolve, computer-move re-grant by GUID, unknown-GUID/wrong-folder
                                    needs-regrant (never silent), renamed-candidate; hermetic (scratch

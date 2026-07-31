@@ -899,15 +899,32 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### LOW
 
-- [ ] **W23.l1 — the Notes Reader-link containment check is bypassable through a symlink [S · LOW · scope
-  bypass] (blocked-on: W23.m14).** `Links/ReaderLinkResolver.swift`, `Views/ReaderPreviewPopover.swift`. The
-  resolver uses `standardizedFileURL`, which normalizes `..` **lexically but does not resolve symlinks**, then
-  calls `fileExists`, which **does** follow them. A symlink under the granted Reader root pointing at an
-  otherwise-accessible PDF **outside** the root is returned as `.resolved`, violating the resolver's stated
-  granted-root containment contract. (The app sandbox may independently deny some targets — this is a semantic
-  scope bypass, not a claim that every symlink escapes the sandbox.)
-  **Fix:** contain on `resolvingSymlinksInPath` / `realpath`, not `standardizedFileURL`. Blocked-on W23.m14 —
-  same function, and m14 restructures it. Tests cover `../../` traversal but not symlink/real-path containment.
+- [x] **W23.l1 — the Notes Reader-link containment check is bypassable through a symlink [S · LOW · scope
+  bypass] (blocked-on: W23.m14).** ✅ **DONE 2026-07-31** (checkpoint `2f13d25` = the exact-path stage + 8
+  tests; completing commit = the basename walk, its 2 tests and the trackers). Premise re-confirmed on a
+  scratch tree before anything changed: the old rule really did accept the escape — `standardizedFileURL`
+  normalizes `..` lexically and does **not** resolve symlinks, while `fileExists` **does** follow them, so
+  `<root>/alias.pdf` → a PDF outside the granted Reader root came back `.resolved`. Containment now goes
+  through one seam, **`ReaderRootContainment`**: `canonical()` = `resolvingSymlinksInPath().standardizedFileURL`
+  applied to **both sides** (so a root reached through a symlinked ancestor, or the `/var` ↔ `/private/var`
+  alias, still contains its own files) and `isContained()` compares **path components** (so `…/root-extra/x.pdf`
+  is not "under" `…/root`). Both doors are closed, not just the one in the finding: the **basename walk** was
+  the other one — the enumerator lists a symlink as an ordinary entry, so an escaping twin could still be
+  offered as `.renamedCandidate`; it is now skipped, and *skipped* rather than stopped, so a genuine copy
+  further on is still found and absence is still established (`.exhausted` → `.notFound`, never
+  `.searchIncomplete`). `.resolved` still carries the URL the link named, not its canonical form — that is the
+  spelling the granted root's security scope covers, and containment is proven by then. `ReaderPreviewPopover`
+  needed **no change**: it presents whatever the resolver decides, and the resolver is the seam. Kept honest in
+  the other direction — an in-root symlink still resolves, a root under a symlinked ancestor still resolves its
+  files, and a **dangling** symlink is not an escape (there is nothing to escape to): it falls through to the
+  basename search like any other missing file. **10 new tests** (`ReaderLinkContainmentTests`), scratch temp
+  trees only, `readerRootBookmarks` snapshot/restored so host defaults are left byte-identical; **every escape
+  case first asserts the pre-fix rule accepted the fixture**, so none can pass vacuously (the W23.m3
+  `AssetPathResolverTests` pattern). One fixture correction worth recording: a root that IS a symlink cannot be
+  registered at all — security-scoped `bookmarkData` refuses one — so that guarantee is proven at the predicate
+  level and the end-to-end test uses the shape that does occur, a symlinked *ancestor*. **654/654**
+  `ArchiveNotesTests` green, clean build, 0 new warnings. Notes-only; no ArchiveCore type touched, so the
+  shared-core rebuild rule is N/A. No view or interaction code changed, so no VM UITest run was needed.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Links/ReaderLinkResolver,Views/ReaderPreviewPopover}.swift | S | low | none
 
 - [ ] **W23.l2 — a cancelled prune task can still defeat the two-emission absence gate [S · LOW · residual

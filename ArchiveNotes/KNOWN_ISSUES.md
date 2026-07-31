@@ -3,6 +3,48 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.l1) — a symlink could walk the Reader-link resolver out of the granted root
+
+**2026-07-31.** `ReaderLinkResolver` promised that anything it hands back lives inside the Reader root
+the user granted, and enforced it by comparing `standardizedFileURL` paths — which normalizes `.`/`..`
+**lexically** and does **not** resolve symlinks — before asking `FileManager.fileExists`, which **does**
+follow them. So `<root>/alias.pdf` pointing at a PDF anywhere else on disk was spelled inside the root,
+existed, and came back `.resolved`. A note body is a plain `.md` file the owner (or a sync client) can
+hand-edit, so the link in a source block is untrusted input; this was a semantic scope bypass of the
+resolver's own contract, not a claim that the sandbox would have allowed every target.
+
+**One seam, canonical on both sides.** `ReaderRootContainment.canonical()` is
+`resolvingSymlinksInPath().standardizedFileURL`, and it is applied to the root *and* the candidate. That
+symmetry is the point: canonicalizing only the candidate would put every file of a root reached through
+a symlinked ancestor — or through the `/var` ↔ `/private/var` alias `FileManager`'s enumerator hands
+back — "outside" its own root. `isContained()` then compares **path components**, because a string
+prefix accepts `…/root-extra/doc.pdf` as living under `…/root`.
+
+**Both doors, not just the one in the finding.** The exact-path stage was the reported hole; the
+**basename fallback** is the same contract through another door, since the enumerator lists a symlink as
+an ordinary entry (it just won't descend into one), so an escaping same-named twin could be offered as
+`.renamedCandidate`. A non-contained match is now **skipped, not stopped** — the walk goes on, a genuine
+copy further along is still found, and absence is still established, so the verdict stays `.notFound`
+and never degrades to `.searchIncomplete`. Containment is asked only of an entry whose *name* already
+matched, so the walk pays one `realpath` per candidate, not one per 150k entries.
+
+**What deliberately did not change.** `.resolved` still carries the URL the link named rather than its
+canonical form — that is the spelling the granted root's security scope covers, and containment is
+already proven by then. `ReaderPreviewPopover` needed no edit: it presents whatever the resolver
+decides. An in-root symlink still resolves; a **dangling** symlink is not treated as an escape, because
+there is nothing to escape to — it falls through to the basename search like any other missing file.
+
+**Gotcha for future fixtures:** a Reader root that *is itself* a symlink cannot be registered at all —
+security-scoped `bookmarkData` refuses one, `grantRoot` logs and drops it, and resolution then reports
+`.needsRootGrant`. The both-spellings guarantee is therefore proven at the predicate level, and the
+end-to-end test uses the shape that does occur in the wild: a symlinked **ancestor**.
+
+10 tests (`ReaderLinkContainmentTests`), scratch temp trees only, with `readerRootBookmarks`
+snapshot/restored so the host's defaults are left byte-identical. Every escape case first asserts the
+**pre-fix** rule accepted the fixture, so none of them can pass vacuously. **654/654**
+`ArchiveNotesTests` green, clean build, 0 new warnings. Notes-only — no ArchiveCore type touched. No
+view or interaction code changed, so no VM UITest run was required.
+
 ## ✅ FIXED (W23.m15) — deleting Inbox or Extracts was permanent, and the app kept filing notes into it
 
 **2026-07-31.** Every row in the folder tree offered Rename and Delete, the two **fixed-ID system

@@ -272,4 +272,78 @@ struct ReaderLinkContainmentTests {
             #expect(ReaderRootContainment.isContained(privateSpelling, inCanonicalRoot: canonicalRoot))
         }
     }
+
+    // MARK: - 4. The basename fallback is held to the same contract
+
+    /// The walk's match rule exactly as it read **before** W23.l1: the first entry whose last
+    /// path component matches, with no containment test at all. The enumerator lists a symlink
+    /// as an ordinary entry, so this is what used to offer an escape as `.renamedCandidate`.
+    private func preFixScanMatch(name: String, under root: URL) -> URL? {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return nil }
+        while let entry = enumerator.nextObject() {
+            if let url = entry as? URL, url.lastPathComponent == name { return url }
+        }
+        return nil
+    }
+
+    @Test("The basename fallback never offers a match that escapes the root")
+    func basenameFallbackRefusesEscapingMatch() async throws {
+        let tree = try makeTree()
+        defer { try? FileManager.default.removeItem(at: tree.base) }
+
+        // The cited path is gone; the only `doc.pdf` left under the root is a symlink out.
+        let elsewhere = try writeFile(at: tree.outside.appendingPathComponent("doc.pdf"))
+        try symlink(at: tree.root.appendingPathComponent("mirror/doc.pdf"), to: elsewhere)
+
+        // Non-vacuity: the pre-fix walk would have handed that symlink back as the candidate.
+        #expect(preFixScanMatch(name: "doc.pdf", under: tree.root) != nil)
+
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: tree.root)
+        #expect(scan.match == nil)
+        // Skipped, not stopped: absence under the root really was established.
+        #expect(scan.stop == .exhausted)
+
+        await withHermeticBookmarks {
+            let store = ReaderRootStore()
+            store.grantRoot(tree.root)
+            let resolver = ReaderLinkResolver(rootStore: store)
+            let result = await resolver.resolve(rootGUID: tree.guid,
+                                                relativePath: "collection/doc.pdf")
+            #expect(result == .notFound)
+        }
+    }
+
+    @Test("A genuine in-root copy is still offered when an escaping twin shares its name")
+    func basenameFallbackStillFindsTheContainedCopy() async throws {
+        let tree = try makeTree()
+        defer { try? FileManager.default.removeItem(at: tree.base) }
+
+        let elsewhere = try writeFile(at: tree.outside.appendingPathComponent("doc.pdf"))
+        try symlink(at: tree.root.appendingPathComponent("aaa/doc.pdf"), to: elsewhere)
+        let realCopy = try writeFile(at: tree.root.appendingPathComponent("zzz/doc.pdf"))
+
+        // Whichever the walk meets first, the answer must be the contained one. Compared
+        // canonically: the enumerator hands back its own spelling of the same path.
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: tree.root)
+        #expect(scan.match.map { ReaderRootContainment.canonical($0).path }
+                == ReaderRootContainment.canonical(realCopy).path)
+
+        await withHermeticBookmarks {
+            let store = ReaderRootStore()
+            store.grantRoot(tree.root)
+            let resolver = ReaderLinkResolver(rootStore: store)
+            let result = await resolver.resolve(rootGUID: tree.guid,
+                                                relativePath: "collection/doc.pdf")
+            if case .renamedCandidate(let url) = result {
+                #expect(url.path.contains("zzz"))
+                #expect(!url.path.contains("aaa"))
+            } else {
+                Issue.record("Expected .renamedCandidate for the contained copy, got \(result)")
+            }
+        }
+    }
 }
