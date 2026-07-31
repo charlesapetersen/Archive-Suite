@@ -166,5 +166,32 @@ data class CapturedItem(
     // DISPLAY-ONLY: this photo has been copied to the phone's gallery via "Save to phone". Purely a UI cue
     // (so a saved photo's thumbnail no longer reads as "failed"); it does NOT affect the upload/queue/dedup
     // state or the phone↔Mac protocol in any way.
-    val savedToPhone: Boolean = false
+    val savedToPhone: Boolean = false,
+    // W23.m8 — recovered from disk against a manifest known to be older than the state that produced it, so
+    // the box/folder, group boundary, tags and replacement provenance this page carried are gone. HELD on
+    // the phone (never auto-sent) until the operator says what it is. Persisted, so a further kill can't
+    // release it: the phone must not assert to the Mac a classification nobody chose, and the Mac's half of
+    // that mistake — a page filed into the archive — is the half with no undo.
+    val needsReview: Boolean = false
 )
+
+/** W23.m8 — how to re-adopt a capture file the restored session doesn't know about. Adopt it either way:
+ *  an archival photo can't be re-taken, so a file nobody tracks must never stay invisible. What differs is
+ *  what the adoption is allowed to CLAIM. Against a trustworthy manifest the file is simply one the last
+ *  save hadn't caught up with, and a fresh recovery segment is an honest description of it. Against a
+ *  known-stale manifest the very same adoption is a fabrication — a default Document group standing in for
+ *  a classification that was lost with the unpublished write — so the page is held for review instead. */
+internal fun adoptedOrphan(
+    id: Long,
+    file: File,
+    groupId: String,
+    seq: Int,
+    manifestStale: Boolean
+): CapturedItem = CapturedItem(
+    id = id, file = file, groupId = groupId, seq = seq, type = GroupType.DOCUMENT,
+    needsReview = manifestStale
+)
+
+/** Whether a capture may go to the Mac right now. The one thing that withholds it is an unreviewed
+ *  recovery: everything else the queue holds has a classification the operator actually chose. */
+internal fun isSendable(item: CapturedItem): Boolean = !item.needsReview

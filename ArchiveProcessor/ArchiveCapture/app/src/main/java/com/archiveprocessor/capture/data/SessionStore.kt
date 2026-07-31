@@ -10,8 +10,25 @@ import java.io.File
 
 /** Crash-durable capture session. Persists every captured item + metadata + upload state so a
  *  phone crash/kill never loses photos or their grouping/tags. Rewritten (temp→rename) on change. */
-class SessionStore(context: Context) {
-    private val file = File(context.filesDir, "session.json")
+class SessionStore internal constructor(
+    private val dir: File,
+    /** How a finished snapshot reaches disk. Injectable so a test can fail a publish the way a full or
+     *  read-only filesystem does, without needing one. */
+    private val publish: (File, ByteArray) -> Boolean = { f, bytes -> ManifestFileWriter.replace(f, bytes) }
+) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = File(dir, "session.json")
+
+    /** W23.m8 — the publish-in-progress flag. Created BEFORE a snapshot is written and removed only once
+     *  that write is confirmed on disk, so finding it at launch means exactly one thing: the manifest we
+     *  are about to restore is OLDER than the state the app last held. That matters because the recovery
+     *  path re-adopts capture files the manifest doesn't mention, and against a stale manifest those files
+     *  are not "untracked" at all — they are pages whose box/folder and tags went down with the write.
+     *  Set-before-write rather than set-on-failure deliberately: a kill *during* the publish leaves the
+     *  same older manifest behind, and must read the same way. (Durable against process death — the stated
+     *  failure — not against power loss, which no unfsynced directory entry survives.) */
+    private val staleMarker = File(dir, "session.stale")
 
     /** A document segment the operator has ended whose segment-complete signal the Mac hasn't acked yet.
      *  Persisted so an app-kill between End segment and the ack can't strand the document. */
@@ -21,9 +38,17 @@ class SessionStore(context: Context) {
     data class Restored(val items: List<CapturedItem>, val seq: Int, val nextId: Long, val groupId: String?,
                         val pendingTagGroupId: String?, val endedSegments: List<EndedSeg>)
 
+    /** Publish a snapshot of the live session.
+     *
+     *  @return true only when THIS snapshot is durably on disk. False means the manifest still holds an
+     *  older state — the caller is the only one that can see the difference, so it must treat what it holds
+     *  in memory as un-persisted and say so. (Returning Unit here is what let a failed publish look
+     *  identical to a successful one all the way up to the view model.) Never throws: a persistence hiccup
+     *  must not take down the capture flow — but it must not be mistaken for success either. */
     fun save(items: List<CapturedItem>, seq: Int, nextId: Long, currentGroupId: String, pendingTagGroupId: String?,
-             endedSegments: List<EndedSeg>) {
-        try {
+             endedSegments: List<EndedSeg>): Boolean {
+        markPublishInProgress()
+        val published = try {
             val arr = JSONArray()
             for (it in items) {
                 arr.put(JSONObject().apply {
@@ -39,6 +64,9 @@ class SessionStore(context: Context) {
                     it.replacesGroupId?.let { v -> put("replacesGroupId", v) }
                     if (it.needsResend) put("needsResend", true)
                     if (it.savedToPhone) put("savedToPhone", true)
+                    // The hold on a page recovered against a stale manifest outlives the process that
+                    // imposed it — otherwise the next kill releases it to the Mac unclassified.
+                    if (it.needsReview) put("needsReview", true)
                 })
             }
             val ended = JSONArray()
@@ -59,10 +87,29 @@ class SessionStore(context: Context) {
                 if (pendingTagGroupId != null) put("pendingTag", pendingTagGroupId)
                 if (ended.length() > 0) put("ended", ended)
             }
-            ManifestFileWriter.replace(file, root.toString().toByteArray(Charsets.UTF_8))
+            publish(file, root.toString().toByteArray(Charsets.UTF_8))
         } catch (e: Exception) {
-            // Never crash the capture flow because of a persistence hiccup.
+            // Never crash the capture flow because of a persistence hiccup — and never call it saved.
+            false
         }
+        if (published) clearPublishInProgress()
+        return published
+    }
+
+    /** True when the manifest on disk is known to be older than the state the app last held (a publish
+     *  failed, or the process died inside one). Read it BEFORE anything can persist — the first successful
+     *  save of the new process clears it. */
+    fun manifestIsStale(): Boolean = staleMarker.exists()
+
+    private fun markPublishInProgress() {
+        runCatching {
+            dir.mkdirs()
+            if (!staleMarker.exists()) staleMarker.createNewFile()
+        }
+    }
+
+    private fun clearPublishInProgress() {
+        runCatching { staleMarker.delete() }
     }
 
     fun load(): Restored? {
@@ -88,7 +135,8 @@ class SessionStore(context: Context) {
                         state = UploadState.valueOf(o.getString("state")),
                         replacesGroupId = if (o.has("replacesGroupId")) o.getString("replacesGroupId") else null,
                         needsResend = o.optBoolean("needsResend", false),
-                        savedToPhone = o.optBoolean("savedToPhone", false)
+                        savedToPhone = o.optBoolean("savedToPhone", false),
+                        needsReview = o.optBoolean("needsReview", false)
                     )
                 )
             }
@@ -117,5 +165,8 @@ class SessionStore(context: Context) {
 
     fun clear() {
         file.delete()
+        // A session that no longer exists has nothing to be stale about; leaving the flag would make the
+        // next launch quarantine a fresh session's own photos.
+        staleMarker.delete()
     }
 }

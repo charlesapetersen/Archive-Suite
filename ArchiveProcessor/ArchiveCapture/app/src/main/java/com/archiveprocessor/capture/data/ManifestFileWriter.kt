@@ -18,7 +18,13 @@ internal object ManifestFileWriter {
     ): Boolean {
         val parent = destination.parentFile ?: return false
         parent.mkdirs()
-        val temporary = File.createTempFile("${destination.name}.", ".tmp", parent)
+        // Creating the sibling can itself fail (unwritable/absent parent) and used to throw straight past
+        // this function — so the one caller that now reads the result could never see that failure as one.
+        val temporary = try {
+            File.createTempFile("${destination.name}.", ".tmp", parent)
+        } catch (_: Exception) {
+            return false
+        }
         return try {
             FileOutputStream(temporary).use { output ->
                 output.write(bytes)
