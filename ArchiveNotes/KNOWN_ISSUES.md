@@ -418,21 +418,51 @@ mirrors it after the build settles, and its message goes to `statusMessage` — 
 that skipped it would hang `bootstrap()`, and `NotesIndexerFailureTests` is the guard on that (it would hang
 rather than fail).
 
+**Every model-level index read goes through the health-aware seam (W23.m9-fu, `cc9fb59`).** m9 gave the
+*driver* an `openForQuery()` that reports a dead index instead of answering `[]` — but `NotesModel.search(_:)`
+and `reloadItems()` queried the shared `NotesIndex` directly, never attempted an open, and so never noticed a
+dead index nor a repaired one. (The item said "`search`/`summary(for:)`"; `NotesModel` has no `summary(for:)`
+— its second direct read is `reloadItems()` → `allSummaries()`, the note-list projection.) Both now go through
+`NotesModel.openIndexForQuery()`, which returns the index **only once it has opened**:
+- it delegates to `NotesIndexer.openForQuery()` (internal, not private, for exactly this) whenever there is a
+  driver, so the driver stays the single owner of `failure` and the model only mirrors it; a model injected
+  with a bare index (tests, previews) opens directly under the same all-or-nothing contract and publishes the
+  same typed failure itself — **the report must not depend on which initializer ran**;
+- a **failed `reloadItems` publishes nothing.** `allSummaries()` answers `[]` for an unopenable index exactly
+  as for an empty one, so publishing it erased the visible library on the strength of a query that never ran.
+  A *successful* read still publishes what it found, empty included — the guard must not freeze the list;
+- the **blank-query check stays first** in `search`: not searching is not a failed search, and must raise no
+  banner.
+
 Other notes:
-- `adoptIndexFailure` sets `statusMessage` but never clears it — `statusMessage` is shared with other
-  degradations, so clearing a message it didn't set would be worse. In practice the build runs once per launch.
+- `adoptIndexFailure` **re-posts** its line on every read that hits a degraded index — that is what makes a
+  dismissed banner come back instead of leaving the next empty result unexplained (W23.m9-fu). The
+  `@Published indexFailure` assignment is change-guarded, because search is 150 ms-debounced and would
+  otherwise republish an identical value per keystroke.
+- It also **retracts** that line when the index recovers, but only if its own message is still the one
+  showing (`postedIndexMessage`): `statusMessage` is shared with every other degradation, so clearing a line
+  it didn't post would swallow another subsystem's report. Without the retraction a recovered index leaves a
+  now-false "unavailable" banner up for the session; without the guard, recovery silently ate the trash-failure
+  line. Both directions are held by a test.
+- **Writes are deliberately NOT routed through the seam.** `upsertBatch`/`deleteItems` already throw on a nil
+  handle and every call site reports it, so they were never the silent path; an accessor that can return nil
+  would turn that loud failure into a skipped write nobody hears about.
 - `pruneIfSettled`'s `try?` is deliberate: a failed open makes `allIndexedIDs()` empty, `pruneDecision` finds
   nothing absent, and the prune degrades to a no-op.
 - `Failure` is deliberately NOT shared with Reader's `ContentIndexer.Failure`: this driver is a fork, the copy
   differs (notes vs files), and hoisting a UI-facing type into ArchiveCore would couple both apps' wording to
   a third module (and make every such tweak a three-app rebuild).
-- **Residual, filed as `W23.m9-fu` (LOW):** `NotesModel.search`/`summary` query the shared `NotesIndex`
-  *directly*, not through the indexer's wrappers, so they never attempt an open or set a `Failure`. Once the
-  launch banner is dismissed, a session whose index died answers every search with `[]` and says no more.
+- **Residual, filed as `W23.m9-fu2` (LOW):** re-opening a repaired index makes it *queryable* again, but
+  nothing repopulates it — rows are rebuilt only by `buildIndexFromDisk()` at launch (or one at a time by a
+  later mutation). In the rare mid-session repair window, search therefore goes back to answering `[]` with
+  nothing said. Filed rather than fixed here: rebuilding on the recovery transition starts a full disk walk
+  from a keystroke and bumps the `an.status.indexReady` probe mid-session. Same shape as `W23.m10-fu`.
 
 Tests: `NotesIndexRecoveryTests` (4), `NotesIndexerFailureTests` (9), incl. the end-to-end shape — real `.md`
-notes on disk plus a dead index → settled, list genuinely empty, and that emptiness *reported*. Scratch only.
-Both mechanisms proven non-vacuous by neutering; Notes suite 572/572.
+notes on disk plus a dead index → settled, list genuinely empty, and that emptiness *reported*; plus
+`NotesModelIndexHealthTests` (11) over the model's own two reads. Scratch only. Every mechanism proven
+non-vacuous by neutering (m9-fu: the pre-fix code reddened 6 of 11 while the 5 must-not-over-report guards
+stayed green, then 3 neuters each reddened exactly one predicted assertion). Notes suite 714/714.
 
 ## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
 

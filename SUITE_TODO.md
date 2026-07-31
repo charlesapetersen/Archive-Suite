@@ -776,7 +776,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   filed as **W23.m9-fu** (LOW). Write-ups: `ArchiveReader/KNOWN_ISSUES.md`, `ArchiveNotes/KNOWN_ISSUES.md`.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/{ContentIndexer,ContentIndex}.swift, ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/NotesIndexer,Index/NotesIndex,Core/NotesModel}.swift | M | med | none
 
-- [ ] **W23.m9-fu — Notes' *model-level* search still can't report an unavailable index [XS–S · LOW].**
+- [x] **W23.m9-fu — Notes' *model-level* search still can't report an unavailable index [XS–S · LOW].**
   Residual of W23.m9, filed 2026-07-30. `NotesModel.search(_:)`/`summary(for:)` query the shared
   `NotesIndex` **directly** rather than through `NotesIndexer`'s wrappers, so they never attempt an open and
   never set a `Failure`: after the banner is dismissed, a session whose index died at launch answers every
@@ -785,6 +785,51 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   plus the missed chance to recover if the bad file is replaced while the app runs. Fix: route those two
   through the same `openForQuery()` seam the indexer uses (or share one health-aware accessor), and let the
   banner re-arm. Notes `Core/NotesModel.swift`, `Index/NotesIndexer.swift`. | Tier-1 | XS–S | LOW
+  — ✅ **DONE 2026-07-31** (checkpoint `cc9fb59` code+tests): both model-level reads go through one
+  `NotesModel.openIndexForQuery()`, which delegates to `NotesIndexer.openForQuery()` (now internal) so the
+  driver stays the single owner of index health, and opens directly under the same all-or-nothing contract
+  for a model injected with a bare index — the report must not depend on which initializer ran.
+  **One correction to the item's text:** `NotesModel` has no `summary(for:)`; its second direct read is
+  `reloadItems()` → `allSummaries()`, the note-list projection, so that is the second path routed.
+  Three things the item didn't name, each measured rather than assumed. (1) **Re-arming the banner is not
+  the same as reporting once** — `adoptIndexFailure` now re-posts the line on every read that hits a
+  degraded index, so a dismissed banner comes back instead of leaving the next empty result unexplained;
+  the `@Published indexFailure` assignment is change-guarded because a 150 ms-debounced search would
+  otherwise republish an identical value per keystroke. (2) **Retraction had to be added with it** — a
+  recovering index otherwise leaves a now-false "unavailable" banner up for the rest of the session; the
+  model records the line it posted and clears *only* that one, since `statusMessage` is shared with every
+  other degradation. (3) **A failed `reloadItems` must not publish its empty read** — `allSummaries()`
+  answers `[]` for an unopenable index exactly as for an empty one, so publishing it erased the visible
+  library on the strength of a query that never ran; a *successful* read still publishes whatever it found,
+  empty included. Writes (`upsertBatch`/`deleteItems`) were deliberately left out of the seam: they already
+  throw and are reported, and an accessor that can return nil would turn that loud failure into a silent
+  skip. **Tier-1, scratch only** (garbage/empty sqlite3 files + real `.md` notes in per-test temp dirs; no
+  real store, no corpus, no network, $0): 11 new tests (`NotesModelIndexHealthTests`). **Non-vacuous,
+  measured twice over:** against the pre-fix code the 6 report/recover assertions were RED and the 5
+  must-not-over-report guards GREEN (blank query, healthy-empty index, healthy `reloadItems`, driver-less
+  search, index-less model); then 3 neuters each reddened exactly one predicted assertion and nothing else
+  (A unconditional retraction → the trash-failure line is swallowed; B no retraction → the false banner
+  stays up; C publish the failed read → the library is erased). All reverted; `grep NEUTER` clean.
+  **714/714** Notes + 189 XCTest, clean build, 0 new warnings. No ArchiveCore type and no SPEC change →
+  Reader/Processor untouched, so the shared-core all-three-app rebuild rule is N/A. No new view code — the
+  only visible surface is the existing `an.sidebar.status` line, and no GUI fixture can produce a corrupt
+  index, so there is nothing for the VM lane to see (same as m9). Residual filed as **W23.m9-fu2** (below).
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndexer}.swift
+
+- [ ] **W23.m9-fu2 — a repaired index becomes queryable again but stays EMPTY until the next launch
+  [XS–S · LOW].** Residual of W23.m9-fu, filed 2026-07-31 (`cc9fb59`). A read that re-opens an index which
+  had been reported unavailable now retracts the false banner and hands back a live handle — but nothing
+  repopulates it: rows are rebuilt only by `buildIndexFromDisk()` at launch (or one at a time by a later
+  mutation's `upsertBatch`). So in the rare window where the bad file is repaired mid-session (operator
+  replaces it, a sync client heals it, the volume returns), search goes back to answering `[]` with nothing
+  said. Not a re-open of m9-fu: a dead index is now reported on *every* model-level read, and the
+  retraction is correct — the "unavailable" claim really is false once the file opens. **Filed rather than
+  fixed deliberately:** the obvious fix (kick `buildIndexFromDisk()` on the `.unavailable`→healthy
+  transition) starts a full disk walk from a keystroke and bumps `isIndexReady`/`indexGeneration`
+  mid-session, which the XCUITest `an.status.indexReady` probe reads — a behaviour change that deserves its
+  own item rather than riding along on a LOW visibility fix. Same shape as **W23.m10-fu** (a recovered
+  volume doesn't re-mirror until the next organization mutation), and worth doing with it. Notes
+  `Core/NotesModel.swift`, `Index/NotesIndexer.swift`. | Tier-1 | XS–S | LOW
 
 - [x] **W23.m10 — `organization.json` export failure is reported as a successful organization change
   [S · MED · durable-mirror rot].** `Index/OrganizationFile.swift`, `Index/OrganizationStore.swift`.
