@@ -1832,6 +1832,17 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
      the "Notes failures"); no lock around a single shared VM (→ `tart_lock_*`, and the VM is only stopped
      by whoever booted it); plus the runner's two. New harness `ops/autonomous/tests/prove-vm-lane.sh` (31
      checks) pins the exit-code→owner-text mapping, the lock, the shim and the smoke-script guards.
+- [ ] **W21.vmgui-path — `vm-gui-runner.sh` blames a missing VM when `tart` is merely off PATH [XS · repeat
+  cost].** `ensure_vm()` does `tart list 2>/dev/null | … || die "VM 'archive-gui-runner' not found — create it
+  first"`, so in a plain non-interactive shell (no `/opt/homebrew/bin` on PATH) it reports the VM as absent
+  while the VM is present and healthy. **This has now cost three daemon sessions** (W23.m14, W23.m15, W23.l4 —
+  each logged it to Morning Review, one lost a whole lane run), which is why it is a queue item and not a
+  fourth note. **Fix:** resolve `tart` by absolute path (or prepend `/opt/homebrew/bin` inside the script), and
+  split the two failures in the message — "tart not found on PATH" vs "VM not created (ops/gui/README.md §3)".
+  A misleading message here is expensive in a specific way: a session that believes it defers a GUI check to
+  the owner that it could have run itself. Same treatment for any sibling `tart` call in `ops/gui/tart-lib.sh`.
+  | files: ops/gui/vm-gui-runner.sh, ops/gui/tart-lib.sh | XS | low | none
+
 - [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
   three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
   scratch fixture builder and a 13/13 GUI-on baseline; Processor is greenfield **and** carries the Keychain risk).
