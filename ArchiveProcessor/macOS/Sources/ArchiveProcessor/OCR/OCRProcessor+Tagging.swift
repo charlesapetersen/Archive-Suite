@@ -82,7 +82,7 @@ extension OCRProcessor {
     ///
     /// This is the same rule everything else already follows — `TagGenerator` when it builds a fresh
     /// `GeneratedTags`, `applyBoxFolderLabelTags` on a label PDF, `performDocumentMerging` on a merged
-    /// PDF, the review flows on a reclassification. The two **read-append-rewrite** sites
+    /// PDF, and — since W23.m5-fu2 — the review flows on a reclassification. The two **read-append-rewrite** sites
     /// (`applyCapturePriorityTags`, `exportOriginalImages`) had no such source: they re-applied an array
     /// of tag NAMES read back off disk, so `MacOSTagger`'s raw-array colour DETECTION ran over it and a
     /// document whose subject tag is literally "Red" was promoted to Finder label 6 — which the Reader
@@ -116,6 +116,15 @@ extension OCRProcessor {
         case .folderLabel: return "Folder"
         default: return nil            // ordinary document, or not classified → no structure tag
         }
+    }
+
+    /// The classification a page is CURRENTLY tagged for — the value whose words a reclassification is
+    /// entitled to take back. Coalesced for exactly the reason `authoritativeColor(forJob:)` is: every
+    /// writer keeps `job.classification` and `result.classification` in sync, but the strip must not
+    /// read nil off one of them and strand the app's own "Box"/"Red" on a page that is no longer a box.
+    /// Read it BEFORE the site overwrites either field.
+    nonisolated static func taggedClassification(of job: OCRJob) -> DocumentClassification? {
+        job.classification ?? job.result?.classification
     }
 
     /// Rewrite one page's tag array for a classification change.

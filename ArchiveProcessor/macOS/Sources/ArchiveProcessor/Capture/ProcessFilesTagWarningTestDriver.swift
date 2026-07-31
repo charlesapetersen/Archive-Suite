@@ -24,6 +24,9 @@ import ArchiveCore
 ///   7. A read-append-rewrite reproduces the label the FRESH write intended (W23.m5-fu) — the two sites
 ///      that re-apply tags read back off disk take the colour from the page's classification, so a
 ///      subject tag "Red" is never promoted to the box label and a real box/folder never loses one.
+///   8. A RECLASSIFICATION takes back only what the app added (W23.m5-fu2) — all three review-flow
+///      re-tag sites drop the OLD classification's words and no others, so a page whose genuine subject
+///      is "Box"/"Red"/"Folder" keeps it, while a demoted box label really does lose the app's own.
 ///
 /// Writes a PASS/FAIL report to `PROCESSFILES_TAGWARN_TEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -421,6 +424,120 @@ enum ProcessFilesTagWarningTestDriver {
         check("stripping a word the page never carried is a harmless no-op",
               OCRProcessor.reclassifiedTags(["1948"], from: .boxLabel, to: .folderLabel)
               == ["Folder", "1948", "Purple"])
+
+        // 8b. THE WIRING — all THREE real reclassification sites, against real files on disk. A rule
+        // nothing calls is worth nothing, and the sites are the whole point: each one both strips and
+        // re-adds, so each has to be shown keeping the operator's word AND landing the right label.
+        let reclassDir = tmp.appendingPathComponent("reclass", isDirectory: true)
+        try? fm.createDirectory(at: reclassDir, withIntermediateDirectories: true)
+
+        /// One processor holding a single already-tagged job, wired as the tagging phase leaves it.
+        func reclassProcessor(_ base: String, tags: GeneratedTags,
+                              classification: DocumentClassification?) -> (OCRProcessor, URL, URL) {
+            let source = reclassDir.appendingPathComponent("\(base).jpg")
+            let output = reclassDir.appendingPathComponent("\(base).pdf")
+            writeOnePagePDF(output)
+            _ = OCRProcessor.writeOutputTags(tags, to: output, stampUnread: true)
+            let p = OCRProcessor()
+            p.taggingMode = .automatic        // stampsUnread → a real-tagging rewrite, label written
+            var job = OCRJob(sourceURL: source)
+            job.classification = classification
+            job.result = OCRResult(text: "", classification: classification,
+                                   errorMessage: nil, errorCode: nil)
+            job.appliedTags = tags.allTags
+            p.jobs = [job]
+            p.outputURLMap = [source: output]
+            return (p, source, output)
+        }
+
+        // 8b-i. `updateClassification` — the file pane's inline edit. documentStart → continuation adds
+        // and removes nothing, which is the purest form of the defect: the old strip deleted a subject
+        // tag "Box" on a change that had no business touching any tag at all.
+        let (inline, _, inlinePDF) = reclassProcessor(
+            "boxphoto", tags: GeneratedTags(subjectTags: ["Box", "1948"]),
+            classification: .documentStart)
+        inline.updateClassification(at: 0, to: .documentContinuation)
+        check("an inline reclassification KEEPS a subject tag that is merely the word \"Box\"",
+              tagsOf(inlinePDF).contains("Box") && tagsOf(inlinePDF).contains("1948"))
+        check("...and the model agrees with the disk", inline.jobs[0].appliedTags.contains("Box"))
+        check("...and no Finder colour was invented for it", labelOf(inlinePDF) == 0)
+
+        // The other direction — a REAL box label demoted must lose the words the app gave it.
+        let (demote, _, demotePDF) = reclassProcessor(
+            "box12", tags: GeneratedTags(subjectTags: ["Box"], colorTag: "Red"),
+            classification: .boxLabel)
+        demote.updateClassification(at: 0, to: .documentStart)
+        check("demoting a real box label DOES take back the app's own \"Box\" and \"Red\"",
+              !tagsOf(demotePDF).contains("Box") && !tagsOf(demotePDF).contains("Red"))
+        check("...and clears its red Finder label", labelOf(demotePDF) == 0)
+
+        // Promotion onto a page whose SUBJECT collides with the colour word, then straight back again:
+        // the app's copy is the one that comes and goes, the operator's is the one that stays.
+        let (promote, _, promotePDF) = reclassProcessor(
+            "redscare", tags: GeneratedTags(subjectTags: ["Red", "1948"]),
+            classification: .documentStart)
+        promote.updateClassification(at: 0, to: .boxLabel)
+        check("promoting a \"Red Scare\" page to a box label lands the red label and the Box tag",
+              labelOf(promotePDF) == 6 && tagsOf(promotePDF).contains("Box"))
+        check("...carrying BOTH the app's colour word and the operator's subject tag",
+              tagsOf(promotePDF).filter { $0 == "Red" }.count == 2)
+        promote.updateClassification(at: 0, to: .documentStart)
+        check("...and demoting it again leaves exactly the operator's own tags",
+              tagsOf(promotePDF).filter { $0 == "Red" }.count == 1
+              && tagsOf(promotePDF).contains("1948") && !tagsOf(promotePDF).contains("Box"))
+        check("...with the label cleared, not left red", labelOf(promotePDF) == 0)
+
+        // Which classification the strip reads matters as much as what it strips. The OCR pass writes
+        // BOTH `job.classification` and `result.classification`, but a site that set only the result
+        // would leave the strip reading nil — and then a demoted box label would keep the app's own
+        // "Box"/"Red" forever, the very tag-rot this item is about, just in the other direction.
+        let (resultOnly, _, resultOnlyPDF) = reclassProcessor(
+            "box13", tags: GeneratedTags(subjectTags: ["Box"], colorTag: "Red"),
+            classification: .boxLabel)
+        resultOnly.jobs[0].classification = nil          // classification lives only on the OCR result
+        check("a job classified only on its OCR result resolves the same way",
+              OCRProcessor.taggedClassification(of: resultOnly.jobs[0]) == .boxLabel)
+        resultOnly.updateClassification(at: 0, to: .documentStart)
+        check("...so demoting it still takes back the app's own \"Box\" and \"Red\"",
+              !tagsOf(resultOnlyPDF).contains("Box") && !tagsOf(resultOnlyPDF).contains("Red")
+              && labelOf(resultOnlyPDF) == 0)
+
+        // 8b-ii. `applyReviewEdits` — the collection review. A photo OF a folder, promoted to a box label.
+        let (collection, collectionSrc, collectionPDF) = reclassProcessor(
+            "folderphoto", tags: GeneratedTags(subjectTags: ["Folder", "1948"]),
+            classification: .documentStart)
+        collection.collectionReviewItems = [
+            CollectionReviewItem(fileIndex: 0, fileName: collectionSrc.lastPathComponent,
+                                 fileURL: collectionSrc, classification: .boxLabel,
+                                 collectionName: "Box 12", isBoxLabel: true)
+        ]
+        collection.applyReviewEdits(files: [collectionSrc], runConfig: nil)
+        check("the collection review KEEPS a subject tag that is merely the word \"Folder\"",
+              tagsOf(collectionPDF).contains("Folder") && tagsOf(collectionPDF).contains("1948"))
+        check("...while still marking the page a box label, in red",
+              tagsOf(collectionPDF).contains("Box") && labelOf(collectionPDF) == 6)
+        check("...and it really did re-segment the run", collection.collectionSegments.count == 1)
+
+        // 8b-iii. `applyDocumentReviewEdits` — the per-collection document review. This site never
+        // guarded its re-add with `contains`, so it is the one that could double a word; prove it does
+        // not, and that the operator's "Red" is not what the demotion takes.
+        let (docReview, docSrc, docPDF) = reclassProcessor(
+            "redmemo", tags: GeneratedTags(subjectTags: ["Red", "Correspondence"], colorTag: "Purple"),
+            classification: .folderLabel)
+        docReview.jobs[0].appliedTags.insert("Folder", at: 0)   // as the folder-label pass leaves it
+        _ = OCRProcessor.writeOutputTags(docReview.jobs[0].appliedTags, to: docPDF,
+                                         appColor: "Purple", colorIsAuthoritative: true, stampUnread: true)
+        docReview.documentReviewItems = [
+            DocumentReviewItem(fileIndex: 0, fileName: docSrc.lastPathComponent,
+                               fileURL: docSrc, classification: .documentStart)
+        ]
+        docReview.applyDocumentReviewEdits(outputDirectory: reclassDir, runConfig: nil)
+        check("the document review takes back the folder label's own \"Folder\" and \"Purple\"",
+              !tagsOf(docPDF).contains("Folder") && !tagsOf(docPDF).contains("Purple"))
+        check("...without touching the operator's subject tag \"Red\"",
+              tagsOf(docPDF).contains("Red") && tagsOf(docPDF).contains("Correspondence"))
+        check("...and that surviving \"Red\" is NOT promoted back to the box label",
+              labelOf(docPDF) == 0)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

@@ -600,27 +600,55 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   warnings; seven sibling regressions green (merge-safety, collection-organize, recovery, batch-resume,
   multipage-reocr, segment-json, output-file-safety). Processor-internal — nothing in ArchiveCore
   changed, so the all-three-app rebuild rule is N/A; no view code, nothing for the VM lane to see.
-  **Adjacent finding, filed not fixed: W23.m5-fu2** (below) — the reclassification re-tag in
+  **Adjacent finding, filed then fixed the next session: W23.m5-fu2** (below) — the reclassification re-tag in
   `+ReviewFlows` strips the literal words "Red"/"Purple"/"Box"/"Folder" from the tag array, which for a
   document whose SUBJECT is one of those words really does delete it. Different site, different
   mechanism, out of this item's two-site scope.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift, Capture/ProcessFilesTagWarningTestDriver.swift | XS–S | low | W23.m5
 
-- [ ] **W23.m5-fu2 — reclassifying a document DELETES a subject tag that happens to be a structure word
-  [XS · LOW · tag loss].** Found 2026-07-31 while fixing W23.m5-fu (audit of the neighbouring rewrite
-  sites, not a new review). `OCRProcessor+ReviewFlows` re-tags an output whenever the operator changes
-  its classification (two sites: the collection review at ~`:164` and the single-item change at ~`:317`).
-  Both rebuild the array with `existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" ||
+- [x] **W23.m5-fu2 — reclassifying a document DELETES a subject tag that happens to be a structure word
+  [XS · LOW · tag loss].** ✅ DONE this commit (checkpoint `7a0043c` = the rule + its checks). Found
+  2026-07-31 while fixing W23.m5-fu (audit of the neighbouring rewrite sites, not a new review).
+  `OCRProcessor+ReviewFlows` re-tags an output whenever the operator changes its classification, and
+  rebuilt the array with `existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" ||
   $0 == "Folder" }` before appending the new classification's words. The intent is right — drop the OLD
-  structure tags so they can be replaced — but the filter matches on the literal word, so a document
-  whose genuine subject tag is "Red" (Red Scare/Red Cross), "Box" (a ballot box file) or "Folder" loses
-  it from both the file and `jobs[].appliedTags`, and it never comes back. The Finder LABEL is correct
-  here (the colour is classification-derived and appended), so this is tag loss, not misfile — the
-  mirror image of m5-fu. Fix: track which structure tags the app itself added (or strip only the words
-  matching the OLD classification) instead of pattern-matching the vocabulary. Test: extend
-  `scripts/test-processfiles-tagwarn.sh` — reclassify a document tagged `["Red", "1948"]` and assert
-  "Red" survives.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift | XS | low | none
+  structure tags so they can be replaced — but the filter matched on the literal word, so a document
+  whose genuine subject tag is "Red" (Red Scare/Red Cross), "Box" (a ballot box file) or "Folder" lost
+  it from both the file and `jobs[].appliedTags`, and it never came back. Tag loss, not misfile — the
+  mirror image of m5-fu.
+  Two new seams beside `authoritativeColor(for:)`: **`structureTag(for:)`** (box→"Box", folder→"Folder",
+  else nil — the companion of the colour, so between them they are the complete set a classification
+  contributes and therefore the complete set a *re*-classification may take back) and
+  **`reclassifiedTags(_:from:to:)`** — remove ONE occurrence of each word the app added for the OLD
+  classification, then add exactly one of each for the NEW one in the fresh `GeneratedTags` shape
+  (subject word first, colour last). One app copy in, one app copy out, so box → folder → box neither
+  piles up duplicates nor eats the operator's own tag.
+  **Three things the item did not say, each checked rather than assumed:** (1) **there are THREE sites,
+  not two** — `applyReviewEdits`, `updateClassification` and `applyDocumentReviewEdits`, the last of
+  which also re-added unguarded, so it could double a word. (2) **The strip fix alone would have
+  re-introduced W23.m5-fu's misfile.** All three called `tagOutput` with the DEFAULT
+  `colorIsAuthoritative: false`, so `MacOSTagger`'s raw-array detection ran over the array; the item's
+  claim that "the Finder LABEL is correct here" held *only because* the strip deleted the operator's
+  "Red" first. The moment a subject "Red" survives, detection promotes it back to Finder label 6 — which
+  the Reader reads as a box photo. So both halves ship together, exactly as in m5-fu: every site now also
+  passes `appColor: authoritativeColor(for: newClassification), colorIsAuthoritative: true`. (3) **which
+  field the strip reads matters** — all three read `jobs[].classification` alone, so a page carrying its
+  classification only on `result` would have had nothing stripped and kept the app's own "Box"/"Red"
+  forever (the same tag rot, other direction). New `taggedClassification(of:)` coalesces both fields, as
+  `authoritativeColor(forJob:)` already did.
+  **Tier-2, scratch only** (synthetic files in a temp dir; no corpus, no OCR, no network, no GUI, $0):
+  27 new checks in `ProcessFilesTagWarningTestDriver` (§8a the rule, §8b all three REAL production
+  functions against real files on disk), **74 total ALL PASS**. **Non-vacuous by three neuters, each
+  reddening exactly the predicted set and nothing else**: the literal-word `removeAll` restored → 10 RED
+  (this is also the premise re-confirmation, being the pre-fix code); `colorIsAuthoritative: false` →
+  3 RED, proving the colour half is load-bearing; `taggedClassification` de-coalesced → 2 RED.
+  `grep NEUTER` clean before shipping. Build clean, 0 new warnings; six sibling regressions green
+  (merge-safety, collection-organize, recovery, batch-resume, multipage-reocr, output-file-safety).
+  Processor-internal — nothing in ArchiveCore changed, so the all-three-app rebuild rule is N/A; no view
+  code, nothing for the VM lane to see. `applyReviewEdits` / `applyDocumentReviewEdits` went from
+  `private` to internal so the headless driver can exercise the real sites; the UI still reaches them
+  only through `confirmCollectionReview` / `confirmDocumentReview`.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift, OCR/OCRProcessor+Tagging.swift, Capture/ProcessFilesTagWarningTestDriver.swift | XS | low | none
 
 - [x] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
   [S–M · MED · broken citations · SHARED CORE].** ✅ DONE `fa8bc02` (ArchiveCore) + `1e0af47` (Reader) + this

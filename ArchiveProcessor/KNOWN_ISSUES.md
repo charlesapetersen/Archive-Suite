@@ -43,7 +43,7 @@ Four decisions worth keeping:
   placeholder inside the merged PDF — the page an operator would actually re-shoot.
 
 **Guard:** `scripts/test-processfiles-tagwarn.sh` (`ProcessFilesTagWarningTestDriver`,
-`PROCESSFILES_TAGWARN_TEST=1`) — 47 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
+`PROCESSFILES_TAGWARN_TEST=1`) — 74 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
 `chflags uchg` makes the tagger genuinely fail; a real production site (`applyBoxFolderLabelTags`) proves
 the WIRING and that fixing the permission clears the warning; merge, the summary copy and the h5-fu
 placeholder path are all driven end to end. Proven non-vacuous by six neuters, each turning exactly the
@@ -60,7 +60,25 @@ job.result?.classification`, since a failed re-OCR can blank the result's copy).
 so a rewrite reproduces the label the FRESH write intended. Note the fix is **not** simply
 `colorIsAuthoritative: true`: with no colour to pass, that strips the label off every genuine box/folder
 PDF — a dedicated neuter holds that line. Copy-source mode was never affected (verbatim names, label
-untouched). 12 of the 47 guard checks cover this, driving both real production functions.
+untouched). 12 of the guard checks cover this, driving both real production functions.
+
+**The reclassification half — also FIXED now (W23.m5-fu2, 2026-07-31, `7a0043c` + the trackers commit).**
+The sentence above says the review flows "already follow" the classification rule. They did — but only by
+*appending* "Red"/"Purple" to the array and letting detection find it, and they cleared the way first with
+`removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }`. Matching the literal word
+is what made the label look right: a document whose genuine **subject** is one of those words lost it from
+the file and from `jobs[].appliedTags` the moment anyone reclassified the page, and it never came back —
+tag LOSS, the mirror image of the misfile above. All **three** sites (`applyReviewEdits`,
+`updateClassification`, `applyDocumentReviewEdits`) now go through `OCRProcessor.reclassifiedTags(_:from:to:)`,
+which takes back exactly one occurrence of each word the app added for the OLD classification
+(`structureTag(for:)` + `authoritativeColor(for:)`) and adds one of each for the new one, in the fresh
+`GeneratedTags` shape. The two halves are ONE fix: once a subject "Red" can survive the strip, raw-array
+detection would promote it straight back to the box label, so every site now also passes
+`colorIsAuthoritative: true` with the classification's colour. The OLD classification is read through
+`taggedClassification(of:)`, which coalesces `job.classification ?? job.result?.classification` — reading
+one field alone would strand the app's own "Box"/"Red" on a page that is no longer a box. Copy-source mode
+keeps its verbatim pass-through and untouched label. 27 of the guard checks cover this, §8b driving all
+three real production functions against real files on disk; three dedicated neuters hold each half.
 
 ---
 

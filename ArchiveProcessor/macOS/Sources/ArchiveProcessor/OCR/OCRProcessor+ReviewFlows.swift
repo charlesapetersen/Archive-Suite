@@ -137,7 +137,9 @@ extension OCRProcessor {
     /// Apply user edits from review items back into collectionSegments.
     /// Rebuilds segmentation from scratch using the confirmed box/folder identifications.
     /// Also updates macOS Finder tags to reflect reclassifications.
-    private func applyReviewEdits(files: [URL], runConfig: SessionProcessingConfig?) {
+    /// Internal rather than private so `ProcessFilesTagWarningTestDriver` can drive the real
+    /// reclassification re-tag headlessly; the UI reaches it only through `confirmCollectionReview`.
+    func applyReviewEdits(files: [URL], runConfig: SessionProcessingConfig?) {
         let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
         // Build a lookup from file index to the reviewed item
         var reviewByIndex: [Int: CollectionReviewItem] = [:]
@@ -148,7 +150,7 @@ extension OCRProcessor {
         // Update job classifications and re-tag files whose classification changed
         for item in collectionReviewItems {
             if item.fileIndex < jobs.count {
-                let oldClassification = jobs[item.fileIndex].classification
+                let oldClassification = Self.taggedClassification(of: jobs[item.fileIndex])
                 let newClassification = item.classification
                 jobs[item.fileIndex].classification = newClassification
                 if let existingResult = jobs[item.fileIndex].result {
@@ -158,29 +160,19 @@ extension OCRProcessor {
                     )
                 }
 
-                // Re-tag the output file if classification changed
+                // Re-tag the output file if classification changed. W23.m5-fu2: take back only the words
+                // the app added for the OLD classification, so a genuine subject tag "Box"/"Red" is not
+                // deleted along with them — and, because a subject word can now SURVIVE the strip, the
+                // colour has to be authoritative (W23.m5-fu) or raw-array detection would promote that
+                // surviving "Red" straight back to the box label. One fix, two halves.
                 if oldClassification != newClassification,
                    let outputURL = outputURLMap[item.fileURL] {
-                    let colorTag: String? = {
-                        switch newClassification {
-                        case .boxLabel: return "Red"
-                        case .folderLabel: return "Purple"
-                        default: return nil
-                        }
-                    }()
-                    // Build updated tags: keep existing non-color tags, replace color
-                    var existingTags = jobs[item.fileIndex].appliedTags
-                    existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }
-                    if let color = colorTag {
-                        existingTags.append(color)
-                    }
-                    if newClassification == .boxLabel {
-                        if !existingTags.contains("Box") { existingTags.insert("Box", at: 0) }
-                    } else if newClassification == .folderLabel {
-                        if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
-                    }
-                    tagOutput(existingTags, at: outputURL, source: item.fileURL, stampUnread: stampUnread)
-                    jobs[item.fileIndex].appliedTags = existingTags
+                    let updatedTags = Self.reclassifiedTags(jobs[item.fileIndex].appliedTags,
+                                                            from: oldClassification, to: newClassification)
+                    tagOutput(updatedTags, at: outputURL, source: item.fileURL,
+                              appColor: Self.authoritativeColor(for: newClassification),
+                              colorIsAuthoritative: true, stampUnread: stampUnread)
+                    jobs[item.fileIndex].appliedTags = updatedTags
                 }
             }
         }
@@ -303,7 +295,7 @@ extension OCRProcessor {
         runConfig: SessionProcessingConfig? = nil
     ) {
         guard index < jobs.count else { return }
-        let oldClassification = jobs[index].classification
+        let oldClassification = Self.taggedClassification(of: jobs[index])
         jobs[index].classification = newClassification
         if let existingResult = jobs[index].result {
             jobs[index].result = existingResult.with(
@@ -311,27 +303,16 @@ extension OCRProcessor {
                 rotationDegrees: existingResult.rotationDegrees
             )
         }
-        // Update tags on the output file
+        // Update tags on the output file (W23.m5-fu2 — see `applyReviewEdits`).
         if oldClassification != newClassification,
            let outputURL = outputURLMap[jobs[index].sourceURL] {
-            let colorTag: String? = {
-                switch newClassification {
-                case .boxLabel: return "Red"
-                case .folderLabel: return "Purple"
-                default: return nil
-                }
-            }()
-            var existingTags = jobs[index].appliedTags
-            existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }
-            if let color = colorTag { existingTags.append(color) }
-            if newClassification == .boxLabel {
-                if !existingTags.contains("Box") { existingTags.insert("Box", at: 0) }
-            } else if newClassification == .folderLabel {
-                if !existingTags.contains("Folder") { existingTags.insert("Folder", at: 0) }
-            }
-            tagOutput(existingTags, at: outputURL, source: jobs[index].sourceURL,
+            let updatedTags = Self.reclassifiedTags(jobs[index].appliedTags,
+                                                    from: oldClassification, to: newClassification)
+            tagOutput(updatedTags, at: outputURL, source: jobs[index].sourceURL,
+                      appColor: Self.authoritativeColor(for: newClassification),
+                      colorIsAuthoritative: true,
                       stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
-            jobs[index].appliedTags = existingTags
+            jobs[index].appliedTags = updatedTags
         }
     }
     /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
@@ -579,8 +560,10 @@ extension OCRProcessor {
     }
     /// Apply document segmentation review edits: update job classifications, re-tag, and rebuild collection segments if needed.
     /// Returns true if any files were reclassified as box or folder (requiring collection re-segmentation).
+    /// Internal rather than private for the same reason as `applyReviewEdits` — the headless driver
+    /// exercises this site directly; the UI reaches it only through `confirmDocumentReview`.
     @discardableResult
-    private func applyDocumentReviewEdits(
+    func applyDocumentReviewEdits(
         outputDirectory: URL,
         runConfig: SessionProcessingConfig?
     ) -> Bool {
@@ -588,7 +571,7 @@ extension OCRProcessor {
 
         for item in documentReviewItems {
             guard item.fileIndex < jobs.count else { continue }
-            let oldClassification = jobs[item.fileIndex].classification
+            let oldClassification = Self.taggedClassification(of: jobs[item.fileIndex])
             let newClassification = item.classification
 
             jobs[item.fileIndex].classification = newClassification
@@ -599,25 +582,16 @@ extension OCRProcessor {
                 )
             }
 
+            // W23.m5-fu2 — see `applyReviewEdits`. Same rule, same authoritative colour.
             if oldClassification != newClassification,
                let outputURL = outputURLMap[item.fileURL] {
-                var existingTags = jobs[item.fileIndex].appliedTags
-                // Remove old color/subject tags
-                existingTags.removeAll { $0 == "Red" || $0 == "Purple" || $0 == "Box" || $0 == "Folder" }
-                // Apply new tags based on classification
-                switch newClassification {
-                case .boxLabel:
-                    existingTags.append("Red")
-                    existingTags.insert("Box", at: 0)
-                case .folderLabel:
-                    existingTags.append("Purple")
-                    existingTags.insert("Folder", at: 0)
-                default:
-                    break
-                }
-                tagOutput(existingTags, at: outputURL, source: jobs[item.fileIndex].sourceURL,
+                let updatedTags = Self.reclassifiedTags(jobs[item.fileIndex].appliedTags,
+                                                        from: oldClassification, to: newClassification)
+                tagOutput(updatedTags, at: outputURL, source: jobs[item.fileIndex].sourceURL,
+                          appColor: Self.authoritativeColor(for: newClassification),
+                          colorIsAuthoritative: true,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
-                jobs[item.fileIndex].appliedTags = existingTags
+                jobs[item.fileIndex].appliedTags = updatedTags
             }
 
             // Track if any file was reclassified to/from box/folder
