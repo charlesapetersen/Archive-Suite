@@ -12,6 +12,9 @@ import AppKit
 ///   4. Corrupt (non-JSON) bytes decode to nil (ignored, not misapplied).
 ///   5. The LAN receiver authenticates and admits a bounded request head before body buffering, rejects
 ///      ambiguous HTTP framing, and enforces route-specific plus aggregate memory limits.
+///   6. (W23.m7) The Mac tag card's Save/Skip is durable before anything acts on it: a failed manifest
+///      write refuses the decision, rolls memory back, keeps the card up and tells the operator — and live
+///      processing is notified only once the decision is already readable on disk.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_MANIFESTTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -327,6 +330,112 @@ enum ManifestPersistenceTestDriver {
               && restoredSession.completedDocGroups.isSuperset(of: ["gSession", "gLate"])
               && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
               && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+
+        // --- W23.m7: the Mac tag card's Apply/Skip decision is durable BEFORE anything acts on it.
+        // Same synthetic temp session (no corpus, no OCR, no network, no GUI). Two halves are proven:
+        // (a) a failed manifest write refuses the decision, rolls memory back and leaves the card up with
+        //     a message, so the operator can retry instead of losing a decision the app already acted on;
+        // (b) live processing is told the segment resolved only AFTER the bytes are on disk — asserted by
+        //     reading the real manifest file from inside the notification itself, not by inspection.
+        let manifestFile = session.incomingFolder.appendingPathComponent("manifest.json")
+        // Clear the cards B10 left pending so exactly one card is up per case below.
+        var leftoverResolvesDurable = true
+        while let pending = session.pendingTagGroup, pending.id != "gCard" {
+            if !session.skipMacTags(groupId: pending.id) { leftoverResolvesDurable = false; break }
+        }
+        check("W23.m7: B10's leftover cards resolve durably (test precondition)",
+              leftoverResolvesDurable && session.pendingTagGroup == nil)
+
+        var notified: [String] = []
+        var durableOnDiskWhenNotified: [String: Bool] = [:]
+        session.resolvedNotifyHookForTest = { groupId in
+            notified.append(groupId)
+            let onDisk = (try? Data(contentsOf: manifestFile)).flatMap { CaptureSession.decodeManifest($0) }
+            let durableNow = onDisk?.resolved.contains(groupId) == true
+            // AND, not overwrite: one premature notification must stay visible even if a later retry
+            // notifies again from a durable state.
+            durableOnDiskWhenNotified[groupId] = (durableOnDiskWhenNotified[groupId] ?? true) && durableNow
+        }
+
+        let cardPhoto = session.ingest(jpeg: Data("synthetic card page".utf8), groupId: "gCard", seq: 102,
+                                       type: .document, priority: nil, year: nil, month: nil,
+                                       deviceName: "ManifestTest")
+        check("W23.m7: a page for the tag-card group ingests", cardPhoto != nil)
+        check("W23.m7: its segment completes and surfaces exactly one card",
+              session.markSegmentComplete(groupId: "gCard", priority: nil, year: nil, month: nil)
+              && session.pendingTagGroup?.id == "gCard")
+
+        // (a) Save against a failing write: refused, rolled back, card kept, operator told, nothing acted on.
+        var saveOfferedDecisionToDisk = false
+        session.manifestWriteOverride = { data, _ in
+            let offered = CaptureSession.decodeManifest(data)
+            saveOfferedDecisionToDisk = offered?.resolved.contains("gCard") == true
+                && offered?.macTags["gCard"]?.subjects == ["oral history"]
+                && offered?.macTags["gCard"]?.year == 1971
+            return false
+        }
+        session.statusMessage = "Listening"
+        let refusedSave = session.applyMacTags(groupId: "gCard", subjects: ["oral history"],
+                                               priority: "P8", year: 1971, month: 4)
+        check("W23.m7: a failed manifest write refuses the Save instead of reporting success", !refusedSave)
+        check("W23.m7: the refused Save had already staged the decision into the bytes offered to disk",
+              saveOfferedDecisionToDisk)
+        check("W23.m7: a refused Save rolls the resolve AND the Mac tags back",
+              !session.resolvedGroupIds.contains("gCard") && session.macTags["gCard"] == nil)
+        check("W23.m7: a refused Save leaves the card up (the operator can retry, nothing typed is lost)",
+              session.pendingTagGroup?.id == "gCard")
+        check("W23.m7: a refused Save never tells live processing the segment resolved", notified.isEmpty)
+        check("W23.m7: a refused Save is announced to the operator",
+              session.statusMessage == CaptureSession.tagDecisionNotDurableMessage)
+        let afterRefusedSave = CaptureSession()
+        check("W23.m7: after a refused Save a relaunch agrees with memory — card unresolved, no phantom tags",
+              afterRefusedSave.pendingTagGroup?.id == "gCard"
+              && !afterRefusedSave.resolvedGroupIds.contains("gCard")
+              && afterRefusedSave.macTags["gCard"] == nil)
+
+        // (b) Retry with the real writer: resolved, told once, and the disk already agreed at that moment.
+        session.manifestWriteOverride = nil
+        let retriedSave = session.applyMacTags(groupId: "gCard", subjects: ["oral history"],
+                                               priority: "P8", year: 1971, month: 4)
+        check("W23.m7: the retry resolves the card once the write succeeds",
+              retriedSave && session.pendingTagGroup == nil
+              && session.macTags["gCard"]?.subjects == ["oral history"])
+        check("W23.m7: live processing is told exactly once, and only for the durable decision",
+              notified == ["gCard"])
+        check("W23.m7: at the moment live processing was told, the decision was ALREADY on disk",
+              durableOnDiskWhenNotified["gCard"] == true)
+
+        // Skip is a decision too: same contract (a relaunch must not re-ask for an already-produced segment).
+        let skipPhoto = session.ingest(jpeg: Data("synthetic skip page".utf8), groupId: "gSkip", seq: 103,
+                                       type: .document, priority: nil, year: nil, month: nil,
+                                       deviceName: "ManifestTest")
+        check("W23.m7: a page for the skip-card group ingests + completes",
+              skipPhoto != nil
+              && session.markSegmentComplete(groupId: "gSkip", priority: nil, year: nil, month: nil)
+              && session.pendingTagGroup?.id == "gSkip")
+        session.manifestWriteOverride = { _, _ in false }
+        session.statusMessage = "Listening"
+        let refusedSkip = session.skipMacTags(groupId: "gSkip")
+        check("W23.m7: a failed manifest write refuses the Skip too", !refusedSkip)
+        check("W23.m7: a refused Skip rolls back, keeps the card, tells the operator, acts on nothing",
+              !session.resolvedGroupIds.contains("gSkip")
+              && session.pendingTagGroup?.id == "gSkip"
+              && session.statusMessage == CaptureSession.tagDecisionNotDurableMessage
+              && notified == ["gCard"])
+        session.manifestWriteOverride = nil
+        let retriedSkip = session.skipMacTags(groupId: "gSkip")
+        check("W23.m7: the Skip retry resolves the card and is told only after the write",
+              retriedSkip && session.pendingTagGroup == nil
+              && notified == ["gCard", "gSkip"]
+              && durableOnDiskWhenNotified["gSkip"] == true)
+        session.resolvedNotifyHookForTest = nil
+        let afterDurableDecisions = CaptureSession()
+        check("W23.m7: both durable decisions survive a fresh session restore (no card re-asked)",
+              afterDurableDecisions.pendingTagGroup == nil
+              && afterDurableDecisions.resolvedGroupIds.isSuperset(of: ["gCard", "gSkip"])
+              && afterDurableDecisions.macTags["gCard"]?.year == 1971
+              && afterDurableDecisions.macTags["gCard"]?.priority == "P8"
+              && afterDurableDecisions.macTags["gSkip"] == nil)
 
         // --- B17: LAN request admission happens from a bounded head before body accumulation. ---
         let serverToken = "test-token"
