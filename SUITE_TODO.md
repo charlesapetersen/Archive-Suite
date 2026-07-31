@@ -743,14 +743,23 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   the store observes an external change.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/InlineImageAttachment.swift | Tier-1 | XS | LOW
 
-- [ ] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note
-  disappears].** `Core/NotesModel.swift` → `trashItems`. It **logs** each `NoteStore.delete` failure but then
-  deletes **every requested ID** from `NotesIndex` and reloads the list. A note whose directory is still on
-  disk therefore vanishes from **All Notes for the rest of the run** — there is no watcher to restore it, and
-  the full disk rebuild runs only at bootstrap. This **contradicts the method's own stated safety invariant**
+- [x] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note
+  disappears].** `Core/NotesModel.swift` → `trashItems`. It **logged** each `NoteStore.delete` failure but then
+  deleted **every requested ID** from `NotesIndex` and reloaded the list. A note whose directory is still on
+  disk therefore vanished from **All Notes for the rest of the run** — there is no watcher to restore it, and
+  the full disk rebuild runs only at bootstrap. This **contradicted the method's own stated safety invariant**
   that a trash failure leaves the note on disk *and discoverable* under All Notes.
-  **Fix:** only remove IDs whose delete actually succeeded; surface the failures. Add a test that a failed
-  delete leaves the note in All Notes.
+  ✅ **DONE 2026-07-30** (checkpoint `8e15b59` fix + tests/docs in the completing commit): a row is dropped
+  only once its note is **provably absent**, decided by asking the disk (new read-only `NoteStore.itemExists`)
+  rather than by classifying the error — because `delete` *also* throws when the directory was already gone
+  (`StoreError.notFound`), where keeping the row would strand a phantom note that opens on nothing. A refused
+  note keeps its row (still under All Notes, 0 memberships) and the sidebar status line says where it is;
+  `trashItems` returns the survivors. Same seam, opposite direction: a failing `NotesIndex.deleteItems` is no
+  longer swallowed by a bare `try?`. 9 new scratch tests (`NotesTrashFailureTests`) over a real
+  store+index+indexer, with a **per-item** `UF_IMMUTABLE` refusal so one note in a batch fails while its
+  sibling trashes normally; both real callers covered; non-vacuity measured by 3 neuters (pre-fix → the 4
+  finding tests RED; over-correct → only the already-absent guard RED; `try?` → only the index-write test RED).
+  598/598 Notes green, 0 new warnings.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift | S | med | none
 
 - [ ] **W23.m13 — several multi-step Notes organization operations leave partial state after a failure

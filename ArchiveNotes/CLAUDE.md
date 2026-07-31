@@ -116,7 +116,9 @@ macOS/Sources/ArchiveNotes/
                                    route the extract through openItem for select+raise (W14.4 b/c);
                                    search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
-                                   (fresh read), trashItems (recoverable Trash), deleteFolderDeletingStranded
+                                   (fresh read), trashItems (recoverable Trash; drops an index row only once
+                                   NoteStore.itemExists says the note is gone, returns the survivors — W23.m12),
+                                   deleteFolderDeletingStranded
                                    (batched), titles(for:) (W6-S5); templates — @Published templates +
                                    reloadTemplates, assignTemplate/effectiveTemplate (resolver + lazy
                                    dangling-cleanup)/templates(matching:), create/duplicate/rename/delete

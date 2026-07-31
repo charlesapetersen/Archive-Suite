@@ -3,6 +3,47 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m12) — a note the disk refused to trash disappeared from All Notes anyway
+
+**2026-07-30.** `NotesModel.trashItems` logged each `NoteStore.delete` failure and then deleted **every
+requested id** from `NotesIndex`. All Notes is served *from that index* (`reloadItems` →
+`NotesIndex.allSummaries`), nothing watches the store, and the full disk rebuild only runs at bootstrap —
+so a note the disk refused to trash (locked entry, read-only or full volume, a permission change under a
+synced store root) **vanished from the note list for the rest of the run** while sitting safe on disk, with
+no way to find it again. That contradicted the invariant both call sites state in their own comments
+("membership first, file second — a trash failure leaves a recoverable, still-findable note").
+
+**The fix:** a row is dropped only once its note is **provably absent**, and the decision is made by asking
+the disk (`NoteStore.itemExists`) rather than by classifying the error. That distinction matters in both
+directions:
+
+- the disk **refused** → the directory is still there → keep the row, so the note stays under All Notes
+  (0 memberships), and put a message on the sidebar status line naming where it still is;
+- the directory was **already gone** → `delete` throws `StoreError.notFound` too (the other window got
+  there first, or the operator emptied it by hand) → the row must still go, or All Notes keeps offering a
+  phantom note that opens on nothing.
+
+`trashItems` now returns the surviving ids, so a caller can react. Same seam, opposite direction: a failing
+`NotesIndex.deleteItems` is no longer swallowed by a bare `try?` either — files that went to the Trash while
+their rows outlived them are reported ("it will catch up on the next launch") instead of presented as a
+clean delete.
+
+**Status-line precedence** (deliberate, documented at the symbol): the survivor message is set last inside
+`trashItems`, so neither `reloadItems` nor `rebuild` can outrun it, but `adoptMirrorFailure()` still wins in
+the folder-delete path — the W23.m10 rule that a real degradation outranks a path's own text. Both are
+logged, and either way the note stays listed.
+
+**Verified** (scratch fixtures only — a `temporaryDirectory` store with its index in a sibling directory;
+never the real notes store): **9 tests**, `NotesTrashFailureTests`, driving the real `NoteStore` +
+`NotesIndex` + `NotesIndexer` and indexing from disk the way `bootstrap()` does. The refusal is real, not
+mocked: the item directory is flagged `UF_IMMUTABLE` (`FileAttributeKey.immutable`), which is **per item**,
+so one note in a batch is refused while its sibling trashes normally — exactly the mixed case the old code
+got backwards. Coverage runs through both real callers (`deleteFolderDeletingStranded` and
+`NotesNavigationModel.confirmDeletion`). Non-vacuity measured with three neuters: restoring the pre-fix
+"drop every requested row" reddens exactly the 4 finding tests (11 assertions); keeping the row on *any*
+error reddens only the already-absent guard; restoring the `try?` reddens only the index-write test. 598/598
+`ArchiveNotesTests` green, no new warnings.
+
 ## ✅ FIXED (W23.m11) — the inline-image cache showed one note's image inside another note
 
 **2026-07-30.** `InlineImageAttachment.thumbnailCache` is `static`, i.e. **one cache for the whole app**,
