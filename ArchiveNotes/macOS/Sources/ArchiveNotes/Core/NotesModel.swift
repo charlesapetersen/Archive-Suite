@@ -724,6 +724,7 @@ final class NotesModel: ObservableObject {
 
     /// Rename a folder. Whitespace-trimmed; empty rejected; deduped against siblings (excluding self).
     func renameFolder(_ id: UUID, to rawName: String) async {
+        guard !refuseSystemFolder(id) else { return }
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { statusMessage = "A folder needs a name."; return }
         let parent = organization.folders.first { $0.id == id }?.parentId
@@ -752,6 +753,7 @@ final class NotesModel: ObservableObject {
     /// confirmation UI is W6-S5 (delete path, Tier-2). Returns the orphaned item ids for the caller.
     @discardableResult
     func deleteFolder(_ id: UUID) async -> [UUID] {
+        guard !refuseSystemFolder(id) else { return [] }
         do {
             let orphaned = try await organization.deleteFolder(id)
             if selectedFolderId == id { setAllNotesScope() }
@@ -789,6 +791,10 @@ final class NotesModel: ObservableObject {
     /// a trash fails the note is still on disk *and* discoverable under All Notes (0 memberships),
     /// never silently lost. Subfolders are reparented (never deleted) by `deleteFolder`.
     func deleteFolderDeletingStranded(_ folderId: UUID, stranded: [UUID]) async {
+        // Before anything is trashed. The store refuses a system folder anyway, but its throw would
+        // arrive after the caller had already shown a modal naming the notes it was about to delete —
+        // and this method's whole job is to delete notes, so the refusal has to come first (W23.m15).
+        guard !refuseSystemFolder(folderId) else { return }
         let orphaned: [UUID]
         do {
             orphaned = try await organization.deleteFolder(folderId)   // removes memberships, reparents children
@@ -909,6 +915,16 @@ final class NotesModel: ObservableObject {
     }
 
     // MARK: Private
+
+    /// `true` (having set the explanation) when `id` is a system folder and the caller must stop
+    /// (W23.m15). The sidebar disables Rename/Delete on those rows, so this is the second of three
+    /// layers — the third is `OrganizationStore`'s own throw — but it is the one that produces a
+    /// sentence the user can read, since `report` would only say "Couldn't delete the folder."
+    private func refuseSystemFolder(_ id: UUID) -> Bool {
+        guard let name = OrganizationStore.systemFolderName(id) else { return false }
+        statusMessage = "“\(name)” is a built-in folder — it can't be renamed or deleted."
+        return true
+    }
 
     private func report(_ error: Error, _ action: String) {
         statusMessage = "Couldn't \(action)."

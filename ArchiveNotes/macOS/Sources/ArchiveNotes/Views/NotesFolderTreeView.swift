@@ -160,9 +160,16 @@ struct NotesFolderTreeView: View {
         .help(name)
     }
 
+    /// The per-folder context menu. Rename and Delete are **disabled** on the fixed-ID system folders
+    /// (Inbox / Extracts, §16.6) rather than hidden — greyed-out says "not allowed here", a missing
+    /// item reads as a broken menu (W23.m15). Deleting one used to be permanent: nothing recreated it
+    /// while the app kept filing new notes and extracts under its id. Subfolders and templates stay
+    /// available; neither destroys the folder.
     @ViewBuilder private func folderMenu(_ node: NotesFolderNode) -> some View {
+        let isSystem = OrganizationStore.isSystemFolder(node.id)
         Button("New Subfolder…") { beginNewFolder(parent: node.id) }
         Button("Rename…") { renameText = node.name; renameID = node.id }
+            .disabled(isSystem)
         Divider()
         templateAssignmentMenu(node)
         Divider()
@@ -171,6 +178,7 @@ struct NotesFolderTreeView: View {
             deleteStranded = model.strandedByDeletingFolder(node.id)   // fresh read at click time (§5)
             deleteID = node.id
         }
+        .disabled(isSystem)
     }
 
     /// "Template ▸ (None / …each template… / Manage…)" — sets THIS folder's direct assignment (§16.4:

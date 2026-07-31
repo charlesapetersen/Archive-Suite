@@ -49,6 +49,29 @@ enum ConfirmedRemoveResult: Sendable {
     case notPresent
 }
 
+/// A refusal from `OrganizationStore` — a mutation the graph will not perform, as opposed to a
+/// storage failure (W23.m15).
+///
+/// Both cases are **backstops**, not the primary UX: the sidebar disables Rename/Delete on a system
+/// folder, and every replicate/move target comes from the rendered tree. They exist so a future caller
+/// that skips those checks gets a refusal instead of silently destroying a system folder or minting a
+/// membership to a folder that does not exist.
+enum OrganizationError: Error, LocalizedError, Equatable {
+    /// A rename/delete aimed at one of the three fixed-ID system folders (§16.6).
+    case systemFolderImmutable(name: String)
+    /// A membership aimed at a folder id that is not in the graph — the ghost-membership defect.
+    case unknownFolder(UUID)
+
+    var errorDescription: String? {
+        switch self {
+        case .systemFolderImmutable(let name):
+            return "“\(name)” is a built-in folder — it can't be renamed or deleted."
+        case .unknownFolder(let id):
+            return "That folder no longer exists (\(id.uuidString))."
+        }
+    }
+}
+
 /// Why `organization.json` — the durable mirror (§4/§11) — does not currently reflect committed
 /// organization state (W23.m10). `nil` means it does.
 enum OrganizationMirrorFailure: Sendable, Equatable {
@@ -81,6 +104,32 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     static let allNotesFolderId  = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let inboxFolderId     = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let extractsFolderId  = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+
+    /// The canonical shape of every system folder — **one** definition, used both to seed a fresh
+    /// store and to restore a system folder that went missing (W23.m15). Order is the sidebar order.
+    ///
+    /// Restoration is by **ID**, and only when the id is absent: a system folder the user renamed
+    /// keeps its name, because "missing" and "not called Inbox any more" are different questions.
+    static let systemFolderSeeds: [VFolder] = [
+        VFolder(id: allNotesFolderId, name: "All Notes", parentId: nil,
+                sortOrder: 0, kind: .smart, queryJSON: nil),
+        VFolder(id: inboxFolderId, name: "Inbox", parentId: nil,
+                sortOrder: 1, kind: .normal, queryJSON: nil),
+        VFolder(id: extractsFolderId, name: "Extracts", parentId: nil,
+                sortOrder: 2, kind: .normal, queryJSON: nil),
+    ]
+
+    /// Whether `id` is one of the three fixed-ID system folders (§16.6) — the ids the app itself files
+    /// into (`newItem` → Inbox, `createExtract` → Extracts) and that the sidebar always shows.
+    static func isSystemFolder(_ id: UUID) -> Bool {
+        systemFolderSeeds.contains { $0.id == id }
+    }
+
+    /// The **canonical** name of a system folder id (not the user's possibly-renamed one) — for the
+    /// refusal message. `nil` for a user folder.
+    static func systemFolderName(_ id: UUID) -> String? {
+        systemFolderSeeds.first { $0.id == id }?.name
+    }
 
     @Published private(set) var folders: [VFolder] = []
     @Published private(set) var memberships: [Membership] = []
@@ -121,25 +170,57 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// Load the organizational graph from the DB; if the DB has no folders
     /// but `organization.json` exists, rebuild the DB from the JSON (§4).
     /// Seeds system folders if neither source has data.
+    ///
+    /// **Every path ends with all three system folders present (W23.m15).** They used to be seeded only
+    /// when the whole folder table was empty, so a store that had *any* other folder came up without a
+    /// deleted Inbox or Extracts — permanently, since nothing else ever recreated them while the app
+    /// kept filing new notes and extracts under their fixed ids. Restoration is by id, so it is a no-op
+    /// for a healthy store and cannot clobber a rename.
     func load(storeRoot: URL) async throws {
         self.storeRoot = storeRoot
 
         let dbFolders = await index.allFolders()
         if dbFolders.isEmpty {
             if let file = OrganizationFile.load(from: storeRoot) {
-                folders = file.folders
-                memberships = file.memberships
-                assignments = file.assignments
+                let restored = missingSystemFolders(in: file.folders)
+                folders = file.folders + restored
+                // Drop graph edges that point at a folder the mirror does not define. Such an edge is
+                // already invisible — no row can render it and no restore can revive it — and with the
+                // memberships FK in place it would fail the import outright, turning a tidy-up into a
+                // store that will not open. The system folders are restored FIRST (above), so the
+                // common case — edges left behind by a deleted Inbox/Extracts — is *revived*, not lost.
+                let live = Set(folders.map(\.id))
+                memberships = file.memberships.filter { live.contains($0.folderId) }
+                assignments = file.assignments.filter { live.contains($0.folderId) }
+                let dropped = (file.memberships.count - memberships.count)
+                            + (file.assignments.count - assignments.count)
+                if dropped > 0 {
+                    NSLog("OrganizationStore: dropped \(dropped) organization.json edge(s) with no folder")
+                }
                 try await index.replaceOrganization(
                     folders: folders, memberships: memberships, assignments: assignments)
+                // Only when the import ADDED something (a restored system folder). A dropped edge
+                // leaves the mirror alone on purpose: the DB is the live truth from here, the next
+                // mutation re-exports the whole graph anyway, and a read path should not be the thing
+                // that rewrites the user's durable file.
+                if !restored.isEmpty { exportOrganization() }
             } else {
-                seedSystemFolders()
+                folders = Self.systemFolderSeeds
                 for f in folders { try await index.insertFolder(f) }
             }
         } else {
             folders = dbFolders
             memberships = await index.allMemberships()
             assignments = await index.allTemplateAssignments()
+
+            let restored = missingSystemFolders(in: dbFolders)
+            if !restored.isEmpty {
+                for f in restored { try await index.insertFolder(f) }
+                folders.append(contentsOf: restored)
+                // Bring the mirror back in line with the restored graph immediately, rather than
+                // waiting for the user's next folder mutation.
+                exportOrganization()
+            }
         }
     }
 
@@ -158,6 +239,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     }
 
     func renameFolder(_ id: UUID, to name: String) async throws {
+        try refuseSystemFolder(id)
         guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
         var updated = folders[i]
         updated.name = name
@@ -187,8 +269,13 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// SQLite failure part-way through left the graph half-deleted in memory and differently
     /// half-deleted on disk. A throw from here now means nothing changed anywhere: the DB legs are one
     /// transaction, and every in-memory mutation happens after it commits.
+    ///
+    /// **Refuses a system folder (W23.m15).** Inbox and Extracts are the fixed ids `newItem` and
+    /// `createExtract` file into, and `load` only ever *restored* them when the folder table was
+    /// entirely empty — so deleting one was permanent while the app went on writing memberships to it.
     @discardableResult
     func deleteFolder(_ id: UUID) async throws -> [UUID] {
+        try refuseSystemFolder(id)
         let deletedParent = folders.first(where: { $0.id == id })?.parentId
 
         // Reparent children to the deleted folder's parent (or root) — as COPIES. Nothing in `folders`
@@ -227,7 +314,15 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
 
     // MARK: - Replication
 
+    /// File `item` into `folder`.
+    ///
+    /// **Refuses a folder that is not in the graph (W23.m15).** Without this the store would happily
+    /// write a membership to any UUID — and the `memberships` table had no foreign key to catch it — so
+    /// every note created after Inbox was deleted added a row nothing could ever render or remove.
+    /// The FK now refuses the same write at the SQL layer; this guard is what makes the refusal a
+    /// clear error instead of a constraint violation, and keeps memory from running ahead of the DB.
     func addMembership(item: UUID, folder: UUID) async throws {
+        try requireFolderExists(folder)
         guard !memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else { return }
         let m = Membership(itemId: item, folderId: folder, addedAt: Date())
         try await index.insertMembership(m)
@@ -288,6 +383,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// A no-op (not an error) when the item is already only in `target`, so a stale drag costs nothing.
     func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
         guard source != target else { return try await addMembership(item: item, folder: target) }
+        try requireFolderExists(target)
         let inSource = memberships.contains { $0.itemId == item && $0.folderId == source }
         let inTarget = memberships.contains { $0.itemId == item && $0.folderId == target }
         guard inSource || !inTarget else { return }
@@ -394,17 +490,25 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         return false
     }
 
-    private func seedSystemFolders() {
-        let allNotes = VFolder(
-            id: Self.allNotesFolderId, name: "All Notes", parentId: nil,
-            sortOrder: 0, kind: .smart, queryJSON: nil)
-        let inbox = VFolder(
-            id: Self.inboxFolderId, name: "Inbox", parentId: nil,
-            sortOrder: 1, kind: .normal, queryJSON: nil)
-        let extracts = VFolder(
-            id: Self.extractsFolderId, name: "Extracts", parentId: nil,
-            sortOrder: 2, kind: .normal, queryJSON: nil)
-        folders = [allNotes, inbox, extracts]
+    /// The system folders absent from `existing`, in canonical order — what `load` must restore
+    /// (W23.m15). Empty for a healthy store, which is why this is safe to run on every launch.
+    private func missingSystemFolders(in existing: [VFolder]) -> [VFolder] {
+        let present = Set(existing.map(\.id))
+        return Self.systemFolderSeeds.filter { !present.contains($0.id) }
+    }
+
+    /// Throw if `id` names a system folder — the rename/delete backstop (W23.m15).
+    private func refuseSystemFolder(_ id: UUID) throws {
+        if let name = Self.systemFolderName(id) {
+            throw OrganizationError.systemFolderImmutable(name: name)
+        }
+    }
+
+    /// Throw unless `folder` is in the graph — the ghost-membership backstop (W23.m15).
+    private func requireFolderExists(_ folder: UUID) throws {
+        guard folders.contains(where: { $0.id == folder }) else {
+            throw OrganizationError.unknownFolder(folder)
+        }
     }
 
     /// Re-export the whole graph to the durable mirror and record the outcome on `mirrorFailure`
