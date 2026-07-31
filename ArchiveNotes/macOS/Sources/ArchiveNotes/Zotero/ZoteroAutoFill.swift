@@ -26,6 +26,12 @@ extension ZoteroCSLItem {
     /// `[y,m,d]`→`.day`. CSL never yields a decade, so `.decade` is never emitted.
     /// If only `issued.raw` is present, a leading 4-digit run is taken as `.year`;
     /// otherwise `(nil, nil)` (leave the note's date untouched).
+    ///
+    /// A day is kept only if it **exists in that month** (`GregorianDay`): this is
+    /// foreign data, and `date-parts: [[1968, 2, 31]]` used to arrive here as a
+    /// day-precision `1968-02-31` — the plan below writes `date`/`date_precision`
+    /// straight onto the item, so `Item.normalizedDate` never sees it (W23.l4).
+    /// An impossible day drops the precision to `.month`, keeping what is real.
     func mappedDate() -> (date: String?, precision: Item.DatePrecision?) {
         if let parts = issued?.dateParts?.first, let year = parts.first, year > 0 {
             var s = "\(year)"
@@ -33,7 +39,8 @@ extension ZoteroCSLItem {
             if parts.count >= 2, (1...12).contains(parts[1]) {
                 s += String(format: "-%02d", parts[1])
                 precision = .month
-                if parts.count >= 3, (1...31).contains(parts[2]) {
+                if parts.count >= 3,
+                   GregorianDay.isValidDay(year: year, month: parts[1], day: parts[2]) {
                     s += String(format: "-%02d", parts[2])
                     precision = .day
                 }

@@ -103,6 +103,44 @@ struct ZoteroAutoFillTests {
         #expect(precision == .month)
     }
 
+    // MARK: - Impossible day-parts (W23.l4)
+    //
+    // The day was range-checked as 1…31 independently of the month, and this is foreign data: a CSL
+    // record saying `[[1968, 2, 31]]` produced a day-precision `1968-02-31`. It matters more here than
+    // at the typed seam because `AutoFillPlan.apply` writes `date`/`date_precision` straight onto the
+    // item — `Item.normalizedDate` never sees it, so this mapper is the only guard on the path.
+
+    @Test("a day the month cannot have stops at month precision (1968-02-31 ⟹ 1968-02)")
+    func dateImpossibleDay() {
+        let (date, precision) = csl(dateParts: [[1968, 2, 31]]).mappedDate()
+        #expect(date == "1968-02")
+        #expect(precision == .month)
+        // Baseline: the pre-fix predicate accepted this day, which is how it got persisted.
+        #expect((1...31).contains(31))
+    }
+
+    @Test("February 29 is kept in a leap year, dropped in a common one")
+    func dateLeapDay() {
+        let (leap, leapP) = csl(dateParts: [[2024, 2, 29]]).mappedDate()
+        #expect(leap == "2024-02-29")
+        #expect(leapP == .day)
+        let (common, commonP) = csl(dateParts: [[2026, 2, 29]]).mappedDate()
+        #expect(common == "2026-02")
+        #expect(commonP == .month)
+    }
+
+    @Test("an impossible day never reaches the item, whose date is written directly by apply()")
+    func applyNeverWritesImpossibleDay() {
+        let item = makeItem()                                   // undated
+        let plan = AutoFillPlan.make(from: csl(dateParts: [[1968, 2, 31]]), item: item)
+        #expect(plan.proposedDate == "1968-02")
+        #expect(plan.proposedDatePrecision == .month)
+        let out = plan.apply(selected: [.date], to: item)
+        #expect(out.date == "1968-02")
+        #expect(out.datePrecision == .month)
+        #expect(out.sortDate == 19_680_200)                     // not 19_680_231
+    }
+
     @Test("raw date fallback takes the first 4-digit run as year")
     func dateRawFallback() {
         let (date, precision) = csl(raw: "circa 1850").mappedDate()

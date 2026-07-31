@@ -72,6 +72,10 @@ extension Item {
     ///   * `month`/`day` **downgrade** to the finest precision the string actually specifies when a
     ///     lower field is missing/out-of-range (e.g. `day` precision with no day ⟹ `month`; no month
     ///     ⟹ `year`). Components are zero-padded ("1970-03-05") to match the SPEC date convention.
+    ///   * a day the chosen month cannot have is **impossible, not merely out of range**, and
+    ///     downgrades the same way ("2026-02-31" ⟹ "2026-02", month precision) — W23.l4. Coarsening
+    ///     rather than clamping is deliberate: clamping to Feb 28 would assert a day the source never
+    ///     said, while month precision states exactly what is known.
     /// Pure + locale-independent; the single source of truth for the write path and unit-tested directly.
     static func normalizedDate(_ date: String?,
                                precision: DatePrecision?) -> (date: String?, precision: DatePrecision?) {
@@ -82,7 +86,13 @@ extension Item {
         let month = parts.count >= 2 ? Int(parts[1]) : nil
         let day = parts.count >= 3 ? Int(parts[2]) : nil
         let validMonth = month.flatMap { (1...12).contains($0) ? $0 : nil }
-        let validDay = day.flatMap { (1...31).contains($0) ? $0 : nil }
+        // The day is judged against the (year, month) it sits in — never independently as 1…31, which
+        // is what let `2026-02-31` through as a day-precision date (W23.l4). No month ⟹ no day.
+        let validDay: Int? = day.flatMap { d in
+            guard let m = validMonth,
+                  GregorianDay.isValidDay(year: year, month: m, day: d) else { return nil }
+            return d
+        }
 
         switch precision ?? .year {
         case .decade:

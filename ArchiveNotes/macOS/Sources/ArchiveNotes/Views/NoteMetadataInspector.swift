@@ -12,6 +12,10 @@ import SwiftUI
 /// rewrites its date. Each edit composes a canonical string for the chosen precision and calls the
 /// async setter, which normalizes (`Item.normalizedDate`: decade floors the year; month/day downgrade
 /// when a lower field is missing), persists atomically, and re-indexes.
+///
+/// The field rules — what a commit composes, whether the day row's "Set" is live, and the note shown
+/// for a day the chosen month cannot have (`Feb 31`, W23.l4) — live in `DateFieldEntry` so they are
+/// unit-testable without a window; this view is the `@State` + bindings layer over them.
 struct NoteMetadataInspector: View {
     @ObservedObject var nav: NotesNavigationModel
     let item: ItemSummary
@@ -21,8 +25,7 @@ struct NoteMetadataInspector: View {
     @State private var month = 0          // 0 = none
     @State private var dayText = ""
 
-    private static let monthNames = ["January", "February", "March", "April", "May", "June",
-                                     "July", "August", "September", "October", "November", "December"]
+    private static let monthNames = DateFieldEntry.monthNames
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -82,7 +85,15 @@ struct NoteMetadataInspector: View {
                         .onSubmit { commit() }
                         .accessibilityIdentifier("an.detail.date.day")
                     Button("Set") { commit() }
-                        .disabled(Int(dayText).map { !(1...31).contains($0) } ?? true)
+                        .disabled(!dayFieldCommittable)
+                }
+                if let msg = impossibleDayMessage {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("an.detail.date.dayWarning")
+                    }
+                    .padding(.leading, 54)
                 }
             }
 
@@ -114,20 +125,19 @@ struct NoteMetadataInspector: View {
         dayText = parts.count >= 3 ? parts[2] : ""
     }
 
-    /// Compose a loose date string for the current precision from the fields; the model normalizes it
-    /// (zero-pads, floors a decade, downgrades when a component is missing). `nil` ⟹ clear the date.
+    /// Why a typed day is being dropped (nil when there is nothing to report) — see `DateFieldEntry`.
+    private var impossibleDayMessage: String? {
+        DateFieldEntry.impossibleDayNote(yearText: yearText, month: month, dayText: dayText)
+    }
+
+    private var dayFieldCommittable: Bool {
+        DateFieldEntry.dayCommittable(yearText: yearText, month: month, dayText: dayText)
+    }
+
+    /// The loose date string the fields describe; the model normalizes it (zero-pads, floors a decade,
+    /// downgrades when a component is missing or impossible). `nil` ⟹ clear the date.
     private func composedDate() -> String? {
-        guard let y = Int(yearText.trimmingCharacters(in: .whitespaces)), y > 0 else { return nil }
-        switch precision {
-        case .decade, .year:
-            return String(y)
-        case .month:
-            return month > 0 ? "\(y)-\(month)" : String(y)
-        case .day:
-            if month > 0, let d = Int(dayText), (1...31).contains(d) { return "\(y)-\(month)-\(d)" }
-            if month > 0 { return "\(y)-\(month)" }
-            return String(y)
-        }
+        DateFieldEntry.composed(yearText: yearText, month: month, dayText: dayText, precision: precision)
     }
 
     private func commit() {

@@ -134,6 +134,69 @@ struct FrontMatterDateWriteTests {
         #expect(r.datePrecision == .year)
     }
 
+    // MARK: - Impossible days (W23.l4)
+    //
+    // The day used to be range-checked as 1…31 independently of the month, so `2026-2-31` reached the
+    // note file as a day-precision date with a normal sort key. It now downgrades like any other day
+    // the string cannot support. These drive the real model → `NoteStore` → front-matter path against
+    // the scratch store, so they pin what lands on disk, not just what the pure rule returns.
+
+    @Test("an impossible day is dropped, keeping the month (2026-02-31 ⟹ 2026-02)")
+    func impossibleDayDowngrades() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try await makeNote(env)
+        await env.model.setDate("2026-2-31", precision: .day, for: id)
+        let r = try await env.store.load(id)
+        #expect(r.date == "2026-02")
+        #expect(r.datePrecision == .month)
+        #expect(r.sortDate == 20_260_200)                     // not 20_260_231
+        #expect(await displayDate(env, id) == "Feb 2026")      // never "Feb 31, 2026"
+    }
+
+    @Test("February 29 is kept in a leap year and dropped in a common one")
+    func leapDayRoundTrip() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let leap = try await makeNote(env, title: "Leap")
+        await env.model.setDate("2024-2-29", precision: .day, for: leap)
+        let l = try await env.store.load(leap)
+        #expect(l.date == "2024-02-29")
+        #expect(l.datePrecision == .day)
+        #expect(l.sortDate == 20_240_229)
+
+        let common = try await makeNote(env, title: "Common")
+        await env.model.setDate("2026-2-29", precision: .day, for: common)
+        let c = try await env.store.load(common)
+        #expect(c.date == "2026-02")
+        #expect(c.datePrecision == .month)
+    }
+
+    @Test("a 31st in a 30-day month downgrades (1968-04-31 ⟹ 1968-04)")
+    func thirtyFirstOfAThirtyDayMonth() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try await makeNote(env)
+        await env.model.setDate("1968-4-31", precision: .day, for: id)
+        let r = try await env.store.load(id)
+        #expect(r.date == "1968-04")
+        #expect(r.datePrecision == .month)
+    }
+
+    /// The last day of every month, at day precision, must survive untouched — the guard has to reject
+    /// only impossible days, never merely late ones.
+    @Test("every real month-end still round-trips at day precision")
+    func everyMonthEndSurvives() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let lengths = [1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30,
+                       7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31]   // 1968 is a leap year
+        for (m, last) in lengths.sorted(by: { $0.key < $1.key }) {
+            let id = try await makeNote(env, title: "M\(m)")
+            await env.model.setDate("1968-\(m)-\(last)", precision: .day, for: id)
+            let r = try await env.store.load(id)
+            let pad = m < 10 ? "0\(m)" : "\(m)"
+            #expect(r.date == "1968-\(pad)-\(last)", "month \(m)")
+            #expect(r.datePrecision == .day, "month \(m)")
+        }
+    }
+
     @Test("nil date clears date + precision (undated)")
     func clearDate() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
