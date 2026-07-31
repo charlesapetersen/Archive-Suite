@@ -202,6 +202,28 @@ fun CaptureScreen(vm: CaptureViewModel) {
                 }
             }
 
+            // W23.m8 — the session snapshot didn't reach phone storage. Its own line, not the status line,
+            // because the status line is overwritten by the next capture and this condition outlives it:
+            // until a later save lands, an app kill costs the classification of everything shot since.
+            if (vm.sessionNotSaved) {
+                Text("⚠︎ Session not saved to this phone — if the app closes now, recent grouping and tags " +
+                     "are lost. Photos are safe; keep the app open.",
+                     color = Color(0xFFFF9500), style = MaterialTheme.typography.bodySmall,
+                     modifier = Modifier.fillMaxWidth())
+            }
+
+            // W23.m8 — pages recovered against a manifest that never reached disk. They are held here, not
+            // sent, because their box/folder is gone and the Mac would file them under a guess. Review is
+            // the only way out, and it is the ordinary tag sheet.
+            if (vm.heldForReviewCount > 0) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠︎ ${vm.heldForReviewCount} recovered photo(s) held — their box/folder wasn't saved.",
+                         color = Color(0xFFFF9500), style = MaterialTheme.typography.bodySmall,
+                         modifier = Modifier.weight(1f))
+                    TextButton(onClick = { vm.reviewRecoveredPhotos() }) { Text("Review") }
+                }
+            }
+
             // Status line — surfaces capture errors (a failed shutter can't be silent; archival photos
             // can't be re-taken) and the recovered-segment prompt after a restart.
             if (vm.statusMessage.isNotEmpty()) {

@@ -192,6 +192,24 @@ internal fun adoptedOrphan(
     needsReview = manifestStale
 )
 
+/** The whole recovery sweep, as a function of what is on disk: every capture file the restored session
+ *  doesn't account for, re-adopted in filename order into one recovery segment starting at [firstId] /
+ *  [firstSeq]. Pure, so the contract that matters — a stale manifest yields pages that are kept but not
+ *  sendable — can be proven without a device. */
+internal fun adoptOrphans(
+    filesOnDisk: List<File>,
+    known: Set<String>,
+    firstId: Long,
+    firstSeq: Int,
+    groupId: String,
+    manifestStale: Boolean
+): List<CapturedItem> = filesOnDisk
+    .filter { it.path !in known }
+    .mapIndexed { i, f ->
+        adoptedOrphan(id = firstId + i, file = f, groupId = groupId, seq = firstSeq + i,
+            manifestStale = manifestStale)
+    }
+
 /** Whether a capture may go to the Mac right now. The one thing that withholds it is an unreviewed
  *  recovery: everything else the queue holds has a classification the operator actually chose. */
 internal fun isSendable(item: CapturedItem): Boolean = !item.needsReview

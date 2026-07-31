@@ -4,6 +4,64 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.m8): the phone's crash-durable session save couldn't tell you it hadn't saved
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
+2026-07-30 against `996a58b` before a line was changed — `SessionStore.save` still returned `Unit`).
+
+**The defect.** `ManifestFileWriter.replace` already computed whether the new session snapshot reached
+disk, but `SessionStore.save` returned `Unit`: it discarded that Boolean and wrapped everything in a
+blanket `catch { }`. Nothing above it could tell a published snapshot from a lost one.
+
+The cost lands on the NEXT launch, not the failed write. `CaptureViewModel`'s recovery sweep re-adopts
+every `img_*` on disk the restored session doesn't mention, into a fresh **default Document group** —
+correct when `session.json` merely lagged, a fabrication when the last publish never landed. Against a
+stale manifest those files were tracked; what died with the write is the record of *what they are*. So a
+page shot into a classified box/folder segment came back as an untagged Document page and the auto-retry
+loop sent it to the Mac, which filed it into the archive under a classification nobody chose. Group
+boundaries, priority/date/tags, replacement provenance and segment-completion state went the same way,
+and pages the stale manifest *did* list came back with stale metadata.
+
+**The fix.** Three layers, because knowing in-process isn't enough when the loss lands after a restart:
+
+1. **Propagate.** `save` returns whether *this* snapshot is durable, while keeping the no-crash contract
+   the blanket catch existed for — a persistence hiccup still can't take down the capture flow, it just
+   can't be mistaken for success. The one writer coroutine reports a change of state to
+   `CaptureViewModel.sessionNotSaved` (its own UI line, not the status line, which the next capture
+   overwrites); conflation makes it self-correcting, since a later snapshot that lands clears it.
+2. **Make staleness durable.** A `session.stale` flag is created **before** a snapshot is written and
+   removed only once that write is confirmed — set-before-write, not set-on-failure, because a kill
+   *during* a publish leaves the same older manifest and must read the same way. `manifestIsStale()` is
+   exposed separately from `Restored` because the worst case is a **first-ever** publish failure, where
+   `load()` returns null and the photos on disk are exactly the ones the sweep would adopt as untracked.
+   `clear()` drops the flag with the manifest. The view model reads it as the first statement of `init` —
+   `resumeUploads()` reaches `setState` → `persist()`, and the first successful save clears it.
+3. **Don't let the adoption lie.** Against a stale manifest the sweep adopts pages `needsReview = true`
+   (persisted). They are **kept** — an archival photo can't be re-taken, so they stay visible, counted as
+   un-sent in the heartbeat, and delete-confirmed — but `isSendable` refuses them at `enqueueUpload`, the
+   single choke point every send passes through. A "Review" action opens the ordinary tag sheet on that
+   segment; applying (or deliberately skipping) tags is the only thing that releases them.
+
+Also fixed en route: `File.createTempFile` sat **outside** `ManifestFileWriter.replace`'s `try`, so an
+unwritable parent threw straight past the function whose Boolean is now the caller's only evidence.
+
+**Not widened (deliberate).** `finalizeSegment` now rotates the current group only when the segment it
+finalized *is* the current one — every pre-existing caller does, but a held recovery segment is reviewed
+while a restored in-progress segment is still open. The flag is durable against process death (the stated
+failure), not against power loss: no unfsynced directory entry is.
+
+**Verification.** 24 headless JVM checks over real scratch temp dirs (no device, no emulator, no corpus),
+all five mechanisms proven non-vacuous by neutering — pre-fix `save` always reporting success → 11 RED;
+adoption ignoring staleness → 3 RED; set-on-failure instead of set-before-write → 1 RED; `clear()` keeping
+the flag → 2 RED; `createTempFile` back outside the `try` → 1 RED. 56/56 pass restored. Not covered: the
+Compose banner and the view model's own wiring lines — the app has no instrumentation-test target
+(`androidTest`), so those are compiler- and inspection-level only.
+
+`ArchiveCapture/.../data/{SessionStore,ManifestFileWriter}.kt`, `capture/{CaptureModels,CaptureViewModel}.kt`,
+`ui/CaptureScreen.kt`.
+
+---
+
 ## ✅ FIXED (W23.m7): the Mac tag card acted on a Save/Skip it had not proved was durable
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on

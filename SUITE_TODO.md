@@ -591,8 +591,17 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   behind and never build-verified here: **re-derive against current `main`, don't cherry-pick.**
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/CaptureSession,Views/LiveCaptureView}.swift | S–M | med | none
 
-- [ ] **W23.m8 — Android's crash-durable `SessionStore` silently ignores current-manifest publication failure
-  [M · MED · metadata loss · Android].** `data/ManifestFileWriter.kt`, `data/SessionStore.kt`,
+- [x] **W23.m8 — Android's crash-durable `SessionStore` silently ignores current-manifest publication failure
+  [M · MED · metadata loss · Android].** ✅ **DONE 2026-07-30** (`5d2c14a` data layer + completing commit;
+  Processor `KNOWN_ISSUES.md` "✅ FIXED (W23.m8)"). `save` now returns whether THIS snapshot is durable, a
+  set-before-write `session.stale` flag makes that knowledge survive the process that discovered it (the
+  loss lands on the NEXT launch, and a first-ever publish failure leaves no manifest to carry the signal),
+  and against a stale manifest the recovery sweep adopts pages `needsReview` — kept, visible and counted,
+  but refused at `enqueueUpload` until the operator classifies them via the ordinary tag sheet, because a
+  default Document group is a classification nobody chose and the Mac's half of that has no undo. En route:
+  `File.createTempFile` sat outside `ManifestFileWriter.replace`'s `try`. 24 new headless JVM checks over
+  scratch temp dirs; all five mechanisms neuter-proven (11/3/1/2/1 RED); 56/56 pass.
+  `data/ManifestFileWriter.kt`, `data/SessionStore.kt`,
   `capture/CaptureViewModel.kt`. `ManifestFileWriter` **reports** replacement failure, but `SessionStore.save`
   returns **no result**, ignores that Boolean, and swallows exceptions — so the writer cannot tell the view
   model that the current snapshot was never committed. After an I/O failure + app termination, a new raw JPEG

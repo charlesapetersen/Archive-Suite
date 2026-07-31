@@ -55,6 +55,13 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     var pendingTagGroupId by mutableStateOf<String?>(null)
         private set
 
+    /** W23.m8 — true while the newest session snapshot is known NOT to have reached disk. Surfaced, because
+     *  the phone is the only place that knows: a lost snapshot costs the operator the classification of
+     *  whatever they shoot next if the app dies before a later save lands. Cleared by the next save that
+     *  does land. */
+    var sessionNotSaved by mutableStateOf(false)
+        private set
+
     /** Thumbnail selection for the tap → X → delete flow (one item at a time). */
     var selectedItemId by mutableStateOf<Long?>(null)
         private set
@@ -123,12 +130,26 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private val statusChannel = Channel<StatusSnapshot>(Channel.CONFLATED)
 
     init {
+        // W23.m8 — read this BEFORE anything can persist. [resumeUploads] below reaches setState → persist(),
+        // and the first successful save of this process clears the flag; reading it any later is a race whose
+        // loser re-adopts recovered pages as if their classification were known.
+        val manifestWasStale = store.manifestIsStale()
         // Start the off-main session writer first, so any persist() during restore is handled off the UI thread.
+        // W23.m8 — confined to this one writer coroutine, so reporting a change of state costs a main-thread
+        // hop only when it actually changes, not on every capture.
+        var lastPublishLanded = true
         viewModelScope.launch(Dispatchers.IO) {
             for (operation in storeChannel) {
                 when (operation) {
                     is StoreOperation.Save -> operation.snapshot.let { snap ->
-                        store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag, snap.ended)
+                        // W23.m8 — the writer is the only place that can tell a published snapshot from a
+                        // lost one, so it is the only place that can say so. Conflation makes this
+                        // self-correcting: a later snapshot that lands clears a flag an earlier one raised.
+                        val durable = store.save(snap.items, snap.seq, snap.nextId, snap.group, snap.pendingTag, snap.ended)
+                        if (durable != lastPublishLanded) {
+                            lastPublishLanded = durable
+                            withContext(Dispatchers.Main) { sessionNotSaved = !durable }
+                        }
                     }
                     is StoreOperation.Clear -> {
                         // Clear is ordered after any save already in progress. Wait for every cancelled
@@ -136,13 +157,17 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                         // gated until this barrier completes, so no older save can resurrect the session.
                         operation.sessionJobs.forEach { it.cancelAndJoin() }
                         operation.files.forEach { runCatching { it.delete() } }
-                        store.clear()
+                        store.clear()   // drops the staleness flag with the manifest (W23.m8)
+                        lastPublishLanded = true
                         withContext(Dispatchers.Main) {
                             inFlightUploads.clear()
                             uploadJobs.clear()
                             segmentJobs.clear()
                             isClearing = false
                             statusMessage = ""
+                            // Nothing is left to have failed to save — a warning about the cleared session
+                            // would only be about state that no longer exists.
+                            sessionNotSaved = false
                             sendStatusReport()   // ordered zero after any pre-Clear heartbeat
                         }
                     }
@@ -187,16 +212,21 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // Self-heal orphans: capture files on disk not tracked by the restored session (session.json can
         // lag/corrupt across a crash) would otherwise never be shown, uploaded, or cleaned up. Re-adopt
         // them into a dedicated recovery segment so an un-retakeable image is never silently lost.
-        val known = items.map { it.file.path }.toHashSet()
-        val orphans = sessionDir.listFiles { f -> f.isFile && f.name.startsWith("img_") && f.path !in known }
+        val onDisk = sessionDir.listFiles { f -> f.isFile && f.name.startsWith("img_") }
             ?.sortedBy { it.name } ?: emptyList()
-        if (orphans.isNotEmpty()) {
-            val recoveryGroup = newGroupId()
-            orphans.forEach { f ->
-                seqCounter += 1
-                items.add(CapturedItem(id = nextId++, file = f, groupId = recoveryGroup, seq = seqCounter, type = GroupType.DOCUMENT))
-            }
-            statusMessage = "Recovered ${orphans.size} untracked photo(s)"
+        // W23.m8 — but "untracked" is only true when the manifest is trustworthy. If the last publish never
+        // landed, these files were tracked; what's missing is the record of WHAT they are. Adopting them into
+        // a default Document group would hand the Mac a classification nobody chose, so against a stale
+        // manifest they are adopted HELD instead (see [adoptedOrphan]) and the operator is told why.
+        val adopted = adoptOrphans(onDisk, items.map { it.file.path }.toHashSet(),
+            firstId = nextId, firstSeq = seqCounter + 1, groupId = newGroupId(), manifestStale = manifestWasStale)
+        if (adopted.isNotEmpty()) {
+            items.addAll(adopted)
+            nextId += adopted.size
+            seqCounter += adopted.size
+            statusMessage = if (manifestWasStale)
+                "Recovered ${adopted.size} photo(s) whose box/folder wasn't saved — tap Review to tag and send."
+            else "Recovered ${adopted.size} untracked photo(s)"
             persist()
         }
         startAutoRetry()
@@ -596,6 +626,21 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  and end the current document segment. */
     fun applyTagsAndContinue(priority: String?, year: Int?, month: Int?) = finalizeSegment(priority, year, month)
 
+    /** W23.m8 — how many recovered pages are still held awaiting classification, and which segment they are
+     *  in. Derived from the items rather than stored, so the hold survives a further kill exactly as the
+     *  per-item flag does; two successive stale launches leave two held segments, reviewed one at a time. */
+    val heldForReviewCount: Int get() = items.count { it.needsReview }
+    private val heldReviewGroupId: String? get() = items.firstOrNull { it.needsReview }?.groupId
+
+    /** W23.m8 — "Review": open the ordinary tag sheet on the held recovery segment, so the operator supplies
+     *  the classification the failed save lost. Applying (or deliberately skipping) tags is what releases
+     *  those pages to the Mac — see [finalizeSegment]. There is no path that releases them silently. */
+    fun reviewRecoveredPhotos() {
+        val group = heldReviewGroupId ?: return
+        pendingTagGroupId = group
+        persist()
+    }
+
     /** Tag sheet → "Cancel — keep shooting": the operator tapped End segment by mistake. Close the sheet
      *  WITHOUT ending the segment, so the current group stays open and further pages keep accumulating in
      *  the same document (nothing is sent, nothing is stranded). Gesture-dismiss of the sheet is disabled
@@ -620,12 +665,19 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             if (it.groupId == gid && it.type == GroupType.DOCUMENT) {
                 // Stamp the segment's tags so any page not yet uploaded (captured offline) carries them
                 // when it uploads; already-uploaded pages get the tags via the segment-complete signal.
-                val stamped = it.copy(priority = it.priority ?: priority, year = year, month = month)
+                // W23.m8: this is also the one place a recovery hold lifts — the operator has now said what
+                // these pages are, so they become sendable with the classification they just supplied.
+                val stamped = it.copy(priority = it.priority ?: priority, year = year, month = month,
+                    needsReview = false)
                 items[i] = stamped
                 if (stamped.state != UploadState.UPLOADED) enqueueUpload(stamped)
             }
         }
-        startNewGroup()                     // gid is now finalized (differs from the new currentGroupId)
+        // Rotate only when the segment just finalized IS the open one. Every pre-existing caller finalizes
+        // the current group, so this is unchanged for them — but a held recovery segment (W23.m8) is
+        // reviewed while a restored in-progress segment is still open, and rotating there would abandon the
+        // segment the operator is still shooting into.
+        if (gid == currentGroupId) startNewGroup()   // gid is now finalized (differs from the new currentGroupId)
         // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
         val seqs = items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT }
             .joinToString(",") { it.seq.toString() }.ifEmpty { null }
@@ -705,6 +757,11 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun enqueueUpload(item: CapturedItem) {
         val c = client ?: return
+        // W23.m8 — the single choke point every send passes through (resume, auto-retry, manual Retry,
+        // finalize). A page recovered against a manifest that never reached disk carries a group nobody
+        // chose; sending it files it into the archive under that guess, and the Mac's half has no undo.
+        // It waits on the phone — safe, visible, counted as un-sent — until the operator classifies it.
+        if (!isSendable(item)) return
         // Stamp this send with the endpoint that owns it. `c` is captured for the whole send, so without
         // the stamp a re-pair mid-upload leaves a coroutine talking to the old Mac with no way to tell.
         val token = pairing.current
