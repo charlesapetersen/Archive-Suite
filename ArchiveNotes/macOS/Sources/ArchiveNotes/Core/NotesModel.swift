@@ -317,6 +317,7 @@ final class NotesModel: ObservableObject {
         do {
             if let templateId { try await organization.assignTemplate(templateId, to: folderId) }
             else { try await organization.removeTemplateAssignment(folder: folderId) }
+            adoptMirrorFailure()
         } catch { report(error, "assign the template") }
     }
 
@@ -336,6 +337,7 @@ final class NotesModel: ObservableObject {
     private func clearDanglingAssignments(_ folderIds: [UUID]) async {
         for f in folderIds { try? await organization.removeTemplateAssignment(folder: f) }
         rebuild()
+        adoptMirrorFailure()
     }
 
     /// Create a new template of `kind` named `name` (empty body). Returns the new id.
@@ -395,6 +397,7 @@ final class NotesModel: ObservableObject {
         catch { report(error, "delete the template") }
         await reloadTemplates()
         rebuild()
+        adoptMirrorFailure()
     }
 
     // MARK: New item (blank or from a template) (W6-S6)
@@ -423,6 +426,7 @@ final class NotesModel: ObservableObject {
             try await organization.addMembership(item: item.id, folder: target)
             await reloadItems()
             rebuild()
+            adoptMirrorFailure()
             return item.id
         } catch { report(error, "create the note"); return nil }
     }
@@ -477,6 +481,7 @@ final class NotesModel: ObservableObject {
             }
             await reloadItems()
             rebuild()
+            adoptMirrorFailure()
             // W14.4(b): route the new extract through the open channel so the Extracts window selects
             // it (and, if open, raises itself) — the extract is no longer silently filed into the list.
             openItem(id: created.id, block: nil)
@@ -679,6 +684,7 @@ final class NotesModel: ObservableObject {
         do {
             let created = try await organization.createFolder(name: unique, parent: parent, kind: .normal)
             rebuild()
+            adoptMirrorFailure()
             return created.id
         } catch { report(error, "create the folder"); return nil }
     }
@@ -699,6 +705,7 @@ final class NotesModel: ObservableObject {
             let created = try await organization.createFolder(
                 name: unique, parent: nil, kind: .smart, queryJSON: json)
             rebuild()
+            adoptMirrorFailure()
             return created.id
         } catch { report(error, "create the smart folder"); return nil }
     }
@@ -709,7 +716,7 @@ final class NotesModel: ObservableObject {
         guard !name.isEmpty else { statusMessage = "A folder needs a name."; return }
         let parent = organization.folders.first { $0.id == id }?.parentId
         let unique = uniqueSiblingName(name, parent: parent, excluding: id)
-        do { try await organization.renameFolder(id, to: unique); rebuild() }
+        do { try await organization.renameFolder(id, to: unique); rebuild(); adoptMirrorFailure() }
         catch { report(error, "rename the folder") }
     }
 
@@ -721,8 +728,10 @@ final class NotesModel: ObservableObject {
             statusMessage = "You can't move a folder into itself or one of its own subfolders."
             return
         }
-        do { try await organization.moveFolder(id, newParent: newParent, sortOrder: index); rebuild() }
-        catch { report(error, "move the folder") }
+        do {
+            try await organization.moveFolder(id, newParent: newParent, sortOrder: index)
+            rebuild(); adoptMirrorFailure()
+        } catch { report(error, "move the folder") }
     }
 
     /// Delete a folder (never its items). `OrganizationStore.deleteFolder` reparents children to the
@@ -739,6 +748,7 @@ final class NotesModel: ObservableObject {
                 let n = orphaned.count
                 statusMessage = "\(n) item\(n == 1 ? "" : "s") \(n == 1 ? "is" : "are") no longer in any folder — find \(n == 1 ? "it" : "them") under All Notes."
             }
+            adoptMirrorFailure()
             return orphaned
         } catch { report(error, "delete the folder"); return [] }
     }
@@ -778,6 +788,7 @@ final class NotesModel: ObservableObject {
         let confirmed = Set(stranded)
         await trashItems(orphaned.filter { confirmed.contains($0) })   // trashes + drops rows + reloads
         rebuild()                                                      // covers the empty case
+        adoptMirrorFailure()
     }
 
     /// Move the given items' folders to the macOS Trash (recoverable — `NoteStore.delete` never
@@ -828,6 +839,17 @@ final class NotesModel: ObservableObject {
         var n = 2
         while taken.contains("\(base) \(n)".lowercased()) { n += 1 }
         return "\(base) \(n)"
+    }
+
+    /// Say so when an organization mutation committed but its durable mirror didn't (W23.m10).
+    ///
+    /// Called at the END of each organization-mutating path — last, so a real degradation wins over
+    /// that path's own status text. The change itself DID commit (SQLite + in memory), so every caller
+    /// still completes its UI work and still returns what it created: this only stops the app from
+    /// presenting a half-saved change as saved. Never clears a message it didn't set (`statusMessage`
+    /// is shared with other degradations), matching `adoptIndexFailure`.
+    func adoptMirrorFailure() {
+        if let failure = organization.mirrorFailure { statusMessage = failure.message }
     }
 
     // MARK: Private

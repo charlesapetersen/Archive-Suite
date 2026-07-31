@@ -241,12 +241,12 @@ final class NotesNavigationModel: ObservableObject {
         do {
             switch try await model.organization.removeMembership(item: itemId, folder: folderId) {
             case .removed:
-                model.rebuild(); recompute()
+                model.rebuild(); recompute(); model.adoptMirrorFailure()
             case .notPresent:
                 // The other window already moved or removed this membership. Nothing to remove — resync
                 // this window's view. NEVER a last instance: some *other* folder may hold the note
                 // (W23.h3).
-                model.rebuild(); recompute()
+                model.rebuild(); recompute(); model.adoptMirrorFailure()
             case .wasLastInstance:
                 let title = model.allItems.first { $0.id == itemId }?.title ?? ""
                 pendingDeletion = PendingDeletion(itemId: itemId, folderId: folderId,
@@ -279,7 +279,7 @@ final class NotesNavigationModel: ObservableObject {
                 item: pending.itemId, folder: pending.folderId) {
             case .unlinkedNotLast:
                 // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
-                model.rebuild(); recompute(); return
+                model.rebuild(); recompute(); model.adoptMirrorFailure(); return
             case .notPresent:
                 // A STALE alert: the other window already moved or removed this membership, so nothing
                 // was removed here and the note may still be filed elsewhere. Keep it (W23.h3).
@@ -290,6 +290,10 @@ final class NotesNavigationModel: ObservableObject {
         } catch { model.statusMessage = "Couldn't remove the note from the folder."; return }
         await model.trashItems([pending.itemId])
         recompute()
+        // The membership removal committed; say so if it never reached organization.json (W23.m10).
+        // The trash decision itself is unchanged — the note is in the macOS Trash (recoverable) and
+        // the graph is consistent in SQLite; making the *durable mirror* transactional is W23.m13.
+        model.adoptMirrorFailure()
     }
 
     /// Dismiss the confirmation without deleting anything (the default / Cancel path).
@@ -306,7 +310,7 @@ final class NotesNavigationModel: ObservableObject {
             do { try await model.organization.addMembership(item: id, folder: target) }
             catch { model.statusMessage = "Couldn't add the note to the folder." }
         }
-        model.rebuild(); recompute()
+        model.rebuild(); recompute(); model.adoptMirrorFailure()
     }
 
     /// **Move** items into `target` (default drag / "Move to Folder…"), removing them from `source`.
@@ -327,7 +331,7 @@ final class NotesNavigationModel: ObservableObject {
                 _ = try? await model.organization.removeMembership(item: id, folder: source)
             }
         }
-        model.rebuild(); recompute()
+        model.rebuild(); recompute(); model.adoptMirrorFailure()
     }
 
     // MARK: Keyword search (FTS)

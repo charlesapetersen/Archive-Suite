@@ -49,6 +49,28 @@ enum ConfirmedRemoveResult: Sendable {
     case notPresent
 }
 
+/// Why `organization.json` — the durable mirror (§4/§11) — does not currently reflect committed
+/// organization state (W23.m10). `nil` means it does.
+enum OrganizationMirrorFailure: Sendable, Equatable {
+    /// The export ran and failed: a full, read-only or vanished volume, or an encode error.
+    case writeFailed(detail: String)
+    /// No store root is configured, so there is nowhere to mirror to and nothing was written at all.
+    case noStoreRoot
+
+    /// One line for the sidebar status line — the same surface `NotesIndexer.Failure` uses (W23.m9).
+    var message: String {
+        switch self {
+        case .writeFailed(let d):
+            return "Folder organization couldn't be saved to organization.json (\(d)) — the change is "
+                 + "live now, but rebuilding the notes index or opening this store on another Mac "
+                 + "would bring the older organization back."
+        case .noStoreRoot:
+            return "Folder organization isn't being saved to disk — no notes store is open, so this "
+                 + "change is only in memory."
+        }
+    }
+}
+
 // MARK: - OrganizationStore
 
 /// Owns the folder tree, memberships, and template assignments (§16.1).
@@ -63,6 +85,25 @@ enum ConfirmedRemoveResult: Sendable {
     @Published private(set) var folders: [VFolder] = []
     @Published private(set) var memberships: [Membership] = []
     @Published private(set) var assignments: [TemplateAssignment] = []
+
+    /// Why the durable mirror is stale, when it is (`nil` = `organization.json` matches what has been
+    /// committed). Published so the UI can say so, and readable by a caller **synchronously right after
+    /// its `await`** (this store is `@MainActor`) to find out whether the mutation it just made actually
+    /// reached disk — that is the seam W23.m13 needs for its rollback decisions.
+    ///
+    /// Deliberately observable STATE rather than an error thrown out of each mutation. Three reasons,
+    /// all load-bearing — do not "simplify" this back into a `throws`:
+    /// 1. The export is the LAST step of every mutation, so by the time it can fail the SQLite and
+    ///    in-memory change has already committed. Throwing would make ~10 call sites report "Couldn't
+    ///    create the folder" about a folder that *exists*, and skip the `rebuild()` that shows it — a
+    ///    worse lie than the silence being fixed here.
+    /// 2. Three existing callers use `try?` (`clearDanglingAssignments`, `deleteTemplate`, and `move`'s
+    ///    source removal), so a thrown error would be swallowed on exactly the paths at issue.
+    /// 3. Staleness persists until a later export succeeds. That is a state, not an event.
+    @Published private(set) var mirrorFailure: OrganizationMirrorFailure?
+
+    /// `true` while `organization.json` does not reflect committed organization state.
+    var isMirrorStale: Bool { mirrorFailure != nil }
 
     private let index: NotesIndex
     private var storeRoot: URL?
@@ -315,10 +356,22 @@ enum ConfirmedRemoveResult: Sendable {
         folders = [allNotes, inbox, extracts]
     }
 
+    /// Re-export the whole graph to the durable mirror and record the outcome on `mirrorFailure`
+    /// (W23.m10). Never throws — see `mirrorFailure` for why that is the deliberate shape.
+    ///
+    /// A success CLEARS a previous failure, and does so correctly: the export is whole-graph, not
+    /// incremental, so one working write brings the mirror fully back in sync — including the changes
+    /// whose own exports failed. That also means a transient full disk can't leave a permanent warning.
     private func exportOrganization() {
-        guard let root = storeRoot else { return }
-        OrganizationFile.export(
-            folders: folders, memberships: memberships,
-            assignments: assignments, to: root)
+        guard let root = storeRoot else { mirrorFailure = .noStoreRoot; return }
+        do {
+            try OrganizationFile.export(
+                folders: folders, memberships: memberships,
+                assignments: assignments, to: root)
+            mirrorFailure = nil
+        } catch {
+            mirrorFailure = .writeFailed(detail: error.localizedDescription)
+            NSLog("OrganizationStore: organization.json export failed: \(error)")
+        }
     }
 }

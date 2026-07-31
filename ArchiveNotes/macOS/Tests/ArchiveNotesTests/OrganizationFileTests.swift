@@ -27,8 +27,8 @@ struct OrganizationFileTests {
             TemplateAssignment(folderId: folderId, templateId: templateId)
         ]
 
-        OrganizationFile.export(folders: folders, memberships: memberships,
-                                assignments: assignments, to: tmp)
+        try OrganizationFile.export(folders: folders, memberships: memberships,
+                                    assignments: assignments, to: tmp)
 
         let result = OrganizationFile.load(from: tmp)
         #expect(result != nil)
@@ -63,7 +63,7 @@ struct OrganizationFileTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
 
-        OrganizationFile.export(folders: [], memberships: [], assignments: [], to: tmp)
+        try OrganizationFile.export(folders: [], memberships: [], assignments: [], to: tmp)
         let jsonURL = tmp.appendingPathComponent("organization.json")
         #expect(FileManager.default.fileExists(atPath: jsonURL.path))
 
