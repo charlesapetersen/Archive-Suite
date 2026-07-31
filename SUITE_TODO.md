@@ -986,7 +986,47 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   **W23.m6** (same file) — if m6 lands first, fold this in.
   | files: packages/ArchiveCore/Sources/ArchiveCore/Links/RootMarker.swift | S | low | none
 
-- [ ] **W23.l4 — Notes accepts impossible day-precision calendar dates [XS–S · LOW].**
+- [x] **W23.l4 — Notes accepts impossible day-precision calendar dates [XS–S · LOW].**
+  ✅ DONE `dee05ab` (the calendar) + this commit (the three seams + trackers). **The finding named two seams;
+  there are three.** `ZoteroAutoFill.mappedDate()` carried the identical independent `1…31` check, and it
+  matters more there: `AutoFillPlan.apply` writes `date`/`date_precision` straight onto the item, so
+  `Item.normalizedDate` never sees it — a CSL record saying `date-parts: [[1968, 2, 31]]` was the one path
+  where nothing downstream could catch the day. All three now ask one new `GregorianDay`.
+  **`Calendar` is the wrong tool here, measured not assumed.** `DateComponents.isValidDate(in:)` — identically
+  for `.gregorian` and `.iso8601`, both ICU Julian→Gregorian hybrids — calls `1500-02-29` **valid** (a Julian
+  leap year), so it would not have closed the bug before the cutover, and calls `1582-10-10` **invalid** (ICU
+  deletes the ten cutover days), so it would have silently rejected a real date off an early-modern document.
+  `Calendar.current` is additionally locale-dependent. `GregorianDay` is therefore plain arithmetic, and
+  February takes 29 days when the year is a leap year under **either reckoning that could have produced the
+  date** — proleptic Gregorian, or Julian before 1582. The 1582 boundary is a stated trade-off: regions on the
+  old calendar into the 20th century did have `1900-02-29`, but honoring that re-admits the likeliest modern
+  typo. **Coarsen, never clamp:** `2026-02-31` ⟹ `2026-02` at month precision, which states what is known,
+  where clamping to Feb 28 would assert a day the source never said. That reuses the downgrade rule
+  `normalizedDate` already had for a missing component, so no new behavior category. ArchiveCore's shared
+  `sortDateKey` was **not** touched (per the item's constraint) → shared-core rebuild rule N/A.
+  **The month menu, not the "Set" button, was the live path**: the picker commits on selection, so choosing
+  February with 31 already typed reached the store with no button to intercept — so the compose rule refuses
+  the day and an inline orange note (`an.detail.date.dayWarning`) says *"February 2026 has 28 days — the day is
+  ignored."*, and the day row's Set goes dead only for a day that month cannot have (its old cases, incl. no
+  month chosen, still commit). The view's field rules moved into a pure `DateFieldEntry` so they are testable
+  without a window; the view is now just `@State` + bindings, and no UITest is needed for the logic.
+  **+33 tests, Notes 693/693, clean build, 0 new warnings.** `GregorianDayTests` (month lengths, century/400,
+  day 0/32, month 0/13, the pre-cutover carve-out, the cutover gap, and two equivalence sweeps against
+  Foundation over the post-1582 range where Foundation is trustworthy); `DateFieldEntryTests` (incl. the
+  month-menu path and a cross-product proving a live Set and a shown warning are mutually exclusive);
+  `FrontMatterDateWriteTests` +4 driving the real model → `NoteStore` → front-matter path on a scratch store,
+  incl. every real month-end surviving at day precision; `ZoteroAutoFillTests` +3 through `apply()`. Every
+  impossible-day case also re-runs the pre-fix predicate and asserts it said yes, so none can pass vacuously.
+  Read path deliberately untouched: a `date:` a human hand-edited into a note file is their data, and its sort
+  key is harmless (`20260231` lands between Feb 28 and Mar 1).
+  **GUI (off the owner's screen, `ops/gui/vm-gui-runner.sh notes both`):** Notes UITests in the Tart VM =
+  **12 executed, 8 passed, 4 failures — exactly the tabled deterministic G3/G6/G8/G11** (`ArchiveNotes/
+  KNOWN_ISSUES.md`), so no regression; the sighted VNC capture shows the app launching and drawing (list +
+  Date column) with this change in the build. **Stated plainly: no UITest drives the metadata strip**, so the
+  new warning row's pixels were not eyeballed — its logic is what `DateFieldEntryTests` pins, and a 10-second
+  owner check is in Morning Review. Also found: `vm-gui-runner.sh` reports `VM 'archive-gui-runner' not found`
+  when `tart` merely isn't on a non-login shell's PATH — a misdiagnosis worth folding into W21.vmgui-a's
+  "make it LOUD" work (`export PATH=/opt/homebrew/bin:$PATH` first). Original finding follows.
   `Views/NoteMetadataInspector.swift`, `Store/Item.swift`. The UI and normalization logic validate month as
   1…12 and day as 1…31 **independently**, never validating the combination against a calendar — so
   `2026-02-31` is persisted as a day-precision date and receives a normal chronological sort key.

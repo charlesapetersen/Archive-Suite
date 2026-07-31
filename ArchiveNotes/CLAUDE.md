@@ -71,7 +71,16 @@ macOS/Sources/ArchiveNotes/
                                    date-range/tags ALL|ANY/title-substring/graph folder-membership),
                                    effective(base:user:) merge, tolerant init(from:) (W6-S4)
   Store/
-    Item.swift                     Item/ZoteroRef/UnknownKey domain models
+    Item.swift                     Item/ZoteroRef/UnknownKey domain models; normalizedDate is THE
+                                   write-path date normalizer (decade floors; month/day downgrade to the
+                                   finest precision the string supports — incl. an impossible day, W23.l4)
+    GregorianDay.swift             Does (year, month, day) name a real day? — the calendar every date
+                                   INPUT seam validates against (Item.normalizedDate, DateFieldEntry,
+                                   ZoteroCSLItem.mappedDate). Arithmetic, NOT Foundation.Calendar:
+                                   ICU's hybrid calls 1500-02-29 valid and 1582-10-10 invalid, both wrong
+                                   for an archival corpus; Feb 29 is allowed under either reckoning that
+                                   could have produced the date (proleptic Gregorian / pre-1582 Julian)
+                                   (W23.l4)
     Template.swift                 Template projection (id/name/kind) + pure TemplateResolution
                                    (nearest-ancestor walk + dangling detection, §16.4) (W6-S6)
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
@@ -290,6 +299,10 @@ macOS/Sources/ArchiveNotes/
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
     LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
+    DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's DATE row (year text +
+                                   month index + day text ⟹ committed string, day-Set enablement, and
+                                   the note shown when a day the chosen month cannot have is dropped) —
+                                   extracted so they are unit-testable without a window (W23.l4)
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
                                    Move to Folder ▸ / Remove-from-scope — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember

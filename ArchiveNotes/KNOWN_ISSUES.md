@@ -3,6 +3,50 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.l4) — an impossible day (`2026-02-31`) could be saved as a day-precision date
+
+**2026-07-31.** Notes' date seams validated month as `1…12` and day as `1…31` **independently**, never as a
+combination, so `2026-02-31` was accepted, written to a note's front-matter at day precision, and handed a
+normal chronological sort key. The finding named the inspector and `Item.normalizedDate`; there was a **third
+seam**, and the worst one: `ZoteroAutoFill.mappedDate()` had the same check, and `AutoFillPlan.apply` writes
+`date`/`date_precision` straight onto the item, so `Item.normalizedDate` never sees it — a CSL record with
+`date-parts: [[1968, 2, 31]]` had nothing downstream to catch it. All three now ask one `GregorianDay`.
+
+**Why this does not use `Foundation.Calendar`** — measured here, not assumed.
+`DateComponents.isValidDate(in:)` is wrong for an archival corpus in both directions, identically for the
+`.gregorian` and `.iso8601` identifiers (both model ICU's Julian→Gregorian *hybrid*): it calls `1500-02-29`
+**valid** (a Julian leap year, not a Gregorian one), so it would not have closed this bug before the cutover;
+and it calls `1582-10-10` **invalid**, because ICU deletes the ten cutover days, so a date read off an
+early-modern document would have been silently rejected. `Calendar.current` is additionally locale-dependent —
+it follows the user's chosen calendar identifier, which need not be Gregorian. `GregorianDay` is plain
+arithmetic instead, and February takes 29 days when the year is a leap year under **either reckoning that
+could have produced the date**: proleptic Gregorian, or Julian before 1582. That boundary is a chosen
+trade-off — regions on the old calendar into the 20th century really did have a `1900-02-29`, but honoring
+that would re-admit the likeliest modern typo.
+
+**Coarsen, never clamp.** An impossible day downgrades to month precision (`2026-02-31` ⟹ `2026-02`), which
+states exactly what is known; clamping to Feb 28 would assert a day the source never said. This reuses the
+downgrade rule `Item.normalizedDate` already applied to a missing component, so it adds no new behavior
+category, and ArchiveCore's shared `DocumentTags.sortDateKey` is untouched — the fix is at the input seams.
+
+**The month menu was the live path, not the "Set" button.** The picker commits on selection, so choosing
+February with `31` already in the day field reached the store with no button press to intercept. So the
+compose rule is what refuses the day, and an inline note beside the field (`an.detail.date.dayWarning`) says
+*"February 2026 has 28 days — the day is ignored."* The field rules now live in a pure `DateFieldEntry`
+(composed string, Set enablement, that message), so they are unit-testable without driving a window;
+`NoteMetadataInspector` is the `@State`+bindings layer over it.
+
+**Not fixed, deliberately:** the READ path. A `date:` a human (or a sync client) hand-edits into a note file
+is their data, and Notes does not rewrite it on load; an impossible one still sorts harmlessly (`20260231`
+falls between Feb 28 and Mar 1) and renders as typed. 33 new tests, scratch store only, Notes 693/693.
+
+**GUI:** re-run off the owner's screen in the Tart VM (`ops/gui/vm-gui-runner.sh notes both`) — 12 executed,
+8 passed, **4 failures = exactly the deterministic G3/G6/G8/G11 tabled below**, so no regression; the sighted
+VNC capture shows the app launching and drawing normally with this change in. **No UITest drives the metadata
+strip**, so the new warning row's pixels are unverified — deliberately said rather than implied. (Harness
+note: the runner reports `VM 'archive-gui-runner' not found` when `tart` is simply absent from a non-login
+shell's PATH — export `/opt/homebrew/bin` first; folded into W21.vmgui-a's "make failures LOUD" work.)
+
 ## ✅ HARDENED (W23.l2) — `NotesIndexer`'s prune gate now survives a superseded task
 
 **2026-07-31.** `NotesIndexer` is a fork of Reader's `ContentIndexer` and carried the identical
