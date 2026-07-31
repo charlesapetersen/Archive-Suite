@@ -1,6 +1,7 @@
 // ReaderLinkResolver.swift — resolve DurableLink.readerReveal to a file URL
 // Part of Archive Notes (W4-S5). W23.m14: the basename fallback moved off the
 // main actor into a cancellable, bounded, progress-reporting search.
+// W23.l1: containment is canonical (symlink-resolving), not merely lexical.
 
 import Foundation
 import ArchiveCore
@@ -63,6 +64,46 @@ struct BasenameScan: Sendable, Equatable {
     static let defaultLimit = 1_000_000
 }
 
+/// Containment for the granted Reader root — the one place that decides whether a path
+/// the resolver is about to hand back is really *inside* the root the user granted.
+///
+/// **W23.l1 — canonical, not lexical.** `standardizedFileURL` normalizes `.`/`..`
+/// **lexically** and does not resolve symlinks, while `FileManager.fileExists` **does**
+/// follow them. So `<root>/alias.pdf` → `/elsewhere/private.pdf` passed the old boundary
+/// test (the path is literally under the root) and came back `.resolved`, against the
+/// resolver's stated granted-root contract. Only `resolvingSymlinksInPath()` exposes where
+/// the path actually lands.
+///
+/// Both sides are canonicalized identically, which is what keeps a root that is *itself*
+/// reached through a symlink — or through the `/var` ↔ `/private/var` alias — containing its
+/// own files. And the comparison is component-wise, because a string prefix would accept a
+/// sibling whose name merely starts with the root's (`…/Archive Extra` vs `…/Archive`).
+///
+/// File-scope (not a member of the `@MainActor` resolver) so the off-actor walk can use it.
+enum ReaderRootContainment {
+
+    /// The form both sides of every comparison are put in.
+    ///
+    /// Applied to a path that does **not** exist it still resolves the symlinks in the part
+    /// that does, which is what makes `<root>/aliased-dir/missing.pdf` refusable before
+    /// anything is opened.
+    static func canonical(_ url: URL) -> URL {
+        url.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    /// Is `url` the root itself, or strictly under it?
+    ///
+    /// `canonicalRoot` must already have been through `canonical(_:)` — the caller usually
+    /// has one root and many candidates, so hoisting it out keeps the walk's per-match cost
+    /// to a single `realpath`. `url` is canonicalized here.
+    static func isContained(_ url: URL, inCanonicalRoot canonicalRoot: URL) -> Bool {
+        let rootComponents = canonicalRoot.pathComponents
+        let urlComponents = canonical(url).pathComponents
+        guard urlComponents.count >= rootComponents.count else { return false }
+        return Array(urlComponents.prefix(rootComponents.count)) == rootComponents
+    }
+}
+
 /// Each a multiple of the one before, so a single modulo gates the rest.
 /// File-scope (not members of the `@MainActor` resolver) so the off-actor walk can read them.
 /// The cancellation check is the tightest of the three: on a slow volume an entry can cost
@@ -95,16 +136,18 @@ final class ReaderLinkResolver {
 
         let targetURL = rootURL.appendingPathComponent(relativePath)
 
-        // Component-boundary containment check: the resolved path must be
-        // strictly under the root (same as LibraryFilter.matches boundary
-        // test). This prevents `../../` escapes.
-        let rootPath = rootURL.standardizedFileURL.path
-        let targetPath = targetURL.standardizedFileURL.path
-        guard targetPath == rootPath || targetPath.hasPrefix(rootPath + "/") else {
+        // Containment: the cited path must be the granted root itself or something under it,
+        // *canonically*. This is what refuses both a `../../` escape (lexical) and a symlink
+        // under the root whose target is outside it (W23.l1) — the latter is invisible to a
+        // string comparison, because the cited path really is spelled under the root.
+        let canonicalRoot = ReaderRootContainment.canonical(rootURL)
+        guard ReaderRootContainment.isContained(targetURL, inCanonicalRoot: canonicalRoot) else {
             return .decided(.notFound)
         }
 
-        if FileManager.default.fileExists(atPath: targetPath) {
+        // The URL handed back is the one the link named, not its canonical form: it is the
+        // spelling the granted root's security scope covers, and containment is already proven.
+        if FileManager.default.fileExists(atPath: targetURL.standardizedFileURL.path) {
             return .decided(.resolved(targetURL))
         }
 
