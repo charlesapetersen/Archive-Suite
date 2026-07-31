@@ -60,6 +60,13 @@ final class LiveCaptureProcessor: ObservableObject {
         /// pages the source photo is the ONLY surviving copy of the image, so finalize must not retire it.
         /// `nil`/empty ⇒ nothing withheld (also the legacy-manifest reading, matching old behaviour).
         var placeholderSources: [URL]?
+        /// W3.cap-r1 — staged ARTIFACTS (PDF / exported JPEG / merged PDF) whose Finder-tag write threw.
+        /// The bytes are complete and the segment IS still filed — that is the owner's recorded decision:
+        /// tags are re-derivable, and withholding "filed" over metadata would strand the source photo for a
+        /// recoverable problem. What a tag failure DOES cost is findability: the Reader's tag-driven triage
+        /// silently omits an untagged file, so this must be said out loud at finalize instead of discarded.
+        /// `nil`/empty ⇒ every artifact was tagged (also the legacy-manifest reading).
+        var untaggedOutputs: [URL]?
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -641,6 +648,11 @@ final class LiveCaptureProcessor: ObservableObject {
         var pdfURLs: [URL] = []
         var imageURLs: [URL] = []
         var placeholderSources: [URL] = []
+        var untaggedOutputs: [URL] = []
+        // W3.cap-r1 — the app's OWN colour for this segment (Red = box, Purple = folder, nil = document),
+        // passed to every tag write below so a *subject* string is never mistaken for one. See
+        // `tagStagedArtifact`.
+        let appColor = jsonTags.colorTag
 
         for page in pages {
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
@@ -663,14 +675,18 @@ final class LiveCaptureProcessor: ObservableObject {
             if imagePage != .embedded { placeholderSources.append(page.sourceURL) }
             var tagList = baseTags
             if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
-            _ = try? MacOSTagger.applyTags(tagList, to: stagedPDF, stampUnread: stampUnread)
+            if !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
+                untaggedOutputs.append(stagedPDF)
+            }
             pdfURLs.append(stagedPDF)
 
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
-                    _ = try? MacOSTagger.applyTags(tagList, to: stagedImg, stampUnread: stampUnread)
+                    if !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
+                        untaggedOutputs.append(stagedImg)
+                    }
                     imageURLs.append(stagedImg)
                 }
             }
@@ -696,7 +712,14 @@ final class LiveCaptureProcessor: ObservableObject {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
                 var tagList = baseTags
                 if let pr = pages.first?.priority, !tagList.contains(pr) { tagList.append(pr) }
-                _ = try? MacOSTagger.applyTags(tagList, to: mergedURL, stampUnread: stampUnread)
+                // The per-page PDFs are about to be deleted, so a tag failure recorded against one of them is
+                // moot — the merged file replaces them and carries its own verdict. Drop them BEFORE tagging
+                // the merged output so the warning only ever names artifacts that still exist.
+                let constituents = Set(pdfURLs)
+                untaggedOutputs.removeAll { constituents.contains($0) }
+                if !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
+                    untaggedOutputs.append(mergedURL)
+                }
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
             } catch { /* keep the individual PDFs if merge fails */ }
@@ -704,7 +727,35 @@ final class LiveCaptureProcessor: ObservableObject {
 
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
-                             pagesComplete: pagesComplete, placeholderSources: placeholderSources)
+                             pagesComplete: pagesComplete, placeholderSources: placeholderSources,
+                             untaggedOutputs: untaggedOutputs)
+    }
+
+    /// W3.cap-r1 — apply this segment's Finder tags to ONE staged artifact and report whether the write
+    /// actually landed. Two defects lived on the same three lines, so both are fixed here, together:
+    ///
+    /// 1. **The colour was inferred from the text.** Passing a raw `[String]` made `applyTags` *detect*
+    ///    "Red"/"Purple" anywhere in the array, so a document whose subject is literally "Red" (the Red
+    ///    Scare, the Red Cross) was promoted to a Finder red label and lost "Red" as a searchable subject.
+    ///    The app assigns exactly one colour — Red = box, Purple = folder, none = document — so that colour
+    ///    is passed explicitly and `colorIsAuthoritative` is fixed `true` here: this seam never guesses.
+    /// 2. **The write result was discarded.** `_ = try? applyTags(…)` swallowed every xattr / coordination /
+    ///    identity / permission failure, and the segment was then staged and finalized as though tagged.
+    ///    The caller now records the artifact so `finalize` can say so.
+    ///
+    /// Returns `true` when the write succeeded (including a legitimate no-op — tags already correct, or
+    /// copy-source mode with nothing to write); `false` only when the primitive threw.
+    nonisolated private static func tagStagedArtifact(
+        _ tags: [String], at url: URL, appColor: String?, stampUnread: Bool
+    ) -> Bool {
+        do {
+            _ = try MacOSTagger.applyTags(tags, to: url, appColor: appColor,
+                                          colorIsAuthoritative: true, stampUnread: stampUnread)
+            return true
+        } catch {
+            NSLog("LiveCapture: Finder-tag write FAILED for \(url.lastPathComponent) — \(error)")
+            return false
+        }
     }
 
     /// Writes the metadata sidecar (OCR body + fields) via the shared `SegmentJSONBuilder`. This path
@@ -1028,6 +1079,14 @@ final class LiveCaptureProcessor: ObservableObject {
             let keptForPlaceholder = placeholderByGroup
                 .filter { filedGroups.contains($0.key) }
                 .values.reduce(0) { $0 + $1.count }
+            // W3.cap-r1 — how many FILED artifacts went out carrying no Finder tags. Counted here, beside
+            // the placeholder tally and for the same reason: `staged` is about to lose exactly the filed
+            // segments. Unlike a placeholder this withholds nothing — the owner's decision is that a tag
+            // failure still counts as filed — so the ONLY remedy is telling the operator, who otherwise
+            // learns about it the day a tag search comes back short.
+            let filedUntagged = self.staged
+                .filter { filedGroups.contains($0.groupId) }
+                .reduce(0) { $0 + ($1.untaggedOutputs?.count ?? 0) }
 
             // Drop bookkeeping for the fully-filed segments only; keep any unfiled segment staged for retry.
             self.staged.removeAll { filedGroups.contains($0.groupId) }
@@ -1065,6 +1124,14 @@ final class LiveCaptureProcessor: ObservableObject {
                 let n = keptForPlaceholder
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
                     + " ⚠️ \(n) page\(n == 1 ? "" : "s") could NOT embed the original scan — \(n == 1 ? "its PDF was" : "their PDFs were") filed with a placeholder image page, so the original photo\(n == 1 ? " was" : "s were") KEPT in the Backup Folder (nothing deleted). Re-run \(n == 1 ? "that page" : "those pages") from the Backup Folder to get the image into the archive."
+            }
+            // W3.cap-r1 — say so when a filed file went out untagged. Nothing was lost and nothing is being
+            // withheld, but the file is now invisible to every tag-driven search in the Reader, and this
+            // summary is the only moment the operator can still connect it to the session that made it.
+            if filedUntagged > 0 {
+                let n = filedUntagged
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
+                    + " ⚠️ \(n) filed file\(n == 1 ? "" : "s") could NOT be tagged — \(n == 1 ? "it is" : "they are") in the collection, but \(n == 1 ? "it carries" : "they carry") NO Finder tags, so tag searches in the Reader will not find \(n == 1 ? "it" : "them"). Re-tag \(n == 1 ? "it" : "them") from the output folder (Process Files → re-tag), or check the folder's permissions before the next session."
             }
             // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
             // stays in the backup folder + Captured pane, recoverable.
@@ -1248,21 +1315,38 @@ final class LiveCaptureProcessor: ObservableObject {
     /// tests can't reach on their own — that `writeSegmentFiles` actually POPULATES `placeholderSources`
     /// from `PDFGenerator`'s outcome, so the detection and the retirement gate are really connected rather
     /// than two correct halves wired to nothing. No OCR, no network: the OCR result is supplied.
+    ///
+    /// W3.cap-r1 extends it: the same staging run also reports which artifacts came back UNTAGGED, and the
+    /// tag inputs (`type`/`baseTags`/`jsonTags`/`stampUnread`) are injectable so a test can drive the
+    /// colour-authority decision. The defaults reproduce the original W23.h5 call exactly.
     nonisolated static func _recoveryTestStageSegment(
-        sources: [URL], stagingDir: URL, model: LLMModel
-    ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL]) {
+        sources: [URL], stagingDir: URL, model: LLMModel,
+        type: CaptureGroupType = .document, baseTags: [String] = [],
+        jsonTags: GeneratedTags = GeneratedTags(), stampUnread: Bool = false, doMerge: Bool = false
+    ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL],
+          untaggedOutputs: [URL], pdfURLs: [URL]) {
         let pages = sources.map {
             PageWork(sourceURL: $0,
                      result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
                      priority: nil)
         }
-        let seg = writeSegmentFiles(groupId: "T", type: .document, collectionKey: "T", order: 0,
-                                    pages: pages, baseTags: [], doMerge: false, model: model,
+        let seg = writeSegmentFiles(groupId: "T", type: type, collectionKey: "T", order: 0,
+                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                     gatewayName: nil, stagingDir: stagingDir, writeJSON: false,
-                                    jsonTags: GeneratedTags(), texts: [], boxLabelText: nil,
+                                    jsonTags: jsonTags, texts: [], boxLabelText: nil,
                                     outputImageFile: false, pdfImageMB: 0, exportedImageMB: 0,
-                                    textColumns: 1, stampUnread: false)
-        return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [])
+                                    textColumns: 1, stampUnread: stampUnread)
+        return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [],
+                seg.untaggedOutputs ?? [], seg.pdfURLs)
+    }
+
+    /// Test-only ($0): the production per-artifact tag step (W3.cap-r1), so a driver can prove the failure
+    /// verdict on an artifact it has made genuinely un-writable — without also having to break PDF
+    /// generation to get there. Returns exactly what `writeSegmentFiles` keys `untaggedOutputs` off.
+    nonisolated static func _recoveryTestTagArtifact(
+        _ tags: [String], at url: URL, appColor: String?, stampUnread: Bool
+    ) -> Bool {
+        tagStagedArtifact(tags, at: url, appColor: appColor, stampUnread: stampUnread)
     }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless

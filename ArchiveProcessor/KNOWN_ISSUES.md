@@ -4,6 +4,60 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W3.cap-r1): Live Capture invented Finder colours, and threw away failed tag writes
+
+**Found 2026-07-18** (adversarial Capture review; the colour half is the never-applied other side of #5
+below). **Premise re-confirmed by symbol on 2026-07-31** before a line changed — all three
+`_ = try? MacOSTagger.applyTags(...)` sites were still there in `writeSegmentFiles`, at 666/673/699 (the
+recorded 640/647/673 had drifted with W16.cfg\*).
+
+**The defect — two of them, on the same three lines.**
+
+1. **The colour was inferred from the text.** The live path passed a raw `[String]`, and that overload
+   *detects* "Red"/"Purple" anywhere in the array. So a document whose subject genuinely is "Red" (the Red
+   Scare, the Red Cross) was promoted to Finder label 6 — and lost "Red" from its tag list, since detection
+   also removes it. Downstream the Reader reads a red label as a **box** photo, so an ordinary document was
+   mis-parsed as archival structure. #5's fix (take the colour from the classification, not the words) was
+   applied to the batch merge path in 2026-07 and never to the live streaming path.
+2. **The write result was discarded.** `try?` swallowed every xattr / coordination / identity / permission
+   failure, and the segment was then staged, finalized and reported as tagged. A PDF could land byte-perfect,
+   count as **filed**, have its **source photo trashed**, and carry no subject/date/priority tags at all —
+   invisible to every tag-driven search in the Reader. This was the only way the "filed" verdict could be
+   silently wrong.
+
+**The fix.** One seam, `LiveCaptureProcessor.tagStagedArtifact`, used by all three sites:
+
+- The app assigns exactly one colour (Red = box, Purple = folder, none = document), so `jsonTags.colorTag`
+  is passed explicitly and `colorIsAuthoritative` is **fixed `true`** in the helper rather than left to the
+  caller — this seam no longer has a code path that can guess.
+- The helper returns whether the write landed; a refusal is recorded on the new
+  `StagedSegment.untaggedOutputs` and `finalize` warns, naming how many filed files carry no tags and what
+  to do. Optional field ⇒ a legacy staging manifest decodes and behaves exactly as before.
+- **The file still counts as filed** — the owner's 2026-07-18 decision. Bytes are safe and retagging is
+  possible, so withholding "filed" would strand the source photo over recoverable metadata. Only the silence
+  was a bug. (Contrast W23.h5, where the *image* is missing and the photo genuinely must be kept.)
+- Merge removes its about-to-be-deleted constituent PDFs from the record before tagging the merged output,
+  so the warning never counts an artifact that no longer exists.
+
+**Both had to ship together** (and did): (1) changes *which* overload is called and (2) changes *whether the
+result is discarded*, on the same three lines — landing them apart would have silently reverted half of the
+first.
+
+**Verification** (Tier-2; scratch only — synthetic files in a temp dir, never a corpus): `test-recovery.sh`
+Test 12 adds 11 checks — a subject tag of "Red" stays a searchable tag and takes no label; a box segment
+still gets label 6 with "Red" exactly once; a successful staging records nothing and its tags are read back
+off disk; a `chflags uchg` artifact makes the tagger genuinely fail and that verdict is both returned and
+threaded onto the segment; and the merge path tags the merged file with no stale record. 56/56 ALL PASS.
+Non-vacuity proven by neutering each half: colour → 1 RED, discarded result → 2 RED, all others GREEN.
+`test-merge-safety.sh` and `test-output-file-safety.sh` re-run clean.
+
+**Not widened (deliberate).** The **nine** equivalent `try?` sites in Process Files
+(`OCRProcessor+{Tagging,OCR,Pipeline}`) are out of scope here and stay queued as **W23.m5**, which reuses
+this mechanism rather than inventing a second one; **W23.h5-fu** (Process Files can't read the placeholder
+signal either) folds into m5 for the same reason.
+
+---
+
 ## ✅ FIXED (W23.m8): the phone's crash-durable session save couldn't tell you it hadn't saved
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
@@ -371,10 +425,11 @@ and writes receipts. It does not. The paragraph is retained below only as the hi
   empty, and the operator sees an empty Processing pane while `_processed/` holds orphaned output. Corrupt
   manifests get renamed + bannered, never auto-deleted.
 - **`W17.det1`** — stranded-session **detection logic only**, no UI.
-- **Tag-write failures folded into `W3.cap-r1`** — a real finding this entry does NOT contain: all three live-path
-  tag writes are `_ = try? MacOSTagger.applyTags(...)` (`LiveCaptureProcessor.swift:640/647/673`), so a file can be
-  trashed-at-source while its output carries **no tags at all** and is invisible to Reader triage. Fix = record
-  `tagsApplied` + warn in the finalize summary; still counts as filed. **Must ship in the same commit as r1.**
+- **Tag-write failures folded into `W3.cap-r1`** — ✅ **SHIPPED 2026-07-31** (see the FIXED entry at the top of this
+  file). A real finding this entry did NOT contain: all three live-path tag writes were
+  `_ = try? MacOSTagger.applyTags(...)`, so a file could be trashed-at-source while its output carried **no tags at
+  all** and was invisible to Reader triage. Fixed as specified — record the failure, warn in the finalize summary,
+  still counts as filed — in the same commit as r1's colour-overload fix, as required.
 
 **Original proposal (historical — see the fiction warning above):**
 

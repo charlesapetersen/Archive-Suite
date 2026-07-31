@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import PDFKit
+import ArchiveCore
 
 /// Headless, $0 self-test of the Live Capture DATA-SAFETY invariants, gated by
 /// `LIVECAPTURE_RECOVERYTEST=1` (does nothing in normal use). Uses synthetic files in a temp dir — no OCR,
@@ -22,6 +23,9 @@ import PDFKit
 ///      deliberate placeholder, so finalize can refuse to retire a source whose PDF carries no scan.
 ///   8. `sourcesSafeToRetire` (W23.h5) withholds exactly those source photos — per PAGE, on top of the
 ///      existing filed gate — so a placeholder-only PDF never costs the operator the original image.
+///   9. Staging (W3.cap-r1) neither invents a Finder colour from a subject tag nor discards a failed tag
+///      write: the app's own colour decides the label, and an artifact the tagger could not write is
+///      recorded on the segment so finalize can warn instead of reporting tags that aren't on disk.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -306,6 +310,100 @@ enum LiveCaptureRecoveryTestDriver {
             placeholderSourcesByGroup: ["T": wired.placeholderSources])
         check("end-to-end: finalize would retire the good photo and KEEP the unembeddable one",
               endToEnd == Set([goodSrc]))
+
+        // --- Test 12 (W3.cap-r1): the Finder-tag write on a staged artifact. TWO defects shared these three
+        // lines, so both are proven here. (i) The colour was INFERRED from the text — a raw `[String]` made
+        // `applyTags` hunt for "Red"/"Purple" anywhere in the array, so a document whose subject really is
+        // "Red" was promoted to a Finder colour label and lost "Red" as a searchable subject. (ii) The write
+        // RESULT was discarded (`_ = try?`), so an xattr/permission/coordination failure left the segment
+        // staged and finalized as though tagged — a file the Reader's tag triage can never surface. ---
+        let tagDir = tmp.appendingPathComponent("tagwrite", isDirectory: true)
+        try? fm.createDirectory(at: tagDir, withIntermediateDirectories: true)
+        func makeJPEG(_ name: String, in dir: URL) -> URL {
+            let u = dir.appendingPathComponent(name)
+            if let d = bitmap?.representation(using: .jpeg, properties: [:]) { try? d.write(to: u) }
+            return u
+        }
+        func tagsOf(_ u: URL) -> [String] {
+            if case .success(let names, _) = TagReading.read(u) { return names }
+            return []
+        }
+        // A cleared label reads back as 0 or absent depending on the write path; both mean "no colour".
+        func labelOf(_ u: URL) -> Int {
+            if case .success(_, let label) = TagReading.read(u) { return label ?? 0 }
+            return -1
+        }
+
+        // (a) THE COLOUR BUG. A plain document whose subject tag is literally "Red" — the app assigned no
+        // colour, so nothing here may become one.
+        let redDoc = makeJPEG("redscare.jpg", in: tagDir)
+        let redSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [redDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1948", "Red"],
+            jsonTags: GeneratedTags(subjectTags: ["Red"]), stampUnread: true)
+        let redPDF = redSeg.pdfURLs.first ?? tagDir
+        check("a subject tag that is literally \"Red\" survives as a searchable tag",
+              tagsOf(redPDF).contains("Red") && tagsOf(redPDF).contains("1948"))
+        check("...and is NOT promoted to a Finder colour label (the app assigned no colour)",
+              labelOf(redPDF) == 0)
+
+        // (b) The app's OWN colour still lands. A box segment carries Red as an actual Finder label, exactly
+        // once — proving (a) narrowed the colour source rather than disabling colouring altogether.
+        let boxSrc = makeJPEG("boxlabel.jpg", in: tagDir)
+        let boxSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [boxSrc], stagingDir: tagDir, model: stubModel,
+            type: .box, baseTags: ["Box", "Red"],
+            jsonTags: GeneratedTags(subjectTags: ["Box"], colorTag: "Red"), stampUnread: true)
+        let boxPDF = boxSeg.pdfURLs.first ?? tagDir
+        check("a box segment still gets the Finder RED label from the app's own colour", labelOf(boxPDF) == 6)
+        check("...and \"Red\" appears exactly once in its tags",
+              tagsOf(boxPDF).filter { $0 == "Red" }.count == 1)
+
+        // (c) No false positives: a write that succeeded records nothing, and the tags really are on disk.
+        check("a successful staging reports no untagged artifact",
+              redSeg.untaggedOutputs.isEmpty && boxSeg.untaggedOutputs.isEmpty)
+        check("the tags the segment claims are genuinely ON DISK", tagsOf(redPDF).last == "Unread")
+
+        // (d) THE DISCARDED-FAILURE BUG, at the production seam. `uchg` makes the artifact genuinely
+        // un-writable, which is the permission class the old `try?` erased.
+        let locked = tagDir.appendingPathComponent("locked.pdf")
+        try? fm.copyItem(at: realOut, to: locked)
+        try? fm.setAttributes([.immutable: true], ofItemAtPath: locked.path)
+        let lockedVerdict = LiveCaptureProcessor._recoveryTestTagArtifact(
+            ["1948", "Correspondence"], at: locked, appColor: nil, stampUnread: true)
+        check("a tag write the filesystem refuses is reported FAILED, not swallowed", lockedVerdict == false)
+        check("...and the refusal was real — the file carries no tags", tagsOf(locked).isEmpty)
+        try? fm.setAttributes([.immutable: false], ofItemAtPath: locked.path)   // so `tmp` can be removed
+
+        // (e) The WIRING: that verdict has to reach the manifest, or finalize still can't warn. Pre-placing
+        // an immutable file at the staged PDF's path fails every write against it — realistic (a locked
+        // output fails as a unit) and enough to prove the verdict is threaded onto the segment.
+        let wireTagDir = tmp.appendingPathComponent("tagwire", isDirectory: true)
+        try? fm.createDirectory(at: wireTagDir, withIntermediateDirectories: true)
+        let lockedSrc = makeJPEG("held.jpg", in: wireTagDir)
+        let lockedOut = wireTagDir.appendingPathComponent("held.pdf")
+        try? Data("pre-existing".utf8).write(to: lockedOut)
+        try? fm.setAttributes([.immutable: true], ofItemAtPath: lockedOut.path)
+        let lockedSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [lockedSrc], stagingDir: wireTagDir, model: stubModel,
+            type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(), stampUnread: true)
+        check("an un-taggable staged artifact is recorded on the segment (the wiring)",
+              lockedSeg.untaggedOutputs == [lockedOut])
+        try? fm.setAttributes([.immutable: false], ofItemAtPath: lockedOut.path)
+
+        // (f) The merge path tags the MERGED file and reports nothing spurious — the constituents it deletes
+        // must not linger in the record as artifacts that no longer exist.
+        let mergeDir = tmp.appendingPathComponent("tagmerge", isDirectory: true)
+        try? fm.createDirectory(at: mergeDir, withIntermediateDirectories: true)
+        let m1 = makeJPEG("m1.jpg", in: mergeDir), m2 = makeJPEG("m2.jpg", in: mergeDir)
+        let mergedSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [m1, m2], stagingDir: mergeDir, model: stubModel,
+            type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(),
+            stampUnread: true, doMerge: true)
+        check("merging leaves exactly one staged PDF and no stale untagged record",
+              mergedSeg.pdfURLs.count == 1 && mergedSeg.untaggedOutputs.isEmpty)
+        check("the merged PDF is the one that carries the tags",
+              mergedSeg.pdfURLs.first.map { tagsOf($0).contains("1948") } == true)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
