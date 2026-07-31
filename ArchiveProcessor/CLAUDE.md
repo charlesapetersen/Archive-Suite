@@ -462,6 +462,9 @@ Capture/                       Live Capture core (Tier-2):
                                test drivers (live-staging / Process-Files GUI / FileRelay invariants).
   LiveCaptureRecoveryTestDriver.swift   $0/no-OCR headless self-test (`LIVECAPTURE_RECOVERYTEST=1`) of the
                                data-safety invariants: confirm-before-delete + trash-not-rm.
+  ProcessFilesTagWarningTestDriver.swift   $0/no-OCR headless self-test (`PROCESSFILES_TAGWARN_TEST=1`) of
+                               the W23.m5/h5-fu output-warning contract: a refused Finder-tag write and a
+                               placeholder image page are REPORTED, not swallowed by `try?`.
 Net/                           Phone↔Mac transports + cloud relay (Tier-2; the protocol is a SHARED HOTSPOT):
   CaptureServer.swift          LAN HTTP/NWListener receiver; Bearer-authed routes (see hotspot list).
   CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.

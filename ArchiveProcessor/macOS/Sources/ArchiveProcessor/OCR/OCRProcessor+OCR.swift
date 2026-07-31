@@ -1142,7 +1142,10 @@ extension OCRProcessor {
         // W23.m5 / W23.h5-fu — the detached worker also reports whether the tag write landed and
         // whether the PDF's image page holds the real scan, so the main actor can record both instead
         // of the old "didn't throw ⇒ everything worked".
-        let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool,
+        // `tagWriteOK` is OPTIONAL on purpose: nil means no tag write was ATTEMPTED here (every mode but
+        // copy-source tags later, in the tagging phase). Recording those as successes would let a post-run
+        // `retryOne` — which regenerates the PDF and does not re-tag it — silently clear a real warning.
+        let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool?,
                         imagePage: PDFGenerator.ImagePageOutcome?)
             = await Task.detached(priority: .utility) {
             let pdfGen = PDFGenerator()
@@ -1153,7 +1156,7 @@ extension OCRProcessor {
                                                     gatewayDisplayName: gatewayName,
                                                     pdfImageMB: pdfMB, textColumns: txtCols)
                 var appliedTags: [String]? = nil
-                var tagWriteOK = true
+                var tagWriteOK: Bool? = nil
                 if shouldPassTags {
                     if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
                         // Copy-source pass-through (verbatim, label untouched) — see the note at the
@@ -1167,7 +1170,7 @@ extension OCRProcessor {
             } catch {
                 os_log(.error, "PDF write failed for %{public}@: %{public}@",
                        originalFileName, error.localizedDescription)
-                return (false, nil, true, nil)
+                return (false, nil, nil, nil)
             }
         }.value
         if pdfResult.success {
@@ -1178,7 +1181,9 @@ extension OCRProcessor {
             if let tags = pdfResult.tags {
                 jobs[index].appliedTags = tags
             }
-            recordTagWrite(succeeded: pdfResult.tagWriteOK, forSource: sourceURL)
+            if let tagWriteOK = pdfResult.tagWriteOK {
+                recordTagWrite(succeeded: tagWriteOK, forSource: sourceURL)
+            }
             if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
         } else {
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on

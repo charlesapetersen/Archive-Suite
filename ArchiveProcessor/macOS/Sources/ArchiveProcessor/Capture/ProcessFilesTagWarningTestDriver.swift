@@ -170,7 +170,29 @@ enum ProcessFilesTagWarningTestDriver {
         check("...and re-running it once the file is writable clears the warning",
               wired.untaggedOutputs.isEmpty && tagsOf(wireOutput).contains("Box"))
 
-        // --- 4. Merge transfers the bookkeeping to the file that survives it. ---
+        // --- 3c. A step that ATTEMPTS no tag write must not read as a success. `handleOCRResult`
+        // regenerates the PDF on a post-run retry and (outside copy-source) does not re-tag it, so if
+        // "no attempt" were recorded as `true`, that retry would silently clear a warning about a file
+        // that is still untagged. Drive the real production path: a retry-shaped second pass through
+        // `handleOCRResult` in a non-copy-source mode must leave the standing warning alone.
+        let retryDir = tmp.appendingPathComponent("retry", isDirectory: true)
+        try? fm.createDirectory(at: retryDir, withIntermediateDirectories: true)
+        let retrySource = makeJPEG("IMG_9001.jpg", in: retryDir)
+        let retrier = OCRProcessor()
+        retrier.taggingMode = .automatic          // NOT copy-source → no tag write in handleOCRResult
+        retrier.jobs = [OCRJob(sourceURL: retrySource)]
+        retrier.recordTagWrite(succeeded: false, forSource: retrySource)   // the tagging phase's verdict
+        let retryModel = LLMModel(id: "test-model", displayName: "Test Model", provider: .gemini,
+                                  supportsThinking: false, returnsMd: false,
+                                  inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+        _ = await retrier.handleOCRResult(
+            OCRResult(text: "retried text", classification: nil, errorMessage: nil, errorCode: nil),
+            index: 0, url: retrySource, model: retryModel, outputDirectory: retryDir)
+        check("a retry that re-writes the PDF without re-tagging leaves the warning standing",
+              retrier.untaggedOutputs == ["IMG_9001.jpg"])
+        check("...and that retry really did produce a fresh output", retrier.outputURLMap[retrySource] != nil)
+
+        // --- 4. Merge keeps the record honest. ---
         // Two component PDFs: one whose tag write failed, one carrying a placeholder image page. After the
         // merge BOTH are deleted, so neither may still be named — but the placeholder pages are copied into
         // the merged PDF, so that half has to move across rather than vanish.

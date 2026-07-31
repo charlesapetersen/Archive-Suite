@@ -4,6 +4,58 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ✅ FIXED (W23.m5 + W23.h5-fu): Process Files reported tags as applied after discarding the write failure
+
+**Found 2026-07-29** (owner-commissioned Codex full-suite review, confirmed finding). **Fixed
+2026-07-31** — `ff792a9` + `088df94` + `4cf1fb7` + the trackers commit. The Process Files sibling of
+W3.cap-r1 (below): the same `_ = try? MacOSTagger.applyTags(…)` on the ordinary OCR pipeline instead of
+the live streaming one.
+
+**What was wrong.** Every tag write in Process Files was its own `try?`. It swallowed each xattr /
+coordination / verification / permission / filesystem failure, and the run then populated
+`jobs[].appliedTags` and reported the file as processed as though the output were tagged. The PDF is
+byte-perfect either way — what an untagged output costs is FINDABILITY: the Reader's tag-driven triage
+silently omits it, so the operator learns about it the day a tag search comes back short. Folded in:
+**W23.h5-fu**, the same silence one layer down — `PDFGenerator.generate` reports whether the image page
+holds the real scan or the deliberate placeholder, and all five Process Files call sites were discarding
+that too.
+
+**The fix.** One seam, `OCRProcessor.writeOutputTags`, serves all 13 sites (`+Tagging` ×6, `+OCR` ×2,
+`+Pipeline` ×1 — the 9 filed — plus 4 in `+ReviewFlows` that are the same defect; leaving those unrouted
+would have made the new summary trustworthy and wrong). It returns whether the write landed. The run
+records the verdict, and the "Done. N succeeded, M failed." status line + the batch log name the
+affected files. Deliberately W3.cap-r1's mechanism, not a second warning channel.
+
+Four decisions worth keeping:
+
+- **The file still counts as processed** — the owner's 2026-07-18 decision, unchanged. Tags are
+  re-derivable; withholding "done" over metadata would help nobody. Only the silence was the bug.
+- **The record is keyed by the INPUT file, not the output.** `CollectionSegmenter.organizeOutput` MOVES
+  *and RENUMBERS* every output (`00003 Box 12.pdf`) as the last step of a run, so an output name or URL
+  recorded during tagging names a file that no longer exists by the time the summary is written. The
+  input name never changes and is what the operator recognizes.
+- **Self-healing, but only on a real attempt.** A later successful re-write (rotation regen, review
+  retry) CLEARS the entry. A step that attempts no write does not: a post-run `retryOne` regenerates the
+  PDF and — outside copy-source — does not re-tag it, so treating "no attempt" as success would have
+  silently cleared a warning about a file that is still untagged.
+- **Merge keeps it honest.** One merged PDF now covers every page, so its successful tag write resolves
+  each page's earlier failure; the placeholder warning stays against the photo whose page is still a
+  placeholder inside the merged PDF — the page an operator would actually re-shoot.
+
+**Guard:** `scripts/test-processfiles-tagwarn.sh` (`ProcessFilesTagWarningTestDriver`,
+`PROCESSFILES_TAGWARN_TEST=1`) — 35 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
+`chflags uchg` makes the tagger genuinely fail; a real production site (`applyBoxFolderLabelTags`) proves
+the WIRING and that fixing the permission clears the warning; merge, the summary copy and the h5-fu
+placeholder path are all driven end to end. Proven non-vacuous by four neuters, each turning exactly the
+expected checks RED.
+
+**Still open:** the two read-append-rewrite sites (`applyCapturePriorityTags`, `exportOriginalImages`)
+re-apply tags as a raw `[String]`, so Red/Purple DETECTION still runs over them — the colour half of
+W3.cap-r1, on this path. Deliberately out of scope here (this change altered no write semantics) and
+filed as **W23.m5-fu** in `SUITE_TODO.md`.
+
+---
+
 ## ✅ FIXED (W3.cap-r1): Live Capture invented Finder colours, and threw away failed tag writes
 
 **Found 2026-07-18** (adversarial Capture review; the colour half is the never-applied other side of #5

@@ -111,6 +111,9 @@ extension OCRProcessor {
     }
     /// Insert-once / remove semantics for the two warning records, order-preserving. Pure + `static`
     /// so the headless driver can prove the self-healing without standing up a processor.
+    /// Two inputs with the SAME basename from different folders collapse to one entry — deliberate:
+    /// this is an operator warning keyed to a recognizable name, not a per-file ledger, and the name is
+    /// still the right thing to go looking for.
     nonisolated static func updatedOutputWarnings(
         _ names: [String], name: String, present: Bool
     ) -> [String] {
@@ -1066,11 +1069,15 @@ extension OCRProcessor {
                 // W23.m5 — every page of this segment is now covered by ONE merged PDF, and the tag
                 // write for it is the `try` above (reaching here means it landed). So each page's earlier
                 // tag failure is resolved and must be cleared, or the summary would keep naming work that
-                // is now correctly tagged. The PLACEHOLDER record is deliberately NOT cleared: those pages
-                // are copied into the merged PDF exactly as they were, and the page still to be re-run is
-                // identified by the photo it came from — which is what the record already holds.
-                for pageSource in segment.pdfURLs {
-                    recordTagWrite(succeeded: true, forSource: pageSource)
+                // is now correctly tagged. Gated on a write having actually HAPPENED: in a no-tagging run
+                // `tagged` is nil and nothing was written, so there is no verdict to record. The
+                // PLACEHOLDER record is deliberately NOT cleared either way — those pages are copied into
+                // the merged PDF exactly as they were, and the page still to be re-run is identified by
+                // the photo it came from, which is what the record already holds.
+                if tagged != nil {
+                    for pageSource in segment.pdfURLs {
+                        recordTagWrite(succeeded: true, forSource: pageSource)
+                    }
                 }
 
                 // Update outputURLMap: point all source URLs in this segment to the merged PDF

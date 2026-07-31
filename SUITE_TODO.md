@@ -537,20 +537,44 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   W20 (test isolation), not W18 (dual reference).
   | files: ArchiveReader/macOS/Sources/ArchiveReader/{ArchiveReaderCommands,Views/NavigationWindowView,Views/PreviewSheet,Views/DocumentWindowView,Views/DocumentViewerModel,Views/NavigationModel}.swift | M | med | none
 
-- [ ] **W23.m5 — Process Files reports Finder tags as applied after silently discarding tag-write failures
-  [M · MED · tag/PDF SPEC] (blocked-on: W3.cap-r1).** `OCR/OCRProcessor+Tagging.swift`,
-  `OCR/OCRProcessor+OCR.swift`, `OCR/OCRProcessor+Pipeline.swift`. Automatic tagging, **both** manual tagging
-  paths, and copy-source tag pass-through all discard `MacOSTagger.applyTags` errors with `try?`, then populate
-  `jobs[].appliedTags` **as though the output were tagged**. On an xattr / coordination / verification /
-  permission / filesystem failure the PDF succeeds and the UI+model report tags that are **absent on disk** —
-  and Reader then silently omits the file from tag-driven triage.
-  **Re-verified 2026-07-29:** **9** `_ = try? MacOSTagger.applyTags(...)` sites, not 3 —
-  `+Tagging.swift` ×6, `+OCR.swift` ×2, `+Pipeline.swift` ×1. (Line numbers drifted with W16.cfg*; grep the
-  literal.) **W3.cap-r1 is scoped to the three *Live Capture* sites in `LiveCaptureProcessor.swift` only** —
-  these ordinary Process Files sites are the remainder. **Blocked-on W3.cap-r1 deliberately: reuse its
-  per-artifact `tagsApplied` + finalize-summary warning mechanism, do not invent a second one.** Same owner
-  decision applies — warn, but the file still counts as filed.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+{Tagging,OCR,Pipeline}.swift | M | med | none
+- [x] **W23.m5 — Process Files reports Finder tags as applied after silently discarding tag-write failures
+  [M · MED · tag/PDF SPEC].** ✅ DONE `ff792a9` (the seam + all 13 sites + surfacing) + `088df94` (the $0
+  functional test) + `4cf1fb7` (re-key to the input file) + this commit (adversarial-review fixes +
+  trackers) — **W23.h5-fu folded in**, as its entry required. Every Process Files tag write now goes
+  through one seam, `OCRProcessor.writeOutputTags`, which RETURNS whether the write landed; the run
+  records the verdict against the INPUT file and the "Done." status line + batch log say so. Reuses
+  W3.cap-r1's mechanism rather than adding a second warning channel. 13 sites, not the 9 recorded:
+  `+Tagging` ×6, `+OCR` ×2, `+Pipeline` ×1 as filed, plus the 4 in `+ReviewFlows` (reclassification ×3 +
+  the copy-source restore after rotation regen) — leaving those unrouted would have made the new summary
+  trustworthy and wrong. The file still counts as processed (the owner's 2026-07-18 decision); only the
+  silence was the bug. Keyed by SOURCE because `organizeOutput` MOVES **and RENUMBERS** every output
+  (`00003 Box 12.pdf`), so an output name recorded during the run names a file that no longer exists by
+  summary time. Self-healing: a later successful re-write clears the entry, but a step that ATTEMPTS no
+  write (a post-run `retryOne`, which regenerates the PDF and does not re-tag it) does not.
+  Tier-2: `scripts/test-processfiles-tagwarn.sh` + `ProcessFilesTagWarningTestDriver`, 35 $0 checks
+  (`chflags uchg` makes the tagger genuinely fail; a real production site proves the WIRING; the summary
+  copy, merge bookkeeping and the h5-fu placeholder path are all driven end to end). Proven non-vacuous
+  by four separate neuters, each turning exactly the expected checks RED. Six sibling regressions green.
+  Build clean, 0 new warnings. Residual colour-detection finding filed as **W23.m5-fu**.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor{,+Tagging,+OCR,+Pipeline,+ReviewFlows}.swift, Capture/ProcessFilesTagWarningTestDriver.swift, scripts/test-processfiles-tagwarn.sh | M | med | none
+
+- [ ] **W23.m5-fu — two read-append-rewrite tag sites still infer the Finder colour from the tag text
+  [XS–S · LOW · misfile].** Found 2026-07-31 while fixing W23.m5 (the audit of the sites it rewrote, not
+  a new review). `applyCapturePriorityTags` and `exportOriginalImages` both READ a PDF's tags back off
+  disk and re-apply them as a raw `[String]`, so `MacOSTagger` runs its Red/Purple DETECTION over the
+  array — the same defect W3.cap-r1 fixed on the Live Capture staging path and KNOWN_ISSUES #5 fixed on
+  the batch merge path. A document whose subject tag is literally "Red" (the Red Scare, the Red Cross)
+  therefore gets Finder label 6 on the rewrite and loses "Red" as a searchable subject; the Reader reads
+  a red label as a **box** photo, so an ordinary document is mis-parsed as archival structure.
+  **Deliberately left in W23.m5** (which is about discarded write failures, and passed these two sites
+  through unchanged so it could not alter what anyone writes) — and the fix is NOT simply flipping
+  `colorIsAuthoritative`: with `appColor: nil` that would STRIP the label from every genuine box/folder
+  PDF. Do what `performDocumentMerging` already does: derive the colour from the job's
+  `classification` (`.boxLabel` → "Red", `.folderLabel` → "Purple", else nil) and pass it explicitly.
+  Both sites iterate `jobs`, so the classification is already in hand. Test: extend
+  `scripts/test-processfiles-tagwarn.sh` — a "Red"-subject document keeps the tag and takes no label
+  through a rewrite; a box PDF still reads label 6 afterwards.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift | XS–S | low | W23.m5
 
 - [x] **W23.m6 — Reader can emit durable links carrying a root GUID that was never persisted
   [S–M · MED · broken citations · SHARED CORE].** ✅ DONE `fa8bc02` (ArchiveCore) + `1e0af47` (Reader) + this
@@ -1082,8 +1106,16 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   `mutateItem`s on one item, then assert the index row matches disk without a rebuild.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndex}.swift | S | low | W23.h2
 
-- [ ] **W23.h5-fu — Process Files still can't tell a placeholder PDF from a real one (the signal now exists;
-  nothing there reads it) [XS–S · LOW] (blocked-on: W23.m5).** Found 2026-07-30 while fixing W23.h5.
+- [x] **W23.h5-fu — Process Files still can't tell a placeholder PDF from a real one (the signal now exists;
+  nothing there reads it) [XS–S · LOW].** ✅ DONE inside **W23.m5** exactly as this entry required —
+  `ff792a9` (all five `generate` call sites now capture `ImagePageOutcome`, surfaced through W23.m5's
+  per-run warning channel, not a second one) + `4cf1fb7` (keyed to the source photo, which is the page
+  to re-run) + this commit (trackers). The multi-page re-OCR assembly reports a placeholder if ANY page
+  fell back; the merged-PDF case keeps the warning against the photo it came from; a regen that embeds
+  the scan clears it. Covered by `scripts/test-processfiles-tagwarn.sh` (a real `PDFGenerator` run on a
+  decodable vs. an undecodable image drives the record end to end; the PDF is still written with both
+  pages and the source image is confirmed untouched). Original finding below.
+  Found 2026-07-30 while fixing W23.h5.
   *(The `blocked-on` was added 2026-07-31: the prose below already said "do this inside W23.m5", but with no
   machine-readable dependency `next-queue-item.sh` offered h5-fu as actionable AHEAD of m5 — which would have
   produced exactly the second warning channel this item forbids.)* `PDFGenerator.generate` now
