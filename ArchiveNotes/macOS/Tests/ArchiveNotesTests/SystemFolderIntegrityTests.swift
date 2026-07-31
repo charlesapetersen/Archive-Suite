@@ -56,9 +56,16 @@ struct SystemFolderIntegrityTests {
 
     /// Delete a folder row **behind the store's back**, the way the shipped bug did — the guards under
     /// test would refuse the same thing through the API, so this is how a damaged store is reproduced.
+    ///
+    /// Foreign keys are switched off around it *because* the fix works: the constraint refuses to
+    /// orphan a membership, so the pre-fix damage can only be recreated under pre-fix conditions
+    /// (a legacy DB had no FK at all). `foreignKeyDeleteIsRefused` below asserts that refusal directly.
     private func deleteFolderRowDirectly(_ id: UUID, in index: NotesIndex) async throws {
-        try await index.executeForTesting(
-            "DELETE FROM folders WHERE id = '\(id.uuidString)';")
+        try await index.executeForTesting("""
+            PRAGMA foreign_keys = OFF;
+            DELETE FROM folders WHERE id = '\(id.uuidString)';
+            PRAGMA foreign_keys = ON;
+            """)
     }
 
     private func dbMembershipCount(_ index: NotesIndex, folder: UUID) async -> Int {
@@ -310,5 +317,174 @@ struct SystemFolderIntegrityTests {
         try await env.org.addMembership(item: item, folder: f.id)
         #expect(env.org.items(in: f.id) == [item])
         #expect(await dbMembershipCount(env.index, folder: f.id) == 1)
+    }
+
+    // MARK: - (c) The SQL layer refuses it too
+
+    /// The store's guard is Swift; this is the backstop under it. A writer that goes straight to the
+    /// index — a future feature, a migration, a repair tool — cannot mint a ghost either.
+    @Test("SQLite refuses a membership naming a folder that doesn't exist")
+    func foreignKeyRefusesGhostMembership() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let ghost = Membership(itemId: UUID(), folderId: UUID(), addedAt: Date())
+        await #expect(throws: NotesIndex.IndexError.self) {
+            try await env.index.insertMembership(ghost)
+        }
+        #expect(await env.index.allMemberships().isEmpty)
+    }
+
+    /// The other half of the constraint: a folder row cannot be dropped out from under its contents.
+    @Test("SQLite refuses to delete a folder that still has memberships")
+    func foreignKeyDeleteIsRefused() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let f = try await env.org.createFolder(name: "Research")
+        try await env.org.addMembership(item: UUID(), folder: f.id)
+        await #expect(throws: NotesIndex.IndexError.self) {
+            try await env.index.deleteFolder(id: f.id)
+        }
+        #expect(await env.index.allFolders().contains { $0.id == f.id })
+    }
+
+    /// Non-vacuity for the refusal above — the app's own delete path still works, because
+    /// `deleteFolderGraph` clears the memberships inside the same transaction first.
+    @Test("the real delete path still removes a folder and its memberships")
+    func deleteFolderGraphStillWorks() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let f = try await env.org.createFolder(name: "Research")
+        let child = try await env.org.createFolder(name: "Sub", parent: f.id)
+        let item = UUID()
+        try await env.org.addMembership(item: item, folder: f.id)
+        try await env.org.addMembership(item: item, folder: child.id)
+
+        let orphaned = try await env.org.deleteFolder(f.id)
+        #expect(orphaned.isEmpty)                       // still in `child`
+        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+        #expect(await dbMembershipCount(env.index, folder: f.id) == 0)
+        // The child was reparented to root, and — the REPLACE trap — kept its membership.
+        #expect(await env.index.allFolders().first { $0.id == child.id }?.parentId == nil)
+        #expect(await dbMembershipCount(env.index, folder: child.id) == 1)
+    }
+
+    /// A guard, not a reproduction: `INSERT OR REPLACE` survives the NO ACTION foreign key (SQLite
+    /// checks an immediate FK at statement end, and delete-then-reinsert of the same key nets to zero),
+    /// so this passes with either shape of `updateFolder`. It is here because "a rename emptied the
+    /// folder" is the failure a future `ON DELETE CASCADE` would cause, and nothing else would catch it.
+    @Test("renaming and reparenting a folder never touches its memberships")
+    func renameAndMoveKeepMemberships() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let parent = try await env.org.createFolder(name: "Parent")
+        let f = try await env.org.createFolder(name: "Research")
+        let a = UUID(), b = UUID()
+        try await env.org.addMembership(item: a, folder: f.id)
+        try await env.org.addMembership(item: b, folder: f.id)
+
+        try await env.org.renameFolder(f.id, to: "Sources")
+        #expect(await dbMembershipCount(env.index, folder: f.id) == 2)
+        #expect(await env.index.allFolders().first { $0.id == f.id }?.name == "Sources")
+
+        try await env.org.moveFolder(f.id, newParent: parent.id, sortOrder: 0)
+        #expect(await dbMembershipCount(env.index, folder: f.id) == 2)
+        let moved = await env.index.allFolders().first { $0.id == f.id }
+        #expect(moved?.parentId == parent.id)
+        #expect(moved?.name == "Sources")               // the UPDATE wrote every column, not just one
+    }
+
+    /// What the `updateFolder` rewrite actually changes: it is an UPDATE, so it cannot resurrect a
+    /// folder row that is gone. The old `INSERT OR REPLACE` alias would have re-created it from a stale
+    /// in-memory copy — a deleted folder reappearing because some other window renamed it.
+    @Test("updateFolder does not resurrect a folder that was deleted")
+    func updateFolderDoesNotResurrect() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let f = try await env.org.createFolder(name: "Research")
+        try await env.index.deleteFolder(id: f.id)      // no memberships, so the FK allows it
+        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+
+        var stale = f
+        stale.name = "Sources"
+        try await env.index.updateFolder(stale)
+        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+    }
+
+    /// A DB written before the FK existed must open, keep every row — **including** the ghosts that are
+    /// the whole point of restoring by id — and be constrained from then on.
+    @Test("a legacy memberships table is migrated in place, ghosts and all")
+    func legacyTableIsMigrated() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("notes-w23m15-legacy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dbURL = root.appendingPathComponent("index.db")
+
+        let ghostFolder = UUID(), ghostItem = UUID(), realItem = UUID()
+        do {
+            let index = NotesIndex(url: dbURL)
+            try await index.open()
+            let org = OrganizationStore(index: index)
+            try await org.load(storeRoot: root)
+            try await org.addMembership(item: realItem, folder: OrganizationStore.inboxFolderId)
+            // Rewind `memberships` to its pre-W23.m15 shape and add a row the FK would now refuse —
+            // i.e. exactly what the shipped build left behind.
+            try await index.executeForTesting("""
+                PRAGMA foreign_keys = OFF;
+                CREATE TABLE memberships_legacy(
+                    item_id TEXT, folder_id TEXT, added_at REAL, PRIMARY KEY(item_id, folder_id));
+                INSERT INTO memberships_legacy SELECT item_id, folder_id, added_at FROM memberships;
+                DROP TABLE memberships;
+                ALTER TABLE memberships_legacy RENAME TO memberships;
+                INSERT INTO memberships(item_id, folder_id, added_at)
+                    VALUES('\(ghostItem.uuidString)', '\(ghostFolder.uuidString)', 0);
+                """)
+            await index.close()
+        }
+
+        let index = NotesIndex(url: dbURL)
+        try await index.open()                          // the migration runs here
+        defer { Task { await index.close() } }
+
+        let rows = await index.allMemberships()
+        #expect(rows.count == 2)                        // nothing was dropped to satisfy the constraint
+        #expect(rows.contains { $0.itemId == realItem })
+        #expect(rows.contains { $0.itemId == ghostItem && $0.folderId == ghostFolder })
+
+        // …and the table is constrained from now on.
+        await #expect(throws: NotesIndex.IndexError.self) {
+            try await index.insertMembership(Membership(itemId: UUID(), folderId: UUID(), addedAt: Date()))
+        }
+        // The indexes the rebuild dropped are back (a missing one is a silent full scan, not an error).
+        #expect(await index.indexNamesForTesting("memberships")
+                    .isSuperset(of: ["memberships_folder", "memberships_item"]))
+    }
+
+    /// The mirror-rebuild path clears children before parents; the reverse order is refused by the FK.
+    @Test("replaceOrganization can rebuild over a populated graph")
+    func replaceOrganizationOverPopulatedGraph() async throws {
+        let env = try await makeEnv()
+        defer { Task { await cleanup(env) } }
+
+        let old = try await env.org.createFolder(name: "Old")
+        try await env.org.addMembership(item: UUID(), folder: old.id)
+        try await env.org.assignTemplate(UUID(), to: old.id)
+
+        let fresh = VFolder(id: UUID(), name: "Fresh", parentId: nil,
+                            sortOrder: 0, kind: .normal, queryJSON: nil)
+        let item = UUID()
+        try await env.index.replaceOrganization(
+            folders: [fresh],
+            memberships: [Membership(itemId: item, folderId: fresh.id, addedAt: Date())],
+            assignments: [])
+
+        #expect(await env.index.allFolders().map(\.id) == [fresh.id])
+        #expect(await env.index.allMemberships().map(\.itemId) == [item])
+        #expect(await env.index.allTemplateAssignments().isEmpty)
     }
 }

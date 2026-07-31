@@ -97,14 +97,22 @@ actor NotesIndex {
                 query_json TEXT
             );
             """)
+        // `folder_id` is a FOREIGN KEY (W23.m15): without it the table happily stored a membership to
+        // any UUID, so every note filed after a folder was deleted added a row nothing could render,
+        // empty, or restore. NO ACTION rather than ON DELETE CASCADE, deliberately — a cascade would
+        // make any accidental delete of a folder row silently destroy its contents, whereas NO ACTION
+        // turns the same mistake into a loud constraint failure. `deleteFolderGraph` already deletes a
+        // folder's memberships before the folder itself, which is exactly what NO ACTION requires.
         try exec("""
             CREATE TABLE IF NOT EXISTS memberships(
                 item_id TEXT,
                 folder_id TEXT,
                 added_at REAL,
-                PRIMARY KEY(item_id, folder_id)
+                PRIMARY KEY(item_id, folder_id),
+                FOREIGN KEY(folder_id) REFERENCES folders(id)
             );
             """)
+        try migrateMembershipsToForeignKey()
         try exec("CREATE INDEX IF NOT EXISTS memberships_folder ON memberships(folder_id);")
         try exec("CREATE INDEX IF NOT EXISTS memberships_item   ON memberships(item_id);")
         try exec("""
@@ -113,6 +121,60 @@ actor NotesIndex {
                 template_id TEXT
             );
             """)
+
+        // Enforcement is per-connection and OFF by default, which is why every statement above — the
+        // membership rebuild included — ran unconstrained. Last, so the migration could copy a legacy
+        // table's pre-existing ghost rows through instead of failing on them: SQLite checks foreign
+        // keys as rows are WRITTEN, so those survive here and are revived when `OrganizationStore.load`
+        // restores the system folder they name. Only NEW violations are refused from now on.
+        //
+        // `template_assignments.folder_id` is deliberately left unconstrained: a stale assignment is
+        // inert (the resolver simply finds nothing) and `clearDanglingAssignments` already tidies it,
+        // so a second table rebuild would buy nothing and risk durable data.
+        try exec("PRAGMA foreign_keys = ON;")
+    }
+
+    /// Give a pre-W23.m15 `memberships` table its `folder_id` foreign key — the standard SQLite
+    /// rebuild, since a constraint cannot be added in place. A no-op once the FK is present, so it
+    /// costs one `PRAGMA` per launch thereafter.
+    ///
+    /// Runs BEFORE `PRAGMA foreign_keys = ON`, which is what lets the copy carry a legacy DB's ghost
+    /// memberships across. Dropping them here instead would delete durable organization data to
+    /// satisfy a constraint added after the fact — and those rows are precisely what comes back to
+    /// life when the system folder they name is restored.
+    private func migrateMembershipsToForeignKey() throws {
+        guard !membershipsHaveForeignKey() else { return }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try exec("""
+                CREATE TABLE memberships_new(
+                    item_id TEXT,
+                    folder_id TEXT,
+                    added_at REAL,
+                    PRIMARY KEY(item_id, folder_id),
+                    FOREIGN KEY(folder_id) REFERENCES folders(id)
+                );
+                """)
+            try exec("""
+                INSERT INTO memberships_new(item_id, folder_id, added_at)
+                SELECT item_id, folder_id, added_at FROM memberships;
+                """)
+            try exec("DROP TABLE memberships;")
+            try exec("ALTER TABLE memberships_new RENAME TO memberships;")
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+        // The old table's indexes went with it; the `CREATE INDEX IF NOT EXISTS` pair in `openSchema`
+        // runs immediately after this and rebuilds them.
+    }
+
+    /// Whether `memberships` already declares a foreign key — the migration guard.
+    private func membershipsHaveForeignKey() -> Bool {
+        guard let stmt = prepare("PRAGMA foreign_key_list(memberships);") else { return false }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW
     }
 
     func close() { discardHandle() }
@@ -399,7 +461,36 @@ actor NotesIndex {
         }
     }
 
-    func updateFolder(_ f: VFolder) throws { try insertFolder(f) }
+    /// Update an existing folder row in place.
+    ///
+    /// A real `UPDATE`, no longer an alias for `insertFolder`'s `INSERT OR REPLACE` (W23.m15).
+    ///
+    /// **The REPLACE was survivable, and the tests say so** — an early draft of this change claimed the
+    /// opposite. REPLACE satisfies the conflict by deleting the existing row and inserting a new one,
+    /// but SQLite checks an *immediate* foreign key at the END of the statement: deleting and
+    /// re-inserting the same primary key nets the violation count back to zero, and NO ACTION means the
+    /// child rows were never touched in between. Restoring the old alias reddens nothing about
+    /// memberships. Two reasons this is still the right shape:
+    ///
+    /// 1. It is **non-upserting**, which is what "update" should mean here: a row that isn't there is a
+    ///    no-op, not a resurrection from a stale in-memory copy. Both callers (`renameFolder`,
+    ///    `moveFolder`) have already found the folder in the graph.
+    /// 2. It removes the delete-and-reinsert entirely, so no rename's correctness rests on the FK
+    ///    having been declared NO ACTION. Declare `ON DELETE CASCADE` here one day and a REPLACE
+    ///    *would* silently empty the folder; an in-place UPDATE cannot.
+    func updateFolder(_ f: VFolder) throws {
+        try run("""
+            UPDATE folders SET name = ?, parent_id = ?, sort_order = ?, kind = ?, query_json = ?
+            WHERE id = ?;
+            """) { stmt in
+            self.bindText(stmt, 1, f.name)
+            if let p = f.parentId { self.bindText(stmt, 2, p.uuidString) } else { sqlite3_bind_null(stmt, 2) }
+            sqlite3_bind_int(stmt, 3, Int32(f.sortOrder))
+            self.bindText(stmt, 4, f.kind.rawValue)
+            if let q = f.queryJSON { self.bindText(stmt, 5, q) } else { sqlite3_bind_null(stmt, 5) }
+            self.bindText(stmt, 6, f.id.uuidString)
+        }
+    }
 
     func deleteFolder(id: UUID) throws {
         try run("DELETE FROM folders WHERE id = ?;") { self.bindText($0, 1, id.uuidString) }
@@ -492,7 +583,9 @@ actor NotesIndex {
     func deleteFolderGraph(id: UUID, reparentedChildren: [VFolder]) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
-            for child in reparentedChildren { try insertFolder(child) }
+            // `updateFolder`, not `insertFolder`: these rows already exist, so this is an update, and
+            // it should not silently re-create a child that another window deleted (W23.m15).
+            for child in reparentedChildren { try updateFolder(child) }
             try deleteMembershipsForFolder(id)
             try deleteTemplateAssignment(folder: id)
             try deleteFolder(id: id)
@@ -541,6 +634,19 @@ actor NotesIndex {
     /// exactly ONE leg of a transaction, which is the only way to prove the other legs roll back.
     /// Not compiled into Release.
     func executeForTesting(_ sql: String) throws { try exec(sql) }
+
+    /// Test-only: the index names attached to `table`. `SystemFolderIntegrityTests` (W23.m15) uses it
+    /// to prove the FK migration's `DROP TABLE` didn't leave the memberships indexes behind — a loss
+    /// nothing else would report, since a missing index is a silent full scan, not an error.
+    func indexNamesForTesting(_ table: String) -> Set<String> {
+        guard let stmt = prepare("PRAGMA index_list(\(table));") else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var names = Set<String>()
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 1) { names.insert(String(cString: c)) }
+        }
+        return names
+    }
     #endif
 
     // MARK: - Bulk organization replace (for JSON import on DB wipe)
@@ -549,9 +655,12 @@ actor NotesIndex {
                              assignments: [TemplateAssignment]) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
-            try exec("DELETE FROM folders;")
+            // Children before parents, then parents before children on the way back in — the FK's
+            // ordering, not a style choice: clearing `folders` while a membership still referenced a
+            // row would be refused outright (W23.m15).
             try exec("DELETE FROM memberships;")
             try exec("DELETE FROM template_assignments;")
+            try exec("DELETE FROM folders;")
             for f in folders { try insertFolder(f) }
             for m in memberships { try insertMembership(m) }
             for a in assignments { try insertTemplateAssignment(a) }

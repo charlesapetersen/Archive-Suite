@@ -849,8 +849,25 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   offline case as its own outcome, not as absence. Notes `Links/{ReaderLinkResolver,ReaderRootStore}`,
   `Views/ReaderPreviewPopover`. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | XS | low | none
 
-- [ ] **W23.m15 — deleting the Inbox or Extracts system folder is permanent and creates ghost memberships
-  forever [S–M · MED].** `Views/NotesFolderTreeView.swift`, `Index/OrganizationStore.swift`,
+- [x] **W23.m15 — deleting the Inbox or Extracts system folder is permanent and creates ghost memberships
+  forever [S–M · MED].** ✅ **DONE 2026-07-31** (checkpoint `cf03fe1` = the three Swift refusal layers,
+  the by-id restore and 13 tests; completing commit = the SQL foreign key, its migration and the
+  trackers). Rename/Delete are disabled
+  on a system folder in the sidebar, refused with a readable sentence by `NotesModel` (and refused
+  *before* `deleteFolderDeletingStranded` trashes anything), and refused by `OrganizationStore` as the
+  backstop; `load` restores a missing system folder **by id** on every path — a no-op for a healthy
+  store, never clobbers a rename, and revives the memberships the deleted folder stranded;
+  `addMembership`/`moveMembership` refuse an unknown folder, and `memberships.folder_id` is now a real
+  FOREIGN KEY with an in-place migration that carries a legacy DB's ghost rows across rather than
+  deleting durable data to satisfy a constraint added after the fact. **NO ACTION, not ON DELETE
+  CASCADE** — a cascade would let any stray folder-row delete silently empty the folder. Two claims the
+  tests corrected: an `INSERT OR REPLACE` on `folders` is *survivable* under NO ACTION (SQLite checks an
+  immediate FK at statement end, so delete-then-reinsert of the same key nets to zero), so the
+  `updateFolder` rewrite is justified by non-upsert semantics rather than that hazard; and
+  `replaceOrganization`'s delete order **is** load-bearing (children before parents). 20 new tests
+  (`SystemFolderIntegrityTests`), scratch fixtures only; 644/644 green; non-vacuity proven by 6 neuters,
+  each reddening a disjoint set. Residual **W23.m15-fu** (LOW) filed in the LOW section.
+  `Views/NotesFolderTreeView.swift`, `Index/OrganizationStore.swift`,
   `Core/NotesModel.swift`, `Index/NotesIndex.swift`. Every folder — **including the fixed-ID Inbox and
   Extracts** — gets Rename and Delete actions, and `deleteFolder` accepts those IDs. System folders are
   reseeded **only when the entire folder table is empty**, so deleting one is **permanent**. Worse, new notes
@@ -861,6 +878,24 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   (defence in depth); (b) reseed a missing system folder at startup by **ID**, not only on an empty table;
   (c) make `addMembership` reject a nonexistent folder, and add the FK/constraint.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NotesFolderTreeView,Index/OrganizationStore,Core/NotesModel,Index/NotesIndex}.swift | S–M | med | none
+
+- [ ] **W23.m15-fu — ghost memberships already on disk are never swept, only out-voted [XS–S · LOW ·
+  stale data].** Residual of W23.m15, filed 2026-07-31. **Not** a re-open: no new ghost can be created
+  (the store guard and the FK both refuse one), and a ghost naming a *system* folder is revived by the
+  by-id restore, which is the common case by far. The gap is the leftover naming a **user** folder that
+  is genuinely gone — only reachable via the pre-fix race between a folder delete and a concurrent
+  replicate. Those rows survive the FK migration on purpose (SQLite checks foreign keys as rows are
+  written, so pre-existing violations are tolerated, and dropping them would delete durable organization
+  data), and the DB load path deliberately does not purge them either. They are invisible, but they do
+  inflate `membershipCount(item:)`, which makes the §3.6 last-instance guard treat such a note as filed
+  elsewhere: deleting its last *real* folder then won't offer to trash it, and the note ends up
+  reachable only under All Notes with nothing said. Conservative — it never deletes a note it shouldn't
+  — but silent. **Fix:** a one-shot sweep at load (`PRAGMA foreign_key_check` / an anti-join against
+  `folders`) that reports what it found rather than deleting quietly, run once and stamped so it isn't a
+  per-launch cost. Deliberately out of scope with it: `template_assignments.folder_id` stays
+  unconstrained (a stale assignment is inert and `clearDanglingAssignments` already tidies it, so a
+  second table rebuild would risk durable data for nothing).
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Index/{OrganizationStore,NotesIndex}.swift | XS–S | low | none
 
 ### LOW
 

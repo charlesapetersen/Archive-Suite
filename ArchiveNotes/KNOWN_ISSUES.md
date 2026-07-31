@@ -3,6 +3,66 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.m15) — deleting Inbox or Extracts was permanent, and the app kept filing notes into it
+
+**2026-07-31.** Every row in the folder tree offered Rename and Delete, the two **fixed-ID system
+folders** (Inbox `…0002`, Extracts `…0003`, §16.6) included, and `OrganizationStore.deleteFolder`
+accepted those ids. `load` re-seeded the system folders **only when the whole folder table was empty**,
+so a store with even one user folder never got a deleted one back — launch after launch. Meanwhile
+`addMembership` never checked that its folder existed and `memberships` declared **no foreign key**, so
+`newItem` (→ Inbox) and `createExtract` (→ Extracts) went on writing memberships to the dead id: rows
+nothing could render, empty, or restore, accumulating for the life of the store.
+
+**Three layers, on purpose.** The sidebar **disables** Rename/Delete on a system folder (greyed says
+"not allowed here"; a missing menu item reads as a broken menu). `NotesModel` refuses with a sentence
+the user can read — and `deleteFolderDeletingStranded` refuses **before** it trashes anything, since its
+whole job is deleting notes and the store's throw would arrive after the modal had already named them.
+`OrganizationStore` throws `OrganizationError`, the backstop for a caller that skips both.
+
+**Restoration is by id, on every load path** — a no-op for a healthy store, it cannot clobber a system
+folder the user renamed, and it brings the stranded memberships back to life with the folder. The
+`organization.json` import restores first and only then drops edges naming a folder the mirror doesn't
+define; those are already unrenderable, and dropping them is what stops the new FK turning a tidy-up
+into a store that won't open.
+
+**The constraint.** `memberships.folder_id` is now `REFERENCES folders(id)`, with a standard in-place
+rebuild for legacy DBs run before `PRAGMA foreign_keys = ON` so a damaged store's existing ghost rows
+are **carried across, not deleted** — SQLite only checks foreign keys as rows are written, so
+pre-existing violations are tolerated, and they are exactly what the by-id restore revives. **NO ACTION,
+not ON DELETE CASCADE**, deliberately: a cascade would let any stray delete of a folder row silently
+destroy its contents, whereas NO ACTION makes the same mistake a loud failure.
+`template_assignments.folder_id` is left unconstrained — a stale assignment is inert and
+`clearDanglingAssignments` already tidies it.
+
+**Two claims the tests corrected.** An early draft held that `INSERT OR REPLACE` on `folders` would fire
+FK delete actions and so break every rename; neutering `updateFolder` back to that alias reddened
+nothing about memberships, because SQLite checks an *immediate* FK at the END of the statement and
+delete-then-reinsert of the same primary key nets the violation count back to zero. The `updateFolder`
+rewrite stayed on different grounds — an UPDATE is non-upserting, so it cannot resurrect a folder
+another window deleted, and it means no rename's correctness rests on the FK having been declared NO
+ACTION. Conversely `replaceOrganization`'s delete order **is** load-bearing: clearing `folders` before
+`memberships` is refused outright.
+
+20 tests (`SystemFolderIntegrityTests`), scratch `temporaryDirectory` fixtures only. **644/644**
+`ArchiveNotesTests` green, clean build, 0 new warnings. Non-vacuity proven by 6 neuters, each reddening
+a disjoint set (the refusals → 4 tests; by-id restore → 3; the store's existence guard → 2; FK
+enforcement → 3; the legacy migration → 1; `updateFolder` → 1). Notes-only; no ArchiveCore type changed.
+
+**GUI:** Notes UITests re-run off-screen in the Tart VM — 4 failures, the same G3/G6/G8/G11 already tabled
+below, so no regression. The first run also reddened **G1** (`testG1_CreateNoteWritesNewItemFile`), which
+was a **flake**, established rather than assumed: a control run at the pre-W23.m15 commit (`ab4b0d4`)
+passed G1, a second run on the branch passed it too, the failing run burned 125 s in `waitForExistence`
+timeouts (⌘N never landed), and **G7 and G9 — the two tests that actually write memberships through
+`addMembership`, including into the Extracts system folder — passed in that same run**, which they could
+not have done if the new folder-existence guard were rejecting the app's own writes. Worth watching: G1
+had not been seen flaking before.
+
+**Residual (`W23.m15-fu`, LOW):** a ghost naming a **user** folder that is genuinely gone (only
+reachable via the pre-fix race between a folder delete and a concurrent replicate) is never swept. It is
+invisible, but it inflates `membershipCount(item:)`, so the §3.6 last-instance guard treats such a note
+as filed elsewhere and won't offer to trash it when its last real folder goes — conservative, but
+silent. A one-shot reporting sweep at load is the fix.
+
 ## ✅ FIXED (W23.m14) — one broken source link froze the whole app for an archive walk
 
 **2026-07-30.** `ReaderLinkResolver` is `@MainActor`, and when a link's exact relative path was missing its
