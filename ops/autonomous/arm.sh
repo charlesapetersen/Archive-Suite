@@ -38,6 +38,14 @@ PLIST_DST="$HOME/Library/LaunchAgents/$JOB.plist"
 GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd domain for the LaunchAgent
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
+# Why the daemon is idle is decided in ONE place, shared with status-digest.sh — see run-state-lib.sh.
+# Guarded: arm.sh runs from the PRIMARY checkout, which may not have merged this file yet (memory
+# `arm-installs-from-primary-checkout`). A missing lib must degrade to the old wording, not to a blank line.
+if [ -r "$REPO/ops/autonomous/run-state-lib.sh" ]; then
+  . "$REPO/ops/autonomous/run-state-lib.sh"
+else
+  idle_explanation() { printf 'running, BACKING OFF (idle %ss — reason undetermined: run-state-lib.sh not in this checkout)' "${1:-?}"; }
+fi
 
 status() {
   echo "== daemon process =="
@@ -63,7 +71,7 @@ status() {
     case "$since" in
       ''|*[!0-9]*) echo "  running, productive (last cycle advanced the run)" ;;
       *) idle=$(( $(date +%s) - since ))
-         echo "  running, BACKING OFF (idle ${idle}s — sessions finding no actionable work; retrying, widening the gap)" ;;
+         printf '  %s\n' "$(idle_explanation "$idle")" ;;
     esac
   elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
     echo "  PARKED — auto-stopped after a long no-progress stretch; every queue item looks blocked on you."

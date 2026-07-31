@@ -156,8 +156,11 @@ STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --
   `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`. If you must stop with the item only PARTIALLY
   done (a real blocker — rare; prefer finishing it), your checkpoints are already pushed, so just
   `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`, do NOT tick the checkbox, and record the
-  remaining sub-steps (STEP 5). End the commit message with:
-      Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+  remaining sub-steps (STEP 5). End the commit message with a co-author trailer naming THE MODEL YOU ARE
+  ACTUALLY RUNNING AS — not a version copied from this file or from the last commit:
+      Co-Authored-By: Claude <your model, e.g. Opus 5> (1M context) <noreply@anthropic.com>
+  (This line used to hard-code `Opus 4.8`, which silently outlived the model and made `git log` claim work
+  was done by something that never ran it. Name yourself; the history is a record, not a template.)
   Push commits freely; do NOT cut a DMG/GitHub release (that's owner-gated).
 
 STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4's push, in the SAME TURN — before
@@ -169,7 +172,16 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   If you COMPLETED the item, tick it in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha
   + one-line result); if you only ADVANCED it (checkpointed, not complete), leave it "[ ]" and note in its
   Session Log EXACTLY which sub-steps remain + your last checkpoint sha, so the next session continues from
-  there instead of restarting. Append to the Session Log either way, and append anything owner-needed to
+  there instead of restarting.
+  ⚠️ **Filing a residual/follow-up item? The dependency has to be a TAG, not a sentence.** If the item's text
+  says it should be done *inside* / *folded into* / *along with* another item X, it MUST also carry a literal
+  `(blocked-on: X)`, mirrored into BOTH trackers (SUITE_TODO.md and the plan's WORK QUEUE).
+  `next-queue-item.sh` parses that tag and cannot read prose, so without it the resolver offers the follow-up
+  as actionable — and the next session, taking the queue at its word, builds the very thing the item's own
+  text forbids. Real near-miss: W23.h5-fu said "do it inside W23.m5" in prose only while m5 was itself
+  blocked, and was offered as the first `ok` item; a session that trusted the queue would have shipped the
+  second warning channel W23.m5 exists to prevent. The prose is for the reader; the tag is what runs.
+  Append to the Session Log either way, and append anything owner-needed to
   Morning Review. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
   refuses, leave it and log to Morning Review. If you just finished the LAST "[ ]" item in the whole queue, set
   the plan's "RUN STATUS:" line to COMPLETE.

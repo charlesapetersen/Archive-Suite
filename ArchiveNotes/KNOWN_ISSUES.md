@@ -480,6 +480,19 @@ Failing (identical across both attempts → **deterministic**, not flake):
 | `testG6_RevealSourceBlockDispatchesReaderDeepLink` | `XCTAssertTrue failed - the reveal seam must be drivable (an.editor.test.reveal)` |
 | `testG11_ZoteroChipDispatchesSelectLink` | `XCTAssertTrue failed - the zotero seam must be drivable (an.editor.test.zoteroOpen)` |
 
+**Genuinely flaky — kept OUT of the table above on purpose.** The four rows are the comparison baseline: a
+run matching them exactly is "no regression". This one is not deterministic and must not be added to that
+baseline, or a real failure of it becomes invisible.
+
+| Test | Tell | Seen |
+|---|---|---|
+| `testG1_CreateNoteWritesNewItemFile` | ~125 s burned in `waitForExistence` timeouts — the ⌘N keystroke, then the toolbar New menu, neither lands. **Input delivery over VNC, not logic.** | Once: first VM run on the W23.m15 branch, 2026-07-31. Passed on re-run; a control run at the pre-change commit `ab4b0d4` also passed. |
+
+How to tell a real G1 failure from this flake: the flake times out *waiting for UI that never appears* and
+takes minutes; a genuine failure asserts about the **written item file** and fails fast. If G1 starts
+failing regularly, look at the ⌘N/new-note input path — **not** the folder graph: `G7`/`G9`, the two tests
+that actually drive membership writes, passed in the same run that flaked.
+
 **Leads, not conclusions** — none of this is diagnosed yet, and nobody should conclude the app is broken
 from this entry alone:
 - The two *not hittable* elements are both tiny (11×14, 10×10) and both at **x ≈ 1033** — the same

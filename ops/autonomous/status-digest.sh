@@ -12,6 +12,14 @@ JOB="com.archivesuite.autonomous"; GUI_DOMAIN="gui/$(id -u)"
 LOG="$STATE/daemon.log"
 g() { git -C "$REPO" "$@" 2>/dev/null; }
 num() { case "$1" in ''|*[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
+# Why the daemon is idle is decided in ONE place, shared with arm.sh — see run-state-lib.sh's header.
+# Guarded for the same reason arm.sh guards it: the daemon runs this script from $REPO, which may predate
+# the lib. Degrade to the old wording rather than emitting nothing.
+if [ -r "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh" ]; then
+  . "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh"
+else
+  idle_explanation() { printf 'running, BACKING OFF (idle %ss — reason undetermined: run-state-lib.sh not in this checkout)' "${1:-?}"; }
+fi
 
 # ---- run state (mirrors arm.sh) ----
 run_state() {
@@ -25,7 +33,7 @@ run_state() {
   if pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1; then
     since=$(cat "$STATE/idle.since" 2>/dev/null)
     case "$since" in ''|*[!0-9]*) echo "running, productive" ;;
-      *) echo "running, BACKING OFF (idle $(( $(date +%s) - since ))s — no actionable work)" ;; esac
+      *) idle_explanation "$(( $(date +%s) - since ))"; echo ;; esac
   elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
     echo "PARKED — $(tail -n 40 "$LOG" 2>/dev/null | grep -m1 'PARKED' | sed 's/.*PARKED (\([^)]*\)).*/\1/;s/.*PARKED/parked/' | cut -c1-60) (blocked on you)"
   else echo "stopped (re-arm: ./ops/autonomous/arm.sh keepalive)"; fi

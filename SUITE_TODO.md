@@ -1211,6 +1211,33 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### Follow-ups discovered while fixing Wave 23
 
+- [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
+  [S · LOW · UX].** Residual of W23.m4, filed 2026-07-31 from the Morning Review. Since m4, the cited page is
+  part of the document window's `openWindow(id:value:)` value, so SwiftUI value identity gives two links to
+  *different* pages of the same document two windows (same page → one). **Owner reviewed and chose to keep
+  the current behaviour** — one view per citation is what you want when comparing two passages — so this is
+  filed as the reversal, not as a bug: implement it only if window sprawl becomes a real annoyance when
+  clicking through a note that cites many pages of one document. **Do (if picked up):** look up an already-open
+  window for that document in a window registry and navigate it to the cited page rather than opening a
+  second one; keep an explicit "open in new window" affordance so the compare-two-passages workflow survives.
+  Needs the registry, so it is its own item and not a tweak.
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | LOW
+
+- [ ] **W23.l4-fu — no UITest drives the Notes metadata strip, so the date warning row is unverified
+  pixels [XS–S].** Owner decision, 2026-07-31 Morning Review: close this with a **test**, not a recurring
+  manual check. W23.l4's logic is fully pinned by `DateFieldEntryTests`, but nothing in any UITest touches
+  the Date row, so the inline warning (`an.detail.date.dayWarning`) and the dead Set button have never been
+  seen by a harness — the standing ask was a 10-second owner eyeball, which does not scale to the next
+  change that touches date entry. **Do:** add a Notes UITest that selects a note, types `31` into Day,
+  chooses **February** from the month menu, and asserts (a) the day is dropped, (b)
+  `an.detail.date.dayWarning` exists and reads *"February <year> has 28 days — the day is ignored."*, and
+  (c) the note is saved at month precision; plus the negative case (a real month-end such as `2026-01-31`
+  commits at day precision with no warning). Run it off-screen via `ops/gui/vm-gui-runner.sh notes` — the
+  Notes VM lane is green, and the known-failure list to compare against is G3/G6/G8/G11 (see
+  `ArchiveNotes/KNOWN_ISSUES.md`), plus the G1 `⌘N` delivery flake first seen 2026-07-31.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift (identifiers only),
+  ArchiveNotes/macOS/Tests/ArchiveNotesUITests/ | Tier-1 | XS–S
+
 - [ ] **W23.h2-fu — concurrent edits can leave the Notes FTS index row transiently stale [S · LOW].**
   Found 2026-07-30 while fixing W23.h2 (adversarial self-review of the fix, not a new review). The `.md` on
   disk is now always correct — `NoteStore.withItem` is atomic — but `NotesModel.mutateItem` does its
@@ -2016,8 +2043,23 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
      the "Notes failures"); no lock around a single shared VM (→ `tart_lock_*`, and the VM is only stopped
      by whoever booted it); plus the runner's two. New harness `ops/autonomous/tests/prove-vm-lane.sh` (31
      checks) pins the exit-code→owner-text mapping, the lock, the shim and the smoke-script guards.
-- [ ] **W21.vmgui-path — `vm-gui-runner.sh` blames a missing VM when `tart` is merely off PATH [XS · repeat
-  cost].** `ensure_vm()` does `tart list 2>/dev/null | … || die "VM 'archive-gui-runner' not found — create it
+- [x] **W21.vmgui-path — `vm-gui-runner.sh` blames a missing VM when `tart` is merely off PATH [XS · repeat
+  cost].** ✅ **DONE 2026-07-31** (this commit, owner's Morning Review walkthrough). Fixed **in
+  `ops/gui/tart-lib.sh`**, not in the runner, because that is where the split caused it: the gate carried its
+  own `export PATH=/opt/homebrew/bin:$PATH` (`gui-vm-gate.sh:35`) and the runner did not, so the *interactive*
+  entry point every doc points a session at was the only one that could be lied to — the second instance of
+  the exact duplication `tart-lib.sh` was created to end. The lib now (a) prepends the first
+  `$TART_SEARCH_DIRS` entry that actually holds an executable `tart`, only when PATH lacks one, and (b)
+  exports `tart_require`, which reports *"tart is NOT INSTALLED or not on PATH — this is not the same as the
+  VM being missing"* with the dirs searched and the PATH it saw, and deliberately makes **no claim about the
+  VM** (it cannot run `tart list` to find out). Both call sites now separate the two: the runner dies with
+  *"tart is installed, but VM '…' does not exist"* only when tart really is present, and the gate SKIPs with
+  two distinct reasons. `TART_SEARCH_DIRS` is one list feeding both the search and the message, so the
+  message cannot claim to have looked somewhere it did not. **Proved, not assumed:** `bash -n` on all three
+  scripts; under `env -i PATH=/usr/bin:/bin` the lib still resolves `/opt/homebrew/bin/tart` and
+  `tart_require` returns 0; with `TART_SEARCH_DIRS=/nope/a /nope/b` it returns 1 and prints the
+  not-installed text with the searched dirs echoed back. No VM boot needed for either check.
+  Previous text: `ensure_vm()` did `tart list 2>/dev/null | … || die "VM 'archive-gui-runner' not found — create it
   first"`, so in a plain non-interactive shell (no `/opt/homebrew/bin` on PATH) it reports the VM as absent
   while the VM is present and healthy. **This has now cost three daemon sessions** (W23.m14, W23.m15, W23.l4 —
   each logged it to Morning Review, one lost a whole lane run), which is why it is a queue item and not a
@@ -2026,6 +2068,28 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   A misleading message here is expensive in a specific way: a session that believes it defers a GUI check to
   the owner that it could have run itself. Same treatment for any sibling `tart` call in `ops/gui/tart-lib.sh`.
   | files: ops/gui/vm-gui-runner.sh, ops/gui/tart-lib.sh | XS | low | none
+
+- [x] **W23.status1 — `arm.sh status` blamed an empty queue for what was a usage cap [XS · misreport].**
+  ✅ **DONE 2026-07-31** (this commit, owner's Morning Review walkthrough). For an hour that morning both
+  status renderers said *"running, BACKING OFF (idle 3375s — sessions finding no actionable work)"* while
+  every session since 06:35 had been **refused with a 429** (five-hour cap, reset 07:30) and died in ~5
+  seconds, with `next-queue-item.sh` offering ~20 actionable items throughout. The 429 was sitting in
+  `$STATE/last-session.log` the whole time; neither renderer read it. **The two states demand opposite owner
+  actions** — "the queue is drained, add work or stop the daemon" vs "it is throttled and resumes by itself"
+  — so this is a misreport, not a wording nit; it is the same family as the `last-gate.log` trap in memory
+  `health-gate-red-retry-once`. **Fix:** new `ops/autonomous/run-state-lib.sh` owns the question, sourced by
+  BOTH `arm.sh` and `status-digest.sh` (writing the check twice is how the tart-PATH trap survived three
+  sessions — see W21.vmgui-path, fixed the same day). Keyed on the **terminal** `"api_error_status":429`, not
+  on a `rate_limit_event`, so a session that was warned, recovered and did work is not slandered as
+  throttled; `resetsAt` distinguishes *"resets 09:21"* from *"already reset 07:30 — next attempt should get
+  through"*. Reporting only — the BACKOFF **behaviour** is already correct for a cap, so no control flow
+  changed. Both call sites degrade to the old wording if the lib is absent, which is the real window while
+  the PRIMARY checkout has not yet merged (memory `arm-installs-from-primary-checkout`). **Proved:** `bash -n`
+  ×3; the detector returns throttled for the real 06:35 log and NOT for the real aborted 07:58 log, a
+  synthetic future reset renders "resets HH:MM", a warned-but-successful session and a missing file both
+  return not-throttled; then end-to-end through the real `status-digest.sh` with a stubbed `pgrep`, printing
+  THROTTLED and BACKING OFF from the two real logs respectively.
+  | files: ops/autonomous/run-state-lib.sh (new), arm.sh, status-digest.sh | Tier-2 | XS
 
 - [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
   three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
@@ -3045,3 +3109,21 @@ the Capture re-pass); this unit was verified **INLINE** by the main-loop model. 
   an empty group) and benign if reached (filename suffix, not a path component → no traversal; `(group,seq)`
   keying stays idempotent), so LOW/hardening — but the shared predicate should reject empty to match its own
   docstring. Fix: add `!s.isEmpty` to `isSafeGroupId` (keep both receivers' explicit guards too). | Net | Tier-2
+
+## Owner ideas — deferred, NOT for the daemon queue (do not start unprompted)
+Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must
+**skip** these: they need the owner's scoping before any code is written.
+
+- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
+  Owner direction (2026-07-31 Morning Review, in response to the W23.l4 `Calendar` deviation). Two halves:
+  (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
+  does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
+  **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in
+  Settings — with it enabled (a medievalist's mode), each item offers a choice of calendar systems
+  (Julian, Julian-with-1752-English-cutover, French Republican, Hebrew, Islamic, …) for display and for
+  the date-entry validator's "N days in that month" rule. Supersedes the narrower fix of hard-coding the
+  Anglo-American 1752 cutover: `GregorianDay` fixes the switchover at **1582**, so a genuine English or
+  colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
+  rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
+  cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
+  Settings; Reader display parity to be scoped with it. | Notes | Tier-2 | L | **deferred — owner-scoped**

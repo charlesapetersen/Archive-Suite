@@ -15,6 +15,38 @@ GUEST_CORPUS="${GUEST_CORPUS:-/Volumes/My Shared Files/corpus}" # --dir=corpus:<
 GUEST_HOME="${GUEST_HOME:-/Users/admin}"                        # the Cirrus image's user
 
 # ---------------------------------------------------------------------------------------------------
+# `tart` must be FINDABLE before any of the helpers below mean anything (SUITE_TODO W21.vmgui-path).
+# A non-login shell — launchd, `claude -p`, a hook — does not inherit Homebrew's bin dir, so an
+# unqualified `tart` is simply "command not found". Every downstream check then reads as *"VM
+# 'archive-gui-runner' not found — create it first"*, which is a lie: the VM is present and healthy.
+# That misdiagnosis cost three daemon sessions (W23.m14, W23.m15, W23.l4) before it was named.
+# It bit only ops/gui/vm-gui-runner.sh because ops/autonomous/gui-vm-gate.sh happened to carry its own
+# `export PATH=/opt/homebrew/bin:$PATH` — the exact two-copies-of-one-fact split this file exists to end.
+# Resolve it HERE, once, so both scripts inherit it, and keep the two failure modes distinguishable.
+# One list, used by BOTH the search and the failure message, so the message can never claim to have
+# looked somewhere it didn't.
+TART_SEARCH_DIRS="${TART_SEARCH_DIRS:-/opt/homebrew/bin /usr/local/bin $HOME/.local/bin}"
+if ! command -v tart >/dev/null 2>&1; then
+  for _tart_dir in $TART_SEARCH_DIRS; do
+    if [ -x "$_tart_dir/tart" ]; then PATH="$_tart_dir:$PATH"; export PATH; break; fi
+  done
+  unset _tart_dir
+fi
+
+# tart_require — 0 if the `tart` binary is usable; else explain WHY on stderr and return 1. Callers turn
+# that into their own kind of fatal (the runner dies, the gate skips), but they must not report it as a
+# missing VM. Deliberately says nothing about the VM: it cannot know, since it cannot run `tart list`.
+tart_require() {
+  command -v tart >/dev/null 2>&1 && return 0
+  printf '%s\n' \
+    "tart is NOT INSTALLED or not on PATH — this is not the same as the VM being missing." \
+    "  looked for it on PATH, then in: $TART_SEARCH_DIRS" \
+    "  PATH was: $PATH" \
+    "  install:  brew install cirruslabs/cli/tart      (setup: ops/gui/README.md §3)" >&2
+  return 1
+}
+
+# ---------------------------------------------------------------------------------------------------
 # archive_app_field APP FIELD — the single per-app config table for the whole GUI lane.
 # Adding an app is one block here, not a fork of either script.
 #   spec/proj/scheme/tests : xcodegen spec (host, repo-relative), .xcodeproj (repo-relative), scheme,

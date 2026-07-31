@@ -59,8 +59,10 @@ skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
 
 # ---- guards (each SKIPs; a missing prereq must never RED) --------------------------------------
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
-command -v tart >/dev/null || skip "tart not installed"
-tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || skip "VM '$VM' not present (build it — ops/gui/README.md §3)"
+# tart-vs-VM stays two distinct skips (W21.vmgui-path). The PATH fix now lives in tart-lib.sh so BOTH
+# entry points get it; line 35's export is kept as belt-and-braces for the lines above the source.
+tart_require || skip "tart not installed or not on PATH (details above) — the VM's existence is unknown"
+tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || skip "tart is installed, but VM '$VM' does not exist (build it — ops/gui/README.md §3)"
 command -v xcodegen >/dev/null || skip "xcodegen not on the host PATH (it generates the projects the VM builds)"
 mkdir -p "$ART"
 if command -v gtimeout >/dev/null; then TO=(gtimeout "$MAXRUN"); else TO=(); fi

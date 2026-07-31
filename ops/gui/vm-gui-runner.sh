@@ -91,7 +91,9 @@ close_vm_viewer() {
 
 # --- ensure the VM is running with a virtual display + shares ---
 ensure_vm() {
-  tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || die "VM '$VM' not found — create it first (ops/gui/README.md §3)."
+  # Two DIFFERENT failures, never conflated (W21.vmgui-path): tart missing, vs tart present but no VM.
+  tart_require || die "cannot reach the VM lane without tart — see above. The VM's existence is unknown, NOT ruled out."
+  tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || die "tart is installed, but VM '$VM' does not exist — create it first (ops/gui/README.md §3)."
   # A VM this script did not start has no VNC endpoint we can read, and may hold the wrong mounts. That is
   # fatal for the sighted lane but harmless for xcuitest, so split rather than blanket-warning (the old
   # code warned and carried on, then failed obscurely inside vncdotool).
