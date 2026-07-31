@@ -273,6 +273,11 @@ final class NotesNavigationModel: ObservableObject {
     /// two outcomes KEEP the file: trashing a note that still has a live membership would strand that
     /// membership on a trashed note. Membership first, file second — a trash failure leaves a
     /// recoverable, still-findable note (§5).
+    ///
+    /// W23.h3-fu: the verdict is only worth as much as its shelf life. `.deletedLastInstance` means
+    /// "zero memberships **now**", and the trash below is a suspension point on a reentrant actor — so
+    /// the hard-delete window opens the instant the verdict lands and stays open until the note is gone,
+    /// which is what keeps a replicate arriving in that gap from re-filing a note into the Trash.
     func confirmDeletion(_ pending: PendingDeletion) async {
         do {
             switch try await model.organization.removeConfirmedLastMembership(
@@ -288,6 +293,8 @@ final class NotesNavigationModel: ObservableObject {
                 break                                   // genuinely the last — fall through to the trash
             }
         } catch { model.statusMessage = "Couldn't remove the note from the folder."; return }
+        model.organization.beginHardDelete([pending.itemId])
+        defer { model.organization.endHardDelete([pending.itemId]) }
         await model.trashItems([pending.itemId])
         recompute()
         // The membership removal committed; say so if it never reached organization.json (W23.m10).
@@ -302,13 +309,21 @@ final class NotesNavigationModel: ObservableObject {
     /// **Replicate** items into `target` (⌥-drag / "Add to Folder…"): add a membership, leaving every
     /// existing membership intact — the DevonThink replicant (one file, K places). Refuses a non-normal
     /// target. Never deletes.
+    ///
+    /// A refusal now prefers the store's own sentence when it has one, because W23.h3-fu introduced a
+    /// refusal the user can actually provoke — dropping a note into a folder while its confirmed delete
+    /// is in flight — and "Couldn't add the note to the folder" would leave them guessing at a drag that
+    /// simply did nothing.
     func replicate(_ ids: [UUID], to target: UUID) async {
         guard isNormalFolder(target) else {
             model.statusMessage = "Smart folders can't hold items directly."; return
         }
         for id in ids {
             do { try await model.organization.addMembership(item: id, folder: target) }
-            catch { model.statusMessage = "Couldn't add the note to the folder." }
+            catch {
+                model.statusMessage = (error as? LocalizedError)?.errorDescription
+                    ?? "Couldn't add the note to the folder."
+            }
         }
         model.rebuild(); recompute(); model.adoptMirrorFailure()
     }

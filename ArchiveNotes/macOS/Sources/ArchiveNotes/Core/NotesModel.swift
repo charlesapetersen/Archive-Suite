@@ -804,12 +804,26 @@ final class NotesModel: ObservableObject {
         // (0 memberships) — `deleteFolder` returns the fresh orphan set, so a replicate between the
         // modal and this confirm rescues its item from deletion (it keeps its other membership).
         let confirmed = Set(stranded)
+        let toTrash = orphaned.filter { confirmed.contains($0) }
+        // The orphan verdict must stay true until the files are gone, so the hard-delete window opens
+        // here rather than inside `trashItems` alone (W23.h3-fu) — `deleteFolder` already suspended on
+        // the DB, and the trash suspends again. Nested with the primitive's own window; the refcount
+        // composes, and `defer` balances it on every exit path.
+        organization.beginHardDelete(toTrash)
+        defer { organization.endHardDelete(toTrash) }
         // Trashes, drops the rows of the ones that really went, reloads, and says so when the disk
         // refused one — that refusal is what makes this method's "still discoverable" promise real.
-        await trashItems(orphaned.filter { confirmed.contains($0) })
+        await trashItems(toTrash)
         rebuild()                                                      // covers the empty case
         adoptMirrorFailure()
     }
+
+    #if DEBUG
+    /// Awaited inside `trashItems` while the hard-delete window is open and before anything has been
+    /// trashed, so a test can deterministically drive a concurrent replicate/move *into* the window
+    /// (W23.h3-fu). DEBUG-only and instance-scoped — same shape as `NotesIndex.executeForTesting`.
+    var hardDeleteWindowHookForTesting: (@MainActor () async -> Void)?
+    #endif
 
     /// Move the given items' folders to the macOS Trash (recoverable — `NoteStore.delete` never
     /// `removeItem`s) and drop the index rows of the ones that are **actually gone**. The caller must
@@ -823,9 +837,23 @@ final class NotesModel: ObservableObject {
     /// the store, and the full disk rebuild only runs at bootstrap — so a note the disk refused to
     /// trash vanished from All Notes for the rest of the run while sitting safe on disk, un-findable.
     /// A row now goes only once its note is provably absent.
+    ///
+    /// W23.h3-fu — this is the hard-delete primitive, so it holds `OrganizationStore`'s hard-delete
+    /// window for the whole call: `await noteStore.delete(id)` is a suspension point, and `@MainActor`
+    /// is reentrant there, so without it the other window's drag-to-folder could file a note between
+    /// the caller's "zero memberships" verdict and the note actually reaching the Trash. Guarding here
+    /// rather than only at the callers means a future third caller inherits it; the refcount is what
+    /// lets a caller nest a wider window around this one.
     @discardableResult
     func trashItems(_ ids: [UUID]) async -> [UUID] {
         guard !ids.isEmpty else { return [] }
+        organization.beginHardDelete(ids)
+        defer { organization.endHardDelete(ids) }
+        #if DEBUG
+        // Test seam (W23.h3-fu): the deterministic way to run a concurrent mutation *inside* the
+        // hard-delete window. Racing two tasks and hoping to hit a sub-millisecond gap is not a test.
+        if let hook = hardDeleteWindowHookForTesting { await hook() }
+        #endif
         var removed: [UUID] = []          // provably no longer on disk ⟹ their rows must go
         var survived: [UUID] = []         // the disk refused ⟹ still on disk, so keep them findable
         if let noteStore {

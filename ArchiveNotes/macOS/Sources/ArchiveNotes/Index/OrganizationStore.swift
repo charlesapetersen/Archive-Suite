@@ -52,15 +52,19 @@ enum ConfirmedRemoveResult: Sendable {
 /// A refusal from `OrganizationStore` — a mutation the graph will not perform, as opposed to a
 /// storage failure (W23.m15).
 ///
-/// Both cases are **backstops**, not the primary UX: the sidebar disables Rename/Delete on a system
-/// folder, and every replicate/move target comes from the rendered tree. They exist so a future caller
-/// that skips those checks gets a refusal instead of silently destroying a system folder or minting a
-/// membership to a folder that does not exist.
+/// The first two are **permanent backstops**, not the primary UX: the sidebar disables Rename/Delete on
+/// a system folder, and every replicate/move target comes from the rendered tree. They exist so a future
+/// caller that skips those checks gets a refusal instead of silently destroying a system folder or
+/// minting a membership to a folder that does not exist. `itemBeingDeleted` is different in kind — a
+/// **transient** refusal that lasts only as long as one confirmed hard delete (W23.h3-fu).
 enum OrganizationError: Error, LocalizedError, Equatable {
     /// A rename/delete aimed at one of the three fixed-ID system folders (§16.6).
     case systemFolderImmutable(name: String)
     /// A membership aimed at a folder id that is not in the graph — the ghost-membership defect.
     case unknownFolder(UUID)
+    /// A membership aimed at an item whose **confirmed** hard delete is already in flight. Granting it
+    /// would leave a live membership row pointing at a note that is on its way to the Trash (W23.h3-fu).
+    case itemBeingDeleted(UUID)
 
     var errorDescription: String? {
         switch self {
@@ -68,6 +72,8 @@ enum OrganizationError: Error, LocalizedError, Equatable {
             return "“\(name)” is a built-in folder — it can't be renamed or deleted."
         case .unknownFolder(let id):
             return "That folder no longer exists (\(id.uuidString))."
+        case .itemBeingDeleted:
+            return "That note is being deleted — it can't be filed into a folder."
         }
     }
 }
@@ -321,7 +327,11 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// every note created after Inbox was deleted added a row nothing could ever render or remove.
     /// The FK now refuses the same write at the SQL layer; this guard is what makes the refusal a
     /// clear error instead of a constraint violation, and keeps memory from running ahead of the DB.
+    ///
+    /// **Refuses an item whose confirmed hard delete is in flight (W23.h3-fu)** — see the hard-delete
+    /// guard below.
     func addMembership(item: UUID, folder: UUID) async throws {
+        try requireNotHardDeleting(item)
         try requireFolderExists(folder)
         guard !memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else { return }
         let m = Membership(itemId: item, folderId: folder, addedAt: Date())
@@ -381,8 +391,13 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// so the item is never transiently member-less — but a failure is now honest and total.
     ///
     /// A no-op (not an error) when the item is already only in `target`, so a stale drag costs nothing.
+    ///
+    /// Like `addMembership`, this **mints** a membership, so it is refused for an item whose confirmed
+    /// hard delete is in flight (W23.h3-fu). Nothing is lost by refusing: a guarded item is one the
+    /// store just proved has zero memberships, so there is no `source` row to move.
     func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
         guard source != target else { return try await addMembership(item: item, folder: target) }
+        try requireNotHardDeleting(item)
         try requireFolderExists(target)
         let inSource = memberships.contains { $0.itemId == item && $0.folderId == source }
         let inTarget = memberships.contains { $0.itemId == item && $0.folderId == target }
@@ -394,6 +409,45 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         if !inTarget { memberships.append(m) }
         memberships.removeAll { $0.itemId == item && $0.folderId == source }
         exportOrganization()
+    }
+
+    // MARK: - Hard-delete guard (W23.h3-fu)
+
+    /// Items whose **confirmed** hard delete is in flight, counted rather than flagged so overlapping
+    /// and nested guards compose (the trash primitive holds one; its caller holds another across the
+    /// wider window). A `Bool` would let the inner `end` unguard the item while the outer window is
+    /// still open — exactly the gap this closes.
+    private var hardDeleting: [UUID: Int] = [:]
+
+    /// Open a hard-delete window over `ids`: `addMembership` / `moveMembership` refuse them until it
+    /// closes, so no replicate or move can slip a live membership onto a note on its way to the Trash.
+    ///
+    /// This exists because W23.h3 closed only the *decision* — `removeConfirmedLastMembership` reads its
+    /// last-instance verdict from what survives the removal, so a membership that appears during the DB
+    /// write downgrades the outcome. But `@MainActor` is reentrant at every `await`, and the caller then
+    /// awaits the trash itself: a replicate landing in **that** gap arrives after the verdict is already
+    /// `.deletedLastInstance`, so nothing downgrades and the note is trashed with a live membership row
+    /// pointing at it. The verdict has to stay true until the file is gone, which is what this window is.
+    ///
+    /// **Every `begin` must be balanced by an `end` on every exit path — use `defer`.**
+    func beginHardDelete(_ ids: [UUID]) {
+        for id in ids { hardDeleting[id, default: 0] += 1 }
+    }
+
+    /// Close one hard-delete window over `ids` (see `beginHardDelete`). Tolerates an id that is not
+    /// guarded, so an unbalanced `end` can never drive the count negative and permanently unguard.
+    func endHardDelete(_ ids: [UUID]) {
+        for id in ids {
+            guard let n = hardDeleting[id] else { continue }
+            if n <= 1 { hardDeleting.removeValue(forKey: id) } else { hardDeleting[id] = n - 1 }
+        }
+    }
+
+    /// Is a confirmed hard delete of `id` in flight?
+    func isHardDeleting(_ id: UUID) -> Bool { hardDeleting[id] != nil }
+
+    private func requireNotHardDeleting(_ id: UUID) throws {
+        guard !isHardDeleting(id) else { throw OrganizationError.itemBeingDeleted(id) }
     }
 
     func foldersContaining(item: UUID) -> [UUID] {
