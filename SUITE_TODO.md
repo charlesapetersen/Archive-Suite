@@ -1974,9 +1974,9 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   **retained** + status message; multi-chunk Anthropic/Mistral (`chunkIds.count != 1`, :1448-1455) → not
   confirmed, retained; zero chunks → not confirmed.
   | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
-- [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept
-  [XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with no undo, so the daemon files it
-  rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
+- [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept**
+  (blocked-on: W16.bat2) **[XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with no undo,
+  so the daemon files it rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
   `cancel()` (`+Pipeline.swift:1531+`) cancels the processing task and then deletes the journal **only** if every
   server-side cancellation was confirmed — otherwise it deliberately keeps it and says *"the paid-batch journal
   was kept for recovery."* But the poll task then resumes and hits `guard !Task.isCancelled else { return }`
