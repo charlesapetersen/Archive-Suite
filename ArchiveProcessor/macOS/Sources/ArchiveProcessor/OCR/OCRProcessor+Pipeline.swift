@@ -1528,6 +1528,81 @@ extension OCRProcessor {
             }
         }
     }
+    /// What `cancel()` did about a paid batch's server-side job and its recovery journal.
+    /// `journalDeleted` is the safety-critical field: that journal is the only way back to a still-live
+    /// batch the operator has already paid for, so deleting it on an unconfirmed cancellation strands
+    /// the money with no way to collect the pages.
+    struct BatchCancellationOutcome: Equatable, Sendable {
+        /// True only when EVERY chunk of the batch was confirmed cancelled by the provider.
+        let confirmed: Bool
+        /// True iff the recovery journal was deleted (i.e. `deleteJournal` was called).
+        let journalDeleted: Bool
+        /// The operator-facing message — set only when the journal was KEPT, so the text and the
+        /// on-disk fact can never disagree.
+        let statusMessage: String?
+        /// The chunk IDs a server-side cancellation was actually attempted for. Empty when the
+        /// provider's rule declines to even try (multi-chunk Anthropic/Mistral, OpenAI, no chunks).
+        let attemptedChunkIds: [String]
+    }
+
+    /// The exact words the operator sees when the journal was kept. A constant so a test can pin the
+    /// promise ("kept for recovery") that the on-disk behaviour has to match.
+    static let batchCancellationNotConfirmedMessage =
+        "Cancelled locally, but server cancellation was not confirmed. The paid-batch journal was kept for recovery."
+
+    /// Cancel a paid batch server-side and decide the fate of its recovery journal.
+    ///
+    /// The one shipped safety guarantee of the cancel path, extracted so it can be proven without a
+    /// network, a key or a cent (`BatchCancelContract`, W16.bat2): **the journal is deleted ONLY when
+    /// every chunk's cancellation was confirmed.** Anything else — an unconfirmed chunk, a multi-chunk
+    /// batch this app has no single ID to cancel, a batch with no chunk IDs at all — keeps the journal
+    /// and says so.
+    ///
+    /// - Parameters:
+    ///   - cancelChunk: performs one chunk's server-side cancellation. `cancel()` passes the provider's
+    ///     live batch client; the headless driver passes a stub, which is the whole point of the seam.
+    ///   - deleteJournal: removes the recovery journal. Called at most once, and only when confirmed.
+    static func performServerBatchCancellation(
+        provider: LLMProvider,
+        chunkIds: [String],
+        cancelChunk: @MainActor (String) async -> Bool,
+        deleteJournal: @MainActor () -> Void
+    ) async -> BatchCancellationOutcome {
+        var attempted: [String] = []
+        let confirmed: Bool
+        switch provider {
+        case .anthropic, .mistral:
+            // Both clients cancel exactly one server-side job. A batch split into several chunks has no
+            // single ID to cancel, so nothing can be confirmed and the journal must survive.
+            if chunkIds.count == 1 {
+                attempted = chunkIds
+                confirmed = await cancelChunk(chunkIds[0])
+            } else {
+                confirmed = false
+            }
+        case .gemini:
+            // Every chunk must be cancelled. An empty list is NOT a vacuous success.
+            var allConfirmed = !chunkIds.isEmpty
+            for chunkId in chunkIds {
+                attempted.append(chunkId)
+                // Deliberately no early exit: a later chunk is still worth cancelling after an earlier
+                // one failed — leaving it running is exactly what costs money.
+                if !(await cancelChunk(chunkId)) { allConfirmed = false }
+            }
+            confirmed = allConfirmed
+        case .openai:
+            confirmed = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
+        }
+        if confirmed {
+            deleteJournal()
+            return BatchCancellationOutcome(confirmed: true, journalDeleted: true,
+                                            statusMessage: nil, attemptedChunkIds: attempted)
+        }
+        return BatchCancellationOutcome(confirmed: false, journalDeleted: false,
+                                        statusMessage: Self.batchCancellationNotConfirmedMessage,
+                                        attemptedChunkIds: attempted)
+    }
+
     func cancel() {
         processingTask?.cancel()
         processingTask = nil
@@ -1565,33 +1640,27 @@ extension OCRProcessor {
                 ?? PendingBatch.parseChunkIDs(batch.batchId)
             activePendingBatch = nil
             Task {
-                let cancelled: Bool
+                // Only the *how* of one chunk's cancellation is provider-specific; the rule for what
+                // that means for the journal lives in `performServerBatchCancellation` (W16.bat2).
+                let cancelChunk: @MainActor (String) async -> Bool
                 switch batch.provider {
                 case .anthropic:
                     let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    if chunkIds.count == 1 {
-                        cancelled = await client.cancelBatch(batchId: chunkIds[0])
-                    } else { cancelled = false }
+                    cancelChunk = { await client.cancelBatch(batchId: $0) }
                 case .mistral:
                     let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
-                    if chunkIds.count == 1 {
-                        cancelled = await client.cancelBatch(batchId: chunkIds[0])
-                    } else { cancelled = false }
+                    cancelChunk = { await client.cancelBatch(batchId: $0) }
                 case .gemini:
                     let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    var allConfirmed = !chunkIds.isEmpty
-                    for singleId in chunkIds {
-                        if !(await client.cancelBatch(batchName: singleId)) { allConfirmed = false }
-                    }
-                    cancelled = allConfirmed
+                    cancelChunk = { await client.cancelBatch(batchName: $0) }
                 case .openai:
-                    cancelled = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
+                    cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
                 }
-                if cancelled {
-                    Self.deletePendingBatch()
-                } else {
-                    statusMessage = "Cancelled locally, but server cancellation was not confirmed. The paid-batch journal was kept for recovery."
-                }
+                let outcome = await Self.performServerBatchCancellation(
+                    provider: batch.provider, chunkIds: chunkIds,
+                    cancelChunk: cancelChunk,
+                    deleteJournal: { Self.deletePendingBatch() })
+                if let message = outcome.statusMessage { statusMessage = message }
                 checkForPendingBatch()
             }
         }
