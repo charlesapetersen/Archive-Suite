@@ -2035,6 +2035,19 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern. **Hard constraint if this is ever authorized: the override must be
   honoured ONLY under `BATCHRESUME_TEST=1` and must fail closed to the real path — a mis-read env var here
   strands a paid batch.** | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift | S | high | none
+- [ ] **W16.bat2-fu3 — fold in the three wiring checks a killed session's draft had and the shipped one
+  does not [XS · LOW].** Not a defect — a coverage delta found while cleaning up. The session that landed
+  W16.bat2-fu's checkpoint 1/3 (`b4b871f`) was killed holding an untracked draft of
+  `BatchCancelWiringContract`; the shipped file was written independently and is stronger where it counts
+  (`clientTypeName`, the seams' defaults, the banner sentinel — the draft has none of those), but the draft
+  covers three things the shipped one does not: (1) a **sweep through the real `cancel()`** over provider ×
+  chunk-count × journal-present × refusal shape, not just named cases; (2) a **multi-chunk single-job-provider
+  Stop** — 3 chunks through an Anthropic batch must attempt nothing and keep the journal — where the shipped
+  Anthropic/Mistral scenario uses one chunk; (3) the **legacy-journal fallback driven through `cancel()`**
+  (shipped pins it on the pure derivation only). Draft + a delta README are preserved at
+  `old/w16-bat2fu-killed-session-draft-20260801/` (gitignored, on the owner's machine only). Whoever takes
+  this: measure non-vacuity as usual, and delete that folder when done.
+  | files: OCR/BatchCancelWiringContract.swift | XS | low | none
 - [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
   (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
   `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that
