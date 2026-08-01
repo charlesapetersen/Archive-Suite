@@ -3,21 +3,40 @@ import UserNotifications
 import os
 
 extension OCRProcessor {
-    /// Resolve the settings used by PDF generation. The optional fallback is deliberate during the
-    /// W16.cfg2/3/5 migration: fresh Process Files runs pass their immutable snapshot, while resume and
-    /// older call sites continue to use the existing write-once statics until they can construct one.
+    /// Resolve the settings used by PDF generation. Every production path injects its run's immutable
+    /// snapshot; W16.cfg6 replaced the `pdfImageMB`/`textColumns` statics that used to answer otherwise
+    /// with a fresh `runSizing()` read, so the no-snapshot case can be *current* but never *stale*.
+    /// The read is lazy — an injected config short-circuits it, so the per-file loops never touch
+    /// UserDefaults.
     nonisolated static func pdfGenerationSettings(
         for runConfig: SessionProcessingConfig?
     ) -> (imageMB: Double, textColumns: Int) {
-        (
-            runConfig?.pdfImageMB ?? pdfImageMB,
-            runConfig?.textColumns ?? textColumns
-        )
+        guard let runConfig else {
+            let sizing = SessionProcessingConfig.runSizing()
+            return (sizing.pdfImageMB, sizing.textColumns)
+        }
+        return (runConfig.pdfImageMB, runConfig.textColumns)
     }
 
-    /// Resolve the bounded worker count for OCR scheduling, retaining the static only as a migration fallback.
+    /// Resolve the bounded worker count for OCR scheduling. Same W16.cfg6 rule as above: injected
+    /// snapshot first, then a pure defaults read — never a process-global left over from another run.
     nonisolated static func schedulingWorkerCount(for runConfig: SessionProcessingConfig?) -> Int {
-        min(12, max(1, runConfig?.ocrWorkerCount ?? ocrWorkerCount))
+        min(12, max(1, runConfig?.ocrWorkerCount ?? SessionProcessingConfig.runSizing().ocrWorkerCount))
+    }
+
+    /// The two values `performOCRCall` requires, resolved once from the run's injected snapshot.
+    ///
+    /// W16.cfg6 made those parameters non-optional, so this is the single place the no-snapshot case is
+    /// decided — one seam to audit instead of eleven `?? someStatic` expressions scattered across the
+    /// call sites. `nonisolated` so the detached OCR workers can resolve it without hopping actors.
+    nonisolated static func ocrCallValues(
+        for runConfig: SessionProcessingConfig?
+    ) -> (rotationMode: RotationMode, standardImageMB: Double) {
+        guard let runConfig else {
+            return (SessionProcessingConfig.defaultRotationMode(),
+                    SessionProcessingConfig.runSizing().standardImageMB)
+        }
+        return (runConfig.rotationMode, runConfig.standardImageMB)
     }
 
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -260,6 +279,7 @@ extension OCRProcessor {
     ) async {
         let total = files.count
         guard total > 0 else { return }
+        let ocrRun = Self.ocrCallValues(for: runConfig)
         let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns
@@ -321,8 +341,8 @@ extension OCRProcessor {
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: pageResults.last?.text, previousImageURL: nil,
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
-                        rotationMode: runConfig?.rotationMode,
-                        standardImageMB: runConfig?.standardImageMB
+                        rotationMode: ocrRun.rotationMode,
+                        standardImageMB: ocrRun.standardImageMB
                     )
                 }
                 pageResults.append(result)
@@ -931,7 +951,7 @@ extension OCRProcessor {
         // M4 perf fix: detect rotation concurrently (bounded) instead of serially.
         // handleOCRResult runs back on MainActor (serialized) for state updates;
         // its PDF gen is off-MainActor via M3.
-        let rotationMode = runConfig?.rotationMode ?? Self.rotationModeForRun
+        let rotationMode = Self.ocrCallValues(for: runConfig).rotationMode
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
@@ -1021,6 +1041,7 @@ extension OCRProcessor {
         let total = fileURLs.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
+        let ocrRun = Self.ocrCallValues(for: runConfig)
         var previousText: String? = nil
         var previousImageURL: URL? = nil
 
@@ -1050,8 +1071,8 @@ extension OCRProcessor {
                 customPrompt: segmentationContext.customPrompt,
                 imageScale: segmentationContext.imageScale,
                 gatewayConfig: gateway, localAgent: localAgent,
-                rotationMode: runConfig?.rotationMode,
-                standardImageMB: runConfig?.standardImageMB
+                rotationMode: ocrRun.rotationMode,
+                standardImageMB: ocrRun.standardImageMB
             )
 
             // If timed out, retry once without context
@@ -1068,8 +1089,8 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
-                    rotationMode: runConfig?.rotationMode,
-                    standardImageMB: runConfig?.standardImageMB
+                    rotationMode: ocrRun.rotationMode,
+                    standardImageMB: ocrRun.standardImageMB
                 )
             }
 
@@ -1098,6 +1119,7 @@ extension OCRProcessor {
         let total = fileURLs.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
+        let ocrRun = Self.ocrCallValues(for: runConfig)
         let concurrency = Self.schedulingWorkerCount(for: runConfig)
         var completed = 0
 
@@ -1121,8 +1143,8 @@ extension OCRProcessor {
                         previousText: nil, previousImageURL: prevImageURL,
                         customPrompt: customPrompt, imageScale: imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
-                        rotationMode: runConfig?.rotationMode,
-                        standardImageMB: runConfig?.standardImageMB
+                        rotationMode: ocrRun.rotationMode,
+                        standardImageMB: ocrRun.standardImageMB
                     )
                     return (index, result)
                 }
@@ -1156,8 +1178,8 @@ extension OCRProcessor {
                             previousText: nil, previousImageURL: prevImageURL,
                             customPrompt: customPrompt, imageScale: imageScale,
                             gatewayConfig: gateway, localAgent: localAgent,
-                            rotationMode: runConfig?.rotationMode,
-                            standardImageMB: runConfig?.standardImageMB
+                            rotationMode: ocrRun.rotationMode,
+                            standardImageMB: ocrRun.standardImageMB
                         )
                         return (idx, result)
                     }
@@ -1274,8 +1296,9 @@ extension OCRProcessor {
         return false
     }
     /// Single-image OCR + concurrent rotation detection, merged into one result. Live Capture, Process
-    /// Files, resumes, retries, and Tools diagnostics pass immutable run values explicitly. The optional
-    /// static fallback remains only as W16.cfg6 migration compatibility.
+    /// Files, resumes, retries, and Tools diagnostics pass immutable run values explicitly — and since
+    /// W16.cfg6 `rotationMode` and `standardImageMB` are **required**, so the compiler, not a code
+    /// review, is what guarantees no call site silently falls back to a process-global.
     nonisolated static func performOCRCall(
         imageURL: URL,
         provider: LLMProvider,
@@ -1288,15 +1311,15 @@ extension OCRProcessor {
         imageScale: Double = 1.0,
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil,
-        rotationMode explicitRotationMode: RotationMode? = nil,
-        standardImageMB explicitStandardImageMB: Double? = nil
+        rotationMode: RotationMode,
+        standardImageMB: Double
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
         // The detected correction overrides the OCR prompt's own rotation guess.
         async let rotationCorrection = detectRotation(
             imageURL: imageURL, provider: provider, apiKey: apiKey,
-            mode: explicitRotationMode ?? rotationModeForRun,
+            mode: rotationMode,
             gatewayConfig: gatewayConfig, localAgent: localAgent
         )
 
@@ -1305,7 +1328,7 @@ extension OCRProcessor {
         let scale = targetDimensionScale(
             forFileAt: imageURL,
             sizeFraction: imageScale,
-            standardImageMB: explicitStandardImageMB)
+            standardImageMB: standardImageMB)
 
         let networkResult: OCRResult
         do {
@@ -1398,6 +1421,7 @@ extension OCRProcessor {
         guard !retryIndices.isEmpty else { return }
         let gateway = currentGateway
         let localAgent = currentLocalAgent
+        let ocrRun = Self.ocrCallValues(for: runConfig)
 
         statusMessage = "Waiting to retry \(retryIndices.count) file\(retryIndices.count == 1 ? "" : "s") (model was busy)…"
         try? await Task.sleep(for: .seconds(10))
@@ -1418,8 +1442,8 @@ extension OCRProcessor {
                 previousText: nil,
                 previousImageURL: nil,
                 gatewayConfig: gateway, localAgent: localAgent,
-                rotationMode: runConfig?.rotationMode,
-                standardImageMB: runConfig?.standardImageMB
+                rotationMode: ocrRun.rotationMode,
+                standardImageMB: ocrRun.standardImageMB
             )
 
             // Update failed files list if retry succeeded

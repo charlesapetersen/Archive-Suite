@@ -482,7 +482,7 @@ enum BatchResumeTestDriver {
               && legacyBatchConfig.exportedImageMB == 8)
 
         // Apply through the same method resumeRun uses, after deliberately setting contradictory live
-        // values. The process globals must remain untouched: cfg5 carries these values in the config.
+        // values. cfg5 carries these values in the config instead of fanning them out.
         processor.taggingMode = .automatic
         processor.passSourceTags = false
         processor.rotationMode = .llmMajority
@@ -491,14 +491,12 @@ enum BatchResumeTestDriver {
         processor.tagVocabulary = []
         processor.exportOriginals = true
         processor.preGroupedBoundaries = []
-        let staticValuesBeforeApply = (
-            OCRProcessor.rotationModeForRun,
-            OCRProcessor.standardImageMB,
-            OCRProcessor.ocrWorkerCount,
-            OCRProcessor.pdfImageMB,
-            OCRProcessor.textColumns,
-            OCRProcessor.exportedImageMB
-        )
+        // W16.cfg6 deleted the six `nonisolated(unsafe)` statics this block used to snapshot and compare,
+        // so "resume does not fan its settings out to process-globals" is now a *compile-time* property:
+        // there is no longer anything to fan out to. What remains testable — and what the fan-out check
+        // was really protecting — is that a SECOND processor is completely unaffected by the first one's
+        // resume. Below, `bystander` shares nothing but the process.
+        let bystander = OCRProcessor()
         processor.applyPendingRunRuntimeConfig(runtimeConfig())
         check("resume applies instance runtime settings instead of contradictory live UI values",
               processor.taggingMode == .copySource && processor.passSourceTags
@@ -507,13 +505,13 @@ enum BatchResumeTestDriver {
               && processor.tagVocabulary == ["Correspondence", "Receipts"]
               && processor.preGroupedBoundaries == [true, false]
               && processor.preGroupedTypes.map(\.rawValue) == ["box", "document"])
-        check("resume no longer fans the six run settings back out to process-global statics",
-              OCRProcessor.rotationModeForRun == staticValuesBeforeApply.0
-              && OCRProcessor.standardImageMB == staticValuesBeforeApply.1
-              && OCRProcessor.ocrWorkerCount == staticValuesBeforeApply.2
-              && OCRProcessor.pdfImageMB == staticValuesBeforeApply.3
-              && OCRProcessor.textColumns == staticValuesBeforeApply.4
-              && OCRProcessor.exportedImageMB == staticValuesBeforeApply.5)
+        check("W16.cfg6: a resume leaks none of its runtime settings to a concurrent processor",
+              bystander.activeRunConfig == nil
+              && bystander.rotationMode == .llmSingle
+              && bystander.taggingMode == .automatic
+              && !bystander.passSourceTags && !bystander.reviewRotation
+              && !bystander.mergeDocuments && bystander.tagVocabulary.isEmpty
+              && bystander.preGroupedBoundaries.isEmpty && bystander.preGroupedTypes.isEmpty)
         let recaptured = processor.makePendingRunRuntimeConfig(
             imageScale: 0.37, gatewayConfig: nil, runConfig: resumedV2Config)
         check("run config recaptures every applied instance/injected setting into one immutable snapshot",

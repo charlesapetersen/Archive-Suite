@@ -39,27 +39,12 @@ enum ManifestPersistenceTestDriver {
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
         let file = tmp.appendingPathComponent("manifest.json")
 
-        // --- B8: Live Capture must not read or write Process Files' mutable run statics. ---
-        // Activate an empty live session under deliberately conflicting globals. Activation used to
-        // overwrite all three, and later Process Files writes could change Live Capture mid-session.
-        let originalRotation = OCRProcessor.rotationModeForRun
-        let originalStandardImageMB = OCRProcessor.standardImageMB
-        let originalOCRWorkerCount = OCRProcessor.ocrWorkerCount
-        let originalPDFImageMB = OCRProcessor.pdfImageMB
-        let originalTextColumns = OCRProcessor.textColumns
-        let originalExportedImageMB = OCRProcessor.exportedImageMB
+        // --- B8: Live Capture must not read or write Process Files' run settings. ---
+        // Activate an empty live session and confirm it changes nothing shared. B8 originally guarded
+        // six mutable `nonisolated(unsafe)` statics; W16.cfg6 deleted them, so the only shared mutable
+        // tagging/sizing state left for this check to protect is `MacOSTagger.stampUnread`.
         let originalStampUnread = MacOSTagger.stampUnread
-        defer {
-            OCRProcessor.rotationModeForRun = originalRotation
-            OCRProcessor.standardImageMB = originalStandardImageMB
-            OCRProcessor.ocrWorkerCount = originalOCRWorkerCount
-            OCRProcessor.pdfImageMB = originalPDFImageMB
-            OCRProcessor.textColumns = originalTextColumns
-            OCRProcessor.exportedImageMB = originalExportedImageMB
-            MacOSTagger.stampUnread = originalStampUnread
-        }
-        OCRProcessor.rotationModeForRun = .off
-        OCRProcessor.standardImageMB = 19
+        defer { MacOSTagger.stampUnread = originalStampUnread }
         MacOSTagger.stampUnread = false
         let liveIsolationSession = CaptureSession()
         let liveProvider = LLMProvider.gemini
@@ -71,10 +56,8 @@ enum ManifestPersistenceTestDriver {
             enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
             outputImageFile: true, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
         liveIsolationSession.beginLiveSession(config: liveConfig)
-        check("B8: Live Capture activation does not mutate Process Files rotation/size/tag globals",
-              OCRProcessor.rotationModeForRun == .off
-              && OCRProcessor.standardImageMB == 19
-              && !MacOSTagger.stampUnread)
+        check("B8: Live Capture activation does not mutate the shared tagging global",
+              !MacOSTagger.stampUnread)
 
         let configDefaultsSuite = "APManifestTest-\(UUID().uuidString)"
         let configDefaults = UserDefaults(suiteName: configDefaultsSuite)!
@@ -107,15 +90,41 @@ enum ManifestPersistenceTestDriver {
               && processFilesConfig.exportedImageMB == 3
               && processFilesConfig.textColumns == 4)
 
-        // --- W16.cfg2: injected scheduling/PDF settings win; nil retains the migration fallback. ---
-        OCRProcessor.ocrWorkerCount = 2
-        OCRProcessor.pdfImageMB = 3
-        OCRProcessor.textColumns = 1
+        // --- W16.cfg6: `runSizing` is a PURE read — the property the deleted statics could not have. ---
+        // A static could hold a value written by a run that already finished (or by a test driver whose
+        // `defer` a crash skipped). These three checks pin the replacement's actual guarantee: what comes
+        // back is a function of the defaults handed in, at the moment it is asked, and nothing else.
+        let sizingFirstRead = SessionProcessingConfig.runSizing(configDefaults)
+        check("W16.cfg6: runSizing applies the same clamps loadStandardImageMB() did",
+              sizingFirstRead.standardImageMB == 0.5      // 0.1 → clamped up
+              && sizingFirstRead.ocrWorkerCount == 12     // 13  → clamped down
+              && sizingFirstRead.pdfImageMB == 20         // 21  → clamped down
+              && sizingFirstRead.exportedImageMB == 3     // .infinity → fallback
+              && sizingFirstRead.textColumns == 4)        // 5   → clamped down
+        check("W16.cfg6: reading twice with no write in between returns the identical value",
+              SessionProcessingConfig.runSizing(configDefaults) == sizingFirstRead)
+        configDefaults.set(1.5, forKey: DefaultsKeys.pdfImageSizeMB)
+        configDefaults.set(2, forKey: DefaultsKeys.textColumns)
+        let sizingAfterWrite = SessionProcessingConfig.runSizing(configDefaults)
+        check("W16.cfg6: a changed default is picked up immediately — nothing is cached or retained",
+              sizingAfterWrite.pdfImageMB == 1.5 && sizingAfterWrite.textColumns == 2
+              && sizingAfterWrite.standardImageMB == sizingFirstRead.standardImageMB)
+        check("W16.cfg6: the run-start builder normalizes through that same one read",
+              SessionProcessingConfig.fromProcessFilesRunStart(configDefaults).runSizing == sizingAfterWrite)
+        // Restore the values the later fromProcessFilesRunStart assertions above were written against.
+        configDefaults.set(21.0, forKey: DefaultsKeys.pdfImageSizeMB)
+        configDefaults.set(5, forKey: DefaultsKeys.textColumns)
+
+        // --- W16.cfg2/cfg6: an injected config wins; with none, the helpers read defaults, not a global. ---
+        let liveSizing = SessionProcessingConfig.runSizing()
         let fallbackPDF = OCRProcessor.pdfGenerationSettings(for: nil)
-        check("W16.cfg2: nil config retains worker/PDF static fallbacks for resume migration",
-              OCRProcessor.schedulingWorkerCount(for: nil) == 2
-              && fallbackPDF.imageMB == 3
-              && fallbackPDF.textColumns == 1)
+        check("W16.cfg6: a nil config resolves through runSizing() rather than a process-global",
+              OCRProcessor.schedulingWorkerCount(for: nil) == liveSizing.ocrWorkerCount
+              && fallbackPDF.imageMB == liveSizing.pdfImageMB
+              && fallbackPDF.textColumns == liveSizing.textColumns
+              && OCRProcessor.ocrCallValues(for: nil).standardImageMB == liveSizing.standardImageMB
+              && OCRProcessor.ocrCallValues(for: nil).rotationMode
+                  == SessionProcessingConfig.defaultRotationMode())
         var injectedConfig = processFilesConfig
         injectedConfig.standardImageMB = 7
         injectedConfig.ocrWorkerCount = 9
@@ -123,7 +132,7 @@ enum ManifestPersistenceTestDriver {
         injectedConfig.textColumns = 3
         injectedConfig.exportedImageMB = 6
         let injectedPDF = OCRProcessor.pdfGenerationSettings(for: injectedConfig)
-        check("W16.cfg2: immutable config overrides conflicting worker/PDF statics",
+        check("W16.cfg2: an immutable config overrides the worker/PDF values a defaults read would give",
               OCRProcessor.schedulingWorkerCount(for: injectedConfig) == 9
               && injectedPDF.imageMB == 8
               && injectedPDF.textColumns == 3)
@@ -177,24 +186,30 @@ enum ManifestPersistenceTestDriver {
               && explicitLateSettings.mergeDocuments
               && !explicitLateSettings.exportOriginals)
         lateStageProcessor.activeRunConfig = nil
-        OCRProcessor.exportedImageMB = 11
         let fallbackLateSettings = lateStageProcessor.lateRunOutputSettings(for: nil)
-        check("W16.cfg3: nil config preserves late-stage fallback until resume migration",
-              fallbackLateSettings.pdfImageMB == 3
-              && fallbackLateSettings.textColumns == 1
-              && fallbackLateSettings.exportedImageMB == 11
+        check("W16.cfg6: with no snapshot at all, late-stage sizing comes from a live defaults read",
+              fallbackLateSettings.pdfImageMB == liveSizing.pdfImageMB
+              && fallbackLateSettings.textColumns == liveSizing.textColumns
+              && fallbackLateSettings.exportedImageMB == liveSizing.exportedImageMB
               && !fallbackLateSettings.stampUnread
               && fallbackLateSettings.taggingMode == .none
               && fallbackLateSettings.mergeDocuments
               && !fallbackLateSettings.exportOriginals)
 
+        // W16.cfg6: `targetDimensionScale` requires its size target, so two runs cannot share one. The
+        // same 1 MB file yields a different scale per caller, and neither call can influence the other.
         let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
         try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)
         let explicitScale = OCRProcessor.targetDimensionScale(
             forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 0.5)
-        let globalScale = OCRProcessor.targetDimensionScale(forFileAt: sizedInput, sizeFraction: 1)
-        check("B8: explicit Live Capture size snapshot wins over conflicting Process Files global",
-              abs(explicitScale - 0.5.squareRoot()) < 0.0001 && globalScale == 1)
+        let otherRunScale = OCRProcessor.targetDimensionScale(
+            forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 3)
+        let explicitScaleAgain = OCRProcessor.targetDimensionScale(
+            forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 0.5)
+        check("B8: each caller's own size snapshot decides its scale; a second caller changes nothing",
+              abs(explicitScale - 0.5.squareRoot()) < 0.0001   // 0.5 MB target under a 1 MB file
+              && otherRunScale == 1                            // 3 MB target ≥ 1 MB file → full res
+              && explicitScaleAgain == explicitScale)
 
         let explicitlyStamped = tmp.appendingPathComponent("b8-explicit-stamp.txt")
         let explicitlyPlain = tmp.appendingPathComponent("b8-explicit-plain.txt")

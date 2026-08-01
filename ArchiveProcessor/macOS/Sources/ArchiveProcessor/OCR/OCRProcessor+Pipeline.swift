@@ -234,13 +234,15 @@ extension OCRProcessor {
     }
 
     /// Capture the effective runtime values used by this run. Production callers supply their immutable
-    /// config; nil retains only the compatibility fallback that W16.cfg6 will delete with the statics.
+    /// config; with none, W16.cfg6 persists a fresh `runSizing()` read rather than the deleted statics —
+    /// so a manifest can never record sizing values inherited from an unrelated earlier run.
     func makePendingRunRuntimeConfig(
         imageScale: Double,
         gatewayConfig: GatewayConfig?,
         runConfig: SessionProcessingConfig? = nil
     ) -> PendingRunRuntimeConfig {
         let effectiveScale = imageScale.isFinite ? max(0.01, min(1.0, imageScale)) : 1.0
+        let sizing = runConfig?.runSizing ?? SessionProcessingConfig.runSizing()
         return PendingRunRuntimeConfig(
             schemaVersion: PendingRunRuntimeConfig.currentSchemaVersion,
             taggingMode: taggingMode,
@@ -257,11 +259,11 @@ extension OCRProcessor {
             preGroupedYears: preGroupedYears,
             preGroupedMonths: preGroupedMonths,
             preGroupedSubjects: preGroupedSubjects,
-            standardImageMB: runConfig?.standardImageMB ?? Self.standardImageMB,
-            ocrWorkerCount: runConfig?.ocrWorkerCount ?? Self.ocrWorkerCount,
-            pdfImageMB: runConfig?.pdfImageMB ?? Self.pdfImageMB,
-            textColumns: runConfig?.textColumns ?? Self.textColumns,
-            exportedImageMB: runConfig?.exportedImageMB ?? Self.exportedImageMB,
+            standardImageMB: sizing.standardImageMB,
+            ocrWorkerCount: sizing.ocrWorkerCount,
+            pdfImageMB: sizing.pdfImageMB,
+            textColumns: sizing.textColumns,
+            exportedImageMB: sizing.exportedImageMB,
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
         )
     }
@@ -1441,6 +1443,7 @@ extension OCRProcessor {
         let remaining = indices.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
+        let ocrRun = Self.ocrCallValues(for: runConfig)
 
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
@@ -1466,8 +1469,8 @@ extension OCRProcessor {
                             customPrompt: segmentationContext.customPrompt,
                             imageScale: scale,
                             gatewayConfig: gateway, localAgent: localAgent,
-                            rotationMode: runConfig?.rotationMode,
-                            standardImageMB: runConfig?.standardImageMB
+                            rotationMode: ocrRun.rotationMode,
+                            standardImageMB: ocrRun.standardImageMB
                         )
                         return (index, result)
                     }
@@ -1499,8 +1502,8 @@ extension OCRProcessor {
                                 customPrompt: segmentationContext.customPrompt,
                                 imageScale: scale,
                                 gatewayConfig: gateway, localAgent: localAgent,
-                                rotationMode: runConfig?.rotationMode,
-                                standardImageMB: runConfig?.standardImageMB
+                                rotationMode: ocrRun.rotationMode,
+                                standardImageMB: ocrRun.standardImageMB
                             )
                             return (idx, result)
                         }
@@ -1530,8 +1533,8 @@ extension OCRProcessor {
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
-                    rotationMode: runConfig?.rotationMode,
-                    standardImageMB: runConfig?.standardImageMB
+                    rotationMode: ocrRun.rotationMode,
+                    standardImageMB: ocrRun.standardImageMB
                 )
 
                 if Self.isTimeoutError(result) {
@@ -1543,8 +1546,8 @@ extension OCRProcessor {
                         customPrompt: segmentationContext.customPrompt,
                         imageScale: segmentationContext.imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
-                        rotationMode: runConfig?.rotationMode,
-                        standardImageMB: runConfig?.standardImageMB
+                        rotationMode: ocrRun.rotationMode,
+                        standardImageMB: ocrRun.standardImageMB
                     )
                 }
 
@@ -2333,11 +2336,12 @@ extension OCRProcessor {
         jobs[index].status = .processing
         let ocrURL = imageURL ?? jobs[index].sourceURL
         let effectiveRunConfig = runConfigForRetry(runConfig)
+        let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
             apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway,
-            localAgent: currentLocalAgent, rotationMode: effectiveRunConfig?.rotationMode,
-            standardImageMB: effectiveRunConfig?.standardImageMB)
+            localAgent: currentLocalAgent, rotationMode: ocrRun.rotationMode,
+            standardImageMB: ocrRun.standardImageMB)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

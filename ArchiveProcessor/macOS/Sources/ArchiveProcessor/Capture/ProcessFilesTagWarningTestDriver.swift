@@ -333,9 +333,19 @@ enum ProcessFilesTagWarningTestDriver {
               && tagsOf(boxLabelPDF).filter { $0 == "Red" }.count == 1)
 
         // 7b. `exportOriginalImages` — the dual output's image mirrors its PDF's tags.
-        let originalExportMB = OCRProcessor.exportedImageMB
-        OCRProcessor.exportedImageMB = 5     // a tiny synthetic JPEG takes the pristine byte-copy path
-        defer { OCRProcessor.exportedImageMB = originalExportMB }
+        // W16.cfg6: the export size is injected, not poked into a process-global. This driver used to
+        // set `OCRProcessor.exportedImageMB = 5` and restore it in a `defer` — precisely the pattern the
+        // item deletes, because a crash between the two left a real run exporting at 5 MB.
+        let exportRunConfig = SessionProcessingConfig(
+            provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: .low, apiKey: "",
+            taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+            outputDirectory: colourDir, contextCharCount: 0, sendPreviousImage: false,
+            customOCRPrompt: "", imageScale: 1, standardImageMB: 3,
+            enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
+            outputImageFile: true,        // → exportOriginals
+            pdfImageMB: 2,
+            exportedImageMB: 5,           // a tiny synthetic JPEG takes the pristine byte-copy path
+            textColumns: 1)
         let exportSource = makeJPEG("IMG_7003.jpg", in: colourDir)
         // Name the PDF off the source's base and the exported image WOULD be the source itself, which
         // the same-file guard skips; a distinct base is what a real run's dedup'd output looks like.
@@ -346,7 +356,7 @@ enum ProcessFilesTagWarningTestDriver {
         let exporter = wiredProcessor(source: exportSource, output: exportPDF,
                                       classification: .documentStart)
         exporter.exportOriginals = true
-        await exporter.exportOriginalImages()
+        await exporter.exportOriginalImages(runConfig: exportRunConfig)
         let exportedImage = colourDir.appendingPathComponent("page-7003.jpg")
         check("the dual output's image was written", fm.fileExists(atPath: exportedImage.path))
         check("...and it mirrors the PDF's tags",

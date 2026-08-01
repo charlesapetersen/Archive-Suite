@@ -89,6 +89,15 @@ struct SessionProcessingConfig: Sendable {
                   pdfImageMB: pdfImageMB, textColumns: textColumns, exportedImageMB: exportedImageMB)
     }
 
+    /// The rotation mode `fromDefaults()` would select, read on its own and without the Keychain.
+    ///
+    /// Companion to `runSizing(_:)` for the sixth value W16.cfg6 removed: the `rotationModeForRun`
+    /// static. Same rule — an OCR call with no run snapshot reads the setting as it is *now* rather
+    /// than whatever a previous run or a test driver last stored in a global.
+    static func defaultRotationMode(_ d: UserDefaults = .standard) -> RotationMode {
+        RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .llmSingle
+    }
+
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
@@ -129,7 +138,7 @@ struct SessionProcessingConfig: Sendable {
             thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low,
             apiKey: apiKey,
             taggingMode: TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic,
-            rotationMode: RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .llmSingle,
+            rotationMode: defaultRotationMode(d),
             mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
             outputDirectory: outURL,
             contextCharCount: Int(d.object(forKey: DefaultsKeys.contextCharCount) as? Double ?? 200),

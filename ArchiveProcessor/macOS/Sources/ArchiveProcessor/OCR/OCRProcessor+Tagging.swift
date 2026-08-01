@@ -4,8 +4,10 @@ import UserNotifications
 import os
 
 extension OCRProcessor {
-    /// Resolve every output setting consumed after the main OCR pass. An explicit config wins, then
-    /// the retained fresh/resumed-run snapshot; nil preserves the migration fallback until W16.cfg5/6.
+    /// Resolve every output setting consumed after the main OCR pass. An explicit config wins, then the
+    /// retained fresh/resumed-run snapshot. W16.cfg6 replaced the last resort — which used to be the
+    /// deleted `exportedImageMB`/`pdfImageMB`/`textColumns` statics — with a pure `runSizing()` read,
+    /// evaluated only when neither snapshot exists.
     func lateRunOutputSettings(
         for explicitRunConfig: SessionProcessingConfig?
     ) -> (
@@ -23,7 +25,7 @@ extension OCRProcessor {
         return (
             pdf.imageMB,
             pdf.textColumns,
-            runConfig?.exportedImageMB ?? Self.exportedImageMB,
+            runConfig?.exportedImageMB ?? SessionProcessingConfig.runSizing().exportedImageMB,
             runTaggingMode.stampsUnread,
             runTaggingMode,
             runConfig?.mergeDocuments ?? mergeDocuments,

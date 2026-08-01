@@ -58,44 +58,19 @@ class OCRProcessor: ObservableObject {
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
     /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
     var reviewRotation = false
-    // MARK: - Per-run configuration statics
+    // MARK: - Per-run configuration
     //
-    // W16.cfg5 moved every production run/diagnostic to explicit `SessionProcessingConfig` values.
-    // These compatibility fallbacks remain only for isolated drivers/legacy helper signatures and are
-    // deleted by W16.cfg6; production no longer writes them at run start or resume.
-
-    /// The active run's rotation mode, readable from the nonisolated OCR call.
-    nonisolated(unsafe) static var rotationModeForRun: RotationMode = .localVision
-
-    /// The "standard" image size (MB) the resolution slider targets.
-    nonisolated(unsafe) static var standardImageMB: Double = 3.0
-
-    /// Parallel OCR workers for the batch run (user-configurable in Settings, 1–12).
-    nonisolated(unsafe) static var ocrWorkerCount: Int = 4
-
-    /// Target size (MB) for the image embedded in each output PDF (0 = full source resolution).
-    nonisolated(unsafe) static var pdfImageMB: Double = 0
-
-    /// Number of text columns on the OCR text page (1 = single-column default, 2–4 for multi-column).
-    nonisolated(unsafe) static var textColumns: Int = 1
-
-    /// Target size (MB) for the separately-exported image file in two-file output (0 = full resolution).
-    nonisolated(unsafe) static var exportedImageMB: Double = 0
-
-    /// Compatibility helper retained for W16.cfg6 cleanup. Production uses
-    /// `SessionProcessingConfig.fromProcessFilesRunStart()` instead.
-    static func loadStandardImageMB() {
-        let v = UserDefaults.standard.double(forKey: DefaultsKeys.standardImageSizeMB)
-        standardImageMB = v.isFinite && v > 0 ? min(20, max(0.5, v)) : 3.0
-        let w = UserDefaults.standard.integer(forKey: DefaultsKeys.ocrWorkerCount)
-        ocrWorkerCount = w > 0 ? min(12, max(1, w)) : 4
-        let p = UserDefaults.standard.double(forKey: DefaultsKeys.pdfImageSizeMB)
-        pdfImageMB = p.isFinite && p > 0 ? min(20, max(0.5, p)) : 2.0
-        let e = UserDefaults.standard.double(forKey: DefaultsKeys.exportedImageSizeMB)
-        exportedImageMB = e.isFinite && e > 0 ? min(20, max(0.5, e)) : 3.0
-        let tc = UserDefaults.standard.integer(forKey: DefaultsKeys.textColumns)
-        textColumns = min(4, max(1, tc))
-    }
+    // W16.cfg5 moved every production run/diagnostic to explicit `SessionProcessingConfig` values, and
+    // W16.cfg6 deleted the six mutable `nonisolated(unsafe)` statics (`rotationModeForRun`,
+    // `standardImageMB`, `ocrWorkerCount`, `pdfImageMB`, `textColumns`, `exportedImageMB`) plus their
+    // `loadStandardImageMB()` loader that used to answer when no snapshot was supplied.
+    //
+    // Nothing process-global remains. A consumer either receives an injected `SessionProcessingConfig`
+    // — which is what every production path does — or falls back through the run's own retained
+    // snapshot to `SessionProcessingConfig.runSizing()`, a pure read of the same UserDefaults keys the
+    // loader used. That closes the failure this item exists for: a test driver could leave a static
+    // mutated when a crash skipped its `defer` restore, and a later *real* run would then write PDFs at
+    // the wrong embedded-image size or column count with nothing to indicate it.
 
     /// Cosmetic status suffix shown while a (typically free-tier) key is being rate-limited (429), so a
     /// paced bulk job doesn't look stalled. The actual backoff/retry is handled in NetworkSession.
@@ -110,16 +85,16 @@ class OCRProcessor: ObservableObject {
     /// standard size gives a target file size; the dimension scale is ~√(target/actual), clamped to
     /// ≤1 (never upscale). So larger files are downscaled more; files already at/under target are
     /// left full-resolution. Returns 1.0 (full) at fraction ≥ 1 for average/small files.
+    ///
+    /// `standardImageMB` is **required** (W16.cfg6): every caller — Live Capture, Process Files,
+    /// resumes, retries, Tools diagnostics — supplies its own run's value, so no two concurrent runs
+    /// can read one another's size target and none can silently inherit a stale process-global.
     nonisolated static func targetDimensionScale(
         forFileAt url: URL,
         sizeFraction: Double,
-        standardImageMB explicitStandardImageMB: Double? = nil
+        standardImageMB: Double
     ) -> Double {
-        // Live Capture supplies its immutable session snapshot here. Process Files keeps using the
-        // run-scoped static until its larger dependency-injection refactor is complete. Crucially,
-        // a Process Files run can no longer change the size target of an in-flight Live Capture call.
-        let runStandardImageMB = explicitStandardImageMB ?? standardImageMB
-        let targetBytes = max(0.01, sizeFraction) * runStandardImageMB * 1_000_000
+        let targetBytes = max(0.01, sizeFraction) * standardImageMB * 1_000_000
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let bytes = (attrs[.size] as? NSNumber)?.doubleValue, bytes > 0 else {
             return min(1.0, sizeFraction)   // unknown size → treat the fraction as a dimension scale
@@ -468,9 +443,9 @@ class OCRProcessor: ObservableObject {
         let preGroupedMonths: [Int?]
         let preGroupedSubjects: [[String]]
 
-        /// UserDefaults-backed sizing/concurrency values copied after `loadStandardImageMB()` normalizes
-        /// them. These affect request cost, generated PDFs/images, and scheduling, so resume must not
-        /// reload potentially-changed defaults.
+        /// UserDefaults-backed sizing/concurrency values, normalized by
+        /// `SessionProcessingConfig.runSizing()`. These affect request cost, generated PDFs/images, and
+        /// scheduling, so resume must not reload potentially-changed defaults.
         let standardImageMB: Double
         let ocrWorkerCount: Int
         let pdfImageMB: Double
