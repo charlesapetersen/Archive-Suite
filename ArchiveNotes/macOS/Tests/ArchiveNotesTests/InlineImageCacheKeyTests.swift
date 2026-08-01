@@ -163,7 +163,7 @@ struct InlineImageCacheKeyTests {
             Issue.record("the item's own asset must resolve")
             return
         }
-        let canonicalKey = InlineImageAttachment.cacheKey(for: canonical, maxPixels: 800)
+        let canonicalKey = try #require(InlineImageAttachment.cacheKey(for: canonical, maxPixels: 800))
 
         // Nothing is cached under either key before the render (guards against a stale sibling entry).
         #expect(InlineImageAttachment.thumbnailCache.object(forKey: canonicalKey as NSString) == nil)
@@ -219,13 +219,14 @@ struct InlineImageCacheKeyTests {
         let large = try #require(InlineImageAttachment.loadThumbnail(from: url, maxPixels: 128))
         #expect(small.size.width <= 32)
         #expect(large.size.width > 32, "the 128px request must not be served the 32px entry")
-        #expect(InlineImageAttachment.cacheKey(for: url, maxPixels: 32)
-                != InlineImageAttachment.cacheKey(for: url, maxPixels: 128))
+        let key32 = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 32))
+        let key128 = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 128))
+        #expect(key32 != key128)
     }
 
     // MARK: - Properties the fix must not break
 
-    @Test("A repeat render of the same asset is still a cache hit (no disk I/O)")
+    @Test("A repeat render of the same asset is still a cache hit (no content read)")
     func repeatRenderStillHitsTheCache() throws {
         let fx = try TwoItemStore()
         defer { fx.cleanup() }
@@ -233,19 +234,26 @@ struct InlineImageCacheKeyTests {
         let reference = "assets/\(name)"
         try fx.write(try solidPNG(.red, side: 24), named: name, into: fx.itemA)
         let assetStore = fx.assetStore(for: fx.itemA)
+        let url = fx.assetURL(name, in: fx.itemA)
+
+        // W23.m11-fu: the key now carries the file's size + modification time, so "unchanged file"
+        // has to be arranged rather than assumed. A whole-second timestamp is restorable *exactly*
+        // (`st_mtimespec` comes back as {sec, 0}), which is what keeps this deterministic.
+        let pinned = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: pinned], ofItemAtPath: url.path)
 
         let first = try #require(renderedImage("![](\(reference))", assetStore))
         let second = try #require(renderedImage("![](\(reference))", assetStore))
         #expect(first === second, "the second render must reuse the decoded thumbnail, not re-decode")
 
-        // Prove that really was a cache hit and not a cheap re-read: serve it from memory with the
-        // bytes gone. (The resolver still needs the path to exist, so restore it afterwards.)
-        let url = fx.assetURL(name, in: fx.itemA)
+        // Prove that really was a cache hit and not a cheap re-read: swap the bytes for garbage of the
+        // SAME length and put the timestamp back, so the file's identity is untouched and only its
+        // *contents* differ. Anything that reads them now cannot produce `first`.
         let bytes = try Data(contentsOf: url)
-        try FileManager.default.removeItem(at: url)
-        try Data("not an image".utf8).write(to: url)
+        try Data(repeating: 0x00, count: bytes.count).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: pinned], ofItemAtPath: url.path)
         let third = renderedImage("![](\(reference))", assetStore)
-        #expect(third === first, "a warm entry must be served without reading the file again")
+        #expect(third === first, "a warm entry must be served without reading the file's bytes again")
         try bytes.write(to: url)
     }
 
@@ -285,7 +293,7 @@ struct InlineImageCacheKeyTests {
             Issue.record("item B's own asset must resolve")
             return
         }
-        let bKey = InlineImageAttachment.cacheKey(for: bCanonical, maxPixels: 800)
+        let bKey = try #require(InlineImageAttachment.cacheKey(for: bCanonical, maxPixels: 800))
 
         #expect(renderedImage("![](\(escape))", assetStore) != nil)   // the "Blocked" placeholder
         #expect(renderedImage("![](\(missing))", assetStore) != nil)  // the "Missing" placeholder
@@ -304,7 +312,7 @@ struct InlineImageCacheKeyTests {
         let name = "bypass-\(UUID().uuidString).png"
         try fx.write(try solidPNG(.red, side: 24), named: name, into: fx.itemA)
         let url = fx.assetURL(name, in: fx.itemA)
-        let key = InlineImageAttachment.cacheKey(for: url, maxPixels: 800) as NSString
+        let key = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 800)) as NSString
 
         #expect(InlineImageAttachment.loadThumbnail(from: url, cached: false) != nil)
         #expect(InlineImageAttachment.thumbnailCache.object(forKey: key) == nil,

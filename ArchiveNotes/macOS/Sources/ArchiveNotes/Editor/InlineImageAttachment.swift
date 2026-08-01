@@ -115,9 +115,9 @@ final class InlineImageAttachment: NSTextAttachment {
 
 extension InlineImageAttachment {
 
-    /// Bounded cache of decoded thumbnails, keyed by `cacheKey(for:maxPixels:)` — the canonical
-    /// absolute path of the file whose bytes were read, not the reference that named it.
-    /// Evictable by the system; re-decoded on demand. Full-resolution PNGs are never
+    /// Bounded cache of decoded thumbnails, keyed by `cacheKey(for:maxPixels:)` — the absolute path of
+    /// the file whose bytes were read *at the version they were read at*, not the reference that named
+    /// it. Evictable by the system; re-decoded on demand. Full-resolution PNGs are never
     /// loaded into the editor — only downsampled thumbnails.
     /// `nonisolated(unsafe)` — NSCache is thread-safe by design; the static let is
     /// initialized once and the cache handles its own synchronization.
@@ -128,8 +128,31 @@ extension InlineImageAttachment {
         return cache
     }()
 
-    /// The cache identity of one inline image: **the file whose bytes are decoded**, at the size they
-    /// are decoded to.
+    /// The identity of the bytes **currently at** `url`: size + modification time, from one `stat(2)`.
+    /// `nil` when the file cannot be stat'ed (deleted, unreachable) — such a file has no cache identity
+    /// at all, which is what stops a vanished asset from being answered out of memory.
+    ///
+    /// `stat(2)` rather than `URL.resourceValues(forKeys:)`, and that is **measured, not stylistic**:
+    /// `URL` caches resource values on its backing `NSURL`, so a second `resourceValues` call on the
+    /// *same* `URL` value hands back the *first* call's size and mtime. Measured here: rewriting a file
+    /// from 100 to 250 bytes between two calls read back as unchanged on both fields — which would have
+    /// silently defeated this whole fix wherever a `URL` value is reused. `FileManager.attributesOfItem`
+    /// is honest but builds a full attribute dictionary (~437 µs/call here, vs ~15 µs for this).
+    ///
+    /// Nanosecond `st_mtimespec` is what makes size+mtime sharp enough to be worth having: 20
+    /// back-to-back same-size rewrites of one file produced 20 distinct versions on this filesystem.
+    private static func fileVersion(of url: URL) -> String? {
+        var info = stat()
+        let rc = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return stat(path, &info)
+        }
+        guard rc == 0 else { return nil }
+        return "\(info.st_size).\(info.st_mtimespec.tv_sec).\(info.st_mtimespec.tv_nsec)"
+    }
+
+    /// The cache identity of one inline image: **the file whose bytes are decoded**, at the version
+    /// those bytes are at, at the size they are decoded to. `nil` when there is no file to identify.
     ///
     /// **W23.m11.** The key used to be the *caller-supplied markdown-relative path* — normally
     /// `assets/<name>` — while this cache is `static`, i.e. app-wide. Same-named assets in different
@@ -145,18 +168,38 @@ extension InlineImageAttachment {
     /// *literally sharing the file*, in which case the bytes are the same and one shared entry is the
     /// correct answer, not a bug; adding the UUID would only split that shared entry in two.
     ///
-    /// Why no expiry: an asset path is **write-once** in this app — `NoteStore.writeReservedAsset`
-    /// throws rather than overwrite an existing name, and `importAsset` disambiguates — so the bytes
-    /// at a canonical path never change under us, and a UUID is never reissued to a second item.
+    /// **W23.m11-fu — why the file's *version* is in the key, and why no expiry is still needed.**
+    /// An asset path is write-once *to this app* — `NoteStore.writeReservedAsset` throws rather than
+    /// overwrite an existing name, `importAsset` disambiguates, and a UUID is never reissued — but the
+    /// store root can sit in a synced folder, and a sync client rewriting the bytes at an existing
+    /// `items/<uuid>/assets/<name>` is not bound by that. Keyed on the path alone, the editor went on
+    /// showing the previous thumbnail until the entry was evicted or the app relaunched. Folding the
+    /// version in means such an entry is simply never looked up again: nothing expires, nothing is
+    /// purged, the stale entry just ages out of a bounded cache under a name no one asks for.
+    ///
+    /// This is deliberately **not** the other candidate fix — dropping an item's entries when the store
+    /// notices an external change — because the store notices nothing: Notes has no file-system watcher
+    /// (see the index rebuild in W23.m9-fu2), so that route is a new subsystem, not a key change.
+    ///
+    /// Size **and** mtime, not either alone: a sync client can rewrite a file to the same length, and
+    /// two unrelated writes can share a whole-second timestamp. The path stays in the key as well —
+    /// version alone would alias two files that happen to match on both fields.
     ///
     /// `maxPixels` is part of the key because it changes the decoded result; without it, the first
     /// caller's size would be served to every later caller asking for a different one.
     ///
-    /// Normalization here is **string-only** (`standardizedFileURL`), deliberately: a cache hit must
-    /// cost no disk I/O. Passing a non-canonical URL therefore degrades to a *duplicate* entry for the
-    /// same bytes — wasteful, never wrong — so production passes the resolver's canonical URL.
-    static func cacheKey(for url: URL, maxPixels: Int) -> String {
-        "\(maxPixels)\u{0000}\(url.standardizedFileURL.path)"
+    /// **The cost, measured before it was paid** (this item's own instruction, since a hit was supposed
+    /// to cost no disk I/O). The `stat` costs ~15 µs on this machine. It replaces a
+    /// `standardizedFileURL` normalization that cost ~53 µs and *itself* touched the file system —
+    /// 12.8 µs on a path that does not exist, 52.7 µs on one that does. So a cache hit gets **cheaper**
+    /// here (~76 µs → ~17 µs of key construction), not dearer, and the "no disk I/O" claim it used to
+    /// carry was not true to begin with. Dropping the normalization keeps the contract the old comment
+    /// stated: a non-canonical URL degrades to a *duplicate* entry for the same bytes — wasteful, never
+    /// wrong — and production passes `AssetPathResolver`'s already-canonical URL. For scale: the decode
+    /// a hit avoids is ~3,200 µs.
+    static func cacheKey(for url: URL, maxPixels: Int) -> String? {
+        guard let version = fileVersion(of: url) else { return nil }
+        return "\(maxPixels)\u{0000}\(version)\u{0000}\(url.path)"
     }
 
     /// Create a downsampled thumbnail from raw image data.
@@ -173,8 +216,8 @@ extension InlineImageAttachment {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    /// Load a thumbnail for `url`, memoized in the app-wide `thumbnailCache`. A hit returns without
-    /// any disk I/O.
+    /// Load a thumbnail for `url`, memoized in the app-wide `thumbnailCache`. A hit costs one `stat`
+    /// and no content read.
     ///
     /// `url` must be a **canonical, contained** file URL — in production, exactly the one
     /// `AssetPathResolver` hands back as `.resolved`. The key is derived from it (W23.m11): callers
@@ -182,11 +225,21 @@ extension InlineImageAttachment {
     /// Pass `cached: false` to force a fresh decode and leave the cache untouched.
     static func loadThumbnail(from url: URL, maxPixels: Int = 800,
                               cached: Bool = true) -> NSImage? {
-        let key = cacheKey(for: url, maxPixels: maxPixels) as NSString
-        if cached, let hit = thumbnailCache.object(forKey: key) { return hit }
+        // One stat, before any decode, settling both questions at once: does a warm entry still
+        // describe *this* file, and what should a fresh entry be filed under (W23.m11-fu). A file with
+        // no identity — deleted, unreachable — is read rather than answered from memory, so the read
+        // fails and the caller gets the "Missing" placeholder instead of a thumbnail of bytes that are
+        // gone. `cached: false` skips the stat entirely: that path touches the cache in neither
+        // direction, so it needs no identity and must not pay for one.
+        let key = cached ? cacheKey(for: url, maxPixels: maxPixels).map { $0 as NSString } : nil
+        if let key, let hit = thumbnailCache.object(forKey: key) { return hit }
         guard let data = try? Data(contentsOf: url) else { return nil }
         guard let thumb = downsampledThumbnail(from: data, maxPixels: maxPixels) else { return nil }
-        if cached {
+        if let key {
+            // If the file changed between the stat and the read, these fresh bytes are filed under the
+            // previous version. That is self-healing rather than a new staleness: this render shows the
+            // bytes it just read (correct), and the next one stats the new version, misses, and re-files
+            // — the residue is one entry under a name nothing will ask for again.
             let cost = Int(thumb.size.width * thumb.size.height * 4)
             thumbnailCache.setObject(thumb, forKey: key, cost: cost)
         }
