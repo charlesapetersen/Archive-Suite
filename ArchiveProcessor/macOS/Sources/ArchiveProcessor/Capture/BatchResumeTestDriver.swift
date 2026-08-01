@@ -30,6 +30,9 @@ import AppKit
 ///  11. V1 paid-batch journals round-trip ordered/consumed chunk IDs and per-file output associations,
 ///      preserve partial submission, reopen missing outputs without another create, reject malformed
 ///      lifecycle state, and retain pre-journal comma-separated compatibility.
+///  12. The three batch clients' **provider response-shape contract** — every status/result body shape
+///      Anthropic, Gemini and Mistral are accepted in, parsed headlessly from literal fixtures
+///      (`BatchParseContract`, W16.bat1). No network, no keys, no cost.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
@@ -597,6 +600,12 @@ enum BatchResumeTestDriver {
         } else {
             check("legacy paid-batch journal fixture is constructible", false)
         }
+
+        // --- 12: provider response-shape contract for the three paid batch clients (W16.bat1). ---
+        // Pure-parse, no network, no keys, no cost — literal Anthropic/Gemini/Mistral bodies through the
+        // parse seams in `BatchOCR.swift`. Lives in its own file because it shares nothing with the
+        // manifest fixtures above; it rides this driver so one script covers the whole paid-batch surface.
+        BatchParseContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
