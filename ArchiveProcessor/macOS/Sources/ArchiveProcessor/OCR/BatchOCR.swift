@@ -4,7 +4,10 @@ import Foundation
 /// first (Mistral's shape), then nested `error.message` (Anthropic/Gemini). Anthropic and Gemini
 /// error bodies carry no top-level `message`, so this is behavior-identical to their prior
 /// nested-only parsing — it simply also covers Mistral's top-level form.
-private func parseBatchErrorBody(data: Data, statusCode: Int) -> String {
+///
+/// Internal (not `private`) so the headless provider-contract driver can pin its shape — see
+/// `BatchParseContract`.
+func parseBatchErrorBody(data: Data, statusCode: Int) -> String {
     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
         if let message = json["message"] as? String { return message }
         if let error = json["error"] as? [String: Any],
@@ -167,7 +170,13 @@ struct AnthropicBatchClient: Sendable {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
+        return try Self.parseStatusBody(data)
+    }
 
+    /// Pure parse of a `messages/batches/{id}` status body — no network, no state, no cost. Lifted
+    /// verbatim out of `checkStatus` so the provider response contract is covered headlessly: a
+    /// response-shape change here decides whether a *paid* batch is seen as finished at all.
+    static func parseStatusBody(_ data: Data) throws -> StatusResult {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
         }
@@ -198,8 +207,13 @@ struct AnthropicBatchClient: Sendable {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        let text = String(data: data, encoding: .utf8) ?? ""
+        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+    }
 
+    /// Pure parse of the results JSONL body (one `{custom_id, result}` object per line) — no network,
+    /// no cost. Lifted verbatim out of `retrieveResults`; a line the parser cannot read is a page of
+    /// *paid* OCR silently missing from the run, so the shape is pinned headlessly.
+    static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
@@ -502,7 +516,15 @@ struct GeminiBatchClient: Sendable {
         request.httpMethod = "GET"
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
+        return try Self.parseStatusBody(data)
+    }
 
+    /// Pure parse of a `batches/{name}` status body — no network, no state, no cost. Lifted verbatim
+    /// out of `checkStatus`. This is the widest response contract in the app: the state and the
+    /// results may each arrive at the top level or under `metadata`, and the result-file location has
+    /// **six** accepted spellings. Nothing else pins them, and getting one wrong reads a *finished,
+    /// paid* batch as unfinished or empty — hence the headless contract driver.
+    static func parseStatusBody(_ data: Data) throws -> StatusResult {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
         }
@@ -556,7 +578,9 @@ struct GeminiBatchClient: Sendable {
 
     /// Parse inline batch responses into OCRResult dictionary.
     /// Each entry has: { "response": { "candidates": [...] }, "metadata": { "key": "0" } }
-    private static func parseInlinedResponses(_ responses: [[String: Any]]) -> [String: OCRResult] {
+    ///
+    /// Internal (not `private`) so the headless contract driver can reach it directly.
+    static func parseInlinedResponses(_ responses: [[String: Any]]) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for entry in responses {
@@ -585,7 +609,9 @@ struct GeminiBatchClient: Sendable {
     }
 
     /// Parse a single generateContent response object into an OCRResult.
-    private static func parseSingleResponse(_ response: [String: Any]) -> OCRResult {
+    ///
+    /// Internal (not `private`) so the headless contract driver can reach it directly.
+    static func parseSingleResponse(_ response: [String: Any]) -> OCRResult {
         if let promptFeedback = response["promptFeedback"] as? [String: Any],
            let blockReason = promptFeedback["blockReason"] as? String {
             return OCRResult(text: nil, classification: nil, errorMessage: "Content blocked by Gemini: \(blockReason)", errorCode: blockReason)
@@ -619,8 +645,14 @@ struct GeminiBatchClient: Sendable {
         request.httpMethod = "GET"
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        let text = String(data: data, encoding: .utf8) ?? ""
+        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+    }
 
+    /// Pure parse of a downloaded batch output file (one `{key, response}` object per line) — no
+    /// network, no cost. Lifted verbatim out of `retrieveResults`. This is the fallback path taken
+    /// when the status response did *not* inline the results, so it is the only way those paid pages
+    /// ever reach the run.
+    static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
@@ -783,7 +815,13 @@ struct MistralBatchClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
+        return try Self.parseStatusBody(data)
+    }
 
+    /// Pure parse of a `batch/jobs/{id}` status body — no network, no state, no cost. Lifted verbatim
+    /// out of `checkStatus`; the completion vocabulary and the `output_file` key are provider contract,
+    /// and misreading either strands a *paid* batch.
+    static func parseStatusBody(_ data: Data) throws -> StatusResult {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
         }
@@ -810,8 +848,13 @@ struct MistralBatchClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        let text = String(data: data, encoding: .utf8) ?? ""
+        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+    }
 
+    /// Pure parse of the batch output file (one `{custom_id, response}` object per line) — no network,
+    /// no cost. Lifted verbatim out of `retrieveResults`; Mistral's OCR body carries `pages[].markdown`
+    /// (with a `text` fallback), and a shape change there is a page of *paid* OCR read as empty.
+    static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
