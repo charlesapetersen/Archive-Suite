@@ -368,6 +368,20 @@ per-call parameter at all 13 sites; the remaining flip is a test affordance on a
 went stale at W16.cfg2, which migrated it to injection.) The one item still open in this area is the
 owner-gated concurrent-runs/TSan stress driver at the bottom of this section — it needs live keys or an
 approved stub OCR backend, and is NOT queued.
+- [ ] **W16.cfg6-fu2 — `fromDefaults()` clamps looser than `runSizing()`, so Live Capture gets unclamped image
+  sizes [S · verified].** Filed by W16.cfg6's adversarial review and **re-verified on both halves during the
+  2026-08-01 owner walkthrough.** `SessionProcessingConfig.fromDefaults()` builds `pdfImageMB` and
+  `exportedImageMB` from bare inline closures (`p > 0 ? p : 2.0`) — no `.isFinite` guard, no 0.5 floor, no 20
+  ceiling — while `standardImageMB`/`ocrWorkerCount` go through the strict shared helpers
+  (`normalizedImageMB`/`ocrWorkerCount`). Live Capture builds its config from `fromDefaults()`
+  (`CaptureSession.swift:230`); Process Files overwrites the five sizing values via `fromProcessFilesRunStart`
+  (`+Pipeline.swift:279`, `:320`). So an out-of-range default reaches **Live Capture unclamped** while Process
+  Files clamps it. Pre-dates cfg6, which never touched `fromDefaults()`. Fix: route those two through
+  `normalizedImageMB`. ⚠️ **Filed in the plan on 2026-08-01 but missed here until the consolidation audit
+  caught it** — an item actionable by the daemon with no entry in the tracker of record. `check-tracker-sync`
+  cannot catch that shape by design (it only compares items present in BOTH files, so plan-only items stay
+  silent to avoid drowning the signal in noise).
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/SessionProcessingConfig.swift | Tier-2 | S
 - [ ] **W16.cfg6-fu — delete `MacOSTagger.stampUnread` and the `taggingMode.didSet` that arms it [XS · LOW].**
   Filed by W16.cfg6 (2026-08-01); the follow-up `MacOSTagger.swift:17-27` names in its own doc comment. It is the
   last ambient tagging global. Nothing in production READS it — W16.cfg4 made `stampUnread:` a required
@@ -1118,10 +1132,17 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
   three times (stale `W21.vmgui-path` checkbox, a six-grants-stale tag list in `resume-prompt.txt`, a prove
   script false-failing 4 runs in 6) — all *a secondary copy drifting from the truth*.
   Audit result: most splits DO have a nameable reason (tooling binding, distinct lifecycle/audience/durability
-  /mutability) and are kept; four do not. **Phase 0 ✅** the tracker-sync guard (`08fa6ed`). **Phase 1 ✅**
-  retired the dead `ARCHIVE_NOTES_PROGRESS.md` (0 open/57 done, no tooling). **Phase 3 ✅** GUI verification
-  de-duplicated to one canonical home in `AGENTS.md`. **Phase 2** split `SUITE_TODO`'s 139 done items out of
-  the live queue. **Phase 4** one item list, strangler-verified, hold gate proven by test.
+  /mutability) and are kept; four do not. **Phase 0 ✅** tracker-sync guard (`08fa6ed`). **Phase 1 ✅** retired
+  the dead `ARCHIVE_NOTES_PROGRESS.md`. **Phase 3 ✅** GUI verification de-duplicated into `AGENTS.md`
+  (`92f0667`). **Phase 2 ✅** 160 completed entries moved to `SUITE_TODO_DONE.md`; the live queue went 3,580 →
+  1,189 lines (`3483627`).
+  **⚠️ Phase 4 — REMAINS OPEN, and this is the actual F1 fix.** Attempted 2026-08-01 and **deliberately
+  reverted**: a trial migration was silently wrong twice. It dropped `(blocked-on: …)` clauses that live in the
+  plan's item text and not in this file, flipping **`W16.bat6` and `W21.vmgui` from `blocked` to `ok`** — and
+  W16.bat6 going actionable before W16.bat3 lands would have inverted a fix order the owner confirmed that
+  morning. It also emitted a mixed queue in the wrong ORDER, which is the one thing the plan's WORK QUEUE
+  exists to get right. Nothing shipped; the plan file was restored and the resolver output re-verified
+  identical. The design and all three findings are written up in the plan — resume from there, don't restart.
   Delete the plan when Phase 4 lands. | Tier-2 | M
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 ## Excluded (not "now": need cost / owner accounts)

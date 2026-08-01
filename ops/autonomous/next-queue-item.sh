@@ -111,6 +111,22 @@ ITEMS=$(awk '
   END { flush() }
 ' "$PLAN")
 
+# --- 2b) NOTE: the WORK QUEUE is an ORDERING, not a second copy ------------------------------------------
+# A tag-reference form for this region (`- W16.bat3`, no checkbox, state+text from SUITE_TODO) was built and
+# then REMOVED on 2026-08-01 rather than shipped dormant, because a trial migration proved it silently wrong
+# in two ways. Both are recorded in execution-plans/tracker-consolidation.md §Phase 4 so the next attempt
+# starts from them instead of rediscovering them:
+#   1. ORDER — checkbox entries and tag references were emitted in two passes, so a queue mixing both came out
+#      in the wrong order. The plan's ORDER is the entire reason this region exists; getting it wrong is worse
+#      than the duplication it was meant to remove.
+#   2. DEPENDENCIES — `(blocked-on: …)` clauses live in the PLAN's item text, not in SUITE_TODO. Converting to
+#      bare tags dropped them: W16.bat6 and W21.vmgui both flipped from `blocked` to `ok`. W16.bat6 becoming
+#      actionable before W16.bat3 lands would have inverted a fix order the owner had explicitly confirmed
+#      that morning — a silent correctness failure on a money path, produced by a docs cleanup.
+# The fix direction is known (emit both forms in a single file-order pass; let a tag reference carry its own
+# `(blocked-on: …)`, since a dependency IS an ordering constraint and so belongs with the order). What is NOT
+# yet done is migrating the 74 done tags whose state lives ONLY in the plan.
+
 [ -n "$ITEMS" ] || { echo "next-queue-item: no unchecked [ ] items in WORK QUEUE"; exit 3; }
 
 any_ok=1   # 1 = none ok yet (shell-true is 0); flip to 0 when we find an ok item
