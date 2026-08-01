@@ -158,10 +158,15 @@ paid Processor OCR smoke.
     the Tart Guest Agent's vsock socket, which comes up later — exec'ing immediately failed every command in
     the run (that was the zero-test "green"). The gate polls `tart exec true` until it answers
     (`AUTONOMOUS_GUI_VM_AGENTWAIT`, 240s).
-  - **Warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`, default `notes`): an app with known-failing UITests still
-    RUNS and reports every gate, but WARNs instead of REDding — visibility without parking a multi-day run on
-    an already-tracked regression. Notes is 4/12 in the VM (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c);
-    Reader is 15/15. Empty the list as a suite goes green: a permanent warn tier is a disabled test.
+  - **The guest's display is raised too** (`tart_ensure_display`, default 1920×1200). `--no-graphics` attaches
+    no display, so the guest boots at **1024×768** whatever the VM's configured `Display` says — too small for
+    the Notes browser, whose window then clipped ~92 pt off each side and failed 4 UITests as "not hittable"
+    (W21.vmgui-c). A failure to raise it WARNs with the consequence named; it never parks the run.
+  - **Warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`) — **empty by default since 2026-08-01**: Reader is 15/15 and
+    Notes 12/12 in the VM, so a UITest failure in either REDs the gate. The tier exists for an app with
+    *tracked* known-failing UITests: it still RUNS and reports every gate but WARNs instead of REDding, buying
+    visibility without parking a multi-day run. Empty it again as soon as that suite is green — a permanent
+    warn tier is a disabled test.
   - **Per-attempt result bundles + logs.** `xcodebuild` refuses to overwrite an existing `-resultBundlePath`,
     so a fixed path made every *retry* fail before running a test — laundering a real RED into a skip. Each
     attempt gets its own bundle and its own `gui-vm-<app>-attempt<n>.log`, so the retry can't destroy attempt

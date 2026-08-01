@@ -97,12 +97,23 @@ Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
 at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/strided corpus.
 
-**Status (2026-07-30):** the gate covers **every app with a UITest bundle** — Reader *and* Notes (Processor has
-no test target). Pick a subset with `AUTONOMOUS_GUI_VM_APPS="reader"`. **Reader is 15/15 in the VM; Notes is
-4/12 failing** on its first run there (`ArchiveNotes/KNOWN_ISSUES.md`, W21.vmgui-c), so Notes sits in the
-**warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`, default `notes`): it runs and reports every gate, but its
-failures WARN instead of RED so they can't park a multi-day run. Empty that list once a suite is green — a
-permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
+**THE GUEST'S SCREEN SIZE IS NOT THE VM'S CONFIGURED ONE (W21.vmgui-c, measured 2026-08-01).** `tart run
+--no-graphics` attaches no display, so the guest's WindowServer boots at its headless default **1024×768** —
+even though `tart get archive-gui-runner` reports `Display: 1920x1200`. That is small enough to break real
+tests: the Notes browser needs ~1084 pt of width, so its window overflowed and ~92 pt was clipped off each
+side, and four `ArchiveNotesUITests` failed as "not hittable" for two days while being tracked as product
+bugs. **`tart_ensure_display` now raises the guest to `$TART_VM_DISPLAY` (default 1920×1200) right after the
+guest-agent wait**, in `tart-lib.sh` so both entry points get it, via the guest-side helper
+`ops/gui/vm-set-display.swift` (`CGConfigureDisplayWithDisplayMode`, `.permanently`, so later runs no-op).
+It reports what actually took effect and WARNs — loudly, with the consequence named — rather than dying, since
+Reader is green at either size. If you ever debug "element is not hittable" in this lane, print
+`NSScreen.screens` and the window frame from the test **first**; `tart get` is not evidence about the guest.
+
+**Status (2026-08-01):** the gate covers **every app with a UITest bundle** — Reader *and* Notes (Processor has
+no test target). Pick a subset with `AUTONOMOUS_GUI_VM_APPS="reader"`. **Reader is 15/15 and Notes is 12/12 in
+the VM**, so the **warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`) is **empty by default** and a UITest failure in
+either app REDs the gate. Don't re-add an app to it without a tracked item — a permanent warn tier is a
+disabled test with extra steps. The gate is **ON by default**
 (`AUTONOMOUS_GUI_VM=0` disables); a missing VM / boot failure / guest-agent timeout **skips** (never parks), and
 it REDs only on a reproducible `** TEST FAILED **` (retry-once). `GATE_MAXRUN` is 50 min to absorb the VM step.
 Sessions also verify view/interaction changes here off-screen — the old `gui-mode` flag was retired, GUI is

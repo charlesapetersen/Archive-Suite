@@ -123,6 +123,28 @@ tart_wait_agent() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_ensure_display VM — raise the guest's screen to $TART_VM_DISPLAY (default 1920x1200). Returns 0
+# when the display now meets the target, 1 when it does not; either way the guest helper's own report is
+# left in $TART_DISPLAY_NOTE so the caller can print what ACTUALLY took effect rather than what it asked
+# for. Needs the guest agent (tart_wait_agent) first, like every other exec.
+#
+# THE BUG THIS EXISTS FOR (measured 2026-08-01, W21.vmgui-c). `tart run --no-graphics` attaches no
+# display, so the guest's WindowServer boots at **1024×768** no matter what the VM's `Display` field says
+# (`tart get` reported 1920x1200 while the guest ran 1024×768). The Notes browser shell needs ~1084 pt of
+# width for tree+list+detail, so at 1024 it overflowed its window and ~92 pt was clipped off EACH side —
+# the sidebar's Add button landed at x = −19, the editor's raw toggle at x = 1033 — and FOUR
+# ArchiveNotesUITests failed as "not hittable" / "seam must be drivable". Those were tracked as product
+# bugs for two days. The guest advertises modes up to 3840×2400; nobody had asked for one.
+# Lives here, not in either script, for the reason at the top of this file.
+tart_ensure_display() {
+  local vm="$1" target="${TART_VM_DISPLAY:-1920x1200}" w h rc=0
+  w="${target%%x*}"; h="${target##*x}"
+  TART_DISPLAY_NOTE="$(tart exec "$vm" bash -lc \
+    "swift '$GUEST_REPO/ops/gui/vm-set-display.swift' $w $h" 2>&1)" || rc=1
+  return "$rc"
+}
+
+# ---------------------------------------------------------------------------------------------------
 # tart_lock_acquire [WAIT_SECONDS] / tart_lock_release — one writer at a time for the shared VM.
 #
 # There is ONE VM name and ONE artifact dir, and both entry points (the health gate and the interactive

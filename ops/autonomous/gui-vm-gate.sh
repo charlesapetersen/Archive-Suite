@@ -41,11 +41,12 @@ APPS="${AUTONOMOUS_GUI_VM_APPS:-reader notes}"
 # Apps whose UITest failures WARN instead of REDding the gate. The point of the warn tier is that a suite
 # with known failures still RUNS and reports every gate — visibility without parking a multi-day run on a
 # regression that is already tracked. An app graduates out of this list the moment its suite is green.
-#   notes: 4/12 fail in the VM as of 2026-07-30 — G3 raw-markdown toggle + G8 delete-last-instance
-#   ("… is not hittable"), G6/G11 "seam must be drivable" (an.editor.test.reveal / .zoteroOpen). Identical
-#   across both attempts, so deterministic. It read as 5/12 and "flaky" until the fixture was rebuilt per
-#   run: G5 was this gate's own staleness bug, not a Notes defect. Tracked as W21.vmgui-c.
-WARN_APPS="${AUTONOMOUS_GUI_VM_WARN_APPS:-notes}"
+# EMPTY by default since 2026-08-01 (W21.vmgui-c): notes was the only entry, and its 4/12 VM failures are
+# fixed — one harness/layout cause, not four bugs (the guest booted at 1024×768 and the browser understated
+# its own minimum width, so ~92 pt of the right pane sat off-window). Notes is 12/12 in the VM; both apps
+# now RED the gate on a failure, which is the point. Do not re-add an app here without a tracked item: a
+# permanent warn tier is a disabled test with extra steps.
+WARN_APPS="${AUTONOMOUS_GUI_VM_WARN_APPS:-}"
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}"
 GLOG="$ART/gui-vm-gate.log"
 # Per-app table, the guest-agent wait and the corpus resolution are SHARED with ops/gui/vm-gui-runner.sh
@@ -100,6 +101,14 @@ boot_vm() {
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 1
   tart_wait_agent "$VM" "$AGENTWAIT" || return 2
   echo "guest agent ready after ${TART_AGENT_WAITED}s" >>"$GLOG"
+  # The guest's SCREEN SIZE, not the VM's configured one: --no-graphics boots the WindowServer at
+  # 1024×768, below the Notes browser's ~1084 pt minimum, which clips its right pane off-window and made
+  # 4 UITests fail as "not hittable" (W21.vmgui-c). Never silent, never fatal — Reader is green either way.
+  if tart_ensure_display "$VM"; then
+    echo "${TART_DISPLAY_NOTE:-guest display OK}" >>"$GLOG"
+  else
+    echo "WARN: could not raise the guest display to ${TART_VM_DISPLAY:-1920x1200} — Notes UITests will likely fail as 'not hittable'. Guest said: ${TART_DISPLAY_NOTE:-(no output)}" >>"$GLOG"
+  fi
   return 0
 }
 
@@ -218,7 +227,7 @@ if [ -n "$red" ]; then
 fi
 if [ -n "$warned" ]; then
   # NOT green. Exit 4 so the caller prints a warning, not a checkmark (see the exit-code note in the header).
-  echo "GUI-VM gate: WARN — reproducible UITest failures in warn-tier app(s):$warned (not parking; see W21.vmgui-c)"
+  echo "GUI-VM gate: WARN — reproducible UITest failures in warn-tier app(s):$warned (not parking; the tracked item that put them in AUTONOMOUS_GUI_VM_WARN_APPS owns the fix)"
   for app in $warned; do show_failures "$app"; done
   echo "GUI-VM gate: passed:${green:- none}  |  detail kept in $ART/gui-vm-<app>-LAST-FAILURE.log"
   exit 4

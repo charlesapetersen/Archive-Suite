@@ -545,14 +545,37 @@ state-triggered neuter reddened only "a healthy index is never rebuilt", an inli
 only the off-the-critical-path half, and scheduling before checking that the open SUCCEEDED reddened only "a
 read over a still-dead index schedules no rebuild"). Notes suite 724/724.
 
-## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
+## ✅ FIXED (W21.vmgui-c): 4/12 `ArchiveNotesUITests` failed in the headless VM — ONE geometry cause, not four bugs
 
-**Found 2026-07-30**, on the suite's first-ever run in the Tart VM (`ops/autonomous/gui-vm-gate.sh` gained
-a Notes lane that day; the 13/13 baseline was a **host, GUI-on** run from mid-July, so this is new
-information, not a regression from that day's work). Reader is 15/15 in the same VM run, so the lane
-itself is sound.
+**Found 2026-07-30, root-caused + fixed 2026-08-01.** The suite is now **12/12 in the VM**
+(`** TEST SUCCEEDED **`, G0/G1/G3/G4/G5/G6/G7/G8/G9/G10/G11 + SmokeUITest), and `notes` is out of the
+gate's warn tier, so a Notes UITest failure REDs the gate again.
 
-Failing (identical across both attempts → **deterministic**, not flake):
+**Root cause — measured, not inferred.** A throwaway diagnostic test dumped the a11y tree with frames:
+
+- The guest's screen was **1024×768**. `tart run --no-graphics` attaches no display, so the guest's
+  WindowServer boots at that headless default *regardless of the VM's configured `Display`* — `tart get`
+  read `1920x1200` the whole time. (The old note below guessed "1920×1200 display"; it was wrong.)
+- The browser window opened at **exactly 900×612** — its declared `.frame(minWidth: 900, minHeight: 560)`.
+- Its three panes need **1084 pt** (tree 220 + list 490 + detail 360 + two 7 pt dividers). A frame minimum
+  *below* the content's own minimum does not shrink the content: SwiftUI centred 1084 pt inside 900 and
+  **~92 pt was clipped off each side**. The sidebar's "Add folder" button sat at x = **−19**; the editor's
+  raw toggle at x = **1033** with the window ending at 962. Off-window ⇒ `isHittable == false`.
+- Every failure follows from that, which is why they looked like four unrelated bugs: G3's `an.editor.rawToggle`
+  and G8's `an.locations.remove` are the two right-most *production* controls in the detail pane; G6/G11's
+  `an.editor.test.reveal` / `.zoteroOpen` are the two right-most buttons of the DEBUG control strip (the ones
+  to their left — `select`, `pasteImage`, `jump` — are inside 962 and always passed).
+
+**The two fixes, both needed** (the window is now 1121 pt wide and all four controls are hittable):
+1. `NotesBrowserView` drops the false `minWidth: 900` and lets SwiftUI derive the shell's real minimum from
+   its panes. This is a genuine app fix, not a test accommodation: a user could drag the window to 900 pt on
+   any display and lose those controls.
+2. `tart_ensure_display` (`ops/gui/tart-lib.sh` + `ops/gui/vm-set-display.swift`) raises the guest to
+   1920×1200 before either lane runs — the guest advertises 16 modes up to 3840×2400; nobody had asked for
+   one. Needed *because* of fix 1: at 1121 pt the honest window no longer fits a 1024-wide screen. A failure
+   here WARNs loudly with the consequence named; it is not fatal (Reader is green at either size).
+
+Kept below for the record — what was failing and what the leads got right and wrong:
 
 | Test | Symptom |
 |---|---|
@@ -561,9 +584,10 @@ Failing (identical across both attempts → **deterministic**, not flake):
 | `testG6_RevealSourceBlockDispatchesReaderDeepLink` | `XCTAssertTrue failed - the reveal seam must be drivable (an.editor.test.reveal)` |
 | `testG11_ZoteroChipDispatchesSelectLink` | `XCTAssertTrue failed - the zotero seam must be drivable (an.editor.test.zoteroOpen)` |
 
-**Genuinely flaky — kept OUT of the table above on purpose.** The four rows are the comparison baseline: a
-run matching them exactly is "no regression". This one is not deterministic and must not be added to that
-baseline, or a real failure of it becomes invisible.
+**Genuinely flaky — kept OUT of the table above on purpose, and STILL LIVE after the fix.** The four rows
+above are history now (the baseline is 12/12); this one is a separate, non-deterministic infra flake that the
+geometry fix does not touch, so it must never be folded into a "known failures" set — that is how a real
+failure of it becomes invisible. G1 passed in the 12/12 run.
 
 | Test | Tell | Seen |
 |---|---|---|
@@ -574,14 +598,22 @@ takes minutes; a genuine failure asserts about the **written item file** and fai
 failing regularly, look at the ⌘N/new-note input path — **not** the folder graph: `G7`/`G9`, the two tests
 that actually drive membership writes, passed in the same run that flaked.
 
-**Leads, not conclusions** — none of this is diagnosed yet, and nobody should conclude the app is broken
-from this entry alone:
-- The two *not hittable* elements are both tiny (11×14, 10×10) and both at **x ≈ 1033** — the same
-  horizontal band. That smells like window geometry / pane widths under the VM's 1920×1200 display
-  (`tart set … --display`) putting them under a divider or off the hittable area, rather than five
-  independent bugs. Check the persisted `@AppStorage` panel widths in the guest container first.
-- The two *seam must be drivable* failures mean the hidden a11y probes aren't queryable — plausibly editor
-  focus / first-responder, not logic.
+**How the leads scored** (kept because the pattern generalises — the *shape* of the guess was right and the
+*mechanism* was wrong, and only measuring settled it):
+- ✅ "Both *not hittable* elements are tiny and both at **x ≈ 1033** — the same horizontal band, so this
+  smells like window geometry, not five independent bugs." Exactly right, and the reason the fix is one
+  change rather than four.
+- ❌ "…under the VM's **1920×1200** display." The VM is *configured* 1920×1200 but the guest was **running
+  1024×768** — `--no-graphics` attaches no display, so the WindowServer takes its own headless default.
+  `tart get` agreeing with the doc is not evidence about the guest; `NSScreen.screens` in the runner is.
+- ❌ "Check the persisted `@AppStorage` panel widths in the guest container first." A dead end by
+  construction: the gate wipes the container every run (the `prerun` hook), so the widths were always the
+  defaults. The window *size* was the variable, and it came from the view's own `minWidth`.
+- ⚖️ "The *seam must be drivable* failures mean the a11y probes aren't queryable — plausibly editor focus /
+  first-responder." Half right: they were queryable (`waitForExistence` succeeded, then `isHittable` stayed
+  false for the full 10 s poll) and focus was never involved — they were simply off-window. The log
+  distinguishes these two, which is worth remembering: "waiting for X to exist" and a stream of "Find the X"
+  retries are different failures.
 **Corrected count (read this before trusting an older note).** This was first written up as **5/12**, adding
 `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` ("the Zotero fixture note should start without a
 reader-page block"), and described as flaky because the count moved between runs. Both were wrong, and the
@@ -592,10 +624,10 @@ pass exactly once and failed forever after. With a per-run rebuild the count is 
 Infra masquerading as a product bug is the thing to watch for here — an adversarial audit caught it, not the
 gate.
 
-**Why it isn't parking the run.** The gate has a warn tier (`AUTONOMOUS_GUI_VM_WARN_APPS`, default
-`notes`): the suite still **runs and reports every gate**, but its failures WARN instead of RED, so a
-multi-day unattended run isn't parked by an already-tracked issue. Remove `notes` from that list the
-moment the suite is green — a permanent warn tier is just a disabled test with extra steps.
+**The warn tier is now EMPTY.** While this was open the gate held `notes` in
+`AUTONOMOUS_GUI_VM_WARN_APPS` so the suite still ran and reported every gate without parking a multi-day
+run. With the suite green that list is empty by default again, so a Notes UITest failure REDs the gate —
+which is the whole point. A permanent warn tier is a disabled test with extra steps.
 
 ## ✅ FIXED (W23.m3): a note's inline image could be another note's file — Tier-2
 

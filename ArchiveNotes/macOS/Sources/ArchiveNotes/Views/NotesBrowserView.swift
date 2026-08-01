@@ -52,7 +52,16 @@ struct NotesBrowserView: View {
             DetailPane(nav: nav)
                 .frame(width: detailWidth)
         }
-        .frame(minWidth: 900, minHeight: 560)
+        // NO `minWidth:` ON PURPOSE — the shell's minimum width is whatever its three panes need
+        // (tree + list + detail + 2 dividers ≈ 1085 pt at the default widths), and SwiftUI derives that
+        // from the children. The old `minWidth: 900` understated it, and a frame minimum BELOW the
+        // content's own minimum does not shrink the content — it lets the content overflow and be
+        // clipped. Measured in the headless VM on 2026-08-01 (W21.vmgui-c): the window opened at exactly
+        // 900 pt, SwiftUI centred the 1084 pt of panes inside it, and ~92 pt was cut off EACH side — the
+        // sidebar's "Add folder" button sat at x = −19 and the editor's raw-Markdown toggle at x = 1033,
+        // both off-window and unclickable. Four UITests failed as "not hittable" and were filed as
+        // product bugs for two days. Height keeps a floor: nothing there overflows.
+        .frame(minHeight: 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)

@@ -101,6 +101,7 @@ ensure_vm() {
     [ "$LANE" = "xcuitest" ] || die "VM '$VM' is already running and this script did not start it, so there is no VNC endpoint (and the mounts may be wrong). Stop it first:  tart stop $VM"
     log "VM already running — reusing it (xcuitest only needs the guest agent)."
     tart_wait_agent "$VM" "$AGENT_WAIT" || die "guest agent never answered within ${AGENT_WAIT}s on the already-running VM."
+    ensure_display
     return 0
   fi
   local runlog="$ART/tart-run.log"; : > "$runlog"
@@ -155,6 +156,22 @@ ensure_vm() {
   # see tart-lib.sh. Never exec after a boot without it.
   tart_wait_agent "$VM" "$AGENT_WAIT" || die "Tart Guest Agent never answered within ${AGENT_WAIT}s — check $runlog"
   log "VM up — guest agent ready after ${TART_AGENT_WAITED}s${VNC_PORT:+, VNC $VNC_HOST:$VNC_PORT}"
+  ensure_display
+}
+
+# --- the guest's SCREEN SIZE (W21.vmgui-c) -----------------------------------------------------------
+# `--no-graphics` boots the guest at 1024×768, which is BELOW the Notes browser's ~1084 pt minimum, so its
+# right pane is clipped off-window and four UITests fail as "not hittable". Raise it, and say what
+# actually happened — never silently. Not fatal: Reader is green at 1024×768, so a failure here degrades
+# one lane rather than breaking the run. See tart_ensure_display in tart-lib.sh for the full measurement.
+ensure_display() {
+  if tart_ensure_display "$VM"; then
+    log "${TART_DISPLAY_NOTE:-guest display OK}"
+  else
+    warn "could not raise the guest display to ${TART_VM_DISPLAY:-1920x1200} — it may still be at the
+    1024×768 headless default, which clips the Notes browser's right pane off-window and fails 4
+    ArchiveNotesUITests as 'not hittable' / 'seam must be drivable'. Guest said: ${TART_DISPLAY_NOTE:-(no output)}"
+  fi
 }
 
 # --- generate the Xcode project on the host (the guest image has no xcodegen) ---
