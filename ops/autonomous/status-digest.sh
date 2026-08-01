@@ -121,7 +121,9 @@ commits24="$(num "$(g log --since='24 hours ago' --oneline 2>/dev/null | wc -l |
 lastwhen="$(g log -1 --format='%cr')"; lastwhen="${lastwhen:-—}"
 lastsubj="$(clip "$(g log -1 --format='%s')" 62)"
 open_todo="$(num "$(grep -cE '^\s*[-*].*\[ \]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
-done_todo="$(num "$(grep -cE '^\s*[-*].*\[[xX]\]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
+# Completed work lives in SUITE_TODO_DONE.md since 2026-08-01 (finishing an item MOVES its entry rather than
+# ticking it in place), so counting SUITE_TODO alone reported "1 finished" the moment the archive was split out.
+done_todo="$(num "$(cat "$REPO/SUITE_TODO.md" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null | grep -cE '^\s*[-*].*\[[xX]\]')")"
 hold="$(num "$(awk '/^## HOLD QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]')")"
 
 gate_last="$(cat "$STATE/last-gate" 2>/dev/null)"

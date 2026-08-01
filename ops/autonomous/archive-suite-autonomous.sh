@@ -299,12 +299,17 @@ note_progress() {   # something moved -> back to the productive cadence
 # COUNTING a completion: a MISSED completion would false-park (bad); a spurious one only misses a runaway,
 # which the budget cap + idle backoff still backstop. A missing SUITE_TODO.md -> that half is 0 (fail-safe).
 completed_items() {
-  local q t re='^[[:space:]]*[-*][[:space:]]+\[[xX]\]'
+  local q t d re='^[[:space:]]*[-*][[:space:]]+\[[xX]\]'
   q=$(awk '/^## WORK QUEUE/{f=1;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE "$re")
   t=$(grep -cE "$re" "$REPO/SUITE_TODO.md" 2>/dev/null)
+  # Since 2026-08-01 a finished item is MOVED to SUITE_TODO_DONE.md rather than ticked in place, so the count
+  # of `[x]` left in SUITE_TODO no longer grows on completion — it stays ~0. Counting the archive is what keeps
+  # "an item completed" observable here. (A missing file -> 0, fail-safe, as with the other halves.)
+  d=$(grep -cE "$re" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null)
   case "$q" in ''|*[!0-9]*) q=0 ;; esac
   case "$t" in ''|*[!0-9]*) t=0 ;; esac
-  echo $(( q + t ))
+  case "$d" in ''|*[!0-9]*) d=0 ;; esac
+  echo $(( q + t + d ))
 }
 
 # WS4 verdict for a session that COMMITTED work (fingerprint moved). $1=completed-count before, $2=after.

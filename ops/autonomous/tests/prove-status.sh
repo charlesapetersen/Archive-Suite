@@ -38,6 +38,20 @@ write_plan() { printf 'RUN STATUS: IN_PROGRESS — test\n\n## HOLD QUEUE\n%s\n\n
 write_plan "" ""
 : > "$S/daemon.log"
 
+echo "[0] the finished count includes the SUITE_TODO_DONE archive"
+# Regression 2026-08-01: completed items were split out of SUITE_TODO into SUITE_TODO_DONE.md (finishing an
+# item MOVES its entry rather than ticking it in place). The digest still counted only SUITE_TODO, so the
+# live status collapsed from "162 finished" to "1 finished". This suite PASSED throughout — its fixture had
+# a [x] sitting in SUITE_TODO, which is precisely the shape the new convention stops producing.
+printf -- '- [x] archived-one\n- [x] archived-two\n' > "$R/SUITE_TODO_DONE.md"
+OUT="$(RUNNING=0 SUPERVISED=0 run)"
+printf '%s' "$OUT" | grep -qE '2 tasks to do · 3 finished' \
+  && ok "finished = SUITE_TODO [x] + SUITE_TODO_DONE [x]" || bad "archive not counted" "$OUT"
+rm -f "$R/SUITE_TODO_DONE.md"
+OUT="$(RUNNING=0 SUPERVISED=0 run)"
+printf '%s' "$OUT" | grep -qE '2 tasks to do · 1 finished' \
+  && ok "a missing archive is a no-op (works pre-split too)" || bad "missing archive broke the count" "$OUT"
+
 echo "[1] not running -> says so, and says how to start it"
 OUT="$(RUNNING=0 SUPERVISED=0 run)"
 printf '%s' "$OUT" | grep -q 'Not running' && printf '%s' "$OUT" | grep -q 'arm.sh' \
