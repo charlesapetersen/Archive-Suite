@@ -1535,16 +1535,27 @@ extension OCRProcessor {
             }
         }
     }
-    /// One paid batch's per-chunk canceller, carried together with the provider it was built for.
+    /// One paid batch's per-chunk canceller: the provider whose RULE applies, how to cancel one chunk, and
+    /// — for checks only — which client that closure closed over.
     ///
-    /// Bundling the two is the point (W16.bat2-fu): `performServerBatchCancellation` reads the provider
-    /// off the canceller instead of taking it as a second argument, so the rule it applies and the
-    /// client it calls **cannot disagree** — there is no longer a `provider:` at the call site to get
-    /// wrong. Not `Sendable`: it is built and consumed entirely on the MainActor.
+    /// Bundling them is the point (W16.bat2-fu): `performServerBatchCancellation` reads the provider off the
+    /// canceller instead of taking it as a second argument, so a CALL SITE can no longer pass a provider that
+    /// contradicts the client it also passed — the pair is built in exactly one place,
+    /// `liveBatchChunkCanceller`. What that does *not* buy is a self-verifying pair: `provider` is an
+    /// independent field, so an edit inside that one place can still put the wrong client behind the right
+    /// provider. `clientTypeName` is what makes that visible to a check.
+    /// Not `Sendable`: it is built and consumed entirely on the MainActor.
     struct BatchChunkCanceller {
         let provider: LLMProvider
         /// Performs one chunk's server-side cancellation; true means the provider confirmed it.
         let cancelChunk: @MainActor (String) async -> Bool
+        /// The type of the batch client `cancelChunk` closed over, read off the constructed value
+        /// (`type(of:)`) rather than written by hand — `"none"` where there is no client (OpenAI), `"stub"`
+        /// for a test double. Load-bearing: without it a check can only confirm the provider LABEL, and a
+        /// copy-paste that cancels a Gemini job through the Mistral client — or an arm short-circuited to
+        /// `{ _ in true }` — would keep every check green while reporting a paid job as cancelled and
+        /// deleting the recovery journal that was the only way back to it.
+        let clientTypeName: String
     }
 
     /// The durable file a confirmed cancellation is allowed to remove. There is exactly one — the
@@ -1567,20 +1578,28 @@ extension OCRProcessor {
     /// when the returned closure is invoked, which is why a driver can safely ask for one.
     static func liveBatchChunkCanceller(for batch: BatchContext) -> BatchChunkCanceller {
         let cancelChunk: @MainActor (String) async -> Bool
+        // Read off the client that was actually constructed, never typed in — that is the whole point (see
+        // `clientTypeName`): it is what a check compares against the provider whose rule will be applied.
+        let clientTypeName: String
         switch batch.provider {
         case .anthropic:
             let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
             cancelChunk = { await client.cancelBatch(batchId: $0) }
+            clientTypeName = String(describing: type(of: client))
         case .mistral:
             let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
             cancelChunk = { await client.cancelBatch(batchId: $0) }
+            clientTypeName = String(describing: type(of: client))
         case .gemini:
             let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
             cancelChunk = { await client.cancelBatch(batchName: $0) }
+            clientTypeName = String(describing: type(of: client))
         case .openai:
             cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
+            clientTypeName = "none"
         }
-        return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk)
+        return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk,
+                                   clientTypeName: clientTypeName)
     }
 
     /// Which server-side jobs `cancel()` will try to cancel: the journal's acknowledged chunk IDs when

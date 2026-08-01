@@ -86,7 +86,7 @@ enum BatchCancelContract {
             canceller: OCRProcessor.BatchChunkCanceller(provider: provider, cancelChunk: { id in
                 recorder.attempted.append(id)
                 return !refusing.contains(id)
-            }),
+            }, clientTypeName: "stub"),
             chunkIds: chunkIds,
             deleteJournal: {
                 recorder.deleteCalls += 1

@@ -39,10 +39,13 @@ import AppKit
 ///      Stop path. W16.bat3 is an open, owner-gated bug elsewhere (the poll's cancellation guards delete the
 ///      journal first regardless), so a green section 13 does NOT mean pressing Stop is safe end to end.
 ///  14. The **`cancel()` WIRING** (`BatchCancelWiringContract`, W16.bat2-fu): section 13 proves the rule, this
-///      proves `cancel()` feeds it the truth — the live batch's own context and provider, the journal's
-///      acknowledged chunk IDs (not its decoy batch ID), the paid-batch journal and no other durable file,
-///      the kept-journal warning reaching the operator, nothing at all when there is no live batch, and no
-///      second cancellation when Stop is pressed twice. Real `cancel()`, stubbed seams, a real temp file.
+///      proves `cancel()` feeds it the truth — the live batch's own context, a canceller that closes over
+///      *that provider's own client* (not merely one labelled with it), the journal's acknowledged chunk IDs
+///      rather than its decoy batch ID, the paid-batch journal and no other durable file, the kept-journal
+///      warning being assigned and the resume banner refreshed, nothing at all when there is no live batch,
+///      and no second cancellation when Stop is pressed twice. Real `cancel()`, stubbed seams, a real temp
+///      file. Its header lists what it still does NOT cover (the default deleter, W16.bat6) — read it before
+///      citing a green section 14.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches

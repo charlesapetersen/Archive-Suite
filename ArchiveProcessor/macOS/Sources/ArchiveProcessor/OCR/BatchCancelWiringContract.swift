@@ -13,23 +13,36 @@ import Foundation
 /// wrong paid jobs, or none, while the operator is told the batch was stopped), and deleting the whole block.
 /// Each of those is a silent money loss, so each gets a check below.
 ///
-/// **How it stays $0 and can never touch the operator's real state.** Every scenario is built by `stop(…)`,
-/// the only place in this file that constructs an `OCRProcessor`, and it always replaces BOTH seams:
-/// `makeBatchChunkCanceller` (a recording stub — no client, no request) and `makeBatchJournalDeleter` (records
-/// which journal was *asked for*, and deletes a temp fixture instead of the real `pending_batch.json`). The
-/// production deleter — `OCRProcessor.deletePendingBatch()`, which removes the operator's actual paid-batch
-/// journal from Application Support — is therefore never executed by any check here. `cancel()`'s own
-/// `checkForPendingBatch()` reads that state, but only reads it.
+/// **How it stays $0 and can never touch the operator's real state.** Every `cancel()` here is driven by
+/// `stop(…)`, the only place in this file that cancels anything, and it always replaces BOTH seams before the
+/// batch is installed: `makeBatchChunkCanceller` (a recording stub — no client, no request) and
+/// `makeBatchJournalDeleter` (records which journal was *asked for*, and deletes a temp fixture instead of the
+/// real `pending_batch.json`). Nothing suspends between those assignments and `cancel()`, so no cancellation
+/// can start with a default seam installed, and the production deleter —
+/// `OCRProcessor.deletePendingBatch()`, which removes the operator's actual paid-batch journal from
+/// Application Support — is executed by no check here. `defaultSeamsAreTheLiveOnes` builds one more processor
+/// to inspect the *defaults*, but never cancels on it and never invokes the deleter it returns.
 ///
-/// ⚠️ **SCOPE — read before citing this file.**
+/// ⚠️ **SCOPE — read before citing this file.** What is *not* covered, precisely:
 ///   * This is the wiring, not the rule (that is `BatchCancelContract`) and not the whole Stop path:
 ///     **W16.bat3 is open and owner-gated** — the poll's `guard !Task.isCancelled` returns without setting
 ///     `batchPollInterrupted`, so `performBatchOCR` deletes the journal regardless of what `cancel()`
 ///     decided. A green section here does not make pressing Stop safe end to end.
+///   * **The default deleter's body is the one line no check can run** (running it would delete the
+///     operator's journal). That the default is `{ OCRProcessor.deletePendingBatch() }` is grep-verifiable,
+///     not test-verifiable, until the journal path itself is redirectable under test (W16.bat2-fu2).
 ///   * A confirmed cancellation may delete exactly one durable file, and the seam lets it name only that
 ///     one (`BatchCancellationJournal` has a single case, tripwired below). A future edit that bolts an
 ///     *extra*, un-seamed deletion beside it (`deletePendingRun()`, say) is a new defect this file cannot
-///     see — the seam records what was asked for, not everything the block does.
+///     see — the seam records what was asked for, not everything the block does. Worse, it would make
+///     *running this suite* the thing that deletes a real journal; that is the other half of W16.bat2-fu2.
+///   * The kept-journal warning is proven **assigned**, not **survived**: these scenarios have no live
+///     `processingTask`, whereas a real Stop also cancels the poll, which can write `statusMessage` after
+///     the cancellation task did (W16.bat6).
+///   * `cancel()`'s own `checkForPendingBatch()` runs for real. It never deletes either manifest, but it does
+///     read the operator's Application Support state (and `pendingBatchURL` creates that directory) and
+///     recomputes two `@Published` banner strings from it — so the checks below assert only that the refresh
+///     *ran*, never what it found.
 ///
 /// Run from `BatchResumeTestDriver` (section 14) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -37,9 +50,12 @@ import Foundation
 enum BatchCancelWiringContract {
 
     static func run(check: (String, Bool) -> Void) async {
-        theSeamNamesOneJournalAndTheBatchsOwnProvider(check)
+        theSeamNamesOneJournal(check)
+        await theLiveCancellerIsTheBatchsOwnClient(check)
+        defaultSeamsAreTheLiveOnes(check)
         await anUnconfirmedStop(check)
         await aConfirmedStop(check)
+        await aSingleJobProviderStop(check)
         await whichJobsGetCancelled(check)
         await nothingToCancel(check)
         await stopPressedTwice(check)
@@ -78,6 +94,21 @@ enum BatchCancelWiringContract {
         let journalStateCleared: Bool
         /// Did `cancel()` spawn a server-side cancellation at all?
         let spawnedCancellation: Bool
+        /// Was the resume-banner state recomputed (`checkForPendingBatch()`) by the time the cancellation
+        /// finished? Detected with a sentinel, so it holds whether or not the operator has a real journal.
+        let bannerRefreshed: Bool
+    }
+
+    /// Which batch client each provider's arm of `liveBatchChunkCanceller` must close over — named here,
+    /// constructed there, so the comparison is between two independent statements rather than a literal
+    /// against itself.
+    private static func expectedClientTypeName(_ provider: LLMProvider) -> String {
+        switch provider {
+        case .anthropic: return String(describing: AnthropicBatchClient.self)
+        case .mistral: return String(describing: MistralBatchClient.self)
+        case .gemini: return String(describing: GeminiBatchClient.self)
+        case .openai: return "none"   // no batch path in v1, so no client to build
+        }
     }
 
     /// A synthetic model — never sent anywhere. Built by hand rather than read from `provider.models` so no
@@ -138,7 +169,7 @@ enum BatchCancelWiringContract {
             return OCRProcessor.BatchChunkCanceller(provider: context.provider, cancelChunk: { chunkId in
                 wiring.attempted.append(chunkId)
                 return !refusing.contains(chunkId)
-            })
+            }, clientTypeName: "stub")
         }
         processor.makeBatchJournalDeleter = { asked in
             wiring.journalsAsked.append(asked)
@@ -149,6 +180,12 @@ enum BatchCancelWiringContract {
         }
         processor.activeBatch = batch
         processor.activePendingBatch = pendingBatch
+        // A sentinel in the resume-banner field. `cancel()`'s cancellation task ends by recomputing it from
+        // disk (`checkForPendingBatch()`) — the operator's only on-screen pointer to a paid job that may
+        // still be running — so "was it replaced?" detects that refresh without depending on what is on the
+        // operator's disk. A Stop with nothing to cancel must leave the sentinel alone.
+        let sentinel = "wiring-sentinel-\(UUID().uuidString)"
+        processor.pendingBatchInfo = sentinel
 
         processor.cancel()
         // Sampled BEFORE awaiting: the live batch identity must be dropped synchronously, or a second Stop
@@ -167,12 +204,13 @@ enum BatchCancelWiringContract {
         return Stop(wiring: wiring, fixtureExistedBefore: existedBefore, fixtureSurvived: survived,
                     statusMessage: processor.statusMessage,
                     batchClearedSynchronously: batchCleared, journalStateCleared: journalCleared,
-                    spawnedCancellation: spawned)
+                    spawnedCancellation: spawned,
+                    bannerRefreshed: processor.pendingBatchInfo != sentinel)
     }
 
     // MARK: - The seam's own names (tripwires, no Stop involved)
 
-    private static func theSeamNamesOneJournalAndTheBatchsOwnProvider(_ check: (String, Bool) -> Void) {
+    private static func theSeamNamesOneJournal(_ check: (String, Bool) -> Void) {
         // If a second journal case is ever added, the claim "a confirmed cancellation may remove exactly one
         // durable file" stops being true and every check below has to be re-read rather than trusted.
         check("wiring: exactly one durable file may be removed by a confirmed cancellation",
@@ -182,15 +220,62 @@ enum BatchCancelWiringContract {
               && OCRProcessor.pendingBatchFileName != OCRProcessor.pendingRunFileName
               && OCRProcessor.BatchCancellationJournal.paidBatchJournal.fileName != OCRProcessor.pendingRunFileName)
 
-        // The stub factory below bypasses the live one, so pin the live one directly: a paid job must never
-        // be cancelled through another provider's client. Constructing a client opens no connection.
-        var keyedOnItsOwnProvider = true
+    }
+
+    // MARK: - The live canceller: the right client, not just the right label
+
+    /// The stub factory used by every Stop below bypasses the live one, so pin the live one directly. Both
+    /// halves matter and only one of them is cheap: `provider` is passed as a literal at the construction
+    /// site, so checking it catches a hard-coded label and nothing else. `clientTypeName` is read off the
+    /// client that was really built, so it catches the case that actually costs money — the right label in
+    /// front of another provider's client, or an arm short-circuited to always "confirm".
+    private static func theLiveCancellerIsTheBatchsOwnClient(_ check: (String, Bool) -> Void) async {
+        var labelledCorrectly = true
+        var closedOverItsOwnClient = true
         for provider in LLMProvider.allCases {
             let built = OCRProcessor.liveBatchChunkCanceller(for: context(provider, batchId: "batches/x"))
-            if built.provider != provider { keyedOnItsOwnProvider = false }
+            if built.provider != provider { labelledCorrectly = false }
+            if built.clientTypeName != expectedClientTypeName(provider) { closedOverItsOwnClient = false }
         }
-        check("wiring: the live per-chunk canceller is built for the batch's OWN provider (all \(LLMProvider.allCases.count))",
-              keyedOnItsOwnProvider)
+        check("wiring: the live canceller is labelled with the batch's OWN provider (all \(LLMProvider.allCases.count))",
+              labelledCorrectly)
+        check("wiring: and it closes over THAT provider's batch client, not another's (all \(LLMProvider.allCases.count))",
+              closedOverItsOwnClient)
+
+        // The only arm whose closure can be run for free: OpenAI has no batch path in v1, so its canceller is
+        // a literal `false` — invoking it opens no connection and confirms nothing. Guarded on
+        // `supportsBatch` so that if a real OpenAI batch path ever lands, this reddens (demanding a rewrite)
+        // instead of quietly making a network call from a $0 suite.
+        var refusesWithoutANetwork = false
+        if !LLMProvider.openai.supportsBatch {
+            let built = OCRProcessor.liveBatchChunkCanceller(for: context(.openai, batchId: "batches/x"))
+            refusesWithoutANetwork = await built.cancelChunk("batches/x") == false
+        }
+        check("wiring: the provider with no batch path confirms nothing, and needs no network to say so",
+              !LLMProvider.openai.supportsBatch && refusesWithoutANetwork)
+    }
+
+    // MARK: - The seams' DEFAULT values (what production actually gets)
+
+    /// Every Stop below replaces both seams, which leaves their defaults — the values the shipped app uses —
+    /// covered by nothing. Half of that is checkable here: the default canceller factory must route to the
+    /// live one. The other half is not, and is scoped in the header: running the default *deleter* would
+    /// delete the operator's real journal, so this asks for one and drops it unrun.
+    private static func defaultSeamsAreTheLiveOnes(_ check: (String, Bool) -> Void) {
+        // A processor that is never cancelled and never has an `activeBatch`, so no cancellation — and hence
+        // no deletion — can start on it.
+        let untouched = OCRProcessor()
+        var defaultsToTheLiveFactory = true
+        for provider in LLMProvider.allCases {
+            let built = untouched.makeBatchChunkCanceller(context(provider, batchId: "batches/x"))
+            if built.provider != provider
+                || built.clientTypeName != expectedClientTypeName(provider) { defaultsToTheLiveFactory = false }
+        }
+        check("wiring: a processor's DEFAULT canceller factory is the live one, for every provider",
+              defaultsToTheLiveFactory)
+        // Deliberately no companion check on the default DELETER: the only way to observe what it does is to
+        // run it, and running it deletes the operator's real `pending_batch.json`. See the header — that gap
+        // closes when the journal path becomes redirectable under test (W16.bat2-fu2), not before.
     }
 
     // MARK: - A Stop the provider did not fully confirm: the journal survives and the operator hears it
@@ -217,6 +302,11 @@ enum BatchCancelWiringContract {
         // — the one signal that a paid job may still be running server-side.
         check("wiring: the operator is told the journal was kept, in the shipped words, verbatim",
               stopped.statusMessage == OCRProcessor.batchCancellationNotConfirmedMessage)
+        // The kept-journal message is not the only thing the operator needs: the resume banner is what points
+        // at the still-live paid job after the message scrolls away. Dropping `checkForPendingBatch()` from
+        // the cancellation task would leave it stale until the next relaunch.
+        check("wiring: the resume-banner state is recomputed once the cancellation finishes",
+              stopped.bannerRefreshed)
     }
 
     // MARK: - A Stop the provider confirmed: the journal goes, and is never announced as kept
@@ -236,6 +326,32 @@ enum BatchCancelWiringContract {
               !stopped.statusMessage.contains("kept for recovery")
               && stopped.statusMessage != OCRProcessor.batchCancellationNotConfirmedMessage
               && stopped.statusMessage.hasPrefix("Cancelled."))
+    }
+
+    // MARK: - A provider that cancels one server-side job, not several
+
+    /// Every other scenario here is Gemini (the multi-chunk provider). Without this one, a change that gated
+    /// the whole cancel block on `batch.provider == .gemini` would leave all of them green while a
+    /// single-chunk Anthropic or Mistral batch was silently never cancelled and never warned about.
+    private static func aSingleJobProviderStop(_ check: (String, Bool) -> Void) async {
+        var wiredForBoth = true
+        for provider in [LLMProvider.anthropic, .mistral] {
+            let one = ids(1)
+            let batch = context(provider, batchId: "batches/received-id")
+            let stopped = await stop(batch: batch,
+                                     pendingBatch: journal(provider, batchId: "batches/received-id",
+                                                           chunkIds: one))
+            let wired = stopped.wiring.contexts.count == 1
+                && stopped.wiring.contexts.first.map { sameContext($0, batch) } == true
+                && stopped.wiring.attempted == one
+                && stopped.wiring.journalsAsked == [.paidBatchJournal]
+                && stopped.wiring.deleteCalls == 1
+                && stopped.fixtureExistedBefore && !stopped.fixtureSurvived
+                && stopped.bannerRefreshed
+            if !wired { wiredForBoth = false }
+        }
+        check("wiring: a single-job provider's paid batch is cancelled through the same wiring (anthropic, mistral)",
+              wiredForBoth)
     }
 
     // MARK: - Which paid jobs get cancelled
@@ -292,10 +408,16 @@ enum BatchCancelWiringContract {
               && nothing.wiring.deleteCalls == 0
               && nothing.fixtureExistedBefore && nothing.fixtureSurvived
               && nothing.statusMessage.hasPrefix("Cancelled."))
+        // The other half of the banner-refresh check: it is the CANCELLATION that recomputes it, so with
+        // nothing to cancel the sentinel must still be there. Without this, a `checkForPendingBatch()` moved
+        // to the top of `cancel()` would satisfy the refresh check while no longer reflecting the outcome.
+        check("wiring: with nothing to cancel, the resume-banner state is not recomputed",
+              !nothing.bannerRefreshed)
 
         // A journal with no live batch context — Stop after a relaunch, before a resume adopted the batch.
         // Nothing can be cancelled (no credentials), so the journal must be left exactly where it is,
-        // INCLUDING in memory: clearing it here would hide the resume banner for a paid job.
+        // INCLUDING in memory: `activePendingBatch` is what the journal's own mutations are persisted from
+        // (`persistPendingBatchMutation`), and dropping it would discard a paid job's client-side state.
         let orphanJournal = await stop(
             batch: nil, pendingBatch: journal(.gemini, batchId: "batches/x", chunkIds: ids(1)))
         check("wiring: a paid-batch journal with no live batch context is left alone, on disk and in memory",
