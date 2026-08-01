@@ -534,6 +534,36 @@ struct GeminiBatchClient: Sendable {
         return .noneAvailable
     }
 
+    /// How many consecutive polls a chunk may report SUCCEEDED-with-no-results before the poll stops
+    /// and keeps the batch for resume (W16.bat1-fu).
+    static let emptyResultCheckLimit = 3
+
+    /// What the poll must do with a terminal SUCCEEDED chunk once it has tried to obtain its results.
+    enum ChunkOutcome: Sendable, Equatable {
+        /// Hand the results to the pipeline; the chunk may be marked consumed once they persist.
+        case materialize
+        /// Nothing came back. Do NOT consume — read the chunk again on the next poll.
+        case recheck
+        /// Still nothing after the grace window. Stop, keep the journal, let the operator resume.
+        case keepForResume
+    }
+
+    /// The money decision, in one pure function: a chunk is consumable only if it actually produced
+    /// pages. `processBatchResults` cannot enforce this — it returns `true` for an empty set on
+    /// purpose, because a *resumed* chunk whose pages were all persisted already legitimately yields
+    /// no new entries. So emptiness has to be judged here, on the raw provider results, before the
+    /// pipeline ever sees them.
+    ///
+    /// Chunks are only ever submitted non-empty, so zero results from a finished chunk is anomalous by
+    /// construction. The likeliest benign cause is the state flipping to SUCCEEDED a moment before the
+    /// results are attached, which another poll resolves — hence the bounded grace rather than an
+    /// immediate stop. `limit` tunes only that grace: no value of it can turn zero results into
+    /// `.materialize`.
+    static func chunkOutcome(resultCount: Int, emptyObservations: Int, limit: Int) -> ChunkOutcome {
+        guard resultCount <= 0 else { return .materialize }
+        return emptyObservations < max(1, limit) ? .recheck : .keepForResume
+    }
+
     /// Check batch processing status.
     func checkStatus(batchName: String) async throws -> StatusResult {
         let statusURL = try makeBatchURL("\(baseURL)/\(batchName)?key=\(urlComponentEncoded(apiKey))")

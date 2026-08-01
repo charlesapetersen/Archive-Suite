@@ -300,6 +300,44 @@ enum BatchParseContract {
               {"state":"JOB_STATE_RUNNING","response":{"inlinedResponses":{"inlinedResponses":[
                 {"metadata":{"key":"0"},"response":{"candidates":[{"content":{"parts":[{"text":"early"}]}}]}}]}}}
               """) == "none")
+
+        // --- What the poll then DOES with a finished chunk. `processBatchResults` cannot police this:
+        // it returns `true` for an empty set by design (a resumed chunk whose pages all persisted
+        // already yields no new entries), which is exactly why a chunk that produced NOTHING has to be
+        // caught here, on the raw provider results, before the pipeline sees them.
+        let limit = GeminiBatchClient.emptyResultCheckLimit
+        func outcome(_ count: Int, _ observations: Int, limit: Int = limit) -> GeminiBatchClient.ChunkOutcome {
+            GeminiBatchClient.chunkOutcome(resultCount: count, emptyObservations: observations, limit: limit)
+        }
+
+        // THE invariant: no result count of zero, at any point in the grace window, is ever consumable.
+        var zeroEverMaterializes = false
+        for observations in 0...(limit + 5) where outcome(0, observations) == .materialize {
+            zeroEverMaterializes = true
+        }
+        check("gemini chunk: zero results NEVER materialize — a paid chunk cannot be consumed with no pages (W16.bat1-fu)",
+              !zeroEverMaterializes)
+
+        check("gemini chunk: a chunk that produced pages materializes on the first look",
+              outcome(1, 0) == .materialize && outcome(42, 0) == .materialize)
+
+        check("gemini chunk: the first empty reads are a re-check, not a failure — a late-attached result set recovers itself",
+              outcome(0, 1) == .recheck && outcome(0, limit - 1) == .recheck)
+
+        check("gemini chunk: once the grace window is spent, the batch is kept for resume rather than consumed",
+              outcome(0, limit) == .keepForResume && outcome(0, limit + 7) == .keepForResume)
+
+        check("gemini chunk: the grace is bounded — the default limit is neither zero nor unlimited",
+              limit >= 1 && limit <= 10)
+
+        // The limit tunes only the grace. Neither degenerate setting can lose a paid chunk: a limit of
+        // 0 (or a negative one) stops immediately instead of consuming, and a huge one keeps re-reading
+        // until the poll's own 1500-check backstop times out — which also keeps the batch resumable.
+        check("gemini chunk: a zero or negative limit stops loudly, it does not consume",
+              outcome(0, 1, limit: 0) == .keepForResume && outcome(0, 1, limit: -5) == .keepForResume)
+
+        check("gemini chunk: a huge limit only lengthens the re-check window, it never materializes nothing",
+              outcome(0, 900, limit: 100_000) == .recheck && outcome(3, 900, limit: 100_000) == .materialize)
     }
 
     // MARK: - Gemini: inlined response entries

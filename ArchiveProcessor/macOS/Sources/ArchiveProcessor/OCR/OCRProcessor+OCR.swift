@@ -681,6 +681,9 @@ extension OCRProcessor {
         var batchComplete = false
         batchPollInterrupted = false
         var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
+        // How many times a chunk has come back terminal-but-empty this poll session (W16.bat1-fu).
+        // Deliberately not persisted: a resume is the operator asking to look again from scratch.
+        var emptyResultChecks: [String: Int] = [:]
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
@@ -772,19 +775,56 @@ extension OCRProcessor {
                         } else {
                             let succeeded = status.state == "BATCH_STATE_SUCCEEDED" || status.state == "JOB_STATE_SUCCEEDED"
                             if succeeded {
-                                var materialized = true
-                                if let inlineResults = status.inlineResults {
-                                    materialized = await processBatchResults(
-                                        inlineResults, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                        outputDirectory: outputDirectory, runConfig: runConfig)
-                                } else if let fileName = status.resultFileName {
-                                    let results = try await client.retrieveResults(resultFileName: fileName)
-                                    materialized = await processBatchResults(
+                                // Which arm the pages come from is decided in one pure place, because
+                                // *emptiness* is the trap: an empty inline container used to take the
+                                // inline arm, suppress the result-file fetch, and mark a paid chunk
+                                // consumed with zero pages (W16.bat1-fu).
+                                let results: [String: OCRResult]
+                                switch GeminiBatchClient.resultsSource(for: status) {
+                                case .inline(let inlineResults):
+                                    results = inlineResults
+                                case .file(let fileName):
+                                    results = try await client.retrieveResults(resultFileName: fileName)
+                                case .noneAvailable:
+                                    results = [:]
+                                }
+
+                                // A finished chunk that hands back nothing is never consumed — the
+                                // outcome is decided by a pure, pinned rule rather than inline here.
+                                let emptyObservations: Int
+                                if results.isEmpty {
+                                    emptyObservations = (emptyResultChecks[singleBatchId] ?? 0) + 1
+                                    emptyResultChecks[singleBatchId] = emptyObservations
+                                } else {
+                                    emptyObservations = 0
+                                }
+
+                                switch GeminiBatchClient.chunkOutcome(
+                                    resultCount: results.count,
+                                    emptyObservations: emptyObservations,
+                                    limit: GeminiBatchClient.emptyResultCheckLimit
+                                ) {
+                                case .recheck:
+                                    allComplete = false
+                                    if !stateDisplays.isEmpty {
+                                        stateDisplays[stateDisplays.count - 1] = "succeeded (awaiting results)"
+                                    }
+                                    continue
+
+                                case .keepForResume:
+                                    statusMessage = "A finished batch chunk returned no results after \(emptyObservations) checks. Nothing was marked complete — the batch was kept so you can resume it."
+                                    NSLog("[ArchiveProcessor] paid-batch chunk %@ reported %@ with no readable results after %d checks; not consumed",
+                                          singleBatchId, status.state, emptyObservations)
+                                    batchPollInterrupted = true
+                                    return
+
+                                case .materialize:
+                                    let materialized = await processBatchResults(
                                         results, fileURLs: fileURLs, model: model, apiKey: apiKey,
                                         outputDirectory: outputDirectory, runConfig: runConfig)
+                                    guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
+                                    consumedChunkIds.insert(singleBatchId)
                                 }
-                                guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
-                                consumedChunkIds.insert(singleBatchId)
                             } else {
                                 anyFailed = true
                             }
