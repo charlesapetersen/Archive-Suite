@@ -452,17 +452,44 @@ Other notes:
 - `Failure` is deliberately NOT shared with Reader's `ContentIndexer.Failure`: this driver is a fork, the copy
   differs (notes vs files), and hoisting a UI-facing type into ArchiveCore would couple both apps' wording to
   a third module (and make every such tweak a three-app rebuild).
-- **Residual, filed as `W23.m9-fu2` (LOW):** re-opening a repaired index makes it *queryable* again, but
-  nothing repopulates it — rows are rebuilt only by `buildIndexFromDisk()` at launch (or one at a time by a
-  later mutation). In the rare mid-session repair window, search therefore goes back to answering `[]` with
-  nothing said. Filed rather than fixed here: rebuilding on the recovery transition starts a full disk walk
-  from a keystroke and bumps the `an.status.indexReady` probe mid-session. Same shape as `W23.m10-fu`.
+**A repaired index is REFILLED, not just re-opened (W23.m9-fu2, checkpoint `45b3854`).** m9-fu's retraction was
+correct but incomplete: re-opening a repaired index made it *queryable* again while nothing repopulated it —
+rows are written only by the launch-time `buildIndexFromDisk()` (or one at a time by a later mutation's
+`upsertBatch`). A mid-session repair (the operator replaces the bad file, a sync client heals it, the volume
+returns) therefore traded one silent wrong answer — "no matches", because nothing could be read — for another
+— "no matches", because nothing has been written yet — and this time with no banner to explain it.
+
+`openIndexForQuery()` now reads the prior health *before* it opens, and the `unavailable → open` **edge**
+schedules `repopulateIndexAfterRecovery()`. Three properties are the design, and each is a way the obvious
+implementation goes wrong:
+- **Edge, not state.** Only the transition schedules a pass, so the store is walked once per recovery rather
+  than once per keystroke of a 150 ms-debounced search. This is the objection that made m9-fu *file* this
+  instead of fixing it, and the edge is what answers it. (`.incomplete` deliberately does not trigger a
+  rebuild: unlike `.unavailable` it is not cleared by a successful open, so triggering on it would be
+  state-triggered by the back door — a walk per read for as long as the writes keep failing.)
+- **Off the read's critical path.** The read that notices returns its (still empty) result at once and the
+  rows land on a later read, exactly as after a launch build. A search must never block on a store walk.
+- **One at a time.** The pass re-enters the accessor through `reloadItems()`, and a flapping file would
+  otherwise stack rebuilds on each other.
+
+It reuses `buildIndexFromDisk()` verbatim rather than a bespoke recovery path: the two cannot drift, its
+upserts are mtime-skipped (a volume that came back with its rows intact costs one directory walk and no
+writes), and it also repairs the *partial* index a mid-pass failure leaves, which an "only rebuild when the
+index reads empty" shortcut would skip. It is read-only w.r.t. the note store and prunes nothing. It **does**
+re-mark `isIndexReady` and bump `indexGeneration` — the deliberate behaviour change this item was split out to
+make: the token's contract is "a build settled", and one did, and `isIndexReady` only ever goes true, so the
+hidden `an.status.indexReady` probe cannot regress to "building" underneath a test. No driver or no store
+(an injected model, or one pre-`bootstrap`) is a no-op — the handle recovered and the banner is retracted
+either way, there is simply no disk to walk.
 
 Tests: `NotesIndexRecoveryTests` (4), `NotesIndexerFailureTests` (9), incl. the end-to-end shape — real `.md`
 notes on disk plus a dead index → settled, list genuinely empty, and that emptiness *reported*; plus
-`NotesModelIndexHealthTests` (11) over the model's own two reads. Scratch only. Every mechanism proven
-non-vacuous by neutering (m9-fu: the pre-fix code reddened 6 of 11 while the 5 must-not-over-report guards
-stayed green, then 3 neuters each reddened exactly one predicted assertion). Notes suite 714/714.
+`NotesModelIndexHealthTests` (11) over the model's own two reads and `NotesIndexRepopulationTests` (9) over
+the recovery rebuild. Scratch only. Every mechanism proven non-vacuous by neutering (m9-fu: the pre-fix code
+reddened 6 of 11 while the 5 must-not-over-report guards stayed green, then 3 neuters each reddened exactly
+one predicted assertion; m9-fu2: neutering the whole fix reddened 4 of 9 with the 5 guards green, then a
+state-triggered neuter reddened only "a healthy index is never rebuilt" and an inline-blocking neuter reddened
+only the off-the-critical-path half). Notes suite 723/723.
 
 ## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
 

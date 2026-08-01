@@ -816,8 +816,39 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   index, so there is nothing for the VM lane to see (same as m9). Residual filed as **W23.m9-fu2** (below).
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndexer}.swift
 
-- [ ] **W23.m9-fu2 — a repaired index becomes queryable again but stays EMPTY until the next launch
-  [XS–S · LOW].** Residual of W23.m9-fu, filed 2026-07-31 (`cc9fb59`). A read that re-opens an index which
+- [x] **W23.m9-fu2 — a repaired index becomes queryable again but stays EMPTY until the next launch
+  [XS–S · LOW].** ✅ DONE — code in checkpoint `45b3854`, tests + trackers in this commit. The `unavailable → open`
+  **edge** now schedules `repopulateIndexAfterRecovery()`, which is `buildIndexFromDisk()` verbatim — so a
+  repaired index is refilled the same way a fresh one is, and a search moments later answers from real rows
+  instead of an empty file. **Edge, not state, is the whole point:** the item was *filed* rather than fixed
+  because the obvious version walks the store once per keystroke of a 150 ms-debounced search; triggering on
+  the transition walks it once per recovery. (`.incomplete` deliberately stays out — unlike `.unavailable`
+  it is not cleared by a successful open, so triggering on it would be state-triggered by the back door.)
+  It also runs **off the read's critical path** (the read that notices returns its still-empty result at
+  once; the rows land on a later read, as after any launch build) and **one at a time** (the pass re-enters
+  the accessor via `reloadItems()`, and a flapping file would otherwise stack rebuilds). Reusing
+  `buildIndexFromDisk()` rather than a bespoke path is deliberate: the two cannot drift, its upserts are
+  mtime-skipped (a volume that returns with its rows intact costs one directory walk and no writes), and it
+  repairs the *partial* index a mid-pass failure leaves, which an "only rebuild when it reads empty" shortcut
+  would skip. Read-only w.r.t. the note store; prunes nothing — asserted, not merely claimed. The second half
+  of the item's own objection is accepted on purpose: the pass **does** bump `isIndexReady`/`indexGeneration`,
+  which is the behaviour change this item was split out to make deliberately — the token means "a build
+  settled", and one did, and `isIndexReady` only ever goes true, so the hidden `an.status.indexReady` probe
+  cannot regress to "building" under a test. No driver / no store is a no-op (nothing to walk). **Tier-1,
+  scratch only** (garbage/empty sqlite3 files + real `.md` notes in per-test temp dirs; no real store, no
+  corpus, no network, $0): 9 new tests (`NotesIndexRepopulationTests`). **Non-vacuous, measured three ways:**
+  neutering the whole fix reddened 4 of 9 (refilled-on-a-later-read, `reloadItems` republish,
+  exactly-one-rebuild, ready-token-advances) while all 5 guards stayed green; then a **state-triggered**
+  neuter reddened *only* "searching a healthy index never schedules a rebuild", and an **inline-blocking**
+  neuter reddened *only* the off-the-critical-path assertion. All reverted; source `git diff` empty against
+  the checkpoint and `grep NEUTER` clean. **723/723** Notes (was 714), clean build, 0 new warnings. No
+  ArchiveCore type and no SPEC change → Reader/Processor untouched, so the shared-core all-three-app rebuild
+  rule is N/A. No new view code, and no GUI fixture can corrupt an index mid-session, so there is nothing for
+  the VM lane to see (same as m9/m9-fu) — the one GUI-adjacent surface, the `an.status.indexReady` probe, is
+  argued above and held by a headless test. **W23.m10-fu stays open**: same shape, but a different subsystem
+  (`OrganizationStore`'s mirror) with its own retry seam — pairing them was a suggestion, not a dependency.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Core/NotesModel.swift, Tests/ArchiveNotesTests/NotesIndexRepopulationTests.swift}
+  *Original finding:* residual of W23.m9-fu, filed 2026-07-31 (`cc9fb59`). A read that re-opens an index which
   had been reported unavailable now retracts the false banner and hands back a live handle — but nothing
   repopulates it: rows are rebuilt only by `buildIndexFromDisk()` at launch (or one at a time by a later
   mutation's `upsertBatch`). So in the rare window where the bad file is repaired mid-session (operator
