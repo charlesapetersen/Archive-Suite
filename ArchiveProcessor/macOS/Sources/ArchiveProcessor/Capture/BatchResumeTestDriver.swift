@@ -33,6 +33,9 @@ import AppKit
 ///  12. The three batch clients' **provider response-shape contract** — every status/result body shape
 ///      Anthropic, Gemini and Mistral are accepted in, parsed headlessly from literal fixtures
 ///      (`BatchParseContract`, W16.bat1). No network, no keys, no cost.
+///  13. The **cancel path's journal-retention contract** (`BatchCancelContract`, W16.bat2): pressing Stop
+///      deletes the paid-batch recovery journal if and only if every chunk's server-side cancellation was
+///      confirmed — swept over every provider × chunk-count × refusal shape, against a real file.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
@@ -606,6 +609,13 @@ enum BatchResumeTestDriver {
         // parse seams in `BatchOCR.swift`. Lives in its own file because it shares nothing with the
         // manifest fixtures above; it rides this driver so one script covers the whole paid-batch surface.
         BatchParseContract.run(check: check)
+
+        // --- 13: the cancel path's journal-retention contract (W16.bat2). ---
+        // The paid-batch recovery journal is deleted only when every chunk's server-side cancellation
+        // was confirmed. Driven through the real `performServerBatchCancellation` seam with a stub
+        // canceller and a real temp file, so "kept" means a file that is still on disk — no network,
+        // no keys, no cost.
+        await BatchCancelContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
