@@ -35,8 +35,13 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
    **full-codebase review**, use the paced method in [`REVIEW.md`](REVIEW.md) — one subsystem per session,
    lean fan-out, refute-verify; **never** one giant fan-out (it blows a usage window). Use the `/code-review`
    skill for the working diff.
-   ⏸ **Paced *whole-project* reviews are PAUSED for the daemon (owner, 2026-07-29)** while it drains the
-   `SUITE_TODO.md` **Wave 23** bug queue — see [`REVIEW.md`](REVIEW.md). **This does NOT relax this step:** the
+   ⏸ **Paced *whole-project* reviews are PAUSED for the daemon (owner, 2026-07-29; re-confirmed 2026-08-01).**
+   The original wording said "while it drains the `SUITE_TODO.md` **Wave 23** bug queue" — **that condition has
+   now been MET** (Wave 23 is 34 done / 8 open, and all 8 remaining are `-fu` follow-ups rather than original
+   findings). The owner was shown exactly that on 2026-08-01 and **chose to keep the pause anyway**, including
+   declining a narrowly-scoped Notes-only review. **So do not lift the pause on the grounds that Wave 23 is
+   drained** — that argument has already been made to him and turned down. See [`REVIEW.md`](REVIEW.md).
+   **This does NOT relax this step:** the
    per-change Tier-2 gate (adversarial self-review + a functional test on anything with no undo) is
    unchanged and still mandatory. What's paused is *proactively hunting for new findings*, not reviewing
    your own change.
@@ -118,6 +123,34 @@ irreplaceable data. That contract lives, authoritatively, in [`SPEC/tag-format.m
 — **any change to how tags/dates/priority/color/classification are written or parsed must update both
 apps and that spec together**, and is Tier‑2 (adversarial review + tests on scratch copies, never the
 real corpus).
+
+## There is no production material yet — what that relaxes, and what it does not
+
+**Owner directive, 2026-08-01.** No app in this suite has produced data he intends to keep: Notes holds only
+test material, the Processor has produced no files, and **the entire corpus predates these apps**. Nothing
+depends on the apps' current settings, structure or outputs.
+
+**So stop designing for continuity.** These are *not* constraints here:
+- **No migration paths** — legacy on‑disk formats (old staging manifests, old `PendingRun` shapes, old note
+  front‑matter) need no reader. Change a schema; don't version it.
+- **No backward‑compatible parsing** — a link/tag/PDF format may change shape outright.
+- **No inert‑legacy carve‑outs** — rules that exist to avoid disturbing already‑written app output are moot.
+- **Settings and structure are free to change.** Prefer the right end state to the compatible one, and say in
+  the commit that no migration was written *because there is nothing to migrate*.
+
+**What is UNCHANGED — the directive is about app *output*, not about inputs or money:**
+- ⛔ **The real corpus stays sacred.** `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs) is irreplaceable
+  and predates the apps — which is exactly *why* it isn't app output. The Reader's Core Directive and
+  scratch‑copy‑only testing are untouched.
+- ⛔ **Money paths are unchanged.** Stranding a live paid batch costs real money regardless of whether any
+  output matters (the W16 `bat3`/`bat5`/`bat2-fu2` work is framed around money, not data).
+- ⛔ **Tier‑2 review, scratch‑only tests and no‑force git discipline all stand.** "No production data" means
+  **no compatibility burden** — it does not mean less care, and it does not skip a gate.
+
+⏸ **Related: the DEVONthink import is ON HOLD** (owner, 2026-08-01) until Notes' basic structure is settled —
+and **its plans are retained in full**, an explicit exception to the "delete a shipped plan" rule below. See
+`SUITE_TODO.md` §"Archive Notes — DEVONthink import". Restructuring Notes is free *now* and stops being free
+once 7.5 GB lands in it.
 
 ## Conventions
 

@@ -1,6 +1,28 @@
 # Execution plan — Import the personal DEVONthink database into Archive Notes
 
-**Status:** PLANNING (not started). Owner-requested 2026-07-17.
+> ## ⏸ ON HOLD — owner directive, 2026-08-01. THIS PLAN IS RETAINED ON PURPOSE.
+> *"Retain all work plans related to devonthink import but put that work on hold. We don't want to do that
+> until we're happy with the basic structure of Notes as an app."*
+>
+> **Do not delete this file.** The repo convention in `CLAUDE.md` §"Docs & backlog convention" says to delete
+> an `execution-plans/` plan once its feature ships — and a housekeeping pass might read "on hold, not
+> progressing" as "dead, tidy it away." **This plan is an explicit, owner-stated exception:** it is neither
+> shipped nor abandoned, the planning work keeps its value, and it stays here in full. Not `old/`, not
+> summarised, not trimmed.
+>
+> **Do not start or advance the work either**, and **never mirror this into
+> `.maintenance/AUTONOMOUS_PLAN.md`'s WORK QUEUE** — it appears zero times there deliberately, so
+> `next-queue-item.sh` cannot offer it. It does not belong in that file's HOLD QUEUE either: it is not waiting
+> on an owner *gate*, it is out of scope until a qualitative bar is met.
+>
+> **The gate is the owner's alone and is qualitative:** "when we're happy with the basic structure of Notes as
+> an app." Do not infer it from a green suite, a drained queue, or a clean review — ask him.
+>
+> **Why this ordering:** Notes currently holds only test material (see `CLAUDE.md` §"There is no production
+> material yet"), so restructuring it is free *right now*. That freedom ends the moment ~7.5 GB of real
+> research lands in it — importing into a shape that later changes means doing the import twice.
+
+**Status:** ⏸ **ON HOLD** (owner, 2026-08-01) — was PLANNING (not started). Owner-requested 2026-07-17.
 **Owner:** Charles. **App:** Archive Notes (+ shared `ArchiveCore`; depends on an Archive Reader root).
 **Risk:** HIGH — irreplaceable personal research corpus, ~40k records, net-new model work. Treat the
 whole project as **Tier-2** (adversarial review + functional tests on scratch copies) with an extra

@@ -3,7 +3,16 @@
 A **durable, resumable** way to code-review this monorepo **without burning a whole usage window at once**.
 Reach for this whenever you'd otherwise "do a full code review" — do NOT fire one giant fan-out.
 
-> **⏸ STATUS: paced reviews are PAUSED for the autonomous daemon (owner directive, 2026-07-29).**
+> **⏸ STATUS: paced reviews are PAUSED for the autonomous daemon (owner directive, 2026-07-29 — RE-CONFIRMED
+> 2026-08-01).** ⚠️ **The original condition has been met and the pause was deliberately kept.** This pause was
+> written as "while it drains the Wave 23 bug queue"; as of 2026-08-01 Wave 23 is **34 done / 8 open, and all 8
+> remaining are `-fu` follow-ups**, not original findings. The owner was shown that in the morning-review
+> walkthrough, together with the fact that Notes units 12–16 have never been reviewed and that he wants Notes'
+> structure settled before the DEVONthink import — and he **chose "keep everything paused"**, declining even a
+> narrowly-scoped, inline, two-unit Notes review. **Do not re-propose lifting this because Wave 23 is drained.**
+> For the record, if it is ever revisited the real obstacle is cost, not supply: the `lean-review` fan-out ran at
+> ~$4.5/min and was budget-stopped on 2026-07-18 *before a single finder emitted a finding*, forcing the unit to
+> be verified inline instead. Fix that before re-enabling anything.
 > `ops/autonomous/next-review-unit.sh` has a master switch (`REVIEW_ENABLED_DEFAULT=0`) that makes the WS11
 > cadence always report "none due", so **no daemon session will start a review** — it drains bugs instead. The
 > reason is supply, not doubt in the method: the owner-commissioned Codex full-suite review of 2026-07-29 filed

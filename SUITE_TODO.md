@@ -2069,7 +2069,14 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   *survived* (→ **W16.bat6**). Both are written into the file header, not just here.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift, OCR/BatchCancelContract.swift, Capture/BatchResumeTestDriver.swift | S | low | none
 - [ ] **W16.bat2-fu2 — make the paid-batch journal path redirectable under test, so the default deleter is
-  provable** (blocked-on: W16.bat2-fu2-owner-ok) `[hold]` **— needs: owner.** HOLD-QUEUE: the change edits how
+  provable** ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED, the
+  `W16.bat2-fu2-owner-ok` gate is ticked, and the owner **sequenced this FIRST of the three W16 money-path
+  items**, ahead of `W16.bat3`/`W16.bat5`, because it is what lets their fixes be proven against the REAL
+  deleter in a temp dir instead of a stub. **Binding constraint (unchanged from the filing): the override is
+  honoured ONLY under `BATCHRESUME_TEST=1` and MUST fail closed to the real path** on unset/empty/malformed —
+  a mis-read env var strands a paid batch. Also required: a check that the fail-closed direction holds, and a
+  check that fails if the default deleter body is neutered to `{ }`. Full grant + constraints in the plan's
+  §OWNER AUTHORIZATIONS. Original filing follows. HOLD-QUEUE rationale (historic): the change edits how
   the operator's REAL `pending_batch.json` path is resolved, on the only code path that spends money. From the
   W16.bat2-fu adversarial review (rated HIGH). Two gaps, one cause: (a) every wiring check replaces
   `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually deletes the journal — is verified by
@@ -2121,8 +2128,15 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   (the journal is deleted downstream anyway) — making a sometimes-lie more reliably visible is the wrong fix
   order. | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | none
 - [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
-  (blocked-on: W16.bat5-owner-ok) `[hold]` **— needs: owner.** HOLD-QUEUE: money path with no undo, same
-  category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
+  ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED and the
+  `W16.bat5-owner-ok` gate is ticked. ⚠️ **The owner also CHOSE the fix direction: the in-flight guard —
+  refuse to delete the journal while a submit is in flight.** He considered and **rejected** the alternative
+  (re-reading the journal's chunk IDs after the cancellations) because it only *narrows* the window: a chunk
+  created between the re-read and the delete still slips, so it stays a TOCTOU race. Implement the invariant
+  ("a submit is in flight ⇒ the journal survives"), **do not ship the re-read as a substitute**, and if the
+  guard proves unimplementable as stated, STOP and flag it rather than falling back. Keep-on-doubt governs.
+  Full grant in the plan's §OWNER AUTHORIZATIONS. Original filing follows. Historic: money path with no undo,
+  same category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
   the W16.bat2 adversarial review. `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while a
   Gemini submit loop may still be creating server-side chunks. If every chunk in that snapshot confirms, the
   journal is **deleted** — and a chunk created after the snapshot is already billed with its ID recorded
@@ -2132,8 +2146,16 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   refuse to delete while a submit is in flight. W16.bat2's driver is the harness for proving it.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | high | none
 - [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept**
-  (blocked-on: W16.bat3-owner-ok) **[XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with
-  no undo, so the daemon files it rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
+  **[XS fix · HIGH]** ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED
+  and the `W16.bat3-owner-ok` gate is ticked. Authorized because the precondition it was waiting on is now
+  met: `W16.bat2`'s driver shipped in `d65e04f`, so a regression test can prove the fix. **Binding
+  constraints:** keep-on-doubt governs (deletion is the irreversible act — whenever interruption is possible
+  but unconfirmed, the journal SURVIVES); scratch only, never the real `pending_batch.json`; and it must land
+  with a check that **fails on today's code and passes after**, covering the **resume path as well as the
+  fresh run** — a `cancel()`-level assertion is insufficient, since one already passes today while the real
+  path deletes. Full grant in the plan's §OWNER AUTHORIZATIONS. Note `W16.bat6` is gated on this item
+  **landing**, not on the authorization. Original filing follows. Historic: owner-gated money path with
+  no undo, so the daemon filed it rather than fixing it. Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
   ⚠️ **Gate re-pointed 2026-08-01:** this used to read `(blocked-on: W16.bat2)`, which was doing double duty as
   the machine-readable hold gate. W16.bat2 has now shipped, so that gate would have released an owner-gated
   money-path item into the actionable queue. The dependency is now the owner's decision itself
@@ -2736,7 +2758,26 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Views/, Core/ArchiveFile.swift, Search/ContentIndex.swift | S–M | low | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
-- [ ] **Import the personal DEVONthink database into Archive Notes** — plan
+
+> ## ⏸ ON HOLD — owner directive, 2026-08-01. PLANS RETAINED IN FULL.
+> *"Retain all work plans related to devonthink import but put that work on hold. We don't want to do that
+> until we're happy with the basic structure of Notes as an app."*
+>
+> - **Do not start, advance, or scope this**, and **never mirror it into `.maintenance/AUTONOMOUS_PLAN.md`'s
+>   WORK QUEUE** — as of 2026-08-01 "devonthink" appears zero times in that file, which is deliberate, so
+>   `next-queue-item.sh` can never offer it. Do not put it in the plan's HOLD QUEUE either: it is not awaiting
+>   an owner *gate*, it is out of scope until a qualitative bar is met.
+> - **`execution-plans/devonthink-import.md` is RETAINED** — an **explicit exception** to this file's own
+>   "delete a shipped `execution-plans/` plan" convention (see §Docs & backlog convention in `CLAUDE.md`). Do
+>   not delete it, do not move it to `old/`, do not summarise-and-delete. The planning work keeps its value.
+> - **The gate is the owner's alone and is qualitative** — "when we're happy with the basic structure of Notes
+>   as an app." Never infer it has been met from a green suite, a drained queue, or a passing review.
+> - **Why the ordering matters:** Notes currently holds only test material, so restructuring it is free *right
+>   now* — and stops being free the moment 7.5 GB of real research lands in it. Importing into a shape that
+>   later changes means doing the import twice.
+
+- [ ] **Import the personal DEVONthink database into Archive Notes** ⏸ **ON HOLD (owner, 2026-08-01 — see the
+  block above; plans retained, do not progress)** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's ~7.5 GB DEVONthink 3
   "Meritocracy Project" DB (`~/Desktop/Scholarship/1000 Research Database.dtBase2`; ~40k notes+excerpts) into
   Archive Notes: 3-stage offline pipeline (JXA extract →
