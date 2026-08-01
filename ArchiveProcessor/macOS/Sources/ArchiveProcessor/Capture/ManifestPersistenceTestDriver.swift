@@ -164,6 +164,105 @@ enum ManifestPersistenceTestDriver {
         check("W16.cfg6-fu2: a negative image size falls back rather than being floored to 0.5",
               SessionProcessingConfig.fromDefaults(fu2Defaults).pdfImageMB == 2.0)
 
+        // --- W16.cfg6-fu3: the WRITERS are bounded too, so what Settings shows is what a run uses. ---
+        // fu2 made every defaults READ clamp, so nothing out of range can reach a run. What was left is
+        // that an out-of-range number could still be STORED and DISPLAYED: each MB row pairs a bounded
+        // Stepper with a TextField that accepts anything, so typing 500 persisted 500 and kept showing
+        // 500 while every run used 20 and the cost pane quoted 500. These pin the writer half.
+        let fu3Suite = "APManifestTest-fu3-\(UUID().uuidString)"
+        let fu3Defaults = UserDefaults(suiteName: fu3Suite)!
+        defer { fu3Defaults.removePersistentDomain(forName: fu3Suite) }
+
+        // Pinned as VALUES, not as "the clamps agree with themselves": `pendingRunRuntimeConfigIsValid`
+        // spelled these ranges out as its own literals until fu3 and now reads `Bounds`. If `Bounds` ever
+        // widened, that fail-closed resume validator would silently start admitting a config that no
+        // builder in the app can produce — this check is what makes the shared declaration safe.
+        check("W16.cfg6-fu3: Bounds still spell the ranges the four former literal sites used",
+              SessionProcessingConfig.Bounds.imageMB == 0.5...20
+              && SessionProcessingConfig.Bounds.ocrWorkers == 1...12
+              && SessionProcessingConfig.Bounds.textColumns == 1...4)
+
+        // An unset key must STAY unset. Normalizing is about correcting what the operator stored, not
+        // about materializing five defaults he never chose — `ProcessingProfileStore.read` distinguishes
+        // stored from defaulted, so writing them all would change what a snapshot means.
+        let normalizedNothing = SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults)
+        check("W16.cfg6-fu3: normalizing an all-unset domain writes nothing and reports no change",
+              !normalizedNothing
+              && fu3Defaults.object(forKey: DefaultsKeys.standardImageSizeMB) == nil
+              && fu3Defaults.object(forKey: DefaultsKeys.pdfImageSizeMB) == nil
+              && fu3Defaults.object(forKey: DefaultsKeys.exportedImageSizeMB) == nil
+              && fu3Defaults.object(forKey: DefaultsKeys.ocrWorkerCount) == nil
+              && fu3Defaults.object(forKey: DefaultsKeys.textColumns) == nil)
+
+        // The headline case: the 500 an operator can type into the field today.
+        fu3Defaults.set(500.0, forKey: DefaultsKeys.standardImageSizeMB)
+        fu3Defaults.set(0.25, forKey: DefaultsKeys.pdfImageSizeMB)
+        fu3Defaults.set(Double.infinity, forKey: DefaultsKeys.exportedImageSizeMB)
+        fu3Defaults.set(100, forKey: DefaultsKeys.ocrWorkerCount)
+        fu3Defaults.set(9, forKey: DefaultsKeys.textColumns)
+        let normalizedSomething = SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults)
+        check("W16.cfg6-fu3: an out-of-range STORED value is rewritten to the value a run would use",
+              normalizedSomething
+              && fu3Defaults.double(forKey: DefaultsKeys.standardImageSizeMB) == 20    // 500 → ceiling
+              && fu3Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == 0.5        // 0.25 → floor
+              && fu3Defaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == 3.0   // ∞ → fallback
+              && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == 12        // 100 → ceiling
+              && fu3Defaults.integer(forKey: DefaultsKeys.textColumns) == 4)           // 9   → ceiling
+
+        // The property the item is actually about — visible == effective. Compares what is now STORED
+        // against what the LIVE builder resolves, so it would fail if the normalizer clamped to its own
+        // idea of the bounds rather than to the reader's.
+        let fu3Live = SessionProcessingConfig.fromDefaults(fu3Defaults)
+        check("W16.cfg6-fu3: the stored numbers and the numbers a run resolves are now the same five",
+              fu3Defaults.double(forKey: DefaultsKeys.standardImageSizeMB) == fu3Live.standardImageMB
+              && fu3Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == fu3Live.pdfImageMB
+              && fu3Defaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == fu3Live.exportedImageMB
+              && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == fu3Live.ocrWorkerCount
+              && fu3Defaults.integer(forKey: DefaultsKeys.textColumns) == fu3Live.textColumns)
+
+        // It runs on every Settings change, so the second pass must be a genuine no-op — otherwise each
+        // write re-enters `.onChange` and the field never settles.
+        check("W16.cfg6-fu3: a second normalization writes nothing",
+              !SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults))
+
+        // The ETA clamped the worker count LOW only (`max(1, ocrWorkers)`), so a stored 100 quoted a time
+        // ~8× optimistic while `schedulingWorkerCount` still ran 12. Pinned against 12 (must match) AND
+        // against 1 (must differ) — without the second half, an estimator that ignored workers entirely
+        // would pass the first.
+        let etaModel = LLMProvider.gemini.models[0]
+        func etaOCRSeconds(_ workers: Int) -> Double {
+            TimeEstimator.estimate(fileCount: 1000, model: etaModel, enableTagging: false,
+                                   ocrWorkers: workers).ocrSeconds
+        }
+        check("W16.cfg6-fu3: the ETA clamps the worker count at both ends, as the pipeline does",
+              etaOCRSeconds(100) == etaOCRSeconds(12)
+              && etaOCRSeconds(0) == etaOCRSeconds(1)
+              && etaOCRSeconds(12) < etaOCRSeconds(1))
+
+        // A profile is unvalidated JSON on disk that `apply` writes verbatim — the one path that could put
+        // any Double back into the five keys after Settings had been left in range. Exercised on a scratch
+        // suite (that is why `apply` takes a `UserDefaults` now), never the real app's settings.
+        let fu3ProfileSuite = "APManifestTest-fu3p-\(UUID().uuidString)"
+        let fu3ProfileDefaults = UserDefaults(suiteName: fu3ProfileSuite)!
+        defer { fu3ProfileDefaults.removePersistentDomain(forName: fu3ProfileSuite) }
+        let handEditedProfile = ProcessingProfile(name: "hand-edited", values: [
+            DefaultsKeys.standardImageSizeMB: .double(500),
+            DefaultsKeys.pdfImageSizeMB: .double(-4),
+            DefaultsKeys.exportedImageSizeMB: .double(0),
+            DefaultsKeys.ocrWorkerCount: .int(64),
+            DefaultsKeys.textColumns: .int(11),
+            DefaultsKeys.batchMode: .bool(true),
+        ])
+        ProcessingProfileStore.shared.apply(handEditedProfile, to: fu3ProfileDefaults)
+        check("W16.cfg6-fu3: applying a hand-edited profile cannot store a sizing value out of range",
+              fu3ProfileDefaults.double(forKey: DefaultsKeys.standardImageSizeMB) == 20
+              && fu3ProfileDefaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == 2.0   // ≤ 0 → fallback
+              && fu3ProfileDefaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == 3.0
+              && fu3ProfileDefaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == 12
+              && fu3ProfileDefaults.integer(forKey: DefaultsKeys.textColumns) == 4
+              // …and a non-sizing key is still applied verbatim: this bounds the writer, not the feature.
+              && fu3ProfileDefaults.bool(forKey: DefaultsKeys.batchMode))
+
         // --- W16.cfg2/cfg6: an injected config wins; with none, the helpers read defaults, not a global. ---
         let liveSizing = SessionProcessingConfig.runSizing()
         let fallbackPDF = OCRProcessor.pdfGenerationSettings(for: nil)
