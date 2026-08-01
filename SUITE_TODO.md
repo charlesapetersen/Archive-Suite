@@ -3469,6 +3469,18 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 - [x] **iOS Drive-relay on-device OAuth — implemented.** `DriveAuth.swift` (`ASWebAuthenticationSession` + PKCE, `drive.file` scope, thread-safe `TokenStore` for `DriveClient`'s blocking token provider); `CaptureViewModel` gains `TransportMode` (.lan/.drive) + auto-selects Drive when QR has a relay token and user is signed in (falls back on LAN-unreachable too); `ConnectScreen` gains a "Sign in to Google Drive" section. `project.yml` registers the reversed-client-ID URL scheme. **Placeholder client ID** — needs a real iOS OAuth client in GCP project YOUR_GCP_PROJECT (bundle ID `com.archiveprocessor.capture.ios`, "Custom URI scheme" enabled). iOS build clean, no new warnings. On-device testing deferred → `ArchiveProcessor/POTENTIAL_FEATURES.md`. | ArchiveCaptureiOS | M
 
 ## P3 — Suite structural
+- [ ] **SUITE.consolidate — one item list, and a doc set where every split has a stated reason.**
+  Plan: [`execution-plans/tracker-consolidation.md`](execution-plans/tracker-consolidation.md). Owner-directed
+  2026-08-01, executed **interactively with the daemon down** — never daemon work, since Phase 4 changes
+  `next-queue-item.sh`, the thing that selects daemon work. Driven by one morning producing the same defect
+  three times (stale `W21.vmgui-path` checkbox, a six-grants-stale tag list in `resume-prompt.txt`, a prove
+  script false-failing 4 runs in 6) — all *a secondary copy drifting from the truth*.
+  Audit result: most splits DO have a nameable reason (tooling binding, distinct lifecycle/audience/durability
+  /mutability) and are kept; four do not. **Phase 0 ✅** the tracker-sync guard (`08fa6ed`). **Phase 1 ✅**
+  retired the dead `ARCHIVE_NOTES_PROGRESS.md` (0 open/57 done, no tooling). **Phase 3 ✅** GUI verification
+  de-duplicated to one canonical home in `AGENTS.md`. **Phase 2** split `SUITE_TODO`'s 139 done items out of
+  the live queue. **Phase 4** one item list, strangler-verified, hold gate proven by test.
+  Delete the plan when Phase 4 lands. | Tier-2 | M
 - [x] Processor Implementation Map added to `ArchiveProcessor/CLAUDE.md` — 2026-07-07. ✅
 - [x] De-nest the `App/App` folders → `App/macOS/`. Both apps build (0 warnings), 161 Reader tests green, DMG verified. ✅
 

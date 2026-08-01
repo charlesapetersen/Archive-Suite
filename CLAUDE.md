@@ -19,16 +19,16 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
    smoke script runs the app's WHOLE scheme, and the scheme contains the UITest bundle, so on the host it
    drives the real app on screen. `test-smoke.sh` therefore restricts itself to the unit bundle whenever
    `ARCHIVE_UNATTENDED=1`, and the UITests run off-screen in the VM instead (`ops/gui/vm-gui-runner.sh
-   <app> xcuitest`). For a **view /
-   PDF-render** change, also confirm it *actually drew*: XCUITest sees only the accessibility tree, not pixels —
-   use a headless render guard (`RenderProbe` / `DocumentRenderGuardTests`, no launch/TCC). For **interaction /
-   whole-window** checks, run them **off-screen in the Tart VM** (`ops/gui/vm-gui-runner.sh` — XCUITest + a VNC
-   pixel capture; unattended-safe, never touches your display) in preference to the host sighted loop
-   (`ops/gui/capture-window.sh` + `cliclick`, which hijacks the screen → interactive use only). See
-   [`ops/gui/README.md`](ops/gui/README.md). **The owner's screen is theirs**: an unattended session may not
-   draw on it at all, and `.claude/hooks/no-host-gui.sh` enforces that (→ [`AGENTS.md`](AGENTS.md) *GUI
-   verification*). Note the unit bundles are app-**hosted** — `xcodebuild test -only-testing:<App>Tests`
-   launches the real `.app` — but it renders nothing under a test host (ArchiveCore `ArchiveTestHost`).
+   <app> xcuitest`). Note the unit bundles are app-**hosted** — `xcodebuild test -only-testing:<App>Tests`
+   launches the real `.app` — but it renders nothing under a test host (ArchiveCore `ArchiveTestHost`), so a
+   green unit run is never evidence that anything *drew*.
+   **Anything visual → [`AGENTS.md`](AGENTS.md) §*GUI verification*, which is CANONICAL for it** — the triage
+   table (read-the-code vs headless render guard vs off-screen Tart VM vs genuinely-owner-only), the TCC
+   state, and every layer that blocks the host screen. Deliberately not restated here: it was maintained in
+   both files, which is how the copies drift. Two consequences bear on this step — a **view / PDF-render**
+   change needs a headless render guard (`RenderProbe` / `DocumentRenderGuardTests`), because XCUITest sees
+   the accessibility tree and not pixels; and **the owner's screen is theirs**, so an unattended session may
+   not draw on it at all (`.claude/hooks/no-host-gui.sh` enforces it mechanically).
 3. **Review by risk** — Tier-2 (adversarial review + a functional test) for anything with **no undo**:
    `Capture/`·`Net/`, file-writing tag/output, manifest/finalize, actor isolation, or the tag/PDF SPEC.
    Full tiers + the phone↔Mac E2E gate: each app's `CLAUDE.md` → *Verification & review policy*. For a

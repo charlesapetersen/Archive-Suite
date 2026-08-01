@@ -863,7 +863,9 @@ real `Store` **absent**; `notesStoreRootBookmark` not persisted).
   typing). All additions are `#if DEBUG` and compile out of Release (verified by a Release build).
 - **Plan reconciliation:** the plan lists G4 as a *cliclick* check; it's implemented as a disk-asserted
   XCUITest instead (deterministic, no pointer geometry) — parity with how G5/G9 (also "special-handling"
-  checks) were done. Logged in `.maintenance/ARCHIVE_NOTES_PROGRESS.md`.
+  checks) were done. (Was logged in `.maintenance/ARCHIVE_NOTES_PROGRESS.md`, **retired 2026-08-01** — it was
+  0-open/57-done and bound to no tooling; preserved under the gitignored
+  `old/archive-notes-progress-retired-20260801/`, since being gitignored means git never held it.)
 - **REMAINING (W8-S8 still open):** G6 (reveal → Reader) / G10 (jump-to-source) / G11 (Zotero chip open);
   G2/G6/G11 owner-eye docs in the harness README; and the `an.status.indexReady` probe queryability fix
   (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8.
