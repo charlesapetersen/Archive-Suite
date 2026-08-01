@@ -189,7 +189,10 @@ enum BatchCancelWiringContract {
 
         processor.cancel()
         // Sampled BEFORE awaiting: the live batch identity must be dropped synchronously, or a second Stop
-        // (or a resume) could act on a batch whose cancellation is already in flight.
+        // (or a resume) could act on a batch whose cancellation is already in flight. This sampling is
+        // meaningful only because `cancel()` contains no `await` — the spawned task cannot start until it
+        // returns. Introduce a suspension point into `cancel()` and these three samples quietly change
+        // meaning rather than failing, so read this comment before adding one.
         let batchCleared = processor.activeBatch == nil
         let journalCleared = processor.activePendingBatch == nil
         let spawned = processor.batchCancellationTask != nil

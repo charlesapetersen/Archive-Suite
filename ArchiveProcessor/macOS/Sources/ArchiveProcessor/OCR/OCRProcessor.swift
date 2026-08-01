@@ -271,6 +271,13 @@ class OCRProcessor: ObservableObject {
     // MARK: Cancel-path seams (W16.bat2-fu — so the WIRING is testable, not just the rule)
     /// The in-flight server-side batch cancellation `cancel()` spawned, retained so a headless driver
     /// can await it (`BatchCancelWiringContract`). Production never reads it.
+    ///
+    /// ⚠️ NOT a supersession handle, despite looking like one: nothing cancels or clears it, so a
+    /// cancellation spawned for run A can still complete during run B and write `statusMessage` +
+    /// `checkForPendingBatch()` into it. Pre-existing — the unretained `Task {}` this replaced had exactly the
+    /// same hazard — and tracked with the related message-ordering defect as **W16.bat6**. Do NOT "fix" it by
+    /// cancelling this task: abandoning a server-side cancellation half-done is how a paid job stays alive
+    /// while the operator is told it stopped.
     var batchCancellationTask: Task<Void, Never>?
     /// How `cancel()` obtains the provider's per-chunk canceller. The default builds the live batch
     /// client for the batch's own provider; the wiring driver swaps in a stub, which is what lets the

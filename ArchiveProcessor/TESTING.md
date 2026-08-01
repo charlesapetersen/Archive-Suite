@@ -267,10 +267,13 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   Stop path — W16.bat3 is open and owner-gated.
   And (W16.bat2-fu) the **cancel path's WIRING** (`BatchCancelWiringContract`) — the arguments that rule is
   fed: the real `cancel()` with both cancel-path seams stubbed, proving it cancels the journal's
-  acknowledged chunk IDs (not a decoy batch ID), through the batch's own provider's client, names the
-  paid-batch journal and no other durable file, passes the kept-journal warning to the operator, touches
-  nothing when there is no live batch, and cannot cancel or re-charge the same batch twice.
-  No network, no keys, no cost. 207 checks as of 2026-08-01.
+  acknowledged chunk IDs (not a decoy batch ID), through a canceller that closes over the batch's *own*
+  provider's client (`clientTypeName`, so a right label in front of the wrong client reddens), names the
+  paid-batch journal and no other durable file, assigns the kept-journal warning and refreshes the resume
+  banner, touches nothing when there is no live batch, and cannot cancel or re-charge the same batch twice.
+  Its header lists what it still does not cover (the default deleter → W16.bat2-fu2; the warning surviving
+  the poll's own messages → W16.bat6) — read it before citing a green section 14.
+  No network, no keys, no cost. 213 checks as of 2026-08-01.
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

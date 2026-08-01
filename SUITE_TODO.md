@@ -2000,17 +2000,51 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   correct because `supportsBatch == false` — reddens if Phase 4 lands), a non-vacuity guard on the
   "never announced as kept" case, honest scoping in both doc blocks, and two new items (W16.bat2-fu, W16.bat5).
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelContract.swift, Capture/BatchResumeTestDriver.swift | M | med | none
-- [ ] **W16.bat2-fu — the cancel WIRING is untested, only the rule is [S · LOW].** From the W16.bat2
-  adversarial review. `BatchCancelContract` proves `performServerBatchCancellation`; nothing proves `cancel()`
-  hands it the right arguments. All of these mutations keep all 28 checks green: dropping
-  `if let message = outcome.statusMessage { statusMessage = message }` (`+Pipeline.swift:1663` — operator
-  gets no warning at all); `deleteJournal: { Self.deletePendingBatch() }` → `{ }` or → also deleting
-  `pending_run.json` (`:1662`); hard-coding `provider:` (`:1660`); changing the `chunkIds` derivation
-  (`:1639-1640`); deleting the whole `if let batch = activeBatch { … }` block. Wants a seam one level up —
-  e.g. hoist the closure construction into a testable factory keyed on provider, so a driver can assert
-  `cancel()` builds a canceller for the live provider and passes `deletePendingBatch` as the deleter — then
-  a check per mutation above. Do NOT do this by driving the real `cancel()` with a live key.
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelContract.swift | S | low | none
+- [x] **W16.bat2-fu — the cancel WIRING is untested, only the rule is [S · LOW].** DONE 2026-08-01
+  `b4b871f` (seam) + `1c8bf22` (18 checks) + `183f792` (review gaps) + this commit. `BatchCancelContract`
+  proved the RULE; nothing proved `cancel()` fed it the truth, and five separate mutations to the cancel block
+  left all 189 checks green. The block's choices became data — `BatchChunkCanceller` (provider + how to cancel
+  one chunk + which client it closed over), `BatchCancellationJournal` (the ONE durable file a confirmed
+  cancellation may remove, as a value), `cancellationChunkIds` (pure), and two per-instance factories
+  (`makeBatchChunkCanceller`, `makeBatchJournalDeleter`) — then `BatchCancelWiringContract` drives the **real
+  `cancel()`** with both seams stubbed and a real temp file: **24 new $0 checks** (`test-batch-resume.sh`
+  189 → 213, ALL PASS), no network, no key, no cent, and `deletePendingBatch()` executed by none of them.
+  Non-vacuity MEASURED with **12 neuters** — the five the item named, the pending_run variant (via a second
+  journal case), and six for the checks the review added — each reddening its own checks and no pre-existing
+  one. Two-reader Tier-2 review: the equivalence reader could not refute the refactor (nothing moved INTO the
+  spawned Task, `cancel()` has no `await` so the summary is still assigned before the Task can start, all three
+  batch clients are pure value structs, the rule body differs by two lines, the chunk-ID expression is
+  textual, both new file-name constants equal the literals they replaced). The test reader killed a tautology:
+  the provider check compared a LABEL production passes as a literal, so a Gemini job cancelled through the
+  Mistral client — or an arm short-circuited to always-confirm — stayed green while deleting the journal. Fixed
+  with `clientTypeName`, read off the constructed client; plus the seams' DEFAULTS (previously covered by
+  nothing), a non-Gemini Stop, and a sentinel proving the resume banner is refreshed.
+  **Scope note — what a green section 14 does NOT buy:** the default *deleter* is unprovable without deleting
+  the operator's real journal (→ **W16.bat2-fu2**), and the kept-journal warning is proven *assigned*, not
+  *survived* (→ **W16.bat6**). Both are written into the file header, not just here.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift, OCR/BatchCancelContract.swift, Capture/BatchResumeTestDriver.swift | S | low | none
+- [ ] **W16.bat2-fu2 — make the paid-batch journal path redirectable under test, so the default deleter is
+  provable** (blocked-on: W16.bat2-fu2-owner-ok) `[hold]` **— needs: owner.** HOLD-QUEUE: the change edits how
+  the operator's REAL `pending_batch.json` path is resolved, on the only code path that spends money. From the
+  W16.bat2-fu adversarial review (rated HIGH). Two gaps, one cause: (a) every wiring check replaces
+  `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually deletes the journal — is verified by
+  grep, not by a test; mutating it to `{ }` keeps all 213 checks green. (b) If anyone ever bolts an un-seamed
+  deletion into the cancel block, *running `test-batch-resume.sh` on the owner's machine would delete his live
+  journal* — the suite becomes the blast radius. Both close if `pendingBatchURL`/`pendingRunURL`
+  (`+Pipeline.swift:536`, `:571`) accept a test-only base-dir override, on the existing
+  `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern. **Hard constraint if this is ever authorized: the override must be
+  honoured ONLY under `BATCHRESUME_TEST=1` and must fail closed to the real path — a mis-read env var here
+  strands a paid batch.** | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift | S | high | none
+- [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
+  (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
+  `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that
+  assigns the kept-journal warning; the cancelled poll unwinds through `performBatchOCR` and writes its own
+  `statusMessage` on the way out. The order is not guaranteed, so the one signal that a paid job may still be
+  running server-side can be clobbered before the operator reads it. `BatchCancelWiringContract` proves the
+  message is *assigned*, and structurally cannot prove it *survives* (no live `processingTask` there).
+  **Gated on W16.bat3 deliberately, not incidentally:** while bat3 stands, that warning is sometimes a lie
+  (the journal is deleted downstream anyway) — making a sometimes-lie more reliably visible is the wrong fix
+  order. | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | none
 - [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
   (blocked-on: W16.bat5-owner-ok) `[hold]` **— needs: owner.** HOLD-QUEUE: money path with no undo, same
   category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
