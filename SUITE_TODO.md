@@ -2028,26 +2028,43 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   the operator's REAL `pending_batch.json` path is resolved, on the only code path that spends money. From the
   W16.bat2-fu adversarial review (rated HIGH). Two gaps, one cause: (a) every wiring check replaces
   `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually deletes the journal — is verified by
-  grep, not by a test; mutating it to `{ }` keeps all 213 checks green. (b) If anyone ever bolts an un-seamed
+  grep, not by a test; mutating it to `{ }` keeps all 225 checks green. (b) If anyone ever bolts an un-seamed
   deletion into the cancel block, *running `test-batch-resume.sh` on the owner's machine would delete his live
   journal* — the suite becomes the blast radius. Both close if `pendingBatchURL`/`pendingRunURL`
   (`+Pipeline.swift:536`, `:571`) accept a test-only base-dir override, on the existing
   `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern. **Hard constraint if this is ever authorized: the override must be
   honoured ONLY under `BATCHRESUME_TEST=1` and must fail closed to the real path — a mis-read env var here
   strands a paid batch.** | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift | S | high | none
-- [ ] **W16.bat2-fu3 — fold in the three wiring checks a killed session's draft had and the shipped one
-  does not [XS · LOW].** Not a defect — a coverage delta found while cleaning up. The session that landed
-  W16.bat2-fu's checkpoint 1/3 (`b4b871f`) was killed holding an untracked draft of
+- [x] **W16.bat2-fu3 — fold in the three wiring checks a killed session's draft had and the shipped one
+  does not [XS · LOW].** DONE 2026-08-01, this commit. Not a defect — a coverage delta found while cleaning up. The
+  session that landed W16.bat2-fu's checkpoint 1/3 (`b4b871f`) was killed holding an untracked draft of
   `BatchCancelWiringContract`; the shipped file was written independently and is stronger where it counts
   (`clientTypeName`, the seams' defaults, the banner sentinel — the draft has none of those), but the draft
-  covers three things the shipped one does not: (1) a **sweep through the real `cancel()`** over provider ×
-  chunk-count × journal-present × refusal shape, not just named cases; (2) a **multi-chunk single-job-provider
-  Stop** — 3 chunks through an Anthropic batch must attempt nothing and keep the journal — where the shipped
-  Anthropic/Mistral scenario uses one chunk; (3) the **legacy-journal fallback driven through `cancel()`**
-  (shipped pins it on the pure derivation only). Draft + a delta README are preserved at
-  `old/w16-bat2fu-killed-session-draft-20260801/` (gitignored, on the owner's machine only). Whoever takes
-  this: measure non-vacuity as usual, and delete that folder when done.
-  | files: OCR/BatchCancelWiringContract.swift | XS | low | none
+  covered three things the shipped one did not, all three now folded in (213 → 225 checks, ALL PASS):
+  (1) `sweepEveryShape` — 80 Stops through the real `cancel()` over every provider × 0–3 acknowledged
+  chunks × journal-present × each chunk refused in turn, each demanding an EXACT outcome. Not a port of the
+  draft's sweep: that one asserted only internal consistency (satisfiable by a cancel path that confirms
+  nothing, ever), and its chunk-ID invariant `attempted == derivedChunkIds` was wrong as written — it
+  fails for every shape whose provider rule declines to attempt (multi-chunk Anthropic/Mistral, OpenAI),
+  which the killed session never got to run. Here each trial states the expected attempt list and
+  confirmation independently, and with-journal trials give the batch decoy IDs the journal never
+  acknowledged, so no shape may fall back to them. (2) A multi-chunk single-job-provider Stop: 3 chunks through an
+  Anthropic/Mistral batch attempts nothing, keeps the journal, and warns — while still asking for the
+  canceller and the deleter, so the check stays about the wiring. (3) The legacy (`lifecycleVersion ==
+  nil`) journal driven through `cancel()`: its batch ID is cancelled, never its non-authoritative stored
+  chunk list. Non-vacuity measured by mutating production five ways: `cancel()` ignoring the journal
+  (14 fails), a single-job provider cancelling the first of several (12), a vacuous empty-list Gemini
+  success (7), the no-batch-path provider reporting confirmed (6 — caught by the sweep alone at the
+  wiring level), and the derivation reading `submittedChunkIds` past `effectiveChunkIds` (2). The
+  adversarial review then found the legacy-journal check green under mutation 1 — it gave the journal and
+  the live `BatchContext` the same batch ID, so `pendingBatch: nil` satisfied it; all three ID sources now
+  disagree and it reddens. Same review: the 80 Stops each run a real `checkForPendingBatch()`, which
+  decodes the operator's OWN manifests, so `test-batch-resume.sh`'s 60s report wait (fine at the measured
+  4s on an empty machine) could time out on a large interrupted run — i.e. fail exactly when there is a
+  live paid batch. Raised to 300s and the dependency written down; it goes away with W16.bat2-fu2. A red
+  in the sweep now names the first bad shape (`Anthropic/1 chunk/journal/none refused`) instead of a bare
+  boolean. The preserved draft folder is deleted.
+  | files: OCR/BatchCancelWiringContract.swift, scripts/test-batch-resume.sh, ArchiveProcessor/TESTING.md | XS | low | none
 - [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
   (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
   `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that

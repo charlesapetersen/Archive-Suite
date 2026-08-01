@@ -13,6 +13,11 @@ import Foundation
 /// wrong paid jobs, or none, while the operator is told the batch was stopped), and deleting the whole block.
 /// Each of those is a silent money loss, so each gets a check below.
 ///
+/// The named scenarios come first, each chosen because some specific mutation survives without it;
+/// `sweepEveryShape` then presses Stop on the whole cross-product (every provider × 0–3 acknowledged
+/// chunks × journal-present × each chunk refused in turn — 80 Stops) and demands an exact outcome from
+/// each, which is what covers the shapes nobody thought to name (W16.bat2-fu3).
+///
 /// **How it stays $0 and can never touch the operator's real state.** Every `cancel()` here is driven by
 /// `stop(…)`, the only place in this file that cancels anything, and it always replaces BOTH seams before the
 /// batch is installed: `makeBatchChunkCanceller` (a recording stub — no client, no request) and
@@ -59,6 +64,7 @@ enum BatchCancelWiringContract {
         await whichJobsGetCancelled(check)
         await nothingToCancel(check)
         await stopPressedTwice(check)
+        await sweepEveryShape(check)
     }
 
     // MARK: - Fixtures
@@ -355,6 +361,41 @@ enum BatchCancelWiringContract {
         }
         check("wiring: a single-job provider's paid batch is cancelled through the same wiring (anthropic, mistral)",
               wiredForBoth)
+
+        // The shape above is the one that WORKS. This is the one that must fail safe: an Anthropic/Mistral
+        // batch whose journal acknowledges SEVERAL server-side jobs. Those clients cancel exactly one, so
+        // there is no single ID to cancel and the rule declines to try — which makes the journal the only
+        // way back to jobs that are still running and still being paid for. The wiring's job in that shape
+        // is to keep it and say so, and it is easy to get wrong in the plausible direction: "cancel the
+        // first one" (leaves the rest live while the journal is deleted as confirmed) or "cancel them all"
+        // (each request is against a job ID the client's endpoint does not accept). Neither shows up in the
+        // single-chunk arm above.
+        //
+        // Unlike the other named scenarios, this shape IS also inside `sweepEveryShape` (anthropic/mistral
+        // × 3 chunks × no refusal, both journal arms), so it is not the only thing standing between the
+        // suite and that mutation. It is kept named because the sweep reports one aggregate boolean per
+        // invariant: a red here says which shape broke, in the words of what it costs.
+        var failedSafeForBoth = true
+        for provider in [LLMProvider.anthropic, .mistral] {
+            let several = ids(3)
+            let batch = context(provider, batchId: "batches/received-id")
+            let stopped = await stop(batch: batch,
+                                     pendingBatch: journal(provider, batchId: "batches/received-id",
+                                                           chunkIds: several))
+            let failedSafe = stopped.wiring.attempted.isEmpty
+                // The canceller and the deleter are still ASKED for — the wiring runs in full; it is the
+                // rule downstream that declines. Pinning that keeps this check about the arguments.
+                && stopped.wiring.contexts.count == 1
+                && stopped.wiring.contexts.first.map { sameContext($0, batch) } == true
+                && stopped.wiring.journalsAsked == [.paidBatchJournal]
+                && stopped.wiring.deleteCalls == 0
+                && stopped.fixtureExistedBefore && stopped.fixtureSurvived
+                && stopped.statusMessage == OCRProcessor.batchCancellationNotConfirmedMessage
+                && stopped.bannerRefreshed
+            if !failedSafe { failedSafeForBoth = false }
+        }
+        check("wiring: a single-job provider's MULTI-chunk batch attempts nothing, keeps the journal, and warns (anthropic, mistral)",
+              failedSafeForBoth)
     }
 
     // MARK: - Which paid jobs get cancelled
@@ -373,6 +414,36 @@ enum BatchCancelWiringContract {
         let legacy = await stop(batch: context(.gemini, batchId: "batches/legacy-x, batches/legacy-y"))
         check("wiring: with no journal, the legacy comma-joined batch ID is what gets cancelled",
               legacy.wiring.attempted == ["batches/legacy-x", "batches/legacy-y"])
+
+        // A legacy journal that IS on disk — `lifecycleVersion == nil`, written by a build before the
+        // paid-batch journal existed. Its `submittedChunkIds` is not nil (the decoder back-fills it) but it
+        // is not authoritative either, so a cancel path that read that array DIRECTLY instead of going
+        // through `effectiveChunkIds` would cancel the wrong jobs on the operator's oldest, most fragile
+        // manifests. Distinct from the case above — there the journal is absent; here it is present and
+        // disagrees with the batch ID on purpose. The pure derivation covers this shape below; only driving
+        // it through `cancel()` proves the cancel path asks the derivation rather than the struct.
+        //
+        // All THREE sources of a chunk ID disagree here, deliberately, so exactly one of them can produce
+        // the expected result: the journal's own (legacy, authoritative) batch ID, the journal's stored
+        // chunk list (back-filled, NOT authoritative), and the live `BatchContext`'s batch ID. Giving the
+        // context the same ID as the journal — the obvious way to write this — would let `pendingBatch:
+        // nil` satisfy the check, i.e. it would stay green for a `cancel()` that ignored the journal
+        // entirely.
+        var legacyOnDisk = journal(.gemini, batchId: "batches/legacy-p,batches/legacy-q",
+                                   chunkIds: ["batches/stale-and-never-submitted"])
+        legacyOnDisk.lifecycleVersion = nil
+        let fromLegacyJournal = await stop(
+            batch: context(.gemini, batchId: "batches/context-only"),
+            pendingBatch: legacyOnDisk)
+        check("wiring: a legacy journal's batch ID is what gets cancelled, never its non-authoritative chunk list",
+              fromLegacyJournal.wiring.attempted == ["batches/legacy-p", "batches/legacy-q"]
+              // …and neither of the two decoys, which is what makes the line above about the journal.
+              && !fromLegacyJournal.wiring.attempted.contains("batches/stale-and-never-submitted")
+              && !fromLegacyJournal.wiring.attempted.contains("batches/context-only")
+              // A legacy journal acknowledges every job its batch ID names, so this Stop is a confirmed
+              // one: the deleter really ran against a file that was really there.
+              && fromLegacyJournal.wiring.deleteCalls == 1
+              && fromLegacyJournal.fixtureExistedBefore && !fromLegacyJournal.fixtureSurvived)
 
         // Stop during a submit that had not acknowledged anything yet. There is nothing to cancel — and
         // falling back to parsing the batch ID here would cancel jobs the journal never claimed. Fail safe:
@@ -443,5 +514,133 @@ enum BatchCancelWiringContract {
         check("wiring: pressing Stop twice cannot cancel the same paid batch twice",
               twice.wiring.contexts.count == 1 && twice.wiring.attempted == chunkIds
               && twice.wiring.journalsAsked == [.paidBatchJournal] && twice.wiring.deleteCalls == 1)
+    }
+
+    // MARK: - The same invariants, swept over every shape a Stop can have
+
+    /// Everything above is a NAMED shape, chosen because a specific mutation survives without it. This is
+    /// the complement: press Stop on the whole cross-product — every provider × 0–3 acknowledged chunks ×
+    /// journal present or not × no refusal, then each chunk refused in turn — and demand an exact outcome
+    /// from all 80. What it buys over the named cases is the shapes nobody thought to name: a two-chunk
+    /// Mistral batch, an OpenAI batch that reached the cancel path at all, a Gemini batch whose *last*
+    /// chunk is the one the provider declines.
+    ///
+    /// Cheap because everything it drives is already stubbed — 80 Stops, no network, no keys, no cent, and
+    /// the only file any of them can delete is that trial's own temp fixture (see `stop`). Not *free*,
+    /// though: each Stop ends in a real `checkForPendingBatch()`, which decodes whatever paid-batch and
+    /// interrupted-run manifests the operator actually has and re-derives their fingerprints. On a machine
+    /// with a large interrupted run that is the sweep's dominant cost, which is why `test-batch-resume.sh`
+    /// waits minutes rather than seconds for the report.
+    private static func sweepEveryShape(_ check: (String, Bool) -> Void) async {
+        // A v1 journal must beat the batch's own ID at EVERY shape, so the with-journal arm gives the batch
+        // a pair of decoy IDs the journal never acknowledged. No trial may ever attempt one of them —
+        // including the count-0 trials, where falling back to the batch ID would cancel two paid jobs that
+        // the journal says were never submitted.
+        let decoys = ["batches/decoy-a", "batches/decoy-b"]
+        let decoyBatchId = decoys.joined(separator: ",")
+
+        var trials = 0, deletions = 0, keeps = 0
+        var fixture = Invariant("wiring sweep: a real journal file was on disk before every Stop")
+        var askedOnce = Invariant("wiring sweep: one Stop asks for one canceller — built from the batch's own context — and one journal")
+        var attemptedIds = Invariant("wiring sweep: the jobs attempted are exactly the ones the derivation names and the provider's rule takes")
+        var noDecoy = Invariant("wiring sweep: a chunk ID the v1 journal never acknowledged is never attempted")
+        var deletes = Invariant("wiring sweep: the deleter runs on exactly the confirmed shapes, never twice")
+        var keptFile = Invariant("wiring sweep: the journal file is still on disk after exactly the unconfirmed shapes")
+        var message = Invariant("wiring sweep: the kept-journal warning appears on exactly the shapes that kept the journal")
+        var state = Invariant("wiring sweep: every Stop with a live batch clears its state synchronously and refreshes the banner")
+
+        for provider in LLMProvider.allCases {
+            for count in 0...3 {
+                let chunkIds = ids(count)
+                for hasJournal in [true, false] {
+                    let batchId = hasJournal ? decoyBatchId : chunkIds.joined(separator: ",")
+                    let pending = hasJournal ? journal(provider, batchId: batchId, chunkIds: chunkIds) : nil
+                    // What `cancel()` must hand the rule — taken from the shipped derivation, not from the
+                    // loop variables, because "does `cancel()` still ask `cancellationChunkIds`?" is the
+                    // wiring question. (That the derivation itself is right is pinned separately, against
+                    // literals, in `whichJobsGetCancelled`.)
+                    let derived = OCRProcessor.cancellationChunkIds(pendingBatch: pending, batchId: batchId)
+                    // …and what the RULE (`performServerBatchCancellation`, pinned by `BatchCancelContract`)
+                    // then does with it. Restated BY HAND here, deliberately: it is what lets every trial
+                    // demand an exact outcome instead of mere internal consistency — "the warning appears
+                    // exactly when the journal survived" is satisfied by a cancel path that confirms
+                    // nothing, ever. The cost is that changing the rule reddens this too, which on a money
+                    // path is the right trade: a second, independent statement of what Stop does.
+                    let willAttempt: [String]
+                    switch provider {
+                    case .gemini:              willAttempt = derived
+                    case .anthropic, .mistral: willAttempt = derived.count == 1 ? derived : []
+                    case .openai:              willAttempt = []      // no batch path in v1
+                    }
+
+                    // No refusal, then each acknowledged chunk refused in turn.
+                    var refusals: [Set<String>] = [[]]
+                    refusals += chunkIds.map { Set([$0]) }
+
+                    for refusing in refusals {
+                        // A confirmed cancellation needs something to attempt AND no refusal among it.
+                        let willConfirm = !willAttempt.isEmpty && refusing.isDisjoint(with: willAttempt)
+                        let batch = context(provider, batchId: batchId)
+                        let stopped = await stop(batch: batch, pendingBatch: pending, refusing: refusing)
+                        trials += 1
+                        // Named so a red points at one of 80 trials instead of at a boolean.
+                        let shape = "\(provider.rawValue)/\(count) chunk\(count == 1 ? "" : "s")/"
+                            + (hasJournal ? "journal" : "no journal") + "/"
+                            + (refusing.isEmpty ? "none refused" : "refusing \(refusing.sorted().joined(separator: " "))")
+
+                        // Observed, not predicted: what actually happened to a real file on disk.
+                        if stopped.wiring.deleteCalls == 1 && !stopped.fixtureSurvived { deletions += 1 }
+                        if stopped.wiring.deleteCalls == 0 && stopped.fixtureSurvived { keeps += 1 }
+
+                        fixture.require(stopped.fixtureExistedBefore, shape)
+                        askedOnce.require(stopped.wiring.contexts.count == 1
+                            && stopped.wiring.contexts.first.map({ sameContext($0, batch) }) == true
+                            && stopped.wiring.journalsAsked == [.paidBatchJournal], shape)
+                        attemptedIds.require(stopped.wiring.attempted == willAttempt, shape)
+                        noDecoy.require(!hasJournal || !stopped.wiring.attempted.contains(where: decoys.contains),
+                                        shape)
+                        deletes.require((stopped.wiring.deleteCalls == 1) == willConfirm
+                                        && stopped.wiring.deleteCalls <= 1, shape)
+                        keptFile.require(stopped.fixtureSurvived == !willConfirm, shape)
+                        let warned = stopped.statusMessage == OCRProcessor.batchCancellationNotConfirmedMessage
+                        message.require(warned == !willConfirm
+                                        && (!willConfirm || stopped.statusMessage.hasPrefix("Cancelled.")), shape)
+                        state.require(stopped.spawnedCancellation && stopped.batchClearedSynchronously
+                                      && stopped.journalStateCleared && stopped.bannerRefreshed, shape)
+                    }
+                }
+            }
+        }
+
+        check("wiring sweep: every provider × 0–3 chunks × journal-present × refusal shape was stopped (\(trials) trials)",
+              trials == 80)
+        // Non-vacuity, MEASURED. Not because the invariants above would otherwise hold for free — each is
+        // stated against `willConfirm`, which is computed independently of what was observed, so a cancel
+        // path that confirmed nothing would redden them. What these literals catch is the two statements
+        // degenerating TOGETHER: change the rule and the hand-written table beside it in the same way, and
+        // every "exactly when confirmed" invariant becomes "exactly when never", satisfied vacuously by 80
+        // trials that all keep. 10 of the 80 shapes are fully confirmable — Gemini with 1–3 chunks and
+        // Anthropic/Mistral with exactly 1, each unrefused, in both the journal and no-journal arms — and
+        // both counters below are incremented from what happened to a real file, not from the table.
+        // (A fifth provider would move these numbers; that is a deliberate re-read, not a false alarm.)
+        check("wiring sweep: 10 of the \(trials) shapes really deleted a real journal file, and 70 really kept one",
+              deletions == 10 && keeps == 70 && deletions + keeps == trials)
+        for invariant in [fixture, askedOnce, attemptedIds, noDecoy, deletes, keptFile, message, state] {
+            check(invariant.label, invariant.held && trials == 80)
+        }
+    }
+
+    /// One invariant swept across all 80 trials. Collapsing them to plain `Bool`s loses the thing that
+    /// makes a red actionable — WHICH shape broke — so the first failing shape rides along in the label.
+    private struct Invariant {
+        private let name: String
+        private(set) var firstBad: String?
+        init(_ name: String) { self.name = name }
+        /// `shape` is an autoclosure so the 80 × 8 labels that never fail are never built.
+        mutating func require(_ ok: Bool, _ shape: @autoclosure () -> String) {
+            if !ok && firstBad == nil { firstBad = shape() }
+        }
+        var held: Bool { firstBad == nil }
+        var label: String { firstBad.map { "\(name) [first bad shape: \($0)]" } ?? name }
     }
 }

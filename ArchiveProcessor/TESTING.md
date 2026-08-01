@@ -271,9 +271,15 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   provider's client (`clientTypeName`, so a right label in front of the wrong client reddens), names the
   paid-batch journal and no other durable file, assigns the kept-journal warning and refreshes the resume
   banner, touches nothing when there is no live batch, and cannot cancel or re-charge the same batch twice.
+  Those are named shapes; W16.bat2-fu3 adds the complement — a sweep that presses Stop on the whole
+  cross-product (every provider × 0–3 acknowledged chunks × journal-present × each chunk refused in turn,
+  80 Stops) and demands an exact outcome from each, plus the two shapes the named cases missed: a
+  single-job provider (Anthropic/Mistral) handed SEVERAL chunks must attempt nothing and keep the journal,
+  and a legacy (`lifecycleVersion == nil`) journal must be cancelled by its batch ID, never by its
+  non-authoritative stored chunk list.
   Its header lists what it still does not cover (the default deleter → W16.bat2-fu2; the warning surviving
   the poll's own messages → W16.bat6) — read it before citing a green section 14.
-  No network, no keys, no cost. 213 checks as of 2026-08-01.
+  No network, no keys, no cost. 225 checks as of 2026-08-01.
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.
