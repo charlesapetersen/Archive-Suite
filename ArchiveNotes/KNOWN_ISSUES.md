@@ -624,6 +624,32 @@ pass exactly once and failed forever after. With a per-run rebuild the count is 
 Infra masquerading as a product bug is the thing to watch for here — an adversarial audit caught it, not the
 gate.
 
+**What the green lane was FOR — three owner-eye checks discharged with it (suite 12/12 → 15/15).** These had
+shipped with unit proof and a "live GUI drive → Morning Review" tail, i.e. behaviour never once driven through
+the real UI:
+- **G12** — W14.4 (d) per-window Sources column. Asserts the *same* cell identifier present in the Extracts
+  window and absent in the Note window, so the negative half cannot pass on a mistyped id.
+- **G13** — W14.3 live copy→paste. Asserts the imported file is **byte-identical** to the source note's asset,
+  not merely referenced — a reference without the bytes is precisely the bug W14.3 fixed. Self-contained: the
+  fixture's only `![](assets/…)` line is a reader-page thumbnail the chip consumes, so the test pastes its own
+  image in first (and XCTest's alphabetical order runs it before G4 anyway).
+- **G14** — W14.4 (b) raise **and** focus, for both triggers: ⌘⌥E raises the Extracts window, then
+  Jump-to-Source raises the Note window back. Via a new DEBUG `an.status.keyWindow` probe, since XCUITest
+  exposes no `isKeyWindow`/`isMainWindow` on a window element; without it the check could only assert the
+  *selection* half and would be claiming a raise it never observed. Non-vacuous by construction: the test
+  asserts both polarities on both windows, so a probe stuck at either value fails it.
+
+New DEBUG seams for G13: `an.editor.test.copyPassage` / `.pastePassage`, because ⌘C/⌘V route to the first
+responder and XCUITest cannot reliably make the styled TextKit-2 text view first responder — the same reason
+`an.editor.test.select` and `.pasteImage` exist. They call the production `copy(_:)`/`paste(_:)` handlers
+verbatim. The control strip now wraps to **two rows**, so a tenth control can never again push the last one
+past the fixed-width detail pane and off-window — the exact failure that hid `reveal`/`zoteroOpen`.
+
+**Still open: W14.4 (c), the cross-window chip recolour** — `SUITE_TODO.md` `W21.vmgui-c-fu`. Two independent
+blockers: the chip is an `NSTextAttachmentViewProvider` subview that is not in the a11y tree at all, and Notes
+has **no in-GUI rename path for an item title**, so the check's stated trigger cannot be performed. Filed
+rather than half-asserted.
+
 **The warn tier is now EMPTY.** While this was open the gate held `notes` in
 `AUTONOMOUS_GUI_VM_WARN_APPS` so the suite still ran and reported every gate without parking a multi-day
 run. With the suite green that list is empty by default again, so a Notes UITest failure REDs the gate —

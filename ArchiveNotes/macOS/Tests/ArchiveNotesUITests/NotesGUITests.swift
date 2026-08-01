@@ -260,10 +260,15 @@ class NotesFixtureUITestCase: XCTestCase {
     /// (`an.editor.test.selectionInput` + `an.editor.test.select`) — XCUITest can't reliably place a
     /// caret selection inside the styled NSTextView, so the strip drives it through `testBox`. Returns
     /// false if the strip isn't present/hittable (which would itself be the finding to fix).
+    /// `scope` limits the query to one window — REQUIRED once a second window is open (G12/G14), since both
+    /// windows carry an editor and its strip, and an unscoped query then resolves to "multiple matching
+    /// elements" and throws rather than picking one.
     @discardableResult
-    func setEditorSelection(location: Int, length: Int, timeout: TimeInterval = 10) -> Bool {
-        let field = app.descendants(matching: .any)["an.editor.test.selectionInput"]
-        let button = app.descendants(matching: .any)["an.editor.test.select"]
+    func setEditorSelection(location: Int, length: Int, timeout: TimeInterval = 10,
+                            in scope: XCUIElement? = nil) -> Bool {
+        let root = scope ?? app!
+        let field = root.descendants(matching: .any)["an.editor.test.selectionInput"]
+        let button = root.descendants(matching: .any)["an.editor.test.select"]
         guard field.waitForExistence(timeout: timeout),
               button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return field.isHittable }
@@ -328,9 +333,11 @@ class NotesFixtureUITestCase: XCTestCase {
     }
 
     /// Click a hidden control-strip button by identifier, bringing the app forward + waiting for
-    /// hittability first (shared by the reveal/zotero seam triggers).
-    private func clickStripButton(_ id: String, timeout: TimeInterval) -> Bool {
-        let button = app.descendants(matching: .any)[id]
+    /// hittability first (shared by the reveal/zotero/copy/paste seam triggers). `scope` limits the query to
+    /// one window, which is required once a second window is open — see `setEditorSelection`.
+    @discardableResult
+    func clickStripButton(_ id: String, timeout: TimeInterval, in scope: XCUIElement? = nil) -> Bool {
+        let button = (scope ?? app!).descendants(matching: .any)[id]
         guard button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
         guard button.isHittable else { return false }
@@ -928,5 +935,236 @@ final class NotesGUITests: NotesFixtureUITestCase {
         let url = lastOpenedURL(startingWith: "zotero://select")
         XCTAssertEqual(url, "zotero://select/library/items/ABCD1234",
                        "Open in Zotero should dispatch the item's select link; got \(url)")
+    }
+
+    // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
+    //
+    // Each of these shipped with unit proof and a "live GUI drive → Morning Review" tail, i.e. behaviour
+    // never once driven through the real UI. They run here, off-screen in the Tart VM, which is what
+    // W21.vmgui-c exists for. W14.4's third tail — (c) the cross-window chip recolour — is deliberately
+    // NOT here; the reason is in `testG14`'s comment.
+
+    /// G12 — per-window column visibility (W14.4 d). The Note window hides the `sources` column, which is
+    /// always blank for notes; the Extracts window shows it. `NotesAppSettings.defaultHiddenColumns(for:)`
+    /// decides that per window kind and `NotesTableView` applies it as `NSTableColumn.isHidden`, so a hidden
+    /// column materialises no cell views at all — its per-row cell id is simply absent from the
+    /// accessibility tree. That is what makes the negative half of this check meaningful, and it is paired
+    /// with the positive half in the other window (same row, same identifier, present), so a typo in the
+    /// identifier cannot pass itself off as "correctly hidden".
+    ///
+    /// Read-only w.r.t. the store. Deliberately uses the EXTRACT row: `sourcesText` is a count for extracts
+    /// and blank for notes, and an empty `NSTextField` may not surface in the a11y tree at all — so on a
+    /// note row this check could not tell "column hidden" from "cell empty".
+    func testG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow() throws {
+        let noteWin = app.windows["Archive Notes"]
+        XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
+
+        // Note window: show BOTH kinds so the extract row is listed here too, then assert its title cell
+        // exists (the row IS there) while its sources cell does not (that column is hidden).
+        XCTAssertTrue(setKind(to: "Both", in: noteWin), "should switch the Note window's kind filter to Both")
+        let noteTitleCell = noteWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+        XCTAssertTrue(noteTitleCell.waitForExistence(timeout: 20),
+                      "the extract row should be listed in the Note window once Both kinds are shown")
+        let noteSourcesCell = noteWin.descendants(matching: .any)["an.cell.sources.\(Self.idExtract)"]
+        XCTAssertFalse(noteSourcesCell.waitForExistence(timeout: 3),
+                       "the Note window hides the sources column, so that row should have no sources cell")
+
+        // Extracts window: the same row, the same identifier — present, because the column is shown.
+        let extractWin = try openExtractsWindow()
+        let extractTitleCell = extractWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+        XCTAssertTrue(extractTitleCell.waitForExistence(timeout: 20),
+                      "the extract row should be listed in the Extracts window")
+        let extractSourcesCell = extractWin.descendants(matching: .any)["an.cell.sources.\(Self.idExtract)"]
+        XCTAssertTrue(extractSourcesCell.waitForExistence(timeout: 10),
+                      "the Extracts window shows the sources column, so that row should have a sources cell")
+
+        closeExtractsWindow(extractWin)
+    }
+
+    /// G13 — a live copy→paste carries inline-image BYTES into the extract's own `assets/` (W14.3). The
+    /// shipped fix made `MarkdownEditorView.handlePassagePaste` import the `com.archivenotes.passage`
+    /// payload's bytes via `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` instead of
+    /// inserting bare references that render as missing-asset placeholders until re-saved. Unit tests cover
+    /// the builder; this is the end-to-end drive, and it asserts **bytes**, not just a reference: the file
+    /// that lands in the extract must be byte-identical to the one in the source note.
+    ///
+    /// Self-contained rather than fixture-dependent: the fixture's only `![](assets/…)` line is a
+    /// reader-page block's thumbnail, which the chip CONSUMES, so no fixture note carries a free-standing
+    /// inline image. So this pastes one in first (the G4 path) and then copies it out. Depending on G4
+    /// having run would be wrong regardless — XCTest orders methods alphabetically and `testG13…` sorts
+    /// before `testG4…`.
+    ///
+    /// Both new seams exist because ⌘C/⌘V route to the FIRST RESPONDER and XCUITest cannot reliably make the
+    /// styled TextKit-2 text view first responder — the same reason `an.editor.test.select` and
+    /// `.pasteImage` exist. They call the production `copy(_:)`/`paste(_:)` handlers verbatim; only the
+    /// keystroke is bypassed (the literal ⌘C/⌘V gesture stays owner-eye, like G2's typing).
+    /// Writes only inside the scratch fixture — `idPlain`'s and `idExtract`'s own `assets/`.
+    func testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract() throws {
+        guard let png = Self.makePNGData() else {
+            return XCTFail("should build PNG bytes for the pasteboard")
+        }
+        let sourceAssetsBefore = Set(assetFiles(inItemDir: Self.idPlain))
+        let extractAssetsBefore = Set(assetFiles(inItemDir: Self.idExtract))
+
+        func newAsset(in dir: String, since before: Set<String>) -> String? {
+            Set(assetFiles(inItemDir: dir)).subtracting(before).first { $0.hasSuffix(".png") }
+        }
+        func assetBytes(_ dir: String, _ name: String) -> Data? {
+            try? Data(contentsOf: URL(fileURLWithPath: itemsDir + "/" + dir + "/assets/" + name))
+        }
+
+        // --- 1. Give the source NOTE a free-standing inline image (the G4 path). ---
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty },
+                      "the note body should load before pasting")
+        ensureStyled()
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        XCTAssertTrue(pb.setData(png, forType: .png), "should seed the pasteboard with PNG bytes")
+        XCTAssertTrue(pasteImageViaSeam(), "the DEBUG image-paste seam must be drivable")
+        XCTAssertTrue(pollUntil(timeout: 12) { newAsset(in: Self.idPlain, since: sourceAssetsBefore) != nil },
+                      "the pasted image should land in the source note's assets/")
+        guard let sourceAsset = newAsset(in: Self.idPlain, since: sourceAssetsBefore),
+              let sourceBytes = assetBytes(Self.idPlain, sourceAsset), !sourceBytes.isEmpty else {
+            return XCTFail("should read the pasted asset's bytes back out of the source note")
+        }
+
+        // --- 2. Copy the whole note body as a passage (the length is clamped, so this selects all). ---
+        XCTAssertTrue(setEditorSelection(location: 0, length: 100_000),
+                      "the DEBUG selection seam must be drivable")
+        XCTAssertTrue(clickStripButton("an.editor.test.copyPassage", timeout: 10),
+                      "the copy-passage seam must be drivable (an.editor.test.copyPassage)")
+
+        // --- 3. Paste it into the EXTRACT — `handlePassagePaste` declines unless an extract is loaded. ---
+        setKind(to: "Both", in: app.windows["Archive Notes"])
+        selectItem(uuid: Self.idExtract)
+        XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("Moore says") },
+                      "selecting the extract should load its body into the editor")
+        ensureStyled()
+        _ = setEditorSelection(location: 0, length: 0)   // defined caret; the paste replaces the selection
+        XCTAssertTrue(clickStripButton("an.editor.test.pastePassage", timeout: 10),
+                      "the paste-passage seam must be drivable (an.editor.test.pastePassage)")
+
+        // --- 4. The BYTES must be in the extract's own assets/, and the .md must reference them there. ---
+        XCTAssertTrue(pollUntil(timeout: 15) { newAsset(in: Self.idExtract, since: extractAssetsBefore) != nil },
+                      "the pasted passage's image bytes should be imported into the extract's own assets/")
+        guard let importedAsset = newAsset(in: Self.idExtract, since: extractAssetsBefore) else { return }
+        XCTAssertEqual(assetBytes(Self.idExtract, importedAsset), sourceBytes,
+                       "the imported file must be byte-identical to the source note's asset — a reference "
+                       + "without the bytes is exactly the W14.3 bug")
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            (rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("](assets/\(importedAsset))")
+        }, "the extract .md should reference the imported asset by its own assets/ path")
+        // (Both items are left dirty — the runner can't delete under /Users/; the next pre-run fixture
+        // rebuild restores them.)
+    }
+
+    /// G14 — the target window is RAISED and FOCUSED, not merely updated (W14.4 b). Two phases over one
+    /// setup, matching the two triggers the shipped fix wired: `NotesModel.createExtract` routes the new
+    /// extract through `openItem`, and `NoteEditorPane.handleOpen` fronts the featuring window
+    /// (`openWindow(id:)` + `NSApp.activate`) — for jump-to-source as well.
+    ///
+    /// Asserted through the DEBUG `an.status.keyWindow` probe, which both windows carry under the same
+    /// identifier so a window-scoped query answers *about that window*. XCUITest exposes no
+    /// `isKeyWindow`/`isMainWindow` on a window element, so without that probe this check could only assert
+    /// the *selection* half while claiming a raise it never observed. Both windows are asserted at each
+    /// step (one key, the other not), because "the target is key" alone would also hold if nothing moved.
+    ///
+    /// NOT covered here — W14.4 (c), the cross-window chip recolour. The chip is an
+    /// `NSTextAttachmentViewProvider` subview and, per `ArchiveNotes/KNOWN_ISSUES.md`, is not in the
+    /// accessibility tree at all (not merely un-hittable), so neither its label nor its colour is
+    /// observable from XCUITest; and Notes has no in-GUI rename path for an item title, so the stated
+    /// trigger cannot be performed either. Tracked as its own item rather than half-asserted here.
+    func testG14_CreateExtractAndJumpRaiseTheFeaturingWindow() throws {
+        let noteWin = app.windows["Archive Notes"]
+        XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
+        let extractWin = try openExtractsWindow()
+
+        // --- Phase 1: ⌘⌥E in the Note window must raise the EXTRACTS window. ---
+        // Focus the Note window first (opening the Extracts window took it), so a raise is a real
+        // transition rather than the state we started in.
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) },
+                      "selecting in the Note window should make it key before the trigger")
+        XCTAssertFalse(isKey(extractWin), "the Extracts window should not be key at this point")
+
+        // Every query below is window-SCOPED: both windows carry an `an.editor.text` and a control strip,
+        // so an unscoped one resolves to "multiple matching elements" and throws.
+        let noteEditor = noteWin.textViews["an.editor.text"]
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 10), "the Note window's editor should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((noteEditor.value as? String) ?? "").isEmpty },
+                      "the note body should load before selecting text")
+        XCTAssertTrue(setEditorSelection(location: 0, length: 8, in: noteWin),
+                      "the DEBUG selection seam must be drivable")
+        app.activate()
+        app.typeKey("e", modifierFlags: [.command, .option])
+
+        XCTAssertTrue(pollUntil(timeout: 15) { isKey(extractWin) },
+                      "Create Extract should front + focus the Extracts window (W14.4 b)")
+        XCTAssertFalse(isKey(noteWin), "the Note window should have resigned key to the Extracts window")
+        // The raise comes paired with a selection: the new extract's body is the copied passage, so the
+        // Extracts window's editor now holds content.
+        let extractEditor = extractWin.textViews["an.editor.text"]
+        XCTAssertTrue(pollUntil(timeout: 15) { !((extractEditor.value as? String) ?? "").isEmpty },
+                      "the raised Extracts window should have loaded the new extract")
+
+        // --- Phase 2: Jump-to-Source from the Extracts window must raise the NOTE window back. ---
+        // The new extract carries a note-passage chip pointing at idPlain, a `.note`, so `openAction`
+        // routes the jump to the note-featuring window.
+        XCTAssertTrue(clickStripButton("an.editor.test.jump", timeout: 10, in: extractWin),
+                      "the jump seam must be drivable in the Extracts window")
+
+        XCTAssertTrue(pollUntil(timeout: 15) { isKey(noteWin) },
+                      "Jump to Source should front + focus the Note window (W14.4 b)")
+        XCTAssertFalse(isKey(extractWin),
+                       "the Extracts window should have resigned key back to the Note window")
+
+        closeExtractsWindow(extractWin)
+    }
+
+    // MARK: - G12/G13/G14 helpers
+
+    /// Is `win` the key window, per its own `an.status.keyWindow` probe? The probe publishes `key`/`notkey`
+    /// as its accessibility VALUE and `key:<Note|Extract>` as its label; accept either, since some SwiftUI
+    /// static texts surface their string only via `.label` (the `an.status.indexReady` lesson, W8-S8b).
+    private func isKey(_ win: XCUIElement) -> Bool {
+        let probe = win.descendants(matching: .any)["an.status.keyWindow"].firstMatch
+        guard probe.exists else { return false }
+        if let v = probe.value as? String, !v.isEmpty { return v == "key" }
+        return probe.label.hasPrefix("key:")
+    }
+
+    /// The Extracts window, opened if it is not already up. SwiftUI's automatic Window menu carries one
+    /// item per `Window(title:id:)` scene, so `Window ▸ Extracts` fronts (or reopens) it; the app declares
+    /// no custom command for this. Whether that window is already open at launch is state-dependent, so
+    /// handle both.
+    private func openExtractsWindow() throws -> XCUIElement {
+        let win = app.windows["Extracts"]
+        if !win.exists {
+            let windowMenu = app.menuBars.menuBarItems["Window"]
+            XCTAssertTrue(windowMenu.waitForExistence(timeout: 10), "the Window menu should exist")
+            windowMenu.click()
+            let item = app.menuItems["Extracts"]
+            XCTAssertTrue(item.waitForExistence(timeout: 5),
+                          "Window ▸ Extracts should be offered for the second Window scene")
+            item.click()
+        }
+        XCTAssertTrue(win.waitForExistence(timeout: 15), "the Extracts window should be open")
+        return win
+    }
+
+    /// Put the window set back the way the rest of the suite expects to find it. SwiftUI persists which
+    /// `Window` scenes were open, the container is NOT wiped between tests in a run, and the sibling checks
+    /// query unscoped (`app.textViews["an.editor.text"]`) — so a second window left open could make a LATER
+    /// test fail with "multiple matching elements", which reads as a bug in whatever ran next. Called at the
+    /// end of the two tests that open it. (If one of them FAILS first, `continueAfterFailure = false` aborts
+    /// before this runs and the run is already RED, so the cascade is noise on a real failure, not a
+    /// false one.)
+    private func closeExtractsWindow(_ win: XCUIElement) {
+        guard win.exists else { return }
+        let close = win.buttons[XCUIIdentifierCloseWindow]
+        if close.waitForExistence(timeout: 5), close.isHittable { close.click() }
+        _ = pollUntil(timeout: 5) { !win.exists }
     }
 }

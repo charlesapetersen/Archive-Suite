@@ -662,29 +662,45 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     (Reader already writes a raw minimal PDF inline for its no-text-layer fixture — extend that to N text-bearing
     pages) so the lane is corpus-independent. If a real sample is ever wanted, mount it as a **read-only** third
     share — **never** mount anything under `~/Desktop/Google Drive`.
-  - [ ] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** ⚠️ **Wiring is
-    DONE (2026-07-30, W21.screen): the Notes suite now runs in the gate — and it is NOT green: 4/12 fail**
-    (`ArchiveNotes/KNOWN_ISSUES.md` has the table + leads). G3 and G8 fail "… is not hittable" on tiny controls
-    that are **both at x ≈ 1033** — likely one window-geometry problem under the VM's 1920×1200 display, not two
-    bugs; G6/G11 report "the reveal/zotero seam must be drivable" (the hidden a11y probes aren't queryable —
-    smells like editor focus / first-responder, not logic). Deterministic across both attempts. **It was first
-    logged as 5/12 and "flaky"; that was the gate's own stale-fixture bug** (build-if-absent vs a suite that
-    mutates its fixture) — fixed, G5 passes, don't re-derive the old number. Held in the gate's **warn tier**
-    (`AUTONOMOUS_GUI_VM_WARN_APPS=notes`) so it reports every gate without parking the run — **remove `notes`
-    from that list as the definition of done**.
-    The remaining original scope below (guest fixture, container reset) is already implemented in the gate.
-    `ArchiveNotesUITests`
-    already exists (`macOS/project.yml`: `bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveNotes`, ad-hoc sign +
-    `ENABLE_HARDENED_RUNTIME: NO`) and is in the scheme's test action; Debug already uses
-    `ArchiveNotes.uitest.entitlements` and the fixture builder + `-ANUITestStorePath` override are shipped — so
-    this is wiring, not construction. Build the fixture **in the guest**, assert prereqs there
-    (`/opt/homebrew/bin/tag`; absent → tag projection is skipped with a warning), and **reset the app container**
-    (`~/Library/Containers/com.archivenotes.app`) before each run: `organization.json` is loaded only when the
-    container's index DB has no folders, so a stale container shadows the fixture graph and makes G7/G8
-    nondeterministic (the INDEX-DB CAVEAT in `make-notes-fixture.sh`). **Store safety:** hit only
-    `…/ArchiveNotes/AN-GUI-Fixture` with the DEBUG scratch-write guard armed — **never** the real store
-    (`GUI_SAFETY.md`). Then discharge **W14.4** (b) window raise/focus, (c) cross-window chip recolour,
-    (d) two-window column visibility, and **W14.3** live copy→paste image bytes.
+  - [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** DONE 2026-08-01
+    `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
+    `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).
+    The 4/12 was **one geometry cause wearing four costumes**, not four bugs, and neither half of it was what
+    the leads guessed — measured with a throwaway diagnostic test that dumped the a11y tree with frames:
+    `tart run --no-graphics` attaches no display, so the guest ran **1024×768** (while `tart get` said
+    1920x1200 all along), and `NotesBrowserView` declared `.frame(minWidth: 900)` against panes needing
+    ~1084 pt — a frame minimum below the content's own minimum does not shrink the content, so SwiftUI
+    centred 1084 in 900 and cut ~92 pt off EACH side. The four failing controls were simply the right-most
+    ones (rawToggle, locations.remove, and the strip's reveal/zoteroOpen; select/pasteImage/jump to their
+    left always passed). Fixes: drop the false `minWidth` (a real app bug — a user could drag the window to
+    900 pt and lose those controls) + `tart_ensure_display` raising the guest to 1920×1200 from
+    `ops/gui/tart-lib.sh`, loudly, so both entry points get it. Window is now 1121 pt.
+    **Backlog drained — 3 of the 4 owner-eye checks are now automated** (`ArchiveNotesUITests`, VM log
+    `~/.tart-mirror/vm-artifacts-wt/xcuitest-notes.log`, 15/15): **G12** = W14.4 (d) per-window Sources
+    column (same cell id asserted present in the Extracts window and absent in the Note window, so the
+    negative can't pass on a typo); **G13** = W14.3 live copy→paste, asserting the imported file is
+    **byte-identical** to the source note's asset, not merely referenced; **G14** = W14.4 (b) raise+focus
+    for BOTH triggers (⌘⌥E → Extracts window, then Jump-to-Source → back to the Note window), via a new
+    DEBUG `an.status.keyWindow` probe — XCUITest exposes no `isKeyWindow` on a window element, so without it
+    the check could only assert the selection half. New DEBUG seams: `an.editor.test.copyPassage` /
+    `.pastePassage` (⌘C/⌘V route to the first responder, which XCUITest can't reliably make the styled text
+    view), and the control strip now wraps to two rows so a tenth control can't push the last one
+    off-window again. **W14.4 (c) is NOT discharged** — see `W21.vmgui-c-fu`.
+  - [ ] **W21.vmgui-c-fu — W14.4 (c) cross-window chip recolour is not assertable from XCUITest [S · LOW].**
+    The last of W21.vmgui-c's four owner-eye checks, and the only one that could not be automated — filed
+    rather than half-asserted. TWO independent blockers, both verified 2026-08-01: (1) the provenance chip is
+    an `NSTextAttachmentViewProvider` subview and is **not in the accessibility tree at all** (not merely
+    un-hittable — `ArchiveNotes/KNOWN_ISSUES.md`), so neither its label nor its colour is observable, and its
+    own label carries no `accessibilityIdentifier`; (2) **Notes has no in-GUI rename path for an item title**
+    — `renameFolder`/`renameTemplate` exist, but no `renameItem`; the list's title cell is a read-only
+    `NSTextField` and the metadata inspector edits only date/quality — so the check's stated trigger cannot
+    be performed at all. Options, cheapest first: (a) a DEBUG `testBox` seam reporting each chip's resolved
+    label + `passageSourceMissing` state, read from the text storage where the chips are re-styled — proves
+    the reactive `itemsGeneration` mechanism deterministically, driven by TRASHING a cited note (which G8
+    shows is drivable) rather than renaming one; (b) a sighted VNC before/after capture of the chip's pixels;
+    (c) give the chip label an a11y identifier and check whether a view-provider subview can be made
+    queryable at all. The underlying mechanism is unit-covered (`NotePassageResolveTests` chipLabel /
+    isSourceMissing) and shipped `d615589`, so this is a verification gap, not a suspected defect.
   - [ ] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
     W21.vmgui-c). Processor has **no test target of any kind**, **no `schemes:` block** (it relies on Xcode
     autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes) and **no

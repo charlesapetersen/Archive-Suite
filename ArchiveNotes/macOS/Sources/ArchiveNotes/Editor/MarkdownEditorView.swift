@@ -25,6 +25,12 @@ final class EditorTestBox {
     var jumpFirstPassage: (() -> Void)?
     var revealFirstSource: (() -> Void)?
     var openFirstZotero: (() -> Void)?
+    /// The passage copy/paste pair (W14.3's live copy→paste check). ⌘C/⌘V route to the FIRST RESPONDER,
+    /// and XCUITest cannot reliably make the styled TextKit-2 text view first responder — the same reason
+    /// `setSelection` and `pasteImage` exist. These run the production `copy(_:)`/`paste(_:)` overrides'
+    /// own handlers verbatim; only the keystroke is bypassed.
+    var copyPassage: (() -> Void)?
+    var pastePassage: (() -> Void)?
     init() {}
 }
 #endif
@@ -123,6 +129,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.openFirstZotero = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestOpenFirstZotero()
+        }
+        testBox?.copyPassage = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestCopyPassage()
+        }
+        testBox?.pastePassage = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestPastePassage()
         }
 #endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
@@ -524,6 +536,27 @@ struct MarkdownEditorView: NSViewRepresentable {
         @discardableResult
         func uiTestOpenFirstZotero() -> Bool {
             return textView?.uiTestOpenFirstZotero() ?? false
+        }
+
+        /// Run the REAL passage-copy handler (`copy(_:)`'s `passageCopyHandler`) on the current selection
+        /// — the copy half of W14.3's live copy→paste. Read-only w.r.t. the store; it only writes the
+        /// pasteboard. Returns whether a passage payload was written (false ⇒ the production path would
+        /// have fallen through to the plain RTF copy, which is itself the finding).
+        @discardableResult
+        func uiTestCopyPassage() -> Bool {
+            return copyPassageIfNote()
+        }
+
+        /// Run the REAL passage-paste handler (`paste(_:)`'s `passagePasteHandler`) — the paste half of
+        /// W14.3, i.e. `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` importing the
+        /// payload's image bytes into THIS extract's own `assets/`. Flushes the write-back (like
+        /// `uiTestPasteImage`) so the `.md` is on disk when the test reads it, instead of waiting out the
+        /// autosave debounce. Returns whether a passage paste was handled.
+        @discardableResult
+        func uiTestPastePassage() -> Bool {
+            let handled = handlePassagePaste()
+            if handled { flushWriteBack() }
+            return handled
         }
 
         /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same

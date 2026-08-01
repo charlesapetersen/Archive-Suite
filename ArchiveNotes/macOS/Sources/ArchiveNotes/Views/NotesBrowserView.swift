@@ -119,6 +119,9 @@ struct NotesBrowserView: View {
     }
 
 #if DEBUG
+    /// Live key-window state behind `keyWindowProbe` (W14.4 b). DEBUG-only, like the probe it backs.
+    @State private var isKeyWindow = false
+
     /// XCUITest index-ready signal (08-testing §3.4). Present ONLY under the UITest harness
     /// (`-ANUITestStorePath`), mirroring `NoteEditorPane`'s control strip — a normal DEBUG run and
     /// Release carry no probe at all. Sits in `.background(...)` behind the opaque 3-pane content, so it
@@ -136,7 +139,30 @@ struct NotesBrowserView: View {
                 .accessibilityIdentifier("an.status.indexReady")
                 .accessibilityValue(model.isIndexReady ? String(model.indexGeneration) : "")
                 .frame(height: 16)
+            keyWindowProbe
         }
+    }
+
+    /// Hidden UITest probe for **which window is key** (W14.4 b — the jump/create-extract raise+focus).
+    /// Both windows carry one under the same identifier, so a query scoped to a window
+    /// (`win.descendants(…)["an.status.keyWindow"]`) answers *about that window*: `key:<Note|Extract>` when
+    /// it holds key status, `notkey:<…>` otherwise. There is no other accessibility signal for front-ness —
+    /// XCUITest exposes no `isMainWindow`/`isKeyWindow` on a window element — so without this a raise check
+    /// can only assert the *selection* half and call the raise proven, which it would not be.
+    /// Same shape as `indexReadyProbe` above (a normally-rendered `Text`, occluded behind the panes) for
+    /// the same reason: a 1×1 clear view does not reliably resolve in the a11y tree.
+    @ViewBuilder
+    private var keyWindowProbe: some View {
+        Text(verbatim: "\(isKeyWindow ? "key" : "notkey"):\(kindLabel)")
+            .accessibilityIdentifier("an.status.keyWindow")
+            .accessibilityValue(isKeyWindow ? "key" : "notkey")
+            .frame(height: 16)
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+                if let w = note.object as? NSWindow, w === window { isKeyWindow = true }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { note in
+                if let w = note.object as? NSWindow, w === window { isKeyWindow = false }
+            }
     }
 
     /// True when launched by the UITest harness (`-ANUITestStorePath`), mirroring the
@@ -169,6 +195,11 @@ struct NotesBrowserView: View {
         guard !didConfigureWindow else { return }
         didConfigureWindow = true
         self.window = window
+#if DEBUG
+        // Seed the key-window probe: the first window is already key before the notification observers
+        // attach, so waiting for a transition would report a permanent "notkey" for it (W14.4 b).
+        isKeyWindow = window.isKeyWindow
+#endif
         guard let size = NotesAppSettings.windowSize else { return }
         if abs(window.frame.width - size.width) > 2 || abs(window.frame.height - size.height) > 2 {
             var frame = window.frame

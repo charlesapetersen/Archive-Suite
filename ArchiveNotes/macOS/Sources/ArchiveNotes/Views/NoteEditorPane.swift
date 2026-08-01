@@ -151,48 +151,64 @@ struct NoteEditorPane: View {
     @ViewBuilder
     private var uiTestControlStrip: some View {
         if Self.isUITestHarness {
-            HStack(spacing: 2) {
-                TextField("", text: $testCommitInput)
-                    .accessibilityIdentifier("an.editor.test.input")
-                Button("commit") { testBox.replaceMarkdown?(testCommitInput) }
-                    .accessibilityIdentifier("an.editor.test.commit")
-                Button("insert") { testBox.insertMarkdown?(testCommitInput) }
-                    .accessibilityIdentifier("an.editor.test.insert")
-                TextField("", text: $testSelectionInput)
-                    .accessibilityIdentifier("an.editor.test.selectionInput")
-                Button("select") {
-                    let parts = testSelectionInput.split(separator: ",")
-                    if parts.count == 2,
-                       let loc = Int(parts[0].trimmingCharacters(in: .whitespaces)),
-                       let len = Int(parts[1].trimmingCharacters(in: .whitespaces)) {
-                        testBox.setSelection?(loc, len)
+            // TWO ROWS, not one (W21.vmgui-c). The strip lives inside the fixed-width detail pane, so a
+            // single row of ten controls measured 361 pt in a 360 pt pane — its right-hand end sat outside
+            // the pane, hence outside the window, hence `isHittable == false`. That is exactly how
+            // `reveal`/`zoteroOpen` went unreachable while `select`/`pasteImage`/`jump` to their left kept
+            // working. Wrapping bounds each row at ~250 pt, so adding a seam can't silently push the last
+            // one off-window again. Labels stay short for the same reason.
+            VStack(spacing: 2) {
+                HStack(spacing: 2) {
+                    TextField("", text: $testCommitInput)
+                        .accessibilityIdentifier("an.editor.test.input")
+                    Button("commit") { testBox.replaceMarkdown?(testCommitInput) }
+                        .accessibilityIdentifier("an.editor.test.commit")
+                    Button("insert") { testBox.insertMarkdown?(testCommitInput) }
+                        .accessibilityIdentifier("an.editor.test.insert")
+                    TextField("", text: $testSelectionInput)
+                        .accessibilityIdentifier("an.editor.test.selectionInput")
+                    Button("select") {
+                        let parts = testSelectionInput.split(separator: ",")
+                        if parts.count == 2,
+                           let loc = Int(parts[0].trimmingCharacters(in: .whitespaces)),
+                           let len = Int(parts[1].trimmingCharacters(in: .whitespaces)) {
+                            testBox.setSelection?(loc, len)
+                        }
                     }
+                    .accessibilityIdentifier("an.editor.test.select")
                 }
-                .accessibilityIdentifier("an.editor.test.select")
-                Button("pasteImage") { testBox.pasteImage?() }
-                    .accessibilityIdentifier("an.editor.test.pasteImage")
-                Button("jump") { testBox.jumpFirstPassage?() }
-                    .accessibilityIdentifier("an.editor.test.jump")
-                Button("reveal") {
-                    testBox.revealFirstSource?()
-                    testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
+                HStack(spacing: 2) {
+                    Button("pasteImg") { testBox.pasteImage?() }
+                        .accessibilityIdentifier("an.editor.test.pasteImage")
+                    Button("jump") { testBox.jumpFirstPassage?() }
+                        .accessibilityIdentifier("an.editor.test.jump")
+                    Button("reveal") {
+                        testBox.revealFirstSource?()
+                        testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
+                    }
+                    .accessibilityIdentifier("an.editor.test.reveal")
+                    Button("zotero") {
+                        testBox.openFirstZotero?()
+                        testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
+                    }
+                    .accessibilityIdentifier("an.editor.test.zoteroOpen")
+                    // W14.3's live copy→paste: ⌘C/⌘V go to the first responder, which XCUITest cannot
+                    // reliably make the styled text view. These call the production handlers verbatim.
+                    Button("copyP") { testBox.copyPassage?() }
+                        .accessibilityIdentifier("an.editor.test.copyPassage")
+                    Button("pasteP") { testBox.pastePassage?() }
+                        .accessibilityIdentifier("an.editor.test.pastePassage")
+                    // Read-back of the last external URL dispatched (G6/G11). A visible static text (not a
+                    // 1×1 hidden element — the `an.status.indexReady` probe's queryability hazard) so
+                    // XCUITest resolves it; "-" keeps the element present before the first dispatch.
+                    Text(testLastOpened.isEmpty ? "-" : testLastOpened)
+                        .accessibilityIdentifier("an.editor.test.lastOpenedURL")
                 }
-                .accessibilityIdentifier("an.editor.test.reveal")
-                Button("zoteroOpen") {
-                    testBox.openFirstZotero?()
-                    testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
-                }
-                .accessibilityIdentifier("an.editor.test.zoteroOpen")
-                // Read-back of the last external URL dispatched (G6/G11). A visible static text (not a
-                // 1×1 hidden element — the `an.status.indexReady` probe's queryability hazard) so XCUITest
-                // resolves it; "-" keeps the element present before the first dispatch.
-                Text(testLastOpened.isEmpty ? "-" : testLastOpened)
-                    .accessibilityIdentifier("an.editor.test.lastOpenedURL")
             }
             // Height/font kept generous enough that XCUITest reliably hit-tests + focuses these controls
             // (a 14 pt / .caption2 strip is a known XCUITest hit-testing hazard — W8-S8 §G9). DEBUG- and
             // `-ANUITestStorePath`-gated, so a normal run never shows it and Release omits it entirely.
-            .frame(height: 28)
+            .frame(height: 58)
         }
     }
 
