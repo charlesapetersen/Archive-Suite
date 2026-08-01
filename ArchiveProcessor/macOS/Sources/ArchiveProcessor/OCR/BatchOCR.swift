@@ -509,6 +509,31 @@ struct GeminiBatchClient: Sendable {
         let resultFileName: String?
     }
 
+    /// Where a finished chunk's pages are actually readable from.
+    enum ResultsSource: Sendable {
+        /// Pages arrived inline in the status body (never empty — an empty container is not a source).
+        case inline([String: OCRResult])
+        /// Pages must be downloaded from this result file (name is never empty).
+        case file(String)
+        /// The chunk reports SUCCEEDED but offers nothing to read. Paid pages are unaccounted for:
+        /// the caller must NOT mark the chunk consumed.
+        case noneAvailable
+    }
+
+    /// Decide where a terminal chunk's results come from — the one place that ranks the two
+    /// retrieval arms. Pure: no network, no state, no cost.
+    ///
+    /// This exists because *emptiness* is the trap (W16.bat1-fu). `parseStatusBody` faithfully reports
+    /// an empty `inlinedResponses` container as a **non-nil empty** dictionary, and the poll used to
+    /// branch on `if let inlineResults = …` alone — so an empty container took the inline arm, the
+    /// result file was never fetched, and the chunk was marked consumed with zero pages while the run
+    /// reported success. An empty container (and an empty file name) are therefore *not* sources here.
+    static func resultsSource(for status: StatusResult) -> ResultsSource {
+        if let inline = status.inlineResults, !inline.isEmpty { return .inline(inline) }
+        if let fileName = status.resultFileName, !fileName.isEmpty { return .file(fileName) }
+        return .noneAvailable
+    }
+
     /// Check batch processing status.
     func checkStatus(batchName: String) async throws -> StatusResult {
         let statusURL = try makeBatchURL("\(baseURL)/\(batchName)?key=\(urlComponentEncoded(apiKey))")

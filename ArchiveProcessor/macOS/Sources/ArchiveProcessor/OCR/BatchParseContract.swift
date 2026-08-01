@@ -19,6 +19,7 @@ enum BatchParseContract {
         anthropicStatus(check)
         anthropicResults(check)
         geminiStatus(check)
+        geminiResultsSource(check)
         geminiInlinedResponses(check)
         geminiResultFileLocation(check)
         geminiResultFileJSONL(check)
@@ -214,20 +215,91 @@ enum BatchParseContract {
         check("gemini: a terminal batch with no inline container leaves inlineResults nil so the result FILE is fetched",
               noInline?.inlineResults == nil && noInline?.resultFileName == "files/out-1")
 
-        // ⚠️ Pinned hazard, not an endorsement: an EMPTY inlined container parses to a non-nil empty
-        // dictionary, and the poll's `if let inline = status.inlineResults { … } else if let file = …`
-        // then skips the result-file fallback and marks the paid chunk consumed with zero pages.
-        // Filed as W16.bat1-fu — this check exists so the behaviour cannot change unnoticed either way.
+        // The parse stays faithful to the wire: an EMPTY inlined container is a real, distinguishable
+        // shape, so it still reads as a non-nil empty dictionary. What used to make that a money bug was
+        // the POLL branching on `if let inline = status.inlineResults { … } else if let file = …`, which
+        // let an empty container shadow the result file and consume a paid chunk with zero pages. That
+        // decision now lives in `resultsSource(for:)` and is pinned just below (W16.bat1-fu).
         let emptyInline = try? GeminiBatchClient.parseStatusBody(bytes("""
         {"state":"JOB_STATE_SUCCEEDED","response":{"inlinedResponses":{"inlinedResponses":[]}},
          "metadata":{"dest":{"fileName":"files/out-1"}}}
         """))
-        check("gemini: an EMPTY inline container parses to a non-nil empty set — shadowing the result file (W16.bat1-fu)",
+        check("gemini: an EMPTY inline container still parses to a non-nil empty set (the wire shape is preserved)",
               emptyInline?.inlineResults != nil && emptyInline?.inlineResults?.isEmpty == true)
 
         var threw = false
         do { _ = try GeminiBatchClient.parseStatusBody(bytes("<html>502 Bad Gateway</html>")) } catch { threw = true }
         check("gemini: an HTML error page where JSON belongs throws instead of reading as running", threw)
+    }
+
+    // MARK: - Gemini: which arm a finished chunk's pages come from (W16.bat1-fu)
+
+    /// Collapse a `ResultsSource` to a comparable tag. `OCRResult` is not `Equatable`, so the enum
+    /// cannot be — and a tag reads better in a failure line than a pattern match would.
+    private static func sourceTag(_ source: GeminiBatchClient.ResultsSource) -> String {
+        switch source {
+        case .inline(let results): return "inline:\(results.count)"
+        case .file(let name): return "file:\(name)"
+        case .noneAvailable: return "none"
+        }
+    }
+
+    private static func geminiResultsSource(_ check: (String, Bool) -> Void) {
+        func source(_ json: String) -> String {
+            guard let status = try? GeminiBatchClient.parseStatusBody(bytes(json)) else { return "throw" }
+            return sourceTag(GeminiBatchClient.resultsSource(for: status))
+        }
+
+        // The bug this whole section exists for: a SUCCEEDED chunk whose inline container is empty but
+        // whose pages are sitting in the result file. The old poll took the inline arm and consumed the
+        // chunk with zero pages; the file must win.
+        check("gemini source: an EMPTY inline container no longer shadows the result FILE (W16.bat1-fu)",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","response":{"inlinedResponses":{"inlinedResponses":[]}},
+               "metadata":{"dest":{"fileName":"files/out-1"}}}
+              """) == "file:files/out-1")
+
+        check("gemini source: a NON-empty inline container wins over a result file (no redundant download)",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","response":{"inlinedResponses":{"inlinedResponses":[
+                {"metadata":{"key":"0"},"response":{"candidates":[{"content":{"parts":[{"text":"page"}]}}]}}]}},
+               "metadata":{"dest":{"fileName":"files/out-1"}}}
+              """) == "inline:1")
+
+        check("gemini source: no inline container at all still falls back to the result file",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","metadata":{"dest":{"fileName":"files/out-1"}}}
+              """) == "file:files/out-1")
+
+        // Nothing readable at all → the chunk must not be marked consumed. Three ways to get there.
+        check("gemini source: an EMPTY inline container with NO result file yields no source — the chunk is not consumable",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","response":{"inlinedResponses":{"inlinedResponses":[]}}}
+              """) == "none")
+
+        check("gemini source: a SUCCEEDED chunk with neither inline results nor a result file yields no source",
+              source(#"{"state":"JOB_STATE_SUCCEEDED"}"#) == "none")
+
+        check("gemini source: an EMPTY result-file NAME is not a source (never builds a headless download URL)",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","metadata":{"dest":{"fileName":""}}}
+              """) == "none")
+
+        // A page that parsed into a failure (provider error / block) is still a page: it must be
+        // materialized and reported, not treated as an absent result.
+        check("gemini source: an inline container holding only FAILED pages is still a source, not `none`",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","response":{"inlinedResponses":{"inlinedResponses":[
+                {"metadata":{"key":"0"},"error":{"code":429,"message":"Resource has been exhausted"}}]}}}
+              """) == "inline:1")
+
+        // A running batch never has inline results (the parse only fills them when terminal), so the
+        // source is `none` — the poll reaches this call only for a terminal SUCCEEDED chunk.
+        check("gemini source: a still-running batch offers no inline source",
+              source("""
+              {"state":"JOB_STATE_RUNNING","response":{"inlinedResponses":{"inlinedResponses":[
+                {"metadata":{"key":"0"},"response":{"candidates":[{"content":{"parts":[{"text":"early"}]}}]}}]}}}
+              """) == "none")
     }
 
     // MARK: - Gemini: inlined response entries
