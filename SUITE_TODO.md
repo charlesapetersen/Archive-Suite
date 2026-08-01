@@ -1925,7 +1925,7 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   batch submission reports an uncertain outcome"). Processor builds clean, 0 new warnings. Residual filed as
   **W16.bat1-fu** below.
   | files: OCR/BatchOCR.swift, OCR/BatchParseContract.swift, Capture/BatchResumeTestDriver.swift, scripts/, README.md, TESTING.md | M | low | none
-- [ ] **W16.bat1-fu — an EMPTY inlined-results container makes the poll consume a paid Gemini chunk with zero
+- [x] **W16.bat1-fu — an EMPTY inlined-results container makes the poll consume a paid Gemini chunk with zero
   pages [XS–S · LOW · measured, never observed].** Found by measurement while writing the W16.bat1 fixtures, and
   pinned there as a fact rather than an endorsement (`gemini: an EMPTY inline container parses to a non-nil
   empty set`). `GeminiBatchClient.parseStatusBody` sets `inlineResults` to a **non-nil empty dictionary** when a
@@ -1938,6 +1938,34 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   condition (`if let inline = status.inlineResults, !inline.isEmpty`) plus a decision on what an empty container
   with **no** file spelling means (fail the chunk loudly rather than consume it). Touches the paid poll →
   **Tier-2**, and the existing pin must be flipped to assert the new behaviour.
+  ✅ **DONE this commit** (checkpoints `43b53e9` = the ranking seam, `c9490ac` = the poll + the outcome rule,
+  `94c39a9` = the terminal-verdict rewrite the Tier-2 review forced). Both halves of the decision are now pure
+  and pinned rather than inline in the poll. `resultsSource(for:)` ranks the two retrieval arms and treats an
+  empty inline container — **and a blank or whitespace-only result-file name** — as *not a source*, so the
+  result file is still fetched. `chunkOutcome(resultCount:emptyObservations:limit:)` then judges the **raw
+  provider results**, which is where the judgement has to happen: `processBatchResults` returns `true` for an
+  empty set *by design*, because a resumed chunk whose pages all persisted already legitimately yields no new
+  entries — so it can never be the gate.
+  **The verdict is terminal, not blocking** — and getting that wrong first is the lesson worth keeping. The
+  adversarial review killed checkpoint 2's design: it set `batchPollInterrupted` and returned, with a
+  poll-local observation count, so every Resume restarted the grace and aborted again and **nothing ever
+  converted an empty chunk to failed** — the run could never finalize, tag, or retry, and sibling chunks still
+  hours from finishing were abandoned. Its worst case: a result file that 404s after Gemini's ~48h retention
+  (`NetworkSession` does not throw on non-2xx, so the error body parses to zero results) on a chunk whose pages
+  are **all already on disk** → a run blocked forever with nothing missing. Now: the chunk is still never
+  marked consumed, but the batch COMPLETES, and the existing completion sweep gives each unmaterialized file an
+  explicit `no_result` failure the retry pass can act on (resume restores already-persisted results as
+  `.succeeded`/`.failed`, so they are not re-failed). Given-up chunks are remembered so later polls don't
+  re-fetch them. Grace is 5 polls (~2–4 min); 3 gave the late-attach case it exists for only ~90s.
+  **17 new $0 checks** (`test-batch-resume.sh` 144 → 161, ALL PASS), including the invariant swept over BOTH
+  axes — every observation count against every limit from −5 to 100,000 — in both directions: zero results
+  never materialize, and pages are never withheld. Non-vacuity MEASURED with 4 neuters, each reddening exactly
+  its own checks. The W16.bat1 pin was kept but renamed: the *parse* still reports the empty container
+  faithfully; what changed is that the poll no longer acts on it. Adjacent `test-network-session`,
+  `test-manifest-persistence`, `test-recovery` green; clean build, 0 new warnings. Operator note in
+  `ArchiveProcessor/README.md`. Two **pre-existing** defects the review surfaced are filed separately, not
+  fixed here: **W16.bat3** (Stop deletes the paid journal) and **W16.bat4** (the Resume control is not
+  re-surfaced after an interrupted first run).
   | files: OCR/BatchOCR.swift, OCR/OCRProcessor+OCR.swift, OCR/BatchParseContract.swift | XS–S | low | none
 - [ ] **W16.bat2 — headless coverage for the cancel path's journal-retention contract [M].** `cancel()`
   (`+Pipeline.swift:1437-1473`) is the one shipped safety guarantee with **no regression test** — the
@@ -1946,6 +1974,30 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   **retained** + status message; multi-chunk Anthropic/Mistral (`chunkIds.count != 1`, :1448-1455) → not
   confirmed, retained; zero chunks → not confirmed.
   | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept
+  [XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with no undo, so the daemon files it
+  rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
+  `cancel()` (`+Pipeline.swift:1531+`) cancels the processing task and then deletes the journal **only** if every
+  server-side cancellation was confirmed — otherwise it deliberately keeps it and says *"the paid-batch journal
+  was kept for recovery."* But the poll task then resumes and hits `guard !Task.isCancelled else { return }`
+  (`+OCR.swift:689`, `:701`), which returns **without** setting `batchPollInterrupted`, so
+  `performBatchOCR` (`:661-664`) runs `Self.deletePendingBatch()` unconditionally. The resume path is identical
+  (`+Pipeline.swift:911`, whose own `guard !Task.isCancelled` at `:914` sits *after* the delete). Net: pressing
+  Stop mid-poll can strand a paid, still-live server-side batch with no way back, and tell the operator the
+  opposite. Fix is one line in each cancellation guard (`batchPollInterrupted = true`) — but it changes cancel
+  semantics on the only path that spends real money, so it wants the owner's eye plus **W16.bat2**'s driver to
+  prove it (a `cancel()`-level test passes today while the real path deletes).
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | XS | high | none
+- [ ] **W16.bat4 — after an interrupted FIRST run, the Resume control the message names never appears [S · LOW].**
+  Also from the W16.bat1-fu review; **pre-existing**. Every `batchPollInterrupted` message tells the operator the
+  batch was kept so they can resume it. On a **resume** that is true (`+Pipeline.swift:903-909` calls
+  `cleanupTempFiles()` + `checkForPendingBatch()`), but on a **first** run the interrupt lands at
+  `+Pipeline.swift:1839` — `isProcessing = false; return` — with neither call. `pendingBatchInfo` is only written
+  inside `checkForPendingBatch()` (`:736/744/747`), so the "Pending Batch / Resume Batch" box
+  (`Views/OCRView.swift:319-336`) never appears and the PDF-input temp JPEGs leak. The operator has to press
+  Start and be refused (`:1637-1641` does call it) before the Resume button exists. Reachable from the poll
+  timeout, the 10-error network streak, and a persistence failure. Fix: make `:1839` mirror the resume site.
+  | files: OCR/OCRProcessor+Pipeline.swift | S | low | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
   honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid

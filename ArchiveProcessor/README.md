@@ -112,6 +112,25 @@ finish and resume from it; if there is none, the submission never landed and it 
 (The sibling message *"Batch submission stopped after N server jobs"* is not this case — those N jobs
 **are** acknowledged and Resume picks them up normally.)
 
+#### If a finished chunk comes back with no pages
+
+A batch is sent as one or more chunks, and a chunk the provider reports as *finished* is expected to carry
+pages. If one comes back empty, the app re-reads it for a few minutes — a job can flip to "succeeded" a
+moment before its results are attached, and that resolves itself. If it is still empty it says
+
+> A finished batch chunk returned no pages after 5 checks. Its files are reported as failed; nothing was
+> marked complete for it.
+
+and then lets the run finish normally. Two things matter here. That chunk is never written off as done, so
+nothing claims pages arrived that did not. And the run is not held hostage to it: every other chunk still
+lands, the files from the empty chunk are listed as failed like any other failure, and the retry pass can
+re-run just those pages. Files whose pages had already been retrieved on an earlier pass stay done.
+
+This is rare and means the provider reported a finished job it then had nothing to hand back — for example a
+result file asked for long after the provider stopped keeping it (Gemini discards batch output after about
+two days). Look the job up in the provider's console before re-running the pages, since re-running them is a
+new, billable request.
+
 ### Automatic Retry
 
 - **Auto-retry:** Files that fail due to rate limits or server overload (429, 503, 529) are automatically retried with exponential backoff

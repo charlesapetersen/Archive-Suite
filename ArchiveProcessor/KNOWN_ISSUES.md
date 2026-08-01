@@ -831,8 +831,31 @@ their resolution order; both state envelopes and both inline envelopes with thei
 RECITATION; entry-level errors; the `'0'` → `'file-0'` normalization; empty and malformed result sets; and the
 rule that one unreadable JSONL line never costs the other paid pages. Non-vacuity measured with 7 neuters.
 **Only verification-plan item 5 is closed** — items 1–4 were already covered (above), and the protocol rewrite
-stays CLOSED by owner decision. One residual filed: **W16.bat1-fu** (an empty inlined container shadows the
-result-file fallback). Original analysis below.
+stays CLOSED by owner decision.
+
+**Residual W16.bat1-fu — CLOSED 2026-08-01.** The fixtures' one live finding: an empty `inlinedResponses`
+container shadowed the result-file fallback, so a SUCCEEDED Gemini chunk could be marked *consumed* in the
+journal with zero pages. Both halves of that decision are now pure and pinned instead of inline in the poll —
+`GeminiBatchClient.resultsSource(for:)` ranks the retrieval arms (an empty inline container, and a blank or
+whitespace-only result-file name, are *not* sources), and `chunkOutcome(resultCount:emptyObservations:limit:)`
+judges the **raw** provider results, which is the only place it can be judged: `processBatchResults` returns
+`true` on an empty set deliberately, so that a resumed chunk whose pages already persisted is not
+re-materialized. A finished chunk that produced nothing is re-read for ~2–4 minutes, then reported empty —
+**never consumed, and never allowed to block the batch**: the run completes, the completion sweep gives its
+unmaterialized files an explicit `no_result` failure the retry pass can act on, and the pages that did arrive
+finish normally. 17 more $0 checks (`scripts/test-batch-resume.sh` → 161 total), non-vacuity measured with 4
+neuters.
+
+The first attempt at that fix halted the poll and kept the batch for resume instead, which the adversarial
+review correctly rejected: the observation count was poll-local, so no number of resumes ever converted an
+empty chunk to failed, and one anomalous chunk could block a run **permanently** — including the case where
+every page was already on disk and only a long-expired result file was missing. Worth remembering when
+touching this path: *"don't consume it"* and *"don't let it finish"* are not the same requirement, and only
+the first one is a safety property. That review also surfaced two **pre-existing** defects, queued as
+**W16.bat3** (Stop mid-poll deletes the paid journal while the UI says it was kept — owner-gated) and
+**W16.bat4** (the Resume control is never surfaced after an interrupted first run).
+
+Original analysis below.
 
 ## Original text: unify paid-batch providers behind one durable state machine
 
