@@ -90,6 +90,28 @@ Anthropic, Gemini, and Mistral support batch processing for lower-cost, asynchro
 - Cancel running batches (server-side cancellation)
 - Cost estimator shows batch discount (50% for all providers)
 
+#### If a batch submission reports an uncertain outcome
+
+Very rarely, the provider can accept a batch and its reply can be lost on the way back (a dropped
+connection at exactly the wrong moment). The app never guesses in that situation: it stops, keeps the
+recovery journal, and says
+
+> Batch submission outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying.
+
+**Do not just press Resume — check the provider's own console first.** The app cannot list your batches
+on the provider side, so it cannot tell whether that batch exists there; retrying blind is the one way to
+pay for the same pages twice. Nothing has been lost either way — your originals are untouched and no
+output was written.
+
+- **Anthropic** — Console → *Batches* (https://console.anthropic.com)
+- **Gemini** — Google AI Studio / Cloud console → *Batch jobs* (https://aistudio.google.com)
+- **Mistral** — La Plateforme → *Batch* (https://console.mistral.ai)
+
+Look for a job created in the last few minutes with roughly your page count. If one is there, let it
+finish and resume from it; if there is none, the submission never landed and it is safe to run again.
+(The sibling message *"Batch submission stopped after N server jobs"* is not this case — those N jobs
+**are** acknowledged and Resume picks them up normally.)
+
 ### Automatic Retry
 
 - **Auto-retry:** Files that fail due to rate limits or server overload (429, 503, 529) are automatically retried with exponential backoff

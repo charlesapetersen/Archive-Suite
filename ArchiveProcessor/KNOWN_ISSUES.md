@@ -820,10 +820,19 @@ rewrite** — it would touch the only code path that spends real money to remove
 Revisit only when OpenAI batch (Phase 4) is actually implemented; the defensive `case .openai` arms
 (`+OCR.swift:551-555`, `:740-743`, `+Pipeline.swift:1463-1464`) are where that work will land.
 
-**The genuinely unmet gap** (and the reason W16.bat1 exists): verification-plan item 5, provider contract
-fixtures. `GeminiBatchClient.checkStatus` parses **six alternative JSON shapes** (`BatchOCR.swift:511-548`) with
-**zero tests** — a provider response-shape change would silently mark an entire paid batch as failed. Original
-analysis below.
+**The genuinely unmet gap — CLOSED 2026-08-01 (W16.bat1):** verification-plan item 5, provider contract
+fixtures. `GeminiBatchClient.checkStatus` parsed **six alternative JSON shapes** with **zero tests**, so a
+provider response-shape change would silently have marked an entire paid batch as failed. Each client's parse
+bodies were lifted verbatim into pure seams (`parseStatusBody` / `parseResultsJSONL`, plus internal
+`parseInlinedResponses` / `parseSingleResponse` / `parseBatchErrorBody`) and `BatchParseContract` now drives
+literal Anthropic/Gemini/Mistral bodies through them — **81 checks, $0, no network, no keys**, riding
+`scripts/test-batch-resume.sh` (144 checks total). All six result-file spellings are covered individually plus
+their resolution order; both state envelopes and both inline envelopes with their precedence; blockReason /
+RECITATION; entry-level errors; the `'0'` → `'file-0'` normalization; empty and malformed result sets; and the
+rule that one unreadable JSONL line never costs the other paid pages. Non-vacuity measured with 7 neuters.
+**Only verification-plan item 5 is closed** — items 1–4 were already covered (above), and the protocol rewrite
+stays CLOSED by owner decision. One residual filed: **W16.bat1-fu** (an empty inlined container shadows the
+result-file fallback). Original analysis below.
 
 ## Original text: unify paid-batch providers behind one durable state machine
 
@@ -878,7 +887,11 @@ the app from creating the duplicate itself, and the UI actively discourages the 
 An adoption mistake would also attach results to the wrong local run, so the UI needs owner design input.
 
 **Decision:** ship an operator-facing note pointing at the provider console (folded into **W16.bat1**); build the
-real reconciliation **only if a lost-create event is ever actually observed.** If it is built, it must preserve
+real reconciliation **only if a lost-create event is ever actually observed.** ✅ **The note SHIPPED 2026-08-01**
+with W16.bat1 — `README.md` §"Batch Processing → If a batch submission reports an uncertain outcome": quotes the
+exact in-app message, says do **not** press Resume before checking the provider's own console, links all three
+consoles, and distinguishes this from the benign *"stopped after N server jobs"* message. The reconciliation
+itself remains unbuilt, by decision. If it is built, it must preserve
 the per-call idempotency declaration — dropping that silently reopens the FIXED CRITICAL "ambiguous retries could
 duplicate billable requests."
 

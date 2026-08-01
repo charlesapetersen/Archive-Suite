@@ -1,5 +1,6 @@
 #!/bin/bash
-# Key-free, no-network regression for Process Files batch/non-batch crash-resume manifests.
+# Key-free, no-network regression for Process Files batch/non-batch crash-resume manifests,
+# plus the three paid batch clients' provider response-shape contract (W16.bat1 — BatchParseContract).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

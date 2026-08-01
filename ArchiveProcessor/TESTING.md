@@ -255,7 +255,10 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
 - **`test-segment-json.sh`** — byte-identity of the shared `SegmentJSONBuilder` output.
 
 **Process Files pipeline**
-- **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests.
+- **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
+  batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
+  Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`
+  (`BatchParseContract`). No network, no keys, no cost. 144 checks as of 2026-08-01.
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

@@ -1899,17 +1899,46 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat1 — provider contract fixtures for the three batch clients' response parsing [M].** The **only
+- [x] **W16.bat1 — provider contract fixtures for the three batch clients' response parsing [M].** The **only
   unmet item in the entry's own verification plan**, and the highest-value remaining slice. `GeminiBatchClient.checkStatus`
-  parses **six alternative JSON shapes** (`BatchOCR.swift:511-548`) with **zero tests** — a provider response-shape
-  change would silently mark an entire paid batch as failed. Pure-parse, **$0, no network**. Requires promoting
-  `parseInlinedResponses`/`parseSingleResponse` (`BatchOCR.swift:559, :588`) and the Anthropic/Mistral JSONL
-  parsing from `private` to internal (or extracting free functions) so a headless driver can reach them. Cover:
-  all six Gemini status shapes, inline vs result-file, Recitation/blockReason, error entries, key normalization
-  (`'0'` → `'file-0'`), empty + malformed result sets, and Anthropic/Mistral succeeded+errored JSONL lines. Wire
-  into `scripts/test-batch-resume.sh`. **Also fold in here:** a short operator-facing note pointing at the
-  provider console for the lost-create case (see the separate LOW entry below).
-  | files: OCR/BatchOCR.swift, Capture/BatchResumeTestDriver.swift, scripts/ | M | low | none
+  parsed **six alternative JSON shapes** with **zero tests** — a provider response-shape change would silently
+  have marked an entire paid batch as failed.
+  ✅ **DONE this commit** (checkpoints `8f51c9b` = the seams, `85c3b96` = the checks). Each client's parse body
+  was lifted **verbatim** out of its `async throws` network call into a pure static seam — `parseStatusBody(_:)`
+  and `parseResultsJSONL(_:)` on all three clients — and `parseInlinedResponses` / `parseSingleResponse` /
+  `parseBatchErrorBody` went `private` → internal. No behaviour change is possible by construction: the diff
+  moves whole statement runs and adds no logic. `OCR/BatchParseContract.swift` then drives literal
+  Anthropic/Gemini/Mistral bodies through those seams as section 12 of `BatchResumeTestDriver`, so
+  `scripts/test-batch-resume.sh` covers the whole paid-batch surface: **81 new checks, 144 total, ALL PASS, $0,
+  no network, no keys.** Every shape the item asked for is pinned — all six result-file spellings *individually*
+  plus the order they resolve in; state under `state` vs `metadata.state` and inline results under `response.…`
+  vs `metadata.output.…`, both with their precedence; inline results read ONLY once terminal; all eight terminal
+  states across the BATCH_/JOB_ vocabularies; blockReason / RECITATION as stated refusals; entry-level errors
+  with their code; the `'0'` → `'file-0'` normalization (and that an unattributable entry is DROPPED, never
+  misfiled onto another page); empty + malformed result sets; Anthropic succeeded/errored/expired lines and the
+  rule that a non-text block is excluded by TYPE even when it carries a `text` field (thinking must not leak
+  into a transcription); Mistral's five terminal statuses, `pages[].markdown` + `text` fallback and its error
+  ladder; the shared HTTP error body incl. an HTML gateway page. Across all three: one unreadable JSONL line
+  never costs the other paid pages. **Non-vacuity measured, not assumed** — 7 neuters reddened 14 checks
+  (8 predicted; the 6 extras all traced to the shared key-normalization neuter's wider blast radius), and every
+  neuter reddened at least one check. The operator note also shipped (`README.md` §"Batch Processing → If a
+  batch submission reports an uncertain outcome"). Processor builds clean, 0 new warnings. Residual filed as
+  **W16.bat1-fu** below.
+  | files: OCR/BatchOCR.swift, OCR/BatchParseContract.swift, Capture/BatchResumeTestDriver.swift, scripts/, README.md, TESTING.md | M | low | none
+- [ ] **W16.bat1-fu — an EMPTY inlined-results container makes the poll consume a paid Gemini chunk with zero
+  pages [XS–S · LOW · measured, never observed].** Found by measurement while writing the W16.bat1 fixtures, and
+  pinned there as a fact rather than an endorsement (`gemini: an EMPTY inline container parses to a non-nil
+  empty set`). `GeminiBatchClient.parseStatusBody` sets `inlineResults` to a **non-nil empty dictionary** when a
+  terminal batch carries `inlinedResponses: []`, and the poll then takes the inline arm — `if let inlineResults
+  = status.inlineResults { … } else if let fileName = status.resultFileName { … }`
+  (`OCRProcessor+OCR.swift:776-785`) — so the result **file is never fetched**. `processBatchResults` returns
+  `true` on an empty set (`:874`), so the chunk is marked *consumed* and never retried: that chunk's paid OCR is
+  lost while the run reports success. Requires the provider to emit an empty container on a SUCCEEDED batch
+  (never seen here), hence LOW — but it is exactly the response-shape class W16.bat1 exists to catch. Fix is one
+  condition (`if let inline = status.inlineResults, !inline.isEmpty`) plus a decision on what an empty container
+  with **no** file spelling means (fail the chunk loudly rather than consume it). Touches the paid poll →
+  **Tier-2**, and the existing pin must be flipped to assert the new behaviour.
+  | files: OCR/BatchOCR.swift, OCR/OCRProcessor+OCR.swift, OCR/BatchParseContract.swift | XS–S | low | none
 - [ ] **W16.bat2 — headless coverage for the cancel path's journal-retention contract [M].** `cancel()`
   (`+Pipeline.swift:1437-1473`) is the one shipped safety guarantee with **no regression test** — the
   delete-only-if-all-confirmed rule is currently verified by reading the code. Add a small injectable cancel seam
@@ -1923,7 +1952,10 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   twice. Building auto-adoption needs **live paid API calls** against each provider's list endpoint (outside the
   daemon's envelope) for a failure mode **never observed here**; the non-idempotent retry policy already stops the
   app from creating the duplicate itself. Ship the operator doc note (in W16.bat1) instead; build only if a
-  lost-create event is ever actually observed.
+  lost-create event is ever actually observed. ✅ **The doc note shipped with W16.bat1** (`ArchiveProcessor/README.md`
+  §"Batch Processing → If a batch submission reports an uncertain outcome"): it quotes the exact in-app message,
+  says do **not** press Resume before checking the provider's own console, links all three consoles, and separates
+  this from the benign *"stopped after N server jobs"* message. The reconciliation itself stays unbuilt by decision.
 
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
