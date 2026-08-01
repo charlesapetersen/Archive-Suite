@@ -183,7 +183,10 @@ extension InlineImageAttachment {
     ///
     /// Size **and** mtime, not either alone: a sync client can rewrite a file to the same length, and
     /// two unrelated writes can share a whole-second timestamp. The path stays in the key as well —
-    /// version alone would alias two files that happen to match on both fields.
+    /// version alone would alias two files that happen to match on both fields. The one rewrite this
+    /// still cannot see is same-length *and* same-timestamp, which needs a volume whose timestamps are
+    /// coarser than APFS's nanoseconds (an SMB share, say) — strictly narrower than the bug it
+    /// replaces, and it still recovers on eviction or relaunch exactly as before.
     ///
     /// `maxPixels` is part of the key because it changes the decoded result; without it, the first
     /// caller's size would be served to every later caller asking for a different one.

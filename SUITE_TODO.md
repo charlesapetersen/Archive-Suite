@@ -976,15 +976,46 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   replaced by garbage. 589/589 `ArchiveNotesTests` green, no new warnings. Residual filed as **W23.m11-fu**
   (LOW). Write-up: `ArchiveNotes/KNOWN_ISSUES.md`.
 
-- [ ] **W23.m11-fu — an inline image replaced OUTSIDE the app keeps showing its old thumbnail
-  [XS · LOW · stale display].** Residual of W23.m11, filed 2026-07-30. Cache entries never expire, which is
+- [x] **W23.m11-fu — an inline image replaced OUTSIDE the app keeps showing its old thumbnail
+  [XS · LOW · stale display].** Residual of W23.m11, filed 2026-07-30. Cache entries never expired, which is
   sound for every in-app writer (asset paths are write-once — see m11), but the Notes store root can live in
-  a synced folder, and a sync client rewriting bytes at an existing `items/<uuid>/assets/<name>` leaves the
-  editor showing the previous thumbnail until the entry is evicted or the app restarts. **Display only** —
-  the file on disk, the note body, and the copy/extract path (which reads bytes fresh) are all correct, which
-  is why this is LOW and not a re-open. Options: fold size+mtime into `cacheKey` (costs one `stat` per
-  render — measure first, the cache exists so that a hit does *no* disk I/O), or drop an item's entries when
-  the store observes an external change.
+  a synced folder, and a sync client rewriting bytes at an existing `items/<uuid>/assets/<name>` left the
+  editor showing the previous thumbnail until the entry was evicted or the app restarted. **Display only** —
+  the file on disk, the note body, and the copy/extract path (which reads bytes fresh) were all correct,
+  which is why this was LOW and not a re-open.
+  ✅ **DONE this commit** (checkpoint `136453b` = the code). Took the first option: `cacheKey` folds in the
+  file's **version** — size + nanosecond `st_mtimespec` from one `stat(2)` — so a stale entry is never looked
+  up again. Nothing expires and nothing is purged; it ages out of a bounded cache under a name nothing asks
+  for. `cacheKey` returns **nil** for a file that cannot be stat'ed, so a vanished asset has no cache identity
+  and is read (and fails) rather than answered out of memory; `cached: false` skips the stat entirely.
+  **The item said "measure first". Measuring reversed a design choice and demoted the objection:**
+  (1) **`stat(2)`, not `URL.resourceValues`** — `URL` caches resource values on its backing `NSURL`, so
+  rewriting a file 100→250 bytes between two calls *on the same `URL` value* read back **unchanged on both
+  fields**; the idiomatic Foundation call would have defeated the fix silently (`FileManager
+  .attributesOfItem` is honest but ~437 µs vs ~15 µs). (2) **A hit got cheaper, not dearer** — the ~15 µs
+  `stat` *replaces* a `standardizedFileURL` that cost ~53 µs and itself touched the file system (12.8 µs on a
+  path that does not exist, 52.7 µs on one that does), so key construction goes ~76 µs → ~17 µs; the premise
+  behind the objection ("a hit does no disk I/O") was not true to begin with. The decode a hit avoids is
+  ~3,200 µs. (3) **Nanosecond mtime is sharp enough** — 20 back-to-back same-size rewrites of one file gave
+  20 distinct versions on APFS; the only rewrite still invisible is same-length *and* same-timestamp, which
+  needs a coarser-timestamp volume (SMB) and still recovers on eviction/relaunch as before.
+  The other option (purge on an observed external change) was rejected with a reason, not skipped: the store
+  observes nothing — Notes has **no file-system watcher**, as W23.m9-fu2 records for the index — so that is a
+  new subsystem, not a key change. **Tier-1, scratch only** (temp-dir stores; never the real Notes store, no
+  corpus, no network, $0): **5 new tests** in `InlineImageCacheKeyTests`, each first showing the stale entry
+  is *still live in the cache*, so what they prove is the keying and not an eviction. One existing test was
+  changed rather than deleted — `repeatRenderStillHitsTheCache` proved a hit by replacing the bytes with
+  garbage, which is now a different file; it pins the mtime to a whole second (restorable exactly), swaps in
+  **same-length** garbage and restores that timestamp, keeping its intent and documenting the granularity.
+  **Non-vacuous by 4 neuters, each predicted in advance and each reddening exactly the predicted set:**
+  drop the version → the 3 detectors; drop the nil-on-missing contract → the 1 vanished-asset assertion; drop
+  the path → the 2 tests pinning m11's own result; invalidate on *every* call → the cache-hit guards (which
+  is what proves those guards aren't vacuous). All reverted; source diff clean, `grep NEUTER` empty.
+  **738/738** Notes green (was 733), clean build, **0 new warnings**. Notes-internal — no ArchiveCore type,
+  no SPEC change → the shared-core all-three-app rebuild rule is N/A. GUI: the visible effect *is* the decoded
+  pixels, asserted headlessly at attachment level (as in m11), and no GUI fixture can rewrite a file behind
+  the app's back → nothing for the VM lane to see. Write-up: `ArchiveNotes/KNOWN_ISSUES.md` (folded into the
+  m11 entry, whose now-false "no disk I/O on the hit path" cost claim is corrected there).
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/InlineImageAttachment.swift | Tier-1 | XS | LOW
 
 - [x] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note

@@ -247,7 +247,10 @@ macOS/Sources/ArchiveNotes/
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
                                    noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path,
-                                   Missing/Blocked placeholder kinds), EditorAssetStore protocol
+                                   Missing/Blocked placeholder kinds); app-wide thumbnailCache keyed
+                                   by cacheKey = maxPixels + the file's VERSION (size + ns mtime,
+                                   one stat) + path, derived here and never caller-supplied
+                                   (W23.m11 / m11-fu); EditorAssetStore protocol
                                    (resolve → AssetResolution; resolveAsset convenience),
                                    ScratchAssetStore (test impl), ItemAssetStore (production:
                                    @MainActor sync name-reserve → async NoteStore.writeReservedAsset

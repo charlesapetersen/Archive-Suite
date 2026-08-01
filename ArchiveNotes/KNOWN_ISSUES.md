@@ -344,25 +344,65 @@ entry in two.
 
 **Why there is no expiry or per-item invalidation.** An asset path is **write-once** in this app:
 `NoteStore.writeReservedAsset` throws rather than overwrite an existing name, and `importAsset`
-disambiguates — so the bytes at a canonical path never change under us, and a UUID is never reissued.
-A per-item purge would have had no caller. `maxPixels` *is* in the key, because it changes the decoded
-result; without it the first requested size would be served to every later caller asking for another.
+disambiguates — so the bytes at a canonical path never change *because of this app*, and a UUID is never
+reissued. A per-item purge would have had no caller. (Write-once to *us* is not write-once on disk — that
+gap is W23.m11-fu, below.) `maxPixels` *is* in the key, because it changes the decoded result; without it
+the first requested size would be served to every later caller asking for another.
 
-**Cost:** none on the hit path. Key normalization is string-only (`standardizedFileURL`, no disk I/O), so
-a cache hit still costs zero reads. A non-canonical URL therefore degrades to a *duplicate* entry for the
-same bytes — wasteful, never wrong.
+**Cost:** *superseded by W23.m11-fu.* The claim made here — "none on the hit path, key normalization is
+string-only (`standardizedFileURL`, no disk I/O)" — was measured and found **false**: `standardizedFileURL`
+touches the file system (52.7 µs on a path that exists, 12.8 µs on one that does not). What does still
+hold: a non-canonical URL degrades to a *duplicate* entry for the same bytes — wasteful, never wrong.
 
 **Verified** (scratch temp stores only, never the real Notes store or the corpus): 8 tests,
 `InlineImageCacheKeyTests`, each written to be non-vacuous — the headline test proves note B renders its
 own blue pixels after note A warmed the cache with red ones under the same relative path, and a second
 test plants a red sentinel under the *exact* pre-fix key, asserts it is a live hit, then shows the render
-ignores it. Cache-hit behaviour is pinned too (a repeat render is served with the file's bytes replaced by
-garbage). 589/589 `ArchiveNotesTests` green, no new warnings.
+ignores it. Cache-hit behaviour is pinned too (a repeat render served with the file's bytes replaced by
+garbage — W23.m11-fu made that *same-length* garbage under a restored timestamp). 589/589
+`ArchiveNotesTests` green, no new warnings.
 
-**Residual (`W23.m11-fu`, LOW):** because entries never expire, an asset replaced **outside the app** (a
-sync client writing new bytes at the same path) shows its stale thumbnail until the entry is evicted or
-the app restarts. Display only — the file on disk, the note body and the copy/extract path (which reads
-bytes fresh) are all unaffected.
+**Residual — ✅ FIXED (W23.m11-fu, LOW).** Because entries never expired, an asset replaced **outside the
+app** — a sync client writing new bytes at an existing `items/<uuid>/assets/<name>` — showed its stale
+thumbnail until the entry was evicted or the app restarted. Display only (the file on disk, the note body,
+and the copy/extract path, which reads bytes fresh, were all correct), which is why it was LOW rather than
+a re-open of m11.
+
+`cacheKey` now folds in the **version** of the bytes at that path — size + nanosecond `st_mtimespec`, from
+one `stat(2)`. Nothing expires and nothing is purged: a stale entry is simply never looked up again, and
+ages out of a bounded cache under a name nothing asks for. `cacheKey` returns **nil** when the file cannot
+be stat'ed, so a vanished asset has no cache identity and is read (and fails) rather than answered out of
+memory. `cached: false` skips the stat entirely.
+
+**Three measurements shaped this, and one of them reversed a design choice:**
+- **`stat(2)`, NOT `URL.resourceValues(forKeys:)`.** `URL` caches resource values on its backing `NSURL`:
+  rewriting a file 100 → 250 bytes between two calls *on the same `URL` value* read back **unchanged on
+  both fields**. The idiomatic Foundation call would have defeated this fix silently.
+  `FileManager.attributesOfItem` is honest but builds a whole attribute dictionary (~437 µs vs ~15 µs).
+- **The `stat` makes a hit cheaper, not dearer.** It costs ~15 µs and *replaces* the `standardizedFileURL`
+  normalization (~53 µs, itself file-system-touching), so key construction goes ~76 µs → ~17 µs. The item
+  asked for the cost to be measured before it was paid, on the premise that a hit did no disk I/O; the
+  measurement showed the hit was already doing more I/O than the fix adds. The decode a hit avoids is
+  ~3,200 µs.
+- **Nanosecond mtime is sharp enough to be worth having:** 20 back-to-back same-size rewrites of one file
+  produced 20 distinct versions on APFS. The one rewrite this still cannot see is same-length *and*
+  same-timestamp, which needs a coarser-timestamp volume (an SMB share) — strictly narrower than the bug
+  it replaces, and it still recovers on eviction or relaunch exactly as before.
+
+Deliberately **not** the other candidate fix (drop an item's entries when the store observes an external
+change): the store observes nothing — Notes has no file-system watcher, as W23.m9-fu2 records for the
+index — so that route is a new subsystem, not a key change.
+
+**Verified** (scratch temp stores only, never the real Notes store or the corpus): **5 new tests** in
+`InlineImageCacheKeyTests`, each showing the stale entry is *still live in the cache* before asserting the
+render walks past it — so what they prove is the keying, not an eviction. **Non-vacuous by 4 neuters, each
+predicted in advance:** dropping the version from the key reddens exactly the 3 detector tests (external
+replace, key-tracks-size-and-mtime, twin-versions-on-different-paths); removing the nil-on-missing
+contract reddens exactly the 1 vanished-asset assertion; dropping the path from the key reddens exactly
+the 2 tests that pin W23.m11's own result; and an over-correction that invalidates on *every* call reddens
+the cache-hit guards, which is what shows those guards are not vacuous. All reverted — source diff clean
+and `grep NEUTER` empty before shipping. **738/738** `ArchiveNotesTests` green (was 733), clean build, no
+new warnings.
 
 ## ✅ FIXED (W23.m10) — a failed `organization.json` write was reported as a saved organization change
 **2026-07-30.** `organization.json` is the **durable mirror** the folder graph is rebuilt from after a DB

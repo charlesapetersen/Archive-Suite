@@ -17,7 +17,11 @@ import AppKit
 /// would have collided (the two files exist, differ, and share a relative path; a sentinel planted under
 /// the old key is a live hit), so a passing assertion documents the hole it closes rather than merely
 /// agreeing with the current code.
-@Suite("Inline-image thumbnail cache identity (W23.m11)")
+/// **W23.m11-fu** adds the second half of that identity: the *version* of the bytes at that file.
+/// The cache never expired, which is right for every in-app writer (an asset path is write-once
+/// here) and wrong for a store root in a synced folder, where an outside rewrite left the previous
+/// thumbnail on screen until eviction or relaunch.
+@Suite("Inline-image thumbnail cache identity (W23.m11 · m11-fu)")
 @MainActor
 struct InlineImageCacheKeyTests {
 
@@ -322,5 +326,162 @@ struct InlineImageCacheKeyTests {
         #expect(InlineImageAttachment.thumbnailCache.object(forKey: key) === warm)
         let fresh = try #require(InlineImageAttachment.loadThumbnail(from: url, cached: false))
         #expect(fresh !== warm, "an uncached load must decode rather than return the warm entry")
+    }
+
+    // MARK: - Freshness: bytes replaced from outside the app (W23.m11-fu)
+    //
+    // m11 made the key name the right *file*; these pin that it also names the right *bytes*. An asset
+    // path is write-once to this app, so nothing in-app can reach these paths — but the store root can
+    // live in a synced folder, and a sync client is not bound by that. Each test below first shows the
+    // stale entry is still sitting in the cache, so what it proves is that the key walks past it, not
+    // that something evicted it.
+
+    /// A whole-second timestamp, so `setAttributes` round-trips it into `st_mtimespec` exactly
+    /// (`{sec, 0}`) and a test can make two files' modification times *identical by construction*
+    /// rather than by hoping the clock cooperated.
+    private func pinModificationTime(_ url: URL, to date: Date) throws {
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+    private var epochA: Date { Date(timeIntervalSince1970: 1_700_000_000) }
+    private var epochB: Date { Date(timeIntervalSince1970: 1_700_000_060) }
+
+    @Test("An asset replaced outside the app renders its NEW bytes, not the warm thumbnail")
+    func anExternallyReplacedAssetRendersItsNewBytes() throws {
+        let fx = try TwoItemStore()
+        defer { fx.cleanup() }
+        let name = "synced-\(UUID().uuidString).png"
+        let reference = "assets/\(name)"
+        let url = fx.assetURL(name, in: fx.itemA)
+        let assetStore = fx.assetStore(for: fx.itemA)
+
+        try fx.write(try solidPNG(.red, side: 24), named: name, into: fx.itemA)
+        try pinModificationTime(url, to: epochA)
+        let before = try #require(renderedImage("![](\(reference))", assetStore))
+        #expect(dominantChannel(of: before) == "R")
+        let staleKey = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 800)) as NSString
+        #expect(InlineImageAttachment.thumbnailCache.object(forKey: staleKey) === before)
+
+        // The sync client's write: same path, different bytes, and a timestamp it did not consult us
+        // about. Nothing in the app is involved, so nothing in the app gets a chance to invalidate.
+        try solidPNG(.blue, side: 40).write(to: url)
+        try pinModificationTime(url, to: epochB)
+
+        let after = renderedImage("![](\(reference))", assetStore)
+        #expect(dominantChannel(of: after) == "B",
+                "the editor must show the bytes now on disk, not the thumbnail it decoded earlier")
+        #expect(after !== before)
+
+        // Non-vacuity: the old thumbnail is still a live, retrievable entry — the fix is that its key
+        // no longer describes this file, not that anything purged it. Pre-fix, the key was the path
+        // alone, so this same entry is exactly what the render above would have been handed.
+        #expect(InlineImageAttachment.thumbnailCache.object(forKey: staleKey) === before,
+                "the stale entry must be keyed past, not evicted")
+    }
+
+    @Test("The replacement's thumbnail is filed under the new identity, so it caches too")
+    func theReplacementIsFiledUnderItsOwnIdentity() throws {
+        let fx = try TwoItemStore()
+        defer { fx.cleanup() }
+        let name = "refiled-\(UUID().uuidString).png"
+        let reference = "assets/\(name)"
+        let url = fx.assetURL(name, in: fx.itemA)
+        let assetStore = fx.assetStore(for: fx.itemA)
+
+        try fx.write(try solidPNG(.red, side: 24), named: name, into: fx.itemA)
+        try pinModificationTime(url, to: epochA)
+        #expect(renderedImage("![](\(reference))", assetStore) != nil)
+
+        try solidPNG(.blue, side: 40).write(to: url)
+        try pinModificationTime(url, to: epochB)
+
+        // Keying past a stale entry must not mean "stop caching this file": the second render of the
+        // replacement is a hit, or every later render of a synced asset pays a full decode forever.
+        let first = try #require(renderedImage("![](\(reference))", assetStore))
+        let second = try #require(renderedImage("![](\(reference))", assetStore))
+        #expect(first === second, "the new bytes must be memoized under their own key")
+        let newKey = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 800)) as NSString
+        #expect(InlineImageAttachment.thumbnailCache.object(forKey: newKey) === first)
+    }
+
+    @Test("The key tracks size AND modification time, and nothing else about the bytes")
+    func theKeyTracksSizeAndModificationTime() throws {
+        let fx = try TwoItemStore()
+        defer { fx.cleanup() }
+        let name = "versioned-\(UUID().uuidString).bin"
+        let url = fx.assetURL(name, in: fx.itemA)
+        func key() throws -> String {
+            try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 800))
+        }
+
+        try Data(repeating: 0x41, count: 100).write(to: url)
+        try pinModificationTime(url, to: epochA)
+        let base = try key()
+
+        // (a) same length, different content — only the modification time can tell these apart, which
+        // is the case a size-only version would miss and a sync client can easily produce.
+        try Data(repeating: 0x42, count: 100).write(to: url)
+        try pinModificationTime(url, to: epochB)
+        let byTime = try key()
+        #expect(byTime != base, "an mtime change alone must change the key")
+
+        // (b) different length at the *same* timestamp — the case an mtime-only version would miss,
+        // and whole-second timestamps are common enough (restores, unzips) for it to matter.
+        try Data(repeating: 0x42, count: 250).write(to: url)
+        try pinModificationTime(url, to: epochB)
+        #expect(try key() != byTime, "a size change alone must change the key")
+
+        // (c) restored to the original size and timestamp — the key comes back. Stated as a property
+        // rather than discovered later: the identity is exactly size+mtime, so a rewrite that matches
+        // on both is deliberately not detected. That is also what makes a plain repeat render a hit.
+        try Data(repeating: 0x43, count: 100).write(to: url)
+        try pinModificationTime(url, to: epochA)
+        #expect(try key() == base)
+    }
+
+    @Test("Two different files sharing a size and a timestamp still get different keys")
+    func identicalVersionsOnDifferentPathsDoNotCollide() throws {
+        let fx = try TwoItemStore()
+        defer { fx.cleanup() }
+        let name = "twin-\(UUID().uuidString).bin"
+        let aURL = fx.assetURL(name, in: fx.itemA)
+        let bURL = fx.assetURL(name, in: fx.itemB)
+        try Data(repeating: 0x41, count: 100).write(to: aURL)
+        try Data(repeating: 0x42, count: 100).write(to: bURL)
+        try pinModificationTime(aURL, to: epochA)
+        try pinModificationTime(bURL, to: epochA)
+
+        let aKey = try #require(InlineImageAttachment.cacheKey(for: aURL, maxPixels: 800))
+        let bKey = try #require(InlineImageAttachment.cacheKey(for: bURL, maxPixels: 800))
+        // Non-vacuity: the version halves really are identical, so only the path is separating these.
+        // (Key layout: maxPixels, version, path — NUL-separated.)
+        let aParts = aKey.components(separatedBy: "\u{0000}")
+        let bParts = bKey.components(separatedBy: "\u{0000}")
+        #expect(aParts.count == 3 && bParts.count == 3)
+        #expect(aParts[1] == bParts[1], "the two files must be indistinguishable by version alone")
+        #expect(aKey != bKey, "the path must stay in the key — W23.m11 is not undone by versioning it")
+    }
+
+    @Test("A vanished asset has no cache identity and is not served from memory")
+    func aVanishedAssetIsNotServedFromMemory() throws {
+        let fx = try TwoItemStore()
+        defer { fx.cleanup() }
+        let name = "vanished-\(UUID().uuidString).png"
+        let url = fx.assetURL(name, in: fx.itemA)
+        try fx.write(try solidPNG(.red, side: 24), named: name, into: fx.itemA)
+
+        let warm = try #require(InlineImageAttachment.loadThumbnail(from: url))
+        let staleKey = try #require(InlineImageAttachment.cacheKey(for: url, maxPixels: 800)) as NSString
+        #expect(InlineImageAttachment.thumbnailCache.object(forKey: staleKey) === warm)
+
+        try FileManager.default.removeItem(at: url)
+
+        // The render path never reaches this — `AssetPathResolver` answers `.missing` for a path that
+        // is gone, so `MarkdownBridge` shows the placeholder without asking for a thumbnail. This is
+        // the accessor's own contract, and it is load-bearing: if a file with no `stat` still produced
+        // a key, the entry below is what the loader would hand back for bytes that no longer exist.
+        #expect(InlineImageAttachment.cacheKey(for: url, maxPixels: 800) == nil)
+        #expect(InlineImageAttachment.loadThumbnail(from: url) == nil)
+        #expect(InlineImageAttachment.thumbnailCache.object(forKey: staleKey) === warm,
+                "still a live entry — it is the missing identity that keeps it from being served")
     }
 }
