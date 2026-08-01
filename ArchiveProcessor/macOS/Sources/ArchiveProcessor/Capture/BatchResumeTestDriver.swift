@@ -38,6 +38,11 @@ import AppKit
 ///      every provider × chunk-count × refusal shape, against a real file. Scope: the RULE, not the whole
 ///      Stop path. W16.bat3 is an open, owner-gated bug elsewhere (the poll's cancellation guards delete the
 ///      journal first regardless), so a green section 13 does NOT mean pressing Stop is safe end to end.
+///  14. The **`cancel()` WIRING** (`BatchCancelWiringContract`, W16.bat2-fu): section 13 proves the rule, this
+///      proves `cancel()` feeds it the truth — the live batch's own context and provider, the journal's
+///      acknowledged chunk IDs (not its decoy batch ID), the paid-batch journal and no other durable file,
+///      the kept-journal warning reaching the operator, nothing at all when there is no live batch, and no
+///      second cancellation when Stop is pressed twice. Real `cancel()`, stubbed seams, a real temp file.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
@@ -618,6 +623,13 @@ enum BatchResumeTestDriver {
         // canceller and a real temp file, so "kept" means a file that is still on disk — no network,
         // no keys, no cost.
         await BatchCancelContract.run(check: check)
+
+        // --- 14: the cancel path's WIRING contract (W16.bat2-fu). ---
+        // Section 13 pins the rule; this pins the arguments `cancel()` feeds it — which paid jobs, which
+        // provider's client, which durable journal, and whether the operator is warned. Drives the REAL
+        // `cancel()` with both cancel-path seams stubbed, so the operator's own `pending_batch.json` is
+        // never touched: no network, no keys, no cost.
+        await BatchCancelWiringContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

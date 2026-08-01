@@ -20,8 +20,10 @@ import Foundation
 ///     (`OCRProcessor+OCR.swift:691`, `:703`) returns without setting `batchPollInterrupted`, so
 ///     `performBatchOCR:661-663` deletes the journal regardless of what `cancel()` decided. A green run
 ///     below does not make Stop safe end to end, and must not be used to close that item.
-///   * **The wiring** — nothing here proves `cancel()` passes `Self.deletePendingBatch` as the deleter, the
-///     live provider, or the journal's chunk IDs (filed as W16.bat2-fu).
+///   * **The wiring** — nothing HERE proves `cancel()` passes the paid-batch journal's deleter, the live
+///     provider, or the journal's chunk IDs. That is `BatchCancelWiringContract` (W16.bat2-fu), which drives
+///     the real `cancel()` with both seams stubbed; the two files are complementary and neither substitutes
+///     for the other.
 ///
 /// The checks pin three things a future edit must not break:
 ///   * **iff** — the journal is deleted if and only if the cancellation was confirmed, over every
