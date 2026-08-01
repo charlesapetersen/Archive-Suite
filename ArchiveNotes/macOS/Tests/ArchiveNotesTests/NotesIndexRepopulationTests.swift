@@ -143,6 +143,29 @@ struct NotesIndexRepopulationTests {
         await index.close()
     }
 
+    /// The other half of that objection, and the one an implementation gets wrong by scheduling before
+    /// it checks whether the open actually succeeded: an index that is STILL dead has recovered
+    /// nothing, so a read of it must walk nothing — otherwise the pathological case, a file that never
+    /// comes back, is precisely the one that walks the store on every keystroke.
+    @Test("a read over a still-dead index schedules no rebuild")
+    func stillDeadIndexSchedulesNoRebuild() async throws {
+        let dir = try scratchDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("index.sqlite3")
+        try writeGarbage(to: url)
+        let model = model(over: NotesIndex(url: url),
+                          store: try await store(in: dir, titles: ["Ptolemy"]))
+
+        await model.buildIndexFromDisk()
+        let settled = model.indexGeneration
+        for _ in 0..<3 { _ = await model.search("Ptolemy") }   // the file is never repaired
+
+        guard case .unavailable = model.indexFailure else {
+            Issue.record("precondition: the index must still be reported dead"); return
+        }
+        #expect(model.inFlightIndexRecoveryTask == nil, "nothing recovered, so nothing may be rebuilt")
+        #expect(model.indexGeneration == settled, "a dead index must not cost a store walk per read")
+    }
+
     /// One recovery, one pass — the reads that follow the first must not stack rebuilds on it. Each
     /// settled pass bumps `indexGeneration` by exactly one, so the token counts them.
     @Test("three reads after one repair run exactly one rebuild")

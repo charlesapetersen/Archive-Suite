@@ -836,12 +836,15 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   settled", and one did, and `isIndexReady` only ever goes true, so the hidden `an.status.indexReady` probe
   cannot regress to "building" under a test. No driver / no store is a no-op (nothing to walk). **Tier-1,
   scratch only** (garbage/empty sqlite3 files + real `.md` notes in per-test temp dirs; no real store, no
-  corpus, no network, $0): 9 new tests (`NotesIndexRepopulationTests`). **Non-vacuous, measured three ways:**
-  neutering the whole fix reddened 4 of 9 (refilled-on-a-later-read, `reloadItems` republish,
-  exactly-one-rebuild, ready-token-advances) while all 5 guards stayed green; then a **state-triggered**
-  neuter reddened *only* "searching a healthy index never schedules a rebuild", and an **inline-blocking**
-  neuter reddened *only* the off-the-critical-path assertion. All reverted; source `git diff` empty against
-  the checkpoint and `grep NEUTER` clean. **723/723** Notes (was 714), clean build, 0 new warnings. No
+  corpus, no network, $0): 10 new tests (`NotesIndexRepopulationTests`). **Non-vacuous, measured four
+  ways:** neutering the whole fix reddened 4 of 10 (refilled-on-a-later-read, `reloadItems` republish,
+  exactly-one-rebuild, ready-token-advances) while all 6 guards stayed green; then three targeted neuters
+  each reddened exactly ONE predicted test and nothing else — **state-triggered** (schedule on every
+  successful open) reddened only "searching a healthy index never schedules a rebuild"; **inline-blocking**
+  (await the rebuild on the read) reddened only the off-the-critical-path assertion; and **schedule-before-
+  checking-`opened`** reddened only "a read over a still-dead index schedules no rebuild" — the case where
+  a file that never comes back would walk the store on every keystroke. All reverted; source `git diff`
+  empty against the checkpoint and `grep NEUTER` clean. **724/724** Notes (was 714), clean build, 0 new warnings. No
   ArchiveCore type and no SPEC change → Reader/Processor untouched, so the shared-core all-three-app rebuild
   rule is N/A. No new view code, and no GUI fixture can corrupt an index mid-session, so there is nothing for
   the VM lane to see (same as m9/m9-fu) — the one GUI-adjacent surface, the `an.status.indexReady` probe, is
@@ -2371,6 +2374,19 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
   clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
   change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
+- [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
+  Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
+  warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`
+  can not be referenced from a nonisolated context", and the same for `launch()`/`activate()`/`terminate()`/
+  `waitForExistence` and the static `fixturePath`. The `setUp`/`tearDown` overrides are nonisolated while
+  every `XCUIApplication` member they touch is `@MainActor`. **Why it matters beyond tidiness:** they are
+  invisible on an incremental build and appear only on a fresh one (a new worktree's DerivedData), so a
+  session that greps its build log for `warning:` sees a wall of 22 and cannot tell a NEW warning from this
+  backdrop — which is exactly what the repo's "no new warnings" gate depends on being able to do. Fix is
+  annotation-only: `@MainActor override func setUpWithError()` / `tearDownWithError()` (or hoist the
+  `XCUIApplication` handling into the `@MainActor` test methods). Not new — the file has been untouched since
+  `73e91338` (W8-S8b) — and it does NOT need the VM or a GUI run: `xcodebuild build-for-testing` on the Notes
+  scheme reproduces and verifies it. Daemon-buildable, $0. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
 - [ ] **W21.seed — OWNER, one-time ~2 min: seed the Processor login-Keychain "Always Allow" [XS].** ⛔ **This
   gates every Processor GUI check.** Launch `./launch.sh processor` **interactively** once and click **Always
   Allow** on the login-Keychain prompt so the stable "Archive Suite Dev" cert requirement sticks across rebuilds

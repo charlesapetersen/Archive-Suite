@@ -484,12 +484,13 @@ either way, there is simply no disk to walk.
 
 Tests: `NotesIndexRecoveryTests` (4), `NotesIndexerFailureTests` (9), incl. the end-to-end shape — real `.md`
 notes on disk plus a dead index → settled, list genuinely empty, and that emptiness *reported*; plus
-`NotesModelIndexHealthTests` (11) over the model's own two reads and `NotesIndexRepopulationTests` (9) over
+`NotesModelIndexHealthTests` (11) over the model's own two reads and `NotesIndexRepopulationTests` (10) over
 the recovery rebuild. Scratch only. Every mechanism proven non-vacuous by neutering (m9-fu: the pre-fix code
 reddened 6 of 11 while the 5 must-not-over-report guards stayed green, then 3 neuters each reddened exactly
 one predicted assertion; m9-fu2: neutering the whole fix reddened 4 of 9 with the 5 guards green, then a
-state-triggered neuter reddened only "a healthy index is never rebuilt" and an inline-blocking neuter reddened
-only the off-the-critical-path half). Notes suite 723/723.
+state-triggered neuter reddened only "a healthy index is never rebuilt", an inline-blocking neuter reddened
+only the off-the-critical-path half, and scheduling before checking that the open SUCCEEDED reddened only "a
+read over a still-dead index schedules no rebuild"). Notes suite 724/724.
 
 ## ⚠️ OPEN: 4/12 `ArchiveNotesUITests` fail in the headless VM (warn-tier, not parking) — W21.vmgui-c
 
