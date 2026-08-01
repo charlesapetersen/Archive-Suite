@@ -392,8 +392,21 @@ from all 17 organization-mutating paths. `isMirrorStale` is readable synchronous
 the root read-only also stops SQLite creating its journal/WAL sidecars, so the mutation fails *before* the
 export and the test proves nothing about the mirror.
 
-**Residual (W23.m10-fu, LOW):** only a mutation exports, so if the volume recovers and the operator never
-touches folders again, the mirror stays stale for the session once the status line is dismissed.
+**Residual — ✅ FIXED (W23.m10-fu, LOW):** only a mutation exported, so if the volume recovered and the
+operator never touched folders again, the mirror stayed stale for the session (and into the next one — the
+DB wins at startup) once the status line had been dismissed. `OrganizationStore.retryStaleMirrorExport()`
+re-runs the same whole-graph export, and `NotesModel` hangs it off **app activation** and **app terminate**:
+the moment the operator comes back — the one correlated with having plugged the volume in — and the last
+moment the file can be written before the next launch inherits it. Three properties make that safe, each
+held by a test: it runs **only while stale**, so no app switch rewrites a healthy `organization.json`; it
+requires the graph to have finished loading, because `load` assigns `storeRoot` before it awaits the DB and
+a speculative export in that window would write a half-built forest; and while the volume is still bad it
+**re-posts** the warning on every activation (the m9-fu idiom), while a mirror that heals now has the
+model's own line **retracted** — the first time that mattered, since before this the claim could only stop
+being true via a mutation. Reentrancy was checked, not assumed: the trigger is a synchronous notification,
+so it can land while a mutation is suspended at its `await`, but every mutation commits DB → memory →
+export with no suspension between the last two, so the worst a retry can write is the consistent
+pre-mutation graph that the mutation's own export then supersedes.
 
 ## ✅ FIXED (W23.m9) — a failed `NotesIndex.open()` poisoned the DB until restart, and a dead index still read "Ready"
 **2026-07-30.** The cross-app twin of the Reader fix (`../ArchiveReader/KNOWN_ISSUES.md` has the shared

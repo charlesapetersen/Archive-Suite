@@ -1170,9 +1170,11 @@ private final class NotificationObservers {
 
     init(center: NotificationCenter) { self.center = center }
 
-    /// `queue: nil` runs `block` **synchronously on the posting thread** — the property the terminate
-    /// leg depends on, since an operation hopped onto the main queue would not run before the process
-    /// exits. AppKit posts the notifications this is used for on the main thread.
+    /// `queue: nil` is the documented "run the block **synchronously on the posting thread**" form, and
+    /// that guarantee is what the terminate leg rests on: a block merely *scheduled* onto a queue has
+    /// no promise of running before the process exits. (Measured: `queue: .main` also runs inline when
+    /// the post is already on the main queue, so today it behaves the same — this is about depending on
+    /// the contract rather than on that.) AppKit posts the notifications used here on the main thread.
     func observe(_ name: Notification.Name, using block: @escaping @Sendable (Notification) -> Void) {
         tokens.append(center.addObserver(forName: name, object: nil, queue: nil, using: block))
     }

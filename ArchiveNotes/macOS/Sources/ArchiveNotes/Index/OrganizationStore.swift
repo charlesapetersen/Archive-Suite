@@ -594,6 +594,15 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// **Runs only while stale**, which is what makes it safe to hang off something as frequent as app
     /// activation: a healthy mirror is never rewritten, so no app switch touches the user's file.
     /// Returns whether an export was attempted — the caller reads `mirrorFailure` for the outcome.
+    ///
+    /// **Reentrancy is safe here, by the store's existing convention, not by luck.** Its trigger is a
+    /// synchronous notification, so it can land on the main actor while a mutation is suspended at its
+    /// `await` — and `@MainActor` is reentrant. Every mutation commits in the order DB transaction →
+    /// memory → export, with no suspension between the last two, so the only state a retry can observe
+    /// mid-mutation is the consistent *pre-mutation* graph: it writes that, and the mutation's own
+    /// export overwrites it a moment later with the new one. (If that mutation instead throws, memory
+    /// never moved and the pre-mutation graph was the right thing to have written.) A mutation that
+    /// updated memory before its await would break that — hence this note next to the convention.
     @discardableResult
     func retryStaleMirrorExport() -> Bool {
         guard isMirrorStale, didLoadGraph else { return false }

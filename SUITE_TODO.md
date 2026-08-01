@@ -907,7 +907,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   existed and is GUI-covered), so nothing for the VM lane. Residual filed as **W23.m10-fu** (LOW).
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Index/OrganizationFile,Index/OrganizationStore,Core/NotesModel,Core/NotesNavigationModel}.swift | S | med | none
 
-- [ ] **W23.m10-fu — a recovered volume doesn't re-mirror until the next organization mutation
+- [x] **W23.m10-fu — a recovered volume doesn't re-mirror until the next organization mutation
   [XS · LOW].** Residual of W23.m10, filed 2026-07-30. `mirrorFailure` is cleared by the next *successful
   export*, and the only thing that exports is a mutation — so if the disk frees up (or the volume comes back)
   and the operator never touches folders again, `organization.json` stays stale for the rest of the session
@@ -916,6 +916,43 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   retry the export opportunistically while `isMirrorStale` (on app activate / periodically / before
   terminate), or make the sidebar line sticky while stale rather than dismissible. Notes
   `Index/OrganizationStore.swift`, `Core/NotesModel.swift`. | Tier-1 | XS | LOW
+  — ✅ **DONE** (checkpoints `bd2ac11` = code, `7a5cf04` = tests). `OrganizationStore.retryStaleMirrorExport()`
+  re-runs the same **whole-graph** export — so one working write recovers everything that missed the mirror,
+  with no queue of changes to replay — and `NotesModel` hangs it off **app activation** and **app terminate**.
+  Those two, not a timer: activation is the moment correlated with the volume having come back, terminate is
+  the last moment the file can be written before the next launch inherits it (the DB wins at startup, so
+  nothing else re-syncs it), and this app does no background polling. **Three guards, each a way the obvious
+  implementation goes wrong.** (1) It runs **only while stale**, so no app switch rewrites a healthy
+  `organization.json` — the whole reason it is safe to hang off something that frequent. (2) It requires the
+  graph to have **finished loading**: `load` assigns `storeRoot` before it awaits the DB, and a speculative
+  export in that window would put a half-built forest in the user's file. (3) The stale line is **re-posted**
+  on every activation while the volume is still bad (the m9-fu "a dismissed banner comes back" idiom) and
+  **retracted** when the mirror heals — narrowly, only if the line still showing is the one this model posted,
+  since `statusMessage` is shared. Retraction had to ship *with* the retry: before it, `mirrorFailure` could
+  only stop being true via a mutation, so nothing could leave a false claim on screen. **Reentrancy checked,
+  not assumed:** the trigger is a synchronous notification, so it can land on the main actor while a mutation
+  is suspended at its `await` (`@MainActor` is reentrant) — but every mutation in the store commits DB
+  transaction → memory → export with **no suspension between the last two**, so the only state a retry can
+  observe mid-mutation is the consistent *pre-mutation* graph, which that mutation's own export supersedes a
+  moment later (and if it throws instead, the pre-mutation graph was the right thing to have written). Noted
+  next to the convention it depends on. The observers live in a small non-isolated box so they are removed
+  when the model dies — a `@MainActor` type's `deinit` cannot touch its own token array. Tier-1 but gated
+  like Tier-2 (it writes a durable file), scratch only (`temporaryDirectory` fixtures + a `0555` root, index
+  deliberately outside it; never the real store, no corpus, no network, $0): **9 new tests**
+  (`OrganizationMirrorRetryTests`), including sentinel bytes to prove a healthy mirror is *not* rewritten.
+  **Non-vacuous by 4 neuters, each reddening exactly the predicted tests and nothing else:** dropping the
+  stale-only guard → the 2 "healthy mirror untouched" tests; dropping the loaded-graph guard → the no-root
+  test; unwiring the triggers → the 4 notification tests; dropping the retraction → the recovery test only
+  (the "don't swallow another subsystem's line" test correctly stayed green). All reverted, `grep NEUTER`
+  clean. A 5th measurement corrected a *comment* rather than code: `queue: .main` also runs inline when the
+  post is already on the main queue, so the doc no longer claims a behavioural difference it doesn't have —
+  `queue: nil` is kept for the documented synchronous-delivery guarantee the terminate leg rests on.
+  **733/733** Notes (was 724), clean build, **0 new warnings**. Notes-internal — no ArchiveCore type and no
+  SPEC change → the shared-core all-three-app rebuild rule is N/A. No new view code (the `an.sidebar.status`
+  line already existed and is GUI-covered) and no GUI fixture can make a volume read-only mid-session, so
+  there is nothing for the VM lane to see — same argument as m10/m9-fu2.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Index/OrganizationStore.swift,
+  Sources/ArchiveNotes/Core/NotesModel.swift, Tests/ArchiveNotesTests/OrganizationMirrorRetryTests.swift}
 
 - [x] **W23.m11 — the app-wide inline-image cache can display another note's same-named image
   [S · MED · wrong content shown].** ✅ DONE this commit. Premise re-confirmed by symbol first and it was
