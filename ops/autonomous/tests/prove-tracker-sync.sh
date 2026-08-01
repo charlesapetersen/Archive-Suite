@@ -55,14 +55,39 @@ run '## WORK QUEUE
 [ "$RC" = 1 ] && ok "plan DONE + tracker OPEN -> exit 1" || bad "expected 1, got $RC"
 case "$OUT" in *"record disagrees"*) ok "describes the reverse direction distinctly";; *) bad "reverse wording missing: $OUT";; esac
 
-# ---- 4. legitimate asymmetry must NOT fire -------------------------------------------------------------
+# ---- 4. asymmetry: todo-only is silent, plan-only ACTIONABLE is untracked work -------------------------
+# A SUITE_TODO item the daemon never sees is normal (long tail). A plan item the daemon WILL offer with no
+# tracker entry is not — that is the W16.cfg6-fu2 shape, filed in the plan on 2026-08-01 and missed here.
 run '## WORK QUEUE
 - [ ] **W3.a — in both**
-- [ ] **W3.plan-only — daemon-side only**
 
 ## HOLD QUEUE' '- [ ] **W3.a — in both**
 - [x] **W3.todo-only — long tail the daemon never sees**'
-[ "$RC" = 0 ] && ok "items present in only ONE file are not drift" || bad "asymmetry wrongly flagged: $OUT"
+[ "$RC" = 0 ] && ok "a SUITE_TODO-only item is not drift (long tail)" || bad "todo-only wrongly flagged: $OUT"
+
+run '## WORK QUEUE
+- [ ] **W3.a — in both**
+- [ ] **W3.plan-only — actionable, but absent from the tracker**
+
+## HOLD QUEUE' '- [ ] **W3.a — in both**'
+[ "$RC" = 1 ] && ok "a plan-only ACTIONABLE item is reported as untracked (W16.cfg6-fu2 shape)" \
+              || bad "untracked actionable item not reported: rc=$RC $OUT"
+case "$OUT" in *"W3.plan-only"*) ok "names the untracked item";; *) bad "not named: $OUT";; esac
+case "$OUT" in *"NO entry in SUITE_TODO"*) ok "says what is wrong with it";; *) bad "no explanation: $OUT";; esac
+
+# A DONE plan item that is absent from the tracker is history, not untracked work — must stay quiet.
+run '## WORK QUEUE
+- [x] **W3.oldwork — finished long ago, never mirrored**
+
+## HOLD QUEUE' '- [ ] **W3.a — unrelated**'
+[ "$RC" = 0 ] && ok "a DONE plan-only item is history, not untracked work" || bad "done plan-only flagged: $OUT"
+
+# Milestone markers and prose bullets are legitimately plan-only — only tags shaped like item IDs count.
+run '## WORK QUEUE
+- [ ] **Waves 13-23 COMPLETE** — a milestone marker, not an item
+
+## HOLD QUEUE' '- [ ] **W3.a — unrelated**'
+[ "$RC" = 0 ] && ok "a dotless milestone marker is not treated as untracked work" || bad "marker flagged: $OUT"
 
 # ---- 5. HOLD QUEUE is out of scope ---------------------------------------------------------------------
 # An item parked in the hold queue is not offered as work, so its state is not the same assertion.

@@ -2433,3 +2433,27 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   Build clean, 0 new warnings. Unblocks **W23.m5**, which reuses this exact mechanism for the 9 Process Files
   sites. Original entry: `LiveCaptureProcessor.swift:640/647/673` — **(a) the SPEC subject-collision:** the live path writes tags via the raw `[String]` `MacOSTagger.applyTags` overload (no `colorIsAuthoritative`), so a document segment whose subject is literally "Red"/"Purple" is promoted to a Finder color label (Red=6/Purple=3) → the Reader mis-parses it as a box/folder photo. KNOWN_ISSUES #5's fix (derive authoritative color from classification) was applied to the batch merge path but **never to the live streaming path**. *(Premise manually confirmed: raw overload at all 3 call sites.)* **(b) tag-write failures are silently swallowed** (found by the 2026-07-18 review; was NOT in any KNOWN_ISSUES entry): all three sites are `_ = try? MacOSTagger.applyTags(...)`, so a PDF can land byte-perfect, count as **filed**, and have its **source photo trashed** while carrying no subject/date/priority tags at all — in the Reader that file is then invisible to tag-driven triage. **This is the only way today's "filed" verdict can be wrong without the operator ever knowing.** Owner decision 2026-07-18: record a per-artifact `tagsApplied` and **warn in the finalize summary**, but the file still counts as filed — the bytes are safe and retagging is possible, so withholding "filed" (and thus retaining the source) over-corrects. ⚠️ **THESE MUST BE ONE COMMIT.** (a) changes *which* overload is called; (b) changes *whether the result is discarded* — both rewrite the same three lines, so landing them separately means the second silently reverts part of the first. | Capture | Tier-2
 
+## P3 — Suite structural
+
+- [x] **SUITE.consolidate — one item list, and a doc set where every split has a stated reason.** DONE
+  2026-08-01 (`08fa6ed`, `92f0667`, `3483627`, `ec967aa`, `3c00f46`, and this commit). Owner-directed, executed
+  interactively with the daemon down. Driven by one morning producing the same defect three times — a stale
+  `W21.vmgui-path` checkbox, a six-grants-stale tag list in `resume-prompt.txt`, a prove script false-failing 4
+  runs in 6 — every one *a secondary copy drifting from the truth*.
+  **Audit:** each document was tested against five criteria (tooling binds its path / distinct lifecycle /
+  audience / durability / mutability), per the owner's instruction to check there was "actually a reason and
+  not just path determinacy". Most splits survived with the reason now written down — `AGENTS.md` on audience
+  (non-Claude agents that never read `CLAUDE.md`), `REVIEW.md` on load pattern, the per-app `CLAUDE.md` files on
+  the token-efficiency directive. Four did not.
+  **Shipped:** `check-tracker-sync.sh`, WARN-only on every health gate, which also reports untracked actionable
+  work (25 assertions); the dead 139K `ARCHIVE_NOTES_PROGRESS.md` retired to `old/`; GUI verification
+  de-duplicated to one canonical home in `AGENTS.md`; 160 completed entries moved here out of `SUITE_TODO`
+  (3,580 → 1,189 lines); and the plan's 36 open WORK QUEUE entries collapsed to one-liners, removing 208 lines
+  of duplicated prose and the dual-write tax on every item edit.
+  **NOT done, deliberately:** replacing the plan's checkboxes with bare tag references. Tried and reverted — it
+  dropped `(blocked-on: …)` clauses that live only in the plan, flipping `W16.bat6` and `W21.vmgui` from
+  `blocked` to `ok`, and W16.bat6 going actionable before W16.bat3 would have inverted a fix order the owner had
+  confirmed that morning. The guard already makes that class of drift loud, which was the actual goal. The
+  reasoning sits at the code site (`next-queue-item.sh` §2b) and in the plan's WORK QUEUE header, so a future
+  attempt starts from it — deliberately NOT left as a lingering execution plan.
+

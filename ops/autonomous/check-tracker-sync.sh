@@ -76,10 +76,28 @@ both="$(join -t"$TAB" "$P" "$T" 2>/dev/null)"
 overlap="$(printf '%s' "$both" | grep -c . || true)"
 report="$(printf '%s\n' "$both" | awk -F"$TAB" 'NF==3 && $2 != $3')"
 
-if [ -z "$report" ]; then
+# UNTRACKED ACTIONABLE WORK — a different defect from drift, and invisible to the comparison above.
+# An item can be OPEN in the plan's WORK QUEUE (so the daemon will offer it) while having no entry at all in
+# SUITE_TODO. Nothing above sees that, because only items present in BOTH files are compared. Found on
+# 2026-08-01: `W16.cfg6-fu2` was filed in the plan and missed in the tracker, and FOUR more were live —
+# including `W21.vmgui-c`, the head of the queue. Restricted to tags containing a `.` so milestone markers
+# ("Waves 13–23 COMPLETE") and other prose bullets, which are legitimately plan-only, stay quiet.
+untracked="$(awk -F"$TAB" '$2==" " && $1 ~ /\./ {print $1}' "$P" \
+             | while IFS= read -r t; do grep -qxF -- "$t" <(cut -f1 "$T") || echo "$t"; done)"
+
+if [ -z "$report" ] && [ -z "$untracked" ]; then
   [ "$QUIET" = 1 ] || echo "  ✓ tracker-sync: plan WORK QUEUE and SUITE_TODO agree on all $overlap shared items"
   exit 0
 fi
+
+if [ -n "$untracked" ]; then
+  n_u="$(printf '%s\n' "$untracked" | grep -c .)"
+  echo "  ⚠ tracker-sync: $n_u actionable plan item(s) have NO entry in SUITE_TODO — untracked work:"
+  printf '%s\n' "$untracked" | sed 's/^/      /'
+  echo "      The daemon can pick these up, but the tracker of record does not know they exist."
+fi
+
+if [ -z "$report" ]; then exit 1; fi
 
 n="$(printf '%s\n' "$report" | grep -c .)"
 echo "  ⚠ tracker-sync: $n of $overlap shared items DISAGREE between the plan and SUITE_TODO:"

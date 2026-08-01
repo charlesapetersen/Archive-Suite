@@ -1124,26 +1124,6 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 > `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
 > on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
 
-## P3 — Suite structural
-- [ ] **SUITE.consolidate — one item list, and a doc set where every split has a stated reason.**
-  Plan: [`execution-plans/tracker-consolidation.md`](execution-plans/tracker-consolidation.md). Owner-directed
-  2026-08-01, executed **interactively with the daemon down** — never daemon work, since Phase 4 changes
-  `next-queue-item.sh`, the thing that selects daemon work. Driven by one morning producing the same defect
-  three times (stale `W21.vmgui-path` checkbox, a six-grants-stale tag list in `resume-prompt.txt`, a prove
-  script false-failing 4 runs in 6) — all *a secondary copy drifting from the truth*.
-  Audit result: most splits DO have a nameable reason (tooling binding, distinct lifecycle/audience/durability
-  /mutability) and are kept; four do not. **Phase 0 ✅** tracker-sync guard (`08fa6ed`). **Phase 1 ✅** retired
-  the dead `ARCHIVE_NOTES_PROGRESS.md`. **Phase 3 ✅** GUI verification de-duplicated into `AGENTS.md`
-  (`92f0667`). **Phase 2 ✅** 160 completed entries moved to `SUITE_TODO_DONE.md`; the live queue went 3,580 →
-  1,189 lines (`3483627`).
-  **⚠️ Phase 4 — REMAINS OPEN, and this is the actual F1 fix.** Attempted 2026-08-01 and **deliberately
-  reverted**: a trial migration was silently wrong twice. It dropped `(blocked-on: …)` clauses that live in the
-  plan's item text and not in this file, flipping **`W16.bat6` and `W21.vmgui` from `blocked` to `ok`** — and
-  W16.bat6 going actionable before W16.bat3 lands would have inverted a fix order the owner confirmed that
-  morning. It also emitted a mixed queue in the wrong ORDER, which is the one thing the plan's WORK QUEUE
-  exists to get right. Nothing shipped; the plan file was restored and the resolver output re-verified
-  identical. The design and all three findings are written up in the plan — resume from there, don't restart.
-  Delete the plan when Phase 4 lands. | Tier-2 | M
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 ## Excluded (not "now": need cost / owner accounts)
 - Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).
