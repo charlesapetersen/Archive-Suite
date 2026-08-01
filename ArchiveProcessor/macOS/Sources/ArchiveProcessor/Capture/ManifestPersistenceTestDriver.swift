@@ -115,6 +115,55 @@ enum ManifestPersistenceTestDriver {
         configDefaults.set(21.0, forKey: DefaultsKeys.pdfImageSizeMB)
         configDefaults.set(5, forKey: DefaultsKeys.textColumns)
 
+        // --- W16.cfg6-fu2: LIVE CAPTURE's builder clamps identically to the run-start one. ---
+        // `fromDefaults()` used to size pdfImageMB/exportedImageMB with bare inline closures
+        // (`p > 0 ? p : 2.0`) — no `.isFinite` guard, no 0.5 floor, no 20 ceiling — while the other three
+        // values went through the strict shared helpers. `CaptureSession` snapshots its whole session
+        // config from `fromDefaults()`, so those two closures were the ONLY clamp an out-of-range default
+        // met on the live path: 21 MB stayed 21 for a live capture while Process Files made it 20.
+        // These pin the fix at the VALUE level (a check that merely compares the two builders to each
+        // other would stay green if both drifted together).
+        let liveBuilderConfig = SessionProcessingConfig.fromDefaults(configDefaults)
+        check("W16.cfg6-fu2: fromDefaults clamps every sizing value, so Live Capture cannot be handed one out of range",
+              liveBuilderConfig.standardImageMB == 0.5   // 0.1 → floor
+              && liveBuilderConfig.ocrWorkerCount == 12  // 13  → ceiling
+              && liveBuilderConfig.pdfImageMB == 20      // 21  → ceiling (was 21 unclamped)
+              && liveBuilderConfig.exportedImageMB == 3  // non-finite → fallback (was passed through)
+              && liveBuilderConfig.textColumns == 4)     // 5   → ceiling
+        check("W16.cfg6-fu2: the live and run-start builders now resolve to the same five numbers",
+              liveBuilderConfig.runSizing == SessionProcessingConfig.runSizing(configDefaults)
+              && SessionProcessingConfig.fromProcessFilesRunStart(configDefaults).runSizing
+                  == liveBuilderConfig.runSizing)
+
+        // A separate suite, so these edge values cannot disturb the assertions above or below.
+        let fu2Suite = "APManifestTest-fu2-\(UUID().uuidString)"
+        let fu2Defaults = UserDefaults(suiteName: fu2Suite)!
+        defer { fu2Defaults.removePersistentDomain(forName: fu2Suite) }
+        let unsetConfig = SessionProcessingConfig.fromDefaults(fu2Defaults)
+        check("W16.cfg6-fu2: an unset sizing default still yields the documented fallback, not the floor",
+              unsetConfig.pdfImageMB == 2.0 && unsetConfig.exportedImageMB == 3.0
+              && unsetConfig.standardImageMB == 3.0 && unsetConfig.ocrWorkerCount == 4
+              && unsetConfig.textColumns == 1)
+        // The sub-floor case the old closures let through untouched: `0.25 > 0`, so it was kept verbatim.
+        fu2Defaults.set(0.25, forKey: DefaultsKeys.pdfImageSizeMB)
+        fu2Defaults.set(0.4, forKey: DefaultsKeys.exportedImageSizeMB)
+        let subFloorConfig = SessionProcessingConfig.fromDefaults(fu2Defaults)
+        check("W16.cfg6-fu2: a sub-floor image size is raised to 0.5, not embedded as written",
+              subFloorConfig.pdfImageMB == 0.5 && subFloorConfig.exportedImageMB == 0.5)
+        // Non-finite is the case the old closures were WORST at: `Double.infinity > 0` is true, so an
+        // infinite target went to Live Capture verbatim — and UserDefaults really does round-trip it
+        // (measured, not assumed). NaN and negatives already fell back before the fix; they are here to
+        // pin that the new `.isFinite && > 0` guard did not trade one hole for another.
+        fu2Defaults.set(Double.infinity, forKey: DefaultsKeys.pdfImageSizeMB)
+        fu2Defaults.set(Double.nan, forKey: DefaultsKeys.exportedImageSizeMB)
+        let nonFiniteConfig = SessionProcessingConfig.fromDefaults(fu2Defaults)
+        check("W16.cfg6-fu2: an infinite or NaN image size falls back rather than reaching a live session",
+              fu2Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB).isInfinite   // the input really is ∞
+              && nonFiniteConfig.pdfImageMB == 2.0 && nonFiniteConfig.exportedImageMB == 3.0)
+        fu2Defaults.set(-3.0, forKey: DefaultsKeys.pdfImageSizeMB)
+        check("W16.cfg6-fu2: a negative image size falls back rather than being floored to 0.5",
+              SessionProcessingConfig.fromDefaults(fu2Defaults).pdfImageMB == 2.0)
+
         // --- W16.cfg2/cfg6: an injected config wins; with none, the helpers read defaults, not a global. ---
         let liveSizing = SessionProcessingConfig.runSizing()
         let fallbackPDF = OCRProcessor.pdfGenerationSettings(for: nil)

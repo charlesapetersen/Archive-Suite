@@ -701,6 +701,15 @@ lock-backed (`5b58da8`) and an explicit per-call parameter at all 13 sites since
 reads it, and it is tracked for deletion as **W16.cfg6-fu**. The concurrent-runs + Thread-Sanitizer stress
 driver from the verification plan stays deferred (needs live keys or an owner-approved stub OCR backend).
 
+**One gap the "single run config" framing hid, closed 2026-08-01 by W16.cfg6-fu2:** `fromDefaults()` — the
+builder **Live Capture** snapshots — clamped `pdfImageMB`/`exportedImageMB` with looser inline closures than
+`runSizing()`, so an out-of-range setting reached a live capture unclamped (21 MB stayed 21; `+.infinity`
+passed straight through, since `inf > 0`) while Process Files clamped the same number. All five sizing values
+now come from `runSizing()` on every defaults read. Scope that honestly: it is **one clamp per defaults read**,
+not one clamp in the app — the settings *writers* are still unbounded (an unbounded Settings text field, an
+unvalidated processing profile, a worker count the ETA clamps low-only), tracked as **W16.cfg6-fu3**. Nothing
+out of range can reach a run; a number out of range can still be stored and shown back to the operator.
+
 *Historical record below.* Promoted to `SUITE_TODO.md` §"Known-issues
 work — Wave 16" as **W16.cfg1–cfg6**. **Owner decision: extend `SessionProcessingConfig` to be the single run
 config** (it already carries 5 of the 6 values; `ocrWorkerCount` is the only gap) and have

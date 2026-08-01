@@ -25,6 +25,9 @@ struct SessionProcessingConfig: Sendable {
     var tagVocabulary: [String]
     var gateway: GatewayConfig?
     var outputImageFile: Bool         // two files (PDF + separate image) vs one file (PDF only)
+    // 0 still means "full resolution" to the writers (`PDFGenerator`, `ImageEncoding`), but NEITHER
+    // builder below can produce it: a defaults read of 0 (or of anything out of range) resolves to the
+    // 2 MB / 3 MB fallback. Only a direct memberwise construction can pass the 0 sentinel through.
     var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
     var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
     var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
@@ -48,16 +51,28 @@ struct SessionProcessingConfig: Sendable {
     /// The five run-scoped sizing/concurrency values, and nothing else.
     ///
     /// These are exactly the numbers that used to live in `OCRProcessor`'s six mutable
-    /// `nonisolated(unsafe)` statics (W16.cfg6 deleted them). They are grouped here so the two things
-    /// that answer for a Process Files run — `fromProcessFilesRunStart()` and the last-resort read
-    /// below — cannot drift apart: both normalize through `runSizing(_:)`.
+    /// `nonisolated(unsafe)` statics (W16.cfg6 deleted them). They are grouped here so every path that
+    /// answers for them cannot drift apart: `fromDefaults()` (which is what **Live Capture** snapshots),
+    /// `fromProcessFilesRunStart()`, and the last-resort read below all normalize through
+    /// `runSizing(_:)`.
     ///
-    /// ⚠️ That is **one clamp per value on the run-start path, not app-wide.** `fromDefaults()` still
-    /// normalizes `pdfImageMB`/`exportedImageMB` with its own looser inline closures (no `.isFinite`
-    /// guard, no 0.5 floor, no 20 ceiling), and Live Capture builds its session config from
-    /// `fromDefaults()` — so an out-of-range default reaches Live Capture unclamped while Process Files
-    /// clamps it. That divergence predates W16.cfg6, which did not touch `fromDefaults()`; it is filed
-    /// as **W16.cfg6-fu2**. Do not read this type as proof the two paths already agree.
+    /// ⚠️ Scope that exactly: **one clamp per value per DEFAULTS READ** — NOT "the only clamp in the app".
+    /// Downstream still re-bounds some of these (`OCRProcessor.schedulingWorkerCount` the worker count,
+    /// `PDFGenerator` the column count); those are idempotent belt-and-braces over an *injected* config,
+    /// which need not have come from a defaults read. Two paths bypass this type and are **not** covered:
+    /// a resumed Process Files run, which fail-closed *validates* its persisted runtime config against
+    /// these same ranges rather than clamping it (`OCRProcessor.pendingRunRuntimeConfigIsValid`), and
+    /// `StagedSegment`'s decoder, which restores a staged live segment's sizes verbatim. Those, plus the
+    /// Settings text field that lets an out-of-range number be typed and stored in the first place, are
+    /// filed as **W16.cfg6-fu3**.
+    ///
+    /// W16.cfg6-fu2 is what made even the narrow claim true. Until then `fromDefaults()` sized `pdfImageMB` and
+    /// `exportedImageMB` with its own looser inline closures — no `.isFinite` guard, no 0.5 floor, no 20
+    /// ceiling — while `standardImageMB`/`ocrWorkerCount` went through the strict shared helpers. Since
+    /// Live Capture builds its session config from `fromDefaults()` (`CaptureSession.swift`) and Process
+    /// Files overwrites the five values at run start, an out-of-range default reached Live Capture
+    /// unclamped while the same number was clamped for Process Files: a 500 MB `pdfImageSizeMB` sized the
+    /// image embedded in every live-captured PDF, and an infinite one is not a size at all.
     struct RunSizing: Sendable, Equatable {
         var standardImageMB: Double
         var ocrWorkerCount: Int
@@ -106,7 +121,12 @@ struct SessionProcessingConfig: Sendable {
     }
 
     /// Read the app's shared settings into a config snapshot.
+    ///
+    /// The five sizing/concurrency values come from `runSizing(_:)` — the same single normalization the
+    /// Process Files run start uses (W16.cfg6-fu2). This matters because **Live Capture snapshots its
+    /// whole session config here**, so this is the only clamp an out-of-range default meets on that path.
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
+        let sizing = runSizing(d)
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let modelId = d.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
         let builtIns = provider.models
@@ -152,8 +172,8 @@ struct SessionProcessingConfig: Sendable {
             sendPreviousImage: d.bool(forKey: DefaultsKeys.sendPreviousImage),
             customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
-            standardImageMB: normalizedImageMB(d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0),
-            ocrWorkerCount: ocrWorkerCount(from: d),
+            standardImageMB: sizing.standardImageMB,
+            ocrWorkerCount: sizing.ocrWorkerCount,
             enableSegmentJSON: d.object(forKey: DefaultsKeys.enableSegmentJSON) as? Bool ?? true,
             tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
                 .components(separatedBy: .newlines)
@@ -161,29 +181,24 @@ struct SessionProcessingConfig: Sendable {
                 .filter { !$0.isEmpty },
             gateway: gateway,
             outputImageFile: (d.object(forKey: DefaultsKeys.outputImageFile) as? Bool) ?? true,
-            pdfImageMB: { let p = d.double(forKey: DefaultsKeys.pdfImageSizeMB); return p > 0 ? p : 2.0 }(),
-            exportedImageMB: { let e = d.double(forKey: DefaultsKeys.exportedImageSizeMB); return e > 0 ? e : 3.0 }(),
-            textColumns: { let tc = d.integer(forKey: DefaultsKeys.textColumns); return tc > 1 ? min(4, tc) : 1 }(),
+            pdfImageMB: sizing.pdfImageMB,
+            exportedImageMB: sizing.exportedImageMB,
+            textColumns: sizing.textColumns,
             localAgent: LocalAgentConfig.fromDefaults(d)
         )
     }
 
     /// Build the Process Files run snapshot with the exact normalization historically performed by
-    /// `OCRProcessor.loadStandardImageMB()`. Fresh runs, resumes, and standalone diagnostics now inject
-    /// these values across OCR, PDF generation, review, tagging, export, and merge.
+    /// `OCRProcessor.loadStandardImageMB()`. Fresh runs, resumes, and standalone diagnostics inject these
+    /// values across OCR, PDF generation, review, tagging, export, and merge.
+    ///
+    /// Retained as the *named* run-start seam its call sites read against, but since W16.cfg6-fu2 it is
+    /// exactly `fromDefaults(d)`: that builder now applies the same `runSizing(_:)` normalization, so
+    /// there is nothing left for a run start to correct. It used to re-apply the sizing on top —
+    /// necessary only because `fromDefaults()` clamped two of the five values more loosely, which is the
+    /// bug fu2 fixed. If run start ever needs to freeze something Live Capture must not, it goes here.
     static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
-        var config = fromDefaults(d)
-        config.applySizing(runSizing(d))
-        return config
-    }
-
-    /// Overwrite this config's five sizing/concurrency values from an already-normalized read.
-    mutating func applySizing(_ sizing: RunSizing) {
-        standardImageMB = sizing.standardImageMB
-        ocrWorkerCount = sizing.ocrWorkerCount
-        pdfImageMB = sizing.pdfImageMB
-        textColumns = sizing.textColumns
-        exportedImageMB = sizing.exportedImageMB
+        fromDefaults(d)
     }
 
     /// The effective model for OCR calls (gateway model when a gateway is configured).

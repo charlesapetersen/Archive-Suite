@@ -368,20 +368,28 @@ per-call parameter at all 13 sites; the remaining flip is a test affordance on a
 went stale at W16.cfg2, which migrated it to injection.) The one item still open in this area is the
 owner-gated concurrent-runs/TSan stress driver at the bottom of this section — it needs live keys or an
 approved stub OCR backend, and is NOT queued.
-- [ ] **W16.cfg6-fu2 — `fromDefaults()` clamps looser than `runSizing()`, so Live Capture gets unclamped image
-  sizes [S · verified].** Filed by W16.cfg6's adversarial review and **re-verified on both halves during the
-  2026-08-01 owner walkthrough.** `SessionProcessingConfig.fromDefaults()` builds `pdfImageMB` and
-  `exportedImageMB` from bare inline closures (`p > 0 ? p : 2.0`) — no `.isFinite` guard, no 0.5 floor, no 20
-  ceiling — while `standardImageMB`/`ocrWorkerCount` go through the strict shared helpers
-  (`normalizedImageMB`/`ocrWorkerCount`). Live Capture builds its config from `fromDefaults()`
-  (`CaptureSession.swift:230`); Process Files overwrites the five sizing values via `fromProcessFilesRunStart`
-  (`+Pipeline.swift:279`, `:320`). So an out-of-range default reaches **Live Capture unclamped** while Process
-  Files clamps it. Pre-dates cfg6, which never touched `fromDefaults()`. Fix: route those two through
-  `normalizedImageMB`. ⚠️ **Filed in the plan on 2026-08-01 but missed here until the consolidation audit
-  caught it** — an item actionable by the daemon with no entry in the tracker of record. `check-tracker-sync`
-  cannot catch that shape by design (it only compares items present in BOTH files, so plan-only items stay
-  silent to avoid drowning the signal in noise).
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/SessionProcessingConfig.swift | Tier-2 | S
+- [ ] **W16.cfg6-fu3 — the WRITERS of the five sizing settings are still unbounded; the reader is what saves
+  them [S · LOW].** Filed by W16.cfg6-fu2's adversarial review + consumer trace (2026-08-01). fu2 made every
+  *defaults read* clamp, so nothing out of range reaches a run any more — this item is about the settings
+  being storable and displayable out of range in the first place, which is now a visible-vs-effective
+  divergence rather than a processing bug. Four sites, no undo issue, none urgent:
+  1. `Views/SettingsView.swift:552`/`:569`/`:592` — each MB row pairs a **bounded `Stepper` (0.5…20)** with an
+     **unbounded `TextField`** (`.number`, no range, no `.onChange`). Typing `500` persists `500`; the field
+     keeps showing `500` while every run uses 20. Same shape for `ocrWorkerCount` (Stepper 1…12).
+  2. `Views/SettingsView.swift:228`/`:541` — the cost pane multiplies the **raw** `standardImageSizeMB`, so a
+     500 MB setting is quoted to the operator at ~167× the size the pipeline will actually send.
+  3. `Models/TimeEstimator.swift:68-72` (fed by `Views/OCRView.swift:24` + `SettingsView.swift:245`) — clamps
+     the worker count **low only** (`max(1, ocrWorkers)`, no `min(12,…)`): a stored 100 makes the ETA ~8×
+     optimistic while the pipeline still runs 12.
+  4. `Models/ProcessingProfileStore.swift:128-156` — reads AND writes all five keys verbatim, no bounds, and
+     its JSON blob decodes unvalidated; applying a hand-edited profile puts any Double back into the keys.
+  Also uncovered by fu2, deliberately: `LiveCaptureProcessor` `StagedSegment.init(from:)` (`:618-620`) restores
+  a staged segment's sizes verbatim. Moot for now — no production material, and a staged segment is written by
+  the same build that reads it. **The right end state is probably to bound the writers** (a `.onChange` clamp
+  or a bounded formatter) rather than add a fifth clamp; check first whether an operator typing a big number
+  means "keep the original bytes" — `ImageEncoding.writeSizedJPEG`/`PDFGenerator` DO have a verbatim fast path
+  for a source under the target, so a 500 MB target used to mean "never re-encode" on the live path.
+  | files: Views/SettingsView.swift, Models/{TimeEstimator,ProcessingProfileStore}.swift | S | low | none
 - [ ] **W16.cfg6-fu — delete `MacOSTagger.stampUnread` and the `taggingMode.didSet` that arms it [XS · LOW].**
   Filed by W16.cfg6 (2026-08-01); the follow-up `MacOSTagger.swift:17-27` names in its own doc comment. It is the
   last ambient tagging global. Nothing in production READS it — W16.cfg4 made `stampUnread:` a required

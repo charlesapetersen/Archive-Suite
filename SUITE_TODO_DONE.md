@@ -1511,6 +1511,32 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   and the legacy image-scale clamp mismatch, then approved.
   | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
     Capture/{BatchResumeTestDriver,SessionProcessingConfig}.swift, Views/ToolsView.swift | M | med | none
+- [x] **W16.cfg6-fu2 — `fromDefaults()` clamped looser than `runSizing()`, so Live Capture got unclamped image
+  sizes [S · verified].** DONE 2026-08-01 (this commit). Filed by W16.cfg6's adversarial review and re-verified
+  on both halves during the 2026-08-01 owner walkthrough. `fromDefaults()` built `pdfImageMB`/`exportedImageMB`
+  from bare inline closures (`p > 0 ? p : 2.0`) — no `.isFinite` guard, no 0.5 floor, no 20 ceiling — while
+  `standardImageMB`/`ocrWorkerCount` went through the strict shared helpers. **Live Capture snapshots its whole
+  session config from `fromDefaults()`** (`CaptureSession.swift:230`), so those closures were the only clamp an
+  out-of-range default met on the live path: a 21 MB `pdfImageSizeMB` stayed 21 for a live capture (Process
+  Files made it 20), and `+.infinity` — which UserDefaults really does round-trip, measured — passed straight
+  through, since `inf > 0`. Fixed by taking **all five** sizing values in `fromDefaults()` from `runSizing(_:)`,
+  so there is one normalization per defaults read. `fromProcessFilesRunStart()` therefore had nothing left to
+  correct: it is now a one-line forward, and the callerless `applySizing(_:)` is deleted. `textColumns`'
+  old closure was already numerically equivalent (`tc > 1 ? min(4, tc) : 1` ≡ `min(4, max(1, tc))` for every
+  `Int`, `Int.min` included) — merged for one definition, not to change behaviour.
+  **Verification:** Debug build clean, 0 new warnings; `test-manifest-persistence.sh` **96 PASS / 0 FAIL**
+  ($0, no network, no key, scratch suites only) including six new `W16.cfg6-fu2` checks. **Non-vacuity
+  measured**, not asserted: restoring the two pre-fix closures turns 4 of the 6 red (ceiling, builder
+  agreement, 0.5 floor, non-finite). The other two — unset-defaults fallback and negative-falls-back — are
+  green pre-fix by design: they guard against a *wrong fix* (e.g. `max(0.5, v)` without the `.isFinite && > 0`
+  test), not against the original bug. **Adversarial review** (opus, refute-first) killed two weaker checks and
+  one overclaim: a "REAL defaults are in range" check that was unfalsifiable while the clamp exists was
+  deleted, a "negative or NaN" check that the old code also passed was re-scoped onto `+.infinity` (which it
+  did not), and the new doc comment's "one clamp per value, app-wide" was corrected to per-defaults-read after
+  the reviewer produced four counterexamples. Its claim that the resume path applies a runtime config
+  unclamped was checked and does not hold — `pendingRunRuntimeConfigIsValid` fail-closes on the same ranges.
+  Residual writer-side gaps filed as **W16.cfg6-fu3**.
+  | files: Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift | Tier-2 | S | none
 - [x] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2,
   W16.cfg3, W16.cfg5) **[S].** DONE 2026-08-01 (this commit; checkpoints `6713e43`, `2373d30`). All six are
   gone — `rotationModeForRun`, `standardImageMB`, `ocrWorkerCount`, `pdfImageMB`, `textColumns`,
@@ -1523,7 +1549,9 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   `makePendingRunRuntimeConfig`), the terminal fallback is now `SessionProcessingConfig.runSizing()` /
   `defaultRotationMode()` — **pure, lazily evaluated, Keychain-free** defaults reads, so an injected config
   short-circuits them and the per-file loops never touch UserDefaults. `fromProcessFilesRunStart()` normalizes
-  through the same `runSizing()`, so there is now **one clamp per value in the whole app**. Behaviour: every
+  through the same `runSizing()`, so there is now **one clamp per value in the whole app** ⚠️ *(overclaim —
+  see W16.cfg6-fu2 below: `fromDefaults()`, which is Live Capture's builder, did NOT go through it; the honest
+  scope even after fu2 is one clamp per **defaults read**)*. Behaviour: every
   production path injects a config (cfg2/cfg3/cfg5), so the only branch whose value changes is the one no
   production caller reaches — and there it goes from the deleted statics' *initial* constants (pdfImageMB 0,
   exportedImageMB 0, rotation `.localVision`, which is what a post-cfg5 process would serve since nothing wrote
