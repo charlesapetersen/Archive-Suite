@@ -98,6 +98,7 @@ Ownership lanes, per-app build commands, and shared hotspots: [`AGENTS.md`](AGEN
 ```
 Archive-Suite/
 ├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for all apps
+├── OWNER_AUTHORIZATIONS.md # what the owner has cleared on gated paths, + each grant's ⛔ constraints
 ├── packages/ArchiveCore/   # shared Swift package (tags, PDF, durable links, suite marker)
 ├── release/                # suite-level release tooling (combined DMG)
 ├── launch.sh               # dispatcher → ./launch.sh reader|processor|notes
@@ -179,7 +180,7 @@ Three tiers, so nothing sprawls or goes stale:
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 
-Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.
+Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). **Owner grants on gated paths live in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)** — committed on purpose (moved out of the gitignored maintenance plan 2026-08-01) because a grant plus its ⛔ constraints is durable policy that needs history and recoverability; entries there are a permanent record, marked discharged when the item ships rather than deleted. Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.
 
 ## Working directive — token-efficient feature-add & maintenance
 

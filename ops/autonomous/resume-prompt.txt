@@ -69,11 +69,17 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
   (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything
   that **writes the real corpus**, and any **HIGH review finding on an irreversible path** (Capture/Net/
-  finalize, TagWriter/file-safety) routed here by STEP 2.0. **ONE EXCEPTION MECHANISM:** the plan's
-  "## OWNER AUTHORIZATIONS" section lists specific items, BY TAG, that the owner has explicitly cleared
-  (currently `W15.tu0` and `R13d`, both SPEC edits). An item named there IS pickable — read its entry first and
-  obey any constraint attached to it verbatim (R13d in particular carries a hard do-NOT-strip constraint whose
-  violation would delete tags from the owner's real notes). Nothing else narrows the categories: a category is
+  finalize, TagWriter/file-safety) routed here by STEP 2.0. **ONE EXCEPTION MECHANISM:** the COMMITTED file
+  `OWNER_AUTHORIZATIONS.md` at the repo root lists specific items, BY TAG, that the owner has explicitly
+  cleared. (Moved there from the plan on 2026-08-01 — the plan's "## OWNER AUTHORIZATIONS" heading is now only
+  a pointer stub. READ THE FILE; do not rely on any list of tags quoted elsewhere, including here. This
+  sentence used to name "W15.tu0 and R13d" and was six grants out of date by the time anyone noticed.)
+  An item named there IS pickable — read its entry first and obey every constraint attached to it VERBATIM;
+  the ⛔ constraints are part of the grant, not advice, and several are hard limits on money or delete paths
+  (R13d, for one, carries a do-NOT-strip constraint). If you cannot satisfy a constraint, STOP and surface it
+  rather than proceeding on a narrower reading. **A grant is a licence, not a queue entry:** the item must
+  ALSO be in the plan's WORK QUEUE region to be actionable — an item sitting in "## HOLD QUEUE" is not
+  pickable no matter what the authorizations file says. Nothing else narrows the categories: a category is
   never authorized wholesale, only item by item. Skip everything else: surface each
   to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
   there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard

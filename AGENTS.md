@@ -65,8 +65,11 @@ byte-identical** so `blocked-on` resolves.
 
 **4. HIGH-severity findings on irreversible paths are owner-gated by default.**
 Anything touching `Capture/`·`Net/`, finalize/manifest, file-writing tag/output, or `SPEC/tag-format.md` needs a
-per-item entry in the plan's `## OWNER AUTHORIZATIONS` before the daemon may execute it. The category is
-**never** authorized wholesale. If you file such a finding, say so explicitly and leave it for the owner.
+per-item entry in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) before the daemon may execute it. The
+category is **never** authorized wholesale. Each grant carries ⛔ constraints that are part of the grant, not
+advice — read the entry and obey it verbatim, and STOP rather than proceed on a narrower reading. Note a grant
+is a *licence*, not a queue entry: the item must also sit in the plan's WORK QUEUE region to be actionable.
+If you file such a finding, say so explicitly and leave it for the owner.
 
 **5. Filing a review: queue it, don't just write a report.**
 A review report on its own is not tracked work. Turn each confirmed finding into a `[ ]` item in

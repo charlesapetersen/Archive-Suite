@@ -117,7 +117,7 @@ you do not need the report.**
 
 **Owner routing decisions (2026-07-29).** (a) **W23 drains FIRST**, ahead of the remaining W16/W3.cap/W17–W22
 work — these are confirmed bugs, several with silent data loss. (b) All **5 HIGH findings are daemon-AUTHORIZED
-per item** via named entries in the plan's `## OWNER AUTHORIZATIONS`, rather than parked in the hold queue —
+per item** via named entries in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md), rather than parked in the hold queue —
 they are the most valuable findings and the authorization text carries each one's hard constraints. The normal
 Tier-2 gate is unchanged, and **scratch-copy-only** still binds absolutely (Reader Core Directive).
 
@@ -162,7 +162,7 @@ superseded** (its run-config work was re-implemented on `main` as `W16.cfg1`–`
 In both "EXISTS" cases: **re-derive against current `main`, never cherry-pick.** Neither was ever build-verified
 in this repo, and both predate the W16.cfg* rewrite of the same files.
 
-### HIGH — all five daemon-AUTHORIZED per item (plan §OWNER AUTHORIZATIONS); Tier-2, scratch copies only
+### HIGH — all five daemon-AUTHORIZED per item ([`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)); Tier-2, scratch copies only
 
 - [x] **W23.h1 — launch-time `pruneEmptySessions` recursively HARD-deletes unrecognized content under the
   visible Live Capture root, including pending relay objects [M · HIGH · data loss · no undo].** ✅ FIXED —
@@ -2075,8 +2075,8 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   deleter in a temp dir instead of a stub. **Binding constraint (unchanged from the filing): the override is
   honoured ONLY under `BATCHRESUME_TEST=1` and MUST fail closed to the real path** on unset/empty/malformed —
   a mis-read env var strands a paid batch. Also required: a check that the fail-closed direction holds, and a
-  check that fails if the default deleter body is neutered to `{ }`. Full grant + constraints in the plan's
-  §OWNER AUTHORIZATIONS. Original filing follows. HOLD-QUEUE rationale (historic): the change edits how
+  check that fails if the default deleter body is neutered to `{ }`. Full grant + constraints in
+  [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Original filing follows. HOLD-QUEUE rationale (historic): the change edits how
   the operator's REAL `pending_batch.json` path is resolved, on the only code path that spends money. From the
   W16.bat2-fu adversarial review (rated HIGH). Two gaps, one cause: (a) every wiring check replaces
   `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually deletes the journal — is verified by
@@ -2135,7 +2135,7 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   created between the re-read and the delete still slips, so it stays a TOCTOU race. Implement the invariant
   ("a submit is in flight ⇒ the journal survives"), **do not ship the re-read as a substitute**, and if the
   guard proves unimplementable as stated, STOP and flag it rather than falling back. Keep-on-doubt governs.
-  Full grant in the plan's §OWNER AUTHORIZATIONS. Original filing follows. Historic: money path with no undo,
+  Full grant in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Original filing follows. Historic: money path with no undo,
   same category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
   the W16.bat2 adversarial review. `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while a
   Gemini submit loop may still be creating server-side chunks. If every chunk in that snapshot confirms, the
@@ -2153,7 +2153,7 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   but unconfirmed, the journal SURVIVES); scratch only, never the real `pending_batch.json`; and it must land
   with a check that **fails on today's code and passes after**, covering the **resume path as well as the
   fresh run** — a `cancel()`-level assertion is insufficient, since one already passes today while the real
-  path deletes. Full grant in the plan's §OWNER AUTHORIZATIONS. Note `W16.bat6` is gated on this item
+  path deletes. Full grant in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Note `W16.bat6` is gated on this item
   **landing**, not on the authorization. Original filing follows. Historic: owner-gated money path with
   no undo, so the daemon filed it rather than fixing it. Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
   ⚠️ **Gate re-pointed 2026-08-01:** this used to read `(blocked-on: W16.bat2)`, which was doing double duty as
