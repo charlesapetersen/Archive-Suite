@@ -45,6 +45,50 @@ struct SessionProcessingConfig: Sendable {
         return value > 0 ? min(12, max(1, value)) : 4
     }
 
+    /// The five run-scoped sizing/concurrency values, and nothing else.
+    ///
+    /// These are exactly the numbers that used to live in `OCRProcessor`'s six mutable
+    /// `nonisolated(unsafe)` statics (W16.cfg6 deleted them). They are grouped here so the run-start
+    /// builder and the last-resort read below cannot drift apart: both normalize through
+    /// `runSizing(_:)`, so there is one clamp per value in the whole app.
+    struct RunSizing: Sendable, Equatable {
+        var standardImageMB: Double
+        var ocrWorkerCount: Int
+        var pdfImageMB: Double
+        var textColumns: Int
+        var exportedImageMB: Double
+    }
+
+    /// Read the sizing values straight from UserDefaults, with the exact clamps
+    /// `OCRProcessor.loadStandardImageMB()` historically applied at run start.
+    ///
+    /// Deliberately **Keychain-free**: unlike `fromDefaults()` this performs no provider/model/Keychain
+    /// lookup, because none of these five values needs one — so it is safe to call from a nonisolated
+    /// last-resort path without risking a blocking Keychain prompt.
+    ///
+    /// It is also a **pure function of UserDefaults**, which is the point of W16.cfg6: the statics it
+    /// replaces were process-global `var`s that a test driver could leave mutated when a crash skipped
+    /// its `defer` restore, silently giving a later real run the wrong embedded-image size, column
+    /// count, or worker count. A value read here can be *current* but never *left over*.
+    static func runSizing(_ d: UserDefaults = .standard) -> RunSizing {
+        RunSizing(
+            standardImageMB: normalizedImageMB(
+                d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0),
+            ocrWorkerCount: ocrWorkerCount(from: d),
+            pdfImageMB: normalizedImageMB(
+                d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: 2.0),
+            textColumns: min(4, max(1, d.integer(forKey: DefaultsKeys.textColumns))),
+            exportedImageMB: normalizedImageMB(
+                d.double(forKey: DefaultsKeys.exportedImageSizeMB), fallback: 3.0)
+        )
+    }
+
+    /// This config's own sizing values, for comparing an injected snapshot against a defaults read.
+    var runSizing: RunSizing {
+        RunSizing(standardImageMB: standardImageMB, ocrWorkerCount: ocrWorkerCount,
+                  pdfImageMB: pdfImageMB, textColumns: textColumns, exportedImageMB: exportedImageMB)
+    }
+
     /// Read the app's shared settings into a config snapshot.
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
@@ -113,16 +157,17 @@ struct SessionProcessingConfig: Sendable {
     /// these values across OCR, PDF generation, review, tagging, export, and merge.
     static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         var config = fromDefaults(d)
-        config.standardImageMB = normalizedImageMB(
-            d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0)
-        config.ocrWorkerCount = ocrWorkerCount(from: d)
-        config.pdfImageMB = normalizedImageMB(
-            d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: 2.0)
-        config.exportedImageMB = normalizedImageMB(
-            d.double(forKey: DefaultsKeys.exportedImageSizeMB), fallback: 3.0)
-        let columns = d.integer(forKey: DefaultsKeys.textColumns)
-        config.textColumns = min(4, max(1, columns))
+        config.applySizing(runSizing(d))
         return config
+    }
+
+    /// Overwrite this config's five sizing/concurrency values from an already-normalized read.
+    mutating func applySizing(_ sizing: RunSizing) {
+        standardImageMB = sizing.standardImageMB
+        ocrWorkerCount = sizing.ocrWorkerCount
+        pdfImageMB = sizing.pdfImageMB
+        textColumns = sizing.textColumns
+        exportedImageMB = sizing.exportedImageMB
     }
 
     /// The effective model for OCR calls (gateway model when a gateway is configured).
