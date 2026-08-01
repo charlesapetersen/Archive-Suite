@@ -805,7 +805,8 @@ size and tag policies win. (2026-07-17)
   (`submissionComplete`, `OCRProcessor.swift:298`; guard `+Pipeline.swift:408`), regression-tested at
   `BatchResumeTestDriver.swift:476-486`.
 - *"delete recovery state before cancellation is confirmed"* → `cancel()` deletes the journal **only** when every
-  server cancellation is confirmed (`+Pipeline.swift:1466-1470`).
+  server cancellation is confirmed — and since W16.bat2 that rule lives in one testable seam,
+  `performServerBatchCancellation` (`+Pipeline.swift:1565`), regression-tested by `BatchCancelContract`.
 - *"keep a migration decoder for existing `pending_batch.json`"* → **already shipped** (`OCRProcessor.swift:344-372`).
 
 *"Gemini returns multiple job IDs as a comma-separated string"* is **half stale**: the joined string survives as a
@@ -854,6 +855,22 @@ touching this path: *"don't consume it"* and *"don't let it finish"* are not the
 the first one is a safety property. That review also surfaced two **pre-existing** defects, queued as
 **W16.bat3** (Stop mid-poll deletes the paid journal while the UI says it was kept — owner-gated) and
 **W16.bat4** (the Resume control is never surfaced after an interrupted first run).
+
+**W16.bat2 — CLOSED 2026-08-01.** The other promoted item: the cancel path's journal-retention rule had no
+regression test either, because it was welded to three live network clients — the only way to verify it was
+to read it. It now lives in one seam, `performServerBatchCancellation` (`+Pipeline.swift:1565`), which takes
+the provider's per-chunk cancellation as an injectable closure and returns what it did to the journal; the
+extraction is behaviour-preserving (same switch, same order, same message, same single delete condition).
+`BatchCancelContract` drives it with a stub canceller and a **real temp file**, so "kept" means a file that
+is still on disk: 28 checks (`scripts/test-batch-resume.sh` 161 → 189), including the invariant swept over
+all four providers × chunk counts 0–6 × no refusal / each chunk refused in turn / all refused — 132 trials
+asserting *deleted ⟺ confirmed* in the outcome **and** on disk, confirmation matching an independently
+written statement of the providers' capabilities, no attempt a provider's rule could not act on, the
+"kept for recovery" sentence present exactly when the file survived, and delete called at most once.
+Non-vacuity measured with **five neuters**, each reddening exactly its own checks — including one shaped
+like W16.bat3 (journal deleted while the outcome still claims it was kept), which reddens 13.
+Note what this does and does not buy: it pins the *rule*, not the *whole Stop path* — W16.bat3's bug lives
+in the poll's cancellation guards, downstream of this seam, and is still open and still owner-gated.
 
 Original analysis below.
 

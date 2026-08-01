@@ -1967,26 +1967,81 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   fixed here: **W16.bat3** (Stop deletes the paid journal) and **W16.bat4** (the Resume control is not
   re-surfaced after an interrupted first run).
   | files: OCR/BatchOCR.swift, OCR/OCRProcessor+OCR.swift, OCR/BatchParseContract.swift | XS–S | low | none
-- [ ] **W16.bat2 — headless coverage for the cancel path's journal-retention contract [M].** `cancel()`
-  (`+Pipeline.swift:1437-1473`) is the one shipped safety guarantee with **no regression test** — the
-  delete-only-if-all-confirmed rule is currently verified by reading the code. Add a small injectable cancel seam
-  (a closure) so a no-network driver can prove: all-confirmed → journal deleted; any chunk unconfirmed → journal
-  **retained** + status message; multi-chunk Anthropic/Mistral (`chunkIds.count != 1`, :1448-1455) → not
-  confirmed, retained; zero chunks → not confirmed.
-  | files: OCR/OCRProcessor+Pipeline.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- [x] **W16.bat2 — headless coverage for the cancel path's journal-retention contract [M].** DONE 2026-08-01
+  `c3dc615` + `72b1ed7` + this commit — the delete-only-if-all-confirmed rule was the one shipped safety
+  guarantee on the money path with no regression test, because it was welded to three live network clients.
+  It now lives in one seam, `performServerBatchCancellation` (`+Pipeline.swift:1565`), which takes the
+  provider's per-chunk cancellation as an injectable closure and returns what it did to the journal
+  (`BatchCancellationOutcome`, incl. which chunks it actually attempted); `cancel()` keeps only the
+  provider-specific *how*. Behaviour-preserving: same switch, same order, same message (now a pinnable
+  constant), same single delete condition.
+  **28 new $0 checks** (`test-batch-resume.sh` 161 → 189, ALL PASS) in `BatchCancelContract`, driven through
+  the real seam with a stub canceller and a **real temp file**, so "kept" means a file that is still on disk.
+  Named cases for every rule the item asked for — all-confirmed deletes; one refusal keeps; multi-chunk
+  Anthropic/Mistral is neither confirmed nor *half*-cancelled (no chunk attempted); zero chunks is a failure
+  to confirm, not a vacuous success; OpenAI never confirms — plus Gemini's no-early-exit loop (a live chunk
+  is what costs money) and "the words and the disk cannot disagree". Then the invariant swept over both axes:
+  4 providers × chunk counts 0–6 × no refusal / each chunk refused in turn / all refused = **132 trials**,
+  asserting *deleted ⟺ confirmed* in the outcome AND on disk, confirmation matching an independently written
+  statement of the providers' capabilities, no attempt a provider's rule could not act on, message ⟺
+  survival, and delete called at most once. Non-vacuity MEASURED with **5 neuters**, each reddening exactly
+  its own checks — including one shaped like W16.bat3 (journal deleted while the outcome still says "kept"),
+  which reddens 13. Clean build, 0 new warnings; `test-network-session`, `test-recovery`,
+  `test-manifest-persistence` green.
+  **Scope note — what a green section 13 does NOT buy:** it pins the *rule*, in the seam, not the whole Stop
+  path. No check goes through `cancel()`, and `deletePendingBatch()` is executed by none of them (the stub
+  deletes a temp fixture), so the *wiring* is unproven — filed as **W16.bat2-fu**. And W16.bat3's bug is
+  downstream of this seam entirely, in the poll's cancellation guards; it stays open + owner-gated and must
+  not be closed by citing this. Both caveats are now written into the code comments too, because the code
+  comment is what the next maintainer reads.
+  The adversarial review could not refute behaviour equivalence (case-by-case against `69f3bbc`: identical
+  call counts, byte-identical message, same single delete condition, same MainActor executor, clients already
+  constructed before the count check). Its findings drove one extra tripwire check (OpenAI's rule is only
+  correct because `supportsBatch == false` — reddens if Phase 4 lands), a non-vacuity guard on the
+  "never announced as kept" case, honest scoping in both doc blocks, and two new items (W16.bat2-fu, W16.bat5).
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelContract.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+- [ ] **W16.bat2-fu — the cancel WIRING is untested, only the rule is [S · LOW].** From the W16.bat2
+  adversarial review. `BatchCancelContract` proves `performServerBatchCancellation`; nothing proves `cancel()`
+  hands it the right arguments. All of these mutations keep all 28 checks green: dropping
+  `if let message = outcome.statusMessage { statusMessage = message }` (`+Pipeline.swift:1663` — operator
+  gets no warning at all); `deleteJournal: { Self.deletePendingBatch() }` → `{ }` or → also deleting
+  `pending_run.json` (`:1662`); hard-coding `provider:` (`:1660`); changing the `chunkIds` derivation
+  (`:1639-1640`); deleting the whole `if let batch = activeBatch { … }` block. Wants a seam one level up —
+  e.g. hoist the closure construction into a testable factory keyed on provider, so a driver can assert
+  `cancel()` builds a canceller for the live provider and passes `deletePendingBatch` as the deleter — then
+  a check per mutation above. Do NOT do this by driving the real `cancel()` with a live key.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelContract.swift | S | low | none
+- [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
+  (blocked-on: W16.bat5-owner-ok) `[hold]` **— needs: owner.** HOLD-QUEUE: money path with no undo, same
+  category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
+  the W16.bat2 adversarial review. `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while a
+  Gemini submit loop may still be creating server-side chunks. If every chunk in that snapshot confirms, the
+  journal is **deleted** — and a chunk created after the snapshot is already billed with its ID recorded
+  nowhere. `recordSubmittedBatchChunk` does then fail on the nil `activePendingBatch` and abort the submit,
+  so the window is narrow, but the money is already spent by then. Fix direction (needs the owner's call):
+  re-read the journal's chunk IDs after the cancellations rather than trusting the pre-submit snapshot, or
+  refuse to delete while a submit is in flight. W16.bat2's driver is the harness for proving it.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | high | none
 - [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept**
-  (blocked-on: W16.bat2) **[XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with no undo,
-  so the daemon files it rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
-  `cancel()` (`+Pipeline.swift:1531+`) cancels the processing task and then deletes the journal **only** if every
-  server-side cancellation was confirmed — otherwise it deliberately keeps it and says *"the paid-batch journal
-  was kept for recovery."* But the poll task then resumes and hits `guard !Task.isCancelled else { return }`
-  (`+OCR.swift:689`, `:701`), which returns **without** setting `batchPollInterrupted`, so
-  `performBatchOCR` (`:661-664`) runs `Self.deletePendingBatch()` unconditionally. The resume path is identical
-  (`+Pipeline.swift:911`, whose own `guard !Task.isCancelled` at `:914` sits *after* the delete). Net: pressing
-  Stop mid-poll can strand a paid, still-live server-side batch with no way back, and tell the operator the
-  opposite. Fix is one line in each cancellation guard (`batchPollInterrupted = true`) — but it changes cancel
-  semantics on the only path that spends real money, so it wants the owner's eye plus **W16.bat2**'s driver to
-  prove it (a `cancel()`-level test passes today while the real path deletes).
+  (blocked-on: W16.bat3-owner-ok) **[XS fix · HIGH · needs: owner]** `[hold]` — **owner-gated: money path with
+  no undo, so the daemon files it rather than fixing it.** Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
+  ⚠️ **Gate re-pointed 2026-08-01:** this used to read `(blocked-on: W16.bat2)`, which was doing double duty as
+  the machine-readable hold gate. W16.bat2 has now shipped, so that gate would have released an owner-gated
+  money-path item into the actionable queue. The dependency is now the owner's decision itself
+  (`W16.bat3-owner-ok`, an unticked gate item in the plan's HOLD QUEUE) — a tag the daemon cannot satisfy.
+  `cancel()` (`+Pipeline.swift:1606`) cancels the processing task and then deletes the journal **only** if every
+  server-side cancellation was confirmed (the rule now lives in `performServerBatchCancellation`, `:1565`, and
+  is regression-tested by `BatchCancelContract` since W16.bat2) — otherwise it deliberately keeps it and says
+  *"the paid-batch journal was kept for recovery."* But the poll task then resumes and hits
+  `guard !Task.isCancelled else { return }` (`+OCR.swift:691`, `:703`), which returns **without** setting
+  `batchPollInterrupted`, so `performBatchOCR` (`:661-663`) runs `Self.deletePendingBatch()` unconditionally.
+  The resume path is identical (`+Pipeline.swift:911`, whose own `guard !Task.isCancelled` at `:915` sits
+  *after* the delete). Net: pressing Stop mid-poll can strand a paid, still-live server-side batch with no way
+  back, and tell the operator the opposite. Fix is one line in each cancellation guard
+  (`batchPollInterrupted = true`) — but it changes cancel semantics on the only path that spends real money, so
+  it wants the owner's eye. **W16.bat2's driver now exists** and is the harness for proving the fix; note it
+  proves the `cancel()` RULE only, and this bug is downstream of that seam, so a green
+  `BatchCancelContract` is not evidence either way here.
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | XS | high | none
 - [ ] **W16.bat4 — after an interrupted FIRST run, the Resume control the message names never appears [S · LOW].**
   Also from the W16.bat1-fu review; **pre-existing**. Every `batchPollInterrupted` message tells the operator the

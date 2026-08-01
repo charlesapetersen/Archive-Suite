@@ -260,7 +260,12 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`
   (`BatchParseContract`) — plus (W16.bat1-fu) the two pure rules the poll uses to decide where a finished
   chunk's pages come from and whether a chunk that produced none may be marked consumed.
-  No network, no keys, no cost. 161 checks as of 2026-08-01.
+  Also (W16.bat2) the **cancel path's journal-retention contract** (`BatchCancelContract`): pressing Stop
+  deletes the paid-batch recovery journal if and only if every chunk's server-side cancellation was
+  confirmed — driven through the real seam with a stub canceller and a real temp file, swept over all four
+  providers × chunk counts 0–6 × which chunk refused. Scope: the `cancel()` RULE, not the whole
+  Stop path — W16.bat3 is open and owner-gated.
+  No network, no keys, no cost. 189 checks as of 2026-08-01.
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

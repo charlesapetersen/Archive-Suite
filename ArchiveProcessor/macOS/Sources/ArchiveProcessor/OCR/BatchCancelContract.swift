@@ -5,13 +5,23 @@ import Foundation
 /// canceller and a REAL journal file in a temp dir, so every claim below is about a file that either
 /// survived or did not.
 ///
-/// Why this exists: pressing Stop during a paid batch is the one place where a wrong answer costs money
-/// that cannot be recovered. The recovery journal is the only record of a server-side job the operator
-/// has already paid for; delete it while that job is still live and the pages are gone with the money.
-/// So `cancel()` deletes it ONLY when every chunk's cancellation was confirmed, and otherwise keeps it
-/// and says so. That guarantee shipped with no regression test at all — it was verified by reading the
-/// code — and it is exactly the kind of rule a later edit weakens by accident, because the failure is
-/// silent: the UI says "kept for recovery" whether or not anything was kept.
+/// Why this exists: cancelling a paid batch is the one place where a wrong answer costs money that cannot
+/// be recovered. The recovery journal is the only record of a server-side job the operator has already paid
+/// for; delete it while that job is still live and the pages are gone with the money. So `cancel()` deletes
+/// it ONLY when every chunk's cancellation was confirmed, and otherwise keeps it and says so. That
+/// guarantee shipped with no regression test at all — it was verified by reading the code — and it is
+/// exactly the kind of rule a later edit weakens by accident, because the failure is silent: the UI says
+/// "kept for recovery" whether or not anything was kept.
+///
+/// ⚠️ **SCOPE — read before citing this file.** What is pinned here is the RULE, in the seam. It is NOT an
+/// end-to-end guarantee about pressing Stop, and it does not touch the real journal (the stub deletes a
+/// temp fixture; `deletePendingBatch()` is never executed by any check). Two things stay uncovered:
+///   * **W16.bat3, open and owner-gated** — the poll's `guard !Task.isCancelled else { return }`
+///     (`OCRProcessor+OCR.swift:691`, `:703`) returns without setting `batchPollInterrupted`, so
+///     `performBatchOCR:661-663` deletes the journal regardless of what `cancel()` decided. A green run
+///     below does not make Stop safe end to end, and must not be used to close that item.
+///   * **The wiring** — nothing here proves `cancel()` passes `Self.deletePendingBatch` as the deleter, the
+///     live provider, or the journal's chunk IDs (filed as W16.bat2-fu).
 ///
 /// The checks pin three things a future edit must not break:
 ///   * **iff** — the journal is deleted if and only if the cancellation was confirmed, over every
@@ -141,8 +151,12 @@ enum BatchCancelContract {
                   !refused.outcome.confirmed && refused.journalSurvived
                   && refused.deleteCalls == 0 && refused.attempted == one)
 
-            // The important one: the client can cancel one ID, so a chunked batch has no single job to
-            // cancel. It must not be reported as cancelled, and no half-cancellation may be attempted.
+            // Both clients record exactly one submitted chunk (`+OCR.swift:598`, `:604` — only Gemini has
+            // a per-chunk callback), so in practice the count here is 0 or 1 and this ≥2 case is reachable
+            // only from a corrupt or legacy comma-joined journal. It is pinned anyway because the rule has
+            // to fail SAFE there: not reported as cancelled, and not half-cancelled either. The case that
+            // actually happens in the field is the zero-chunk one below — Stop pressed after `activeBatch`
+            // is set but before the submit returns.
             let chunked = await trial(provider, ids(2))
             check("\(name): a multi-chunk batch cannot be confirmed, so the journal is kept",
                   !chunked.outcome.confirmed && !chunked.outcome.journalDeleted
@@ -163,6 +177,11 @@ enum BatchCancelContract {
         check("openai: never confirms and never calls a batch endpoint (no batch path in v1)",
               !single.outcome.confirmed && single.attempted.isEmpty
               && single.journalSurvived && single.deleteCalls == 0)
+        // Tripwire, not a restatement: the rule above is only correct BECAUSE OpenAI has no batch path.
+        // If Phase 4 ever lands one, this reddens and the contract has to be rewritten rather than
+        // quietly continuing to assert that a real provider can never be cancelled.
+        check("openai's no-confirmation rule is still justified — it has no batch path to cancel",
+              !LLMProvider.openai.supportsBatch)
     }
 
     // MARK: - The message and the disk cannot disagree
@@ -171,12 +190,16 @@ enum BatchCancelContract {
         let kept = await trial(.gemini, ids(2), refusing: ["batches/chunk-1"])
         check("the kept-journal message is the operator-facing promise, verbatim",
               kept.outcome.statusMessage == OCRProcessor.batchCancellationNotConfirmedMessage)
-        check("that promise actually says the journal was kept for recovery",
-              OCRProcessor.batchCancellationNotConfirmedMessage.contains("kept for recovery"))
+        // Not a tautology over a literal: the promise is read off the outcome of a real trial and matched
+        // against the file that trial left behind, so the words and the disk are compared to each other.
+        check("the run that promised recovery really did leave the journal there",
+              kept.outcome.statusMessage?.contains("kept for recovery") == true
+              && kept.journalExistedBefore && kept.journalSurvived)
 
         let deleted = await trial(.gemini, ids(2))
         check("a deleted journal is never announced as kept",
-              deleted.outcome.statusMessage == nil && !deleted.journalSurvived)
+              deleted.outcome.statusMessage == nil
+              && deleted.journalExistedBefore && !deleted.journalSurvived)
     }
 
     // MARK: - The invariant, swept over every shape

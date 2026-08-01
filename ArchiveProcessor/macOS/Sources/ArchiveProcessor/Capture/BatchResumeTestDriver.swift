@@ -33,9 +33,11 @@ import AppKit
 ///  12. The three batch clients' **provider response-shape contract** — every status/result body shape
 ///      Anthropic, Gemini and Mistral are accepted in, parsed headlessly from literal fixtures
 ///      (`BatchParseContract`, W16.bat1). No network, no keys, no cost.
-///  13. The **cancel path's journal-retention contract** (`BatchCancelContract`, W16.bat2): pressing Stop
-///      deletes the paid-batch recovery journal if and only if every chunk's server-side cancellation was
-///      confirmed — swept over every provider × chunk-count × refusal shape, against a real file.
+///  13. The **`cancel()` journal-retention rule** (`BatchCancelContract`, W16.bat2): the paid-batch recovery
+///      journal is deleted if and only if every chunk's server-side cancellation was confirmed — swept over
+///      every provider × chunk-count × refusal shape, against a real file. Scope: the RULE, not the whole
+///      Stop path. W16.bat3 is an open, owner-gated bug elsewhere (the poll's cancellation guards delete the
+///      journal first regardless), so a green section 13 does NOT mean pressing Stop is safe end to end.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
