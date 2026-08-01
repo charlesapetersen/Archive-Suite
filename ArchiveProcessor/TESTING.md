@@ -279,7 +279,16 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   non-authoritative stored chunk list.
   Its header lists what it still does not cover (the default deleter → W16.bat2-fu2; the warning surviving
   the poll's own messages → W16.bat6) — read it before citing a green section 14.
-  No network, no keys, no cost. 225 checks as of 2026-08-01.
+  Finally (W16.bat4) the **interrupted-batch TAIL** (`BatchInterruptTailContract`): sections 13/14 are about
+  Stop, this one is about a run that ends itself with a paid job possibly still alive. The real
+  `finishInterruptedBatchPoll()` — the one tail both paid-batch entry points now run — must recompute the
+  resume banner (the Resume control every interruption message names, and the half that was simply missing on
+  a FIRST run), delete exactly this run's own temp PDF→JPEG conversions and nothing else in the directory
+  (including decoys named from the shipped `pending_batch.json` / `pending_run.json` constants), and leave the
+  interruption message, the run's results and the interrupted-RUN manifest untouched — swept over all 24 start
+  states the four interrupted exits can arrive in. Its header scopes out the two call sites themselves, which
+  need a real paid submission or the un-redirectable journal path (W16.bat2-fu2) to drive.
+  No network, no keys, no cost. 241 checks as of 2026-08-01 (16 of them section 15).
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

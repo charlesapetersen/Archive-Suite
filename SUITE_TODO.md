@@ -2107,15 +2107,24 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   proves the `cancel()` RULE only, and this bug is downstream of that seam, so a green
   `BatchCancelContract` is not evidence either way here.
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | XS | high | none
-- [ ] **W16.bat4 — after an interrupted FIRST run, the Resume control the message names never appears [S · LOW].**
-  Also from the W16.bat1-fu review; **pre-existing**. Every `batchPollInterrupted` message tells the operator the
-  batch was kept so they can resume it. On a **resume** that is true (`+Pipeline.swift:903-909` calls
-  `cleanupTempFiles()` + `checkForPendingBatch()`), but on a **first** run the interrupt lands at
-  `+Pipeline.swift:1839` — `isProcessing = false; return` — with neither call. `pendingBatchInfo` is only written
-  inside `checkForPendingBatch()` (`:736/744/747`), so the "Pending Batch / Resume Batch" box
-  (`Views/OCRView.swift:319-336`) never appears and the PDF-input temp JPEGs leak. The operator has to press
-  Start and be refused (`:1637-1641` does call it) before the Resume button exists. Reachable from the poll
-  timeout, the 10-error network streak, and a persistence failure. Fix: make `:1839` mirror the resume site.
+- [x] **W16.bat4 — after an interrupted FIRST run, the Resume control the message names never appears [S · LOW].**
+  DONE 2026-08-01 `1515773` + `819494d` + this commit. Was: every `batchPollInterrupted` message tells the
+  operator the batch was kept so they can resume it; on a **resume** that was true (the site called
+  `cleanupTempFiles()` + `checkForPendingBatch()`), but on a **first** run the interrupt was
+  `isProcessing = false; return` with neither call. `pendingBatchInfo` — the only thing the "Pending Batch /
+  Resume Batch" box (`Views/OCRView.swift:319-336`) renders from — is written only inside
+  `checkForPendingBatch()`, so the button the message named did not exist until the operator pressed Start and
+  was refused, and the PDF-input temp JPEGs leaked. The two tails are now ONE method,
+  `finishInterruptedBatchPoll()` (`+Pipeline.swift:796`), called by both sites and by nothing else, so they
+  cannot drift again. Reaching the first-run site through it also covers `performBatchOCR`'s three earlier
+  interrupted exits (journal-save failure, a submission stopped part-way, a journal/ID disagreement), which
+  previously left a dead `activeBatch`/`activePendingBatch` behind and leaked the same temp files. It deletes
+  no journal and touches no output — a paid server-side job may still be running.
+  `BatchInterruptTailContract` (driver section 15) adds **16 $0 checks** (`test-batch-resume.sh` 225 → 241),
+  non-vacuity measured with **four neuters**, each reddening exactly its own checks — including the shipped
+  bug itself (drop `checkForPendingBatch()` → 5 red). Scoped in its header: it pins the TAIL, not its two call
+  sites (driving either needs a real paid submission or the un-redirectable journal path — W16.bat2-fu2);
+  what keeps them aligned meanwhile is structural, each being a bare `finishInterruptedBatchPoll(); return`.
   | files: OCR/OCRProcessor+Pipeline.swift | S | low | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity

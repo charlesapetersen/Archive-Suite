@@ -856,6 +856,24 @@ the first one is a safety property. That review also surfaced two **pre-existing
 **W16.bat3** (Stop mid-poll deletes the paid journal while the UI says it was kept — owner-gated) and
 **W16.bat4** (the Resume control is never surfaced after an interrupted first run).
 
+**W16.bat4 — CLOSED 2026-08-01** (`1515773` + `819494d` + this commit). The second of those two. Every
+`batchPollInterrupted` message tells the operator the paid batch was kept *so they can resume it*, and the
+"Pending Batch / Resume Batch" box (`Views/OCRView.swift:319`) renders only from `pendingBatchInfo`, which is
+written only inside `checkForPendingBatch()`. The resume path called it; the first-run path ended its
+interruption with `isProcessing = false` and nothing else. So the operator was told to press a button that was
+not on screen — they had to press Start, be refused, and only then see it — and the run's PDF→JPEG temp files
+stayed behind. The two tails are now one method, `finishInterruptedBatchPoll()` (`+Pipeline.swift:796`),
+called by both sites and by nothing else. Routing the first-run site through it also covers `performBatchOCR`'s
+three earlier interrupted exits — a journal-save failure, a submission that stopped part-way, a journal/ID
+disagreement — which each left a dead `activeBatch`/`activePendingBatch` behind and leaked the same temp files.
+The tail deletes no journal and touches no output: a paid server-side job may still be running, and the journal
+is the only way back to it. 16 $0 checks (`BatchInterruptTailContract`, driver section 15;
+`scripts/test-batch-resume.sh` 225 → 241), non-vacuity measured with four neuters — dropping
+`checkForPendingBatch()`, which is exactly the shipped bug, reddens five. What it does **not** pin is the two
+call sites themselves: driving either needs a real paid submission or a journal-save failure at the
+un-redirectable Application Support path (**W16.bat2-fu2**). That gap is held closed structurally instead —
+each site is now a bare `finishInterruptedBatchPoll(); return`, with no second copy of the tail to drift.
+
 **W16.bat2 — CLOSED 2026-08-01.** The other promoted item: the cancel path's journal-retention rule had no
 regression test either, because it was welded to three live network clients — the only way to verify it was
 to read it. It now lives in one seam, `performServerBatchCancellation` (`+Pipeline.swift:1565`), which takes
