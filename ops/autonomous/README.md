@@ -347,7 +347,31 @@ ops/autonomous/tests/prove-no-host-gui.sh      # the host-GUI firewall (.claude/
                                                # blocked lanes deny, their legitimate neighbours (VM lane,
                                                # unit-only tests, `emulator -no-window`, read-only simctl) still
                                                # allow, and an INTERACTIVE session keeps full host GUI ($0, <1s).
+ops/autonomous/tests/prove-tracker-sync.sh     # the tracker-sync guard: drift is loud (both directions, the
+                                               # real W21.vmgui-path shape) and legitimate asymmetry is silent
+                                               # (one-file-only items, HOLD QUEUE, fences, quotes) ($0, <1s).
 ```
+
+### Tracker sync — `check-tracker-sync.sh` (WARN-only in the gate)
+
+The same item is tracked twice: the plan's WORK QUEUE (gitignored, what `next-queue-item.sh` offers) and
+`SUITE_TODO.md` (committed, the tracker of record). Nothing enforced that they agree, and on **2026-08-01**
+they didn't — `W21.vmgui-path` shipped on 07-31 and was ticked in `SUITE_TODO` but left `[ ]` in the plan, so
+the resolver was offering finished work as the next task. A human caught it. **The harm from duplicated state
+is that drift is silent**, so `health-gate.sh` now runs `check-tracker-sync.sh` on every gate.
+
+- **WARN-only, never RED** — same reasoning as the coherence check beside it: a doc mismatch must not park a
+  run whose builds and suites are green.
+- **Compares only items in BOTH files.** One-file-only items are not drift (the plan mirrors a subset by
+  design; `SUITE_TODO` carries a long tail the daemon never sees), and HOLD QUEUE items are out of scope
+  because they aren't offered as work. A guard that cries wolf gets ignored — the failure it exists to prevent.
+- **Parsing deliberately mirrors `next-queue-item.sh`** — same bullet forms, code-fence and blockquote
+  skipping, first-occurrence-wins. If the checker and the resolver disagreed about what an item is, the check
+  would report phantom drift. Portable POSIX awk only (macOS `/usr/bin/awk` has no 3-arg `match()`).
+- Run it directly anytime: `ops/autonomous/check-tracker-sync.sh` (read-only; `0` in sync, `1` drift,
+  `2` bad input; `TRACKER_SYNC_QUIET=1` silences the success line but never a divergence).
+- It doubles as the **equivalence check for the tracker consolidation** — "do both sources report the same
+  item state?" is exactly the assertion a strangler migration needs while both lists still exist.
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12
 

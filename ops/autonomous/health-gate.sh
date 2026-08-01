@@ -97,6 +97,12 @@ else
   echo "  ✓ coherence (clean tree)"
 fi
 
+# Tracker sync: the plan's WORK QUEUE and SUITE_TODO must agree about what is already done. WARN-ONLY, for
+# the same reason as coherence above — a doc mismatch must not park a run whose builds and suites are green.
+# It is here rather than nowhere because the failure it catches is silent and expensive: on 2026-08-01 the
+# plan still listed W21.vmgui-path as open after it shipped, so the resolver was offering finished work.
+bash "$ROOT/ops/autonomous/check-tracker-sync.sh" || true
+
 # Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
 # Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
 # set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
