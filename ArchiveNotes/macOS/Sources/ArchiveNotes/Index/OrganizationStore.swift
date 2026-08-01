@@ -166,6 +166,14 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     private let index: NotesIndex
     private var storeRoot: URL?
 
+    /// `true` once `load(storeRoot:)` has finished reading the graph — the precondition for a
+    /// *speculative* re-export (W23.m10-fu). `load` assigns `storeRoot` before it awaits the DB, so
+    /// between those two points the store has a destination but not yet the graph that belongs in it.
+    /// A mutation can never fall into that window (it is what fills the graph), but an opportunistic
+    /// retry fires on an app notification at an arbitrary moment, and exporting there would overwrite
+    /// the user's `organization.json` with a half-built forest.
+    private var didLoadGraph = false
+
     /// The Extracts system folder ID (§16.1 / §16.6).
     var extractsHomeFolderId: UUID { Self.extractsFolderId }
 
@@ -228,6 +236,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
                 exportOrganization()
             }
         }
+
+        didLoadGraph = true
     }
 
     // MARK: - Folder operations
@@ -571,6 +581,26 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// A success CLEARS a previous failure, and does so correctly: the export is whole-graph, not
     /// incremental, so one working write brings the mirror fully back in sync — including the changes
     /// whose own exports failed. That also means a transient full disk can't leave a permanent warning.
+    /// Re-export a mirror that is already known stale, so a volume that came back is picked up without
+    /// waiting for the operator's next organization change (W23.m10-fu).
+    ///
+    /// W23.m10 clears `mirrorFailure` on the next *successful* export — and the only thing that exports
+    /// is a mutation. So after a transient full disk or an unplugged volume, an operator who simply
+    /// stops touching folders keeps a stale `organization.json` for the rest of the session, and into
+    /// the next one (the DB wins at startup, so nothing re-syncs it on launch either). This is the
+    /// retry that closes that gap; it is deliberately the same whole-graph export, so one working write
+    /// recovers *everything* that missed the mirror rather than replaying a queue of changes.
+    ///
+    /// **Runs only while stale**, which is what makes it safe to hang off something as frequent as app
+    /// activation: a healthy mirror is never rewritten, so no app switch touches the user's file.
+    /// Returns whether an export was attempted — the caller reads `mirrorFailure` for the outcome.
+    @discardableResult
+    func retryStaleMirrorExport() -> Bool {
+        guard isMirrorStale, didLoadGraph else { return false }
+        exportOrganization()
+        return true
+    }
+
     private func exportOrganization() {
         guard let root = storeRoot else { mirrorFailure = .noStoreRoot; return }
         do {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ArchiveCore
 
@@ -126,16 +127,27 @@ final class NotesModel: ObservableObject {
     private var noteStore: NoteStore?
     private var didBootstrap = false
 
+    /// Where the app-lifecycle triggers for the stale-mirror retry come from (W23.m10-fu) — `.default`
+    /// in the app, a private centre under test so one posted notification reaches one model.
+    private let notificationCenter: NotificationCenter
+    /// Kept so the observers die with the model rather than outliving it on a shared centre.
+    private var mirrorRecoveryObservers: NotificationObservers?
+
     // MARK: Init
 
     /// Injection init (tests, previews): the caller provides an already-loaded `OrganizationStore`.
-    init(organization: OrganizationStore) {
+    ///
+    /// `notificationCenter` is the seam the mirror-recovery triggers are attached to (W23.m10-fu);
+    /// tests pass their own so a posted app notification reaches exactly one model.
+    init(organization: OrganizationStore, notificationCenter: NotificationCenter = .default) {
         self.organization = organization
         self.ownsDataLayer = false
         self.index = nil
         self.rootStore = nil
         self.indexer = nil
+        self.notificationCenter = notificationCenter
         rebuild()
+        observeMirrorRecoveryTriggers()
     }
 
     /// Injection init with a live index — for tests that exercise FTS `search(_:)` or the W6-S5 delete
@@ -144,14 +156,16 @@ final class NotesModel: ObservableObject {
     /// still does **not** own the data layer (`bootstrap()` stays a no-op), so callers seed items via
     /// `replaceItems`.
     init(organization: OrganizationStore, index: NotesIndex, noteStore: NoteStore? = nil,
-         indexer: NotesIndexer? = nil) {
+         indexer: NotesIndexer? = nil, notificationCenter: NotificationCenter = .default) {
         self.organization = organization
         self.ownsDataLayer = false
         self.index = index
         self.rootStore = nil
         self.noteStore = noteStore
         self.indexer = indexer
+        self.notificationCenter = notificationCenter
         rebuild()
+        observeMirrorRecoveryTriggers()
     }
 
     /// App init: build the real data layer (index + org store + store-root). The tree stays empty
@@ -208,7 +222,9 @@ final class NotesModel: ObservableObject {
         self.index = index
         self.rootStore = rootStore
         self.indexer = NotesIndexer(index: index)   // shares the one NotesIndex handle
+        self.notificationCenter = .default
         // Tree stays empty until bootstrap().
+        observeMirrorRecoveryTriggers()
     }
 
     /// App path only: open the index and load persisted organization, then rebuild. Idempotent — safe
@@ -1068,8 +1084,60 @@ final class NotesModel: ObservableObject {
     /// still completes its UI work and still returns what it created: this only stops the app from
     /// presenting a half-saved change as saved. Never clears a message it didn't set (`statusMessage`
     /// is shared with other degradations), matching `adoptIndexFailure`.
+    ///
+    /// It also *retracts* its own line once the mirror is back in sync (W23.m10-fu). Before the
+    /// recovery retry below, the only way to reach `mirrorFailure == nil` here was a later successful
+    /// mutation, and leaving the warning up through it was merely untidy; now that a retry can heal the
+    /// mirror with the operator doing nothing at all, a line still claiming the durable mirror is
+    /// behind would be a false statement the app never takes back.
     func adoptMirrorFailure() {
-        if let failure = organization.mirrorFailure { statusMessage = failure.message }
+        if let failure = organization.mirrorFailure {
+            statusMessage = failure.message
+            postedMirrorMessage = failure.message
+        } else {
+            // Only our own line — another subsystem's report must survive the mirror recovering.
+            if let posted = postedMirrorMessage, statusMessage == posted { statusMessage = nil }
+            postedMirrorMessage = nil
+        }
+    }
+
+    /// The mirror-health line this model last put in `statusMessage`, so it can be retracted when the
+    /// mirror recovers — and *only* it. The `postedIndexMessage` idiom, for the other degradation.
+    private var postedMirrorMessage: String?
+
+    /// Re-attempt a durable-mirror export that failed earlier, and update what the sidebar says
+    /// (W23.m10-fu). A no-op unless `organization.isMirrorStale`, so it costs nothing on a healthy
+    /// store and never rewrites `organization.json` behind the operator's back.
+    ///
+    /// Wired to the two moments that matter (see `observeMirrorRecoveryTriggers`), and public so the
+    /// app can call it from anywhere else that turns out to be a good moment.
+    func retryStaleMirrorExport() {
+        guard organization.retryStaleMirrorExport() else { return }
+        adoptMirrorFailure()
+    }
+
+    /// Retry the stale-mirror export when the app is **activated** and when it is about to **quit**.
+    ///
+    /// Activation is the moment the operator comes back to the app — the one correlated with having
+    /// plugged the volume in, emptied the disk, or fixed permissions in another app — and it doubles as
+    /// the re-post of a warning that was dismissed while the volume is still bad, the way a degraded
+    /// index re-posts on every read (W23.m9-fu). Terminate is the last chance to write the mirror
+    /// before the session ends, after which the stale file is what the next launch inherits (the DB
+    /// wins at startup, so nothing else re-syncs it).
+    ///
+    /// Deliberately **not** a timer: this app does no background polling (the Zotero clipboard check
+    /// makes the same call), and the export is a disk write — tying it to something the operator did
+    /// keeps it to moments a write is expected. `queue: nil` runs the block synchronously on the
+    /// poster's thread, which is what makes the terminate leg useful at all; AppKit posts both of these
+    /// on the main thread, hence `assumeIsolated`.
+    private func observeMirrorRecoveryTriggers() {
+        let observers = NotificationObservers(center: notificationCenter)
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.willTerminateNotification] {
+            observers.observe(name) { [weak self] _ in
+                MainActor.assumeIsolated { self?.retryStaleMirrorExport() }
+            }
+        }
+        mirrorRecoveryObservers = observers
     }
 
     // MARK: Private
@@ -1088,4 +1156,26 @@ final class NotesModel: ObservableObject {
         statusMessage = "Couldn't \(action)."
         NSLog("NotesModel: failed to \(action): \(error)")
     }
+}
+
+/// Block-based notification observers whose lifetime is the object that owns this box (W23.m10-fu).
+///
+/// A separate, *non-isolated* class on purpose: a `@MainActor` type's `deinit` is nonisolated and so
+/// cannot read main-actor state, and the observer tokens (`[any NSObjectProtocol]`, not `Sendable`)
+/// count as exactly that. Parking them here keeps the un-registration automatic — without it, every
+/// model ever built would keep observing the shared centre for the life of the process.
+private final class NotificationObservers {
+    private let center: NotificationCenter
+    private var tokens: [any NSObjectProtocol] = []
+
+    init(center: NotificationCenter) { self.center = center }
+
+    /// `queue: nil` runs `block` **synchronously on the posting thread** — the property the terminate
+    /// leg depends on, since an operation hopped onto the main queue would not run before the process
+    /// exits. AppKit posts the notifications this is used for on the main thread.
+    func observe(_ name: Notification.Name, using block: @escaping @Sendable (Notification) -> Void) {
+        tokens.append(center.addObserver(forName: name, object: nil, queue: nil, using: block))
+    }
+
+    deinit { for token in tokens { center.removeObserver(token) } }
 }
