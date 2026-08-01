@@ -264,6 +264,9 @@ final class NotesModel: ObservableObject {
     /// `an.status.indexReady` element for this before asserting search / relevance (08-testing §3.4).
     /// The index is a disposable cache, so this is read-only w.r.t. the store (mtime-skipped upserts
     /// only; no prune here — that stays gated on a settled snapshot elsewhere).
+    ///
+    /// Also the mid-session recovery pass: `repopulateIndexAfterRecovery()` reuses this verbatim so a
+    /// repaired index is refilled the same way a fresh one is (W23.m9-fu2).
     func buildIndexFromDisk() async {
         guard let indexer, let noteStore else {
             // Pure injected store (no background indexer/store): nothing to build — surface ready anyway.
@@ -317,23 +320,91 @@ final class NotesModel: ObservableObject {
     /// single owner of index health and this only mirrors it. A model injected with a bare index (tests,
     /// previews) has no driver, so it opens under the same all-or-nothing contract and publishes the
     /// same typed failure itself — the report must not depend on which initializer ran.
+    ///
+    /// **Recovering the handle is not recovering the rows** (W23.m9-fu2). An index that opens after
+    /// having been `unavailable` is queryable but, in the case that matters, EMPTY — the operator
+    /// replaced the corrupt file, a sync client healed it, the volume came back. Retracting the banner
+    /// on its own therefore traded one silent wrong answer ("no matches", because nothing could be read)
+    /// for another ("no matches", because nothing has been written yet). The `unavailable → open` edge
+    /// is what schedules the rebuild that fills it, hence reading the prior health *before* the open.
     private func openIndexForQuery() async -> NotesIndex? {
         guard let index else { return nil }          // pure injected store: no index to be unhealthy
+        // The driver owns `failure` when there is one; only a driver-less model answers for itself. Read
+        // it from the owner, since `buildIndexFromDisk()` adopts the driver's verdict only at the end of
+        // the pass — mid-pass the model's mirror can still be nil while the driver knows better.
+        var wasUnavailable = false
+        if case .unavailable = indexer?.failure ?? indexFailure { wasUnavailable = true }
+
+        let opened: Bool
         if let indexer {
-            let opened = await indexer.openForQuery()
+            opened = await indexer.openForQuery()
             adoptIndexFailure(indexer.failure)
-            return opened ? index : nil
+        } else {
+            do {
+                try await index.open()
+                // It opened, so an `unavailable` claim is now false. An `incomplete` one still stands — a
+                // successful open says nothing about rows a previous pass failed to write.
+                if case .unavailable = indexFailure { adoptIndexFailure(nil) }
+                opened = true
+            } catch {
+                adoptIndexFailure(.unavailable(detail: NotesIndexer.failureDetail(error)))
+                opened = false
+            }
         }
-        do {
-            try await index.open()
-            // It opened, so an `unavailable` claim is now false. An `incomplete` one still stands — a
-            // successful open says nothing about rows a previous pass failed to write.
-            if case .unavailable = indexFailure { adoptIndexFailure(nil) }
-            return index
-        } catch {
-            adoptIndexFailure(.unavailable(detail: NotesIndexer.failureDetail(error)))
-            return nil
+        guard opened else { return nil }
+        if wasUnavailable { scheduleIndexRepopulationAfterRecovery() }
+        return index
+    }
+
+    /// The in-flight post-recovery rebuild (W23.m9-fu2) — `nil` when none is running.
+    private var indexRecoveryTask: Task<Void, Never>?
+
+    /// The in-flight post-recovery rebuild, so a test can await it rather than sleep on a task the query
+    /// path scheduled. (`nil` also means "already finished" — the assertions are on the rebuilt state.)
+    var inFlightIndexRecoveryTask: Task<Void, Never>? { indexRecoveryTask }
+
+    /// Kick a from-disk rebuild after the index recovered from `unavailable`, WITHOUT making the read
+    /// that noticed wait for it (W23.m9-fu2).
+    ///
+    /// Three properties are the whole design:
+    /// - **Edge-triggered, not per-read.** Only the `unavailable → open` transition schedules it, so the
+    ///   directory walk happens once per recovery rather than once per keystroke of a 150 ms-debounced
+    ///   search. This is the "a full disk walk from a keystroke" objection that deferred the fix, and it
+    ///   is the edge — not the failure state — that answers it.
+    /// - **Off the read's critical path.** The caller returns its (still empty) result immediately and
+    ///   the rows land on a later read, exactly as they do after a launch build. A search must never
+    ///   block on a store walk.
+    /// - **One at a time.** `buildIndexFromDisk()` re-enters `openIndexForQuery()` via `reloadItems()`,
+    ///   and a file that flaps would otherwise stack rebuilds on each other.
+    ///
+    /// Nothing to rebuild *from* — no driver, or no store yet (an injected model, or one pre-`bootstrap`)
+    /// — is a no-op: the handle recovered and the banner is retracted either way, there is simply no
+    /// disk to walk.
+    private func scheduleIndexRepopulationAfterRecovery() {
+        guard indexer != nil, noteStore != nil, indexRecoveryTask == nil else { return }
+        indexRecoveryTask = Task { [weak self] in
+            await self?.repopulateIndexAfterRecovery()
+            self?.indexRecoveryTask = nil
         }
+    }
+
+    /// The rebuild itself: the same from-disk pass the app runs at launch (W23.m9-fu2).
+    ///
+    /// Deliberately `buildIndexFromDisk()` and not a bespoke recovery path — the two cannot drift, its
+    /// upserts are mtime-skipped (so a volume that came back with its rows intact costs one directory
+    /// walk and no writes), and it also repairs the *partial* index a mid-pass failure leaves behind,
+    /// which an "only rebuild when the index reads empty" shortcut would skip. It is read-only w.r.t.
+    /// the note store and prunes nothing, so the worst case of a needless run is wasted work.
+    ///
+    /// It does re-mark `isIndexReady` and bump `indexGeneration` — the deliberate behaviour change this
+    /// item exists to make, rather than smuggle into the LOW visibility fix it fell out of. The token's
+    /// contract is "a build settled", and one did; `isIndexReady` only ever goes true, so the hidden
+    /// `an.status.indexReady` probe cannot regress to "building" underneath a test.
+    ///
+    /// Internal so a test can drive the rebuild deterministically instead of racing the scheduler.
+    func repopulateIndexAfterRecovery() async {
+        guard indexer != nil, noteStore != nil else { return }
+        await buildIndexFromDisk()
     }
 
     private func markIndexReady(generation: Int) {
