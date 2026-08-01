@@ -775,6 +775,31 @@ extension OCRProcessor {
             pendingRunInfo = nil
         }
     }
+    /// The tail every transiently-interrupted paid batch must run before its run ends (W16.bat4).
+    ///
+    /// A transient interruption — poll timeout, the 10-error network streak, a journal-persistence failure,
+    /// a submission that stopped part-way — leaves a PAID server-side batch alive and its journal on disk,
+    /// so the run must stop short of tagging/finalize but hand the operator the way back to it. Every
+    /// `batchPollInterrupted` message says the batch was kept "so you can resume it", and the Resume control
+    /// (`OCRView`'s "Pending Batch" box) renders only from `pendingBatchInfo`, which is written **only** by
+    /// `checkForPendingBatch()` — so a path that skips this call tells the operator to press a button that
+    /// is not there.
+    ///
+    /// Deliberately NON-destructive: it deletes no journal (`deletePendingBatch()` is exactly what must not
+    /// happen while a paid job may still be running) and touches no output. The only files it removes are
+    /// this run's own temporary PDF→JPEG conversions, which a resume regenerates from the original sources.
+    ///
+    /// Both entry points into a paid batch call this and nothing else, so the two cannot drift again: the
+    /// resume path (`resumePendingBatch`, after `pollBatchUntilComplete` returns) and the first-run path
+    /// (`processFiles`, after `performBatchOCR` returns — which covers all four of its interrupted exits).
+    /// Pinned headlessly by `BatchInterruptTailContract` (W16.bat4).
+    func finishInterruptedBatchPoll() {
+        activeBatch = nil
+        activePendingBatch = nil
+        isProcessing = false
+        cleanupTempFiles()
+        checkForPendingBatch()
+    }
     /// Dismiss a pending batch notification (deletes local state only — server-side batch continues).
     func dismissPendingBatch() {
         Self.deletePendingBatch()
@@ -908,11 +933,7 @@ extension OCRProcessor {
         // Reset isProcessing + re-surface the pending-batch banner (mirrors startProcessing) so the UI
         // isn't wedged with every Start/Resume button disabled until relaunch.
         if batchPollInterrupted {
-            activeBatch = nil
-            activePendingBatch = nil
-            isProcessing = false
-            cleanupTempFiles()
-            checkForPendingBatch()
+            finishInterruptedBatchPoll()
             return
         }
         Self.deletePendingBatch()
@@ -1976,9 +1997,16 @@ extension OCRProcessor {
                     runConfig: runConfig
                 )
                 // Transient interruption during batch polling: the batch is preserved (resumable) and
-                // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results;
-                // reset isProcessing so the UI isn't stuck, and let the user Resume pending batch.
-                if batchPollInterrupted { isProcessing = false; return }
+                // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results.
+                // The SAME tail as the resume site (W16.bat4) — resetting `isProcessing` alone left the
+                // Resume control the interruption message names unrendered until the operator pressed Start
+                // and was refused, and leaked this run's temp JPEGs. Reached by all four of
+                // `performBatchOCR`'s interrupted exits: journal-save failure, a submission that stopped
+                // part-way, a journal/ID disagreement, and the poll's own timeout / error streak.
+                if batchPollInterrupted {
+                    finishInterruptedBatchPoll()
+                    return
+                }
             } else {
                 // Create a complete, versioned snapshot before the first non-batch OCR request. The v2
                 // fingerprint covers ordered inputs + every run/backend/runtime setting and is recomputed
