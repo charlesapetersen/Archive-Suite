@@ -682,9 +682,26 @@ currently being changed by another autonomous run.
 
 ---
 
-## PROMOTED → Wave 16: replace process-global processing settings with per-run dependencies [MEDIUM-LOW — was HIGH]
+## RESOLVED (2026-08-01) → Wave 16: replace process-global processing settings with per-run dependencies [was MEDIUM-LOW]
 
-**No longer deferred; severity corrected (owner review 2026-07-18).** Promoted to `SUITE_TODO.md` §"Known-issues
+✅ **FIXED — W16.cfg1…cfg6 all shipped; the six `nonisolated(unsafe)` statics no longer exist.**
+`OCRProcessor`'s `rotationModeForRun`, `standardImageMB`, `ocrWorkerCount`, `pdfImageMB`, `textColumns` and
+`exportedImageMB`, and the `loadStandardImageMB()` that loaded them, were deleted by **W16.cfg6** (2026-08-01).
+Every run/resume/retry/review/tag/export/merge consumer takes its values from an injected
+`SessionProcessingConfig`; `targetDimensionScale` and `performOCRCall` now take their run values as **required**
+parameters, so completeness is compiler-enforced rather than review-enforced. Where an optional config remains,
+the terminal fallback is `SessionProcessingConfig.runSizing()` / `defaultRotationMode()` — pure, lazily
+evaluated, Keychain-free UserDefaults reads that can return a *current* value but never a *stale* one.
+
+**The residual risk this entry stayed open for is now unrepresentable, not merely unlikely:** no test driver can
+leave a run-config global mutated, because there is no such global to mutate. The text below about drivers
+poking `rotationModeForRun`/`standardImageMB`/`pdfImageMB`/`textColumns` describes the pre-cfg6 code and is kept
+only as the historical rationale. What survives is `MacOSTagger.stampUnread` — a *different* global, already
+lock-backed (`5b58da8`) and an explicit per-call parameter at all 13 sites since W16.cfg4; production no longer
+reads it, and it is tracked for deletion as **W16.cfg6-fu**. The concurrent-runs + Thread-Sanitizer stress
+driver from the verification plan stays deferred (needs live keys or an owner-approved stub OCR backend).
+
+*Historical record below.* Promoted to `SUITE_TODO.md` §"Known-issues
 work — Wave 16" as **W16.cfg1–cfg6**. **Owner decision: extend `SessionProcessingConfig` to be the single run
 config** (it already carries 5 of the 6 values; `ocrWorkerCount` is the only gap) and have
 `PendingRunRuntimeConfig` wrap it — **do NOT introduce a third type.** This is a consolidation job, not the

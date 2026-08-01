@@ -48,9 +48,16 @@ struct SessionProcessingConfig: Sendable {
     /// The five run-scoped sizing/concurrency values, and nothing else.
     ///
     /// These are exactly the numbers that used to live in `OCRProcessor`'s six mutable
-    /// `nonisolated(unsafe)` statics (W16.cfg6 deleted them). They are grouped here so the run-start
-    /// builder and the last-resort read below cannot drift apart: both normalize through
-    /// `runSizing(_:)`, so there is one clamp per value in the whole app.
+    /// `nonisolated(unsafe)` statics (W16.cfg6 deleted them). They are grouped here so the two things
+    /// that answer for a Process Files run — `fromProcessFilesRunStart()` and the last-resort read
+    /// below — cannot drift apart: both normalize through `runSizing(_:)`.
+    ///
+    /// ⚠️ That is **one clamp per value on the run-start path, not app-wide.** `fromDefaults()` still
+    /// normalizes `pdfImageMB`/`exportedImageMB` with its own looser inline closures (no `.isFinite`
+    /// guard, no 0.5 floor, no 20 ceiling), and Live Capture builds its session config from
+    /// `fromDefaults()` — so an out-of-range default reaches Live Capture unclamped while Process Files
+    /// clamps it. That divergence predates W16.cfg6, which did not touch `fromDefaults()`; it is filed
+    /// as **W16.cfg6-fu2**. Do not read this type as proof the two paths already agree.
     struct RunSizing: Sendable, Equatable {
         var standardImageMB: Double
         var ocrWorkerCount: Int

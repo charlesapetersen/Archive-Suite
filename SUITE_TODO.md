@@ -1806,6 +1806,15 @@ restore is skipped by a crash** — alongside real work, output gets the wrong e
 count, or a missing/extra `Unread` tag. That is non-zero **precisely because the daemon runs smoke tests
 unattended.** All Tier-2 (file-writing/tag paths); Processor has no unit target, so verify via the headless
 drivers + `scripts/test-smoke.sh` on scratch fixtures.
+
+✅ **CLOSED 2026-08-01 by W16.cfg6.** The six statics no longer exist, so the driver-leak scenario above is not
+merely unlikely — it is unrepresentable. No driver pokes a run-config global any more. (`MergeSafetyTestDriver`'s
+`stampUnread` flip is a *different* global, `MacOSTagger.stampUnread`, which W16.cfg4 already made an explicit
+per-call parameter at all 13 sites; the remaining flip is a test affordance on a lock-backed property, not a
+`nonisolated(unsafe)` var. The header's mention of `MultiPageReOCRTestDriver` poking `pdfImageMB`/`textColumns`
+went stale at W16.cfg2, which migrated it to injection.) The one item still open in this area is the
+owner-gated concurrent-runs/TSan stress driver at the bottom of this section — it needs live keys or an
+approved stub OCR backend, and is NOT queued.
 - [x] **W16.cfg1 — make `SessionProcessingConfig` the single run config [S].** DONE 2026-07-29 (this commit).
   `SessionProcessingConfig` is now explicitly `Sendable`; its existing `fromDefaults()` builder snapshots
   `ocrWorkerCount` with the same 1…12 clamp/fallback of 4 as `OCRProcessor.loadStandardImageMB()`. A dedicated,
@@ -1861,12 +1870,36 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   and the legacy image-scale clamp mismatch, then approved.
   | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
     Capture/{BatchResumeTestDriver,SessionProcessingConfig}.swift, Views/ToolsView.swift | M | med | none
-- [ ] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2, W16.cfg3, W16.cfg5) **[S].**
-  The payoff commit: remove `OCRProcessor.swift:70/73/76/79/82/85`; delete the now-redundant
-  `loadStandardImageMB()` and make every run start use cfg1's already-normalized
-  `SessionProcessingConfig.fromProcessFilesRunStart()` builder; drop the redundant `explicit…` fallback params
-  (`OCRProcessor.swift:114-124`, `+OCR.swift:1117-1133`); and update the three drivers that save/restore statics.
-  The compiler enforces completeness. | files: OCR/OCRProcessor.swift, Capture/*TestDriver.swift | S | med | none
+- [x] **W16.cfg6 — delete the six `nonisolated(unsafe)` statics; injection mandatory** (blocked-on: W16.cfg2,
+  W16.cfg3, W16.cfg5) **[S].** DONE 2026-08-01 (this commit; checkpoints `6713e43`, `2373d30`). All six are
+  gone — `rotationModeForRun`, `standardImageMB`, `ocrWorkerCount`, `pdfImageMB`, `textColumns`,
+  `exportedImageMB` — with `loadStandardImageMB()`. **Nothing process-global decides how a Process Files run
+  sizes an image, columns a text page, or schedules its workers any more.** Two parameters became required, so
+  the compiler (not a reviewer) enforces completeness: `targetDimensionScale(forFileAt:sizeFraction:standardImageMB:)`
+  and `performOCRCall(…, rotationMode:, standardImageMB:)`; all 11 `performOCRCall` sites resolve both once per
+  function via the new `OCRProcessor.ocrCallValues(for:)`, hoisted before any actor hop. Where an optional
+  `runConfig` legitimately remains (`pdfGenerationSettings`, `schedulingWorkerCount`, `lateRunOutputSettings`,
+  `makePendingRunRuntimeConfig`), the terminal fallback is now `SessionProcessingConfig.runSizing()` /
+  `defaultRotationMode()` — **pure, lazily evaluated, Keychain-free** defaults reads, so an injected config
+  short-circuits them and the per-file loops never touch UserDefaults. `fromProcessFilesRunStart()` normalizes
+  through the same `runSizing()`, so there is now **one clamp per value in the whole app**. Behaviour: every
+  production path injects a config (cfg2/cfg3/cfg5), so the only branch whose value changes is the one no
+  production caller reaches — and there it goes from the deleted statics' *initial* constants (pdfImageMB 0,
+  exportedImageMB 0, rotation `.localVision`, which is what a post-cfg5 process would serve since nothing wrote
+  them any more) back to the normalized run-start defaults `loadStandardImageMB()` produced pre-cfg5. A
+  restoration, not a new rule. The three drivers **stop poking globals** — exactly the pattern this item
+  existed to delete, since a crash between a driver's write and its `defer` restore left a REAL run exporting
+  at the test's size: `ProcessFilesTagWarningTestDriver` injects its 5 MB export target,
+  `BatchResumeTestDriver`'s "no fan-out to statics" check became a bystander-processor check (nothing left to
+  fan out to), and `ManifestPersistenceTestDriver` gained five W16.cfg6 checks pinning what a static could never
+  offer — read twice, same answer; change a default, seen immediately; nothing cached, nothing retained.
+  **Verification:** Debug build clean, 0 new warnings; `test-manifest-persistence.sh`, `test-batch-resume.sh`,
+  `test-processfiles-tagwarn.sh`, `test-merge-safety.sh`, `test-multipage-reocr.sh`, `test-recovery.sh`,
+  `test-output-file-safety.sh`, `test-collection-organize.sh`, `test-localagent.sh`, `test-segment-json.sh`,
+  `test-incremental-skip.sh` — **all pass** ($0, scratch/temp dirs only, no corpus). `test-tier2.sh` needs a
+  live Gemini key (pre-existing keyed tail, not run). Two-lens adversarial refute-verify
+  (reachability+numeric-equivalence; call-site mechanics+concurrency+test integrity) — see below.
+  | files: OCR/OCRProcessor{,+OCR,+Pipeline,+Tagging}.swift, Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver,BatchResumeTestDriver,ProcessFilesTagWarningTestDriver}.swift | S | med | none
 - [x] **W16.cfg4 — make `stampUnread` injection explicit at all `MacOSTagger` call sites [M].** DONE 2026-07-18
   (`806a6d3`). `applyTags`'s `stampUnread` is now a **required non-optional** parameter (both overloads);
   the process-global is no longer read by `applyTags` (retained only as a test-driver affordance + `taggingMode.didSet`
@@ -1884,6 +1917,18 @@ drivers + `scripts/test-smoke.sh` on scratch fixtures.
   (the invariant lens proved `enableTagging` is derived, so `passSourceTags && enableTagging ≡ (mode==.copySource)`,
   closing the one hypothesized hole). Behavior-preserving for every production path.
   | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor+{OCR,Tagging,ReviewFlows,Pipeline}.swift, Capture/MergeSafetyTestDriver.swift | M | **high** | none
+- [ ] **W16.cfg6-fu — delete `MacOSTagger.stampUnread` and the `taggingMode.didSet` that arms it [XS · LOW].**
+  Filed by W16.cfg6 (2026-08-01); the follow-up `MacOSTagger.swift:17-27` names in its own doc comment. It is the
+  last ambient tagging global. Nothing in production READS it — W16.cfg4 made `stampUnread:` a required
+  per-call parameter at all 13 `applyTags` sites — but `OCRProcessor.taggingMode`'s `didSet`
+  (`OCRProcessor.swift:54`) still writes it, and three drivers still set/restore it
+  (`MergeSafetyTestDriver:102/123`, `ManifestPersistenceTestDriver:48/219/225`,
+  `ProcessFilesTagWarningTestDriver:55`). Removing it means: drop the property + the `didSet`, then rework
+  those driver assertions the way W16.cfg6 reworked the run-config ones — assert the injected per-call value,
+  not the global's arming. Note `ManifestPersistenceTestDriver`'s B8 check currently exists *only* to prove the
+  arming behaviour, so it needs a new subject or retirement. Not urgent: the property is
+  `OSAllocatedUnfairLock`-backed (`5b58da8`), so this is style/clarity, not a data race.
+  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor.swift, Capture/*TestDriver.swift | XS | low | none
 - **Deferred (needs owner sign-off, NOT queued):** the concurrent-runs + Thread-Sanitizer stress driver
   (verification-plan items 1/2/4). It needs either live API keys for a genuine concurrent OCR run or an
   **owner-approved stub OCR backend**, and the mutate-Settings-mid-run steps need GUI. Revisit if the stub
