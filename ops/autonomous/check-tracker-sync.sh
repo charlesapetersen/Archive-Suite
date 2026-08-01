@@ -25,6 +25,13 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PLAN="${AUTONOMOUS_PLAN:-$ROOT/.maintenance/AUTONOMOUS_PLAN.md}"
 TODO="${AUTONOMOUS_TODO:-$ROOT/SUITE_TODO.md}"
+# The completed-item archive is part of the SAME logical tracker and MUST be scanned with it. Splitting the
+# done items out (2026-08-01, consolidation phase 2) dropped coverage from 100 shared items to 34 and made the
+# very failure this guard was written for invisible: W21.vmgui-path was `[ ]` in the plan and `[x]` in the
+# tracker, and once "[x] in the tracker" means "lives in the archive", comparing only SUITE_TODO can never see
+# it again. Optional: absent = no-op, so this works before or after the split.
+TODO_DONE="${AUTONOMOUS_TODO_DONE:-$ROOT/SUITE_TODO_DONE.md}"
+[ -f "$TODO_DONE" ] || TODO_DONE=/dev/null
 QUIET="${TRACKER_SYNC_QUIET:-0}"
 
 [ -f "$PLAN" ] || { echo "check-tracker-sync: no plan at $PLAN" >&2; exit 2; }
@@ -58,7 +65,8 @@ items() {
 
 P="$(mktemp)"; T="$(mktemp)"; trap 'rm -f "$P" "$T"' EXIT
 items "$PLAN" 1 | sort > "$P"
-items "$TODO" 0 | sort > "$T"
+# SUITE_TODO first so a live entry wins over a stale archived twin (first-occurrence-wins, as in the resolver).
+{ items "$TODO" 0; items "$TODO_DONE" 0; } | awk -F'\t' '!seen[$1]++' | sort > "$T"
 
 TAB="$(printf '\t')"
 # Compare only items present in BOTH. An item in one file and not the other is NOT drift: the plan mirrors a

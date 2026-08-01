@@ -20,7 +20,10 @@ plan(){ { printf '# P\n\nRUN STATUS: IN_PROGRESS\n\n## PRIME DIRECTIVES\n- x\n\n
           for l in "$@"; do printf '%s\n' "$l"; done
           printf '\n## Session Log\n- done\n'; } > "$SANDBOX/plan.md"; }
 todo(){ { printf '# SUITE_TODO\n\n'; for l in "$@"; do printf '%s\n' "$l"; done; } > "$SANDBOX/todo.md"; }
+# Completed items are archived out of SUITE_TODO into SUITE_TODO_DONE.md, but must still SATISFY dependencies.
+donefile(){ { printf '# SUITE_TODO_DONE\n\n'; for l in "$@"; do printf '%s\n' "$l"; done; } > "$SANDBOX/done.md"; }
 run(){ AUTONOMOUS_PLAN="$SANDBOX/plan.md" AUTONOMOUS_SUITE_TODO="$SANDBOX/todo.md" \
+       AUTONOMOUS_SUITE_TODO_DONE="$SANDBOX/done.md" \
        bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/out.txt" 2>&1; echo $? >"$SANDBOX/rc.txt"; }
 rc(){ cat "$SANDBOX/rc.txt"; }
 verdict(){ awk -F'\t' -v s="$1" -v t="$2" '$1==s&&$2==t' "$SANDBOX/out.txt" | grep -q .; }  # status/tag present?
@@ -168,6 +171,28 @@ plan "- [ ] **W.p — the REAL pending item** — not done." \
 run
 chk "S pend-wins: [x] elsewhere + [ ] in queue -> still blocked" "verdict blocked:W.p W.q"
 todo
+
+# --- the completed-item ARCHIVE satisfies dependencies (consolidation phase 2) --------------------------
+# A tag the resolver cannot find reads as NOT done, so archiving a [x] item that something depends on would
+# permanently block the dependent — the dead end W3.cap-r4 once created for W17.stg1. Zero items were exposed
+# on the day of the split, but that was luck: the next `(blocked-on: <archived tag>)` anyone writes would hit it.
+donefile "- [x] **W.arch — shipped, then archived**"
+plan "- [ ] **W.dep — needs the archived one** (blocked-on: W.arch) — must be actionable."
+run
+chk "T archive: a dep satisfied ONLY by SUITE_TODO_DONE resolves as done" "verdict ok W.dep"
+
+# ...but the [ ]-anywhere-wins rule must still beat a stale archived twin, or re-opened work runs early.
+todo "- [ ] **W.arch — re-opened after shipping**"
+run
+chk "T archive: a re-opened item beats its stale archived [x]" "verdict blocked:W.arch W.dep"
+todo
+
+# ...and a missing archive stays a no-op, so the resolver works before the split too.
+rm -f "$SANDBOX/done.md"
+plan "- [ ] **W.solo — no deps**"
+run
+chk "T archive: absent SUITE_TODO_DONE is a no-op" "verdict ok W.solo"
+donefile
 
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="

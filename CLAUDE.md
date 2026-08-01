@@ -176,7 +176,8 @@ tracker, not just your scratch notes. **The owner should never have to catch a s
 is part of the change, full stop.
 
 Three tiers, so nothing sprawls or goes stale:
-- **Near-term work → `SUITE_TODO.md`** (root) — the single live to-do queue; it also **indexes the active execution plans** (below).
+- **Near-term work → `SUITE_TODO.md`** (root) — the single live to-do queue, **OPEN items only**; it also **indexes the active execution plans** (below).
+- **Completed work → `SUITE_TODO_DONE.md`** (root) — when an item ships, **move its whole entry there** under its section heading instead of ticking it in place (2026-08-01: 47 open items were buried among 160 done ones in one 3,580-line file). Doc-sync is unchanged — the move still happens in the same commit as the code. Kept rather than deleted because the entries cite the commits that shipped them and often carry *why* a later change may or may not revisit that code. ⚠️ `next-queue-item.sh` and `check-tracker-sync.sh` both read it; don't rename it without them.
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 

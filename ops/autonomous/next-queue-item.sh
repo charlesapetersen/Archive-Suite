@@ -10,7 +10,7 @@
 #
 # HOW an item's TAG is read: the first `[A-Za-z0-9._-]` token after the checkbox (leading `**` stripped) — e.g.
 # `- [x] **W3.f1 [HIGH] …**` → `W3.f1`. A prerequisite `T` is DONE iff some checkbox line's tag is `T` with
-# `[x]` AND no `[ ]` line has tag `T`, scanning the plan's WORK QUEUE + SUITE_TODO.md. A missing `T` is treated
+# `[x]` AND no `[ ]` line has tag `T`, scanning the plan + SUITE_TODO.md + SUITE_TODO_DONE.md. A missing `T` is treated
 # as NOT done (blocked + surfaced) — an unresolved prerequisite should stall the item, not run out of order.
 #
 # OUTPUT: one line per `[ ]` WORK QUEUE item, in priority order:  <status>\t<tag>\t<text>
@@ -18,13 +18,20 @@
 # EXIT: 0 = at least one `ok` item exists; 4 = `[ ]` items exist but ALL are dependency-blocked; 3 = no `[ ]`
 # items at all; 2 = no plan file OR no `## WORK QUEUE` section (bad plan — surfaced, not silently "empty").
 # (Hold-queue skips are layered by the resume prompt ON TOP of this — the script's ONLY concern is
-# `blocked-on` dependency state. The tag->state scan reads the WHOLE plan + SUITE_TODO, not just the queue, so
-# a prerequisite ticked anywhere counts as done; the `[ ]`-anywhere-wins rule keeps that safe.)
+# `blocked-on` dependency state. The tag->state scan reads the WHOLE plan + SUITE_TODO + the SUITE_TODO_DONE
+# archive — not just the queue — so a prerequisite ticked anywhere counts as done; the `[ ]`-anywhere-wins
+# rule keeps that safe.)
 set -u
 
 REPO="${1:-/Users/<user>/Claude/Archive Suite}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 TODO="${AUTONOMOUS_SUITE_TODO:-$REPO/SUITE_TODO.md}"
+# Completed items are archived out of the live queue into SUITE_TODO_DONE.md, but they MUST still count as
+# satisfied prerequisites: a missing tag reads as NOT done (see below), so archiving a `[x]` item that
+# something depends on would permanently block the dependent — the dead end W3.cap-r4 once created for
+# W17.stg1. Scanned for STATE ONLY; it is never a source of queue candidates. Optional: absent = no-op.
+DONEFILE="${AUTONOMOUS_SUITE_TODO_DONE:-$REPO/SUITE_TODO_DONE.md}"
+[ -f "$DONEFILE" ] || DONEFILE=/dev/null
 [ -f "$PLAN" ] || { echo "next-queue-item: no plan at $PLAN"; exit 2; }
 
 grep -qE '^## WORK QUEUE' "$PLAN" || { echo "next-queue-item: no '## WORK QUEUE' section in $PLAN — bad plan"; exit 2; }
@@ -45,7 +52,7 @@ STATES=$(awk '
     sub(/^\*+[[:space:]]*/, "", rest)          # strip a leading bold marker
     if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) print substr(rest, 1, RLENGTH) "\t" st
   }
-' "$TODO" "$PLAN" 2>/dev/null)
+' "$TODO" "$DONEFILE" "$PLAN" 2>/dev/null)
 
 # done-set = tags seen as [x]; pending-set = tags seen as [ ]. A tag is DONE iff in done and NOT in pending.
 DONE=$(printf '%s\n' "$STATES" | awk -F'\t' '$2=="x"{print $1}' | sort -u)

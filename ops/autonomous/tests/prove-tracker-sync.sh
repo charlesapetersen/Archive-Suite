@@ -118,6 +118,32 @@ printf -- '- [x] **W8.a**\n' > "$T/todo.md"
 OUT="$(TRACKER_SYNC_QUIET=1 AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" bash "$CHECK" 2>&1)"; RC=$?
 [ -n "$OUT" ] && [ "$RC" = 1 ] && ok "quiet mode still reports DRIFT (quiet != silent about failure)" || bad "quiet mode swallowed a divergence"
 
+# ---- 10. THE ARCHIVE IS PART OF THE SAME TRACKER ------------------------------------------------------
+# Regression: splitting done items into SUITE_TODO_DONE.md (consolidation phase 2) dropped coverage from 100
+# shared items to 34 and made the guard's founding case invisible — "[x] in the tracker" now often means
+# "lives in the archive", so comparing SUITE_TODO alone can never see it.
+printf '## WORK QUEUE\n- [ ] **W9.archived — shipped, then archived**\n\n## HOLD QUEUE\n' > "$T/plan.md"
+printf -- '- [ ] **W9.other — unrelated live item**\n' > "$T/todo.md"
+printf -- '- [x] **W9.archived — shipped, then archived**\n' > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 1 ] && ok "an item archived in SUITE_TODO_DONE is still compared (phase-2 regression)" \
+              || bad "archived item invisible to the guard: rc=$RC $OUT"
+case "$OUT" in *"W9.archived"*) ok "names the archived item";; *) bad "archived item not named: $OUT";; esac
+
+# ...and a live entry must win over a stale archived twin, so re-opened work isn't judged by its old state.
+printf -- '- [ ] **W9.reopened — re-opened after shipping**\n' > "$T/todo.md"
+printf -- '- [x] **W9.reopened — the stale archived twin**\n' > "$T/done.md"
+printf '## WORK QUEUE\n- [ ] **W9.reopened — re-opened after shipping**\n\n## HOLD QUEUE\n' > "$T/plan.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 0 ] && ok "a live entry outranks a stale archived twin (no false drift)" \
+              || bad "stale archive twin caused false drift: $OUT"
+
+# ...and the archive being absent must be a no-op, so this works before the split too.
+printf '## WORK QUEUE\n- [ ] **W9.plain**\n\n## HOLD QUEUE\n' > "$T/plan.md"
+printf -- '- [ ] **W9.plain**\n' > "$T/todo.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/nonexistent.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 0 ] && ok "a missing archive is a no-op, not an error" || bad "missing archive broke it: rc=$RC $OUT"
+
 echo
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
