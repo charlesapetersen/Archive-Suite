@@ -806,7 +806,10 @@ tick() {
       >> "$SLOG" 2>&1 &
   local cpid=$!
   # Start stamp — used ONLY to tell a usage-limit fast-fail apart from a genuine no-op in the verdict below.
-  local _t0; _t0="$(date +%s)"
+  # Bash's SECONDS builtin, NOT $(date +%s): this runs on every session launch, and a fork+exec here lands in
+  # the exact window prove-exit-logging races (it SIGTERMs right after "launching fresh resume session"), which
+  # is how the first cut of this turned that suite RED. A builtin costs nothing and cannot perturb timing.
+  local _t0=$SECONDS
   # Watchdog A — OUTER wall-clock backstop. POLLS cpid liveness (rather than one long unconditional sleep) so
   # it self-exits promptly when the session ends AND never fires _terminate_tree against a stale/reused pid if
   # the daemon dies uncleanly (crash/OOM/kill-by-pid). Last resort behind the health watchdog (Watchdog C).
@@ -852,7 +855,7 @@ tick() {
     # window is exhausted (see the Watchdog note above) and cannot move the fingerprint, so it lands here
     # looking identical to "there was nothing to do". Reading that as an idle queue is the same misreport
     # W23.status1 fixed one layer up in `arm.sh status`; this is the log line it left behind.
-    local _elapsed=$(( $(date +%s) - _t0 ))
+    local _elapsed=$(( SECONDS - _t0 ))
     if [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
       log "session (rc=$rc) exited after ${_elapsed}s — likely USAGE-LIMIT fast-fail, not an empty queue; backing off."
     else

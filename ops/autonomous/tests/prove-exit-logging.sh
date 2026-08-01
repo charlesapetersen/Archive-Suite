@@ -88,6 +88,12 @@ LOG="$STATE/daemon.log"
 reset() { : > "$LOG"; rm -f "$STATE/engine.lock" "$STATE/idle.since" "$STATE/STATUS.md"; : > "$SECOUT"; rm -f "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt"; }
 downlines() { grep -c 'daemon down' "$LOG" 2>/dev/null | tr -d ' '; }
 waitfor() { local n=0; while [ "$n" -lt 60 ]; do grep -q "$1" "$LOG" 2>/dev/null && return 0; sleep 0.2; n=$((n+1)); done; return 1; }
+# Wait for a daemon pid to actually be gone. NOTE: plain `wait "$p"` does NOT work here — launch() runs inside
+# a command substitution, so the daemon is a child of THAT subshell, not of this shell, and `wait` on a
+# non-child returns immediately. Every assertion that counted log lines straight after a `wait` was therefore
+# racing the daemon's EXIT trap; the SIGTERM case had no sleep cushion either and false-failed ~4 runs in 6
+# ("expected 1 'daemon down' line, got 1" — the count changed between the test and the error message).
+waitgone() { local n=0; while kill -0 "$1" 2>/dev/null && [ "$n" -lt 80 ]; do sleep 0.2; n=$((n+1)); done; }
 
 echo "prove-exit-logging — the daemon must say WHY it exited"
 
@@ -95,7 +101,7 @@ echo "prove-exit-logging — the daemon must say WHY it exited"
 reset; write_plan IN_PROGRESS
 p=$(launch)
 if waitfor "launching fresh resume session"; then
-  kill -TERM "$p" 2>/dev/null; wait "$p" 2>/dev/null
+  kill -TERM "$p" 2>/dev/null; waitgone "$p"; waitfor "daemon down"
   if [ "$(downlines)" = "1" ]; then ok "SIGTERM logs exactly ONE 'daemon down' line"; else bad "SIGTERM: expected 1 'daemon down' line, got $(downlines)"; fi
   if grep -q 'reason: SIGTERM' "$LOG"; then ok "SIGTERM names itself in the reason"; else bad "SIGTERM reason missing; log: $(grep 'daemon down' "$LOG" || echo '<none>')"; fi
   if grep -q 'lid closing' "$LOG"; then ok "SIGTERM reason mentions the lid/shutdown interpretation"; else bad "SIGTERM reason lacks the lid/shutdown hint"; fi
@@ -121,7 +127,7 @@ fi
 reset; write_plan IN_PROGRESS
 p=$(launch)
 if waitfor "launching fresh resume session"; then
-  kill -9 "$p" 2>/dev/null; wait "$p" 2>/dev/null; sleep 0.5
+  kill -9 "$p" 2>/dev/null; waitgone "$p"; sleep 0.5
   if [ "$(downlines)" = "0" ]; then ok "SIGKILL logs NOTHING (documents the untrappable case)"; else bad "SIGKILL somehow logged $(downlines) line(s)"; fi
   if grep -q 'daemon up' "$LOG"; then ok "'daemon up' with no 'daemon down' = the hard-kill signature"; else bad "no 'daemon up' line to pair against"; fi
 else
@@ -135,7 +141,7 @@ reset; write_plan IN_PROGRESS
 printf '<string>allow</string>\n' > "$SECOUT"
 p=$(launch)
 if waitfor "launching fresh resume session"; then
-  kill -TERM "$p" 2>/dev/null; wait "$p" 2>/dev/null; sleep 0.3
+  kill -TERM "$p" 2>/dev/null; waitgone "$p"; sleep 0.3
   if [ -f "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" ]; then ok "taskport reminder still fires from the EXIT trap"; else bad "taskport reminder LOST — remind_revert_taskport no longer runs on exit"; fi
   if grep -q 'reason: SIGTERM' "$LOG"; then ok "reason still logged alongside the reminder"; else bad "reason missing on the reminder path"; fi
 else
