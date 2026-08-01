@@ -69,7 +69,9 @@ struct TimeEstimator {
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
-        let maxWorkers = Double(max(1, ocrWorkers))
+        // W16.cfg6-fu3: clamp BOTH ends, as the pipeline does. `max(1, ocrWorkers)` alone meant a stored
+        // 100 divided the ETA by 100 while `schedulingWorkerCount` still ran 12 — an ~8× optimistic quote.
+        let maxWorkers = Double(SessionProcessingConfig.clampOCRWorkers(ocrWorkers))
 
         // OCR (image → full transcription), or text-only classification for pre-OCRed input.
         var ocr = 0.0

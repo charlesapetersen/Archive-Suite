@@ -212,11 +212,16 @@ extension OCRProcessor {
               enableTagging == config.taggingMode.enablesTagging,
               config.passSourceTags == (config.taggingMode == .copySource),
               config.imageScale.isFinite, (0.01...1.0).contains(config.imageScale),
-              config.standardImageMB.isFinite, (0.5...20.0).contains(config.standardImageMB),
-              (1...12).contains(config.ocrWorkerCount),
-              config.pdfImageMB.isFinite, (0.5...20.0).contains(config.pdfImageMB),
-              (1...4).contains(config.textColumns),
-              config.exportedImageMB.isFinite, (0.5...20.0).contains(config.exportedImageMB),
+              // W16.cfg6-fu3: the same `Bounds` the clamps and the Settings steppers use, so this
+              // fail-closed validator cannot end up stricter or looser than what the app can produce.
+              config.standardImageMB.isFinite,
+              SessionProcessingConfig.Bounds.imageMB.contains(config.standardImageMB),
+              SessionProcessingConfig.Bounds.ocrWorkers.contains(config.ocrWorkerCount),
+              config.pdfImageMB.isFinite,
+              SessionProcessingConfig.Bounds.imageMB.contains(config.pdfImageMB),
+              SessionProcessingConfig.Bounds.textColumns.contains(config.textColumns),
+              config.exportedImageMB.isFinite,
+              SessionProcessingConfig.Bounds.imageMB.contains(config.exportedImageMB),
               hasGateway == (config.gatewayUpstreamProvider != nil) else { return false }
 
         let optionalParallelCounts = [

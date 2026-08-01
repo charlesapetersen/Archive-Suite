@@ -37,15 +37,43 @@ struct SessionProcessingConfig: Sendable {
     /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
     var localAgent: LocalAgentConfig? = nil
 
+    /// The one declaration of what each sizing/concurrency setting is allowed to be.
+    ///
+    /// Before W16.cfg6-fu3 these three ranges were literals repeated across the reader (`normalizedImageMB`,
+    /// `ocrWorkerCount(from:)`, `runSizing`), the Settings `Stepper`s, and
+    /// `OCRProcessor.pendingRunRuntimeConfigIsValid`. Widening the ceiling meant finding all of them.
+    enum Bounds {
+        static let imageMB: ClosedRange<Double> = 0.5...20
+        static let ocrWorkers: ClosedRange<Int> = 1...12
+        static let textColumns: ClosedRange<Int> = 1...4
+    }
+
     /// Preserve the Process Files run-start normalization now used by every fresh and resumed production
     /// path. W16.cfg6 only removes the remaining compatibility statics and optional fallbacks.
+    ///
+    /// A value that is not a usable size at all (0, negative, NaN, ±∞) takes the `fallback`; a usable one
+    /// out of range is pulled to the nearest bound.
     static func normalizedImageMB(_ value: Double, fallback: Double) -> Double {
-        value.isFinite && value > 0 ? min(20, max(0.5, value)) : fallback
+        value.isFinite && value > 0 ? clampImageMB(value) : fallback
+    }
+
+    /// Pull a *usable* size into range. Callers must reject non-finite input first (`normalizedImageMB`
+    /// does): `max(0.5, .nan)` is `.nan` on every platform Swift targets, so a NaN would survive this.
+    static func clampImageMB(_ value: Double) -> Double {
+        min(Bounds.imageMB.upperBound, max(Bounds.imageMB.lowerBound, value))
+    }
+
+    static func clampOCRWorkers(_ value: Int) -> Int {
+        min(Bounds.ocrWorkers.upperBound, max(Bounds.ocrWorkers.lowerBound, value))
+    }
+
+    static func clampTextColumns(_ value: Int) -> Int {
+        min(Bounds.textColumns.upperBound, max(Bounds.textColumns.lowerBound, value))
     }
 
     static func ocrWorkerCount(from defaults: UserDefaults) -> Int {
         let value = defaults.integer(forKey: DefaultsKeys.ocrWorkerCount)
-        return value > 0 ? min(12, max(1, value)) : 4
+        return value > 0 ? clampOCRWorkers(value) : 4
     }
 
     /// The five run-scoped sizing/concurrency values, and nothing else.
@@ -59,12 +87,14 @@ struct SessionProcessingConfig: Sendable {
     /// ⚠️ Scope that exactly: **one clamp per value per DEFAULTS READ** — NOT "the only clamp in the app".
     /// Downstream still re-bounds some of these (`OCRProcessor.schedulingWorkerCount` the worker count,
     /// `PDFGenerator` the column count); those are idempotent belt-and-braces over an *injected* config,
-    /// which need not have come from a defaults read. Two paths bypass this type and are **not** covered:
-    /// a resumed Process Files run, which fail-closed *validates* its persisted runtime config against
-    /// these same ranges rather than clamping it (`OCRProcessor.pendingRunRuntimeConfigIsValid`), and
-    /// `StagedSegment`'s decoder, which restores a staged live segment's sizes verbatim. Those, plus the
-    /// Settings text field that lets an out-of-range number be typed and stored in the first place, are
-    /// filed as **W16.cfg6-fu3**.
+    /// which need not have come from a defaults read. Two paths bypass this type: a resumed Process Files
+    /// run, which fail-closed *validates* its persisted runtime config against `Bounds` rather than
+    /// clamping it (`OCRProcessor.pendingRunRuntimeConfigIsValid`), and `StagedSegment`'s decoder, which
+    /// restores a staged live segment's sizes verbatim (harmless — the build that wrote the segment is the
+    /// build that reads it back).
+    ///
+    /// W16.cfg6-fu3 added the writer half, `normalizeSizingDefaults(_:)`: the number an operator can type
+    /// or a profile can apply is now held to `Bounds` too, so what Settings *shows* is what a run *uses*.
     ///
     /// W16.cfg6-fu2 is what made even the narrow claim true. Until then `fromDefaults()` sized `pdfImageMB` and
     /// `exportedImageMB` with its own looser inline closures — no `.isFinite` guard, no 0.5 floor, no 20
@@ -99,10 +129,53 @@ struct SessionProcessingConfig: Sendable {
             ocrWorkerCount: ocrWorkerCount(from: d),
             pdfImageMB: normalizedImageMB(
                 d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: 2.0),
-            textColumns: min(4, max(1, d.integer(forKey: DefaultsKeys.textColumns))),
+            textColumns: clampTextColumns(d.integer(forKey: DefaultsKeys.textColumns)),
             exportedImageMB: normalizedImageMB(
                 d.double(forKey: DefaultsKeys.exportedImageSizeMB), fallback: 3.0)
         )
+    }
+
+    /// Rewrite the five sizing/concurrency defaults as the values a run would actually use — the WRITER
+    /// half of W16.cfg6-fu3.
+    ///
+    /// Since W16.cfg6-fu2 every *read* clamps, so nothing out of range can reach a run. What remained was
+    /// that an out-of-range number could still be **stored and displayed**: typing 500 into the Settings
+    /// MB field beside its 0.5…20 stepper persisted 500 and kept showing 500, while every run used 20 and
+    /// the cost pane quoted 500. This closes that divergence at the source rather than adding a fifth
+    /// clamp on the way out.
+    ///
+    /// It writes `runSizing(d)` verbatim, so the normalizer and the reader cannot disagree about a bound
+    /// or a fallback — they are literally the same function.
+    ///
+    /// Two deliberate restraints:
+    /// - **An UNSET key stays unset.** Materializing it would only trade one silent difference for
+    ///   another (`ProcessingProfileStore` distinguishes stored from defaulted), and an unset key already
+    ///   resolves to exactly the value this would write.
+    /// - **A key already equal to its normalized value is not rewritten**, so calling this on every
+    ///   settings change is idempotent and does not churn `@AppStorage` observers.
+    ///
+    /// - Returns: whether anything was actually rewritten (for tests and callers that want to know).
+    @discardableResult
+    static func normalizeSizingDefaults(_ d: UserDefaults = .standard) -> Bool {
+        let sizing = runSizing(d)
+        var changed = false
+        func normalizeDouble(_ key: String, to value: Double) {
+            // NaN compares unequal to everything, so a stored NaN is always rewritten. Intended.
+            guard d.object(forKey: key) != nil, d.double(forKey: key) != value else { return }
+            d.set(value, forKey: key)
+            changed = true
+        }
+        func normalizeInt(_ key: String, to value: Int) {
+            guard d.object(forKey: key) != nil, d.integer(forKey: key) != value else { return }
+            d.set(value, forKey: key)
+            changed = true
+        }
+        normalizeDouble(DefaultsKeys.standardImageSizeMB, to: sizing.standardImageMB)
+        normalizeDouble(DefaultsKeys.pdfImageSizeMB, to: sizing.pdfImageMB)
+        normalizeDouble(DefaultsKeys.exportedImageSizeMB, to: sizing.exportedImageMB)
+        normalizeInt(DefaultsKeys.ocrWorkerCount, to: sizing.ocrWorkerCount)
+        normalizeInt(DefaultsKeys.textColumns, to: sizing.textColumns)
+        return changed
     }
 
     /// This config's own sizing values, for comparing an injected snapshot against a defaults read.

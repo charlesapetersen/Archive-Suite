@@ -125,6 +125,17 @@ struct SettingsView: View {
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
 
+    /// The steppers below must offer exactly the range the run-time clamps enforce, so both read one
+    /// declaration rather than repeating `0.5...20` / `1...12` (W16.cfg6-fu3).
+    private typealias SizingBounds = SessionProcessingConfig.Bounds
+
+    /// The standard image size a run would actually use. Identical to `standardImageSizeMB` once the
+    /// writers are normalized — it exists so the two places that *quote a size to the operator* can never
+    /// go back to advertising a number the pipeline will not honour.
+    private var effectiveStandardImageMB: Double {
+        SessionProcessingConfig.normalizedImageMB(standardImageSizeMB, fallback: 3.0)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             Form {
@@ -225,7 +236,7 @@ struct SettingsView: View {
         let tagging = taggingMode.llmTags   // LLM tag/date calls (excludes Human / Copy-source / None)
         VStack(alignment: .leading, spacing: 6) {
             Text("Estimate — 1,000 files").font(.headline)
-            Text("~\(String(format: "%.2g", standardImageSizeMB)) MB each")
+            Text("~\(String(format: "%.2g", effectiveStandardImageMB)) MB each")
                 .font(.caption2).foregroundStyle(.secondary)
 
             if useLocalAgent {
@@ -538,7 +549,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Image resolution")
-                    HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * standardImageSizeMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution. Not used for pre-OCRed input (no images are sent).")
+                    HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * effectiveStandardImageMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution. Not used for pre-OCRed input (no images are sent).")
                     Spacer()
                     Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary)
                 }
@@ -552,7 +563,7 @@ struct SettingsView: View {
                 TextField("", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.secondary)
-                Stepper("", value: $standardImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+                Stepper("", value: $standardImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(preOCRedInput)
             Toggle(isOn: $outputImageFile) {
@@ -569,7 +580,7 @@ struct SettingsView: View {
                 TextField("", value: $pdfImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.secondary)
-                Stepper("", value: $pdfImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+                Stepper("", value: $pdfImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(preOCRedInput)
             HStack {
@@ -592,14 +603,14 @@ struct SettingsView: View {
                 TextField("", value: $exportedImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.secondary)
-                Stepper("", value: $exportedImageSizeMB, in: 0.5...20, step: 0.5).labelsHidden()
+                Stepper("", value: $exportedImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(!outputImageFile || preOCRedInput)
             HStack {
                 Text("Parallel OCR workers: \(ocrWorkerCount)")
                 HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
                 Spacer()
-                Stepper("", value: $ocrWorkerCount, in: 1...12).labelsHidden()
+                Stepper("", value: $ocrWorkerCount, in: SizingBounds.ocrWorkers).labelsHidden()
             }
             Toggle(isOn: $writeLogEnabled) {
                 HStack {
@@ -608,6 +619,17 @@ struct SettingsView: View {
                 }
             }
         }
+        // W16.cfg6-fu3 — the writer side. Each MB row pairs a bounded `Stepper` with a `TextField` that
+        // accepts any number, so typing 500 used to persist and keep displaying 500 while every run used
+        // 20. `normalizeSizingDefaults` writes back exactly what a run would read, so the field snaps to
+        // the effective value instead of the two silently disagreeing. It is idempotent, so the write it
+        // triggers settles on the second pass rather than looping. `.onAppear` covers a value that was
+        // already stored out of range (an applied profile, an older build, `defaults write`).
+        .onAppear { SessionProcessingConfig.normalizeSizingDefaults() }
+        .onChange(of: standardImageSizeMB) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
+        .onChange(of: pdfImageSizeMB) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
+        .onChange(of: exportedImageSizeMB) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
+        .onChange(of: ocrWorkerCount) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
     }
 
     @ViewBuilder private var rotationSection: some View {

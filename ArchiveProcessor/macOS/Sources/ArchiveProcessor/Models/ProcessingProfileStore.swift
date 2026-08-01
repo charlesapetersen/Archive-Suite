@@ -138,8 +138,15 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
     /// Write a profile's values back through the same UserDefaults / ModelSelectionStore keys the app
     /// reads, so `@AppStorage`-bound views (main window + Settings) update. Posts notifications so views
     /// holding derived `@State` (selected model, API-key fields) re-sync. NEVER touches the Keychain.
-    func apply(_ profile: ProcessingProfile) {
-        let d = UserDefaults.standard
+    ///
+    /// A profile is JSON on disk and decodes **unvalidated** — nothing stops a hand-edited blob (or one
+    /// saved by an older build) from carrying a 500 MB image size. It is written verbatim and then
+    /// normalized, so a profile can restore any setting but cannot put a sizing value out of the range
+    /// the pipeline honours (W16.cfg6-fu3).
+    ///
+    /// - Parameter d: the defaults to write. Defaults to `.standard`; the parameter exists so the
+    ///   headless driver can exercise this on a scratch suite instead of the real app's settings.
+    func apply(_ profile: ProcessingProfile, to d: UserDefaults = .standard) {
         // Per-provider model ids first, so a subsequent provider change lands on the right model.
         for (providerRaw, modelId) in profile.modelIdByProvider {
             if let provider = LLMProvider(rawValue: providerRaw) {
@@ -154,6 +161,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
             case .string(let s): d.set(s, forKey: key)
             }
         }
+        SessionProcessingConfig.normalizeSizingDefaults(d)
         NotificationCenter.default.post(name: .processingProfileApplied, object: nil)
         NotificationCenter.default.post(name: .apiKeyChanged, object: nil)   // provider may have changed → reload key fields
     }
