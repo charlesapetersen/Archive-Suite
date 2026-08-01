@@ -530,13 +530,19 @@ struct GeminiBatchClient: Sendable {
     /// reported success. An empty container (and an empty file name) are therefore *not* sources here.
     static func resultsSource(for status: StatusResult) -> ResultsSource {
         if let inline = status.inlineResults, !inline.isEmpty { return .inline(inline) }
-        if let fileName = status.resultFileName, !fileName.isEmpty { return .file(fileName) }
+        // A blank name is not a spelling of "there is a file" — it would build a download URL ending in
+        // `/:download` and spend a request on it. Whitespace counts as blank.
+        if let fileName = status.resultFileName,
+           !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .file(fileName)
+        }
         return .noneAvailable
     }
 
-    /// How many consecutive polls a chunk may report SUCCEEDED-with-no-results before the poll stops
-    /// and keeps the batch for resume (W16.bat1-fu).
-    static let emptyResultCheckLimit = 3
+    /// How many consecutive polls a chunk may report SUCCEEDED-with-no-results before the poll gives up
+    /// on it (W16.bat1-fu). At the poll's 30s/60s intervals this is a few minutes of grace — enough for
+    /// a result set attached slightly after its state flipped, and bounded either way.
+    static let emptyResultCheckLimit = 5
 
     /// What the poll must do with a terminal SUCCEEDED chunk once it has tried to obtain its results.
     enum ChunkOutcome: Sendable, Equatable {
@@ -544,8 +550,11 @@ struct GeminiBatchClient: Sendable {
         case materialize
         /// Nothing came back. Do NOT consume — read the chunk again on the next poll.
         case recheck
-        /// Still nothing after the grace window. Stop, keep the journal, let the operator resume.
-        case keepForResume
+        /// Still nothing after the grace window. Do NOT consume the chunk — nothing was materialized
+        /// from it — but do not block the batch either: the pages that DID arrive have to be able to
+        /// finish the run, and this chunk's files get an explicit per-file failure they can be retried
+        /// from. A chunk that produces nothing must be terminal, not a run that can never end.
+        case reportEmpty
     }
 
     /// The money decision, in one pure function: a chunk is consumable only if it actually produced
@@ -557,11 +566,11 @@ struct GeminiBatchClient: Sendable {
     /// Chunks are only ever submitted non-empty, so zero results from a finished chunk is anomalous by
     /// construction. The likeliest benign cause is the state flipping to SUCCEEDED a moment before the
     /// results are attached, which another poll resolves — hence the bounded grace rather than an
-    /// immediate stop. `limit` tunes only that grace: no value of it can turn zero results into
-    /// `.materialize`.
+    /// immediate verdict. `limit` tunes only that grace: no value of it can turn zero results into
+    /// `.materialize`, and none of the three outcomes can mark an empty chunk consumed.
     static func chunkOutcome(resultCount: Int, emptyObservations: Int, limit: Int) -> ChunkOutcome {
         guard resultCount <= 0 else { return .materialize }
-        return emptyObservations < max(1, limit) ? .recheck : .keepForResume
+        return emptyObservations < max(1, limit) ? .recheck : .reportEmpty
     }
 
     /// Check batch processing status.

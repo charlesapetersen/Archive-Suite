@@ -280,10 +280,25 @@ enum BatchParseContract {
         check("gemini source: a SUCCEEDED chunk with neither inline results nor a result file yields no source",
               source(#"{"state":"JOB_STATE_SUCCEEDED"}"#) == "none")
 
-        check("gemini source: an EMPTY result-file NAME is not a source (never builds a headless download URL)",
+        // A blank name is not a spelling of "there is a file": taking it would build a download URL
+        // ending in `/:download` and spend a request on it. Whitespace-only counts as blank — the
+        // trimming check below is the one that would have been missed.
+        check("gemini source: an EMPTY result-file NAME is not a source",
               source("""
               {"state":"JOB_STATE_SUCCEEDED","metadata":{"dest":{"fileName":""}}}
               """) == "none")
+
+        check("gemini source: a WHITESPACE-ONLY result-file name is not a source either",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","metadata":{"dest":{"fileName":"  \\n "}}}
+              """) == "none")
+
+        // …but a name is passed through verbatim once it has any content: the app must not "clean up"
+        // a provider identifier it has to send back.
+        check("gemini source: a real file name is carried through untouched, surrounding spaces included",
+              source("""
+              {"state":"JOB_STATE_SUCCEEDED","metadata":{"dest":{"fileName":" files/out-1 "}}}
+              """) == "file: files/out-1 ")
 
         // A page that parsed into a failure (provider error / block) is still a page: it must be
         // materialized and reported, not treated as an absent result.
@@ -310,31 +325,42 @@ enum BatchParseContract {
             GeminiBatchClient.chunkOutcome(resultCount: count, emptyObservations: observations, limit: limit)
         }
 
-        // THE invariant: no result count of zero, at any point in the grace window, is ever consumable.
+        // THE invariant, swept over BOTH axes — every observation count in and past the grace window,
+        // against every limit from degenerate to absurd. Zero results are never consumable, period.
         var zeroEverMaterializes = false
-        for observations in 0...(limit + 5) where outcome(0, observations) == .materialize {
-            zeroEverMaterializes = true
+        for candidateLimit in [-5, 0, 1, 2, limit, limit + 1, 50, 100_000] {
+            for observations in 0...(max(limit, 3) + 5) where outcome(0, observations, limit: candidateLimit) == .materialize {
+                zeroEverMaterializes = true
+            }
         }
-        check("gemini chunk: zero results NEVER materialize — a paid chunk cannot be consumed with no pages (W16.bat1-fu)",
+        check("gemini chunk: zero results NEVER materialize, at any observation count under any limit — a paid chunk cannot be consumed with no pages (W16.bat1-fu)",
               !zeroEverMaterializes)
 
-        check("gemini chunk: a chunk that produced pages materializes on the first look",
-              outcome(1, 0) == .materialize && outcome(42, 0) == .materialize)
+        // And the same sweep for the other half of the promise: whatever the limit, a chunk that DID
+        // produce pages materializes. The grace window can never swallow real pages.
+        var pagesEverWithheld = false
+        for candidateLimit in [-5, 0, 1, limit, 100_000] {
+            for observations in 0...(max(limit, 3) + 5) where outcome(1, observations, limit: candidateLimit) != .materialize {
+                pagesEverWithheld = true
+            }
+        }
+        check("gemini chunk: a chunk that produced pages ALWAYS materializes — no limit or observation count withholds them",
+              !pagesEverWithheld)
 
-        check("gemini chunk: the first empty reads are a re-check, not a failure — a late-attached result set recovers itself",
+        check("gemini chunk: the first empty reads are a re-check, not a verdict — a late-attached result set recovers itself",
               outcome(0, 1) == .recheck && outcome(0, limit - 1) == .recheck)
 
-        check("gemini chunk: once the grace window is spent, the batch is kept for resume rather than consumed",
-              outcome(0, limit) == .keepForResume && outcome(0, limit + 7) == .keepForResume)
+        // Terminal, not blocking. The chunk is never consumed, but the batch is allowed to finish so the
+        // pages that DID arrive complete the run and this chunk's files get a retryable failure. An
+        // outcome that stalled the run instead would be a worse bug than the one this item fixed.
+        check("gemini chunk: once the grace window is spent the chunk is reported empty — terminal, and never consumed",
+              outcome(0, limit) == .reportEmpty && outcome(0, limit + 7) == .reportEmpty)
 
         check("gemini chunk: the grace is bounded — the default limit is neither zero nor unlimited",
-              limit >= 1 && limit <= 10)
+              limit >= 1 && limit <= 20)
 
-        // The limit tunes only the grace. Neither degenerate setting can lose a paid chunk: a limit of
-        // 0 (or a negative one) stops immediately instead of consuming, and a huge one keeps re-reading
-        // until the poll's own 1500-check backstop times out — which also keeps the batch resumable.
-        check("gemini chunk: a zero or negative limit stops loudly, it does not consume",
-              outcome(0, 1, limit: 0) == .keepForResume && outcome(0, 1, limit: -5) == .keepForResume)
+        check("gemini chunk: a zero or negative limit gives its verdict at once, it does not consume",
+              outcome(0, 1, limit: 0) == .reportEmpty && outcome(0, 1, limit: -5) == .reportEmpty)
 
         check("gemini chunk: a huge limit only lengthens the re-check window, it never materializes nothing",
               outcome(0, 900, limit: 100_000) == .recheck && outcome(3, 900, limit: 100_000) == .materialize)

@@ -681,9 +681,11 @@ extension OCRProcessor {
         var batchComplete = false
         batchPollInterrupted = false
         var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
-        // How many times a chunk has come back terminal-but-empty this poll session (W16.bat1-fu).
-        // Deliberately not persisted: a resume is the operator asking to look again from scratch.
+        // How many times a chunk has come back terminal-but-empty, and the chunks already given up on
+        // (W16.bat1-fu). Poll-session state, deliberately not journaled: the give-up is terminal within
+        // the run, so it never has to survive one — and a resume is the operator asking to look again.
         var emptyResultChecks: [String: Int] = [:]
+        var emptyChunkIds: Set<String> = []
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
             guard !Task.isCancelled else { return }
@@ -763,6 +765,10 @@ extension OCRProcessor {
                         // re-PDFs) every finished chunk until the slowest lands, multiplying cost + time.
                         // Count them as complete so allComplete still reflects the whole batch.
                         if consumedChunkIds.contains(singleBatchId) { stateDisplays.append("succeeded"); continue }
+                        // Likewise for a chunk already given up on as empty (W16.bat1-fu): re-reading it
+                        // every poll while slower chunks finish would just re-download nothing. It counts
+                        // as terminal — its files fail in the completion sweep.
+                        if emptyChunkIds.contains(singleBatchId) { stateDisplays.append("failed"); continue }
                         let status = try await client.checkStatus(batchName: singleBatchId)
                         let stateDisplay = status.state
                             .replacingOccurrences(of: "BATCH_STATE_", with: "")
@@ -811,12 +817,20 @@ extension OCRProcessor {
                                     }
                                     continue
 
-                                case .keepForResume:
-                                    statusMessage = "A finished batch chunk returned no results after \(emptyObservations) checks. Nothing was marked complete — the batch was kept so you can resume it."
-                                    NSLog("[ArchiveProcessor] paid-batch chunk %@ reported %@ with no readable results after %d checks; not consumed",
+                                case .reportEmpty:
+                                    // The grace is spent. This chunk is NOT marked consumed — nothing
+                                    // was materialized from it — but the batch is still allowed to
+                                    // complete: blocking it would strand every page that DID arrive,
+                                    // and a chunk that produces nothing has to be terminal rather than
+                                    // a run that can never end. The completion sweep below then gives
+                                    // each of this chunk's files an explicit `no_result` failure with an
+                                    // output record, which the retry pass can act on. Remembered so the
+                                    // remaining polls don't re-fetch it while slower chunks finish.
+                                    emptyChunkIds.insert(singleBatchId)
+                                    statusMessage = "A finished batch chunk returned no pages after \(emptyObservations) checks. Its files are reported as failed; nothing was marked complete for it."
+                                    NSLog("[ArchiveProcessor] paid-batch chunk %@ reported %@ with no readable results after %d checks; not consumed, its files fail",
                                           singleBatchId, status.state, emptyObservations)
-                                    batchPollInterrupted = true
-                                    return
+                                    continue
 
                                 case .materialize:
                                     let materialized = await processBatchResults(
@@ -824,6 +838,7 @@ extension OCRProcessor {
                                         outputDirectory: outputDirectory, runConfig: runConfig)
                                     guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
                                     consumedChunkIds.insert(singleBatchId)
+                                    emptyResultChecks[singleBatchId] = nil
                                 }
                             } else {
                                 anyFailed = true
