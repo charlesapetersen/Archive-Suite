@@ -46,6 +46,15 @@ import AppKit
 ///      and no second cancellation when Stop is pressed twice. Real `cancel()`, stubbed seams, a real temp
 ///      file. Its header lists what it still does NOT cover (the default deleter, W16.bat6) — read it before
 ///      citing a green section 14.
+///  15. The **interrupted-batch TAIL** (`BatchInterruptTailContract`, W16.bat4): sections 13/14 are about
+///      Stop; this is about a run that ends itself with a paid job possibly still alive. The real
+///      `finishInterruptedBatchPoll()` — the one tail both paid-batch entry points now run — recomputes the
+///      resume banner (the Resume control every interruption message names, and the half that was missing on
+///      a FIRST run), deletes exactly this run's own temp PDF→JPEG conversions and nothing else in the
+///      directory (including two decoys named like the durable manifests), and leaves the interruption
+///      message, the run's results and the interrupted-RUN manifest untouched — swept over every start state
+///      the four interrupted exits can arrive in. Its header scopes what it does not cover (the two call
+///      sites themselves, W16.bat2-fu2).
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
 /// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
@@ -633,6 +642,15 @@ enum BatchResumeTestDriver {
         // `cancel()` with both cancel-path seams stubbed, so the operator's own `pending_batch.json` is
         // never touched: no network, no keys, no cost.
         await BatchCancelWiringContract.run(check: check)
+
+        // --- 15: the interrupted-batch TAIL contract (W16.bat4). ---
+        // Sections 13/14 are about Stop; this one is about the run ending itself. Drives the real
+        // `finishInterruptedBatchPoll()` — the single tail both paid-batch entry points run when a poll is
+        // cut short with a server-side job possibly still alive — and pins that it recomputes the resume
+        // banner (the Resume control every interruption message names), deletes exactly this run's own temp
+        // conversions and nothing else in the directory, and leaves the interruption message, the run's
+        // results and the interrupted-RUN manifest alone. Temp files only: no network, no keys, no cost.
+        BatchInterruptTailContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
