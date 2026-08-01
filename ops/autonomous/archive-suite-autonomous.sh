@@ -805,6 +805,8 @@ tick() {
       --disallowedTools "${DENY[@]}" \
       >> "$SLOG" 2>&1 &
   local cpid=$!
+  # Start stamp — used ONLY to tell a usage-limit fast-fail apart from a genuine no-op in the verdict below.
+  local _t0; _t0="$(date +%s)"
   # Watchdog A — OUTER wall-clock backstop. POLLS cpid liveness (rather than one long unconditional sleep) so
   # it self-exits promptly when the session ends AND never fires _terminate_tree against a stale/reused pid if
   # the daemon dies uncleanly (crash/OOM/kill-by-pid). Last resort behind the health watchdog (Watchdog C).
@@ -846,7 +848,16 @@ tick() {
     # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item?
     note_committed "$cc_before" "$cc_after" || verdict=9
   else
-    log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
+    # Name the cause. A usage-limit fast-fail is NOT an empty queue: the CLI exits nonzero in ~2-3s when the
+    # window is exhausted (see the Watchdog note above) and cannot move the fingerprint, so it lands here
+    # looking identical to "there was nothing to do". Reading that as an idle queue is the same misreport
+    # W23.status1 fixed one layer up in `arm.sh status`; this is the log line it left behind.
+    local _elapsed=$(( $(date +%s) - _t0 ))
+    if [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
+      log "session (rc=$rc) exited after ${_elapsed}s — likely USAGE-LIMIT fast-fail, not an empty queue; backing off."
+    else
+      log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
+    fi
     note_no_progress || verdict=9
   fi
 
