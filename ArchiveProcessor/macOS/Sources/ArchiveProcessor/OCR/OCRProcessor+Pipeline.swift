@@ -529,12 +529,16 @@ extension OCRProcessor {
         return try? JSONDecoder().decode(PendingBatch.self, from: data)
     }
 
+    /// The paid-batch recovery journal's file name. A named constant because the cancel path has to be
+    /// able to say *which* durable file a confirmed cancellation may remove, and be checked on it
+    /// without touching the file itself (W16.bat2-fu → `BatchCancellationJournal`).
+    nonisolated static let pendingBatchFileName = "pending_batch.json"
     private static var pendingBatchURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("ArchiveProcessor")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("pending_batch.json")
+        return dir.appendingPathComponent(pendingBatchFileName)
     }
     @discardableResult
     static func savePendingBatch(_ batch: PendingBatch) -> PendingBatch? {
@@ -562,12 +566,15 @@ extension OCRProcessor {
     var pendingBatchFileURLs: [URL]? {
         Self.loadPendingBatch()?.fileURLs
     }
+    /// The interrupted-run manifest's file name. Named for the same reason as its batch sibling, and
+    /// pinned as a DIFFERENT file: cancelling a paid batch must never take this one with it.
+    nonisolated static let pendingRunFileName = "pending_run.json"
     private static var pendingRunURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("ArchiveProcessor")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("pending_run.json")
+        return dir.appendingPathComponent(pendingRunFileName)
     }
     @discardableResult
     private static func savePendingRun(_ run: PendingRun) -> Bool {
@@ -1528,6 +1535,62 @@ extension OCRProcessor {
             }
         }
     }
+    /// One paid batch's per-chunk canceller, carried together with the provider it was built for.
+    ///
+    /// Bundling the two is the point (W16.bat2-fu): `performServerBatchCancellation` reads the provider
+    /// off the canceller instead of taking it as a second argument, so the rule it applies and the
+    /// client it calls **cannot disagree** — there is no longer a `provider:` at the call site to get
+    /// wrong. Not `Sendable`: it is built and consumed entirely on the MainActor.
+    struct BatchChunkCanceller {
+        let provider: LLMProvider
+        /// Performs one chunk's server-side cancellation; true means the provider confirmed it.
+        let cancelChunk: @MainActor (String) async -> Bool
+    }
+
+    /// The durable file a confirmed cancellation is allowed to remove. There is exactly one — the
+    /// paid-batch recovery journal — and naming it as a *value* rather than an inline closure is what
+    /// lets a headless driver assert that `cancel()` asked to delete that and nothing else, without
+    /// ever running the deleter against the operator's real state (W16.bat2-fu).
+    enum BatchCancellationJournal: String, CaseIterable, Sendable {
+        case paidBatchJournal
+        /// The file this names — as a name, so asking costs no filesystem access.
+        var fileName: String {
+            switch self {
+            case .paidBatchJournal: return OCRProcessor.pendingBatchFileName
+            }
+        }
+    }
+
+    /// Build the live per-chunk canceller for a batch: the only provider-specific part of the cancel
+    /// path. Keyed on the batch's OWN provider, so a paid job can never be cancelled with another
+    /// provider's client. Constructing a client opens no connection — the network call happens only
+    /// when the returned closure is invoked, which is why a driver can safely ask for one.
+    static func liveBatchChunkCanceller(for batch: BatchContext) -> BatchChunkCanceller {
+        let cancelChunk: @MainActor (String) async -> Bool
+        switch batch.provider {
+        case .anthropic:
+            let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
+            cancelChunk = { await client.cancelBatch(batchId: $0) }
+        case .mistral:
+            let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
+            cancelChunk = { await client.cancelBatch(batchId: $0) }
+        case .gemini:
+            let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
+            cancelChunk = { await client.cancelBatch(batchName: $0) }
+        case .openai:
+            cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
+        }
+        return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk)
+    }
+
+    /// Which server-side jobs `cancel()` will try to cancel: the journal's acknowledged chunk IDs when
+    /// there is a v1 journal, otherwise the IDs packed into the batch's own ID (legacy comma-joined
+    /// manifests). Pure, so the derivation is pinnable — getting it wrong here cancels the wrong paid
+    /// jobs, or none, while the operator is told the batch was stopped (W16.bat2-fu).
+    static func cancellationChunkIds(pendingBatch: PendingBatch?, batchId: String) -> [String] {
+        pendingBatch?.effectiveChunkIds ?? PendingBatch.parseChunkIDs(batchId)
+    }
+
     /// What `cancel()` did about a paid batch's server-side job and its recovery journal.
     /// `journalDeleted` is the safety-critical field: that journal is the only way back to a still-live
     /// batch the operator has already paid for, so deleting it on an unconfirmed cancellation strands
@@ -1559,18 +1622,18 @@ extension OCRProcessor {
     /// and says so.
     ///
     /// - Parameters:
-    ///   - cancelChunk: performs one chunk's server-side cancellation. `cancel()` passes the provider's
-    ///     live batch client; the headless driver passes a stub, which is the whole point of the seam.
+    ///   - canceller: the provider it applies plus how to cancel one chunk. `cancel()` passes the live
+    ///     batch client's canceller; the headless driver passes a stub, which is the point of the seam.
     ///   - deleteJournal: removes the recovery journal. Called at most once, and only when confirmed.
     static func performServerBatchCancellation(
-        provider: LLMProvider,
+        canceller: BatchChunkCanceller,
         chunkIds: [String],
-        cancelChunk: @MainActor (String) async -> Bool,
         deleteJournal: @MainActor () -> Void
     ) async -> BatchCancellationOutcome {
+        let cancelChunk = canceller.cancelChunk
         var attempted: [String] = []
         let confirmed: Bool
-        switch provider {
+        switch canceller.provider {
         case .anthropic, .mistral:
             // Both clients cancel exactly one server-side job. A batch split into several chunks has no
             // single ID to cancel, so nothing can be confirmed and the journal must survive.
@@ -1633,33 +1696,24 @@ extension OCRProcessor {
         boxFolderConfirmContinuation = nil
         cleanupTempFiles()
 
-        // Cancel server-side batch if active
+        // Cancel server-side batch if active.
+        // Every decision here is made from data and named seams rather than inline closures, so the
+        // WIRING can be driven headlessly (`BatchCancelWiringContract`, W16.bat2-fu) — which jobs get
+        // cancelled, with which provider's client, which journal may be deleted, and whether the
+        // operator is told. The RULE those feed is `performServerBatchCancellation` (W16.bat2).
         if let batch = activeBatch {
             activeBatch = nil
-            let chunkIds = activePendingBatch?.effectiveChunkIds
-                ?? PendingBatch.parseChunkIDs(batch.batchId)
+            let chunkIds = Self.cancellationChunkIds(pendingBatch: activePendingBatch, batchId: batch.batchId)
             activePendingBatch = nil
-            Task {
-                // Only the *how* of one chunk's cancellation is provider-specific; the rule for what
-                // that means for the journal lives in `performServerBatchCancellation` (W16.bat2).
-                let cancelChunk: @MainActor (String) async -> Bool
-                switch batch.provider {
-                case .anthropic:
-                    let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    cancelChunk = { await client.cancelBatch(batchId: $0) }
-                case .mistral:
-                    let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
-                    cancelChunk = { await client.cancelBatch(batchId: $0) }
-                case .gemini:
-                    let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
-                    cancelChunk = { await client.cancelBatch(batchName: $0) }
-                case .openai:
-                    cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
-                }
+            // Built synchronously (constructing a client opens no connection) so the choices are made
+            // from state that is still current, not from whatever it became by the time the Task ran.
+            let canceller = makeBatchChunkCanceller(batch)
+            let deleteJournal = makeBatchJournalDeleter(.paidBatchJournal)
+            batchCancellationTask = Task {
                 let outcome = await Self.performServerBatchCancellation(
-                    provider: batch.provider, chunkIds: chunkIds,
-                    cancelChunk: cancelChunk,
-                    deleteJournal: { Self.deletePendingBatch() })
+                    canceller: canceller, chunkIds: chunkIds, deleteJournal: deleteJournal)
+                // Only a KEPT journal produces a message, and the operator must see it: it is the only
+                // signal that a paid job may still be running server-side.
                 if let message = outcome.statusMessage { statusMessage = message }
                 checkForPendingBatch()
             }

@@ -268,6 +268,28 @@ class OCRProcessor: ObservableObject {
     /// still-processing file as failed. A completed batch always resets this to false.
     var batchPollInterrupted = false
 
+    // MARK: Cancel-path seams (W16.bat2-fu — so the WIRING is testable, not just the rule)
+    /// The in-flight server-side batch cancellation `cancel()` spawned, retained so a headless driver
+    /// can await it (`BatchCancelWiringContract`). Production never reads it.
+    var batchCancellationTask: Task<Void, Never>?
+    /// How `cancel()` obtains the provider's per-chunk canceller. The default builds the live batch
+    /// client for the batch's own provider; the wiring driver swaps in a stub, which is what lets the
+    /// whole Stop path be exercised with no network, no key and no cent. Instance-scoped on purpose —
+    /// a global would leak between runs (cf. W16.cfg6).
+    var makeBatchChunkCanceller: @MainActor (BatchContext) -> BatchChunkCanceller = {
+        OCRProcessor.liveBatchChunkCanceller(for: $0)
+    }
+    /// How `cancel()` turns the journal it is *allowed* to delete into the act of deleting it.
+    /// Injectable for a blunt reason: the real deleter removes the operator's real `pending_batch.json`
+    /// at a fixed Application Support path, so a check may never run it. The driver replaces the
+    /// *doing* and asserts which journal was *asked for*.
+    var makeBatchJournalDeleter: @MainActor (BatchCancellationJournal) -> (@MainActor () -> Void) = {
+        journal in
+        switch journal {
+        case .paidBatchJournal: return { OCRProcessor.deletePendingBatch() }
+        }
+    }
+
     // MARK: - Batch Persistence
 
     struct PendingBatch: Codable {

@@ -81,12 +81,11 @@ enum BatchCancelContract {
 
         let recorder = Recorder()
         let outcome = await OCRProcessor.performServerBatchCancellation(
-            provider: provider,
-            chunkIds: chunkIds,
-            cancelChunk: { id in
+            canceller: OCRProcessor.BatchChunkCanceller(provider: provider, cancelChunk: { id in
                 recorder.attempted.append(id)
                 return !refusing.contains(id)
-            },
+            }),
+            chunkIds: chunkIds,
             deleteJournal: {
                 recorder.deleteCalls += 1
                 try? fm.removeItem(at: journal)
