@@ -1777,14 +1777,63 @@ extension OCRProcessor {
         pendingBatch?.effectiveChunkIds ?? PendingBatch.parseChunkIDs(batchId)
     }
 
+    /// Is a paid-batch SUBMISSION still being constructed for this journal? (W16.bat5)
+    ///
+    /// The invariant it serves: **a submit is in flight ⇒ the journal survives.** `cancel()` snapshots the
+    /// chunk IDs once and then cancels them; a Gemini run creates its server-side jobs one at a time, so a
+    /// chunk created *after* that snapshot is billed with its ID recorded nowhere — and if every chunk in
+    /// the stale snapshot confirms, the journal (the only local trace of the run) is deleted on top of it.
+    /// The owner considered and rejected re-reading the journal's IDs after the cancellations: a chunk
+    /// created between the re-read and the delete still slips, so it narrows the race rather than removing
+    /// it. The rule here removes it — whenever a submission had not finished at the moment Stop landed, the
+    /// journal is kept, no matter what the cancellations then confirm.
+    ///
+    /// The flag is `submissionComplete`, which the journal already carries and which already brackets the
+    /// submit loop exactly: `performBatchOCR` writes the journal with `submissionComplete: false` **before**
+    /// the first provider create request (`+OCR.swift`), and `markBatchSubmissionComplete()` flips it true
+    /// **after** the last one — and the Gemini submit loop is strictly sequential (`BatchOCR.swift`: each
+    /// create is followed inline by its `onJobCreated` callback, no task group, nothing detached), so
+    /// "the flag is still false" really does mean "another create may yet happen". Reusing it rather than
+    /// adding a second, process-local bool is deliberate: it is durable, and there is no new set/clear
+    /// pair for a later edit to forget.
+    ///
+    /// ⚠️ **It is a SUPERSET of "a create is happening right now", and that is the point.** What it really
+    /// answers is *"was this submission ever recorded as finished?"* — so it also says yes for a journal
+    /// left unfinished by an earlier interrupted submit (including one being resumed, where nothing is
+    /// being submitted at all) and for a submit that finished but whose marker write failed. Each of those
+    /// is a batch whose full set of paid jobs is unknown, which is exactly the condition that must keep the
+    /// journal, so the breadth is the correct reading rather than slop. It does mean the operator-facing
+    /// message must not claim anything about *when* — see
+    /// `batchCancellationSubmissionInFlightMessage`, which is worded from the unfinished record instead.
+    ///
+    /// The one direction it deliberately does NOT cover:
+    ///   * No journal at all ⇒ NOT in flight. There is no submission state to consult (a legacy
+    ///     comma-joined manifest is written after its single submit, and `activePendingBatch` is non-nil for
+    ///     the whole of a v1 submit window — it is assigned one line before `activeBatch`, with no
+    ///     suspension between, so `cancel()` can never see a live batch without its journal).
+    ///
+    /// Pure, and read synchronously by `cancel()` **before** it drops `activePendingBatch` — the answer
+    /// describes the instant Stop was pressed, which is what makes it a rule and not another race.
+    static func batchSubmissionIsInFlight(_ pendingBatch: PendingBatch?) -> Bool {
+        guard let pendingBatch else { return false }
+        return !pendingBatch.submissionComplete
+    }
+
     /// What `cancel()` did about a paid batch's server-side job and its recovery journal.
     /// `journalDeleted` is the safety-critical field: that journal is the only way back to a still-live
     /// batch the operator has already paid for, so deleting it on an unconfirmed cancellation strands
     /// the money with no way to collect the pages.
     struct BatchCancellationOutcome: Equatable, Sendable {
-        /// True only when EVERY chunk of the batch was confirmed cancelled by the provider.
+        /// True only when every chunk the cancellation KNEW ABOUT was confirmed cancelled by the provider —
+        /// which is the whole batch only when `submissionInFlight` was false. That distinction is the whole
+        /// of W16.bat5: the chunk list is a snapshot, and an unfinished submission means it may be short.
         let confirmed: Bool
         /// True iff the recovery journal was deleted (i.e. `deleteJournal` was called).
+        ///
+        /// ⚠️ **Not a synonym for `confirmed` any more** (W16.bat5): `confirmed && !journalDeleted` is a
+        /// real, reachable outcome — every chunk the cancellation knew about was stopped, but the
+        /// submission was still in flight, so the list may have been incomplete and the journal survives.
+        /// `journalDeleted` is the safety-critical one; read it, never `confirmed`, to know the file's fate.
         let journalDeleted: Bool
         /// The operator-facing message — set only when the journal was KEPT, so the text and the
         /// on-disk fact can never disagree.
@@ -1799,6 +1848,22 @@ extension OCRProcessor {
     static let batchCancellationNotConfirmedMessage =
         "Cancelled locally, but server cancellation was not confirmed. The paid-batch journal was kept for recovery."
 
+    /// The words for the OTHER reason the journal is kept (W16.bat5): every chunk the cancellation knew
+    /// about was confirmed, but the journal's submission was never recorded as finished, so the list may
+    /// not have been the whole batch. Distinct from the message above on purpose — "we could not stop it"
+    /// and "we stopped everything we knew of, and there may be more" are different things to hand an
+    /// operator who is deciding whether to press Resume.
+    ///
+    /// ⚠️ **Deliberately says nothing about *when*.** The obvious wording — "cancelled while the batch was
+    /// still being submitted, so a job may have been created after the cancellation started" — is FALSE in
+    /// two shapes this rule also fires on, and this is the one sentence the operator makes a money decision
+    /// from: a Stop during a *resumed* batch whose original submission never completed (resume is GET-only,
+    /// so nothing is being submitted and nothing is created after the Stop), and a submit that really did
+    /// finish but whose `markBatchSubmissionComplete()` could not persist. The unfinished *record* is what
+    /// is true in all three, and it is the whole reason the journal is kept.
+    static let batchCancellationSubmissionInFlightMessage =
+        "The batch's submission was never recorded as finished, so paid jobs may exist beyond the ones that were cancelled. The paid-batch journal was kept for recovery."
+
     /// Cancel a paid batch server-side and decide the fate of its recovery journal.
     ///
     /// The one shipped safety guarantee of the cancel path, extracted so it can be proven without a
@@ -1807,13 +1872,24 @@ extension OCRProcessor {
     /// batch this app has no single ID to cancel, a batch with no chunk IDs at all — keeps the journal
     /// and says so.
     ///
+    /// **A submission still in flight overrides confirmation** (W16.bat5). `chunkIds` is a snapshot taken
+    /// when Stop landed; if the run was still creating server-side jobs at that instant, the snapshot is not
+    /// the whole batch, and confirming all of it says nothing about the job created next. So the journal is
+    /// kept — the operator is told a paid job may exist beyond the ones that were stopped. This is the only
+    /// case where a fully confirmed cancellation still keeps the journal.
+    ///
     /// - Parameters:
     ///   - canceller: the provider it applies plus how to cancel one chunk. `cancel()` passes the live
     ///     batch client's canceller; the headless driver passes a stub, which is the point of the seam.
-    ///   - deleteJournal: removes the recovery journal. Called at most once, and only when confirmed.
+    ///   - submissionInFlight: was the batch's submission still unfinished when Stop was pressed
+    ///     (`batchSubmissionIsInFlight`)? Deliberately NOT defaulted: a caller that has to answer it cannot
+    ///     forget it, and on this path forgetting means deleting a journal that should have survived.
+    ///   - deleteJournal: removes the recovery journal. Called at most once, and only when the cancellation
+    ///     was confirmed AND no submission was in flight.
     static func performServerBatchCancellation(
         canceller: BatchChunkCanceller,
         chunkIds: [String],
+        submissionInFlight: Bool,
         deleteJournal: @MainActor () -> Void
     ) async -> BatchCancellationOutcome {
         let cancelChunk = canceller.cancelChunk
@@ -1841,6 +1917,14 @@ extension OCRProcessor {
             confirmed = allConfirmed
         case .openai:
             confirmed = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
+        }
+        // Keep-on-doubt, and the doubt outranks the confirmation: an unfinished submission means the
+        // chunk list above may not be the whole batch, so "all of them stopped" is not "all of it stopped".
+        if confirmed && submissionInFlight {
+            return BatchCancellationOutcome(
+                confirmed: true, journalDeleted: false,
+                statusMessage: Self.batchCancellationSubmissionInFlightMessage,
+                attemptedChunkIds: attempted)
         }
         if confirmed {
             deleteJournal()
@@ -1894,6 +1978,13 @@ extension OCRProcessor {
         if let batch = activeBatch {
             activeBatch = nil
             let chunkIds = Self.cancellationChunkIds(pendingBatch: activePendingBatch, batchId: batch.batchId)
+            // Read HERE, synchronously, from the same journal state the chunk snapshot came from (W16.bat5).
+            // Whether the submission had finished is a fact about the instant Stop landed, so it is settled
+            // now rather than re-derived by the cancellation task later — by then `activePendingBatch` is
+            // the nil set on the next line, and the predicate answers "nothing in flight" for want of a
+            // journal to read, which is the deleting direction. `cancel()` has no `await`, so this read and
+            // the decision that uses it are one uninterrupted MainActor turn: no window, not a re-read.
+            let submissionInFlight = Self.batchSubmissionIsInFlight(activePendingBatch)
             activePendingBatch = nil
             // Built synchronously (constructing a client opens no connection) so the choices are made
             // from state that is still current, not from whatever it became by the time the Task ran.
@@ -1901,7 +1992,8 @@ extension OCRProcessor {
             let deleteJournal = makeBatchJournalDeleter(.paidBatchJournal)
             batchCancellationTask = Task {
                 let outcome = await Self.performServerBatchCancellation(
-                    canceller: canceller, chunkIds: chunkIds, deleteJournal: deleteJournal)
+                    canceller: canceller, chunkIds: chunkIds,
+                    submissionInFlight: submissionInFlight, deleteJournal: deleteJournal)
                 // The cancelled run is still unwinding, and it writes `statusMessage` too: a poll whose
                 // status check was in flight when Stop landed still reports "Batch processing… n/m" or
                 // "Error checking batch… Retrying…" once that request resolves. Wait for it to finish

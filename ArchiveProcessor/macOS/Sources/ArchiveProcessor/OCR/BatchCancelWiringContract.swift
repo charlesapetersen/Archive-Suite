@@ -64,6 +64,7 @@ enum BatchCancelWiringContract {
         defaultSeamsAreTheLiveOnes(check)
         await anUnconfirmedStop(check)
         await aConfirmedStop(check)
+        await aStopWhileTheSubmissionIsStillInFlight(check)
         await aSingleJobProviderStop(check)
         await whichJobsGetCancelled(check)
         await nothingToCancel(check)
@@ -135,16 +136,20 @@ enum BatchCancelWiringContract {
                                   model: model(provider), thinkingLevel: .high, provider: provider)
     }
 
-    /// A v1 paid-batch journal that acknowledges `chunkIds` server-side jobs.
+    /// A v1 paid-batch journal that acknowledges `chunkIds` server-side jobs. `submissionComplete` defaults
+    /// to true — a batch that finished submitting — because that is the shape every scenario written before
+    /// W16.bat5 assumed; pass `false` for the mid-submit shape, where the acknowledged list may not be the
+    /// whole batch.
     private static func journal(_ provider: LLMProvider,
                                 batchId: String,
-                                chunkIds: [String]) -> OCRProcessor.PendingBatch {
+                                chunkIds: [String],
+                                submissionComplete: Bool = true) -> OCRProcessor.PendingBatch {
         OCRProcessor.PendingBatch(
             batchId: batchId, provider: provider, model: model(provider), thinkingLevel: .high,
             fileURLs: [], outputDirectory: FileManager.default.temporaryDirectory,
             enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
-            submittedChunkIds: chunkIds)
+            submittedChunkIds: chunkIds, submissionComplete: submissionComplete)
     }
 
     private static func ids(_ n: Int) -> [String] { (0..<n).map { "batches/chunk-\($0)" } }
@@ -341,6 +346,62 @@ enum BatchCancelWiringContract {
               && stopped.statusMessage.hasPrefix("Cancelled."))
     }
 
+    // MARK: - A Stop that landed mid-submit: confirmed, and the journal still survives (W16.bat5)
+
+    /// The wiring half of the in-flight guard. `BatchCancelContract` proves the RULE obeys a
+    /// `submissionInFlight: true`; nothing there proves `cancel()` ever passes `true`. The mutation this
+    /// kills is the whole fix reduced to a no-op: hard-code `submissionInFlight: false` at the call site
+    /// (or drop the argument's derivation) and every check in the rule contract stays green while a Stop
+    /// mid-submit deletes the journal exactly as it did before.
+    ///
+    /// The shape is the money one: a Gemini batch whose journal acknowledges three chunks, every one of
+    /// which the provider confirms cancelled, and whose `submissionComplete` is still `false` — i.e. the
+    /// submit loop had not finished, so a fourth chunk may already have been created and billed. Before
+    /// W16.bat5 this deleted the fixture.
+    private static func aStopWhileTheSubmissionIsStillInFlight(_ check: (String, Bool) -> Void) async {
+        let chunkIds = ids(3)
+        let batch = context(.gemini, batchId: "batches/received-id")
+        let midSubmit = await stop(
+            batch: batch,
+            pendingBatch: journal(.gemini, batchId: "batches/received-id", chunkIds: chunkIds,
+                                  submissionComplete: false))
+
+        check("wiring: a Stop mid-submit keeps the paid-batch journal even though every known chunk confirmed",
+              midSubmit.wiring.journalsAsked == [.paidBatchJournal]
+              && midSubmit.wiring.deleteCalls == 0
+              && midSubmit.fixtureExistedBefore && midSubmit.fixtureSurvived)
+        // The cancellations are not skipped — a guard that returned early would keep the journal by leaving
+        // three paid jobs running, which is a worse bug than the one being fixed.
+        check("wiring: and it still cancels every chunk the journal had acknowledged",
+              midSubmit.wiring.attempted == chunkIds
+              && midSubmit.wiring.contexts.count == 1
+              && midSubmit.wiring.contexts.first.map { sameContext($0, batch) } == true)
+        check("wiring: the operator is told a paid job may exist beyond the ones that were stopped",
+              midSubmit.statusMessage == OCRProcessor.batchCancellationSubmissionInFlightMessage
+              && midSubmit.bannerRefreshed)
+
+        // Non-vacuity, and the whole regression in one comparison: the SAME Stop with `submissionComplete`
+        // true — the only difference — still deletes. Without this pair, "keeps the journal" would also be
+        // satisfied by a cancel path that had simply stopped deleting anything.
+        let finished = await stop(
+            batch: context(.gemini, batchId: "batches/received-id"),
+            pendingBatch: journal(.gemini, batchId: "batches/received-id", chunkIds: chunkIds))
+        check("wiring: the submission marker is the ONLY thing that changed — the finished twin still deletes",
+              finished.wiring.deleteCalls == 1 && finished.fixtureExistedBefore && !finished.fixtureSurvived
+              && finished.wiring.attempted == midSubmit.wiring.attempted)
+
+        // `cancel()` must read the in-flight fact from the journal it is about to drop, not re-derive it
+        // later: by the time the cancellation task runs, `activePendingBatch` is nil, and the predicate
+        // answers "nothing in flight" for want of a journal to read — the deleting direction. Pinned by
+        // driving the pure derivation over the same two journals the two Stops above used.
+        check("wiring: the in-flight answer comes from the journal's own submission marker",
+              OCRProcessor.batchSubmissionIsInFlight(
+                  journal(.gemini, batchId: "batches/received-id", chunkIds: chunkIds,
+                          submissionComplete: false))
+              && !OCRProcessor.batchSubmissionIsInFlight(
+                  journal(.gemini, batchId: "batches/received-id", chunkIds: chunkIds)))
+    }
+
     // MARK: - A provider that cancels one server-side job, not several
 
     /// Every other scenario here is Gemini (the multi-chunk provider). Without this one, a change that gated
@@ -524,12 +585,12 @@ enum BatchCancelWiringContract {
 
     /// Everything above is a NAMED shape, chosen because a specific mutation survives without it. This is
     /// the complement: press Stop on the whole cross-product — every provider × 0–3 acknowledged chunks ×
-    /// journal present or not × no refusal, then each chunk refused in turn — and demand an exact outcome
-    /// from all 80. What it buys over the named cases is the shapes nobody thought to name: a two-chunk
-    /// Mistral batch, an OpenAI batch that reached the cancel path at all, a Gemini batch whose *last*
-    /// chunk is the one the provider declines.
+    /// journal arm (finished / mid-submit / absent) × no refusal, then each chunk refused in turn — and
+    /// demand an exact outcome from all 120. What it buys over the named cases is the shapes nobody thought
+    /// to name: a two-chunk Mistral batch, an OpenAI batch that reached the cancel path at all, a Gemini
+    /// batch whose *last* chunk is the one the provider declines, a mid-submit Stop at every chunk count.
     ///
-    /// Cheap because everything it drives is already stubbed — 80 Stops, no network, no keys, no cent, and
+    /// Cheap because everything it drives is already stubbed — 120 Stops, no network, no keys, no cent, and
     /// the only file any of them can delete is that trial's own temp fixture (see `stop`). Each Stop does end
     /// in a real `checkForPendingBatch()`, which decodes whatever manifests it finds and re-derives their
     /// fingerprints; before W16.bat2-fu2 those were the operator's own, so a large interrupted run was the
@@ -553,13 +614,24 @@ enum BatchCancelWiringContract {
         var keptFile = Invariant("wiring sweep: the journal file is still on disk after exactly the unconfirmed shapes")
         var message = Invariant("wiring sweep: the kept-journal warning appears on exactly the shapes that kept the journal")
         var state = Invariant("wiring sweep: every Stop with a live batch clears its state synchronously and refreshes the banner")
+        var inFlight = Invariant("wiring sweep: no Stop that landed mid-submit deletes the journal, whatever confirmed")
+
+        // Three journal arms, not two (W16.bat5): a v1 journal that finished submitting, the SAME journal
+        // mid-submit, and no journal at all. The no-journal arm has no in-flight twin — with nothing to read
+        // there is no submission state, and that `nil ⇒ not in flight` reading is pinned separately in
+        // `BatchCancelContract`.
+        let arms: [(hasJournal: Bool, inFlight: Bool)] = [(true, false), (true, true), (false, false)]
 
         for provider in LLMProvider.allCases {
             for count in 0...3 {
                 let chunkIds = ids(count)
-                for hasJournal in [true, false] {
+                for arm in arms {
+                    let hasJournal = arm.hasJournal
                     let batchId = hasJournal ? decoyBatchId : chunkIds.joined(separator: ",")
-                    let pending = hasJournal ? journal(provider, batchId: batchId, chunkIds: chunkIds) : nil
+                    let pending = hasJournal
+                        ? journal(provider, batchId: batchId, chunkIds: chunkIds,
+                                  submissionComplete: !arm.inFlight)
+                        : nil
                     // What `cancel()` must hand the rule — taken from the shipped derivation, not from the
                     // loop variables, because "does `cancel()` still ask `cancellationChunkIds`?" is the
                     // wiring question. (That the derivation itself is right is pinned separately, against
@@ -585,12 +657,15 @@ enum BatchCancelWiringContract {
                     for refusing in refusals {
                         // A confirmed cancellation needs something to attempt AND no refusal among it.
                         let willConfirm = !willAttempt.isEmpty && refusing.isDisjoint(with: willAttempt)
+                        // …and a DELETION needs one more thing since W16.bat5: that the submission had
+                        // finished, so the list just confirmed is known to be the whole batch.
+                        let willDelete = willConfirm && !arm.inFlight
                         let batch = context(provider, batchId: batchId)
                         let stopped = await stop(batch: batch, pendingBatch: pending, refusing: refusing)
                         trials += 1
-                        // Named so a red points at one of 80 trials instead of at a boolean.
+                        // Named so a red points at one of 120 trials instead of at a boolean.
                         let shape = "\(provider.rawValue)/\(count) chunk\(count == 1 ? "" : "s")/"
-                            + (hasJournal ? "journal" : "no journal") + "/"
+                            + (hasJournal ? (arm.inFlight ? "journal mid-submit" : "journal") : "no journal") + "/"
                             + (refusing.isEmpty ? "none refused" : "refusing \(refusing.sorted().joined(separator: " "))")
 
                         // Observed, not predicted: what actually happened to a real file on disk.
@@ -604,12 +679,20 @@ enum BatchCancelWiringContract {
                         attemptedIds.require(stopped.wiring.attempted == willAttempt, shape)
                         noDecoy.require(!hasJournal || !stopped.wiring.attempted.contains(where: decoys.contains),
                                         shape)
-                        deletes.require((stopped.wiring.deleteCalls == 1) == willConfirm
+                        deletes.require((stopped.wiring.deleteCalls == 1) == willDelete
                                         && stopped.wiring.deleteCalls <= 1, shape)
-                        keptFile.require(stopped.fixtureSurvived == !willConfirm, shape)
-                        let warned = stopped.statusMessage == OCRProcessor.batchCancellationNotConfirmedMessage
-                        message.require(warned == !willConfirm
-                                        && (!willConfirm || stopped.statusMessage.hasPrefix("Cancelled.")), shape)
+                        keptFile.require(stopped.fixtureSurvived == !willDelete, shape)
+                        inFlight.require(!arm.inFlight
+                                         || (stopped.wiring.deleteCalls == 0 && stopped.fixtureSurvived),
+                                         shape)
+                        // Which of the two reasons kept it has to be right, not just that something was
+                        // said: telling an operator "server cancellation was not confirmed" about a batch
+                        // every known chunk of which WAS confirmed sends them looking for the wrong thing.
+                        let expectedWarning: String? = willConfirm
+                            ? (arm.inFlight ? OCRProcessor.batchCancellationSubmissionInFlightMessage : nil)
+                            : OCRProcessor.batchCancellationNotConfirmedMessage
+                        message.require(expectedWarning.map { stopped.statusMessage == $0 }
+                                        ?? stopped.statusMessage.hasPrefix("Cancelled."), shape)
                         state.require(stopped.spawnedCancellation && stopped.batchClearedSynchronously
                                       && stopped.journalStateCleared && stopped.bannerRefreshed, shape)
                     }
@@ -617,25 +700,27 @@ enum BatchCancelWiringContract {
             }
         }
 
-        check("wiring sweep: every provider × 0–3 chunks × journal-present × refusal shape was stopped (\(trials) trials)",
-              trials == 80)
+        check("wiring sweep: every provider × 0–3 chunks × journal arm × refusal shape was stopped (\(trials) trials)",
+              trials == 120)
         // Non-vacuity, MEASURED. Not because the invariants above would otherwise hold for free — each is
         // stated against `willConfirm`, which is computed independently of what was observed, so a cancel
         // path that confirmed nothing would redden them. What these literals catch is the two statements
         // degenerating TOGETHER: change the rule and the hand-written table beside it in the same way, and
         // every "exactly when confirmed" invariant becomes "exactly when never", satisfied vacuously by 80
-        // trials that all keep. 10 of the 80 shapes are fully confirmable — Gemini with 1–3 chunks and
-        // Anthropic/Mistral with exactly 1, each unrefused, in both the journal and no-journal arms — and
-        // both counters below are incremented from what happened to a real file, not from the table.
+        // trials that all keep. 15 of the 120 shapes are fully confirmable — Gemini with 1–3 chunks and
+        // Anthropic/Mistral with exactly 1, each unrefused, once per journal arm — and both counters below
+        // are incremented from what happened to a real file, not from the table. Only 10 of those 15 delete:
+        // the 5 in the mid-submit arm are exactly the W16.bat5 regression, confirmed cancellations that keep
+        // the journal anyway, so the split 10/110 is itself the fix being counted.
         // (A fifth provider would move these numbers; that is a deliberate re-read, not a false alarm.)
-        check("wiring sweep: 10 of the \(trials) shapes really deleted a real journal file, and 70 really kept one",
-              deletions == 10 && keeps == 70 && deletions + keeps == trials)
-        for invariant in [fixture, askedOnce, attemptedIds, noDecoy, deletes, keptFile, message, state] {
-            check(invariant.label, invariant.held && trials == 80)
+        check("wiring sweep: 10 of the \(trials) shapes really deleted a real journal file, and 110 really kept one",
+              deletions == 10 && keeps == 110 && deletions + keeps == trials)
+        for invariant in [fixture, askedOnce, attemptedIds, noDecoy, deletes, keptFile, message, state, inFlight] {
+            check(invariant.label, invariant.held && trials == 120)
         }
     }
 
-    /// One invariant swept across all 80 trials. Collapsing them to plain `Bool`s loses the thing that
+    /// One invariant swept across all 120 trials. Collapsing them to plain `Bool`s loses the thing that
     /// makes a red actionable — WHICH shape broke — so the first failing shape rides along in the label.
     private struct Invariant {
         private let name: String
