@@ -89,6 +89,39 @@ enum ManifestPersistenceTestDriver {
                                     Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
             textColumns: unlike(b8SizingBefore.textColumns,
                                 Bounds.textColumns.lowerBound, Bounds.textColumns.upperBound))
+        // W16.cfg6-fu4: the same isolation asked of the production READ PATH, alongside — never instead of
+        // — the raw-key check below. An independent Process Files processor holding no snapshot is sampled
+        // either side of the activation through the three seams a snapshot-less run actually resolves
+        // through: `lateRunOutputSettings` (pdf/exported sizing + tagging/merge/export),
+        // `ocrCallValues` (rotation mode + standard image size) and `schedulingWorkerCount`. Between them
+        // those cover the same seven values the raw-key check pins, which is the point: the raw-key check
+        // names the storage, this one names only the ANSWER, so a future leak through a channel nobody
+        // enumerated — a reintroduced global, a shared singleton consulted inside `defaultRotationMode()`
+        // or `runSizing()` — moves this observable while the seven named keys stay green.
+        //
+        // Be precise about which half is which, because the two are not interchangeable:
+        //   • tagging / merge / export come from the processor INSTANCE's own stored properties. No
+        //     production code holds this instance, so a real Live Capture leak cannot reach it — what this
+        //     half guards is the resolution LOGIC growing an ambient input that outvotes the instance.
+        //     Its three values are set to the far side of the live config (opposite tagging mode, inverted
+        //     merge/export flags) so such an override is visible rather than coincidentally equal.
+        //   • sizing / rotation / workers are pure `runSizing()` / `defaultRotationMode()` reads — the
+        //     instance contributes NOTHING to them. That half therefore overlaps the raw-key check rather
+        //     than superseding it, and it is strictly narrower in one direction: it sees resolved values,
+        //     so a write that re-stores a value-equal setting is invisible to it and visible only to the
+        //     raw-string comparison below. Deleting either check loses coverage.
+        //
+        // Constructing an `OCRProcessor` here is inert — plain stored properties, no custom init, no
+        // defaults registration, `activeRunConfig` nil — which is why it can sit between the baseline reads
+        // and the activation without disturbing what they pin.
+        let pfIsolationProcessor = OCRProcessor()
+        let pfIsolationTaggingMode = unlike(liveConfig.taggingMode, .automatic, .none)
+        pfIsolationProcessor.taggingMode = pfIsolationTaggingMode
+        pfIsolationProcessor.mergeDocuments = !liveConfig.mergeDocuments
+        pfIsolationProcessor.exportOriginals = !liveConfig.outputImageFile
+        let pfSettingsBeforeLive = pfIsolationProcessor.lateRunOutputSettings(for: nil)
+        let pfOCRValuesBeforeLive = OCRProcessor.ocrCallValues(for: nil)
+        let pfWorkersBeforeLive = OCRProcessor.schedulingWorkerCount(for: nil)
         check("B8: the live config differs from every shared default it could leak into (7/7)",
               liveConfig.standardImageMB != b8SizingBefore.standardImageMB
               && liveConfig.ocrWorkerCount != b8SizingBefore.ocrWorkerCount
@@ -102,6 +135,35 @@ enum ManifestPersistenceTestDriver {
               SessionProcessingConfig.runSizing() == b8SizingBefore
               && UserDefaults.standard.string(forKey: DefaultsKeys.rotationModeRaw) == b8RotationRawBefore
               && UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw) == b8TaggingRawBefore)
+        let pfSettingsAfterLive = pfIsolationProcessor.lateRunOutputSettings(for: nil)
+        check("B8: activation leaves an independent Process Files run's tagging policy untouched",
+              pfSettingsAfterLive.taggingMode == pfSettingsBeforeLive.taggingMode
+              && pfSettingsAfterLive.stampUnread == pfSettingsBeforeLive.stampUnread
+              && pfSettingsAfterLive.mergeDocuments == pfSettingsBeforeLive.mergeDocuments
+              && pfSettingsAfterLive.exportOriginals == pfSettingsBeforeLive.exportOriginals
+              // …and still the far side of the live config, not a copy of it.
+              && pfSettingsAfterLive.taggingMode == pfIsolationTaggingMode
+              && pfSettingsAfterLive.stampUnread == pfIsolationTaggingMode.stampsUnread
+              && pfSettingsAfterLive.mergeDocuments == !liveConfig.mergeDocuments
+              && pfSettingsAfterLive.exportOriginals == !liveConfig.outputImageFile)
+        check("B8: activation leaves an independent Process Files run's late-stage sizing untouched",
+              pfSettingsAfterLive.pdfImageMB == pfSettingsBeforeLive.pdfImageMB
+              && pfSettingsAfterLive.textColumns == pfSettingsBeforeLive.textColumns
+              && pfSettingsAfterLive.exportedImageMB == pfSettingsBeforeLive.exportedImageMB
+              // …and none of the three became the live run's value (all three differ from it by `unlike`).
+              && pfSettingsAfterLive.pdfImageMB != liveConfig.pdfImageMB
+              && pfSettingsAfterLive.textColumns != liveConfig.textColumns
+              && pfSettingsAfterLive.exportedImageMB != liveConfig.exportedImageMB)
+        let pfOCRValuesAfterLive = OCRProcessor.ocrCallValues(for: nil)
+        let pfWorkersAfterLive = OCRProcessor.schedulingWorkerCount(for: nil)
+        check("B8: activation leaves an independent Process Files run's OCR-call inputs untouched",
+              pfOCRValuesAfterLive.rotationMode == pfOCRValuesBeforeLive.rotationMode
+              && pfOCRValuesAfterLive.standardImageMB == pfOCRValuesBeforeLive.standardImageMB
+              && pfWorkersAfterLive == pfWorkersBeforeLive
+              // …and none of the three became the live run's value.
+              && pfOCRValuesAfterLive.rotationMode != liveConfig.rotationMode
+              && pfOCRValuesAfterLive.standardImageMB != liveConfig.standardImageMB
+              && pfWorkersAfterLive != liveConfig.ocrWorkerCount)
 
         let configDefaultsSuite = "APManifestTest-\(UUID().uuidString)"
         let configDefaults = UserDefaults(suiteName: configDefaultsSuite)!
@@ -443,12 +505,25 @@ enum ManifestPersistenceTestDriver {
         // argument is now the only input, so neither call can colour the other. (W16.cfg6-fu deleted the
         // global, which is what turns this from "explicit wins over the global" into "there is nothing
         // else to win against".)
+        // W16.cfg6-fu4: a THIRD call closes the direction two cannot see. Two calls — `true` then `false`,
+        // on different files — only prove the second is not coloured by the first. The sequence is now
+        // `true`, `false`, `true`, with the last two on the SAME file, so it also proves the copy-source
+        // write leaves no residue that suppresses the later stamp: the exact failure any reintroduced
+        // sticky state would produce, and the one direction a `true`-then-`false` pair is blind to.
+        //
+        // Tags are compared as a MULTISET, never by position (`SPEC/tag-format.md`: macOS may reorder on
+        // write, which is why `CoordinatedTagWriter` verifies with `multisetEqual`). The stamp's presence
+        // is the property under test — residue drops it entirely, it does not reorder it.
         _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyStamped, stampUnread: true)
         _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyPlain, stampUnread: false)
         let stampedTags = try? MacOSTagger.readTags(from: explicitlyStamped)
         let plainTags = try? MacOSTagger.readTags(from: explicitlyPlain)
+        _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyPlain, stampUnread: true)
+        let restampedTags = try? MacOSTagger.readTags(from: explicitlyPlain)
         check("B8: each write's own stampUnread: decides it; the adjacent opposite write changes nothing",
-              stampedTags?.last == "Unread" && plainTags == ["Subject"])
+              stampedTags?.sorted() == ["Subject", "Unread"] && plainTags == ["Subject"])
+        check("B8: a re-stamp after an interleaved copy-source write still lands",
+              restampedTags?.sorted() == ["Subject", "Unread"])
 
         typealias Entry = CaptureSession.ManifestEntry
         let entries = [

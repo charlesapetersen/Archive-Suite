@@ -1543,6 +1543,56 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   label on both `applyTags` overloads — so **no owner-gated SPEC edit was needed.**
   | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor.swift,
     Capture/{ManifestPersistence,MergeSafety,ProcessFiles,ProcessFilesTagWarning}TestDriver.swift | XS | low | none
+- [x] **W16.cfg6-fu4 — the killed session's two B8 coverage ideas are folded in, and B8 now asks the
+  production READ PATH as well as the storage [XS · verified].** DONE 2026-08-01 (this commit). Filed by
+  `a720659` to preserve the delta of a daemon session (worktree `wt/autonomous-20260801-173656-39537`) that
+  did W16.cfg6-fu independently and was killed before it pushed. Both ideas are now in, **alongside** the
+  shipped raw-key check rather than replacing it — that was the item's explicit instruction and it turned out
+  to matter (see below).
+  1. **A channel-agnostic subject.** An independent, snapshot-less `OCRProcessor` is sampled either side of
+     `beginLiveSession` through the three seams a Process Files run actually resolves through —
+     `lateRunOutputSettings` (pdf/exported sizing + tagging/merge/export), `ocrCallValues` (rotation mode +
+     standard image size) and `schedulingWorkerCount`. The raw-key check names the STORAGE; this one names
+     only the ANSWER, so a future leak through a channel nobody enumerated — a reintroduced global, a
+     singleton consulted inside `defaultRotationMode()`/`runSizing()` — moves this observable while all seven
+     named keys stay green. Its tagging/merge/export values are set to the far side of the live config so an
+     override is visible rather than coincidentally equal.
+  2. **A third interleaved tag write.** The sequence is now `true`, `false`, `true`, the last two on the same
+     file, so it also rules out residue in the direction a `true`-then-`false` pair is blind to: a
+     copy-source write suppressing a later stamp.
+  **The killed session's version was extended in three places its own review had not reached.** Its PF
+  processor was hardcoded to `.none` tagging and `mergeDocuments: false` — the first is only the *opposite*
+  of the live config when the on-disk mode happens to be `.none`, and the second is never opposite, so two of
+  its three tagging conjuncts were near-vacuous; both now derive from `liveConfig`. And its observable covered
+  only `lateRunOutputSettings`, which surfaces just four of the seven pinned values — `rotationMode`,
+  `standardImageMB` and `ocrWorkerCount` resolve through `ocrCallValues`/`schedulingWorkerCount` and were
+  invisible to it, so a reintroduced *rotation* global (the exact W16.cfg6 shape) would have passed. Those two
+  seams are now sampled too.
+  **Verified $0, scratch-only, no network:** manifest-persistence **109 PASS / 0 FAIL** (was 105), merge-safety
+  15 / 0, tagwarn 74 / 0; Debug build clean, no new warnings. **Non-vacuity measured against 4 mutants**, each
+  rebuilt and rerun: a tagging-mode override and a live-config snapshot bleed each reddened exactly the new
+  observable checks **while the shipped raw-key check stayed green** (the complementarity claim, demonstrated
+  rather than asserted); an `ocrCallValues(for: liveConfig)` bleed reddened only the new OCR-inputs check; and
+  flipping the third write's `stampUnread:` reddened only the new re-stamp check, leaving the pre-existing
+  two-write check green. All restored.
+  **Tier-2 adversarial review found five real defects — one contract violation and four false comment claims —
+  all fixed before this commit.** (a) The re-stamp assertion compared the tag array **by position**
+  (`== ["Subject","Unread"]`), which `SPEC/tag-format.md` forbids — macOS may reorder on write, which is why
+  `CoordinatedTagWriter` verifies with `multisetEqual`; both it and the adjacent pre-existing
+  `.last == "Unread"` now compare as multisets, removing a latent flake that would have failed the whole
+  driver with no defect. (b) The comment claimed the observable was "blind to nothing" when it missed three of
+  the seven values — fixed by *adding the two seams* (above) rather than by softening the claim. (c) It called
+  the sizing values the processor's "own settings"; they are pure defaults reads to which the instance
+  contributes nothing, so that half **overlaps** the raw-key check and must not be read as superseding it —
+  the comment now says so explicitly, because a maintainer acting on the old wording would have deleted the
+  raw-key check and silently dropped two keys plus the value-equal-rewrite detection only a raw-string
+  comparison has. (d) "true, false, true on the SAME file" described three writes to one file when the first
+  targets a different file. (e) A parenthetical conflated the block's non-vacuity precondition with its
+  must-not-move assertion. Review also confirmed, and this commit relies on: `unlike()` cannot produce a
+  spurious red under any clamped/out-of-range/unset on-disk value (`b8SizingBefore` is already normalized), and
+  constructing an `OCRProcessor` mid-block is genuinely inert (no custom init, no defaults registration, no
+  notification wiring), so it cannot perturb what the surrounding checks pin.
+  | files: Capture/ManifestPersistenceTestDriver.swift | XS | low | none
 - [x] **W16.cfg6-fu3 — the WRITERS of the five sizing settings were unbounded; only the reader saved them
   [S · verified].** DONE 2026-08-01 (this commit; checkpoints `eb8a70d`, `42285f4`). Filed by W16.cfg6-fu2's
   adversarial review. fu2 made every *defaults read* clamp, so nothing out of range could reach a run; this

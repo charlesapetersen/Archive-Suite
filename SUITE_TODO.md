@@ -365,25 +365,6 @@ merely unlikely, it is unrepresentable: **no driver pokes any global**, because 
 header's mention of `MultiPageReOCRTestDriver` poking `pdfImageMB`/`textColumns` went stale at W16.cfg2, which
 migrated it to injection.) The one item still open in this area is the owner-gated concurrent-runs/TSan stress
 driver below — it needs live keys or an approved stub OCR backend, and is NOT queued.
-- [ ] **W16.cfg6-fu4 — two B8 coverage ideas from a killed session, worth folding into the shipped check
-  [XS · LOW].** A daemon session (worktree `wt/autonomous-20260801-173656-39537`) did W16.cfg6-fu independently
-  and was killed before it pushed; `1ea18ee` shipped a different, mostly stronger rework, but that session's
-  WIP has two things the shipped check does NOT have, and they should not be lost with the worktree:
-  1. **A channel-agnostic B8 subject.** It sampled an independent `OCRProcessor`'s
-     `lateRunOutputSettings(for: nil)` either side of `beginLiveSession` (with the PF processor deliberately
-     in the OPPOSITE tagging mode to the live config) and asserted both halves unchanged. That goes through
-     the real production read path instead of re-deriving the defaults keys, so it would catch a leak via a
-     channel nobody enumerated — a new global, a shared singleton — where the shipped check only sees the
-     seven keys it names. The shipped check is stronger in the other direction (raw-string comparison; the
-     live config forced to differ in all seven values; rotation mode covered). **They are complementary —
-     add the observable-based pair alongside, don't replace.**
-  2. **A third interleaved tag write.** The shipped tag-policy check does `stampUnread: true` then `false`
-     on two files. That session did `true`, `false`, then `true` AGAIN on the same file and asserted the
-     re-stamp lands — strictly stronger, since it rules out residue in the direction the two-write version
-     cannot see.
-  Recover both from that worktree's `git diff` before it is removed (see Morning Review). Tier-2 only in the
-  sense that it touches a tag-writing driver; it is test-only, $0, scratch-only.
-  | files: Capture/ManifestPersistenceTestDriver.swift | XS | low | none
 - **Deferred (needs owner sign-off, NOT queued):** the concurrent-runs + Thread-Sanitizer stress driver
   (verification-plan items 1/2/4). It needs either live API keys for a genuine concurrent OCR run or an
   **owner-approved stub OCR backend**, and the mutate-Settings-mid-run steps need GUI. Revisit if the stub
