@@ -391,18 +391,6 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   `pending_run.json` fixture into the redirected directory first, so both sides have something to find, and
   assert the banner text matches. Do it in that contract, not by widening section 16. No production change.
   | files: OCR/BatchInterruptTailContract.swift | XS | low | none
-- [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
-  (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
-  `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that
-  assigns the kept-journal warning; the cancelled poll unwinds through `performBatchOCR` and writes its own
-  `statusMessage` on the way out. The order is not guaranteed, so the one signal that a paid job may still be
-  running server-side can be clobbered before the operator reads it. `BatchCancelWiringContract` proves the
-  message is *assigned*, and structurally cannot prove it *survives* (no live `processingTask` there).
-  **Was gated on W16.bat3 deliberately, not incidentally:** while bat3 stood, that warning was sometimes a
-  lie (the journal was deleted downstream anyway) and making a sometimes-lie more reliably visible is the
-  wrong fix order. ✅ **That gate is discharged — W16.bat3 shipped 2026-08-02 (`53e43e2` + the commit that
-  ticks this line), so the warning now tells the truth and making it survive is worth doing.**
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | none
 - [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
   ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED and the
   `W16.bat5-owner-ok` gate is ticked. ⚠️ **The owner also CHOSE the fix direction: the in-flight guard —

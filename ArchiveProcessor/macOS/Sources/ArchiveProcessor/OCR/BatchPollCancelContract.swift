@@ -40,7 +40,8 @@ import Foundation
 ///     flag by hand to pin what the tail does with it, and the tail's rule did not change. Cite sections 1,
 ///     2 and 4 for "a Stop mid-poll keeps the journal", and section 3 only for "the tail obeys the flag,
 ///     both ways". Section 5 has its own measured regression, against a different change: remove
-///     `cancel()`'s `await interruptedRun?.value` and its first check reddens.
+///     `cancel()`'s `await interruptedRun?.value` and 2 of its 3 checks redden (the second and third — the
+///     first describes the setup, and holds either way by design).
 ///
 /// Sections 3–4 write to, and delete from, whatever `OCRProcessor.pendingBatchURL` resolves to, so they run
 /// only when the harness's redirect is in force (`BatchJournalPathContract.redirectIsInForce`, taken by the

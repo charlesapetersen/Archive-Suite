@@ -1866,18 +1866,25 @@ extension OCRProcessor {
                 // before the warning goes up (W16.bat6) — the two tasks were previously racing, and the
                 // loser is whichever writes first.
                 //
-                // Ordered deliberately: the server-side cancellations go out FIRST, because those stop
-                // paid work and must not wait on anything. Only the message is held back.
+                // Ordered deliberately, and ONLY the message is held back. The server-side cancellations
+                // above stop paid work, and the Resume banner here is the control every interruption
+                // message points at — W16.bat4 shipped because leaving it unrendered wedges the operator
+                // into pressing Start and being refused. Neither may wait on an unwinding run.
+                checkForPendingBatch()
                 //
-                // This waits, but not indefinitely. That task is already cancelled, and every continuation
-                // it could be parked on was resumed above, so the one thing that can still hold it open is
-                // an in-flight provider request running out its own `timeoutInterval` (30s for a status
-                // check, 120s for a result fetch). A late warning beats a lost one — and beats narrowing
-                // the window, since the write that clobbers is by definition the one that comes back last.
+                // This waits, but not indefinitely. That task is already cancelled, and all seven
+                // continuations it could be parked on were resumed above, so the one thing that can still
+                // hold it open is an in-flight provider request running out its own `timeoutInterval`
+                // (30s for a status check, 120s for a result fetch). A late warning beats a lost one — and
+                // beats narrowing the window, since the write that clobbers is by definition the one that
+                // comes back last.
                 await interruptedRun?.value
                 // Only a KEPT journal produces a message, and the operator must see it: it is the only
                 // signal that a paid job may still be running server-side.
                 if let message = outcome.statusMessage { statusMessage = message }
+                // Recomputed again, because the run that just finished unwinding may have changed what is
+                // on disk (its tail retires the journal when the poll had in fact completed), and the
+                // banner has to describe the disk as it finally is rather than as it was mid-unwind.
                 checkForPendingBatch()
             }
         }

@@ -1961,6 +1961,40 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   interrupted exit in `performBatchOCR` that runs no tail at all — is filed as **W16.bat3-fu**. Unblocks
   **W16.bat6**, whose gate was this item *landing*.
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/BatchPollCancelContract.swift | XS | high | none
+- [x] **W16.bat6 — the kept-journal warning could be overwritten by the cancelled run's own status message
+  [S · LOW].** DONE 2026-08-02 `f5c9fe8` + this commit. From the W16.bat2-fu adversarial review;
+  **pre-existing.** Gated on W16.bat3 deliberately — while that stood, the warning was *sometimes a lie* (the
+  journal was deleted downstream anyway) and making a sometimes-lie more visible is the wrong fix order — and
+  released by it landing. Was: `cancel()` cancels `processingTask` and then spawns the cancellation task that
+  assigns *"the paid-batch journal was kept for recovery"*, while the run it just cancelled unwinds
+  concurrently and writes `statusMessage` of its own — a status check still in flight when Stop landed
+  resolves into `"Batch processing… n/m complete"` or `"Error checking batch… Retrying…"` on the way out. No
+  order was guaranteed, so the one signal that a paid job may still be running server-side could be gone
+  before the operator read it, with the journal on disk and nothing on screen pointing at it. **Fix:**
+  `cancel()` keeps the run's task handle after dropping it, and the cancellation task awaits it before
+  raising the warning — last by construction, not by luck. Only the *message* waits: the server-side
+  cancellations still go out first (they stop paid work), and the Resume banner is still recomputed
+  immediately — leaving it unrendered is precisely the W16.bat4 wedge — then recomputed again afterwards,
+  since the unwinding run's tail may retire the journal. The wait cannot hang: that task is already cancelled
+  and all seven continuations it can park on are resumed above it, so the only thing that can hold it open is
+  an in-flight request running out its own `timeoutInterval` (30s status / 120s fetch). **Narrowing the
+  window was rejected on the same reasoning the owner used for W16.bat5** — the clobbering write is by
+  definition the one that comes back last, so a timeout on the wait would only shrink the race, not end it; a
+  late warning beats a lost one. **3 new $0 checks** (`BatchPollCancelContract` section 5; `test-batch-resume`
+  265 → 268), the only ones in the suite that press Stop with a **live `processingTask`** — which is exactly
+  why `BatchCancelWiringContract` could prove the warning *assigned* and never *survived*. Discrimination
+  **measured**: remove the await and 2 of the 3 redden. Honest limit, written into the section header: the
+  window where a *real* poll writes after a Stop is inside a paid provider call (both cancellation guards sit
+  above the `switch provider`), so the run is a stand-in — live, suspended when Stop lands, cancelled by the
+  real `cancel()`, then writing one of the poll's own status lines on a **non-cancellable** timer so the
+  losing order is certain rather than likely. Everything the fix touches is real. Adversarial review found
+  one defect and it was fixed before shipping: the first draft moved `checkForPendingBatch()` behind the
+  wait, which would have re-opened W16.bat4's unrendered-Resume-control wedge for as long as the unwind took.
+  Also verified: no `cancel()` call site is inside `processingTask` (all five are view actions), so the await
+  cannot self-deadlock, and every `Task.detached`/task-group child in the run path is awaited inline, so
+  nothing outlives the run task to write afterwards. Regression: `test-recovery.sh` 56/56 and
+  `test-manifest-persistence.sh` 109/109 still ALL PASS. Clean build, 0 new warnings.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchPollCancelContract.swift | S | low | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
   honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid

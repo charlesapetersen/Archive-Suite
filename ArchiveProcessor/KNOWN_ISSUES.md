@@ -915,6 +915,27 @@ call sites are. One adjacent defect the review surfaced is **open**: `performBat
 interrupted exit (`markBatchSubmissionComplete()` failing) that runs no tail at all → `SUITE_TODO.md`
 **W16.bat3-fu**.
 
+**W16.bat6 — CLOSED 2026-08-02** (this commit). W16.bat3 made *"the paid-batch journal was kept for
+recovery"* true; this makes it legible. `cancel()` raised that sentence from a task that raced the run it had
+just cancelled, and the run writes `statusMessage` too — a status check still in flight when Stop landed
+resolves into `"Batch processing… n/m complete"` or `"Error checking batch… Retrying…"` on the way out.
+Whichever wrote last won, so the operator's only signal that a paid job may still be running server-side
+could be gone before they read it, with the journal on disk and nothing on screen pointing at it.
+`cancel()` now keeps the run's task handle after dropping it and awaits it before raising the warning: last
+by construction rather than by luck. Deliberately *only* the message waits — the server-side cancellations
+go out first (they stop paid work) and the Resume banner is still recomputed immediately (leaving it
+unrendered is the W16.bat4 wedge), then again afterwards in case the unwinding run changed what is on disk.
+The wait cannot hang: that task is already cancelled and all seven continuations it can park on are resumed
+above it, so the only thing that can hold it open is an in-flight request running out its own
+`timeoutInterval` — and a late warning beats a lost one, where merely *narrowing* the window would not, the
+clobbering write being by definition the one that returns last. **3 new $0 checks**
+(`BatchPollCancelContract` section 5; `test-batch-resume.sh` 265 → 268), and they are the only ones in the
+suite that press Stop with a **live `processingTask`** — which is exactly why `BatchCancelWiringContract`
+could prove the warning *assigned* but never *survived*. Discrimination measured: remove the await and 2 of
+the 3 redden. The stand-in run is honest about its limits (the window where a *real* poll writes after a
+Stop is inside a paid provider call, so it cannot be reached for free); what is real is the whole ordering
+seam — the real `cancel()`, the real cancellation task, the real `statusMessage`.
+
 **W16.bat4 — CLOSED 2026-08-01** (`1515773` + `819494d` + this commit). The second of those two. Every
 `batchPollInterrupted` message tells the operator the paid batch was kept *so they can resume it*, and the
 "Pending Batch / Resume Batch" box (`Views/OCRView.swift:319`) renders only from `pendingBatchInfo`, which is

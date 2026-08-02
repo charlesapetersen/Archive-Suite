@@ -277,8 +277,9 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   single-job provider (Anthropic/Mistral) handed SEVERAL chunks must attempt nothing and keep the journal,
   and a legacy (`lifecycleVersion == nil`) journal must be cancelled by its batch ID, never by its
   non-authoritative stored chunk list.
-  Its header lists what it still does not cover (the warning surviving the poll's own messages → W16.bat6) —
-  read it before citing a green section 14.
+  Its header lists what it still does not cover — in particular the warning *surviving* the cancelled run's
+  own messages, which no scenario there can see because none has a live `processingTask`. That half is
+  W16.bat6, in section 17's own section 5. Read both headers before citing a green section 14.
   Finally (W16.bat4) the **interrupted-batch TAIL** (`BatchInterruptTailContract`): sections 13/14 are about
   Stop, this one is about a run that ends itself with a paid job possibly still alive. The real
   `finishInterruptedBatchPoll()` — the one tail both paid-batch entry points now run — must recompute the
@@ -306,8 +307,20 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   not after section 15.
   A side effect worth knowing: those 80 sweep Stops in section 14 now read an empty state directory instead
   of the operator's, so the suite no longer slows down in proportion to a large real interrupted run.
-  No network, no keys, no cost. 258 checks as of 2026-08-01 (16 of them section 15, 17 of them section 16 —
-  one of which, the redirect guard, is emitted from the top of the driver rather than from the section).
+  And (W16.bat3/W16.bat6) **Stop during the POLL** (`BatchPollCancelContract`, section 17). Everything above
+  stops at `cancel()`; this follows the cancellation into the run unwinding alongside it, which is where the
+  journal was really being deleted. Its sections 1–2 press Stop on the real `pollBatchUntilComplete` (before
+  the first status check, swept over every provider; and during the wait between checks, timed to show the
+  sleep was aborted rather than waited out), section 3 drives the first run's tail against a real journal
+  file, and section 4 drives a whole cancelled `resumeBatch`. Section 5 (W16.bat6) is the other half of the
+  promise — the operator being *told*: it is the only place in the suite that presses Stop with a **live
+  `processingTask`**, and it asserts the kept-journal warning is still the message on screen after the
+  cancelled run has finished writing its own. Both poll guards precede the `switch provider`, so no request
+  is ever made, and section 5 stubs both cancel-path seams; the sections that write a journal sit behind the
+  same `redirectIsInForce` verdict as section 16.
+  No network, no keys, no cost. 268 checks as of 2026-08-02 (16 of them section 15, 17 of them section 16 —
+  one of which, the redirect guard, is emitted from the top of the driver rather than from the section — and
+  10 of them section 17).
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.
