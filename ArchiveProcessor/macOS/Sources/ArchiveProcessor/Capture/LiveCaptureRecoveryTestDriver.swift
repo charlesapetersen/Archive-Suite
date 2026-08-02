@@ -32,6 +32,10 @@ import ArchiveCore
 ///  11. A phone auto-retry after a dropped ack (W3.cap-r2) re-ingests the SAME `(groupId, seq)` page and
 ///      buys NO second paid OCR call — while the first call's result stays reachable from the replacement
 ///      photo, and genuinely distinct pages still get their own call.
+///  12. An out-of-order relay Box re-pins its document to the right collection whether it lands while the
+///      document is still IN FLIGHT inside finalize (W3.cap-r5) or after it has staged (W3.cap-r4) — and in
+///      the second case the correction survives the end-of-session rotation review, which regenerates the
+///      segment and used to write the pre-correction collection straight back over it.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -690,6 +694,9 @@ enum LiveCaptureRecoveryTestDriver {
                   r5Key("D") == "B1")
             check("...and the live map the rotation review regenerates from agrees",
                   r5Proc._recoveryTestLiveCollectionKey(for: "D") == "B1")
+            // The out-of-order Box's own finalize was only ENQUEUED by `ingest`; settle for it before asking
+            // about its staged record (it reds ~1 run in 10 on a loaded machine otherwise — W3.cap-r4).
+            _ = await r5Settle { r5Key("B1") != nil }
             check("a Box is still its own collection and is never re-pinned",
                   r5Key("B0") == "B0" && r5Key("B1") == "B1")
 
@@ -702,6 +709,105 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRGate = nil
+        }
+
+        // --- Test 16 (W3.cap-r4): the mirror of Test 15 — the Box arrives AFTER the document has staged, so
+        // `backfillCollections` DOES reach it and corrects the visible record. The correction then had to
+        // survive the operator's last action before the move: the end-of-session rotation review. That pass
+        // regenerates each straightened segment from its RETAINED write inputs and replaces the staged record
+        // with the result — and the retained copy of the collection key was taken at finalize and never
+        // corrected, so straightening a page wrote the pre-correction key straight back over the corrected
+        // one. The document went into the previous collection, on the way out the door, with nothing on
+        // screen to say so. Driven through the real ingest → backfill → rotation-review path. ---
+        if isolatedBackup {
+            let r4Out = tmp.appendingPathComponent("r4out", isDirectory: true)
+            let r4Staging = tmp.appendingPathComponent("APStaging-r4-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: r4Staging, withIntermediateDirectories: true)
+            // Isolation, and it is load-bearing: `CaptureSession.init` adopts the newest backup session that
+            // still holds unprocessed photos (crash recovery). The tests above leave theirs behind, so
+            // without this the session below inherits their groups — including BOXES, whose capture order
+            // then decides where this test's document is pinned. That is the exact fact under test, and it
+            // made the first draft of this test pass before it had done anything. Only session-named folders
+            // under the throwaway root are removed (`isolatedBackup` is what proves it is the script's
+            // mktemp dir and not the operator's Backup Folder), matched with the same conservative predicate
+            // launch-time pruning uses.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let r4Session = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            r4Session._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: r4Out, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: r4Staging)
+            let r4Proc = r4Session.liveProcessor
+            let r4Bytes = Data("synthetic page bytes".utf8)
+            func r4Send(_ gid: String, _ seq: Int, _ type: CaptureGroupType) {
+                r4Session.ingest(jpeg: r4Bytes, groupId: gid, seq: seq, type: type,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func r4Settle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func r4Key(_ gid: String) -> String? { r4Proc.staged.first { $0.groupId == gid }?.collectionKey }
+
+            // 1. A Box, then the document (capture seq 3) — both in order, so it pins to the only Box seen.
+            r4Send("B0", 1, .box)
+            _ = await r4Settle { r4Key("B0") != nil }
+            r4Send("D", 3, .document)
+            r4Proc.segmentResolved(groupId: "D")
+            let r4Staged = await r4Settle { r4Key("D") != nil }
+            check("the document stages under the only Box the Mac has seen", r4Staged && r4Key("D") == "B0")
+
+            // 2. The out-of-order Box (capture seq 2 — shot BEFORE the document) finally arrives. It is the
+            //    document's real collection, and backfill corrects the already-staged record.
+            r4Send("B1", 2, .box)
+            check("an out-of-order Box corrects the already-staged document", r4Key("D") == "B1")
+            // `ingest` back-fills synchronously (the check above is deterministic) but only ENQUEUES the
+            // Box's own finalize. The draft assertion below reads `beginFinalize`'s grouping, which sees
+            // only what has staged — so wait for the Box itself, or the last check turns into a load-
+            // dependent flake that reds on a busy machine while the product invariant is fine.
+            _ = await r4Settle { r4Key("B1") != nil }
+
+            // 3. THE BUG: the operator straightens that page in the end-of-session rotation review. This is
+            //    the review sheet's own path — it edits the page list, then applies.
+            let r4Source = r4Session.photos.first { $0.groupId == "D" }?.url
+            check("the staged document's source page is on disk for regeneration", r4Source != nil)
+            if let r4Source {
+                r4Proc.rotationReviewPages = [
+                    LiveCaptureProcessor.RotationReviewPage(groupId: "D", pageIndex: 0, order: 3,
+                                                            sourceURL: r4Source, rotationDegrees: 90)
+                ]
+                r4Proc.applyRotationReviewAndFinalize()
+                // Non-vacuity: `isFinalizing` is set synchronously ONLY when there is a segment to regenerate.
+                // Without this the checks below could pass on a run that never re-wrote anything.
+                check("the rotation change really does trigger a regeneration", r4Proc.isFinalizing)
+                let r4Done = await r4Settle { !r4Proc.isFinalizing }
+                check("...and the regeneration completes", r4Done)
+                check("straightening a page does NOT re-file the document into the previous collection",
+                      r4Key("D") == "B1")
+                // What the operator actually sees next: the naming sheet groups by collection key. The
+                // misfile shows up here as the document sitting in the wrong draft.
+                let b1 = r4Proc.drafts.first { $0.id == "B1" }
+                let b0 = r4Proc.drafts.first { $0.id == "B0" }
+                check("...so the naming sheet offers the document with its own Box, not the previous one",
+                      b1?.segmentCount == 2 && b0?.segmentCount == 1)
+            }
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

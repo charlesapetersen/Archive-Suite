@@ -469,8 +469,8 @@ final class LiveCaptureProcessor: ObservableObject {
 
         // W3.cap-r5 — this is the key as it stands BEFORE any await. It is what the write below is handed,
         // but it is NOT what gets recorded: an out-of-order Box can still correct this group while finalize
-        // is suspended, so the value that reaches `staged`/`retained` is re-read after the last await (see
-        // `filedCollectionKey`). Kept as the fallback for the case where the session was cleared.
+        // is suspended, so the value that reaches `staged` is re-read after the last await (see the
+        // `outcome.collectionKey` assignment). Kept as the fallback for the case where the session was cleared.
         let collectionKey = groupCollectionKey[groupId] ?? (group.type == .box ? group.id : currentCollectionKey)
         setPhase(groupId, .tagging)
 
@@ -1026,10 +1026,12 @@ final class LiveCaptureProcessor: ObservableObject {
             .compactMap { retained[$0] }
             .filter { seg in seg.pages.allSatisfy { fm.fileExists(atPath: $0.sourceURL.path) } }
         guard !segsToRegen.isEmpty, let stagingDir else { beginFinalize(); return }
-        // W3.cap-r4 — the collection is read live, never replayed from the retained record. Snapshotted here
-        // for the detached write (which only carries it through) and re-read once more after that write, on
-        // the way into `staged` — the same last-possible-moment discipline `finalizeSegment` uses, because
-        // the write below suspends and an out-of-order Box can still re-pin a segment while it runs.
+        // W3.cap-r4 — the collection is read live, never replayed from the retained record. The value that
+        // COUNTS is re-read after the detached write, on the way into `staged` (below) — the same
+        // last-possible-moment discipline `finalizeSegment` uses, because that write suspends and an
+        // out-of-order Box can re-pin a segment while it runs. This snapshot only keeps the record the write
+        // returns from carrying a placeholder in the meantime; it cannot reach `staged` or disk, and the
+        // `??` branch is unreachable (the map is built from this very array).
         let regenKeys: [String: String] = Dictionary(
             uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
         // Legacy retained manifests had no per-run unread policy. Before this fix, activation set the

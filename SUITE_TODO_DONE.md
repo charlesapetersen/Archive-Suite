@@ -2881,6 +2881,43 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r4 [MED · misfile] — ✅ DONE 2026-08-02** (`d719e3f` fix; this commit, test + trackers).
+  The filed premise held exactly. `backfillCollections` corrects an out-of-order Box's document in the live
+  map `groupCollectionKey` **and** in the visible `staged[]` record, but `RetainedSegment` carried a THIRD
+  copy of the same fact, taken at finalize and never touched again. `applyRotationReviewAndFinalize`
+  regenerates each straightened segment from those retained inputs and **replaces** the staged record with the
+  result — so the pre-correction key was written straight back over the corrected one and the document was
+  filed into the previous collection. The trigger is the operator's last action before the move (straighten a
+  page in the end-of-session rotation review), and nothing on screen says the collection changed back.
+  **Fix:** the retained copy is **deleted, not synchronised.** The collection was never a write input —
+  `writeSegmentFiles` only carries it into the record it returns — so there is now exactly one reader,
+  `liveCollectionKey(for:)` (live map, falling back to the staged record, which `loadStagingManifest` re-seeds
+  the map from on resume). With no second copy there is nothing left to drift, and the next correction site
+  someone adds cannot recreate this bug. Regeneration additionally **re-reads** the key on the way into
+  `staged`, AFTER its detached write rather than before it — the same last-possible-moment discipline
+  `finalizeSegment` adopted in `cap-r5`, because that write suspends too and a late Box can re-pin a segment
+  while it runs. No migration written **because there is nothing to migrate** (owner, 2026-08-01); an older
+  manifest still decodes, its now-unread `collectionKey` ignored by the keyed container.
+  **Tier-2:** recovery driver Test 16 — the mirror of Test 15 — 7 new $0 checks driven through the real
+  ingest → backfill → rotation-review path, ending on what the operator actually sees next (the naming
+  sheet's drafts group the document with its own Box, not the previous one). **Mutation-verified against the
+  real pre-fix code**, not a hand-written mutant: `git checkout 1f43498 -- LiveCaptureProcessor.swift` reddens
+  exactly the two W3.cap-r4 assertions and nothing else, Test 15 included. The test needed one non-obvious
+  isolation step, and it is load-bearing: `CaptureSession.init` adopts the newest backup session that still
+  holds unprocessed photos (crash recovery), so the first draft of Test 16 inherited Test 15's groups —
+  **including its boxes, whose capture order then decided this test's answer** — and passed before it had done
+  anything. It now clears session-named folders under the throwaway test root first.
+  **Adversarial review** (independent Opus pass over the diff) confirmed no production defect across the
+  writer/clearer walk, the Codable removal and the actor isolation, and **reproduced a real flake it did
+  find**: Test 16's drafts assertion raced the out-of-order Box's own `finalizeSegment`, which `ingest` only
+  enqueues — 1 red in 10 runs under CPU load, a false red while the product invariant passed. Fixed with a
+  settle, as was the same pre-existing race in `cap-r5`'s Test 15. Verified 6/6 ALL PASS under 8-way CPU load.
+  `test-recovery.sh` ALL PASS (82 → 89 checks); collection-organize / manifest-persistence (109 checks, the
+  manifest round-trip that matters most here) / merge-safety / multipage-reocr / segment-json /
+  output-file-safety ALL PASS; build clean, no new warnings. As with `cap-r5`/`cap-r2`, the Processor's
+  `scripts/test-smoke.sh` was NOT run — its de-nesting paths are stale (`W21.smoke`, still open).
+  **Closes the collection-correction path for good** — `cap-r5` fixed the record being written, this fixes the
+  record already written — and **unblocks `W17.stg1`**, which touches the same `RetainedSegment`.
 - [x] **W3.cap-r5 [MED · misfile] — ✅ DONE 2026-08-02** (`d67b9cb` fix+test; this commit, trackers).
   Premise re-confirmed by reading the path rather than the filed line numbers. `finalizeSegment` inserts the
   group into `finalizedGroups` and reads `groupCollectionKey[groupId]` into a **local** — both before any

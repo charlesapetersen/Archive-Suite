@@ -488,8 +488,11 @@ Reasons, recorded so they aren't relitigated:
   it to `staging-manifest.corrupt-<ts>.json` and surface a banner — never auto-delete, never silently continue.**
   Owner decision: **manifest only** — do NOT add a per-source content hash (that was defensible as corruption
   detection but is optional, and it is *not* collision defense given #4 above). Testable end-to-end in the
-  existing `$0` `LIVECAPTURE_RECOVERYTEST` driver. **Sequencing: after `W3.cap-r4`** — both touch `RetainedSegment`
-  (:552-563), so let the fingerprint land on settled struct semantics.
+  existing `$0` `LIVECAPTURE_RECOVERYTEST` driver. **Sequencing: after `W3.cap-r4`** — both touch `RetainedSegment`,
+  so let the fingerprint land on settled struct semantics. ✅ **That prerequisite shipped 2026-08-02 (`d719e3f`);
+  this is UNBLOCKED.** Note what it changed: `RetainedSegment` no longer carries `collectionKey` (the collection
+  is live state, read via `liveCollectionKey(for:)`, not a retained write input), so the fingerprint covers one
+  fewer field — and must not re-introduce it as "state worth pinning".
   | files: Capture/LiveCaptureProcessor.swift, Capture/LiveCaptureRecoveryTestDriver.swift | M | med | none
 - [ ] **W17.det1 — stranded-session DETECTION logic (no UI) [S].** The one operator gap neither Finder nor the
   Backup Folder button covers is **discovery** of a session stranded by a crash. Owner decision: build the
@@ -1102,18 +1105,17 @@ run a scratch-copy functional test before shipping. ⚠️ The Opus-max **refute
 finder-level candidates (only #1's premise manually confirmed). Report: `.maintenance/review/Processor-Capture.md`.
 
 > **SHIP ORDER (set by the 2026-07-18 Live-Capture architecture review — see Wave 17 below).** Recommended:
-> ~~r6~~ → ~~r2~~ → ~~r5~~ → **r4 → r3** (`r1` shipped earlier). `r6` — the subsystem's one genuine
+> ~~r6~~ → ~~r2~~ → ~~r5~~ → ~~r4~~ → **r3** (`r1` shipped earlier). `r6` — the subsystem's one genuine
 > recoverability hole, a straggler's processed output discarded — **shipped 2026-08-02 `905722d`**; `r2` —
 > the duplicate paid OCR on a phone retry — **shipped 2026-08-02 `96f223b`**; `r5` — the in-flight document
-> no Box could re-pin — **shipped 2026-08-02 `d67b9cb`**. All three entries are in `SUITE_TODO_DONE.md`, and
-> between them they retire most of the two now-closed deferred architecture entries. Next is `r4`, which is
-> now the LAST hole in the same collection-correction path `r5` half-closed: `r5` fixed the record being
-> written (a Box arriving while the segment is in flight), `r4` fixes the record already written (a Box
-> arriving after it is staged, where the correction reaches `staged` but not `retained` and the rotation
-> review reverts it). **Sequencing constraint:** do `r4` **before** `W17.stg1` (both touch
-> `RetainedSegment`), which is enforced by a blocked-on.
+> no Box could re-pin — **shipped 2026-08-02 `d67b9cb`**; `r4` — the correction the rotation review reverted
+> — **shipped 2026-08-02 `d719e3f`**. All four entries are in `SUITE_TODO_DONE.md`, and between them they
+> retire most of the two now-closed deferred architecture entries. **The collection-correction path is closed
+> end to end**: `r5` fixed the record being written, `r4` the record already written — by DELETING the
+> retained second copy of the key rather than syncing it, so there is one reader and nothing left to drift.
+> That also **unblocks `W17.stg1`**, which touches the same `RetainedSegment` (its `(blocked-on: W3.cap-r4)`
+> now resolves). Only `r3` is left.
 - [ ] **W3.cap-r3 [LOW]** `CaptureSession.swift:539/549` — `removePhoto`/`removePhotoIfSafe` delete a photo from `session.photos` but never tell `liveProcessor` to cancel that photo's in-flight OCR Task → deleting/reclassifying a page mid-OCR leaves a paid OCR call running + Task/result orphaned in `pageTasks`. | Capture | Tier-2
-- [ ] **W3.cap-r4 [MED · misfile]** `LiveCaptureProcessor.swift:385` — `backfillCollections` corrects `staged[i].collectionKey` for an out-of-order Box but never updates the parallel `retained[groupId].collectionKey`; the rotation-review regeneration path reads `collectionKey` from `retained` and overwrites the staged entry → silently reverts the correction → **misfiles the document into the wrong collection folder**. | Capture | Tier-2
 
 ## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`

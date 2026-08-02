@@ -1664,7 +1664,9 @@ milestone the Mac logs the collision and does not expand the existing no-op.
 
 ## Collection pinned in arrival order on relay transport  [MEDIUM — FIXED]
 
-**Status:** FIXED (2026-07-09; **completed for the in-flight case 2026-08-02** — see the amendment below).
+**Status:** FIXED (2026-07-09; **closed end to end 2026-08-02** — see the two amendments below. Both windows
+the original fix left open are now shut: a Box arriving mid-finalize, and a correction the rotation review
+reverted afterwards.)
 
 On relay transport, network reordering could cause a document to arrive before its Box marker. The Mac
 pinned `groupCollectionKey` at arrival time, so such a document was assigned to the *previous* collection
@@ -1681,16 +1683,22 @@ per-page OCR awaits, the LLM tag call and the off-main write — and for that wh
 first loop (already finalized) *and* invisible to the second (not yet staged). So a Box arriving mid-finalize
 could not re-pin it, and the very misfile described above still happened, just in a narrower window. The first
 loop now skips only groups already in `staged`, and `finalizeSegment` binds the key it records **after** its
-last await instead of at the pin, so a correction made inside the window still reaches both
-`staged[].collectionKey` and `retained[].collectionKey`. Regression cover: recovery-driver Test 15
-(`scripts/test-recovery.sh`), which holds the window open with a gate on the stub OCR and delivers the Box
-inside it.
+last await instead of at the pin, so a correction made inside the window still reaches the staged record.
+Regression cover: recovery-driver Test 15 (`scripts/test-recovery.sh`), which holds the window open with a
+gate on the stub OCR and delivers the Box inside it.
 
-⚠️ **Still open on this same path: `W3.cap-r4`** (`SUITE_TODO.md`) — a Box arriving *after* the segment is
-staged corrects `staged[i].collectionKey` but not `retained[groupId].collectionKey`, and the rotation-review
-regeneration reads `collectionKey` from `retained` and overwrites the staged entry, silently reverting the
-correction. Until that ships, this issue is closed for the in-flight case but not for a post-staging
-correction followed by a rotation review.
+**Amended 2026-08-02 (`d719e3f`, W3.cap-r4) — the last window, now shut.** A correction that *did* land could
+still be undone afterwards. The collection was recorded in three places: the live `groupCollectionKey` map,
+the `staged[]` record, and a third copy on the private `RetainedSegment`. `backfillCollections` corrected the
+first two; the third was taken at finalize and never touched again. `applyRotationReviewAndFinalize`
+regenerates a straightened segment from those retained inputs and **replaces** the staged record with the
+result — so straightening a page in the end-of-session rotation review wrote the pre-correction key straight
+back over the corrected one, on the operator's last action before the move, with nothing on screen to say so.
+**The retained copy is now deleted rather than synchronised** — the collection was never a write input, so
+there is exactly one reader (`liveCollectionKey(for:)`) and nothing left to drift — and regeneration re-reads
+the key on the way into `staged`, after its detached write, for the same reason `finalizeSegment` does.
+Regression cover: recovery-driver Test 16, the mirror of Test 15, ending on the naming sheet the operator
+actually sees; mutation-verified against the real pre-fix commit.
 
 ---
 
