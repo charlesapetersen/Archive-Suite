@@ -49,10 +49,10 @@ class OCRProcessor: ObservableObject {
     /// Optional controlled vocabulary for subject tags (one per line)
     var tagVocabulary: [String] = []
     /// How tags are assigned (automatic / auto-date / human / copy-source / none). Set from the UI before a run.
-    /// Setting it also arms the "Unread" trailing-tag stamp for real-tagging modes (see MacOSTagger).
-    var taggingMode: TaggingMode = .automatic {
-        didSet { MacOSTagger.stampUnread = taggingMode.stampsUnread }
-    }
+    /// Whether a write stamps the trailing "Unread" tag is decided per call from `taggingMode.stampsUnread`
+    /// (or from the run's own `SessionProcessingConfig`), never by ambient state — W16.cfg6-fu deleted the
+    /// `MacOSTagger.stampUnread` global this property's `didSet` used to arm.
+    var taggingMode: TaggingMode = .automatic
     /// How image rotation is detected. Set from the UI before a run.
     var rotationMode: RotationMode = .llmSingle
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate

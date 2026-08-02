@@ -40,24 +40,46 @@ enum ManifestPersistenceTestDriver {
         let file = tmp.appendingPathComponent("manifest.json")
 
         // --- B8: Live Capture must not read or write Process Files' run settings. ---
-        // Activate an empty live session and confirm it changes nothing shared. B8 originally guarded
-        // six mutable `nonisolated(unsafe)` statics; W16.cfg6 deleted them, so the only shared mutable
-        // tagging/sizing state left for this check to protect is `MacOSTagger.stampUnread`.
-        let originalStampUnread = MacOSTagger.stampUnread
-        defer { MacOSTagger.stampUnread = originalStampUnread }
-        MacOSTagger.stampUnread = false
+        // Activate an empty live session and confirm it changes nothing shared. B8 originally guarded six
+        // mutable `nonisolated(unsafe)` statics; W16.cfg6 deleted them and W16.cfg6-fu deleted the last one
+        // (`MacOSTagger.stampUnread`), so there is no shared mutable state left to poke — the old assertion
+        // ("activation does not arm the tagging global") had lost its subject entirely.
+        //
+        // What it becomes is the ONE channel that still exists. Every last-resort read a Process Files run
+        // makes is `SessionProcessingConfig.runSizing()`, a pure function of UserDefaults, so a live session
+        // could now only reach a later run by PERSISTING its own config. Hand `beginLiveSession` a config
+        // whose every sizing value is deliberately unlike what is on disk (`unlike` picks the far end of
+        // each `Bounds` range), then prove the shared read is identical afterwards. The first conjunct keeps
+        // it honest: it fails if the config ever stops differing, which is what would make the rest vacuous.
+        // Read-only throughout — nothing here writes `UserDefaults.standard`.
+        typealias Bounds = SessionProcessingConfig.Bounds
+        func unlike<T: Equatable>(_ onDisk: T, _ a: T, _ b: T) -> T { onDisk == a ? b : a }
+        let sharedSizingBefore = SessionProcessingConfig.runSizing()
+        let sharedTaggingBefore = UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw)
         let liveIsolationSession = CaptureSession()
         let liveProvider = LLMProvider.gemini
         let liveConfig = SessionProcessingConfig(
             provider: liveProvider, model: liveProvider.models[0], thinkingLevel: .low, apiKey: "",
             taggingMode: .automatic, rotationMode: .llmSingle, mergeDocuments: false,
             outputDirectory: tmp, contextCharCount: 200, sendPreviousImage: false,
-            customOCRPrompt: "", imageScale: 1, standardImageMB: 0.5,
+            customOCRPrompt: "", imageScale: 1,
+            standardImageMB: unlike(sharedSizingBefore.standardImageMB,
+                                    Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
+            ocrWorkerCount: unlike(sharedSizingBefore.ocrWorkerCount,
+                                   Bounds.ocrWorkers.lowerBound, Bounds.ocrWorkers.upperBound),
             enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
-            outputImageFile: true, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
+            outputImageFile: true,
+            pdfImageMB: unlike(sharedSizingBefore.pdfImageMB,
+                               Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
+            exportedImageMB: unlike(sharedSizingBefore.exportedImageMB,
+                                    Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
+            textColumns: unlike(sharedSizingBefore.textColumns,
+                                Bounds.textColumns.lowerBound, Bounds.textColumns.upperBound))
         liveIsolationSession.beginLiveSession(config: liveConfig)
-        check("B8: Live Capture activation does not mutate the shared tagging global",
-              !MacOSTagger.stampUnread)
+        check("B8: Live Capture activation persists nothing a later Process Files run would read back",
+              liveConfig.runSizing != sharedSizingBefore          // the config genuinely carried other values
+              && SessionProcessingConfig.runSizing() == sharedSizingBefore
+              && UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw) == sharedTaggingBefore)
 
         let configDefaultsSuite = "APManifestTest-\(UUID().uuidString)"
         let configDefaults = UserDefaults(suiteName: configDefaultsSuite)!
@@ -394,14 +416,17 @@ enum ManifestPersistenceTestDriver {
         let explicitlyPlain = tmp.appendingPathComponent("b8-explicit-plain.txt")
         try? Data("stamp".utf8).write(to: explicitlyStamped)
         try? Data("plain".utf8).write(to: explicitlyPlain)
+        // Two back-to-back writes with OPPOSITE policies, on one thread, through one adapter. Before
+        // W16.cfg4 the second would have been decided by whatever the process-global last held; the
+        // argument is now the only input, so neither call can colour the other. (W16.cfg6-fu deleted the
+        // global, which is what turns this from "explicit wins over the global" into "there is nothing
+        // else to win against".)
         _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyStamped, stampUnread: true)
-        MacOSTagger.stampUnread = true
         _ = try? MacOSTagger.applyTags(["Subject"], to: explicitlyPlain, stampUnread: false)
         let stampedTags = try? MacOSTagger.readTags(from: explicitlyStamped)
         let plainTags = try? MacOSTagger.readTags(from: explicitlyPlain)
-        check("B8: explicit Live Capture tag policy wins over conflicting Process Files global",
+        check("B8: each write's own stampUnread: decides it; the adjacent opposite write changes nothing",
               stampedTags?.last == "Unread" && plainTags == ["Subject"])
-        MacOSTagger.stampUnread = false
 
         typealias Entry = CaptureSession.ManifestEntry
         let entries = [

@@ -114,8 +114,9 @@ enum ProcessFilesTestDriver {
             return fail("tagging mode '\(mode.rawValue)' needs human input; unsupported headless", marker: donePath)
         }
 
-        // Set pipeline config on the instance (no UserDefaults/Keychain writes). Setting
-        // taggingMode via the property arms MacOSTagger.stampUnread through its didSet.
+        // Set pipeline config on the instance (no UserDefaults/Keychain writes). `taggingMode` is the
+        // whole input: each tag write reads `stampsUnread` off it (or off the run's retained config) as
+        // an explicit per-call argument — W16.cfg6-fu deleted the global its `didSet` used to arm.
         processor.taggingMode = mode
         processor.passSourceTags = (mode == .copySource)
         processor.rotationMode = .off          // macOS Vision rotation hangs without a window server

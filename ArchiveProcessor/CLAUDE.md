@@ -160,7 +160,7 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 **Special tags**
 - Photographs of **boxes** → macOS `Red` tag
 - Photographs of **folders** → macOS `Purple` tag
-- Every output (PDF **and** any exported original image) → a trailing **`Unread`** tag, applied **last**, for triage. Only in real-tagging modes (`.automatic`/`.autoDate`/`.autoDateManualSeg`/`.human`) — never for "No tagging" or "Copy source tags". Implemented via `MacOSTagger.stampUnread` (armed from `TaggingMode.stampsUnread`).
+- Every output (PDF **and** any exported original image) → a trailing **`Unread`** tag, applied **last**, for triage. Only in real-tagging modes (`.automatic`/`.autoDate`/`.autoDateManualSeg`/`.human`) — never for "No tagging" or "Copy source tags". Implemented via the **required** `stampUnread:` argument on `MacOSTagger.applyTags`, passed as `TaggingMode.stampsUnread` from the run's mode/config. There is no ambient flag — W16.cfg4 made the choice per-call and W16.cfg6-fu deleted the `MacOSTagger.stampUnread` global it replaced.
 
 ### API Efficiency for Tagging
 - Minimize API calls — batch OCR results where possible before making tagging calls

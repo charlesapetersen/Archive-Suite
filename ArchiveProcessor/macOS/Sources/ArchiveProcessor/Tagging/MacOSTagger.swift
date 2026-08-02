@@ -1,31 +1,23 @@
 import Foundation
 import AppKit
 import ArchiveCore
-import os
 
 /// Processor's FRESH-WRITE ADAPTER over `ArchiveCore.CoordinatedTagWriter`.
 ///
 /// Every Processor tag write — OCR output tagging, copy-source pass-through, merge tagging,
 /// review-flow re-tagging — goes through here. It translates the Processor's fresh-write
-/// semantics (stampUnread toggle, color-authoritative vs. detection, copy-source verbatim)
-/// into a transform closure and hands it to the shared audited primitive.
+/// semantics (the per-call `stampUnread:` choice, color-authoritative vs. detection, copy-source
+/// verbatim) into a transform closure and hands it to the shared audited primitive.
 ///
-/// `stampUnread` and `finderLabelIndex` remain Processor-specific; the actual metadata I/O
-/// is delegated entirely to ArchiveCore (no direct `setResourceValue` in Processor sources).
+/// Those two decisions — `stampUnread:` and `finderLabelIndex` — remain Processor-specific; the actual
+/// metadata I/O is delegated entirely to ArchiveCore (no direct `setResourceValue` in Processor sources).
+///
+/// **This type holds no state at all.** W16.cfg4 made `stampUnread:` a required per-call parameter; the
+/// process-global flag it replaced (armed from `OCRProcessor.taggingMode`'s `didSet`) was the suite's last
+/// ambient tagging global and W16.cfg6-fu deleted it. Which semantics a write uses is now an argument at
+/// the call site and nothing else — never a value some earlier run, or some test driver whose `defer` a
+/// crash skipped, left behind.
 struct MacOSTagger {
-
-    /// Legacy process-global "stamp a trailing Unread tag" flag, armed from `OCRProcessor.taggingMode`'s
-    /// `didSet`. **`applyTags` no longer reads it** (W16.cfg4): every call site now passes `stampUnread:`
-    /// explicitly, so the write semantics are a per-call input rather than ambient process state.
-    ///
-    /// Retained only as a test-driver affordance (`ManifestPersistenceTestDriver` asserts its arming) and
-    /// because `taggingMode.didSet` still maintains it. Nothing in production reads it — deleting it (and
-    /// that `didSet`) is a natural follow-up once W16.cfg6 removes the remaining run-config globals.
-    private static let _stampUnread = OSAllocatedUnfairLock(initialState: false)
-    static var stampUnread: Bool {
-        get { _stampUnread.withLock { $0 } }
-        set { _stampUnread.withLock { $0 = newValue } }
-    }
 
     /// Read macOS Finder tags from a file. Throws on read failure so callers in the
     /// read-append-rewrite pattern bail instead of silently wiping existing tags with [].

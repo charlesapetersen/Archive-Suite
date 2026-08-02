@@ -50,9 +50,7 @@ enum ProcessFilesTagWarningTestDriver {
         let tmp = fm.temporaryDirectory.appendingPathComponent("APTagWarn-\(UUID().uuidString)",
                                                                isDirectory: true)
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let originalStampUnread = MacOSTagger.stampUnread
         defer {
-            MacOSTagger.stampUnread = originalStampUnread
             // Clear every immutable flag first, or the temp tree cannot be removed. (`FileManager`'s
             // enumerator is unavailable from an async context, so walk the paths it already knows.)
             let allPaths = (try? fm.subpathsOfDirectory(atPath: tmp.path)) ?? []

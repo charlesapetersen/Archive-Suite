@@ -696,10 +696,12 @@ evaluated, Keychain-free UserDefaults reads that can return a *current* value bu
 **The residual risk this entry stayed open for is now unrepresentable, not merely unlikely:** no test driver can
 leave a run-config global mutated, because there is no such global to mutate. The text below about drivers
 poking `rotationModeForRun`/`standardImageMB`/`pdfImageMB`/`textColumns` describes the pre-cfg6 code and is kept
-only as the historical rationale. What survives is `MacOSTagger.stampUnread` — a *different* global, already
-lock-backed (`5b58da8`) and an explicit per-call parameter at all 13 sites since W16.cfg4; production no longer
-reads it, and it is tracked for deletion as **W16.cfg6-fu**. The concurrent-runs + Thread-Sanitizer stress
-driver from the verification plan stays deferred (needs live keys or an owner-approved stub OCR backend).
+only as the historical rationale. **`MacOSTagger.stampUnread` — a *different* global, and the last one — is gone
+too, deleted 2026-08-01 by W16.cfg6-fu** along with the `OCRProcessor.taggingMode` `didSet` that armed it. It had
+already been lock-backed (`5b58da8`) and unread by production since W16.cfg4 made `stampUnread:` a required
+per-call parameter at all 13 sites; what remained was three test drivers poking it, and they now assert the
+injected per-call value instead. The concurrent-runs + Thread-Sanitizer stress driver from the verification plan
+stays deferred (needs live keys or an owner-approved stub OCR backend).
 
 **One gap the "single run config" framing hid, closed 2026-08-01 by W16.cfg6-fu2:** `fromDefaults()` — the
 builder **Live Capture** snapshots — clamped `pdfImageMB`/`exportedImageMB` with looser inline closures than
@@ -759,10 +761,10 @@ targeted scratch regressions passed; adversarial review caught and closed the re
 gaps. Only cfg6 remains: remove the now-production-unused fallback statics and compatibility parameters/drivers.
 
 **Two claims below are STALE — corrected here so they aren't re-derived:**
-- *"`MacOSTagger` retains a global fallback for older call sites"* — the global exists (~13 sites use the
-  implicit default) but it is **no longer `nonisolated(unsafe)`**: commit `5b58da8` made it an
-  `OSAllocatedUnfairLock`-backed property (`MacOSTagger.swift:21-25`), and an explicit `stampUnread:` parameter
-  already allows per-call injection everywhere. The residual defect is **style, not a data race.**
+- *"`MacOSTagger` retains a global fallback for older call sites"* — **there is no global.** It stopped being
+  `nonisolated(unsafe)` at `5b58da8` (`OSAllocatedUnfairLock`-backed), stopped being *read* at W16.cfg4 (which
+  made `stampUnread:` a required parameter at all 13 sites, so no site takes an implicit default), and was
+  deleted outright by **W16.cfg6-fu** on 2026-08-01. `MacOSTagger` now holds no state.
 - *"let persisted recovery records own a versioned copy"* — **already shipped.** `PendingRunRuntimeConfig`
   (`OCRProcessor.swift:403`) is schema-versioned, manifest-attached, structurally validated independent of the
   fingerprint (`+Pipeline.swift:204-233`), and round-trip tested (`BatchResumeTestDriver.swift:304-426`).
