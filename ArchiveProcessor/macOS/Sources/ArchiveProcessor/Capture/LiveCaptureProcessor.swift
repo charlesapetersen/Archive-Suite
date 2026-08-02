@@ -1094,13 +1094,27 @@ final class LiveCaptureProcessor: ObservableObject {
             for gid in filedGroups { self.retained[gid] = nil; self.finalizedGroups.remove(gid) }
             self.drafts.removeAll()
 
-            if outcome.allFiled {
-                // Everything landed → staging holds nothing recoverable. Trash it and reset the session.
+            // W3.cap-r6 — how many segments are STILL staged, asked after the filed ones were dropped just
+            // above. This, not `outcome.allFiled`, is what decides whether the staging directory may be
+            // reclaimed; see `stagingSafeToReclaim`.
+            let stillStaged = self.staged.count
+            if Self.stagingSafeToReclaim(allPlannedFiled: outcome.allFiled, segmentsStillStaged: stillStaged) {
+                // Everything landed and nothing arrived behind it → staging holds nothing recoverable.
+                // Trash it and reset the session.
                 CaptureSession.trashOrRemove(stagingDir)
                 self.startedPhotoIds.removeAll()
                 self.rotationReviewPages.removeAll()
                 self.currentCollectionKey = "__unfiled__"
                 self.finalizeSummary = outcome.summary
+            } else if outcome.allFiled {
+                // W3.cap-r6 — every PLANNED segment filed, but a straggler finished processing during the
+                // move and is not part of this batch. Its freshly written output is in the staging dir, so
+                // the dir must survive; persist the reduced manifest (the straggler's own `persistManifest`
+                // still listed the now-filed segments) so a crash right now leaves a consistent state, and
+                // do NOT reset the session — it is still live and the straggler still needs filing.
+                self.persistManifest()
+                self.finalizeSummary = outcome.summary
+                    + " ⚠️ \(stillStaged) segment\(stillStaged == 1 ? "" : "s") finished processing while this batch was being filed, so \(stillStaged == 1 ? "it was" : "they were") NOT part of it. Nothing was deleted — \(stillStaged == 1 ? "its" : "their") processed files and original photos are KEPT in the Backup Folder. Click Finish again to file \(stillStaged == 1 ? "it" : "them")."
             } else {
                 // Partial/failed: KEEP the unfiled segments staged (their outputs remain in the backup
                 // folder's `_processed`) and KEEP their source photos, for recovery/retry. Persist the
@@ -1310,6 +1324,25 @@ final class LiveCaptureProcessor: ObservableObject {
         return safe
     }
 
+    /// THE staging-reclamation decision (W3.cap-r6), as a pure function so it can be proven headlessly.
+    ///
+    /// `finalize` may send the whole staging directory to the Trash only when it holds nothing recoverable.
+    /// The tempting test — "did every planned move succeed?" — is NOT that question. `plans` is snapshotted
+    /// BEFORE the `executePlans` await, and that await runs for as long as the moves take; a segment whose
+    /// processing finished inside that window (`finalizeSegment` resumes on the MainActor while the move is
+    /// off it) writes fresh output into this same directory and appends itself to `staged` without ever
+    /// having been in `plans`. `allPlannedFiled` reports only on the planned segments, so it stays true —
+    /// and trashing on it alone discards the straggler's processed output while leaving a `staged` entry
+    /// pointing into the Trash.
+    ///
+    /// So ask the honest question instead: is anything STILL staged once the filed segments have been
+    /// dropped? Every staged segment's outputs live in this directory, so a single survivor — a straggler,
+    /// or a segment the finalize sheet simply never planned — means the directory still holds files that
+    /// exist nowhere else. Reclaim only when there are none.
+    nonisolated static func stagingSafeToReclaim(allPlannedFiled: Bool, segmentsStillStaged: Int) -> Bool {
+        allPlannedFiled && segmentsStillStaged == 0
+    }
+
     /// Test-only ($0, no OCR/session): stage a real segment from real image files and report which source
     /// photos came back flagged as placeholder-backed (W23.h5). This closes the last link the two pure
     /// tests can't reach on their own — that `writeSegmentFiles` actually POPULATES `placeholderSources`
@@ -1348,6 +1381,22 @@ final class LiveCaptureProcessor: ObservableObject {
     ) -> Bool {
         tagStagedArtifact(tags, at: url, appColor: appColor, stampUnread: stampUnread)
     }
+
+    /// Test-only ($0, no OCR/network/GUI): arm a processor with a scratch staging dir + a set of
+    /// already-staged segments, so a headless driver can drive the REAL `finalize`. That is the only way to
+    /// reach the staging-reclamation WIRING (W3.cap-r6): the decision is a pure function, but *whether
+    /// `finalize` consults it* lives in the post-await continuation, which no pure test can enter. Never
+    /// called in production — nothing outside the recovery driver references it.
+    func _recoveryTestArm(stagingDir: URL, config: SessionProcessingConfig, staged: [StagedSegment]) {
+        self.stagingDir = stagingDir
+        self.config = config
+        self.staged = staged
+    }
+
+    /// Test-only (W3.cap-r6): THE straggler. Appends a staged segment exactly as `finalizeSegment` does, so
+    /// a driver can inject one into the window between `finalize` snapshotting `plans` and the move
+    /// finishing — the interleaving that produced the bug.
+    func _recoveryTestAppendStaged(_ seg: StagedSegment) { staged.append(seg) }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
     /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as

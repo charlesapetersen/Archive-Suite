@@ -26,11 +26,20 @@ import ArchiveCore
 ///   9. Staging (W3.cap-r1) neither invents a Finder colour from a subject tag nor discards a failed tag
 ///      write: the app's own colour decides the label, and an artifact the tagger could not write is
 ///      recorded on the segment so finalize can warn instead of reporting tags that aren't on disk.
+///  10. `finalize` (W3.cap-r6) reclaims the staging directory only when nothing is left staged — a
+///      straggler segment that finished processing DURING the move keeps the directory (and is reported),
+///      instead of having its freshly written output trashed along with the batch it missed.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
 enum LiveCaptureRecoveryTestDriver {
     private static var didRun = false
+
+    /// Read-only view of the on-disk staging manifest (W3.cap-r6). The processor's own `StagingManifest` is
+    /// private, and the test only needs to know WHICH segments survived a finalize.
+    private struct ManifestPeek: Decodable {
+        let staged: [LiveCaptureProcessor.StagedSegment]
+    }
 
     static func runIfRequested() {
         guard !didRun, ProcessInfo.processInfo.environment["LIVECAPTURE_RECOVERYTEST"] == "1" else { return }
@@ -404,6 +413,126 @@ enum LiveCaptureRecoveryTestDriver {
               mergedSeg.pdfURLs.count == 1 && mergedSeg.untaggedOutputs.isEmpty)
         check("the merged PDF is the one that carries the tags",
               mergedSeg.pdfURLs.first.map { tagsOf($0).contains("1948") } == true)
+
+        // --- Test 13 (W3.cap-r6): finalize must not reclaim the staging directory while it still holds
+        // output nothing else has a copy of. `plans` is snapshotted BEFORE the `executePlans` await; a
+        // segment whose processing finishes inside that window writes fresh output into the SAME staging
+        // dir and appends itself to `staged` without ever being in `plans` — so `allFiled`, which reports
+        // only on the planned segments, stays true. Trashing on that alone threw the straggler's processed
+        // output into the Trash and left a `staged` entry pointing at it. Proven three ways: the decision,
+        // the WIRING on the real `finalize`, and the happy-path reclaim it must not break. ---
+
+        // (a) The decision itself.
+        check("reclaim is allowed only when everything filed AND nothing is left staged",
+              LiveCaptureProcessor.stagingSafeToReclaim(allPlannedFiled: true, segmentsStillStaged: 0))
+        check("a straggler BLOCKS the reclaim even though every PLANNED segment filed",
+              !LiveCaptureProcessor.stagingSafeToReclaim(allPlannedFiled: true, segmentsStillStaged: 1))
+        check("a partial finalize never reclaims (the pre-existing gate is intact)",
+              !LiveCaptureProcessor.stagingSafeToReclaim(allPlannedFiled: false, segmentsStillStaged: 0)
+                  && !LiveCaptureProcessor.stagingSafeToReclaim(allPlannedFiled: false, segmentsStillStaged: 2))
+
+        // (b)+(c) The wiring, driven through the REAL `finalize`. FAIL-CLOSED: this builds a
+        // `CaptureSession`, whose folders come from `backupRoot` — without the test override that is the
+        // operator's real `~/Pictures` backup root, so refuse to run rather than touch it.
+        let isolatedBackup = !(ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] ?? "").isEmpty
+        check("the finalize wiring test runs against an ISOLATED backup root (never the operator's)",
+              isolatedBackup)
+        if isolatedBackup {
+            func makeConfig(_ out: URL) -> SessionProcessingConfig {
+                SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: out, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1)
+            }
+            func stagedSeg(_ gid: String, pdf: URL) -> LiveCaptureProcessor.StagedSegment {
+                LiveCaptureProcessor.StagedSegment(
+                    groupId: gid, type: CaptureGroupType.document.rawValue, collectionKey: gid, order: 0,
+                    pdfURLs: [pdf], imageURLs: [], jsonURL: nil, boxLabelText: nil, pagesComplete: true)
+            }
+            // `chosenExisting` is set on purpose: it makes the destination an explicit scratch folder, so
+            // `currentOutputDirectory` (which would otherwise fall back to the operator's real Settings
+            // output folder) can never contribute a path to this test.
+            func draft(_ key: String, into folder: URL) -> LiveCaptureProcessor.CollectionDraft {
+                LiveCaptureProcessor.CollectionDraft(
+                    id: key, finalName: folder.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                    chosenExisting: folder, segmentCount: 1, photoCount: 1)
+            }
+            func manifestGroupIds(_ dir: URL) -> [String] {
+                let u = dir.appendingPathComponent("staging-manifest.json")
+                guard let d = try? Data(contentsOf: u),
+                      let m = try? JSONDecoder().decode(ManifestPeek.self, from: d) else { return [] }
+                return m.staged.map(\.groupId)
+            }
+            func settle(_ p: LiveCaptureProcessor) async {
+                for _ in 0..<400 {
+                    if !p.isFinalizing { return }
+                    try? await Task.sleep(nanoseconds: 25_000_000)
+                }
+            }
+            // One session for both scenarios: `LiveCaptureProcessor` holds it `unowned`, and finalize only
+            // uses it for `clearFiled` — which retires nothing here, because no `retained` sources exist.
+            let r6Session = CaptureSession()
+            // Distinctively NAMED staging dirs (not `_processed`) so the reclaim case can take its own
+            // folder back out of the Trash instead of leaving one behind on every Tier-2 run.
+            let tok = String(UUID().uuidString.prefix(8))
+
+            // (b) THE BUG: a straggler finalizes during the move.
+            let keepDir = tmp.appendingPathComponent("APStaging-keep-\(tok)", isDirectory: true)
+            try? fm.createDirectory(at: keepDir, withIntermediateDirectories: true)
+            let plannedPDF = keepDir.appendingPathComponent("planned.pdf")
+            try? Data("planned".utf8).write(to: plannedPDF)
+            let keepOut = tmp.appendingPathComponent("r6keep", isDirectory: true)
+            let keepProc = LiveCaptureProcessor(session: r6Session)
+            keepProc._recoveryTestArm(stagingDir: keepDir, config: makeConfig(keepOut),
+                                      staged: [stagedSeg("planned", pdf: plannedPDF)])
+            keepProc.finalize([draft("planned", into: keepOut)])
+            // Still the SAME MainActor turn: `finalize` has already snapshotted `plans` and enqueued its
+            // Task, but that Task cannot have run. Writing output into the staging dir and appending to
+            // `staged` here reproduces the straggler's interleaving exactly, and deterministically.
+            let stragglerPDF = keepDir.appendingPathComponent("straggler.pdf")
+            try? Data("straggler".utf8).write(to: stragglerPDF)
+            keepProc._recoveryTestAppendStaged(stagedSeg("straggler", pdf: stragglerPDF))
+            await settle(keepProc)
+            check("a straggler that finalized during the move KEEPS the staging directory",
+                  fm.fileExists(atPath: keepDir.path))
+            check("...and its processed output is still on disk, not in the Trash",
+                  fm.fileExists(atPath: stragglerPDF.path))
+            check("...and it is still staged, so Finish again can file it",
+                  keepProc.staged.map(\.groupId) == ["straggler"])
+            check("...and the reduced manifest on disk lists exactly the straggler",
+                  manifestGroupIds(keepDir) == ["straggler"])
+            check("...while the PLANNED segment really did file (the fix costs nothing)",
+                  !fm.fileExists(atPath: plannedPDF.path)
+                      && fm.fileExists(atPath: keepOut.appendingPathComponent("00001 r6keep.pdf").path))
+            check("...and the operator is TOLD, instead of seeing a clean \"Finalized\"",
+                  keepProc.finalizeSummary?.contains("finished processing while this batch was being filed") == true)
+
+            // (c) The happy path must still reclaim: nothing arrives behind the move, so the spent staging
+            // dir goes to the Trash exactly as before.
+            let goneDir = tmp.appendingPathComponent("APStaging-reclaim-\(tok)", isDirectory: true)
+            try? fm.createDirectory(at: goneDir, withIntermediateDirectories: true)
+            let onlyPDF = goneDir.appendingPathComponent("only.pdf")
+            try? Data("only".utf8).write(to: onlyPDF)
+            let goneOut = tmp.appendingPathComponent("r6gone", isDirectory: true)
+            let goneProc = LiveCaptureProcessor(session: r6Session)
+            goneProc._recoveryTestArm(stagingDir: goneDir, config: makeConfig(goneOut),
+                                      staged: [stagedSeg("only", pdf: onlyPDF)])
+            goneProc.finalize([draft("only", into: goneOut)])
+            await settle(goneProc)
+            check("no straggler → the spent staging directory is still reclaimed (regression)",
+                  !fm.fileExists(atPath: goneDir.path) && goneProc.staged.isEmpty)
+            check("...and the summary carries no straggler warning",
+                  goneProc.finalizeSummary?.contains("finished processing while") != true)
+            // The reclaim above went to the Trash (recoverable, by design). Take our own probe folder back
+            // out so a Tier-2 run doesn't leave one behind each time — best-effort, since the physical
+            // Trash location varies with the app's launch context. The assertion is about the ORIGINAL
+            // path being gone, so it does not depend on this succeeding.
+            try? fm.removeItem(at: fm.homeDirectoryForCurrentUser
+                .appendingPathComponent(".Trash/\(goneDir.lastPathComponent)"))
+        }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
