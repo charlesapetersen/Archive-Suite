@@ -44,9 +44,10 @@ import Foundation
 ///     cannot see — the seam records what was asked for, not everything the block does. Section 16 is where
 ///     that is caught instead: it presses Stop with the real deleter installed and asserts the
 ///     interrupted-run manifest is still byte-identical afterwards.
-///   * The kept-journal warning is proven **assigned**, not **survived**: these scenarios have no live
-///     `processingTask`, whereas a real Stop also cancels the poll, which can write `statusMessage` after
-///     the cancellation task did (W16.bat6).
+///   * The kept-journal warning is proven **assigned** here, not **survived**: these scenarios have no live
+///     `processingTask`, whereas a real Stop also cancels the run, which writes `statusMessage` of its own
+///     on the way out. That the warning is the message left standing afterwards is W16.bat6, pinned by
+///     `BatchPollCancelContract` section 5 — the one place that presses Stop with a live `processingTask`.
 ///   * `cancel()`'s own `checkForPendingBatch()` runs for real. It never deletes either manifest, and since
 ///     W16.bat2-fu2 it reads the harness's redirected state directory rather than the operator's Application
 ///     Support state — but it still recomputes two `@Published` banner strings from whatever is there, so the

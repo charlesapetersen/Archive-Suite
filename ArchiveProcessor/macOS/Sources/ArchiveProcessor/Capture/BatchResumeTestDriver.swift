@@ -67,6 +67,9 @@ import AppKit
 ///      really being deleted. The poll's two cancellation exits now report themselves interrupted, so the
 ///      first run's tail keeps the journal and a whole cancelled `resumeBatch` leaves the real file on disk
 ///      with the Resume control rendered. Both guards precede any provider call, so nothing is requested.
+///      Its section 5 (W16.bat6) covers the other half of that promise — the operator being *told* — by
+///      pressing Stop with a live `processingTask` and asserting the kept-journal warning is still the
+///      message on screen once the cancelled run has finished writing its own.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections

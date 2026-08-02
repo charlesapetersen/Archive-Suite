@@ -1811,6 +1811,10 @@ extension OCRProcessor {
     }
 
     func cancel() {
+        // Kept after the handle is dropped, for the cancellation task at the bottom of this function: the
+        // run this Stop is ending goes on unwinding on its own task afterwards, and writes its own
+        // `statusMessage` on the way out. That is what the kept-journal warning has to outlive (W16.bat6).
+        let interruptedRun = processingTask
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
@@ -1856,6 +1860,21 @@ extension OCRProcessor {
             batchCancellationTask = Task {
                 let outcome = await Self.performServerBatchCancellation(
                     canceller: canceller, chunkIds: chunkIds, deleteJournal: deleteJournal)
+                // The cancelled run is still unwinding, and it writes `statusMessage` too: a poll whose
+                // status check was in flight when Stop landed still reports "Batch processing… n/m" or
+                // "Error checking batch… Retrying…" once that request resolves. Wait for it to finish
+                // before the warning goes up (W16.bat6) — the two tasks were previously racing, and the
+                // loser is whichever writes first.
+                //
+                // Ordered deliberately: the server-side cancellations go out FIRST, because those stop
+                // paid work and must not wait on anything. Only the message is held back.
+                //
+                // This waits, but not indefinitely. That task is already cancelled, and every continuation
+                // it could be parked on was resumed above, so the one thing that can still hold it open is
+                // an in-flight provider request running out its own `timeoutInterval` (30s for a status
+                // check, 120s for a result fetch). A late warning beats a lost one — and beats narrowing
+                // the window, since the write that clobbers is by definition the one that comes back last.
+                await interruptedRun?.value
                 // Only a KEPT journal produces a message, and the operator must see it: it is the only
                 // signal that a paid job may still be running server-side.
                 if let message = outcome.statusMessage { statusMessage = message }
