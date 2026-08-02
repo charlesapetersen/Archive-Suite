@@ -2138,6 +2138,40 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   §"Batch Processing → If a batch submission reports an uncertain outcome"): it quotes the exact in-app message,
   says do **not** press Resume before checking the provider's own console, links all three consoles, and separates
   this from the benign *"stopped after N server jobs"* message. The reconciliation itself stays unbuilt by decision.
+- [x] **W16.bat4-fu — one interrupt-tail banner check went reliably vacuous when the journal path became
+  redirectable [XS · LOW].** DONE 2026-08-02, this commit. From the W16.bat2-fu2 adversarial review.
+  `BatchInterruptTailContract`'s "the recomputed banners are what `checkForPendingBatch()` alone produces"
+  compared a tailed processor's two banners against a fresh one's — but since the redirect both sides read the
+  harness's **empty** state directory, so it was permanently `nil == nil && nil == nil`. It still caught a tail
+  that assigned a placeholder of its own; it no longer distinguished a correct banner from an empty one.
+  (Before the redirect it was meaningful exactly when the operator happened to have a manifest on disk — i.e.
+  never on purpose.) **Fix — give the read something to find.** The comparison moved out of
+  `theResumeControlAppears` into its own gated section, `theRecomputedBannersAreARealRead`, which writes a real
+  self-consistent `pending_batch.json` (through the PRODUCTION `savePendingBatch`, so the lifecycle fingerprint
+  is stamped) and `pending_run.json` at the SHIPPED URLs first. Two hazards the first draft would have walked
+  into and did not: `runFingerprint` is load-bearing — `fingerprintVersion` defaults to **2**, whose
+  self-consistency arm rejects a manifest with no stored identity outright, so an unstamped fixture renders the
+  *torn/tampered* banner instead of the healthy one (this is what the first run of the new check actually
+  caught) — and it is computed from the shipped `runFingerprint(…)` with the arm's own arguments rather than
+  typed out. **3 new $0 checks** (`test-batch-resume.sh` 297 → 299 net, one check having moved): the banners
+  carry the fixture's own details (fragments built from the fixture's fields, and the label carries the actual
+  banner text on a red so a stale fixture cannot read as a broken tail); the comparison itself, now guarded by
+  `!= nil` on both sides so it can never decay to `nil == nil` again; and — newly assertable, closing half of
+  this file's own scope note — **neither durable journal at the SHIPPED path is removed by the tail**, which is
+  what a `deletePendingBatch()` added "to tidy up" would do, stranding a paid job. **Money-path safety:**
+  writing at the shipped path is gated on the driver's existing `redirectIsInForce` verdict (same gate as
+  sections 16–18), a refused run FAILs three named checks rather than silently skipping them, and both files
+  are restored byte-for-byte (or removed again) on the way out so sections 16–18 find the directory as they
+  left it. Verified after every run that `~/Library/Application Support/ArchiveProcessor/` holds neither
+  journal and was never written. **Discrimination measured on four mutants:** the tail assigns a placeholder →
+  1 red (the value the old check did carry, preserved); the tail calls `deletePendingBatch()` → 2 reds *in this
+  section* where it previously caught **nothing**; the fixture removed before the read, i.e. the exact
+  pre-fix empty-directory state → **3 reds**, which is the regression proof that the check can no longer be
+  vacuous; and the original W16.bat4 bug (no `checkForPendingBatch()` in the tail) → 6 reds, confirming the
+  primary regression checks survived the restructure. Regression: manifest-persistence 109/0, merge-safety
+  15/0, tagwarn 74/0; clean Debug build, 0 new warnings. No production change — the only non-comment edit
+  outside the contract is the driver passing it the redirect verdict it already computes.
+  | files: OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift | XS | low | none
 
 
 ## Wave 19 — Notes date-mirror + Quality facet (MERGES/replaces Priority) (owner-reviewed 2026-07-18)

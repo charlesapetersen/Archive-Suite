@@ -19,13 +19,15 @@ import Foundation
 /// `Self.deletePendingBatch()` "to tidy up" strands a paid job with no way back; clearing `jobs` throws away
 /// the results a resume is supposed to reuse.
 ///
-/// **How it stays $0 and cannot touch the operator's state.** Nothing here performs a network call, and the
-/// only files any check creates or deletes live under a per-trial temp directory. The one thing that reads
-/// durable state is `checkForPendingBatch()` itself, running for real inside the tail: it decodes whatever
-/// `pending_batch.json` / `pending_run.json` it finds and recomputes two banner strings from them. Since
-/// W16.bat2-fu2 that is the harness's redirected state directory rather than the operator's own, and it
-/// deletes neither file in any case (see its own comments — a paid server-side batch must never be
-/// stranded); no check below asserts anything about what it *found*, only that it ran.
+/// **How it stays $0 and cannot touch the operator's state.** Nothing here performs a network call, and
+/// almost every file any check creates or deletes lives under a per-trial temp directory. The one thing that
+/// reads durable state is `checkForPendingBatch()` itself, running for real inside the tail: it decodes
+/// whatever `pending_batch.json` / `pending_run.json` it finds and recomputes two banner strings from them.
+/// Since W16.bat2-fu2 that is the harness's redirected state directory rather than the operator's own.
+/// ONE section (`theRecomputedBannersAreARealRead`, W16.bat4-fu) also *writes* both journals at that shipped
+/// path so there is something to recompute from — it is gated on the driver's `redirectIsInForce` verdict and
+/// restores whatever was there byte for byte, and it is the only place in this file that writes outside a
+/// temp directory.
 ///
 /// ⚠️ **SCOPE — read before citing this file.**
 ///   * This pins the TAIL, not its two call sites. That the resume path (`resumePendingBatch`) and the
@@ -33,11 +35,11 @@ import Foundation
 ///     grep-verifiable, not driven here: both entry points require a real paid submission. What makes them
 ///     safe meanwhile is structural rather than tested: each site is now a bare
 ///     `finishInterruptedBatchPoll(); return`, so there is no second copy of the tail left to drift.
-///   * "Deletes no journal" is proved against decoy files named exactly `pending_batch.json` /
-///     `pending_run.json` in the trial's own directory. That covers a tail that deletes by *name*; a tail
-///     that called `OCRProcessor.deletePendingBatch()` would delete the journal at whatever the shipped path
-///     resolves to, which is not something this contract asserts either way. Section 16
-///     (`BatchJournalPathContract`) is where that path, and that deleter, are pinned.
+///   * "Deletes no journal" is proved twice, and the two halves cover different mutations. Decoy files named
+///     exactly `pending_batch.json` / `pending_run.json` in the trial's own directory catch a tail that
+///     deletes by *name*; since W16.bat4-fu a real journal at the SHIPPED path catches a tail that called
+///     `OCRProcessor.deletePendingBatch()` "to tidy up" — which would strand a paid job. What the shipped
+///     deleter itself does, and where that path resolves, stays section 16 (`BatchJournalPathContract`).
 ///   * The interruption *messages* are the other half of this bug and are not pinned here — this contract
 ///     asserts only that the tail leaves `statusMessage` exactly as its caller set it.
 ///
@@ -46,8 +48,22 @@ import Foundation
 @MainActor
 enum BatchInterruptTailContract {
 
-    static func run(check: (String, Bool) -> Void) {
+    /// `redirected` is `BatchJournalPathContract.redirectIsInForce(_:)`'s verdict, taken by the driver before
+    /// any section ran. Only `theRecomputedBannersAreARealRead` needs it: it is the one part of this file that
+    /// writes a journal at the path the app really keeps one, and doing that against Application Support
+    /// would overwrite the operator's own record of a paid server-side job.
+    static func run(check: (String, Bool) -> Void, redirected: Bool) {
         theResumeControlAppears(check)
+        if redirected {
+            theRecomputedBannersAreARealRead(check)
+        } else {
+            // THREE checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
+            // check count, so a refused run reports SOME FAILED rather than a shorter green report.
+            check("interrupt tail: the three checks that give the tail a real journal to recompute from — the "
+                  + "banner text, the fresh-read comparison, and \"no journal at the SHIPPED path is removed\" "
+                  + "— are SKIPPED (refused: the journal path did not resolve away from Application Support)",
+                  false)
+        }
         onlyThisRunsTempConversionsAreRemoved(check)
         theInterruptionMessageSurvives(check)
         theRunsOwnResultsSurvive(check)
@@ -234,25 +250,138 @@ enum BatchInterruptTailContract {
               tail.runBannerRefreshed)
         check("interrupt tail: the run is stopped and the live batch identity is dropped",
               tail.stoppedProcessing && tail.activeBatchCleared && tail.journalStateCleared)
+    }
 
-        // The banner is not merely *different* from the sentinel — it is what a fresh read of the durable
-        // state says. A tail that assigned some placeholder of its own would clear the sentinel and still be
-        // wrong. Both processors are read back-to-back, so they see the same disk.
+    // MARK: - What the banners are recomputed FROM (W16.bat4-fu)
+
+    /// The sentinel checks above prove the tail *replaced* both banners. This proves what it replaced them
+    /// with: exactly what a fresh `checkForPendingBatch()` reads off the durable journals.
+    ///
+    /// It used to be a two-line comparison sitting in `theResumeControlAppears`, and W16.bat2-fu2 quietly made
+    /// it vacuous. Before the redirect it read the operator's Application Support directory, so it was
+    /// meaningful only when they happened to have a manifest — never on purpose; after it, it read the
+    /// harness's own *empty* directory, so both sides were reliably `nil == nil && nil == nil`. It still
+    /// caught a tail that invented a placeholder of its own, and nothing else: a tail that produced an empty
+    /// banner where a real one was due passed it.
+    ///
+    /// The redirect that broke it is also what fixes it. This writes a real, self-consistent
+    /// `pending_batch.json` and `pending_run.json` at the SHIPPED URLs first, so both sides have something to
+    /// find and the comparison is between two non-empty strings — and it says out loud what that read
+    /// produced, which is the assertion whose absence let the check rot in the first place.
+    ///
+    /// Only reached when the driver's `redirectIsInForce` verdict is true, so those writes land in the
+    /// harness's directory. Whatever the two paths held on the way in is restored byte for byte (or removed
+    /// again if they held nothing) on the way out, so sections 16–18 find the directory as they left it.
+    private static func theRecomputedBannersAreARealRead(_ check: (String, Bool) -> Void) {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory
+            .appendingPathComponent("APInterruptTailBanner-\(UUID().uuidString)", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = dir.appendingPathComponent("banner-fixture.pdf")
+        try? Data("%PDF-1.4\n".utf8).write(to: source)
+
+        let batchURL = OCRProcessor.pendingBatchURL
+        let runURL = OCRProcessor.pendingRunURL
+        let batchBefore = try? Data(contentsOf: batchURL)
+        let runBefore = try? Data(contentsOf: runURL)
+        defer {
+            restore(batchBefore, to: batchURL)
+            restore(runBefore, to: runURL)
+            try? fm.removeItem(at: dir)
+        }
+
+        // The paid-batch journal goes through the PRODUCTION write path, not a hand-rolled encode: only
+        // `savePendingBatch` stamps the lifecycle fingerprint, and `checkForPendingBatch()` renders the
+        // healthy banner only for a manifest that passes `pendingBatchIsSelfConsistent`. An unstamped fixture
+        // would land in the torn/tampered branch instead and pin the wrong sentence.
         //
-        // ⚠️ Honest limit since W16.bat2-fu2: that disk is now the harness's own empty state directory, so
-        // both sides are reliably `nil == nil` and this check no longer distinguishes a correct banner from
-        // an empty one — it only still catches a placeholder. Before the redirect it was meaningful exactly
-        // when the operator happened to have a manifest, i.e. never on purpose. Giving it a journal fixture
-        // to find is now possible and is filed as **W16.bat4-fu**.
+        // ⚠️ `runFingerprint` is LOAD-BEARING and is the one field `savePendingBatch` will NOT fill in for
+        // you: `fingerprintVersion` defaults to 2, whose arm of the self-consistency check rejects a manifest
+        // that has no stored identity outright. The in-memory journals elsewhere in this file never notice,
+        // because nothing reads them back off disk. It is computed here from the shipped function with the
+        // arguments that arm itself uses (`batchMode: true`, `preserveInputOrder: true`) rather than typed
+        // out, so a change to how a run fingerprint is COMPUTED re-points this fixture instead of reddening
+        // it. A change to the fingerprint VERSION still reddens — deliberately: the check below carries the
+        // rejected banner in its label, so the next reader is told the fixture went stale rather than left
+        // to conclude the tail broke.
+        let fixtureModel = model()
+        let provider = LLMProvider.gemini
+        let taggingMode = TaggingMode.automatic
+        let batchSaved = OCRProcessor.savePendingBatch(OCRProcessor.PendingBatch(
+            batchId: "batches/banner-fixture", provider: provider, model: fixtureModel,
+            thinkingLevel: .low, fileURLs: [source], outputDirectory: dir,
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            taggingMode: taggingMode,
+            runFingerprint: OCRProcessor.runFingerprint(
+                files: [source], outputDirectory: dir, taggingMode: taggingMode,
+                enableTagging: false, batchMode: true, preserveInputOrder: true),
+            lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+            submittedChunkIds: ["batches/banner-fixture"])) != nil
+        // Its sibling. `savePendingRun` is private, so this uses the serialization hook the driver already
+        // writes manifests with, pointed at the shipped URL — same encoder, same `.atomic` write. A run with
+        // no runtime snapshot and no fingerprint is self-consistent by construction
+        // (`pendingRunIsSelfConsistent`'s legacy arm), which is all this fixture needs to be.
+        let runSaved = OCRProcessor._testWritePendingRun(OCRProcessor.PendingRun(
+            provider: provider, model: fixtureModel, thinkingLevel: nil,
+            fileURLs: [source], outputDirectory: dir, enableTagging: false, enableSegmentJSON: false,
+            enableCollectionSegmentation: false, confirmCollectionIDs: false,
+            reviewDocumentSegmentation: false, preOCRedInput: false, previousTextCharCount: 0,
+            sendPreviousImage: false, customPrompt: nil, startedAt: Date(), gatewayConfig: nil,
+            completedResults: [:], runFingerprint: nil), to: runURL)
+
         let fresh = OCRProcessor()
         fresh.checkForPendingBatch()
+        // The fixture is only worth writing if it is FOUND. Both expected fragments are built from the
+        // fixture's own fields rather than typed out, so renaming a provider or reshaping a banner re-points
+        // this check instead of silently orphaning it. Neither `nil` (nothing on disk) nor the "failed a
+        // self-consistency check" line (found but rejected) can satisfy it.
+        let batchFragment = "1 files via \(provider.rawValue) \(fixtureModel.displayName)."
+        let runFragment = "0/1 files completed via \(provider.rawValue) \(fixtureModel.displayName)."
+        let bannersAreTheFixtures = batchSaved && runSaved
+            && fresh.pendingBatchInfo?.contains(batchFragment) == true
+            && fresh.pendingRunInfo?.contains(runFragment) == true
+        // A red here has several causes — either file failing to save, either one written but rejected as
+        // self-inconsistent, a reshaped banner — and a bare `false` cannot tell them apart. Carry what
+        // actually happened in the label; the two checks after this one are read against it.
+        check("interrupt tail: the fixture journal and run manifest are found at the shipped path, so both "
+              + "banners carry the fixture's own details"
+              + (bannersAreTheFixtures ? "" : " [saved batch:\(batchSaved) run:\(runSaved); "
+                 + "batch banner: \(fresh.pendingBatchInfo ?? "nil"); "
+                 + "run banner: \(fresh.pendingRunInfo ?? "nil")]"),
+              bannersAreTheFixtures)
+
+        // THE comparison, no longer vacuous. Both processors read the same disk back-to-back; the `!= nil`
+        // pair is what stops it decaying to `nil == nil` again if a later change empties the directory.
         let tailed = OCRProcessor()
         tailed.pendingBatchInfo = "stale"
         tailed.pendingRunInfo = "stale"
         tailed.finishInterruptedBatchPoll()
-        check("interrupt tail: the recomputed banners are what checkForPendingBatch() alone produces",
-              tailed.pendingBatchInfo == fresh.pendingBatchInfo
+        check("interrupt tail: the recomputed banners are what checkForPendingBatch() alone produces, "
+              + "compared against a journal that actually exists",
+              tailed.pendingBatchInfo != nil && tailed.pendingRunInfo != nil
+              && tailed.pendingBatchInfo == fresh.pendingBatchInfo
               && tailed.pendingRunInfo == fresh.pendingRunInfo)
+
+        // The other half of this file's scope note, now assertable. The decoys in `interrupt()` prove the tail
+        // deletes nothing NAMED like a journal in the run's own directory; this proves it removes neither
+        // journal from where the app actually keeps them — the file a `deletePendingBatch()` added "to tidy
+        // up" would take, stranding a paid server-side job with no local record.
+        check("interrupt tail: neither durable journal at the SHIPPED path is removed by the tail",
+              fm.fileExists(atPath: batchURL.path) && fm.fileExists(atPath: runURL.path))
+    }
+
+    /// Put a durable file back as it was found: the same bytes, or removed again if it read as absent.
+    ///
+    /// ⚠️ "Read as absent" is a `try?`, so an unreadable-for-another-reason file would be REMOVED rather than
+    /// restored. That is only tolerable because of where this runs: its single caller is gated on
+    /// `redirectIsInForce`, so `url` is always inside the harness's own temp state directory, never the
+    /// operator's Application Support. Do not lift this helper out of that gate.
+    private static func restore(_ bytes: Data?, to url: URL) {
+        if let bytes {
+            try? bytes.write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     // MARK: - What it is allowed to delete

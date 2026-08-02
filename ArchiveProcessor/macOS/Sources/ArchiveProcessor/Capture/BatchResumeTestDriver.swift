@@ -54,8 +54,11 @@ import AppKit
 ///      a FIRST run), deletes exactly this run's own temp PDF→JPEG conversions and nothing else in the
 ///      directory (including two decoys named like the durable manifests), and leaves the interruption
 ///      message, the run's results and the interrupted-RUN manifest untouched — swept over every start state
-///      the four interrupted exits can arrive in. Its header scopes what it does not cover (the two call
-///      sites themselves, which need a real paid submission to drive).
+///      the four interrupted exits can arrive in. Since W16.bat4-fu one of its sections writes a real journal
+///      at the shipped path (same redirect gate as 16–18, restored byte for byte afterwards) so the recomputed
+///      banners are compared against a read that found something, and so a tail that deleted the journal the
+///      app really keeps is caught and not just one named like it. Its header scopes what it does not cover
+///      (the two call sites themselves, which need a real paid submission to drive).
 ///  16. **Where the journals resolve, and what the SHIPPED deleter does** (`BatchJournalPathContract`,
 ///      W16.bat2-fu2): sections 13–15 all replace the deleter seam, so its default body — the line that
 ///      actually removes `pending_batch.json` — was verified by reading it. The journal directory is now
@@ -681,8 +684,11 @@ enum BatchResumeTestDriver {
         // cut short with a server-side job possibly still alive — and pins that it recomputes the resume
         // banner (the Resume control every interruption message names), deletes exactly this run's own temp
         // conversions and nothing else in the directory, and leaves the interruption message, the run's
-        // results and the interrupted-RUN manifest alone. Temp files only: no network, no keys, no cost.
-        BatchInterruptTailContract.run(check: check)
+        // results and the interrupted-RUN manifest alone. No network, no keys, no cost. Temp files only,
+        // except for one section (W16.bat4-fu) that writes a real journal at the shipped path so "the banners
+        // are a fresh read" is a comparison of two non-empty strings rather than of two nils — hence the same
+        // redirect verdict, and it restores both files byte for byte on the way out.
+        BatchInterruptTailContract.run(check: check, redirected: journalsAreRedirected)
 
         // --- 16: where the journals resolve, and what the SHIPPED deleter does (W16.bat2-fu2). ---
         // Sections 13–15 all replace the deleter seam, so the default body — the line that actually removes
