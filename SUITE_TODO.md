@@ -409,29 +409,55 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   re-read the journal's chunk IDs after the cancellations rather than trusting the pre-submit snapshot, or
   refuse to delete while a submit is in flight. W16.bat2's driver is the harness for proving it.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | high | none
-- [ ] **W16.bat7 — ⛔ `[hold]` NEEDS THE OWNER. Four silent exits in `pollBatchUntilComplete` DELETE the paid
-  batch's journal when its results fail to persist [S · HIGH · money].** Found by the W16.bat3-fu adversarial
-  pass (2026-08-02); **pre-existing**, and NOT covered by any grant the owner has given — bat3 covers the two
-  cancellation guards, bat5 the in-flight submit, bat6 the warning's ordering. Routed to the plan's
-  **HOLD QUEUE** on the STEP-2.0 rule (a HIGH finding on an irreversible money path is filed, never
-  auto-fixed). `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:700`),
-  and **four** of its exits then `return` without touching it again:
-  `guard await processBatchResults(…) else { return }` in the Anthropic arm (`:755`) and the Mistral arm
-  (`:778`); the `materialized` half of `guard materialized, markBatchChunkConsumed(…) else { return }` in the
-  Gemini arm (`:864`); and `guard await handleOCRResult(synthetic, …) else { return }` in the completion sweep
-  (`:944`). Each is reached when `handleOCRResult` could not PERSIST an output — a disk failure, a name
-  collision that could not be resolved, a rejected write. The caller then reads a flag that says *"the poll
-  completed normally"*: the first run retires the journal (`retirePaidBatchJournalIfPollCompleted`,
-  `+Pipeline.swift`), and a resume runs `Self.deletePendingBatch()` and carries on into tagging/finalize.
-  So the exact moment the app fails to write results is the moment it destroys the only local record of the
-  paid job that produced them. W16.bat3-fu fixed the `markBatchChunkConsumed` half of `:864` (a failed
-  mutation now reports itself); the `materialized` half and the other three are untouched. Fix direction
-  (owner's call): set `batchPollInterrupted = true` at all four before returning — deletion-reducing, and
-  every reader treats `true` as keep. Drivable in `BatchPollCancelContract` / section-17 style; note
-  `processBatchResults` and `handleOCRResult` both need a real output-write failure to force, so the seam may
-  need extracting first. ⚠️ Do NOT fold this into W16.bat5 — different sites, different trigger (a *write*
-  failure, not a Stop).
-  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | high | owner
+- [ ] **W16.bat7 — ⛔ `[hold]` NEEDS THE OWNER. Four exits in `pollBatchUntilComplete` return a
+  "poll completed" flag they never set, and the caller then DELETES the paid batch's journal
+  [S · MED · money · defence-in-depth].** Found by the W16.bat3-fu adversarial pass (2026-08-02);
+  **pre-existing**, and covered by NO grant the owner has given — bat3 was the two cancellation guards, bat5
+  the in-flight submit, bat6 the warning's ordering. Kept owner-gated in the plan's **HOLD QUEUE** on
+  precedent rather than on the letter of the STEP-2.0 rule: at MED it is not automatically hold-queue, but
+  every change to what this path deletes has been granted item by item, and one sentence from the owner
+  releases it. `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`)
+  and four of its exits then `return` without touching it again: `guard await processBatchResults(…)
+  else { return }` in the Anthropic (`:766`) and Mistral (`:789`) arms; the `materialized` half of
+  `guard materialized, markBatchChunkConsumed(…) else { return }` in the Gemini arm (`:875`); and
+  `guard await handleOCRResult(synthetic, …) else { return }` in the completion sweep (`:955`). The caller
+  then reads a flag saying the poll finished cleanly — the first run retires the journal
+  (`retirePaidBatchJournalIfPollCompleted`) and a resume runs `Self.deletePendingBatch()` and carries on into
+  tagging/finalize.
+  ⚠️ **Severity was revised DOWN from HIGH on the second read — the honest scope matters here.** As first
+  filed this said the trigger was "`handleOCRResult` could not persist an output", which is no longer true:
+  W16.bat3-fu closed the dominant path. `handleOCRResult` returns `false` in exactly two ways
+  (`+OCR.swift`, verified by enumerating its returns) — its index guard, and `saveResultToPendingRun` — and
+  `saveResultToPendingRun`'s **batch** branch (`+Pipeline.swift:724-735`) now goes through
+  `persistPendingBatchMutation` → `reportInterruptedPaidBatch`, so it sets the flag upstream and these four
+  exits are already safe in that shape. The `markBatchChunkConsumed` half of `:875` is likewise fixed. What
+  is genuinely still silent: **(a)** `handleOCRResult`'s `guard index >= 0 && index < jobs.count` — a bounds
+  bug, and the one concretely reachable trigger left; **(b)** `saveResultToPendingRun`'s pending-**run**
+  branch (`:745-761`), which sets `isProcessing`/`processingTask?.cancel()` but not `batchPollInterrupted` —
+  reachable only with `activePendingRun` non-nil *alongside* a live batch, which could not be constructed
+  from the current call graph, so treat it as defensive.
+  So this is now **defence-in-depth, not a live money-loss bug**: the four exits are safe only because
+  something upstream happens to report, which is exactly the coupling that broke in bat3-fu. Fix direction
+  (owner's call): set `batchPollInterrupted = true` at all four before returning — deletion-reducing, every
+  reader treats `true` as keep. Forcing a real write failure to drive it needs a seam that does not exist
+  yet, so budget for extracting one. ⚠️ Do NOT fold into W16.bat5 — different sites, different trigger.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | owner
+- [ ] **W16.bat3-fu2 — after a Stop, the submission-failure message tells the operator the opposite of what
+  happened [S · MED].** Found by the W16.bat3-fu second read (2026-08-02); **pre-existing**.
+  `performBatchOCR`'s catch block computes `let acknowledged = activePendingBatch?.submittedChunkIds.count
+  ?? 0` and branches on it. But `cancel()` nils `activePendingBatch`, and a Stop mid-submit is precisely how
+  this catch is reached (the chunk callback throws once `recordSubmittedBatchChunk` fails). So `acknowledged`
+  reads **0** even when server jobs WERE created and journaled, and the operator is told *"Batch submission
+  outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying."*
+  — when IDs were in fact received, and when (on a confirmed cancellation) the journal was deleted rather
+  than kept. Both halves of that sentence can be wrong at once, on the only path that spends money, and it
+  is the sentence the operator decides whether to re-submit from. Note this also swallows W16.bat3-fu's new
+  `pendingBatchJournalClosedMessage`, which is assigned just before the throw and overwritten here — the
+  contract asserts the mutator explained itself, which is true at the mutator and not at the operator. Fix
+  direction: count from a value captured BEFORE the cancellation can nil it (the submit loop already knows
+  how many chunks it created), and stop claiming the journal was kept unless it was. No deletion semantics
+  change, so this is not owner-gated.
+  | files: OCR/OCRProcessor+OCR.swift | S | med | none
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned

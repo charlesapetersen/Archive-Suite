@@ -19,9 +19,16 @@ import Foundation
 /// a stale `false` falls through the interruption branch on a paid batch with no results, and the operator
 /// is given no message at all about a job that may still be running server-side.
 ///
-/// **The property, stated once:** a mutator that returns `false` has ALWAYS set `batchPollInterrupted`,
-/// stopped the run, told the operator something, and cancelled the run task — and a mutator that returns
-/// `true` has done none of those. `true` is the keep-on-doubt direction: every reader of the flag
+/// **The property, stated once:** a mutator that returns `false` *because the journal could not be advanced*
+/// has ALWAYS set `batchPollInterrupted`, stopped the run and told the operator something — and a mutator
+/// that returns `true` has done none of those. Two deliberate carve-outs, so the sentence stays true:
+///   * `recordSubmittedBatchChunk`'s **input validation** (`guard !normalized.isEmpty, !normalized.contains(",")`)
+///     still returns `false` in silence. It never reaches the journal, and both call sites turn it into a
+///     `throw` whose catch sets the flag — so it is covered, one layer up, and is not pinned here.
+///   * The post-Stop exit reports WITHOUT cancelling the run task (`cancelRun: false`). `processingTask` is
+///     nil-or-a-newer-run's by then; see `reportInterruptedPaidBatch`'s doc.
+///
+/// `true` is the keep-on-doubt direction: every reader of the flag
 /// (`retirePaidBatchJournalIfPollCompleted`, `resumePendingBatch`, `processFiles`) treats it as "the journal
 /// survives", and not one of them deletes on it. So this contract can only ever move the app toward keeping
 /// a paid batch's only local record, never away from it.
@@ -35,7 +42,7 @@ import Foundation
 ///     the redirected state directory unwritable mid-run, which every other section shares; that exit's
 ///     reporting is the pre-existing behaviour this item did not change, and sections 1–3 below pin the
 ///     helper both of them now route through.
-///   * Section 2 writes a real journal at the shipped path, so it runs only under the harness's redirect.
+///   * Sections 3 and 4 write a real journal at the shipped path, so they run only under the redirect.
 ///
 /// Run from `BatchResumeTestDriver` (section 18) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -44,11 +51,12 @@ enum BatchMutationReportContract {
 
     static func run(check: (String, Bool) -> Void, redirected: Bool) {
         everyMutatorReportsAClosedJournal(check)
-        // Section 2 persists a journal at `OCRProcessor.pendingBatchURL` and removes it again.
+        whoTheReporterIsAllowedToCancel(check)
+        // Sections 3 and 4 persist a journal at `OCRProcessor.pendingBatchURL` and remove it again.
         guard redirected else {
-            // Two checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
+            // FOUR checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
             // check count, so a refused run reports SOME FAILED rather than a shorter green report.
-            check("mutation report: the two checks that write a real journal — a HEALTHY mutation reporting "
+            check("mutation report: the four checks that write a real journal — a HEALTHY mutation reporting "
                   + "nothing, and a report deleting nothing — are SKIPPED (refused: the journal path did not "
                   + "resolve away from Application Support)", false)
             return
@@ -67,6 +75,10 @@ enum BatchMutationReportContract {
                  inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
     }
 
+    /// ⚠️ `submissionComplete: false` is LOAD-BEARING, not tidiness. `PendingBatch.init` defaults it to
+    /// **true**, so a fixture that omits it makes section 2's "the marker was persisted" assertion true
+    /// before the mutator ever runs — neuter `markBatchSubmissionComplete`'s mutation closure to `{ _ in }`
+    /// and both of its checks stay green. Start from the state the real submit path is actually in.
     private static func journal(chunkIds: [String]) -> OCRProcessor.PendingBatch {
         OCRProcessor.PendingBatch(
             batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
@@ -74,7 +86,7 @@ enum BatchMutationReportContract {
             outputDirectory: URL(fileURLWithPath: "/tmp/mutation-report", isDirectory: true),
             enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
-            submittedChunkIds: chunkIds)
+            submittedChunkIds: chunkIds, submissionComplete: false)
     }
 
     /// Everything observable about one mutator call.
@@ -85,9 +97,12 @@ enum BatchMutationReportContract {
         let stoppedProcessing: Bool
         /// `statusMessage` is no longer the sentinel, and is not empty.
         let explainedItself: Bool
-        /// The run task was told to stop, observed on a REAL task rather than assumed.
+        /// Was the run task cancelled? Observed on a REAL task rather than assumed. On the post-Stop exit
+        /// this must be FALSE — `processingTask` is nil-or-a-newer-run's by then.
         let cancelledTheRun: Bool
-        /// Reporting is not acting: the in-memory journal state and the run's jobs are left as they were.
+        /// Reporting is not acting: the run's jobs and the resume banner are left exactly as they were.
+        /// The banner half is the load-bearing one — a reporter that "helpfully" ran `checkForPendingBatch()`
+        /// would be doing `finishInterruptedBatchPoll()`'s job at the wrong layer, and this catches it.
         let leftTheRunAlone: Bool
     }
 
@@ -106,9 +121,13 @@ enum BatchMutationReportContract {
         processor.statusMessage = sentinel
         let source = URL(fileURLWithPath: "/tmp/mutation-report/scan-0.jpg")
         processor.jobs = [OCRJob(sourceURL: source)]
+        // A sentinel in the resume banner. Only `checkForPendingBatch()` writes this, so "was it replaced?"
+        // detects a reporter that started acting on the interruption instead of merely reporting it.
+        let banner = "mutation-report-banner-\(UUID().uuidString)"
+        processor.pendingBatchInfo = banner
 
-        // A real, live run task. `reportInterruptedPaidBatch` cancels `processingTask`, and a check that
-        // asserted nothing about it would pass on an implementation that dropped the call.
+        // A real, live run task, so "did it cancel the run?" is measured rather than assumed — in BOTH
+        // directions: this state is the post-Stop one, where the correct answer is that it does not.
         let run = Task<Void, Never> { try? await Task.sleep(for: .seconds(30)) }
         processor.processingTask = run
 
@@ -122,7 +141,7 @@ enum BatchMutationReportContract {
             stoppedProcessing: !processor.isProcessing,
             explainedItself: processor.statusMessage != sentinel && !processor.statusMessage.isEmpty,
             cancelledTheRun: cancelled,
-            leftTheRunAlone: processor.activePendingBatch == nil && processor.jobs.count == 1
+            leftTheRunAlone: processor.pendingBatchInfo == banner && processor.jobs.count == 1
                 && processor.jobs[0].sourceURL == source)
     }
 
@@ -154,19 +173,54 @@ enum BatchMutationReportContract {
               consumed.returnedFalse && consumed.flaggedInterrupted
               && consumed.stoppedProcessing && consumed.explainedItself)
 
-        // The two halves the three checks above do not name individually, swept across all three mutators:
-        // the run task is really cancelled (not merely `isProcessing = false`, which leaves the submit loop
-        // running), and reporting stays reporting — it does not start clearing the run's state, which is
-        // `finishInterruptedBatchPoll()`'s job at the caller.
+        // The two halves the three checks above do not name individually, swept across all three mutators.
+        // FIRST: none of them cancels `processingTask`. This state is post-Stop by construction, so that
+        // handle is either already nil or the NEXT run's — a confirmed cancellation deletes the journal
+        // `startProcessing` refuses on, and this run can still be resolving a 30–120s provider request when
+        // the operator starts another. Cancelling here would kill the wrong run.
         let all = [submission, recorded, consumed]
-        check("mutation report: all three mutators cancel the run task they interrupted",
-              all.count == 3 && all.allSatisfy { $0.cancelledTheRun })
-        check("mutation report: and none of them touches the journal state or the run's jobs — reporting an "
+        check("mutation report: none of the three cancels the run task — post-Stop, that handle belongs to "
+              + "the next run, not this one",
+              all.count == 3 && all.allSatisfy { !$0.cancelledTheRun })
+        // SECOND: reporting stays reporting. Acting on the interruption — recomputing the resume banner,
+        // clearing state — is `finishInterruptedBatchPoll()`'s job, at the caller, once.
+        check("mutation report: and none of them touches the resume banner or the run's jobs — reporting an "
               + "interruption is not acting on one",
               all.allSatisfy { $0.leftTheRunAlone })
     }
 
-    // MARK: - 2. The other direction, so the property is not "always report"
+    // MARK: - 2. Who the reporter is allowed to cancel
+
+    /// Section 1 pins that the post-Stop exit does NOT cancel. This pins the other direction on the same
+    /// seam, so "never cancels" cannot quietly become the whole behaviour: a LIVE run that has just found it
+    /// cannot persist its journal must still be stopped, or the submit loop keeps spending money after the
+    /// app has decided the run is over. Drives `reportInterruptedPaidBatch` directly — it is the only way to
+    /// reach the `cancelRun: true` side without forcing a real disk-write failure.
+    private static func whoTheReporterIsAllowedToCancel(_ check: (String, Bool) -> Void) {
+        func report(cancelRun: Bool) -> (cancelled: Bool, flagged: Bool, stopped: Bool, said: Bool) {
+            let processor = OCRProcessor()
+            processor.batchPollInterrupted = false
+            processor.isProcessing = true
+            let run = Task<Void, Never> { try? await Task.sleep(for: .seconds(30)) }
+            processor.processingTask = run
+            processor.reportInterruptedPaidBatch("reporter-\(UUID().uuidString)", cancelRun: cancelRun)
+            let cancelled = run.isCancelled
+            run.cancel()
+            return (cancelled, processor.batchPollInterrupted, !processor.isProcessing,
+                    !processor.statusMessage.isEmpty)
+        }
+
+        let live = report(cancelRun: true)
+        let unwinding = report(cancelRun: false)
+        check("mutation report: a LIVE run that cannot persist its journal is really cancelled — the submit "
+              + "loop does not keep going after the app gave up on the run",
+              live.cancelled && live.flagged && live.stopped && live.said)
+        check("mutation report: and the same reporter leaves the task alone when told to, so the two cases "
+              + "are one seam with one switch — not two behaviours that can drift",
+              !unwinding.cancelled && unwinding.flagged && unwinding.stopped && unwinding.said)
+    }
+
+    // MARK: - 3. The other direction, so the property is not "always report"
 
     /// Without this, an implementation that called `reportInterruptedPaidBatch` unconditionally — wedging
     /// every healthy paid batch into a permanent "interrupted" — would satisfy section 1 completely.
@@ -196,7 +250,7 @@ enum BatchMutationReportContract {
               && processor.statusMessage == sentinel && !cancelled)
     }
 
-    // MARK: - 3. Reporting an interruption removes nothing
+    // MARK: - 4. Reporting an interruption removes nothing
 
     /// The direction that costs money if it goes wrong. `reportInterruptedPaidBatch` is called on the exact
     /// path where a paid server-side job may still be alive, so a "tidy up the journal" line added to it

@@ -772,13 +772,23 @@ extension OCRProcessor {
     /// *previous* run happened to leave behind. `true` is also the keep-on-doubt answer — every reader of
     /// the flag treats it as "the journal survives", and none of them deletes on it.
     ///
-    /// Deliberately does NOT touch the journal, the jobs, or any output: reporting an interruption and
-    /// acting on one are different jobs, and the acting is `finishInterruptedBatchPoll()`'s at the caller.
-    func reportInterruptedPaidBatch(_ message: String) {
+    /// Deliberately does NOT touch the journal, the jobs, the resume banner, or any output: reporting an
+    /// interruption and acting on one are different jobs, and the acting is `finishInterruptedBatchPoll()`'s
+    /// at the caller.
+    ///
+    /// `cancelRun` is why this takes a second parameter at all. Stopping the run is right when the run is
+    /// still LIVE and has just discovered it cannot go on — a journal write that failed. It is wrong when we
+    /// are already unwinding FROM a Stop: `cancel()` has set `processingTask = nil`, and by the time this
+    /// run's submit loop notices, the operator may legitimately have started a NEW one (a confirmed
+    /// cancellation deletes the journal `startProcessing` refuses on, while this run is still resolving a
+    /// provider request that can take 30–120s). `processingTask` would then be the new run's, and cancelling
+    /// it would kill the wrong run. So the post-Stop exit reports without cancelling — there is nothing of
+    /// ours left to cancel.
+    func reportInterruptedPaidBatch(_ message: String, cancelRun: Bool = true) {
         statusMessage = message
         batchPollInterrupted = true
         isProcessing = false
-        processingTask?.cancel()
+        if cancelRun { processingTask?.cancel() }
     }
 
     /// Shown when the in-memory journal is gone before a mutation could be applied. `cancel()` nils
@@ -800,7 +810,9 @@ extension OCRProcessor {
         _ mutation: (inout PendingBatch) -> Void
     ) -> Bool {
         guard var candidate = activePendingBatch else {
-            reportInterruptedPaidBatch(Self.pendingBatchJournalClosedMessage)
+            // Post-Stop by construction (only `cancel()` nils this mid-run), so `cancelRun: false` — see
+            // the reporter's doc: `processingTask` is either already nil or a NEWER run's, never ours.
+            reportInterruptedPaidBatch(Self.pendingBatchJournalClosedMessage, cancelRun: false)
             return false
         }
         mutation(&candidate)

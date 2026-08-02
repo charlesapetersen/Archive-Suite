@@ -2035,6 +2035,36 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   warnings. **A new HIGH money-path finding came out of the adversarial pass and is FILED, not fixed:
   `W16.bat7`** — four *other* silent exits in `pollBatchUntilComplete` that delete the journal when results
   fail to persist. It is owner-gated (plan HOLD QUEUE), not a follow-up to this item.
+  **SECOND READ, folded in same-day (third commit).** An independent adversarial agent returned after the
+  first two commits had landed. It confirmed the change SOUND on all eight questions put to it — no new
+  deletion on any path, the four flag readers are the complete set, the new `statusMessage` writes cannot
+  race W16.bat6's kept-journal warning (every reporter call site is inside the run task, so all of them
+  precede `await interruptedRun?.value`), and the Swift 6 isolation is correct — and found six issues, four
+  of them defects in what had just shipped, fixed here rather than filed:
+  **(1) MED, VACUITY — section 2's "the marker was persisted" check was self-fulfilling.**
+  `PendingBatch.init` defaults `submissionComplete` to **`true`** and the fixture omitted it, so the
+  assertion was already true before the mutator ran: neuter `markBatchSubmissionComplete`'s mutation closure
+  to `{ _ in }` and both of its checks stayed green. The fixture now passes `submissionComplete: false`,
+  with the reason written above it, and that mutant reddens 1. This is the one that mattered — a vacuous
+  check on the money path is worse than none, because it reads as coverage.
+  **(2) MED, NEW BEHAVIOUR — the reporter could cancel the WRONG run.** `processingTask?.cancel()` was
+  reachable from the post-Stop exit, which is by construction the unwind: `cancel()` has already nil'd
+  `processingTask`, and a confirmed cancellation deletes the journal `startProcessing` refuses on, so the
+  operator can legitimately start a NEW run while this one is still resolving a 30–120s provider request.
+  The stale run would then cancel the new run's task and reset its state underneath it.
+  `reportInterruptedPaidBatch` now takes `cancelRun:` and the post-Stop exit passes `false`; a new section 2
+  drives the reporter directly to pin BOTH directions (a LIVE run that cannot persist its journal is still
+  cancelled — the submit loop must not keep spending after the app gives up). Neutering the cancel reddens 1.
+  **(3) LOW, OVERCLAIM** — the header's "a mutator returning `false` has ALWAYS reported" was false:
+  `recordSubmittedBatchChunk`'s input-validation guard still returns `false` silently (benign — both call
+  sites throw into a catch that sets the flag). Now an explicit carve-out rather than quietly wrong.
+  **(4) NIT** the skip message said two checks were skipped when four are; **(5) NIT** half of
+  `leftTheRunAlone` was trivially true (it re-asserted a nil the fixture had just set) and is now a
+  resume-banner sentinel, which catches a reporter that starts doing `finishInterruptedBatchPoll()`'s job.
+  Checks 277 → 279, still ALL PASS, and the item's original two mutants still redden 4 and 1.
+  **(6)** Its last point corrected **W16.bat7**'s scope rather than this item — that filing is revised
+  HIGH → MED, because this change closed its dominant trigger. One further finding of its own is filed as
+  **W16.bat3-fu2** (after a Stop, the submission-failure message is doubly wrong).
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/BatchMutationReportContract.swift, OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift | S | med | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
