@@ -786,6 +786,10 @@ extension OCRProcessor {
     /// ours left to cancel.
     func reportInterruptedPaidBatch(_ message: String, cancelRun: Bool = true) {
         statusMessage = message
+        // Kept as well as shown (W16.bat3-fu2). `performBatchOCR`'s catch summarises the interruption over
+        // the top of this, and the summary knows the counts while only the reporter knows the cause; this is
+        // how the cause survives to be read alongside them.
+        lastPaidBatchInterruptionReport = message
         batchPollInterrupted = true
         isProcessing = false
         if cancelRun { processingTask?.cancel() }
@@ -796,6 +800,92 @@ extension OCRProcessor {
     /// mid-submit arrives in — not a corruption, and nothing here removed anything.
     static let pendingBatchJournalClosedMessage =
         "A paid batch step could not be recorded — its recovery journal had already been closed by Stop. Nothing further was removed; check for a pending batch before retrying."
+
+    // MARK: - Telling the operator what an interrupted submission really did (W16.bat3-fu2)
+
+    /// What the durable paid-batch journal says at the instant it is asked.
+    ///
+    /// Read from DISK on purpose. The in-memory `activePendingBatch` is exactly what a Stop mid-submit has
+    /// just nil'd, so it answers "there is no journal and nothing was acknowledged" on the one path where
+    /// both halves are false — which is how `performBatchOCR`'s catch came to tell the operator the journal
+    /// had been kept while reporting zero acknowledged jobs.
+    struct PaidBatchJournalState: Equatable, Sendable {
+        /// The journal FILE exists. Deliberately a file-system fact rather than "it decoded": a torn journal
+        /// is still a journal on disk, and saying it is gone would send the operator looking for a paid job
+        /// with no local record when the record is right there.
+        let onDisk: Bool
+        /// Server job IDs the journal actually carries. Zero for a file that failed to decode — which
+        /// understates nothing, because it is compared against the created count and any shortfall is
+        /// reported as unrecorded work.
+        let acknowledgedChunkCount: Int
+    }
+
+    static func paidBatchJournalState() -> PaidBatchJournalState {
+        PaidBatchJournalState(
+            onDisk: FileManager.default.fileExists(atPath: pendingBatchURL.path),
+            acknowledgedChunkCount: loadPendingBatch()?.effectiveChunkIds.count ?? 0)
+    }
+
+    /// The sentence an operator decides whether to re-submit a paid batch from.
+    ///
+    /// Pure, so the whole matrix behind it can be swept for $0 (`BatchSubmissionMessageContract`). Every
+    /// clause is a fact one of the callers measured rather than an inference:
+    ///   * `createdJobCount` is what the submit loop created (`paidJobsCreatedThisSubmission`), NOT what the
+    ///     journal it may no longer hold says. This is the money number and it is never guessed downward.
+    ///   * the journal clause comes from the file on disk, so "kept" is only ever said about a file that is
+    ///     there — the old text asserted it unconditionally.
+    ///   * a shortfall between the two is named. Created-but-unrecorded jobs are the one shape Resume cannot
+    ///     reach, so an operator who reads only "the journal was kept" would never go looking for them.
+    ///   * `priorReport` leads, when a mutator already explained the cause. It used to be overwritten here.
+    static func interruptedSubmissionMessage(
+        createdJobCount: Int,
+        journal: PaidBatchJournalState,
+        priorReport: String?
+    ) -> String {
+        func jobs(_ n: Int) -> String { "\(n) server job\(n == 1 ? "" : "s")" }
+        var parts: [String] = []
+        if let priorReport, !priorReport.isEmpty { parts.append(priorReport) }
+
+        if createdJobCount == 0 {
+            // Still uncertain rather than "nothing happened": a non-idempotent create can be accepted
+            // server-side with its reply lost on the way back, which is the case this wording exists for.
+            parts.append("Batch submission outcome is uncertain. No server job was acknowledged, "
+                         + "but a create whose reply was lost may still have been accepted.")
+        } else {
+            parts.append("Batch submission stopped after \(jobs(createdJobCount)) had been created.")
+        }
+
+        let unrecorded = max(0, createdJobCount - journal.acknowledgedChunkCount)
+        if journal.onDisk {
+            parts.append(unrecorded == 0
+                ? "The recovery journal was kept, so Resume can pick the batch up."
+                : "The recovery journal was kept, but \(jobs(unrecorded)) "
+                  + "\(unrecorded == 1 ? "is" : "are") missing from it, so Resume will not reach "
+                  + "\(unrecorded == 1 ? "it" : "them").")
+        } else {
+            parts.append(createdJobCount == 0
+                ? "No recovery journal is on disk."
+                : "No recovery journal is on disk, so the app has no local record of "
+                  + "\(createdJobCount == 1 ? "that job" : "those jobs").")
+        }
+        parts.append("Review before retrying.")
+        return parts.joined(separator: " ")
+    }
+
+    /// `performBatchOCR`'s submission-failure exit, extracted so it can be driven without a paid submission.
+    ///
+    /// Same four statements the exit always made — say what happened, flag the interruption, end the run,
+    /// refresh the Resume banner — with the message now composed from measurements. It does NOT cancel
+    /// `processingTask`: this runs *on* that task, and the run is ending under its own power.
+    func reportInterruptedBatchSubmission() {
+        statusMessage = Self.interruptedSubmissionMessage(
+            createdJobCount: paidJobsCreatedThisSubmission.count,
+            journal: Self.paidBatchJournalState(),
+            priorReport: lastPaidBatchInterruptionReport)
+        batchPollInterrupted = true
+        isProcessing = false
+        checkForPendingBatch()
+    }
 
     /// Atomically advance the in-memory + on-disk paid-batch journal. The old durable snapshot remains
     /// authoritative if the replacement fails; callers stop immediately instead of continuing past it.
@@ -832,6 +922,14 @@ extension OCRProcessor {
     @discardableResult
     func recordSubmittedBatchChunk(_ chunkId: String) -> Bool {
         let normalized = chunkId.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Tally FIRST, and before the validation guard (W16.bat3-fu2). This is called once per server-side
+        // job the provider has already created, so it is the earliest — and, once Stop has nil'd
+        // `activePendingBatch`, the only — place the count of what was billed still exists. An ID the guard
+        // below rejects is counted too: the job is no less real for having an unusable name, and a count
+        // that quietly omitted it would be the same understatement this item exists to remove.
+        if !paidJobsCreatedThisSubmission.contains(normalized) {
+            paidJobsCreatedThisSubmission.append(normalized)
+        }
         guard !normalized.isEmpty, !normalized.contains(",") else { return false }
         if activePendingBatch?.submittedChunkIds.contains(normalized) == true { return true }
         return persistPendingBatchMutation(

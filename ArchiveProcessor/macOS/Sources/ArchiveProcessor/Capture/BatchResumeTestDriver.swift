@@ -79,6 +79,14 @@ import AppKit
 ///      the shape a Stop mid-submit lands in — returned `false` having set nothing, leaving the run to be
 ///      judged on the flag a PREVIOUS run left behind. Pins both directions: a failed mutation always
 ///      reports, a healthy one never does, and reporting removes nothing from disk.
+///  19. **What the interrupted submission TELLS the operator** (`BatchSubmissionMessageContract`,
+///      W16.bat3-fu2): section 18 pins that a failed mutation says something; this pins that the sentence is
+///      true. `performBatchOCR`'s catch counted acknowledged jobs out of the journal `cancel()` had just
+///      nil'd, so on the money path it reported "no server ID was received; the journal was kept" with paid
+///      jobs already created and without looking at the file. Now every clause is a measurement — the count
+///      from a tally a Stop cannot clear, "kept" only about a file on disk, created-but-unrecorded jobs
+///      named, and the mutator's own explanation leading rather than overwritten. Drives the real exit
+///      against a real journal (same redirect gate).
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -714,6 +722,12 @@ enum BatchResumeTestDriver {
         // — used to return `false` without setting the flag both callers judge the run by. No provider call
         // is made and no journal is written outside section 2/3, which use the same redirect verdict.
         BatchMutationReportContract.run(check: check, redirected: journalsAreRedirected)
+
+        // --- 19: what the interrupted submission tells the operator (W16.bat3-fu2). ---
+        // Section 18 stops at "it said something." This is the sentence itself — the one an operator decides
+        // whether to pay for the same pages again from. Its last section drives the real exit against a real
+        // journal at the shipped path, so it uses the same redirect verdict and removes what it wrote.
+        BatchSubmissionMessageContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

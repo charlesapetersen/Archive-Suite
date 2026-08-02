@@ -568,6 +568,13 @@ extension OCRProcessor {
     ) async {
         let total = fileURLs.count
 
+        // This submission's own money count and cause, cleared before the first create (W16.bat3-fu2).
+        // `batchPollInterrupted` is the standing warning about what happens when paid-batch state is left
+        // to carry over between runs — a stale total here would put a PREVIOUS batch's jobs into this one's
+        // interruption message, which is the same class of lie in the other direction.
+        paidJobsCreatedThisSubmission = []
+        lastPaidBatchInterruptionReport = nil
+
         // Mark all as processing
         for i in 0..<total { jobs[i].status = .processing }
 
@@ -660,14 +667,14 @@ extension OCRProcessor {
             // A non-idempotent create can be accepted server-side even when its response is lost. Keep
             // the pre-submit journal in every failure case; acknowledged IDs remain resumable, while an
             // empty ID list explicitly records an unknown outcome and prevents an automatic duplicate.
-            let acknowledged = activePendingBatch?.submittedChunkIds.count ?? 0
-            statusMessage = acknowledged == 0
-                ? "Batch submission outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying."
-                : "Batch submission stopped after \(acknowledged) server job\(acknowledged == 1 ? "" : "s"). The acknowledged work was kept for resume."
+            //
+            // What the operator is told is composed from measurements rather than from `activePendingBatch`
+            // (W16.bat3-fu2). This catch's commonest cause is a Stop pressed mid-submit — the chunk callback
+            // throws as soon as `recordSubmittedBatchChunk` finds the journal closed — and `cancel()` has
+            // nil'd that journal by then, so reading the count out of it said "no server ID was received"
+            // about a batch already billed for several, and "the journal was kept" without looking.
             NSLog("[ArchiveProcessor] paid-batch submission interrupted: %@", error.localizedDescription)
-            batchPollInterrupted = true
-            isProcessing = false
-            checkForPendingBatch()
+            reportInterruptedBatchSubmission()
             return
         }
 

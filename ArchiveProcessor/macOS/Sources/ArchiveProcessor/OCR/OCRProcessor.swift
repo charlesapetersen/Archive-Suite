@@ -243,6 +243,28 @@ class OCRProcessor: ObservableObject {
     /// still-processing file as failed. A completed batch always resets this to false.
     var batchPollInterrupted = false
 
+    // MARK: What the submit path remembers after Stop has closed the journal (W16.bat3-fu2)
+
+    /// Every server-side job THIS submission created, in creation order — the money count, kept somewhere
+    /// `cancel()` cannot reach.
+    ///
+    /// `activePendingBatch.submittedChunkIds` is the same list, but it is the wrong place to count from on
+    /// the one path that needs the number: `cancel()` nils `activePendingBatch`, and a Stop pressed
+    /// mid-submit is precisely how `performBatchOCR`'s catch is reached, so counting there reported **0
+    /// jobs created** on a batch that had already been billed for several. Appended by
+    /// `recordSubmittedBatchChunk(_:)` — the one place a created job is first known — *before* its ID is
+    /// validated or journaled, because a job whose ID could not be used is still a job that was paid for.
+    /// Cleared at the top of `performBatchOCR`, so it never carries a previous run's total.
+    var paidJobsCreatedThisSubmission: [String] = []
+    /// The last thing `reportInterruptedPaidBatch(_:cancelRun:)` told the operator, or nil if it has not
+    /// spoken since this submission began.
+    ///
+    /// The mutators explain their own failures precisely (W16.bat3-fu), but `performBatchOCR`'s catch then
+    /// overwrote `statusMessage` with a generic summary — so the explanation was true at the mutator and
+    /// gone by the time it reached the operator. Recording it here lets the summary lead with the cause
+    /// instead of replacing it. Cleared alongside `paidJobsCreatedThisSubmission`.
+    var lastPaidBatchInterruptionReport: String?
+
     // MARK: Cancel-path seams (W16.bat2-fu — so the WIRING is testable, not just the rule)
     /// The in-flight server-side batch cancellation `cancel()` spawned, retained so a headless driver
     /// can await it (`BatchCancelWiringContract`). Production never reads it.
