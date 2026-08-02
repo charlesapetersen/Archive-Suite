@@ -2881,6 +2881,30 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r6 [LOW · data-loss] — ✅ DONE 2026-08-02** (`905722d` fix+test; this commit, trackers).
+  `finalize()`'s allFiled branch trashed the whole `stagingDir` after the `executePlans` move await. Premise
+  re-confirmed by reading the path, not the line number (it had drifted from :996 to :1097): `plans` is
+  snapshotted synchronously in `finalize`, the await runs off the MainActor for as long as the moves take,
+  and `finalizeSegment`'s post-await continuation can resume inside that window — appending to `staged` and
+  writing fresh output into the same `stagingDir` without ever being in `plans`. `outcome.allFiled` reports
+  only on the planned segments, so it stayed true, and the straggler's output was trashed along with the
+  batch it missed, leaving a `staged` entry pointing into the Trash.
+  **Fix:** a pure `stagingSafeToReclaim(allPlannedFiled:segmentsStillStaged:)` beside `sourcesSafeToRetire`,
+  asked AFTER the filed segments are dropped from `staged`. Every staged segment's outputs live in that one
+  directory, so any survivor — a straggler, or a segment the finalize sheet never planned — means it still
+  holds files that exist nowhere else. A survivor now keeps the directory, persists the REDUCED manifest (the
+  straggler's own `persistManifest` still listed the now-filed segments), leaves the session live instead of
+  resetting it, and tells the operator to Finish again. The failure direction is a kept directory, never a
+  deleted one. No behaviour change to the partial branch or to the empty-staging reclaim.
+  **Tier-2:** recovery driver Test 13, 12 new $0 checks — the decision alone; the WIRING through the REAL
+  `finalize`, with the straggler injected in the same MainActor turn as the call so the interleaving is exact
+  rather than timing-dependent; and the happy-path reclaim it must not break. **Mutation-verified:** reverting
+  the gate to the pre-fix `allPlannedFiled` fails 5 of them (the directory is trashed, the straggler's PDF is
+  gone from disk, the manifest lies, the operator is not told) — so the test genuinely catches the bug.
+  `test-recovery.sh` ALL PASS (68 checks); build clean, no new warnings. File safety: the wiring test builds
+  a real `CaptureSession`, so it FAILS CLOSED unless `ARCHIVEPROC_TEST_BACKUP_ROOT` is set; every draft pins
+  `chosenExisting` to a scratch folder so `currentOutputDirectory`'s real-Settings fallback can never
+  contribute a path; and `test-recovery.sh` now also exports `LIVECAPTURE_TESTOUT` as a second belt.
 - [x] **W3.cap-r1 [MED · tag/PDF SPEC] — ✅ DONE (this commit), BOTH FIXES IN ONE COMMIT as required.**
   Premise re-confirmed by symbol first: three `_ = try? MacOSTagger.applyTags(...)` sites remained (line
   numbers had drifted to 666/673/699). Both now go through one new `LiveCaptureProcessor.tagStagedArtifact`

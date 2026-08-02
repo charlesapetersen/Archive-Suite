@@ -1395,6 +1395,17 @@ was classified `.absent` — *not* counted. Two facts combined into total loss:
 - Regression: `LiveCaptureRecoveryTestDriver` ($0, no OCR, `LIVECAPTURE_RECOVERYTEST=1`) asserts a missing
   output is never reported filed, and that `trashOrRemove` trashes rather than hard-deletes.
 
+**Later (W3.cap-r6, 2026-08-02) — the same straggler, one step downstream.** The guard above keeps a
+straggler's *source photo*; it did not keep a straggler's *processed output*. `finalize` reclaimed the whole
+staging directory whenever every **planned** segment filed — but `plans` is snapshotted before the
+`executePlans` await, so a segment that finished processing during the move wrote fresh output into that same
+directory without ever being in `plans`, and `allFiled` (which reports only on the planned segments) stayed
+true. That output went to the Trash and its `staged` entry was left pointing there. The gate is now
+`stagingSafeToReclaim(allPlannedFiled:segmentsStillStaged:)` — reclaim only when nothing is left staged — so
+a survivor keeps the directory, gets the reduced manifest persisted, leaves the session live, and is reported
+to the operator ("Finish again"). Recovery driver Test 13 proves the decision, the wiring through the real
+`finalize`, and that the happy-path reclaim still happens.
+
 **Recovery note for the original run:** those source JPEGs were `removeItem`'d (Trash bypassed) so they are
 **not** recoverable from this Mac. The only surviving copy would be the phone's manual **"Save to phone"**
 gallery album (`Pictures/Archive Capture`) *if the operator tapped it* — the phone auto-deletes each page
