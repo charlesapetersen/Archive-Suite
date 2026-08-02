@@ -132,8 +132,14 @@ its own date. Verbatim as recorded when granted.)*
   end**, not only the fresh run); and the premise was re-confirmed by symbol, the file having indeed moved.
   `cancel()`'s semantics were not touched and neither `W16.bat5` nor `W16.bat6` was started. One adjacent
   defect the adversarial review surfaced was FILED rather than fixed, precisely because this grant does not
-  reach it: `W16.bat3-fu` (`performBatchOCR`'s *fifth* interrupted exit runs no tail at all). The grant is
-  retained verbatim below as the record.
+  reach it: `W16.bat3-fu` (`performBatchOCR`'s *fifth* interrupted exit runs no tail at all).
+  ✅ **The one LOOSER consequence was reviewed with the owner 2026-08-02 and he chose to KEEP it as shipped.**
+  Where the provider confirms every server-side cancellation, the journal used to be deleted twice (the run's
+  tail and `cancel()`'s async task) and now only the second does it — so a quit in the window between them can
+  strand a journal for an already-cancelled batch and offer a Resume that isn't needed. He was offered the
+  tightening (restore the run-tail delete) and declined: it would put a delete back on a path this grant just
+  removed one from. **Do not "fix" this later as if it were an oversight** — it is the keep-on-doubt trade,
+  decided twice. The grant is retained verbatim below as the record.
   **AUTHORIZED (granted 2026-08-01, morning-review walkthrough).** Set `batchPollInterrupted` in
   both `guard !Task.isCancelled` early-returns (`OCRProcessor+OCR.swift:689`, `:701`) so `performBatchOCR:661-664`
   stops deleting the paid-batch recovery journal on a cancelled poll. Authorized because today the operator is
@@ -168,8 +174,16 @@ its own date. Verbatim as recorded when granted.)*
   both contracts stub the deleter and operate on a temp fixture, so no check reaches the shipped journal
   path at all. The regression is built on W16.bat2's driver and **measured** on two mutants (call site
   neutered to `false` → 7 red; rule branch killed → 15 red), with a non-vacuity twin behind every named
-  check. Neither `W16.bat2-fu2`, `W16.bat6` nor any other cancel-semantics change was touched. The grant is
-  retained verbatim below as the record.
+  check. Neither `W16.bat2-fu2`, `W16.bat6` nor any other cancel-semantics change was touched.
+  ✅ **The SUPERSET consequence was reviewed with the owner 2026-08-02 and he chose to KEEP it as shipped.**
+  Reusing the journal's own `submissionComplete` (rather than adding a second bool that could drift) makes the
+  guard a *superset* of "a create is happening right now": a journal whose submission was never recorded as
+  finished reads as in-flight for the rest of its life, including across a resume — so some Stops that used to
+  delete now keep, costing one extra **Dismiss** on the Resume banner. He was offered the narrowing (scope it
+  to the literal submit window) and declined, on the asymmetry: a spurious Dismiss costs a click, a wrongly
+  deleted journal costs a paid batch. **Do not narrow it later as if it were an oversight** — and do not
+  introduce a second in-flight flag alongside `submissionComplete`; avoiding that drift is why it was reused.
+  The grant is retained verbatim below as the record.
   **AUTHORIZED (granted 2026-08-01, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
   THE OWNER: the in-flight guard.** Stop mid-submit can delete the paid-batch journal while a later Gemini chunk
   is already billed: `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while the submit loop may
@@ -191,6 +205,62 @@ its own date. Verbatim as recorded when granted.)*
     in flight, i.e. a check that fails on today's snapshot behaviour and passes after. Tier-2 in full, premise
     re-confirmed by symbol first. **Does NOT authorize** `W16.bat2-fu2`, `W16.bat6`, or any other cancel-semantics
     change.
+- **`W16.bat7` — AUTHORIZED (granted 2026-08-02, morning-review walkthrough), ALL FOUR EXITS.**
+  `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`) and four exits
+  then return without touching it again — `processBatchResults` in the Anthropic (`:766`) and Mistral (`:789`)
+  arms, the `materialized` half of the Gemini arm's guard (`:875`), and `handleOCRResult` in the completion
+  sweep (`:955`). The caller reads "the poll finished cleanly" and then retires
+  (`retirePaidBatchJournalIfPollCompleted`) or deletes (`Self.deletePendingBatch()`) the paid batch's journal.
+  **The owner was shown the honest scope and granted it anyway:** the daemon had already revised this HIGH→MED
+  itself, because `W16.bat3-fu` closed the dominant trigger, leaving only `handleOCRResult`'s index-bounds
+  guard as concretely reachable. It is defence-in-depth, not a live money leak. Granted on the standing
+  precedent that **every change to what this path deletes has been granted item by item**, not because a rule
+  compelled it. `W16.bat7` is moved out of the plan's HOLD QUEUE into the WORK QUEUE.
+  - ⛔ **ALL FOUR EXITS — the narrow variant was OFFERED AND DECLINED.** The owner was given the option of
+    fixing only `handleOCRResult`'s bounds guard (`:955`) and documenting the other three as safe-by-upstream,
+    and he rejected it: leaving three exits dependent on something upstream happening to report is the exact
+    coupling that broke in `W16.bat3-fu`. **Do not ship the narrow variant as a substitute or a first
+    increment.** If one of the four turns out not to need the assignment, say so with evidence rather than
+    silently omitting it.
+  - ⛔ **DELETION-REDUCING ONLY.** Setting `batchPollInterrupted = true` before returning must only ever cause
+    a journal to be KEPT. If any reader of that flag would be made to delete something it does not delete
+    today, STOP and flag to Morning Review. Keep-on-doubt governs, as with `W16.bat3` and `W16.bat5`.
+  - ⛔ **SCRATCH ONLY** — never the owner's real `pending_batch.json`. ⚠️ Unlike the 2026-08-01 grants, the
+    journal path **is** redirectable under test now (`W16.bat2-fu2`, `5424054`, and `test-batch-resume.sh`
+    redirects it), so the regression must drive the **REAL** deleter against a temp fixture rather than a stub.
+  - ⛔ **Must land with a measured regression test**, non-vacuity proven on mutants — a check that is already
+    true before the code under test runs is worse than no check on a money path (the `W16.bat3-fu` lesson,
+    `12f4ce9`). **Budget for extracting a seam:** forcing a real write failure to drive these exits needs one
+    that does not exist yet. Tier-2 in full, premise re-confirmed **by symbol, not line number**, first.
+  - **Does NOT authorize** `W16.bat5-fu` or any other change to `cancel()` semantics — that is the separate
+    grant immediately below. Do not fold the two together; different sites, different trigger.
+- **`W16.bat5-fu` — AUTHORIZED (granted 2026-08-02, morning-review walkthrough), WITH THE FIX DIRECTION
+  CHOSEN BY THE OWNER: let a post-Stop chunk ID still reach the journal.** This is the acknowledged
+  **residual of the direction he chose for `W16.bat5` on 2026-08-01, not a defect in it.** `W16.bat5` stops
+  `cancel()` deleting the journal when a submission was unfinished, so a mid-submit Stop now leaves a local
+  record and a Resume banner. But the record is **short**: a chunk created between `cancel()`'s snapshot and
+  the Stop is billed, and `cancel()` has nil'd `activePendingBatch` by the time that chunk's `onJobCreated`
+  callback runs, so `recordSubmittedBatchChunk` → `persistPendingBatchMutation`'s missing-journal guard
+  reports the interruption and returns `false` with the ID written nowhere. The operator is warned and
+  `ArchiveProcessor/README.md` points them at the provider console, but the app can neither cancel nor
+  collect that job. `W16.bat5-fu` is moved out of the plan's HOLD QUEUE into the WORK QUEUE.
+  - ⛔ **REQUIRED DIRECTION — keep the journal addressable for append-only chunk recording past `cancel()`**
+    (e.g. `cancel()` hands the callback a direct journal handle, or the callback writes a "created after
+    cancellation" ID list straight to disk) so a late `onJobCreated` can still record its ID. The owner
+    considered and **rejected** the alternative of not nilling `activePendingBatch` until in-flight submits
+    quiesce: it makes Stop non-instant and a hung provider request would stall the teardown. **Do not ship
+    the quiesce variant as a substitute.** If the required direction turns out to be unimplementable as
+    stated, STOP and flag to Morning Review with your evidence — do not silently fall back.
+  - ⛔ **STOP MUST STAY INSTANT.** The whole point of rejecting the quiesce variant is that pressing Stop
+    keeps returning immediately. Any design that makes `cancel()` await a provider request violates this
+    grant even if it records the ID correctly.
+  - ⛔ **ADDITIVE ONLY.** The journal may only ever GAIN an ID it would otherwise have lost. No path may start
+    deleting, truncating or rewriting journal state that it does not touch today.
+  - ⛔ **SCRATCH ONLY** — never the owner's real `pending_batch.json`; drive the real journal writer against a
+    temp fixture (redirectable since `W16.bat2-fu2`). **Must land with a measured regression test** that
+    fails on today's behaviour and passes after, non-vacuity proven on mutants. Tier-2 in full, premise
+    re-confirmed by symbol first.
+  - **Does NOT authorize** `W16.bat7`, `W16.bat6`, or any widening of `cancel()` beyond the append path above.
 - **`W23.h1`, `W23.h2`, `W23.h3`, `W23.h4`, `W23.h5` — the five HIGH findings of the 2026-07-29 Codex full-suite
   review: ALL AUTHORIZED (granted 2026-07-29).** Each would normally be hold-queue (Capture/finalize,
   destructive delete, note-file writes). The owner authorized them **as a set, item by item** — they are the

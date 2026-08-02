@@ -380,8 +380,14 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat5-fu — ⛔ `[hold]` NEEDS THE OWNER. The journal W16.bat5 now keeps still does not list the
-  chunk that was paid for after the snapshot [S · MED · money].** Found by the W16.bat5 adversarial pass
+- [ ] **W16.bat5-fu — ✅ AUTHORIZED by the owner 2026-08-02 (morning-review walkthrough). The journal
+  W16.bat5 now keeps still does not list the chunk that was paid for after the snapshot [S · MED · money].**
+  **Owner chose the FIRST fix direction: let a post-Stop chunk ID still reach the journal** — `cancel()` keeps
+  the journal addressable for append-only chunk recording rather than nilling it outright. He explicitly did
+  NOT choose "wait for submits to quiesce before nilling `activePendingBatch`" (it makes Stop non-instant and
+  a hung provider request would stall the teardown). Constraints in
+  [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md); moved out of the plan's HOLD QUEUE into the WORK QUEUE.
+  Found by the W16.bat5 adversarial pass
   (2026-08-02); **the residual of that item's chosen direction, not a defect in it.** W16.bat5 stops
   `cancel()` deleting the journal when a submission was unfinished, so a mid-submit Stop now leaves a local
   record and a Resume banner where it used to leave nothing. But the record is still **short**: the chunk
@@ -397,15 +403,19 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   append-only chunk recording instead of nilling it outright, or the callback writes a "created after
   cancellation" ID list straight to disk. ⚠️ Both touch `cancel()` semantics, which is exactly why this is
   not something to fold in quietly. Do NOT fold into `W16.bat7` — different sites, different trigger.
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | med | owner
-- [ ] **W16.bat7 — ⛔ `[hold]` NEEDS THE OWNER. Four exits in `pollBatchUntilComplete` return a
-  "poll completed" flag they never set, and the caller then DELETES the paid batch's journal
-  [S · MED · money · defence-in-depth].** Found by the W16.bat3-fu adversarial pass (2026-08-02);
-  **pre-existing**, and covered by NO grant the owner has given — bat3 was the two cancellation guards, bat5
-  the in-flight submit, bat6 the warning's ordering. Kept owner-gated in the plan's **HOLD QUEUE** on
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | med | **AUTHORIZED 2026-08-02**
+- [ ] **W16.bat7 — ✅ AUTHORIZED by the owner 2026-08-02 (morning-review walkthrough). Four exits in
+  `pollBatchUntilComplete` return a "poll completed" flag they never set, and the caller then DELETES the
+  paid batch's journal [S · MED · money · defence-in-depth].** **Owner authorized fixing ALL FOUR exits**,
+  having been shown the option of fixing only `handleOCRResult`'s bounds guard (the single concretely
+  reachable trigger) and declined it — leaving three exits safe-only-by-upstream is the exact coupling that
+  broke in bat3-fu. Constraints in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md); moved out of the
+  plan's HOLD QUEUE into the WORK QUEUE.
+  Found by the W16.bat3-fu adversarial pass (2026-08-02);
+  **pre-existing**, and covered by NO grant the owner had given at the time — bat3 was the two cancellation
+  guards, bat5 the in-flight submit, bat6 the warning's ordering. It was owner-gated on
   precedent rather than on the letter of the STEP-2.0 rule: at MED it is not automatically hold-queue, but
-  every change to what this path deletes has been granted item by item, and one sentence from the owner
-  releases it. `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`)
+  every change to what this path deletes had been granted item by item. `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`)
   and four of its exits then `return` without touching it again: `guard await processBatchResults(…)
   else { return }` in the Anthropic (`:766`) and Mistral (`:789`) arms; the `materialized` half of
   `guard materialized, markBatchChunkConsumed(…) else { return }` in the Gemini arm (`:875`); and
@@ -430,7 +440,7 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   (owner's call): set `batchPollInterrupted = true` at all four before returning — deletion-reducing, every
   reader treats `true` as keep. Forcing a real write failure to drive it needs a seam that does not exist
   yet, so budget for extracting one. ⚠️ Do NOT fold into W16.bat5 — different sites, different trigger.
-  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | owner
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | **AUTHORIZED 2026-08-02**
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
@@ -643,7 +653,9 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     own label carries no `accessibilityIdentifier`; (2) **Notes has no in-GUI rename path for an item title**
     — `renameFolder`/`renameTemplate` exist, but no `renameItem`; the list's title cell is a read-only
     `NSTextField` and the metadata inspector edits only date/quality — so the check's stated trigger cannot
-    be performed at all. Options, cheapest first: (a) a DEBUG `testBox` seam reporting each chip's resolved
+    be performed at all. ⚠️ **Blocker (2) is now separately queued as `W22.notes-rename`** (owner called it a
+    gap, 2026-08-02) — if that ships first, the trigger exists and only blocker (1) remains, so re-read this
+    entry before picking an option below. Options, cheapest first: (a) a DEBUG `testBox` seam reporting each chip's resolved
     label + `passageSourceMissing` state, read from the text storage where the chips are re-styled — proves
     the reactive `itemsGeneration` mechanism deterministically, driven by TRASHING a cited note (which G8
     shows is drivable) rather than renaming one; (b) a sighted VNC before/after capture of the chip's pixels;
@@ -835,6 +847,29 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
   clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
   change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
+- [ ] **W21.status-idle — `arm.sh status` reports "nothing it can do" while a session is actively mid-item,
+  and blames the HOLD QUEUE for it [S · LOW · ops].** Filed 2026-08-02 from the morning-review walkthrough,
+  where the headline read *"◐ Running, but not finding anything it can do (2 hours)"* and *"Needs you: 2
+  task(s) are held back for you to decide"* — while a session launched at 08:18 had already committed
+  `d67b9cb` (`W3.cap-r5` checkpoint 1/2) in its worktree and was mid-`Edit` on the trackers. It shipped
+  minutes later as `1f43498`. **Both halves of the headline were wrong**, in two independent ways:
+  (1) *liveness* — the idle clock is driven by `idle.since` + the pushed tip on `main`, so a session that is
+  running and has committed only to its own worktree reads as zero progress; nothing consults `engine.lock`,
+  the running `claude` process, or `git log main..HEAD` in the live `suite-wt-*`. (2) *attribution* — the
+  "Needs you" line pins the idleness on the HOLD QUEUE without asking the resolver, but
+  `next-queue-item.sh` was returning `W3.cap-r5`/`r4`/`r3` and ~20 more as `ok`; the held items were gating
+  nothing. The real cause was six consecutive USAGE-LIMIT fast-fails (rc=1 after 6–8s, backing off
+  180s→1800s), which `daemon.log` names correctly and the headline discards.
+  **Fix direction:** before printing the idle headline, check for a live session (lock + worktree commits
+  ahead of `main`) and say *"working on `<item>` since `<t>`"* instead; and gate the "Needs you → held back"
+  attribution on `next-queue-item.sh` actually returning no `ok` item, otherwise report the backoff reason
+  from `daemon.log`. ⚠️ This is **the mirror image of the known "status says *productive* while every session
+  exits rc=1" bug** — same root shape (the headline summarizes state it does not measure), so fix both
+  directions or the next one lands as a new surprise. **Tier-2 per the autonomous-setup change discipline**
+  (adversarial review + prove-the-mechanism before install), and remember `arm.sh` installs from the PRIMARY
+  checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
+  and the owner re-arms. Read-only reporting change; no daemon behaviour change.
+  | files: ops/autonomous/arm.sh | S | low | none
 - [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
   Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
   warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`
@@ -870,6 +905,33 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   Notes Sources-column pattern). Daemon-buildable ($0/no key); build + the 186 Reader unit tests + a `RenderProbe`
   assertion for the new column. **Live GUI confirm → owner tail** (the fixture XCUITest / sighted loop).
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Views/, Core/ArchiveFile.swift, Search/ContentIndex.swift | S–M | low | none
+
+- [ ] **W22.notes-rename — Archive Notes cannot rename a note from the UI at all [M].** Owner decision
+  2026-08-02 (morning-review walkthrough): **this is a GAP, not a design choice.** He was offered the
+  "titles are derived from the archival source, so renaming is intentionally not offered" reading and
+  rejected it. Verified 2026-08-01 (by `W21.vmgui-c`) and re-verified 2026-08-02: `NotesModel` has
+  `renameTemplate` (`:519`) and `renameFolder` (`:872`), and `OrganizationStore` has another `renameFolder`
+  (`:257`) — **there is no rename for a note.** The list's title cell is a read-only `NSTextField` and the
+  metadata inspector edits only date and quality, so the only way to retitle a note today is to open the file
+  and edit its front matter by hand.
+  **Scope chosen by the owner: the full affordance, not the inspector-only variant** — add `renameNote` to
+  `NotesModel` plus an inline-edit affordance on the list cell, mirroring how folders and templates already
+  rename (so it is an existing interaction pattern, not a new one), rather than only adding a title field to
+  the metadata inspector.
+  ⚠️ **The one thing that needs deciding inside the item: does renaming a note rename its file on disk, or
+  only its front-matter title?** Both are defensible and they diverge on durable links. Resolve it against
+  `SPEC/tag-format.md` + the durable-link machinery in `packages/ArchiveCore` and state the choice in the
+  commit — do NOT leave it implicit. **This is free to get right now and stops being free later:** per the
+  2026-08-01 STANDING PREMISE, Notes holds only test material, so no migration is owed; and the DEVONthink
+  import is ON HOLD precisely so Notes' structure can settle before 7.5 GB lands in it.
+  **Also unblocks `W21.vmgui-c-fu`'s second blocker** — W14.4 (c)'s stated trigger is renaming a note, which
+  is why that check is currently untestable rather than merely un-hittable. It does NOT unblock the first
+  blocker (the chip is an `NSTextAttachmentViewProvider` subview outside the accessibility tree), so
+  `W21.vmgui-c-fu` still needs one of its own three options; note the cross-reference in both.
+  **Tier-2** — it writes to the note's durable identity, and if the file is renamed there is no undo.
+  Scratch copies only, never a real store. GUI confirm goes through the Notes VM lane (green 15/15 as of
+  `7d6bb40`), not the host screen.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift, Index/OrganizationStore.swift, Views/ | M | med | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
