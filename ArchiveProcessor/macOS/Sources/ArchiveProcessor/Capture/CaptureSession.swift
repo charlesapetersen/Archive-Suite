@@ -267,6 +267,18 @@ final class CaptureSession: ObservableObject {
     /// FileRelay offline invariant driver.
     func beginStageSessionForTest() { if processingMode == .undecided { processingMode = .stageForLater } }
 
+    /// Test-only ($0, W3.cap-r2): put the session in `.live` and arm its OWN `liveProcessor` against a
+    /// scratch staging dir, so a headless driver can drive the REAL `ingest` → `photoIngested` path.
+    /// Deliberately NOT `beginLiveSession`: that calls `activate`, whose `pruneLegacyStaging` resolves
+    /// orphans against `backupRoot` — which the test has redirected — and would therefore judge the
+    /// operator's genuine legacy staging dirs orphaned and delete them. Recovery Core Directive: a test
+    /// must not be able to remove real work, so it takes the arming path that touches nothing outside tmp.
+    func _recoveryTestBeginLive(config: SessionProcessingConfig, stagingDir: URL) {
+        self.config = config
+        processingMode = .live
+        liveProcessor._recoveryTestArm(stagingDir: stagingDir, config: config, staged: [])
+    }
+
     /// Test-only: when set, the next `ingest` returns nil (simulating a durable-write failure) so the relay
     /// receiver's "no receipt / no delete / no processed-entry on a nil ingest" invariant can be exercised.
     var testForceIngestFailure = false

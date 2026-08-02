@@ -29,6 +29,9 @@ import ArchiveCore
 ///  10. `finalize` (W3.cap-r6) reclaims the staging directory only when nothing is left staged — a
 ///      straggler segment that finished processing DURING the move keeps the directory (and is reported),
 ///      instead of having its freshly written output trashed along with the batch it missed.
+///  11. A phone auto-retry after a dropped ack (W3.cap-r2) re-ingests the SAME `(groupId, seq)` page and
+///      buys NO second paid OCR call — while the first call's result stays reachable from the replacement
+///      photo, and genuinely distinct pages still get their own call.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -532,6 +535,65 @@ enum LiveCaptureRecoveryTestDriver {
             // path being gone, so it does not depend on this succeeding.
             try? fm.removeItem(at: fm.homeDirectoryForCurrentUser
                 .appendingPathComponent(".Trash/\(goneDir.lastPathComponent)"))
+        }
+
+        // --- Test 14 (W3.cap-r2): a phone auto-retry after a dropped ack must not buy a SECOND paid OCR
+        // call. `CaptureSession.ingest` already de-duplicates a re-upload on `(groupId, seq)` — it REPLACES
+        // the stored photo rather than appending one — but `CapturedPhoto.id` is a fresh `UUID()` per value,
+        // so the processor's "already started" guard, keyed on that id, saw a brand-new page and started OCR
+        // a second time (the first Task orphaned, both calls billed). Driven through the REAL `ingest` path
+        // with a $0 stand-in for the paid call, so what the test counts IS what the operator gets charged. ---
+        if isolatedBackup {
+            let r2Out = tmp.appendingPathComponent("r2out", isDirectory: true)
+            let r2Staging = tmp.appendingPathComponent("APStaging-r2-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: r2Staging, withIntermediateDirectories: true)
+            let r2Session = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            r2Session._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: r2Out, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: r2Staging)
+            let jpeg = Data("synthetic page bytes".utf8)
+            func send(_ gid: String, _ seq: Int) -> Bool {
+                r2Session.ingest(jpeg: jpeg, groupId: gid, seq: seq, type: .document,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone") != nil
+            }
+            func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+
+            let firstAccepted = send("G1", 1)
+            check("the page's first upload is accepted (so the retry checks aren't passing on nothing)",
+                  firstAccepted)
+            check("...and it starts exactly one paid OCR call", paidStarts() == 1)
+
+            let retryAccepted = send("G1", 1)   // THE BUG: the phone's auto-retry after a dropped ack
+            check("the dropped-ack retry is accepted too (a real second trip through ingest)", retryAccepted)
+            check("a re-upload of the SAME (groupId, seq) buys NO second paid OCR call", paidStarts() == 1)
+            check("...and the session still holds exactly one photo for that page", r2Session.photos.count == 1)
+            // Counting starts alone cannot catch a fix that de-duplicates but files the surviving Task under
+            // a key nothing reads: ask the REPLACEMENT photo for its result, the way finalize asks. Without
+            // this the page would finalize as "OCR not started" and be filed image-only.
+            let replaced = r2Session.photos.first
+            let carried = replaced == nil ? nil
+                : await r2Session.liveProcessor._recoveryTestPageOCRText(for: replaced!)
+            check("...and finalize still reaches the FIRST call's result through the replacement photo",
+                  carried == "stub page text")
+
+            // The guard must not over-dedup — `(groupId, seq)` has to keep genuinely distinct pages distinct.
+            check("a genuinely new page in the same group still starts its own OCR",
+                  send("G1", 2) && paidStarts() == 2)
+            check("a page in a different group still starts its own OCR",
+                  send("G2", 3) && paidStarts() == 3)
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

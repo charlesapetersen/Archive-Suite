@@ -102,8 +102,21 @@ final class LiveCaptureProcessor: ObservableObject {
     private var config: SessionProcessingConfig?
     private var stagingDir: URL?
 
-    private var pageTasks: [UUID: Task<OCRResult, Never>] = [:]
-    private var startedPhotoIds: Set<UUID> = []
+    /// Stable identity of a captured PAGE, and the key for everything that must be started exactly once
+    /// per page. **Not** `CapturedPhoto.id` (W3.cap-r2): that is a fresh `UUID()` minted in the initializer,
+    /// so the idempotent re-upload path — `CaptureSession.ingest` REPLACES a same-`(groupId, seq)` photo
+    /// with a new value on a phone auto-retry after a dropped ack — hands us a different `id` for the very
+    /// same page, and the "already started" guard let it through into a SECOND paid OCR call (with the
+    /// first Task orphaned). `(groupId, seq)` is the identity the phone assigns and the identity `ingest`
+    /// itself de-duplicates on, so keying here on it makes the guard mean what it says.
+    struct PageKey: Hashable {
+        let groupId: String
+        let seq: Int
+        init(_ photo: CapturedPhoto) { groupId = photo.groupId; seq = photo.seq }
+    }
+
+    private var pageTasks: [PageKey: Task<OCRResult, Never>] = [:]
+    private var startedPages: Set<PageKey> = []
     private var finalizedGroups: Set<String> = []
     /// Bumped by `clearSessionState()`. A `finalizeSegment` that SUSPENDED at an `await` before the operator
     /// hit Clear captures this at its start and re-checks it after each await; if it changed, the session was
@@ -275,7 +288,7 @@ final class LiveCaptureProcessor: ObservableObject {
             failedGroupIds.remove(gid)
             staged.removeAll { $0.groupId == gid }
             retained[gid] = nil
-            for p in group.photos { startedPhotoIds.remove(p.id); pageTasks[p.id] = nil }
+            for p in group.photos { let k = PageKey(p); startedPages.remove(k); pageTasks[k] = nil }
             groupOCROverride[gid] = override    // nil clears any prior override
             setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
             setPhase(gid, .ocr)
@@ -314,8 +327,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// A photo landed. Start its OCR immediately (max overlap). Box/Folder markers (single image,
     /// no tag card) also finalize right away.
     func photoIngested(_ photo: CapturedPhoto) {
+        let key = PageKey(photo)
         guard session.processingMode == .live, let config,
-              !startedPhotoIds.contains(photo.id) else { return }   // not live / dup / resume → silent
+              !startedPages.contains(key) else { return }   // not live / dup / resume → silent
         if finalizedGroups.contains(photo.groupId) {
             // A page arrived for a document already finalized on the Mac — e.g. the operator kept shooting the
             // SAME document after it was force-completed at Finish, instead of starting a new segment. It can't
@@ -323,7 +337,7 @@ final class LiveCaptureProcessor: ObservableObject {
             session.statusMessage = "A late page arrived for an already-finished document — kept in the Backup Folder, not this collection. Tap Box or End segment to start a NEW segment."
             return
         }
-        startedPhotoIds.insert(photo.id)
+        startedPages.insert(key)
 
         // New capture arrived while a Finish is pending: treat it as another segment to include — the
         // pending finish KEEPS waiting and will complete once this segment is tagged + processed too (it's
@@ -347,16 +361,23 @@ final class LiveCaptureProcessor: ObservableObject {
         // A per-item "retry with model" override (if any) re-OCRs this group with the chosen provider/model
         // via a direct API call (no gateway); otherwise use the session's locked config.
         let ov = groupOCROverride[photo.groupId]
-        pageTasks[photo.id] = Self.ocrTask(
-            imageURL: photo.url,
-            provider: ov?.provider ?? config.provider,
-            model: ov?.model ?? config.model,
-            thinkingLevel: ov.map { $0.thinkingLevel } ?? config.thinkingLevel,
-            apiKey: ov?.apiKey ?? config.apiKey,
-            customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
-            imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
-            localAgent: ov == nil ? config.localAgent : nil,
-            rotationMode: config.rotationMode, standardImageMB: config.standardImageMB)
+        if let stub = Self._recoveryTestOCRStub {
+            // $0 recovery driver ONLY (never set in production): stand in for the PAID call and record the
+            // start, so W3.cap-r2's dedup can be proven on the real ingest path without buying an OCR.
+            Self._recoveryTestOCRStarts.append(key)
+            pageTasks[key] = Task { stub }
+        } else {
+            pageTasks[key] = Self.ocrTask(
+                imageURL: photo.url,
+                provider: ov?.provider ?? config.provider,
+                model: ov?.model ?? config.model,
+                thinkingLevel: ov.map { $0.thinkingLevel } ?? config.thinkingLevel,
+                apiKey: ov?.apiKey ?? config.apiKey,
+                customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
+                imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
+                localAgent: ov == nil ? config.localAgent : nil,
+                rotationMode: config.rotationMode, standardImageMB: config.standardImageMB)
+        }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
         upsertStatus(groupId: photo.groupId, type: photo.type, pageCount: pageCount,
@@ -432,7 +453,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var texts: [String] = []
         let rotationOverride = groupOCROverride[groupId]?.rotation
         for photo in group.photos {
-            var r = await pageTasks[photo.id]?.value
+            var r = await pageTasks[PageKey(photo)]?.value
                 ?? OCRResult(text: nil, classification: nil, errorMessage: "OCR not started", errorCode: nil)
             if let rot = rotationOverride {
                 r = OCRResult(text: r.text, classification: r.classification,
@@ -505,7 +526,7 @@ final class LiveCaptureProcessor: ObservableObject {
             exportedImageMB: exportedImageMB, textColumns: textColumns,
             stampUnread: stampUnread)
         persistManifest()
-        for p in group.photos { pageTasks[p.id] = nil }   // free memory
+        for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
         // A1 — discriminated failure taxonomy (labeling ONLY; the data-safety gate is unchanged). The
         // `outcome` (pdfURLs / pagesComplete) already fed the StagedSegment above, and finalize/deletion
         // keys off `executePlans`' filedGroupIds + `pagesComplete`, NEVER off `failedGroupIds`. So splitting
@@ -1102,7 +1123,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 // Everything landed and nothing arrived behind it → staging holds nothing recoverable.
                 // Trash it and reset the session.
                 CaptureSession.trashOrRemove(stagingDir)
-                self.startedPhotoIds.removeAll()
+                self.startedPages.removeAll()
                 self.rotationReviewPages.removeAll()
                 self.currentCollectionKey = "__unfiled__"
                 self.finalizeSummary = outcome.summary
@@ -1177,7 +1198,7 @@ final class LiveCaptureProcessor: ObservableObject {
         staged.removeAll()
         failedGroupIds.removeAll()
         finalizedGroups.removeAll()
-        startedPhotoIds.removeAll()
+        startedPages.removeAll()
         retained.removeAll()
         groupCollectionKey.removeAll()
         groupOCROverride.removeAll()
@@ -1397,6 +1418,24 @@ final class LiveCaptureProcessor: ObservableObject {
     /// a driver can inject one into the window between `finalize` snapshotting `plans` and the move
     /// finishing — the interleaving that produced the bug.
     func _recoveryTestAppendStaged(_ seg: StagedSegment) { staged.append(seg) }
+
+    /// Test-only ($0, W3.cap-r2): when set, `photoIngested` starts THIS canned result instead of a paid
+    /// OCR call, and appends the page it started to `_recoveryTestOCRStarts`. The dedup guard's whole claim
+    /// is that a re-upload does not spend money, so a test that let the real call through would have to
+    /// spend it to find out; this is the seam that lets the driver count PAID starts for $0. Nil in
+    /// production — only the recovery driver ever assigns it, and it clears it again when done.
+    static var _recoveryTestOCRStub: OCRResult?
+    /// Test-only (W3.cap-r2): every page `photoIngested` started an OCR for while the stub was installed,
+    /// in order. One entry per paid call the operator would have been billed for.
+    static var _recoveryTestOCRStarts: [PageKey] = []
+
+    /// Test-only ($0, W3.cap-r2): the OCR result `finalizeSegment` would await for this page, looked up the
+    /// way finalize looks it up (`pageTasks[PageKey(photo)]`). Counting starts alone cannot catch a fix that
+    /// de-duplicates correctly but files the surviving Task under a key nobody reads: this asks the
+    /// REPLACEMENT `CapturedPhoto` the re-upload minted for its page's result and gets the first call's.
+    func _recoveryTestPageOCRText(for photo: CapturedPhoto) async -> String? {
+        await pageTasks[PageKey(photo)]?.value.text
+    }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
     /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as
