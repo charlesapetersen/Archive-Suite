@@ -679,10 +679,7 @@ extension OCRProcessor {
         )
 
         // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
-        if !batchPollInterrupted {
-            Self.deletePendingBatch()
-            activePendingBatch = nil
-        }
+        retirePaidBatchJournalIfPollCompleted()
         activeBatch = nil
         progress = 0.7
     }
@@ -709,7 +706,11 @@ extension OCRProcessor {
         var emptyChunkIds: Set<String> = []
         let maxPolls = 1500   // safety backstop (~24h at these intervals) so a stuck/unknown state can't poll forever
         while !batchComplete {
-            guard !Task.isCancelled else { return }
+            // Stop was pressed. The server-side job is PAID and may still be running, so this exit must
+            // report itself INTERRUPTED like every other one: both callers decide the fate of the recovery
+            // journal — the only local record of that job — from `batchPollInterrupted`, and a silent
+            // `return` here had them delete it while `cancel()` told the operator it was kept (W16.bat3).
+            guard !Task.isCancelled else { batchPollInterrupted = true; return }
             if pollCount >= maxPolls {
                 statusMessage = "Batch timed out after \(pollCount) status checks — it's kept so you can resume it."
                 batchPollInterrupted = true
@@ -721,7 +722,10 @@ extension OCRProcessor {
             try? await Task.sleep(for: interval)
             pollCount += 1
 
-            guard !Task.isCancelled else { return }
+            // The Stop that arrives during the wait, which is where nearly all of them land: `Task.sleep`
+            // returns early on cancellation, so this is the guard a cancelled poll normally leaves through.
+            // Same rule as the one at the top of the loop — the journal survives an interruption (W16.bat3).
+            guard !Task.isCancelled else { batchPollInterrupted = true; return }
 
             do {
                 switch provider {

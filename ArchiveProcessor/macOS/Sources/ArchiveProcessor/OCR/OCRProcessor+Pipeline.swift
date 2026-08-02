@@ -889,6 +889,20 @@ extension OCRProcessor {
         cleanupTempFiles()
         checkForPendingBatch()
     }
+    /// The first run's counterpart: retire a paid batch's recovery journal, and ONLY when the poll ran to
+    /// completion (W16.bat3).
+    ///
+    /// `performBatchOCR` ends here, and this is the *destructive* half of the interruption decision — the
+    /// journal is a live server-side job's only local record, so an interrupted poll must leave it on disk
+    /// for the Resume control to find. Extracted from the inline `if` it used to be purely so that direction
+    /// can be DRIVEN against a real journal file (`BatchPollCancelContract`, section 17) rather than read:
+    /// the surrounding function needs a paid submission to reach, so nothing could call it before.
+    /// Behaviour is unchanged — same condition, same two statements, same order.
+    func retirePaidBatchJournalIfPollCompleted() {
+        guard !batchPollInterrupted else { return }
+        Self.deletePendingBatch()
+        activePendingBatch = nil
+    }
     /// Dismiss a pending batch notification (deletes local state only — server-side batch continues).
     func dismissPendingBatch() {
         Self.deletePendingBatch()

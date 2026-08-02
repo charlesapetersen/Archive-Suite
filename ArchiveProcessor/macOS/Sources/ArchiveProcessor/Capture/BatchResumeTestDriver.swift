@@ -61,6 +61,11 @@ import AppKit
 ///      redirectable (`ARCHIVEPROC_TEST_STATE_ROOT`, honoured only alongside `BATCHRESUME_TEST=1` and only
 ///      as a usable absolute directory), so this runs the real deleter against a real journal file, and
 ///      pins the fail-closed direction against every bad reading of the two variables.
+///  17. **Stop during the POLL** (`BatchPollCancelContract`, W16.bat3): everything above stops at `cancel()`;
+///      this follows the cancellation into the poll unwinding alongside it, which is where the journal was
+///      really being deleted. The poll's two cancellation exits now report themselves interrupted, so the
+///      first run's tail keeps the journal and a whole cancelled `resumeBatch` leaves the real file on disk
+///      with the Resume control rendered. Both guards precede any provider call, so nothing is requested.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -677,6 +682,14 @@ enum BatchResumeTestDriver {
         // every bad reading of the two variables. No network, no keys, no cost. `journalsAreRedirected` was
         // decided at the top of this function, before section 13 pressed anything.
         await BatchJournalPathContract.run(check: check, redirected: journalsAreRedirected)
+
+        // --- 17: what Stop during a paid batch POLL does to the journal (W16.bat3). ---
+        // Sections 13/14/16 all stop at `cancel()`; this one follows the cancellation into the poll that is
+        // unwinding at the same time, which is where the journal was actually being deleted. Drives the real
+        // `pollBatchUntilComplete` and the real `resumeBatch` under a cancelled task — both cancellation
+        // guards sit before any provider call, so no request is made: no network, no keys, no cost. Its last
+        // two checks write a real journal at the shipped path, so they use the same redirect verdict.
+        await BatchPollCancelContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
