@@ -1587,6 +1587,9 @@ Persists the corrected manifest so a crash doesn't revert the fix. (`LiveCapture
 
 ## ✅ FIXED (2026-07-09): data race on `MacOSTagger.stampUnread`  [MEDIUM — concurrency]
 
+*(The property itself was deleted 2026-08-01 by W16.cfg6-fu — don't go looking for the symbol. The entry
+below is the historical record of how it was made safe while it still existed.)*
+
 **Status:** FIXED. `nonisolated(unsafe) static var stampUnread` was written on `@MainActor` (from
 `OCRProcessor.taggingMode.didSet` and `LiveCaptureProcessor.startProcessing`) and read from detached
 OCR tasks in `applyTags`. Under Swift 6 strict concurrency the `nonisolated(unsafe)` annotation suppressed

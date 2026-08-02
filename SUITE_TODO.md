@@ -345,41 +345,26 @@ permanently — do not re-promote LANSEC-5/6/7 (secure transport, companion mirr
 ### #4 process-global processing settings — consolidation, not greenfield
 **Corrected severity: HIGH → MEDIUM-LOW.** The headline scenario (a Process Files run mutating an in-flight
 Live Capture's settings) is **already impossible** — Live Capture reads and writes zero globals. Two things the
-entry claims as missing already exist: `MacOSTagger.stampUnread` is **no longer** `nonisolated(unsafe)` (it's
-`OSAllocatedUnfairLock`-backed since `5b58da8`, so the residual defect is an implicit default at ~13 call sites,
-not a data race), and `PendingRunRuntimeConfig` is **already** the versioned, manifest-persisted,
+entry claims as missing already exist: `MacOSTagger.stampUnread` is **gone** (it stopped being
+`nonisolated(unsafe)` at `5b58da8`, stopped being read by production at W16.cfg4, and was deleted outright by
+W16.cfg6-fu on 2026-08-01 — it was never the data race the entry assumed), and `PendingRunRuntimeConfig` is
+**already** the versioned, manifest-persisted,
 structurally-validated run config the entry asks for. **Owner decision 2026-07-18: extend
 `SessionProcessingConfig` to be the single run config** (it already carries 5 of the 6 values) and have
 `PendingRunRuntimeConfig` wrap it — **do NOT introduce a third type.**
 
-The residual that justifies doing this at all: the env-gated headless test drivers mutate these globals directly
-(`ManifestPersistenceTestDriver` sets `rotationModeForRun`/`standardImageMB`, `MultiPageReOCRTestDriver` sets
-`pdfImageMB`/`textColumns`, `MergeSafetyTestDriver` flips `stampUnread`). If a driver runs — **or its `defer`
-restore is skipped by a crash** — alongside real work, output gets the wrong embedded-image size, wrong column
-count, or a missing/extra `Unread` tag. That is non-zero **precisely because the daemon runs smoke tests
-unattended.** All Tier-2 (file-writing/tag paths); Processor has no unit target, so verify via the headless
-drivers + `scripts/test-smoke.sh` on scratch fixtures.
+The residual that justified doing this at all: the env-gated headless test drivers mutated these globals directly.
+If a driver ran — **or its `defer` restore was skipped by a crash** — alongside real work, output got the wrong
+embedded-image size, wrong column count, or a missing/extra `Unread` tag. That was non-zero **precisely because
+the daemon runs smoke tests unattended.** All Tier-2 (file-writing/tag paths); Processor has no unit target, so
+verify via the headless drivers + `scripts/test-smoke.sh` on scratch fixtures.
 
-✅ **CLOSED 2026-08-01 by W16.cfg6.** The six statics no longer exist, so the driver-leak scenario above is not
-merely unlikely — it is unrepresentable. No driver pokes a run-config global any more. (`MergeSafetyTestDriver`'s
-`stampUnread` flip is a *different* global, `MacOSTagger.stampUnread`, which W16.cfg4 already made an explicit
-per-call parameter at all 13 sites; the remaining flip is a test affordance on a lock-backed property, not a
-`nonisolated(unsafe)` var. The header's mention of `MultiPageReOCRTestDriver` poking `pdfImageMB`/`textColumns`
-went stale at W16.cfg2, which migrated it to injection.) The one item still open in this area is the
-owner-gated concurrent-runs/TSan stress driver at the bottom of this section — it needs live keys or an
-approved stub OCR backend, and is NOT queued.
-- [ ] **W16.cfg6-fu — delete `MacOSTagger.stampUnread` and the `taggingMode.didSet` that arms it [XS · LOW].**
-  Filed by W16.cfg6 (2026-08-01); the follow-up `MacOSTagger.swift:17-27` names in its own doc comment. It is the
-  last ambient tagging global. Nothing in production READS it — W16.cfg4 made `stampUnread:` a required
-  per-call parameter at all 13 `applyTags` sites — but `OCRProcessor.taggingMode`'s `didSet`
-  (`OCRProcessor.swift:54`) still writes it, and three drivers still set/restore it
-  (`MergeSafetyTestDriver:102/123`, `ManifestPersistenceTestDriver:48/219/225`,
-  `ProcessFilesTagWarningTestDriver:55`). Removing it means: drop the property + the `didSet`, then rework
-  those driver assertions the way W16.cfg6 reworked the run-config ones — assert the injected per-call value,
-  not the global's arming. Note `ManifestPersistenceTestDriver`'s B8 check currently exists *only* to prove the
-  arming behaviour, so it needs a new subject or retirement. Not urgent: the property is
-  `OSAllocatedUnfairLock`-backed (`5b58da8`), so this is style/clarity, not a data race.
-  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor.swift, Capture/*TestDriver.swift | XS | low | none
+✅ **FULLY CLOSED 2026-08-01 by W16.cfg6 + W16.cfg6-fu.** The six run-config statics went at cfg6 and the last
+ambient tagging global, `MacOSTagger.stampUnread`, went at cfg6-fu — so the driver-leak scenario above is not
+merely unlikely, it is unrepresentable: **no driver pokes any global**, because none is left to poke. (The
+header's mention of `MultiPageReOCRTestDriver` poking `pdfImageMB`/`textColumns` went stale at W16.cfg2, which
+migrated it to injection.) The one item still open in this area is the owner-gated concurrent-runs/TSan stress
+driver below — it needs live keys or an approved stub OCR backend, and is NOT queued.
 - **Deferred (needs owner sign-off, NOT queued):** the concurrent-runs + Thread-Sanitizer stress driver
   (verification-plan items 1/2/4). It needs either live API keys for a genuine concurrent OCR run or an
   **owner-approved stub OCR backend**, and the mutate-Settings-mid-run steps need GUI. Revisit if the stub

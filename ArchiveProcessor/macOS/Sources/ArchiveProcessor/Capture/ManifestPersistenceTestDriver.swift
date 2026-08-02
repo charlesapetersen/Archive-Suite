@@ -45,41 +45,63 @@ enum ManifestPersistenceTestDriver {
         // (`MacOSTagger.stampUnread`), so there is no shared mutable state left to poke — the old assertion
         // ("activation does not arm the tagging global") had lost its subject entirely.
         //
-        // What it becomes is the ONE channel that still exists. Every last-resort read a Process Files run
-        // makes is `SessionProcessingConfig.runSizing()`, a pure function of UserDefaults, so a live session
-        // could now only reach a later run by PERSISTING its own config. Hand `beginLiveSession` a config
-        // whose every sizing value is deliberately unlike what is on disk (`unlike` picks the far end of
-        // each `Bounds` range), then prove the shared read is identical afterwards. The first conjunct keeps
-        // it honest: it fails if the config ever stops differing, which is what would make the rest vacuous.
-        // Read-only throughout — nothing here writes `UserDefaults.standard`.
+        // What it becomes is the channel that IS still there. A Process Files run holding no snapshot answers
+        // from pure UserDefaults reads — the five sizing values via `runSizing()`, the rotation mode via
+        // `defaultRotationMode()`, and the tagging mode — so a live session could now only reach a later run
+        // by PERSISTING its own config. Hand `beginLiveSession` a config that differs from what is on disk in
+        // every one of those SEVEN values (`unlike` takes the far end of each `Bounds` range, or the other
+        // enum case), then prove each key reads back exactly as before. The two halves are separate checks so
+        // a failure says which one broke, and the first is what stops the second from going quietly vacuous:
+        // it compares the seven per-field, because one struct-level `!=` is satisfied by a single differing
+        // value and would let the other six stop being covered without anything going red.
+        //
+        // Deliberately NOT claimed to be inert: constructing `CaptureSession` mints the two capture-token
+        // defaults when they are absent (`loadOrCreateToken`/`loadOrCreateLANToken`), and `activate` creates
+        // the session's staging dir and prunes orphaned legacy staging. Those are exactly the writes this
+        // check tolerates — none of them is a key a run's sizing/rotation/tagging read touches, which is the
+        // separation being pinned. The read-backs compare the RAW stored strings, so a write that happens to
+        // re-store a value-equal setting still shows up.
         typealias Bounds = SessionProcessingConfig.Bounds
         func unlike<T: Equatable>(_ onDisk: T, _ a: T, _ b: T) -> T { onDisk == a ? b : a }
-        let sharedSizingBefore = SessionProcessingConfig.runSizing()
-        let sharedTaggingBefore = UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw)
+        let b8SizingBefore = SessionProcessingConfig.runSizing()
+        let b8RotationBefore = SessionProcessingConfig.defaultRotationMode()
+        let b8RotationRawBefore = UserDefaults.standard.string(forKey: DefaultsKeys.rotationModeRaw)
+        let b8TaggingRawBefore = UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw)
+        let b8TaggingBefore = TaggingMode(rawValue: b8TaggingRawBefore ?? "") ?? .automatic
         let liveIsolationSession = CaptureSession()
         let liveProvider = LLMProvider.gemini
         let liveConfig = SessionProcessingConfig(
             provider: liveProvider, model: liveProvider.models[0], thinkingLevel: .low, apiKey: "",
-            taggingMode: .automatic, rotationMode: .llmSingle, mergeDocuments: false,
+            taggingMode: unlike(b8TaggingBefore, .automatic, .none),
+            rotationMode: unlike(b8RotationBefore, .llmSingle, .off),
+            mergeDocuments: false,
             outputDirectory: tmp, contextCharCount: 200, sendPreviousImage: false,
             customOCRPrompt: "", imageScale: 1,
-            standardImageMB: unlike(sharedSizingBefore.standardImageMB,
+            standardImageMB: unlike(b8SizingBefore.standardImageMB,
                                     Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
-            ocrWorkerCount: unlike(sharedSizingBefore.ocrWorkerCount,
+            ocrWorkerCount: unlike(b8SizingBefore.ocrWorkerCount,
                                    Bounds.ocrWorkers.lowerBound, Bounds.ocrWorkers.upperBound),
             enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
             outputImageFile: true,
-            pdfImageMB: unlike(sharedSizingBefore.pdfImageMB,
+            pdfImageMB: unlike(b8SizingBefore.pdfImageMB,
                                Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
-            exportedImageMB: unlike(sharedSizingBefore.exportedImageMB,
+            exportedImageMB: unlike(b8SizingBefore.exportedImageMB,
                                     Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),
-            textColumns: unlike(sharedSizingBefore.textColumns,
+            textColumns: unlike(b8SizingBefore.textColumns,
                                 Bounds.textColumns.lowerBound, Bounds.textColumns.upperBound))
+        check("B8: the live config differs from every shared default it could leak into (7/7)",
+              liveConfig.standardImageMB != b8SizingBefore.standardImageMB
+              && liveConfig.ocrWorkerCount != b8SizingBefore.ocrWorkerCount
+              && liveConfig.pdfImageMB != b8SizingBefore.pdfImageMB
+              && liveConfig.exportedImageMB != b8SizingBefore.exportedImageMB
+              && liveConfig.textColumns != b8SizingBefore.textColumns
+              && liveConfig.rotationMode != b8RotationBefore
+              && liveConfig.taggingMode != b8TaggingBefore)
         liveIsolationSession.beginLiveSession(config: liveConfig)
         check("B8: Live Capture activation persists nothing a later Process Files run would read back",
-              liveConfig.runSizing != sharedSizingBefore          // the config genuinely carried other values
-              && SessionProcessingConfig.runSizing() == sharedSizingBefore
-              && UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw) == sharedTaggingBefore)
+              SessionProcessingConfig.runSizing() == b8SizingBefore
+              && UserDefaults.standard.string(forKey: DefaultsKeys.rotationModeRaw) == b8RotationRawBefore
+              && UserDefaults.standard.string(forKey: DefaultsKeys.taggingModeRaw) == b8TaggingRawBefore)
 
         let configDefaultsSuite = "APManifestTest-\(UUID().uuidString)"
         let configDefaults = UserDefaults(suiteName: configDefaultsSuite)!

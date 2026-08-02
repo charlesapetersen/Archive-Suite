@@ -1511,6 +1511,38 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   and the legacy image-scale clamp mismatch, then approved.
   | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
     Capture/{BatchResumeTestDriver,SessionProcessingConfig}.swift, Views/ToolsView.swift | M | med | none
+- [x] **W16.cfg6-fu — `MacOSTagger.stampUnread` and the `taggingMode.didSet` that armed it are deleted
+  [XS · verified].** DONE 2026-08-01 (this commit; checkpoint `5e72f15`). Filed by W16.cfg6. It was the suite's
+  last ambient tagging global. Nothing in production read it — W16.cfg4 had already made `stampUnread:` a
+  required per-call parameter at all 13 `applyTags` sites — so what kept it alive was three test drivers, plus
+  the standing possibility that a driver whose `defer` a crash skipped would leave a stale value behind.
+  `MacOSTagger` now holds no state at all; which semantics a tag write uses is an argument at the call site and
+  nothing else. The drivers now assert the injected per-call value: `MergeSafetyTestDriver`'s two stamping cases
+  were already driven by the processor's own `taggingMode` (`performDocumentMerging` reads
+  `taggingMode.stampsUnread`), so the global assignments beside them were simply redundant;
+  `ProcessFilesTagWarningTestDriver` only saved/restored it. **`ManifestPersistenceTestDriver`'s B8 check had
+  lost its subject entirely** ("activation does not arm the tagging global") and got a NEW one rather than
+  retirement: a run holding no snapshot answers from pure UserDefaults reads, so the only channel by which Live
+  Capture could still reach a later Process Files run is by PERSISTING its config. B8 now hands
+  `beginLiveSession` a config differing from disk in all **seven** such values (five sizing + rotation mode +
+  tagging mode) and proves each key reads back byte-identical — split into two checks so a failure says which
+  half broke, the first comparing per-field precisely because one struct-level `!=` would let six of the seven
+  silently stop being covered. **Verified $0, scratch-only, no network:** manifest-persistence 105 PASS / 0 FAIL,
+  merge-safety 15 PASS / 0 FAIL, tagwarn 74 PASS / 0 FAIL; Debug build clean, no new warnings. **Non-vacuity
+  measured against 4 mutants** (activation persisted the sizing config / the config didn't actually differ from
+  disk / a rotation-mode leak / a tagging-mode leak) — all RED, restored green. **Tier-2 adversarial review
+  found four real defects in the replacement B8 check and all four were fixed before the final commit:** the
+  comment claimed `runSizing()` was the *only* terminal fallback when `defaultRotationMode()` is a sixth (so a
+  future "remember the last live rotation choice" write would have leaked past a green check — the rotation
+  conjunct exists because of this finding); the honesty guard was a struct-level `!=`; `taggingMode` was
+  hardcoded to `.automatic`, the near-certain on-disk value, making its conjunct nearly vacuous; and the comment
+  asserted "read-only throughout — nothing writes `UserDefaults.standard`", which is **false** — constructing
+  `CaptureSession` mints the two capture-token defaults when absent, and `activate` prunes orphaned legacy
+  staging. The comment now says what is true and why those writes are tolerable. Review also confirmed the SPEC
+  citation `Tagging/MacOSTagger.swift` (`stampUnread`) still resolves — `stampUnread` remains the parameter
+  label on both `applyTags` overloads — so **no owner-gated SPEC edit was needed.**
+  | files: Tagging/MacOSTagger.swift, OCR/OCRProcessor.swift,
+    Capture/{ManifestPersistence,MergeSafety,ProcessFiles,ProcessFilesTagWarning}TestDriver.swift | XS | low | none
 - [x] **W16.cfg6-fu3 — the WRITERS of the five sizing settings were unbounded; only the reader saved them
   [S · verified].** DONE 2026-08-01 (this commit; checkpoints `eb8a70d`, `42285f4`). Filed by W16.cfg6-fu2's
   adversarial review. fu2 made every *defaults read* clamp, so nothing out of range could reach a run; this
