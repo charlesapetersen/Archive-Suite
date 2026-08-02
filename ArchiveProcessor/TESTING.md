@@ -294,15 +294,20 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   The journal directory is now redirectable: `OCRProcessor.pendingStateDirectory` honours
   `ARCHIVEPROC_TEST_STATE_ROOT` **only** alongside `BATCHRESUME_TEST=1` and only as a usable absolute
   directory, so this script points it at its own temp dir and section 16 runs the SHIPPED deleter against a
-  real journal file. Two halves: the fail-closed table (9 near-miss flag values × 11 unusable roots must all
-  resolve to the operator's real Application Support path — a mis-read variable here strands a paid batch,
-  it does not merely fail a test), and, behind a guard that makes them refuse to run unless the path really
-  is redirected, the destructive checks — save/read/delete all land in the redirected directory, the default
+  real journal file. Two halves: the fail-closed table (9 near-miss flag values, then 11 unusable override
+  roots — 20 resolutions in two independent loops, not a cross product — must all come back with the
+  operator's real Application Support path, because a mis-read variable here strands a paid batch rather
+  than merely failing a test), and, behind a guard that makes them refuse to run unless the path really is
+  redirected, the destructive checks — save/read/delete all land in the redirected directory, the default
   deleter removes the journal, a confirmed Stop with the real deleter installed removes it, an unconfirmed
-  one keeps it and warns, and no outcome touches `pending_run.json`.
+  one keeps it and warns, and no outcome touches `pending_run.json`. **That guard runs first, from the top
+  of the driver**, not from section 16: the redirect fails closed *silently*, so a harness whose
+  `ARCHIVEPROC_TEST_STATE_ROOT` did not validate has to be caught before section 13 presses Stop 80+ times,
+  not after section 15.
   A side effect worth knowing: those 80 sweep Stops in section 14 now read an empty state directory instead
   of the operator's, so the suite no longer slows down in proportion to a large real interrupted run.
-  No network, no keys, no cost. 256 checks as of 2026-08-01 (16 of them section 15, 15 of them section 16).
+  No network, no keys, no cost. 258 checks as of 2026-08-01 (16 of them section 15, 17 of them section 16 —
+  one of which, the redirect guard, is emitted from the top of the driver rather than from the section).
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

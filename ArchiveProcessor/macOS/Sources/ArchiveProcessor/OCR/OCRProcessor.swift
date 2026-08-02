@@ -262,9 +262,11 @@ class OCRProcessor: ObservableObject {
         OCRProcessor.liveBatchChunkCanceller(for: $0)
     }
     /// How `cancel()` turns the journal it is *allowed* to delete into the act of deleting it.
-    /// Injectable for a blunt reason: the real deleter removes the operator's real `pending_batch.json`
-    /// at a fixed Application Support path, so a check may never run it. The driver replaces the
-    /// *doing* and asserts which journal was *asked for*.
+    /// Injectable so the WIRING can be checked without deleting anything: `BatchCancelWiringContract`
+    /// replaces the *doing* and asserts which journal was *asked for*. The body below is no longer beyond
+    /// reach, though — since W16.bat2-fu2 the journal directory is redirectable under test, and
+    /// `BatchJournalPathContract` (driver section 16) runs this exact closure against a real journal file in
+    /// the harness's own temp directory. Neuter it to `{ }` and that section reddens.
     var makeBatchJournalDeleter: @MainActor (BatchCancellationJournal) -> (@MainActor () -> Void) = {
         journal in
         switch journal {

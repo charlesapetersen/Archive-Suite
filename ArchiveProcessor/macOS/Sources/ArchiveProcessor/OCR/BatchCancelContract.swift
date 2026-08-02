@@ -14,8 +14,9 @@ import Foundation
 /// "kept for recovery" whether or not anything was kept.
 ///
 /// ⚠️ **SCOPE — read before citing this file.** What is pinned here is the RULE, in the seam. It is NOT an
-/// end-to-end guarantee about pressing Stop, and it does not touch the real journal (the stub deletes a
-/// temp fixture; `deletePendingBatch()` is never executed by any check). Two things stay uncovered:
+/// end-to-end guarantee about pressing Stop, and no check in THIS file executes `deletePendingBatch()` —
+/// the stub deletes a temp fixture. (Section 16, `BatchJournalPathContract`, does execute it, deliberately
+/// and against a redirected journal path; that is W16.bat2-fu2, not this file.) Two things stay uncovered:
 ///   * **W16.bat3, open and owner-gated** — the poll's `guard !Task.isCancelled else { return }`
 ///     (`OCRProcessor+OCR.swift:691`, `:703`) returns without setting `batchPollInterrupted`, so
 ///     `performBatchOCR:661-663` deletes the journal regardless of what `cancel()` decided. A green run

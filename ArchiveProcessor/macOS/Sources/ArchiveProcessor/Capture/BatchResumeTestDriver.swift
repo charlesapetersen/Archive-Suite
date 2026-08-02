@@ -64,10 +64,12 @@ import AppKit
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
-/// 12–15 touch no durable manifest at all; section 16 uses the shipped paths deliberately, which is safe
-/// because `scripts/test-batch-resume.sh` redirects them into its own temp directory first and section 16
-/// refuses to run its destructive checks unless that redirect is in force. Either way the user's real
-/// Application Support recovery state is never touched.
+/// 12–15 write no durable manifest at all; section 16 uses the shipped paths deliberately, which is safe
+/// because `scripts/test-batch-resume.sh` redirects them into its own temp directory and
+/// `redirectIsInForce` — checked at the top of `run()`, before section 13 — refuses the destructive checks
+/// otherwise. So no run of this driver reads, writes or deletes either of the user's real recovery
+/// manifests. It does still *create* `<Application Support>/ArchiveProcessor` if it is absent, because
+/// resolving the real path makes the directory as it always has; an empty directory, never a file in it.
 @MainActor
 enum BatchResumeTestDriver {
     private static var didRun = false
@@ -85,6 +87,14 @@ enum BatchResumeTestDriver {
             results.append("\(ok ? "PASS" : "FAIL"): \(name)")
             NSLog("BATCHRESUME \(ok ? "PASS" : "FAIL"): \(name)")
         }
+
+        // FIRST, before any section runs: is the durable-journal directory actually redirected away from the
+        // operator's Application Support state (W16.bat2-fu2)? Sections 13–15 press Stop 80+ times through
+        // the real `cancel()`, and the redirect fails CLOSED and silently — so if `$ARCHIVEPROC_TEST_STATE_ROOT`
+        // did not validate, those sections would be running against the operator's own journals. Section 16
+        // uses this verdict to decide whether its destructive checks may run at all; asking at section 16
+        // would answer the question after everything risky had already happened.
+        let journalsAreRedirected = BatchJournalPathContract.redirectIsInForce(check)
 
         let tmp = fm.temporaryDirectory.appendingPathComponent("APBatchResume-\(UUID().uuidString)", isDirectory: true)
         let inDir = tmp.appendingPathComponent("in", isDirectory: true)
@@ -664,8 +674,9 @@ enum BatchResumeTestDriver {
         // the operator's `pending_batch.json` — was verified by reading it. With the directory redirectable
         // (and gated twice, so production cannot be redirected by accident), this runs the real thing
         // against a real journal in the harness's own temp dir, and pins the fail-closed direction against
-        // every bad reading of the two variables. No network, no keys, no cost.
-        await BatchJournalPathContract.run(check: check)
+        // every bad reading of the two variables. No network, no keys, no cost. `journalsAreRedirected` was
+        // decided at the top of this function, before section 13 pressed anything.
+        await BatchJournalPathContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

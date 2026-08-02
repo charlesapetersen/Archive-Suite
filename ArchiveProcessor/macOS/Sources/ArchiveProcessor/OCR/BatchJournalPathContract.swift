@@ -5,10 +5,11 @@ import Foundation
 ///
 /// Two gaps closed here, one cause. Until the journal directory became redirectable
 /// (`OCRProcessor.pendingStateDirectory`), the default `makeBatchJournalDeleter` body — the one line on the
-/// money path that actually removes `pending_batch.json` — could be verified only by reading it: every check
-/// in `BatchCancelWiringContract` replaces the seam, so mutating that body to `{ }` left all 241 checks
-/// green. And with the path pinned to Application Support, any future un-seamed deletion in the cancel block
-/// would have made *running `test-batch-resume.sh`* the thing that destroyed the operator's live journal.
+/// money path that actually removes `pending_batch.json` — could be verified only by reading it: no check
+/// anywhere ran it (`BatchCancelWiringContract` replaces the seam before every Stop and never invokes the
+/// default it inspects), so mutating that body to `{ }` left all 241 checks green. And with the path pinned
+/// to Application Support, any future un-seamed deletion in the cancel block would have made *running
+/// `test-batch-resume.sh`* the thing that destroyed the operator's live journal.
 ///
 /// So this file is in two halves, and the order matters:
 ///
@@ -20,9 +21,11 @@ import Foundation
 ///     redirected in production, which is exactly the failure worth ruling out.
 ///
 ///  2. **The shipped deleter really deletes** — and only what it is allowed to. Gated behind a hard safety
-///     guard: if the live resolution is NOT redirected away from Application Support, every destructive
-///     check below reports FAIL *without running*, because the alternative is deleting a real paid batch's
-///     only local record to satisfy a test. A skipped run can never read as green.
+///     guard (`redirectIsInForce`, run by the driver before ANY section): if the live resolution is not
+///     redirected away from Application Support, the six destructive checks are skipped and a single FAIL is
+///     emitted in their place, because the alternative is deleting a real paid batch's only local record to
+///     satisfy a test. Nothing asserts a check count, so a refused run reports SOME FAILED — it cannot read
+///     as a shorter green report.
 ///
 /// ⚠️ **SCOPE.** This proves the journal's *location* and the *deleter's* behaviour. It does not prove the
 /// rule that decides when a cancellation is confirmed (`BatchCancelContract`, section 13) or the arguments
@@ -35,13 +38,19 @@ import Foundation
 @MainActor
 enum BatchJournalPathContract {
 
-    static func run(check: (String, Bool) -> Void) async {
+    /// `redirected` is `redirectIsInForce(_:)`'s verdict, taken by the driver BEFORE section 1 rather than
+    /// here. That ordering is the point: sections 13–15 press Stop 80+ times through the real `cancel()`,
+    /// and if the harness's redirect had silently failed to validate they would do it against the operator's
+    /// own state. Learning that at section 16 would be too late to be a safeguard.
+    static func run(check: (String, Bool) -> Void, redirected: Bool) async {
         theResolverFailsClosed(check)
-        // Everything past here writes to, and deletes from, whatever the journal path resolves to. The guard
-        // is what makes that safe, so it decides whether the rest runs at all.
-        guard theLiveResolutionIsRedirected(check) else {
-            check("journal path: the SHIPPED deleter was run against a redirected journal — NOT RUN (refused: "
-                  + "the journal path did not resolve away from Application Support)", false)
+        // Everything past here writes to, and deletes from, whatever the journal path resolves to.
+        guard redirected else {
+            // Six checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
+            // check count, so a refused run reports SOME FAILED rather than a shorter green report.
+            check("journal path: the SHIPPED deleter was run against a redirected journal — NOT RUN, and the "
+                  + "six checks that would have written to the journal path are SKIPPED (refused: the path "
+                  + "did not resolve away from Application Support)", false)
             return
         }
         theWholeJournalPathIsRedirected(check)
@@ -130,16 +139,52 @@ enum BatchJournalPathContract {
         check("journal path: the flag plus a usable absolute root redirects, and to exactly that root",
               OCRProcessor.pendingStateDirectory(testFlag: "1", overrideRoot: usable.path).path == usable.path)
 
-        // The fallback is the operator's real directory, not some other invention, and it exists by the time
-        // it is handed out — the cancel path's banner refresh has always relied on that side effect.
-        check("journal path: the real fallback is <Application Support>/ArchiveProcessor, and it exists",
+        // The fallback is the operator's real directory, not some other invention.
+        check("journal path: the real fallback is <Application Support>/ArchiveProcessor",
               real.lastPathComponent == "ArchiveProcessor"
-              && real.deletingLastPathComponent().lastPathComponent == "Application Support"
-              && FileManager.default.fileExists(atPath: real.path))
+              && real.deletingLastPathComponent().lastPathComponent == "Application Support")
+
+        // The REAL branch, exercised end to end — against a FileManager that answers the Application Support
+        // query with a scratch directory, so the operator's own `~/Library` is never the subject. Asserting
+        // the side effect on the true path would be worthless: the resolutions above already created it, and
+        // it pre-exists on any machine that has launched the app, so a deleted `createDirectory` would stay
+        // green there.
+        let scratchSupport = fm.temporaryDirectory
+            .appendingPathComponent("APJournalPath-appsupport-\(UUID().uuidString)", isDirectory: true)
+        let expectedScratchState = scratchSupport.appendingPathComponent("ArchiveProcessor", isDirectory: true)
+        let scratchAbsentBefore = !fm.fileExists(atPath: expectedScratchState.path)
+        let resolvedOnScratch = OCRProcessor.pendingStateDirectory(
+            testFlag: nil, overrideRoot: nil, fileManager: ScratchApplicationSupport(root: scratchSupport))
+        var scratchIsDirectory: ObjCBool = false
+        let scratchCreated = fm.fileExists(atPath: expectedScratchState.path, isDirectory: &scratchIsDirectory)
+            && scratchIsDirectory.boolValue
+        try? fm.removeItem(at: scratchSupport)
+        check("journal path: the real branch appends ArchiveProcessor to Application Support and CREATES it",
+              scratchAbsentBefore && scratchCreated && resolvedOnScratch.path == expectedScratchState.path)
+
+        // The create-the-directory SIDE EFFECT, proved rather than assumed. Asserting it on the real path is
+        // worthless — 24 resolutions above already created it, and it pre-exists on any machine that has run
+        // the app — so this uses a directory that provably did not exist a line ago. What depends on it is
+        // the `.atomic` write in `savePendingBatch`/`savePendingRun`, which needs somewhere to put its
+        // sibling temp file; drop the `createDirectory` and a crash-safe write becomes a failed one.
+        let virgin = fm.temporaryDirectory
+            .appendingPathComponent("APJournalPath-virgin-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("nested", isDirectory: true)
+        let absentBefore = !fm.fileExists(atPath: virgin.path)
+        let handedOut = OCRProcessor.pendingStateDirectory(testFlag: "1", overrideRoot: virgin.path)
+        var virginIsDirectory: ObjCBool = false
+        let createdOnTheWayOut = fm.fileExists(atPath: virgin.path, isDirectory: &virginIsDirectory)
+            && virginIsDirectory.boolValue
+        try? fm.removeItem(at: virgin.deletingLastPathComponent())
+        check("journal path: the directory is created before the URL is handed out, so an .atomic write has "
+              + "somewhere to put its sibling temp file",
+              absentBefore && createdOnTheWayOut && handedOut.path == virgin.path)
 
         // Two files, one directory — and they must stay two files. A cancellation is allowed to remove the
         // paid-batch journal; removing the interrupted run's manifest with it would discard cached results
-        // that were already paid for.
+        // that were already paid for. A drift tripwire rather than a test: both URLs are built from the same
+        // directory plus a distinct constant, so this restates the implementation on purpose — it reddens if
+        // someone gives the two journals separate roots or collides their names.
         check("journal path: both journals resolve into the same directory, under different names",
               OCRProcessor.pendingBatchURL.deletingLastPathComponent().path
                   == OCRProcessor.pendingRunURL.deletingLastPathComponent().path
@@ -148,18 +193,28 @@ enum BatchJournalPathContract {
               && OCRProcessor.pendingBatchURL.path != OCRProcessor.pendingRunURL.path)
     }
 
-    // MARK: - 2. The safety guard
+    // MARK: - 2. The safety guard — run FIRST, by the driver, not by this file
 
-    /// The precondition for every destructive check below: this process's journal path must resolve
-    /// somewhere that is NOT the operator's Application Support directory. Returns whether it is safe to
-    /// proceed — a red here stops the file rather than trading a real paid batch's journal for a green run.
-    private static func theLiveResolutionIsRedirected(_ check: (String, Bool) -> Void) -> Bool {
-        let real = OCRProcessor.realPendingStateDirectory()
-        let live = OCRProcessor.pendingStateDirectoryFromEnvironment
+    /// The precondition for every destructive check here, and the whole suite's licence to press Stop
+    /// through the real `cancel()`: this process's journal path must resolve somewhere that is NOT the
+    /// operator's Application Support directory. Called from the top of `BatchResumeTestDriver.run()`, so a
+    /// harness whose redirect silently failed to validate is caught before section 13 rather than after 15.
+    ///
+    /// Symlinks are resolved on both sides before comparing. Without that, an override pointing at a symlink
+    /// to the real directory would satisfy a raw string compare and let the destructive checks below delete
+    /// the operator's actual journal — a perverse value, but this comparison is the only thing standing
+    /// between those checks and the money path, so it does not get to be approximate.
+    static func redirectIsInForce(_ check: (String, Bool) -> Void) -> Bool {
+        let real = OCRProcessor.realPendingStateDirectory().resolvingSymlinksInPath().path
+        let live = OCRProcessor.pendingStateDirectoryFromEnvironment.resolvingSymlinksInPath().path
         let requested = ProcessInfo.processInfo
             .environment[OCRProcessor.pendingStateTestRootEnvKey]
-            .map { URL(fileURLWithPath: $0, isDirectory: true).path }
-        let redirected = live.path != real.path && requested != nil && live.path == requested
+            .map { URL(fileURLWithPath: $0, isDirectory: true).resolvingSymlinksInPath().path }
+        // Not merely "different from real": it must be the directory the harness actually asked for, and
+        // that directory must not be the real one under any spelling — including a parent of it, which would
+        // put the journals right back where they started.
+        let redirected = live != real && requested != nil && live == requested
+            && !real.hasPrefix(live + "/")
         check("journal path: this run's journal directory is the harness's own, not Application Support "
               + "(\(redirected ? "redirected" : "NOT redirected — set ARCHIVEPROC_TEST_STATE_ROOT"))",
               redirected)
@@ -292,6 +347,22 @@ enum BatchJournalPathContract {
     }
 
     // MARK: - Fixtures
+
+    /// A `FileManager` that answers the Application Support query with a scratch directory. It is what lets
+    /// the REAL branch of `pendingStateDirectory` — the one the shipped app takes — be checked end to end
+    /// without `~/Library/Application Support` ever being the subject of the assertion.
+    private final class ScratchApplicationSupport: FileManager, @unchecked Sendable {
+        private let root: URL
+        init(root: URL) {
+            self.root = root
+            super.init()
+        }
+        override func urls(for directory: FileManager.SearchPathDirectory,
+                           in domainMask: FileManager.SearchPathDomainMask) -> [URL] {
+            directory == .applicationSupportDirectory
+                ? [root] : super.urls(for: directory, in: domainMask)
+        }
+    }
 
     /// A synthetic model — never sent anywhere, and built by hand so no check depends on `CustomModelStore`.
     private static func model() -> LLMModel {

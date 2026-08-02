@@ -23,10 +23,11 @@ import Foundation
 /// batch is installed: `makeBatchChunkCanceller` (a recording stub — no client, no request) and
 /// `makeBatchJournalDeleter` (records which journal was *asked for*, and deletes a temp fixture instead of the
 /// real `pending_batch.json`). Nothing suspends between those assignments and `cancel()`, so no cancellation
-/// can start with a default seam installed, and the production deleter —
-/// `OCRProcessor.deletePendingBatch()`, which removes the operator's actual paid-batch journal from
-/// Application Support — is executed by no check here. `defaultSeamsAreTheLiveOnes` builds one more processor
-/// to inspect the *defaults*, but never cancels on it and never invokes the deleter it returns.
+/// can start with a default seam installed, and the production deleter — `OCRProcessor.deletePendingBatch()`
+/// — is executed by no check here. (Where it IS executed, on purpose and against a redirected path, is
+/// section 16: `BatchJournalPathContract`.) `defaultSeamsAreTheLiveOnes` builds one more processor to inspect
+/// the *defaults*, but never cancels on it and never invokes the deleter it returns; `theSeamNamesOneJournal`
+/// and `theLiveCancellerIsTheBatchsOwnClient` press no Stop at all.
 ///
 /// ⚠️ **SCOPE — read before citing this file.** What is *not* covered, precisely:
 ///   * This is the wiring, not the rule (that is `BatchCancelContract`) and not the whole Stop path:

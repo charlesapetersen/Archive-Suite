@@ -1856,19 +1856,32 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   batch. No other trigger (no `#if DEBUG`, no bundle sniffing). The function is **pure in its inputs**, which
   is what lets the fail-closed direction be checked by handing it each bad reading directly rather than by
   mutating the environment of a running app.
-  `BatchJournalPathContract` (driver section 16) adds **15 $0 checks** (`test-batch-resume.sh` 241 → 256, ALL
-  PASS): the fail-closed table (9 near-miss flag values × 11 unusable roots), then — behind a guard that makes
-  them REFUSE to run unless the live path really is redirected — save/read/delete all landing in the
-  redirected directory, the DEFAULT deleter removing a real journal file, a confirmed Stop with the real
-  deleter installed removing it, an unconfirmed one keeping it and warning, and no outcome touching
-  `pending_run.json`. Non-vacuity measured with **five mutants**: the shipped gap verbatim (deleter → `{ }`)
-  reddens 2 where it previously reddened 0; a `!= nil` flag gate 1; dropping the absolute-path guard 1; an
-  un-seamed `deletePendingRun()` in `cancel()` 1; a resolver that ignores the override 3, including the
-  refuse-to-run guard. Production behaviour with the flag absent is unchanged, including the
-  create-the-directory side effect the banner refresh relies on; `cancel()`'s semantics are untouched (that
-  is W16.bat3/bat5). Verified the owner's real `~/Library/Application Support/ArchiveProcessor/` holds neither
-  journal and was not written. Side benefit: section 14's 80 sweep Stops now read an empty state directory,
-  so the suite no longer slows in proportion to a large real interrupted run.
+  `BatchJournalPathContract` (driver section 16) adds **17 $0 checks** (`test-batch-resume.sh` 241 → 258, ALL
+  PASS): the fail-closed table (9 near-miss flag values, then 11 unusable override roots — two independent
+  loops, 20 resolutions, not a cross product), then — behind a guard that makes them REFUSE to run unless the
+  live path really is redirected — save/read/delete all landing in the redirected directory, the DEFAULT
+  deleter removing a real journal file, a confirmed Stop with the real deleter installed removing it, an
+  unconfirmed one keeping it and warning, and no outcome touching `pending_run.json`. Non-vacuity measured
+  with **eight mutants**: the shipped gap verbatim (deleter → `{ }`) reddens 2 where it previously reddened 0;
+  a `!= nil` flag gate 1; dropping the absolute-path guard 1; an un-seamed `deletePendingRun()` in `cancel()`
+  1; a resolver that ignores the override 3, including the refuse-to-run guard; a save that writes elsewhere
+  4; dropping the real branch's `createDirectory` 1 and the override branch's 3.
+  **The second reader's findings** (an independent adversarial pass, 17 raised) landed as a follow-up commit
+  and are folded in above: the guard now runs from the TOP of the driver rather than from section 16 (the
+  resolver fails closed *silently*, so a harness whose override did not validate would have pressed Stop 80+
+  times against the operator's own state before section 16 noticed) and logs a loud warning when an override
+  is requested and rejected; the guard resolves symlinks and rejects a parent of the real directory; the
+  create-the-directory side effect is now proved on BOTH branches against scratch roots (a `FileManager`
+  subclass answers the Application Support query, so the real branch is exercised end to end without
+  `~/Library` being the subject) instead of asserted as a state that was already true; and six stale or wrong
+  doc claims were corrected, including the `makeBatchJournalDeleter` doc still saying "a check may never run
+  it" and the "banner refresh relies on it" justification for the directory — it is the `.atomic` write that
+  needs the directory, not the refresh, which reads through `Data(contentsOf:)`.
+  `cancel()`'s semantics are untouched (that is W16.bat3/bat5). Verified the owner's real
+  `~/Library/Application Support/ArchiveProcessor/` holds neither journal and was not written at any point,
+  including during the eight mutant runs. Side benefit: section 14's 80 sweep Stops now read an empty state
+  directory, so the suite no longer slows in proportion to a large real interrupted run — which also made one
+  check in section 15 reliably vacuous, filed as **W16.bat4-fu**.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchJournalPathContract.swift, OCR/BatchCancelWiringContract.swift, OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift, scripts/test-batch-resume.sh | S | high | none
 - [x] **W16.bat2-fu3 — fold in the three wiring checks a killed session's draft had and the shipped one
   does not [XS · LOW].** DONE 2026-08-01, this commit. Not a defect — a coverage delta found while cleaning up. The

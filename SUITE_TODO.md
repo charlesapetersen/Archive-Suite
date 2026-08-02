@@ -380,6 +380,17 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
+- [ ] **W16.bat4-fu — one interrupt-tail banner check went reliably vacuous when the journal path became
+  redirectable [XS · LOW].** From the W16.bat2-fu2 adversarial review. `BatchInterruptTailContract`'s
+  "the recomputed banners are what `checkForPendingBatch()` alone produces" (`:238-249`) compares a tailed
+  processor's two banners against a fresh one's. Both now read the harness's **empty** redirected state
+  directory, so it is permanently `nil == nil && nil == nil`: it still catches a tail that assigns a
+  placeholder of its own, but no longer distinguishes a correctly recomputed banner from an empty one.
+  (It was only ever meaningful when the operator happened to have a manifest on disk — i.e. never on
+  purpose.) The fix is now cheap and was not available before: write a real `pending_batch.json` /
+  `pending_run.json` fixture into the redirected directory first, so both sides have something to find, and
+  assert the banner text matches. Do it in that contract, not by widening section 16. No production change.
+  | files: OCR/BatchInterruptTailContract.swift | XS | low | none
 - [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
   (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
   `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that

@@ -235,9 +235,15 @@ enum BatchInterruptTailContract {
         check("interrupt tail: the run is stopped and the live batch identity is dropped",
               tail.stoppedProcessing && tail.activeBatchCleared && tail.journalStateCleared)
 
-        // The banner is not merely *different* from the sentinel — it is what a fresh read of the operator's
-        // own state says. A tail that assigned some placeholder of its own would clear the sentinel and
-        // still be wrong. Both processors are read back-to-back, so they see the same disk.
+        // The banner is not merely *different* from the sentinel — it is what a fresh read of the durable
+        // state says. A tail that assigned some placeholder of its own would clear the sentinel and still be
+        // wrong. Both processors are read back-to-back, so they see the same disk.
+        //
+        // ⚠️ Honest limit since W16.bat2-fu2: that disk is now the harness's own empty state directory, so
+        // both sides are reliably `nil == nil` and this check no longer distinguishes a correct banner from
+        // an empty one — it only still catches a placeholder. Before the redirect it was meaningful exactly
+        // when the operator happened to have a manifest, i.e. never on purpose. Giving it a journal fixture
+        // to find is now possible and is filed as **W16.bat4-fu**.
         let fresh = OCRProcessor()
         fresh.checkForPendingBatch()
         let tailed = OCRProcessor()

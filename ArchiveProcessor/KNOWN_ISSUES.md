@@ -925,13 +925,20 @@ a usable absolute directory — unset, empty, whitespace, `"0"`, `"true"`, `"1 "
 path naming a file, or one that cannot be created all resolve to the REAL path, because a mis-read variable
 here does not fail a test, it strands a paid batch. There is deliberately no other trigger (no `#if DEBUG`, no
 bundle sniffing), and the function is pure in its inputs so the fail-closed direction is checked by handing it
-each bad reading directly. 15 $0 checks (`BatchJournalPathContract`, driver section 16; `test-batch-resume.sh`
-241 → 256), non-vacuity measured with **five mutants**: neutering the default deleter to `{ }` — the shipped
+each bad reading directly. 17 $0 checks (`BatchJournalPathContract`, driver section 16; `test-batch-resume.sh`
+241 → 258), non-vacuity measured with **eight mutants**: neutering the default deleter to `{ }` — the shipped
 gap verbatim — reddens 2 where it previously reddened none; a `!= nil` flag gate reddens 1; dropping the
-absolute-path guard reddens 1; an un-seamed `deletePendingRun()` in `cancel()` reddens 1; and a resolver that
+absolute-path guard reddens 1; an un-seamed `deletePendingRun()` in `cancel()` reddens 1; a resolver that
 ignores the override reddens 3, including the guard that makes the destructive checks REFUSE to run rather
-than delete a real journal to satisfy a test. Production behaviour with the flag absent is unchanged,
-including the create-the-directory side effect the banner refresh relies on.
+than delete a real journal to satisfy a test; a save that writes elsewhere reddens 4; and dropping either
+branch's `createDirectory` reddens 1 and 3.
+The redirect guard runs from the **top of the driver**, before section 13 — the resolver fails closed
+*silently*, so a harness whose override did not validate would otherwise press Stop 80+ times against the
+operator's own state and only find out at section 16. It also now logs a loud warning when an override is
+requested and rejected. Production behaviour with the flag absent is unchanged, including the
+create-the-directory side effect — which exists for the **`.atomic` write** in
+`savePendingBatch`/`savePendingRun` (it needs somewhere to put its sibling temp file), not for the banner
+refresh, which reads through `Data(contentsOf:)` and is indifferent to a missing directory.
 
 **W16.bat2 — CLOSED 2026-08-01.** The other promoted item: the cancel path's journal-retention rule had no
 regression test either, because it was welded to three live network clients — the only way to verify it was
