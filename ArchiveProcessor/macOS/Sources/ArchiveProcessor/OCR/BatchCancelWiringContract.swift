@@ -33,21 +33,23 @@ import Foundation
 ///     **W16.bat3 is open and owner-gated** — the poll's `guard !Task.isCancelled` returns without setting
 ///     `batchPollInterrupted`, so `performBatchOCR` deletes the journal regardless of what `cancel()`
 ///     decided. A green section here does not make pressing Stop safe end to end.
-///   * **The default deleter's body is the one line no check can run** (running it would delete the
-///     operator's journal). That the default is `{ OCRProcessor.deletePendingBatch() }` is grep-verifiable,
-///     not test-verifiable, until the journal path itself is redirectable under test (W16.bat2-fu2).
+///   * **The default deleter's body is run by no check HERE** — every scenario in this file replaces the
+///     seam. It is no longer unverified, though: since W16.bat2-fu2 the journal directory is redirectable
+///     under test, and `BatchJournalPathContract` (section 16) runs the shipped deleter against a real
+///     journal file in the harness's own temp directory.
 ///   * A confirmed cancellation may delete exactly one durable file, and the seam lets it name only that
 ///     one (`BatchCancellationJournal` has a single case, tripwired below). A future edit that bolts an
-///     *extra*, un-seamed deletion beside it (`deletePendingRun()`, say) is a new defect this file cannot
-///     see — the seam records what was asked for, not everything the block does. Worse, it would make
-///     *running this suite* the thing that deletes a real journal; that is the other half of W16.bat2-fu2.
+///     *extra*, un-seamed deletion beside it (`deletePendingRun()`, say) is a new defect **this file**
+///     cannot see — the seam records what was asked for, not everything the block does. Section 16 is where
+///     that is caught instead: it presses Stop with the real deleter installed and asserts the
+///     interrupted-run manifest is still byte-identical afterwards.
 ///   * The kept-journal warning is proven **assigned**, not **survived**: these scenarios have no live
 ///     `processingTask`, whereas a real Stop also cancels the poll, which can write `statusMessage` after
 ///     the cancellation task did (W16.bat6).
-///   * `cancel()`'s own `checkForPendingBatch()` runs for real. It never deletes either manifest, but it does
-///     read the operator's Application Support state (and `pendingBatchURL` creates that directory) and
-///     recomputes two `@Published` banner strings from it — so the checks below assert only that the refresh
-///     *ran*, never what it found.
+///   * `cancel()`'s own `checkForPendingBatch()` runs for real. It never deletes either manifest, and since
+///     W16.bat2-fu2 it reads the harness's redirected state directory rather than the operator's Application
+///     Support state — but it still recomputes two `@Published` banner strings from whatever is there, so the
+///     checks below assert only that the refresh *ran*, never what it found.
 ///
 /// Run from `BatchResumeTestDriver` (section 14) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -268,8 +270,8 @@ enum BatchCancelWiringContract {
 
     /// Every Stop below replaces both seams, which leaves their defaults — the values the shipped app uses —
     /// covered by nothing. Half of that is checkable here: the default canceller factory must route to the
-    /// live one. The other half is not, and is scoped in the header: running the default *deleter* would
-    /// delete the operator's real journal, so this asks for one and drops it unrun.
+    /// live one. The other half is checked in section 16 instead (`BatchJournalPathContract`), which is
+    /// where the journal path is redirected; this file asks for a deleter and drops it unrun.
     private static func defaultSeamsAreTheLiveOnes(_ check: (String, Bool) -> Void) {
         // A processor that is never cancelled and never has an `activeBatch`, so no cancellation — and hence
         // no deletion — can start on it.
@@ -283,8 +285,8 @@ enum BatchCancelWiringContract {
         check("wiring: a processor's DEFAULT canceller factory is the live one, for every provider",
               defaultsToTheLiveFactory)
         // Deliberately no companion check on the default DELETER: the only way to observe what it does is to
-        // run it, and running it deletes the operator's real `pending_batch.json`. See the header — that gap
-        // closes when the journal path becomes redirectable under test (W16.bat2-fu2), not before.
+        // run it, and this file's whole safety argument is that it never does. That check lives in section
+        // 16 (`BatchJournalPathContract`), which redirects the journal directory first (W16.bat2-fu2).
     }
 
     // MARK: - A Stop the provider did not fully confirm: the journal survives and the operator hears it
@@ -526,11 +528,12 @@ enum BatchCancelWiringContract {
     /// chunk is the one the provider declines.
     ///
     /// Cheap because everything it drives is already stubbed — 80 Stops, no network, no keys, no cent, and
-    /// the only file any of them can delete is that trial's own temp fixture (see `stop`). Not *free*,
-    /// though: each Stop ends in a real `checkForPendingBatch()`, which decodes whatever paid-batch and
-    /// interrupted-run manifests the operator actually has and re-derives their fingerprints. On a machine
-    /// with a large interrupted run that is the sweep's dominant cost, which is why `test-batch-resume.sh`
-    /// waits minutes rather than seconds for the report.
+    /// the only file any of them can delete is that trial's own temp fixture (see `stop`). Each Stop does end
+    /// in a real `checkForPendingBatch()`, which decodes whatever manifests it finds and re-derives their
+    /// fingerprints; before W16.bat2-fu2 those were the operator's own, so a large interrupted run was the
+    /// sweep's dominant cost. `test-batch-resume.sh` now points the state directory at its own temp dir, so
+    /// that read is of an empty directory and the sweep no longer scales with what the operator happens to
+    /// have. Its generous timeout is kept as insurance, not because it is needed.
     private static func sweepEveryShape(_ check: (String, Bool) -> Void) async {
         // A v1 journal must beat the batch's own ID at EVERY shape, so the with-journal arm gives the batch
         // a pair of decoy IDs the journal never acknowledged. No trial may ever attempt one of them —

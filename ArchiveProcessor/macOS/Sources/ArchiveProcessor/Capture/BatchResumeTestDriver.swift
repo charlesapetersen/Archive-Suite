@@ -54,11 +54,20 @@ import AppKit
 ///      directory (including two decoys named like the durable manifests), and leaves the interruption
 ///      message, the run's results and the interrupted-RUN manifest untouched — swept over every start state
 ///      the four interrupted exits can arrive in. Its header scopes what it does not cover (the two call
-///      sites themselves, W16.bat2-fu2).
+///      sites themselves, which need a real paid submission to drive).
+///  16. **Where the journals resolve, and what the SHIPPED deleter does** (`BatchJournalPathContract`,
+///      W16.bat2-fu2): sections 13–15 all replace the deleter seam, so its default body — the line that
+///      actually removes `pending_batch.json` — was verified by reading it. The journal directory is now
+///      redirectable (`ARCHIVEPROC_TEST_STATE_ROOT`, honoured only alongside `BATCHRESUME_TEST=1` and only
+///      as a usable absolute directory), so this runs the real deleter against a real journal file, and
+///      pins the fail-closed direction against every bad reading of the two variables.
 ///
-/// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only —
-/// it operates on explicit temp manifest URLs via the `_testWrite/_testRead` hooks, so it never touches
-/// the user's real Application Support recovery state.
+/// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
+/// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
+/// 12–15 touch no durable manifest at all; section 16 uses the shipped paths deliberately, which is safe
+/// because `scripts/test-batch-resume.sh` redirects them into its own temp directory first and section 16
+/// refuses to run its destructive checks unless that redirect is in force. Either way the user's real
+/// Application Support recovery state is never touched.
 @MainActor
 enum BatchResumeTestDriver {
     private static var didRun = false
@@ -649,6 +658,14 @@ enum BatchResumeTestDriver {
         // conversions and nothing else in the directory, and leaves the interruption message, the run's
         // results and the interrupted-RUN manifest alone. Temp files only: no network, no keys, no cost.
         BatchInterruptTailContract.run(check: check)
+
+        // --- 16: where the journals resolve, and what the SHIPPED deleter does (W16.bat2-fu2). ---
+        // Sections 13–15 all replace the deleter seam, so the default body — the line that actually removes
+        // the operator's `pending_batch.json` — was verified by reading it. With the directory redirectable
+        // (and gated twice, so production cannot be redirected by accident), this runs the real thing
+        // against a real journal in the harness's own temp dir, and pins the fail-closed direction against
+        // every bad reading of the two variables. No network, no keys, no cost.
+        await BatchJournalPathContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

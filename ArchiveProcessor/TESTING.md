@@ -277,8 +277,8 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   single-job provider (Anthropic/Mistral) handed SEVERAL chunks must attempt nothing and keep the journal,
   and a legacy (`lifecycleVersion == nil`) journal must be cancelled by its batch ID, never by its
   non-authoritative stored chunk list.
-  Its header lists what it still does not cover (the default deleter → W16.bat2-fu2; the warning surviving
-  the poll's own messages → W16.bat6) — read it before citing a green section 14.
+  Its header lists what it still does not cover (the warning surviving the poll's own messages → W16.bat6) —
+  read it before citing a green section 14.
   Finally (W16.bat4) the **interrupted-batch TAIL** (`BatchInterruptTailContract`): sections 13/14 are about
   Stop, this one is about a run that ends itself with a paid job possibly still alive. The real
   `finishInterruptedBatchPoll()` — the one tail both paid-batch entry points now run — must recompute the
@@ -287,8 +287,22 @@ neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearl
   (including decoys named from the shipped `pending_batch.json` / `pending_run.json` constants), and leave the
   interruption message, the run's results and the interrupted-RUN manifest untouched — swept over all 24 start
   states the four interrupted exits can arrive in. Its header scopes out the two call sites themselves, which
-  need a real paid submission or the un-redirectable journal path (W16.bat2-fu2) to drive.
-  No network, no keys, no cost. 241 checks as of 2026-08-01 (16 of them section 15).
+  need a real paid submission to drive.
+  And (W16.bat2-fu2) the **journal PATH + the shipped deleter** (`BatchJournalPathContract`, section 16).
+  Sections 13–15 all replace the deleter seam, so the default body — the line that actually removes
+  `pending_batch.json` — was verified by reading it, and neutering it to `{ }` left all 241 checks green.
+  The journal directory is now redirectable: `OCRProcessor.pendingStateDirectory` honours
+  `ARCHIVEPROC_TEST_STATE_ROOT` **only** alongside `BATCHRESUME_TEST=1` and only as a usable absolute
+  directory, so this script points it at its own temp dir and section 16 runs the SHIPPED deleter against a
+  real journal file. Two halves: the fail-closed table (9 near-miss flag values × 11 unusable roots must all
+  resolve to the operator's real Application Support path — a mis-read variable here strands a paid batch,
+  it does not merely fail a test), and, behind a guard that makes them refuse to run unless the path really
+  is redirected, the destructive checks — save/read/delete all land in the redirected directory, the default
+  deleter removes the journal, a confirmed Stop with the real deleter installed removes it, an unconfirmed
+  one keeps it and warns, and no outcome touches `pending_run.json`.
+  A side effect worth knowing: those 80 sweep Stops in section 14 now read an empty state directory instead
+  of the operator's, so the suite no longer slows down in proportion to a large real interrupted run.
+  No network, no keys, no cost. 256 checks as of 2026-08-01 (16 of them section 15, 15 of them section 16).
 - **`test-incremental-skip.sh`** — incremental processing correctly skips already-processed files.
 - **`test-multipage-reocr.sh`** — the multi-page-PDF re-OCR route over synthetic pages.
 - **`test-processing-history.sh`** — cost tracking + the run log.

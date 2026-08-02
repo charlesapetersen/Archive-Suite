@@ -21,22 +21,23 @@ import Foundation
 ///
 /// **How it stays $0 and cannot touch the operator's state.** Nothing here performs a network call, and the
 /// only files any check creates or deletes live under a per-trial temp directory. The one thing that reads
-/// the operator's real state is `checkForPendingBatch()` itself, running for real inside the tail: it decodes
-/// whatever `pending_batch.json` / `pending_run.json` they actually have and recomputes two banner strings
-/// from them. It deletes neither file (see its own comments — a paid server-side batch must never be
-/// stranded), and no check below asserts anything about what it *found*, only that it ran.
+/// durable state is `checkForPendingBatch()` itself, running for real inside the tail: it decodes whatever
+/// `pending_batch.json` / `pending_run.json` it finds and recomputes two banner strings from them. Since
+/// W16.bat2-fu2 that is the harness's redirected state directory rather than the operator's own, and it
+/// deletes neither file in any case (see its own comments — a paid server-side batch must never be
+/// stranded); no check below asserts anything about what it *found*, only that it ran.
 ///
 /// ⚠️ **SCOPE — read before citing this file.**
 ///   * This pins the TAIL, not its two call sites. That the resume path (`resumePendingBatch`) and the
 ///     first-run path (`processFiles`, after `performBatchOCR`) each reach it — the bug W16.bat4 *was* — is
-///     grep-verifiable, not driven here: both entry points require either a real paid submission or a
-///     journal-save failure at the un-redirectable Application Support path (**W16.bat2-fu2**). What makes
-///     them safe meanwhile is structural rather than tested: each site is now a bare
+///     grep-verifiable, not driven here: both entry points require a real paid submission. What makes them
+///     safe meanwhile is structural rather than tested: each site is now a bare
 ///     `finishInterruptedBatchPoll(); return`, so there is no second copy of the tail left to drift.
 ///   * "Deletes no journal" is proved against decoy files named exactly `pending_batch.json` /
 ///     `pending_run.json` in the trial's own directory. That covers a tail that deletes by *name*; a tail
-///     that called `OCRProcessor.deletePendingBatch()` would remove the operator's real journal, which is
-///     the one thing no check may execute. Also W16.bat2-fu2.
+///     that called `OCRProcessor.deletePendingBatch()` would delete the journal at whatever the shipped path
+///     resolves to, which is not something this contract asserts either way. Section 16
+///     (`BatchJournalPathContract`) is where that path, and that deleter, are pinned.
 ///   * The interruption *messages* are the other half of this bug and are not pinned here — this contract
 ///     asserts only that the tail leaves `statusMessage` exactly as its caller set it.
 ///

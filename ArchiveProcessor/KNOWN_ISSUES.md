@@ -907,9 +907,31 @@ The tail deletes no journal and touches no output: a paid server-side job may st
 is the only way back to it. 16 $0 checks (`BatchInterruptTailContract`, driver section 15;
 `scripts/test-batch-resume.sh` 225 → 241), non-vacuity measured with four neuters — dropping
 `checkForPendingBatch()`, which is exactly the shipped bug, reddens five. What it does **not** pin is the two
-call sites themselves: driving either needs a real paid submission or a journal-save failure at the
-un-redirectable Application Support path (**W16.bat2-fu2**). That gap is held closed structurally instead —
-each site is now a bare `finishInterruptedBatchPoll(); return`, with no second copy of the tail to drift.
+call sites themselves: driving either needs a real paid submission. That gap is held closed structurally
+instead — each site is now a bare `finishInterruptedBatchPoll(); return`, with no second copy of the tail to
+drift. (This paragraph also used to cite the un-redirectable Application Support path as a blocker; that half
+is gone — see **W16.bat2-fu2** below.)
+
+**W16.bat2-fu2 — CLOSED 2026-08-01** (`5424054` + this commit). The paid-batch journal's location was
+computed inline in `pendingBatchURL`/`pendingRunURL` and could not be moved, which cost two things at once.
+The **default journal deleter's body** — `{ OCRProcessor.deletePendingBatch() }`, the one line on the money
+path that actually removes `pending_batch.json` — could only be verified by reading it, because every check
+in sections 13–15 replaces that seam and running the real one would have deleted the operator's own journal:
+mutating the body to `{ }` left all 241 checks green. And the reverse hazard: had anyone bolted an *un-seamed*
+deletion into the cancel block, *running `test-batch-resume.sh`* would have destroyed a live journal.
+Both journals now resolve through `OCRProcessor.pendingStateDirectory(testFlag:overrideRoot:)`, which honours
+`ARCHIVEPROC_TEST_STATE_ROOT` **only** when `BATCHRESUME_TEST` reads exactly `"1"` **and** the override names
+a usable absolute directory — unset, empty, whitespace, `"0"`, `"true"`, `"1 "`, relative, `~`-relative, a
+path naming a file, or one that cannot be created all resolve to the REAL path, because a mis-read variable
+here does not fail a test, it strands a paid batch. There is deliberately no other trigger (no `#if DEBUG`, no
+bundle sniffing), and the function is pure in its inputs so the fail-closed direction is checked by handing it
+each bad reading directly. 15 $0 checks (`BatchJournalPathContract`, driver section 16; `test-batch-resume.sh`
+241 → 256), non-vacuity measured with **five mutants**: neutering the default deleter to `{ }` — the shipped
+gap verbatim — reddens 2 where it previously reddened none; a `!= nil` flag gate reddens 1; dropping the
+absolute-path guard reddens 1; an un-seamed `deletePendingRun()` in `cancel()` reddens 1; and a resolver that
+ignores the override reddens 3, including the guard that makes the destructive checks REFUSE to run rather
+than delete a real journal to satisfy a test. Production behaviour with the flag absent is unchanged,
+including the create-the-directory side effect the banner refresh relies on.
 
 **W16.bat2 — CLOSED 2026-08-01.** The other promoted item: the cancel path's journal-retention rule had no
 regression test either, because it was welded to three live network clients — the only way to verify it was

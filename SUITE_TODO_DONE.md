@@ -1840,6 +1840,36 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   the operator's real journal (→ **W16.bat2-fu2**), and the kept-journal warning is proven *assigned*, not
   *survived* (→ **W16.bat6**). Both are written into the file header, not just here.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift, OCR/BatchCancelContract.swift, Capture/BatchResumeTestDriver.swift | S | low | none
+- [x] **W16.bat2-fu2 — make the paid-batch journal path redirectable under test, so the default deleter is
+  provable [S · HIGH].** DONE 2026-08-01 `5424054` (production) + this commit (the contract).
+  ✅ **OWNER-AUTHORIZED 2026-08-01** and sequenced FIRST of the three W16 money-path items, because it is what
+  lets `W16.bat3`/`W16.bat5` be proven against the REAL deleter rather than a stub. Was: two gaps, one cause.
+  (a) Every wiring check replaces `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually
+  removes `pending_batch.json` — was verified by grep, and mutating it to `{ }` kept all 241 checks green.
+  (b) With the path pinned to Application Support, any future un-seamed deletion in the cancel block would
+  have made *running `test-batch-resume.sh` on the owner's machine delete his live journal*.
+  Both journals now resolve through one function, `OCRProcessor.pendingStateDirectory(testFlag:overrideRoot:)`,
+  honouring `ARCHIVEPROC_TEST_STATE_ROOT` **only** when `BATCHRESUME_TEST` reads exactly `"1"` **and** the
+  override names a usable absolute directory. Unset, empty, whitespace, `"0"`, `"true"`, `"1 "`, relative,
+  `~`-relative, a path naming a file, or one that cannot be created all resolve to the REAL path — the
+  binding constraint, kept verbatim, because a mis-read env var here does not fail a test, it strands a paid
+  batch. No other trigger (no `#if DEBUG`, no bundle sniffing). The function is **pure in its inputs**, which
+  is what lets the fail-closed direction be checked by handing it each bad reading directly rather than by
+  mutating the environment of a running app.
+  `BatchJournalPathContract` (driver section 16) adds **15 $0 checks** (`test-batch-resume.sh` 241 → 256, ALL
+  PASS): the fail-closed table (9 near-miss flag values × 11 unusable roots), then — behind a guard that makes
+  them REFUSE to run unless the live path really is redirected — save/read/delete all landing in the
+  redirected directory, the DEFAULT deleter removing a real journal file, a confirmed Stop with the real
+  deleter installed removing it, an unconfirmed one keeping it and warning, and no outcome touching
+  `pending_run.json`. Non-vacuity measured with **five mutants**: the shipped gap verbatim (deleter → `{ }`)
+  reddens 2 where it previously reddened 0; a `!= nil` flag gate 1; dropping the absolute-path guard 1; an
+  un-seamed `deletePendingRun()` in `cancel()` 1; a resolver that ignores the override 3, including the
+  refuse-to-run guard. Production behaviour with the flag absent is unchanged, including the
+  create-the-directory side effect the banner refresh relies on; `cancel()`'s semantics are untouched (that
+  is W16.bat3/bat5). Verified the owner's real `~/Library/Application Support/ArchiveProcessor/` holds neither
+  journal and was not written. Side benefit: section 14's 80 sweep Stops now read an empty state directory,
+  so the suite no longer slows in proportion to a large real interrupted run.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchJournalPathContract.swift, OCR/BatchCancelWiringContract.swift, OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift, scripts/test-batch-resume.sh | S | high | none
 - [x] **W16.bat2-fu3 — fold in the three wiring checks a killed session's draft had and the shipped one
   does not [XS · LOW].** DONE 2026-08-01, this commit. Not a defect — a coverage delta found while cleaning up. The
   session that landed W16.bat2-fu's checkpoint 1/3 (`b4b871f`) was killed holding an untracked draft of

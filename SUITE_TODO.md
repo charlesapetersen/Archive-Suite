@@ -380,25 +380,6 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat2-fu2 — make the paid-batch journal path redirectable under test, so the default deleter is
-  provable** ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED, the
-  `W16.bat2-fu2-owner-ok` gate is ticked, and the owner **sequenced this FIRST of the three W16 money-path
-  items**, ahead of `W16.bat3`/`W16.bat5`, because it is what lets their fixes be proven against the REAL
-  deleter in a temp dir instead of a stub. **Binding constraint (unchanged from the filing): the override is
-  honoured ONLY under `BATCHRESUME_TEST=1` and MUST fail closed to the real path** on unset/empty/malformed —
-  a mis-read env var strands a paid batch. Also required: a check that the fail-closed direction holds, and a
-  check that fails if the default deleter body is neutered to `{ }`. Full grant + constraints in
-  [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Original filing follows. HOLD-QUEUE rationale (historic): the change edits how
-  the operator's REAL `pending_batch.json` path is resolved, on the only code path that spends money. From the
-  W16.bat2-fu adversarial review (rated HIGH). Two gaps, one cause: (a) every wiring check replaces
-  `makeBatchJournalDeleter`, so its DEFAULT — the one line that actually deletes the journal — is verified by
-  grep, not by a test; mutating it to `{ }` keeps all 225 checks green. (b) If anyone ever bolts an un-seamed
-  deletion into the cancel block, *running `test-batch-resume.sh` on the owner's machine would delete his live
-  journal* — the suite becomes the blast radius. Both close if `pendingBatchURL`/`pendingRunURL`
-  (`+Pipeline.swift:536`, `:571`) accept a test-only base-dir override, on the existing
-  `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern. **Hard constraint if this is ever authorized: the override must be
-  honoured ONLY under `BATCHRESUME_TEST=1` and must fail closed to the real path — a mis-read env var here
-  strands a paid batch.** | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelWiringContract.swift | S | high | none
 - [ ] **W16.bat6 — the kept-journal warning can be overwritten by the poll's own status message**
   (blocked-on: W16.bat3-owner-ok) **[S · LOW].** From the W16.bat2-fu adversarial review; pre-existing.
   `cancel()` cancels `processingTask` (`+Pipeline.swift:1670`) and then spawns the cancellation task that

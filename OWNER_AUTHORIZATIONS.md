@@ -90,7 +90,18 @@ its own date. Verbatim as recorded when granted.)*
     malformed/absent JPEG field degrades to PDF-only rather than failing the whole link.
   - This grant covers the LINK FORMAT only. The rest of that feature (raised root, JPEGS index, sticky
     menu-driven switch) is ordinary non-hold-queue work — it needs no grant.
-- **`W16.bat2-fu2` — AUTHORIZED (granted 2026-08-01, morning-review walkthrough), AND SEQUENCED FIRST of the
+- **`W16.bat2-fu2` — ✅ DISCHARGED 2026-08-01** (`5424054` production + the contract commit that follows it;
+  full record in `SUITE_TODO_DONE.md`). Every ⛔ below was met: the override is honoured only under
+  `BATCHRESUME_TEST=1` with a usable absolute root; the fail-closed direction is checked against 9 near-miss
+  flag values × 11 unusable roots; the DEFAULT deleter is run against a real journal file (neutering it to
+  `{ }` now reddens 2 checks where it reddened 0); nothing ran against a real journal, because the
+  destructive checks refuse to run unless the path is provably redirected; and `cancel()`'s semantics were
+  not touched. The grant is retained verbatim below as the record. ⚠️ **Note for `W16.bat3`/`W16.bat5`:** the
+  "the journal path is still not redirectable under test" clause in each of those grants has now been
+  overtaken — it is redirectable, and `test-batch-resume.sh` redirects it. Their ⛔ SCRATCH-ONLY rule is
+  unchanged and still absolute; what has changed is that satisfying it is no longer at odds with driving the
+  real code.
+  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough), AND SEQUENCED FIRST of the
   three W16 money-path items.** Give `pendingBatchURL`/`pendingRunURL` (`+Pipeline.swift:536`, `:571`) a test-only
   base-dir override on the existing `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern, so the DEFAULT
   `makeBatchJournalDeleter` body can be run against a temp directory instead of being grep-verified. Authorized
