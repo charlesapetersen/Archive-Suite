@@ -577,12 +577,12 @@ exists. Retained below only as the historical proposal.
    **same immutable file**, and a reclassify mints a **new** groupId. **No such collision has ever been recorded
    in this project** — so the conflict/reconciliation UI is speculative, and it is the most expensive part of the
    proposal (it needs owner design input precisely because an adoption mistake binds results to the wrong photo).
-2. **A queued fix delivers the stable-identity pillar far more cheaply.** `W3.cap-r2` re-keys
-   `pageTasks`/`startedPhotoIds` (`LiveCaptureProcessor.swift:88-89`) on `(groupId, seq)` instead of the ephemeral
-   `CapturedPhoto.id` (`CaptureModels.swift:23`), which `ingest` re-mints on the replace path
-   (`CaptureSession.swift:516`). That closes the real, **money-costing** bug today — a phone auto-retry after a
-   dropped ack currently bypasses the dedup guard and triggers a **duplicate paid OCR call** — with **no** persisted
-   generation record, **no** manifest migration, and **no** three-app protocol review.
+2. **A cheaper fix delivered the stable-identity pillar — and has now SHIPPED.** `W3.cap-r2` (`96f223b`,
+   2026-08-02) re-keyed `pageTasks` + `startedPages` (was `startedPhotoIds`) on a `PageKey(groupId, seq)`
+   instead of the ephemeral `CapturedPhoto.id` (`CaptureModels.swift:23`), which `ingest` re-mints on the
+   replace path. That closed the real, **money-costing** bug — a phone auto-retry after a dropped ack
+   bypassed the dedup guard and triggered a **duplicate paid OCR call** — with **no** persisted generation
+   record, **no** manifest migration, and **no** three-app protocol review.
 3. **The wire-contract cost is disproportionate.** Companion-persisted photo UUIDs would change the capture
    protocol across macOS + iOS + Android and all four transports (LAN, USB, file relay, Drive), requiring the
    emulator E2E gate and a physical iPhone to verify — for a failure mode that cannot currently occur (#1).
@@ -592,7 +592,8 @@ exists. Retained below only as the historical proposal.
 
 ### What WAS promoted instead (see `SUITE_TODO.md` §"Known-issues work — Wave 17")
 Nothing from this entry directly. Its legitimate residue is covered by **`W3.cap-r2`** (stable `(groupId, seq)`
-keying, already queued) and **`W17.stg1`** (versioning + integrity + fail-closed on the staging manifest). The
+keying — **shipped 2026-08-02 `96f223b`**) and **`W17.stg1`** (versioning + integrity + fail-closed on the
+staging manifest, still open). The
 per-source **content hash** was considered and **deliberately dropped** by owner decision: it is defensible as
 *corruption detection* (truncated write, partial Drive download, an externally edited JPEG) but it is **not**
 same-key collision defense, and the collision it was meant to defend cannot occur (#1). Revisit only if a

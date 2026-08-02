@@ -2881,6 +2881,37 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r2 [MED · money] — ✅ DONE 2026-08-02** (`96f223b` fix+test; this commit, trackers).
+  Premise re-confirmed by reading the path, not the filed line numbers (they had drifted): `CapturedPhoto.id`
+  is `let id = UUID()`, minted per VALUE (`CaptureModels.swift:23`), while `CaptureSession.ingest`'s
+  idempotent-replace path does `photos[existing] = photo` for a matching `(groupId, seq)` — a REPLACEMENT, so
+  a new value, so a new id. `photoIngested`'s `!startedPhotoIds.contains(photo.id)` therefore saw a brand-new
+  page on a phone auto-retry after a dropped ack and started a **second paid OCR call**, orphaning the first
+  Task under a key nothing would read again.
+  **Fix:** one `PageKey(groupId, seq)` keying `pageTasks` + `startedPages` (renamed from `startedPhotoIds`).
+  That pair is not a new convention — it is the identity `ingest` already de-duplicates on AND the identity
+  the JPEG's own filename encodes (`%05d-<groupId>.jpg`), so two byte-distinct pages could never have
+  coexisted under one key anyway; the processor simply stops disagreeing with the session about what "the
+  same page" means. Money direction is strictly REDUCING — the change can only remove a paid call, never add
+  one — and the worst case if it over-matched is reusing an OCR result for the same page, never deleting a
+  file. Three side effects of the guard now catching the retry, all corrections: no more false "a late page
+  arrived for an already-finished document" alarm on a duplicate of a page that IS in that document; a stale
+  Box re-upload no longer resets `currentCollectionKey` (which could misfile later docs); and no redundant
+  second `finalizeSegment` Task for a re-uploaded Box/Folder marker.
+  **Tier-2:** recovery driver Test 14, 8 new $0 checks driven through the REAL `ingest`, with a canned
+  stand-in for the paid call (`_recoveryTestOCRStub`) so what the test counts is what the operator would be
+  billed. It asserts both ingests were genuinely ACCEPTED before asserting the count (no passing on nothing);
+  that the first call's result is still reachable through the REPLACEMENT photo the way `finalizeSegment`
+  reaches it — a fix that de-duplicated but stranded the Task would finalize the page as "OCR not started"
+  and file it image-only; and that distinct pages/groups still each get their own call. **Mutation-verified**
+  on two mutants: putting the ephemeral id back in the key reddens 3 checks, dropping `seq` from it reddens 2.
+  `test-recovery.sh` ALL PASS (68 → 76 checks); manifest-persistence / multipage-reocr / merge-safety /
+  collection-organize ALL PASS; build clean, no new warnings. **The Processor's `scripts/test-smoke.sh` was
+  NOT run** — its de-nesting paths are stale (`W21.smoke`, still open), so it fails before it builds. File
+  safety: the driver arms its session with `_recoveryTestBeginLive`, deliberately NOT `beginLiveSession` →
+  `activate`, whose `pruneLegacyStaging` resolves orphans against `backupRoot` — redirected under test — and
+  would therefore judge the operator's real legacy staging dirs orphaned and delete them; the block stays
+  fail-closed behind the existing `ARCHIVEPROC_TEST_BACKUP_ROOT` check.
 - [x] **W3.cap-r6 [LOW · data-loss] — ✅ DONE 2026-08-02** (`905722d` fix+test; this commit, trackers).
   `finalize()`'s allFiled branch trashed the whole `stagingDir` after the `executePlans` move await. Premise
   re-confirmed by reading the path, not the line number (it had drifted from :996 to :1097): `plans` is
