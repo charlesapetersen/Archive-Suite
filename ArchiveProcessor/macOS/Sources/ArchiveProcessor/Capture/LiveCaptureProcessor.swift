@@ -364,8 +364,11 @@ final class LiveCaptureProcessor: ObservableObject {
         if let stub = Self._recoveryTestOCRStub {
             // $0 recovery driver ONLY (never set in production): stand in for the PAID call and record the
             // start, so W3.cap-r2's dedup can be proven on the real ingest path without buying an OCR.
+            // W3.cap-r5 — the optional gate, captured per page at ingest, lets the driver hold THIS page's
+            // result (and therefore its segment's `finalizeSegment`) suspended while it delivers a Box.
             Self._recoveryTestOCRStarts.append(key)
-            pageTasks[key] = Task { stub }
+            let gate = Self._recoveryTestOCRGate
+            pageTasks[key] = Task<OCRResult, Never> { await gate?(); return stub }
         } else {
             pageTasks[key] = Self.ocrTask(
                 imageURL: photo.url,
@@ -408,9 +411,18 @@ final class LiveCaptureProcessor: ObservableObject {
             boxes.last { $0.order <= docOrder }
         }
 
-        // Back-fill not-yet-finalized groups
+        // Back-fill every group whose staged record hasn't been written yet — the not-yet-finalized ones
+        // and, W3.cap-r5, the IN-FLIGHT one. A group is in flight from the moment `finalizeSegment` inserts
+        // it into `finalizedGroups` until it appends its `StagedSegment`, and in between it suspends for
+        // seconds at the per-page OCR awaits, the LLM tagging call and the off-main file write. Skipping
+        // `finalizedGroups` here was the whole defect: for that whole window the group was invisible to this
+        // loop (already finalized) AND to the staged loop below (not yet staged), so a Box arriving out of
+        // relay order in that window could never re-pin it and the document was filed into the previous
+        // collection. Only an already-STAGED group is skipped now — the loop below owns those, records and
+        // all. `finalizeSegment` re-reads `groupCollectionKey` after its last await, so a correction made
+        // here still lands on the record it is about to write.
         for group in session.groups where group.type != .box {
-            guard !finalizedGroups.contains(group.id) else { continue }
+            guard !staged.contains(where: { $0.groupId == group.id }) else { continue }
             if let box = correctBox(forOrder: group.order) {
                 groupCollectionKey[group.id] = box.id
             }
@@ -444,6 +456,10 @@ final class LiveCaptureProcessor: ObservableObject {
         // advances and each post-await guard bails us out cleanly. No await has happened yet at this point.
         let startedGeneration = clearGeneration
 
+        // W3.cap-r5 — this is the key as it stands BEFORE any await. It is what the write below is handed,
+        // but it is NOT what gets recorded: an out-of-order Box can still correct this group while finalize
+        // is suspended, so the value that reaches `staged`/`retained` is re-read after the last await (see
+        // `filedCollectionKey`). Kept as the fallback for the case where the session was cleared.
         let collectionKey = groupCollectionKey[groupId] ?? (group.type == .box ? group.id : currentCollectionKey)
         setPhase(groupId, .tagging)
 
@@ -498,7 +514,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // session's `_processed/`. (The write is the last unavoidable-before-check step; see the guard below.)
         guard clearGeneration == startedGeneration else { return }
 
-        let outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
+        var outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
             Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
@@ -515,10 +531,22 @@ final class LiveCaptureProcessor: ObservableObject {
         // in `_processed/`; we only decline to re-populate cleared in-memory state.
         guard clearGeneration == startedGeneration else { return }
 
+        // W3.cap-r5 — bind the collection key HERE, not at the pin before the awaits. Every await above
+        // suspends for seconds, and a relay Box that arrives out of capture order during one of them re-pins
+        // this group through `backfillCollections` (which no longer skips a finalized-but-not-yet-staged
+        // group). Re-reading now is both safe and the LAST point a correction can still land: the key is
+        // metadata about WHERE the segment gets filed, never an input to the bytes or the paths —
+        // `writeSegmentFiles` only carries it into the record it returns — and from here to the two
+        // assignments below there is no await for a Box to slip through. Both readers of that record file
+        // off this value: end-of-session collection grouping (`staged[].collectionKey`) and rotation-review
+        // regeneration (`retained[].collectionKey`). Falls back to the pinned value if the map was emptied.
+        let filedCollectionKey = groupCollectionKey[groupId] ?? collectionKey
+        outcome.collectionKey = filedCollectionKey
+
         staged.append(outcome)
         // Retain the write inputs so an end-of-session rotation review can regenerate this segment.
         retained[groupId] = RetainedSegment(
-            groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
+            groupId: groupId, type: gType, collectionKey: filedCollectionKey, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
@@ -1429,6 +1457,15 @@ final class LiveCaptureProcessor: ObservableObject {
     /// in order. One entry per paid call the operator would have been billed for.
     static var _recoveryTestOCRStarts: [PageKey] = []
 
+    /// Test-only ($0, W3.cap-r5): when set, the stub OCR Task awaits this before returning its result, so a
+    /// driver can hold a `finalizeSegment` SUSPENDED at its per-page OCR await and deliver an out-of-order
+    /// relay Box into exactly that window. The misfile only exists inside that window — a group already in
+    /// `finalizedGroups` but not yet in `staged` — so a test that could not enter it could not prove the fix
+    /// (a pure-function test would pass on both the broken and the fixed code). Captured PER PAGE at ingest,
+    /// so the driver arms it for the one page it wants held and clears it again immediately. Nil in
+    /// production — only the recovery driver ever assigns it.
+    static var _recoveryTestOCRGate: (@Sendable () async -> Void)?
+
     /// Test-only ($0, W3.cap-r2): the OCR result `finalizeSegment` would await for this page, looked up the
     /// way finalize looks it up (`pageTasks[PageKey(photo)]`). Counting starts alone cannot catch a fix that
     /// de-duplicates correctly but files the surviving Task under a key nobody reads: this asks the
@@ -1436,6 +1473,13 @@ final class LiveCaptureProcessor: ObservableObject {
     func _recoveryTestPageOCRText(for photo: CapturedPhoto) async -> String? {
         await pageTasks[PageKey(photo)]?.value.text
     }
+
+    /// Test-only ($0, W3.cap-r5): the collection key on this segment's RETAINED write inputs — the second
+    /// copy of the decision, and the one the end-of-session rotation review regenerates from. Asserting only
+    /// the `staged` copy would let a fix that corrects the visible record while leaving `retained` on the
+    /// stale collection pass. `retained` and its element type are private, so the driver asks for the one
+    /// field it must check.
+    func _recoveryTestRetainedCollectionKey(for groupId: String) -> String? { retained[groupId]?.collectionKey }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
     /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as

@@ -44,6 +44,27 @@ enum LiveCaptureRecoveryTestDriver {
         let staged: [LiveCaptureProcessor.StagedSegment]
     }
 
+    /// A one-shot async gate (W3.cap-r5). Installed as the stub OCR's `_recoveryTestOCRGate`, it parks a
+    /// `finalizeSegment` at its per-page await until the driver has delivered the out-of-order Box and calls
+    /// `open()`. The defect lives only in that window, so the test has to *hold* the window open rather than
+    /// hope a sleep lands inside it. Resuming an already-open gate is safe (a late waiter runs immediately),
+    /// so a page ingested after `open()` is never stranded.
+    private final class TestGate: @unchecked Sendable {
+        private let lock = NSLock()
+        private var opened = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+        func wait() async {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                if opened { lock.unlock(); c.resume() } else { waiters.append(c); lock.unlock() }
+            }
+        }
+        func open() {
+            lock.lock(); opened = true; let pending = waiters; waiters = []; lock.unlock()
+            for w in pending { w.resume() }
+        }
+    }
+
     static func runIfRequested() {
         guard !didRun, ProcessInfo.processInfo.environment["LIVECAPTURE_RECOVERYTEST"] == "1" else { return }
         didRun = true
@@ -594,6 +615,93 @@ enum LiveCaptureRecoveryTestDriver {
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
+        }
+
+        // --- Test 15 (W3.cap-r5): an out-of-order relay Box delivered while a document is IN FLIGHT inside
+        // `finalizeSegment` must still re-pin that document's collection. Finalize inserted the group into
+        // `finalizedGroups` and read its collection key into a local BEFORE its OCR / tagging / file-write
+        // awaits, each of which suspends for seconds; `backfillCollections` skipped anything already
+        // finalized and could only repair segments already in `staged`. Between those two states the
+        // document was reachable from neither side, so a Box arriving out of relay order in that window
+        // could never correct it and the pages were filed into the PREVIOUS collection — an irreplaceable
+        // document in a folder nobody would think to look in. Driven through the REAL ingest → finalize path
+        // with the $0 OCR stub held on a gate, so the Box lands inside that exact window and nowhere else. ---
+        if isolatedBackup {
+            let r5Out = tmp.appendingPathComponent("r5out", isDirectory: true)
+            let r5Staging = tmp.appendingPathComponent("APStaging-r5-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: r5Staging, withIntermediateDirectories: true)
+            let r5Session = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            r5Session._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human`, not `.automatic`: `computeTags` only reaches the LLM for a DOCUMENT in
+                    // automatic mode, and a box/folder short-circuits to a colour tag inside `TagGenerator`.
+                    // So this test finalizes real segments for $0 and never touches the network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: r5Out, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: r5Staging)
+            let r5Proc = r5Session.liveProcessor
+            let r5Bytes = Data("synthetic page bytes".utf8)
+            func r5Send(_ gid: String, _ seq: Int, _ type: CaptureGroupType) {
+                r5Session.ingest(jpeg: r5Bytes, groupId: gid, seq: seq, type: type,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func r5Settle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func r5Key(_ gid: String) -> String? { r5Proc.staged.first { $0.groupId == gid }?.collectionKey }
+
+            // The gate the in-flight document's OCR result parks on. Holding it is what makes the
+            // interleaving deterministic — a sleep would only *hope* to land inside the window.
+            let r5Gate = TestGate()
+
+            // 1. The first Box, delivered in order: it opens collection "B0".
+            r5Send("B0", 1, .box)
+            _ = await r5Settle { r5Key("B0") != nil }
+
+            // 2. The document (capture seq 3). It was shot after a second Box, but the relay delivers it
+            //    first, so on arrival it is pinned to the only Box the Mac has seen — "B0". Its page OCR is
+            //    held, so the finalize its tag card triggers parks mid-flight.
+            LiveCaptureProcessor._recoveryTestOCRGate = { await r5Gate.wait() }
+            r5Send("D", 3, .document)
+            LiveCaptureProcessor._recoveryTestOCRGate = nil   // hold THAT page only
+            r5Proc.segmentResolved(groupId: "D")
+            let parked = await r5Settle { r5Proc.isFinalized("D") }
+            check("the document is genuinely mid-finalize when the Box lands (finalized, not yet staged)",
+                  parked && r5Key("D") == nil)
+
+            // 3. THE BUG: the out-of-order Box (capture seq 2 — before the document) arrives NOW, inside
+            //    the window. It is the document's correct collection.
+            r5Send("B1", 2, .box)
+
+            // 4. Release the held page and let the segment finish writing itself out.
+            r5Gate.open()
+            let landed = await r5Settle { r5Key("D") != nil }
+            check("the in-flight document finishes staging", landed)
+            check("an out-of-order Box delivered mid-finalize RE-PINS the in-flight document",
+                  r5Key("D") == "B1")
+            check("...and the retained copy the rotation review regenerates from agrees",
+                  r5Proc._recoveryTestRetainedCollectionKey(for: "D") == "B1")
+            check("a Box is still its own collection and is never re-pinned",
+                  r5Key("B0") == "B0" && r5Key("B1") == "B1")
+
+            // 5. The correction is ordered, not "latest wins": a Box captured AFTER the document (seq 4)
+            //    must not steal it away from B1.
+            r5Send("B2", 4, .box)
+            _ = await r5Settle { r5Key("B2") != nil }
+            check("a Box captured AFTER the document does not steal it", r5Key("D") == "B1")
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
