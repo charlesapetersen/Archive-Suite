@@ -1427,6 +1427,38 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
 
+- [x] **W16.bat3-fu2 — after a Stop, the submission-failure message tells the operator the opposite of what
+  happened [S · MED].** DONE 2026-08-02 — `80dc4bd` (code + contract) and this commit (docs). Found by the
+  W16.bat3-fu second read; **pre-existing**. `performBatchOCR`'s catch computed
+  `activePendingBatch?.submittedChunkIds.count ?? 0`, but `cancel()` nils that journal and a Stop mid-submit
+  is precisely how the catch is reached (the chunk callback throws as soon as `recordSubmittedBatchChunk`
+  finds the journal closed) — so it read **0** with server jobs already created and journaled, told the
+  operator *"No server ID was received; the recovery journal was kept"* without looking at the file, and
+  overwrote the `pendingBatchJournalClosedMessage` W16.bat3-fu had just written. Every clause is now a
+  measurement: `paidJobsCreatedThisSubmission` is appended by `recordSubmittedBatchChunk` where a created job
+  is FIRST known (before the ID is validated or journaled — a job with an unusable name is still billed) and
+  `cancel()` cannot reach it; `paidBatchJournalState()` reads the FILE so "kept" is only said about one that
+  is there; jobs created but MISSING from the journal — the one shape Resume cannot reach — are named; and
+  `reportInterruptedPaidBatch` retains its message in `lastPaidBatchInterruptionReport` so the cause leads
+  the summary instead of being replaced by it. The catch body is extracted as
+  `reportInterruptedBatchSubmission()` and the wording as the pure `interruptedSubmissionMessage(...)`, so
+  the exit is drivable without a paid submission. **New `BatchSubmissionMessageContract` (driver section 19,
+  17 checks, $0/no-network)**: the regression itself (post-Stop the old expression reads 0 while the tally
+  reads 1), an unusable ID still counted, no double-counting, the cause retained, the six message shapes, a
+  swept invariant that "the recovery journal was kept" is never said when the file is absent and that the
+  number read is never the journal's, and the whole exit driven against a real (redirected) journal in both
+  directions — kept, and genuinely gone. `test-batch-resume.sh` → **ALL PASS**; clean Debug build, no new
+  warnings. Docs moved with it: `README.md`'s uncertain-outcome section quotes the new wording and explains
+  which follow-on clause means Resume is enough, and the `KNOWN_ISSUES.md` lost-create entry records that its
+  *"stopped after N server jobs"* sibling is no longer unconditionally benign. ⚠️ Scope, honestly: the
+  four-line `catch` itself is still undriven (reaching it needs a real paid submission) — what it now
+  contains is one call to the method section 19 drives end to end. Two siblings deliberately NOT touched:
+  the `batchId`-mismatch guard below the catch cannot be reached with a nil journal (no suspension point
+  between it and `markBatchSubmissionComplete()`), and W16.bat7's four poll exits are a different trigger.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor.swift,
+  OCR/BatchSubmissionMessageContract.swift, Capture/BatchResumeTestDriver.swift, ArchiveProcessor/README.md,
+  ArchiveProcessor/KNOWN_ISSUES.md | S | med | none
+
 - [x] **W16.lan1 — write the LAN threat-model + accepted-risk doc [S].** DONE 2026-07-28 (this commit). Docs
   only, no code. Added a durable **LAN transport security — accepted risk** bullet to `ArchiveProcessor/CLAUDE.md`
   §"Primary Function 3: Live Capture": records the plaintext-HTTP + persistent-token exposure, the

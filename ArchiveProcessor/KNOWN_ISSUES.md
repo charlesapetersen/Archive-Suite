@@ -1058,7 +1058,14 @@ An adoption mistake would also attach results to the wrong local run, so the UI 
 real reconciliation **only if a lost-create event is ever actually observed.** ✅ **The note SHIPPED 2026-08-01**
 with W16.bat1 — `README.md` §"Batch Processing → If a batch submission reports an uncertain outcome": quotes the
 exact in-app message, says do **not** press Resume before checking the provider's own console, links all three
-consoles, and distinguishes this from the benign *"stopped after N server jobs"* message. The reconciliation
+consoles, and distinguishes this from the *"stopped after N server jobs"* message. ⚠️ **That sibling message is
+no longer unconditionally benign, and the README section was rewritten accordingly on 2026-08-02
+(W16.bat3-fu2).** Its N is now the number of jobs the submit loop CREATED — read off a tally `cancel()` cannot
+clear, rather than out of the journal a Stop has just nil'd, which used to make the app report **zero server IDs
+received** on a batch it had already been billed for, and claim the journal was "kept" without looking at the
+file. Whether Resume suffices is now a separate clause of the same sentence: the journal was kept and holds them
+all (benign — press Resume), the journal was kept but K of them are missing from it (those K need the provider
+console, exactly as the uncertain-outcome case above), or no journal is on disk at all. The reconciliation
 itself remains unbuilt, by decision. If it is built, it must preserve
 the per-call idempotency declaration — dropping that silently reopens the FIXED CRITICAL "ambiguous retries could
 duplicate billable requests."

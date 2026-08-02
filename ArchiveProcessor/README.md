@@ -96,7 +96,8 @@ Very rarely, the provider can accept a batch and its reply can be lost on the wa
 connection at exactly the wrong moment). The app never guesses in that situation: it stops, keeps the
 recovery journal, and says
 
-> Batch submission outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying.
+> Batch submission outcome is uncertain. No server job was acknowledged, but a create whose reply was lost
+> may still have been accepted. The recovery journal was kept. Review before retrying.
 
 **Do not just press Resume — check the provider's own console first.** The app cannot list your batches
 on the provider side, so it cannot tell whether that batch exists there; retrying blind is the one way to
@@ -109,8 +110,20 @@ output was written.
 
 Look for a job created in the last few minutes with roughly your page count. If one is there, let it
 finish and resume from it; if there is none, the submission never landed and it is safe to run again.
-(The sibling message *"Batch submission stopped after N server jobs"* is not this case — those N jobs
-**are** acknowledged and Resume picks them up normally.)
+
+The sibling message *"Batch submission stopped after N server jobs had been created"* is the case where
+the app **does** know what it made. Read the sentence that follows it, because it is the one that tells you
+whether Resume is enough:
+
+- *"The recovery journal was kept, so Resume can pick the batch up."* — the benign case. All N jobs are
+  recorded; press Resume.
+- *"…but K server jobs are missing from it, so Resume will not reach them."* — K jobs were created and
+  billed, but the app could not write their IDs down (a Stop pressed mid-submission, or a failed journal
+  write). Resume collects the rest; the K missing ones need the provider console, as above.
+- *"No recovery journal is on disk…"* — the app has no local record at all. Go to the provider console.
+
+The count in that message is always the number of jobs the app **created**, not the number it managed to
+record — it is never quietly rounded down to what survived (W16.bat3-fu2).
 
 #### If a finished chunk comes back with no pages
 

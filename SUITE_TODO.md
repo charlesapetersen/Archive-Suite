@@ -431,22 +431,6 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   reader treats `true` as keep. Forcing a real write failure to drive it needs a seam that does not exist
   yet, so budget for extracting one. ⚠️ Do NOT fold into W16.bat5 — different sites, different trigger.
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | owner
-- [ ] **W16.bat3-fu2 — after a Stop, the submission-failure message tells the operator the opposite of what
-  happened [S · MED].** Found by the W16.bat3-fu second read (2026-08-02); **pre-existing**.
-  `performBatchOCR`'s catch block computes `let acknowledged = activePendingBatch?.submittedChunkIds.count
-  ?? 0` and branches on it. But `cancel()` nils `activePendingBatch`, and a Stop mid-submit is precisely how
-  this catch is reached (the chunk callback throws once `recordSubmittedBatchChunk` fails). So `acknowledged`
-  reads **0** even when server jobs WERE created and journaled, and the operator is told *"Batch submission
-  outcome is uncertain. No server ID was received; the recovery journal was kept. Review before retrying."*
-  — when IDs were in fact received, and when (on a confirmed cancellation) the journal was deleted rather
-  than kept. Both halves of that sentence can be wrong at once, on the only path that spends money, and it
-  is the sentence the operator decides whether to re-submit from. Note this also swallows W16.bat3-fu's new
-  `pendingBatchJournalClosedMessage`, which is assigned just before the throw and overwritten here — the
-  contract asserts the mutator explained itself, which is true at the mutator and not at the operator. Fix
-  direction: count from a value captured BEFORE the cancellation can nil it (the submit loop already knows
-  how many chunks it created), and stop claiming the journal was kept unless it was. No deletion semantics
-  change, so this is not owner-gated.
-  | files: OCR/OCRProcessor+OCR.swift | S | med | none
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
