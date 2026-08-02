@@ -715,6 +715,11 @@ extension OCRProcessor {
         var pollCount = 0
         var consecutiveErrors = 0
         var batchComplete = false
+        // Assigning `false` here is what makes every silent exit below a *decision*, not an omission: the
+        // callers read this one fact to choose between keeping and DELETING the paid batch's recovery
+        // journal, so a `return` that leaves it `false` is this run positively asserting "the poll finished
+        // cleanly". Four of them used to do exactly that while unwinding from a downstream step that could
+        // NOT persist (W16.bat7) — they now all set it, marked `// W16.bat7` at each site.
         batchPollInterrupted = false
         var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
         // How many times a chunk has come back terminal-but-empty, and the chunks already given up on
@@ -757,9 +762,12 @@ extension OCRProcessor {
                         if let url = status.resultsURL {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(resultsURL: url)
+                            // W16.bat7 — `processBatchResults` only says no when a result could not be
+                            // PERSISTED, which leaves paid pages unwritten. Keep the journal.
                             guard await processBatchResults(
                                 results, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
+                                outputDirectory: outputDirectory, runConfig: runConfig)
+                            else { batchPollInterrupted = true; return }
                         } else {
                             statusMessage = "Batch completed but no results available"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -780,9 +788,11 @@ extension OCRProcessor {
                         if status.status == "SUCCESS", let fileId = status.outputFileId {
                             statusMessage = "Retrieving batch results…"
                             let results = try await client.retrieveResults(outputFileId: fileId)
+                            // W16.bat7 — same exit, same reason as the Anthropic arm above.
                             guard await processBatchResults(
                                 results, fileURLs: fileURLs, model: model, apiKey: apiKey,
-                                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
+                                outputDirectory: outputDirectory, runConfig: runConfig)
+                            else { batchPollInterrupted = true; return }
                         } else {
                             statusMessage = "Batch \(status.status.lowercased())"
                             for i in jobs.indices where jobs[i].status == .processing {
@@ -879,7 +889,12 @@ extension OCRProcessor {
                                     let materialized = await processBatchResults(
                                         results, fileURLs: fileURLs, model: model, apiKey: apiKey,
                                         outputDirectory: outputDirectory, runConfig: runConfig)
-                                    guard materialized, markBatchChunkConsumed(singleBatchId) else { return }
+                                    // W16.bat7 — the `markBatchChunkConsumed` half reports itself (its
+                                    // mutator ends in `reportInterruptedPaidBatch`); the `materialized`
+                                    // half did not. Set it here so BOTH halves keep the journal, rather
+                                    // than one of them being safe only because the other happens to run.
+                                    guard materialized, markBatchChunkConsumed(singleBatchId)
+                                    else { batchPollInterrupted = true; return }
                                     consumedChunkIds.insert(singleBatchId)
                                     emptyResultChecks[singleBatchId] = nil
                                 }
@@ -946,9 +961,13 @@ extension OCRProcessor {
                                        : "Could not read the source image (unsupported or corrupt file).",
                 errorCode: readable ? "no_result" : "image_unreadable"
             )
+            // W16.bat7 — the one exit of the four with a concretely reachable silent trigger:
+            // `handleOCRResult`'s own `guard index >= 0 && index < jobs.count`, which reports nothing.
+            // A sweep that could not record its failure outputs has not finished cleanly either.
             guard await handleOCRResult(
                 synthetic, index: i, url: url, model: model,
-                outputDirectory: outputDirectory, runConfig: runConfig) else { return }
+                outputDirectory: outputDirectory, runConfig: runConfig)
+            else { batchPollInterrupted = true; return }
         }
     }
     private func processBatchResults(
