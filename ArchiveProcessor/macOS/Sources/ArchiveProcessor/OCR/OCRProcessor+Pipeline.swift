@@ -213,7 +213,10 @@ extension OCRProcessor {
               config.passSourceTags == (config.taggingMode == .copySource),
               config.imageScale.isFinite, (0.01...1.0).contains(config.imageScale),
               // W16.cfg6-fu3: the same `Bounds` the clamps and the Settings steppers use, so this
-              // fail-closed validator cannot end up stricter or looser than what the app can produce.
+              // fail-closed validator cannot drift *stricter* than what a builder can produce — which is
+              // the direction that would strand a resumable paid run. It can still be looser: the Text
+              // columns control is a 1/2/3 Picker, so a persisted 4 is admitted here (and rendered fine
+              // by `PDFGenerator`) even though no control can produce it.
               config.standardImageMB.isFinite,
               SessionProcessingConfig.Bounds.imageMB.contains(config.standardImageMB),
               SessionProcessingConfig.Bounds.ocrWorkers.contains(config.ocrWorkerCount),

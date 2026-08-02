@@ -200,6 +200,9 @@ enum ManifestPersistenceTestDriver {
         fu3Defaults.set(Double.infinity, forKey: DefaultsKeys.exportedImageSizeMB)
         fu3Defaults.set(100, forKey: DefaultsKeys.ocrWorkerCount)
         fu3Defaults.set(9, forKey: DefaultsKeys.textColumns)
+        // What a run WOULD have used, read BEFORE the writer touches anything. This is the honest
+        // subject of the next check — see the note there.
+        let fu3SizingBeforeNormalizing = SessionProcessingConfig.runSizing(fu3Defaults)
         let normalizedSomething = SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults)
         check("W16.cfg6-fu3: an out-of-range STORED value is rewritten to the value a run would use",
               normalizedSomething
@@ -209,21 +212,49 @@ enum ManifestPersistenceTestDriver {
               && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == 12        // 100 → ceiling
               && fu3Defaults.integer(forKey: DefaultsKeys.textColumns) == 4)           // 9   → ceiling
 
-        // The property the item is actually about — visible == effective. Compares what is now STORED
-        // against what the LIVE builder resolves, so it would fail if the normalizer clamped to its own
-        // idea of the bounds rather than to the reader's.
-        let fu3Live = SessionProcessingConfig.fromDefaults(fu3Defaults)
-        check("W16.cfg6-fu3: the stored numbers and the numbers a run resolves are now the same five",
-              fu3Defaults.double(forKey: DefaultsKeys.standardImageSizeMB) == fu3Live.standardImageMB
-              && fu3Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == fu3Live.pdfImageMB
-              && fu3Defaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == fu3Live.exportedImageMB
-              && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == fu3Live.ocrWorkerCount
-              && fu3Defaults.integer(forKey: DefaultsKeys.textColumns) == fu3Live.textColumns)
+        // The property the item is actually about — visible == effective — stated so it can FAIL.
+        // Comparing the stored values against a fresh `fromDefaults` *after* the write proves almost
+        // nothing: the reader agrees with any in-range number it is handed, so a normalizer that clamped
+        // ∞ to the 20 ceiling instead of the 3.0 fallback would pass it. (Measured, not assumed — that
+        // mutation left the after-the-fact comparison green and only this form caught it.) So the subject
+        // is what a run would have used BEFORE normalizing.
+        check("W16.cfg6-fu3: the writer stores exactly what the pre-normalization read resolved to",
+              fu3Defaults.double(forKey: DefaultsKeys.standardImageSizeMB)
+                  == fu3SizingBeforeNormalizing.standardImageMB
+              && fu3Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB)
+                  == fu3SizingBeforeNormalizing.pdfImageMB
+              && fu3Defaults.double(forKey: DefaultsKeys.exportedImageSizeMB)
+                  == fu3SizingBeforeNormalizing.exportedImageMB
+              && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount)
+                  == fu3SizingBeforeNormalizing.ocrWorkerCount
+              && fu3Defaults.integer(forKey: DefaultsKeys.textColumns)
+                  == fu3SizingBeforeNormalizing.textColumns
+              // …and the live builder still agrees afterwards, so the two halves have not drifted.
+              && SessionProcessingConfig.fromDefaults(fu3Defaults).runSizing
+                  == fu3SizingBeforeNormalizing)
 
         // It runs on every Settings change, so the second pass must be a genuine no-op — otherwise each
         // write re-enters `.onChange` and the field never settles.
         check("W16.cfg6-fu3: a second normalization writes nothing",
               !SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults))
+
+        // Every value the checks above land on is a bound or a fallback — 20 / 0.5 / 3.0 / 12 / 4, all
+        // multiples of 0.5. A normalizer that ROUNDED each size to the nearest 0.5 would satisfy all of
+        // them, idempotency included, while quietly turning an operator's 7.3 MB into 7.5. The writer is
+        // only allowed to touch what is out of range, so pin an in-range, non-boundary, non-round value.
+        fu3Defaults.set(7.3, forKey: DefaultsKeys.standardImageSizeMB)
+        fu3Defaults.set(1.7, forKey: DefaultsKeys.pdfImageSizeMB)
+        fu3Defaults.set(11.9, forKey: DefaultsKeys.exportedImageSizeMB)
+        fu3Defaults.set(6, forKey: DefaultsKeys.ocrWorkerCount)
+        fu3Defaults.set(2, forKey: DefaultsKeys.textColumns)
+        let normalizedInRange = SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults)
+        check("W16.cfg6-fu3: an in-range value is left exactly as the operator set it",
+              !normalizedInRange
+              && fu3Defaults.double(forKey: DefaultsKeys.standardImageSizeMB) == 7.3
+              && fu3Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == 1.7
+              && fu3Defaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == 11.9
+              && fu3Defaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == 6
+              && fu3Defaults.integer(forKey: DefaultsKeys.textColumns) == 2)
 
         // The ETA clamped the worker count LOW only (`max(1, ocrWorkers)`), so a stored 100 quoted a time
         // ~8× optimistic while `schedulingWorkerCount` still ran 12. Pinned against 12 (must match) AND

@@ -94,7 +94,10 @@ struct SessionProcessingConfig: Sendable {
     /// build that reads it back).
     ///
     /// W16.cfg6-fu3 added the writer half, `normalizeSizingDefaults(_:)`: the number an operator can type
-    /// or a profile can apply is now held to `Bounds` too, so what Settings *shows* is what a run *uses*.
+    /// or a profile can apply is held to `Bounds` too, so what Settings shows is now IN RANGE — 500 can no
+    /// longer sit in the field while every run uses 20. Not "shows the exact bytes": the MB fields render
+    /// to one decimal, so a stored 19.96 still *displays* as 20 (measured). That residue is under 0.05 MB
+    /// and deliberately left alone.
     ///
     /// W16.cfg6-fu2 is what made even the narrow claim true. Until then `fromDefaults()` sized `pdfImageMB` and
     /// `exportedImageMB` with its own looser inline closures — no `.isFinite` guard, no 0.5 floor, no 20

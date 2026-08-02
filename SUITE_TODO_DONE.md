@@ -1511,6 +1511,54 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   and the legacy image-scale clamp mismatch, then approved.
   | files: OCR/{OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline}.swift,
     Capture/{BatchResumeTestDriver,SessionProcessingConfig}.swift, Views/ToolsView.swift | M | med | none
+- [x] **W16.cfg6-fu3 — the WRITERS of the five sizing settings were unbounded; only the reader saved them
+  [S · verified].** DONE 2026-08-01 (this commit; checkpoints `eb8a70d`, `42285f4`). Filed by W16.cfg6-fu2's
+  adversarial review. fu2 made every *defaults read* clamp, so nothing out of range could reach a run; this
+  item was the visible-vs-effective divergence left over — typing `500` into an MB field beside its 0.5…20
+  stepper persisted 500 and kept displaying 500 while every run used 20 and the cost pane quoted 500.
+  **`SessionProcessingConfig.Bounds`** is now the one declaration of the three ranges (0.5…20 MB, 1…12
+  workers, 1…4 columns). It replaced **six** literal sites, not the four the checkpoint commit claimed — the
+  adversarial review found two more that the first pass missed, and they were the two that mattered most:
+  `OCRProcessor.schedulingWorkerCount` and `PDFGenerator`'s column clamp, i.e. exactly the downstream pair
+  that would keep running 12 workers / 4 columns if the shared bound were ever widened, recreating the
+  divergence this item exists to kill. Both substitutions are value-identical for every `Int`
+  (`min(12, max(1, x))` ≡ `clampOCRWorkers(x)`; `max(1, min(x, 4))` ≡ `clampTextColumns(x)`), so no behaviour
+  moved. The fail-closed resume validator `pendingRunRuntimeConfigIsValid` reads `Bounds` too, with all three
+  `.isFinite` guards intact and in place — verified value-identical, since a stricter validator there would
+  refuse a resumable **paid** batch.
+  **`normalizeSizingDefaults(_:)`** is the writer half: it writes back exactly `runSizing(d)`, so writer and
+  reader cannot disagree about a bound or a fallback. An UNSET key stays unset (`ProcessingProfileStore`
+  reads stored-vs-defaulted), and a key already equal to its normalized value is not rewritten, so it is
+  idempotent. Wired at the four sites the fu2 review named: Settings `.onAppear` + four `.onChange`; the two
+  panes that quote a size to the operator; `TimeEstimator` (now clamps workers at BOTH ends — `max(1, …)`
+  alone let a stored 100 quote an ~8× optimistic ETA while the pipeline ran 12); and
+  `ProcessingProfileStore.apply`, which also gained a `to d: UserDefaults = .standard` parameter so the
+  headless driver exercises it on a scratch suite rather than the real settings.
+  **The design question the item posed is answered, not skipped:** a big number no longer means "keep the
+  original bytes". fu2 already ended that — every read resolves 500 → 20 — so normalizing destroys an intent
+  that had already stopped working, and there is no production material to preserve it for. If a
+  never-re-encode mode is ever wanted it should be an explicit setting, not a magic large number.
+  **Verification:** Debug build clean, 0 new warnings; `test-manifest-persistence.sh` **104 PASS / 0 FAIL**
+  and `test-batch-resume.sh` **241 PASS / 0 FAIL** ($0, no network, no key, scratch suites only), the latter
+  run because this touched the resume validator. **Non-vacuity MEASURED across three mutants:** dropping the
+  unset-guard / the equality-guard / the `TimeEstimator` clamp / the `apply` call turns exactly 4 red;
+  clamping ∞ to the ceiling instead of resolving it turns 3 red; rounding every size to the nearest 0.5 turns
+  exactly 1 red. **The adversarial review earned its keep four times** — it found the two missed literal
+  sites; it killed a near-vacuous check (comparing stored against `fromDefaults` *after* normalizing proves
+  nothing, because the reader agrees with any in-range number handed to it — measured, the clamp-to-ceiling
+  mutant left it green, so it was rewritten to compare against the PRE-normalization read); it produced the
+  round-to-0.5 mutant that no existing check caught, now closed by an in-range-value-untouched check; and it
+  refuted two doc-comment overclaims (the validator can still be *looser* than the app — the columns Picker
+  offers only 1/2/3 while `Bounds` admits 4 — and "what Settings shows is what a run uses" is true only to
+  the field's one-decimal display: a stored 19.96 still renders as 20, measured, and is left alone).
+  ⚠️ **One check deferred, not skipped:** whether the MB field visibly redraws when the normalizer writes
+  behind it while the field still has focus. The Processor has no UITest target or VM lane yet
+  (`W21.vmgui-d`), so the off-screen route does not exist and the host screen is the owner's. Proven safe
+  regardless — it cannot loop (the write is gated on inequality, converging in two passes) and no run reads
+  the raw value — but the redraw itself is unseen. → Morning Review.
+  | files: Capture/{SessionProcessingConfig,ManifestPersistenceTestDriver}.swift,
+    OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR,PDFGenerator}.swift,
+    Views/SettingsView.swift, Models/{TimeEstimator,ProcessingProfileStore}.swift | Tier-2 | S | none
 - [x] **W16.cfg6-fu2 — `fromDefaults()` clamped looser than `runSizing()`, so Live Capture got unclamped image
   sizes [S · verified].** DONE 2026-08-01 (this commit). Filed by W16.cfg6's adversarial review and re-verified
   on both halves during the 2026-08-01 owner walkthrough. `fromDefaults()` built `pdfImageMB`/`exportedImageMB`

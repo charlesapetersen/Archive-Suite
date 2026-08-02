@@ -284,7 +284,7 @@ struct PDFGenerator {
         let pageWidth: CGFloat = 612
         let margin: CGFloat = 54
         let fullTextWidth = pageWidth - 2 * margin
-        let cols = max(1, min(textColumns, 4))
+        let cols = SessionProcessingConfig.clampTextColumns(textColumns)
 
         // --- Measure the header (always single-column, full width) ---
         let headerFS = CTFramesetterCreateWithAttributedString(headerString as CFAttributedString)

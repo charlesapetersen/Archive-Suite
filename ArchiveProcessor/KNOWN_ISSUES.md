@@ -706,9 +706,18 @@ builder **Live Capture** snapshots — clamped `pdfImageMB`/`exportedImageMB` wi
 `runSizing()`, so an out-of-range setting reached a live capture unclamped (21 MB stayed 21; `+.infinity`
 passed straight through, since `inf > 0`) while Process Files clamped the same number. All five sizing values
 now come from `runSizing()` on every defaults read. Scope that honestly: it is **one clamp per defaults read**,
-not one clamp in the app — the settings *writers* are still unbounded (an unbounded Settings text field, an
-unvalidated processing profile, a worker count the ETA clamps low-only), tracked as **W16.cfg6-fu3**. Nothing
-out of range can reach a run; a number out of range can still be stored and shown back to the operator.
+not one clamp in the app.
+
+**The writer side closed 2026-08-01 by W16.cfg6-fu3.** `SessionProcessingConfig.Bounds` is now the single
+declaration of the three ranges (0.5…20 MB, 1…12 workers, 1…4 columns), read by the clamp helpers, the
+Settings steppers, `PDFGenerator`, `schedulingWorkerCount` and the fail-closed resume validator alike; and
+`normalizeSizingDefaults(_:)` writes the five defaults back as exactly what `runSizing()` resolves, on every
+Settings change and after a profile is applied. So a sizing setting can no longer be *stored or displayed*
+out of range — the unbounded text field, the raw cost quote, the low-only ETA clamp and the unvalidated
+processing profile are all bounded. Two residues, both deliberate: the MB fields render to one decimal, so a
+stored 19.96 still displays as `20` (under 0.05 MB, left alone); and the columns `Picker` offers 1/2/3 while
+`Bounds` admits 4, so the validator stays slightly *looser* than what the UI can produce (harmless —
+`PDFGenerator` renders 4 fine, and looser is the safe direction for a resume validator).
 
 *Historical record below.* Promoted to `SUITE_TODO.md` §"Known-issues
 work — Wave 16" as **W16.cfg1–cfg6**. **Owner decision: extend `SessionProcessingConfig` to be the single run

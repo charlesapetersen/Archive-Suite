@@ -21,7 +21,8 @@ extension OCRProcessor {
     /// Resolve the bounded worker count for OCR scheduling. Same W16.cfg6 rule as above: injected
     /// snapshot first, then a pure defaults read — never a process-global left over from another run.
     nonisolated static func schedulingWorkerCount(for runConfig: SessionProcessingConfig?) -> Int {
-        min(12, max(1, runConfig?.ocrWorkerCount ?? SessionProcessingConfig.runSizing().ocrWorkerCount))
+        SessionProcessingConfig.clampOCRWorkers(
+            runConfig?.ocrWorkerCount ?? SessionProcessingConfig.runSizing().ocrWorkerCount)
     }
 
     /// The two values `performOCRCall` requires, resolved once from the run's injected snapshot.
