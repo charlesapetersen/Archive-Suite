@@ -1995,6 +1995,47 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   nothing outlives the run task to write afterwards. Regression: `test-recovery.sh` 56/56 and
   `test-manifest-persistence.sh` 109/109 still ALL PASS. Clean build, 0 new warnings.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchPollCancelContract.swift | S | low | none
+- [x] **W16.bat3-fu — `performBatchOCR`'s FIFTH interrupted exit ran no tail at all [S · MED].** DONE
+  2026-08-02 `a2bb4b9` + this commit. From the W16.bat3 adversarial review; **pre-existing**. ⚠️ **The filing's
+  stated scenario was WRONG, and the correction is part of the substance here.** It claimed
+  `guard markBatchSubmissionComplete() else { return }` (`+OCR.swift`) "returns without setting
+  `batchPollInterrupted`, without `isProcessing = false`" when the submission marker could not be
+  persisted. Re-confirmed by symbol: it does set both. `markBatchSubmissionComplete()` delegates to
+  `persistPendingBatchMutation`, whose `savePendingBatch`-failed branch already assigned `statusMessage`,
+  `batchPollInterrupted = true`, `isProcessing = false` and `processingTask?.cancel()` — so that case
+  reached `processFiles`'s `if batchPollInterrupted { finishInterruptedBatchPoll(); return }` all along. The
+  reviewer read the guard as a plain bool and missed that the side effects live one call down.
+  **The exit was nevertheless unguarded, for a different reason**: `persistPendingBatchMutation`'s *other*
+  failure, `guard var candidate = activePendingBatch else { return false }`, returned with no flag, no
+  message and no task cancellation — and `cancel()` nils `activePendingBatch` while a Gemini submit loop may
+  still be running (the same window W16.bat5 is about), so a **Stop pressed mid-submit lands in exactly
+  it**. That mattered because **nothing resets `batchPollInterrupted` at the start of a run** — the only
+  `= false` in the app is inside `pollBatchUntilComplete`, which this exit never reaches — so the run's fate
+  was decided by whatever the PREVIOUS run left in the flag. **Fix:** one named reporter,
+  `reportInterruptedPaidBatch(_:)`, carrying the four statements the save-failure branch already ran; BOTH
+  of `persistPendingBatchMutation`'s failure exits now route through it (so all three journal mutators —
+  `markBatchSubmissionComplete`, `recordSubmittedBatchChunk`, `markBatchChunkConsumed` — report instead of
+  returning a bare `false`), plus an explicit `batchPollInterrupted = true; isProcessing = false` in the
+  fifth exit's own guard body so it cannot inherit a stale flag if a future edit adds a quiet third failure
+  path. `cancel()` was NOT touched, and nothing about what gets deleted was changed — W16.bat5 was not
+  started. **Keep-on-doubt verified, not assumed:** all four readers of `batchPollInterrupted` were traced
+  first (`+OCR.swift`'s failure-sweep guard, `retirePaidBatchJournalIfPollCompleted`, `resumePendingBatch`,
+  `processFiles`) and every one treats `true` as *keep the journal* — so the change is deletion-**reducing**
+  on every path and adds a delete to none. **9 new $0 checks** (`BatchMutationReportContract`, driver
+  section 18; `test-batch-resume` 268 → 277), pinning both directions: a failed mutation always reports, a
+  HEALTHY one never does, and reporting removes nothing from disk. Discrimination **measured** on two
+  mutants: restore the silent `return false` and 4 redden; make the reporter fire unconditionally and 1
+  reddens. Honest limit, written into the contract header: the fifth exit itself needs a real paid
+  submission to reach, so its explicit flag set is structural (a bare guard body), not driven — the same
+  limit `BatchInterruptTailContract` records for the tail's two call sites. The stale "all four interrupted
+  exits" comments in `finishInterruptedBatchPoll`, `processFiles` and `BatchInterruptTailContract` are
+  corrected to five. Scratch only: the two contract sections that write a real journal sit behind the same
+  `redirectIsInForce` verdict sections 16/17 use, and FAIL loudly rather than skip if it is not in force.
+  Regression: `test-recovery.sh` and `test-manifest-persistence.sh` still ALL PASS. Clean build, 0 new
+  warnings. **A new HIGH money-path finding came out of the adversarial pass and is FILED, not fixed:
+  `W16.bat7`** — four *other* silent exits in `pollBatchUntilComplete` that delete the journal when results
+  fail to persist. It is owner-gated (plan HOLD QUEUE), not a follow-up to this item.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/BatchMutationReportContract.swift, OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift | S | med | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
   honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid
