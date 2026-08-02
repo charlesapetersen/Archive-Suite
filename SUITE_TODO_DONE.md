@@ -2881,6 +2881,42 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r5 [MED · misfile] — ✅ DONE 2026-08-02** (`d67b9cb` fix+test; this commit, trackers).
+  Premise re-confirmed by reading the path rather than the filed line numbers. `finalizeSegment` inserts the
+  group into `finalizedGroups` and reads `groupCollectionKey[groupId]` into a **local** — both before any
+  await — and then suspends, for seconds, at the per-page OCR awaits, the LLM tagging call and the off-main
+  file write. `backfillCollections`' first loop skipped every group in `finalizedGroups`, and its second loop
+  could only repair segments already in `staged`. So for the whole span between those two states the document
+  was reachable from **neither** loop: a Box delivered out of relay order in that window could not re-pin it,
+  and the pages were staged — and later filed — into the PREVIOUS collection. Not a lost file, but an
+  irreplaceable document in a folder nobody would think to look in.
+  **Fix (two halves, both load-bearing):** (a) `backfillCollections` now skips only groups already in
+  `staged` — the loop below owns those, records and all — so the in-flight group is corrected like any other;
+  (b) `finalizeSegment` binds the key it RECORDS after its last await (`filedCollectionKey`) instead of at the
+  pin. (b) is safe precisely because the key is metadata about *where* the segment is filed and never an input
+  to the bytes or the paths: staging is one flat per-session `_processed/` dir, collection folders only
+  materialise at `executePlans`, and `writeSegmentFiles` merely carries the key into the record it returns.
+  There is no await between the re-read and the two assignments, so it is also the LAST point a correction can
+  land. Both readers get it: `staged[].collectionKey` (end-of-session collection grouping) and
+  `retained[].collectionKey` (rotation-review regeneration). Folder markers ride the same path as documents,
+  which matches what the staged loop already did; a Box is still its own collection and is never re-pinned.
+  **Tier-2:** recovery driver Test 15, 6 new $0 checks driven through the REAL ingest → finalize path. The
+  window is the whole defect, so the test **holds it open** rather than hoping a sleep lands inside it: a new
+  one-shot `_recoveryTestOCRGate` parks the stub OCR the segment is awaiting, and the check that the document
+  is genuinely finalized-but-not-yet-staged runs BEFORE the Box is delivered, so the test cannot pass by
+  accidentally exercising the already-working staged path. It asserts both record copies (a fix that corrected
+  `staged` and left `retained` stale would pass on the first alone) and both ordering guards. Costs $0 and
+  touches no network: `taggingMode: .human` keeps the document off the LLM (`computeTags` only calls it in
+  `.automatic`) and a box/folder short-circuits to a colour tag inside `TagGenerator`.
+  **Mutation-verified** on two mutants, one per half: restoring the `finalizedGroups` guard reddens the same
+  2 checks, and recording the pinned key instead of the re-read one reddens the same 2. `test-recovery.sh`
+  ALL PASS (76 → 82 checks); collection-organize / manifest-persistence / merge-safety / multipage-reocr /
+  segment-json / output-file-safety ALL PASS; build clean, no new warnings. As with `cap-r2`, the Processor's
+  `scripts/test-smoke.sh` was NOT run — its de-nesting paths are stale (`W21.smoke`, still open) — and the new
+  driver block stays fail-closed behind the existing `ARCHIVEPROC_TEST_BACKUP_ROOT` isolation check.
+  **Residual, deliberately NOT fixed here:** the mirror-image case where the Box arrives *after* the segment is
+  staged, so the correction reaches `staged` but not `retained` and the rotation review reverts it. That is
+  `W3.cap-r4`, the next item, and it is what closes this path for good.
 - [x] **W3.cap-r2 [MED · money] — ✅ DONE 2026-08-02** (`96f223b` fix+test; this commit, trackers).
   Premise re-confirmed by reading the path, not the filed line numbers (they had drifted): `CapturedPhoto.id`
   is `let id = UUID()`, minted per VALUE (`CaptureModels.swift:23`), while `CaptureSession.ingest`'s

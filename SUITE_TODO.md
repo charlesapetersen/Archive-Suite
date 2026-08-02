@@ -1102,15 +1102,18 @@ run a scratch-copy functional test before shipping. ⚠️ The Opus-max **refute
 finder-level candidates (only #1's premise manually confirmed). Report: `.maintenance/review/Processor-Capture.md`.
 
 > **SHIP ORDER (set by the 2026-07-18 Live-Capture architecture review — see Wave 17 below).** Recommended:
-> ~~r6~~ → ~~r2~~ → **r5 → r4 → r3** (`r1` shipped earlier). `r6` — the subsystem's one genuine
+> ~~r6~~ → ~~r2~~ → ~~r5~~ → **r4 → r3** (`r1` shipped earlier). `r6` — the subsystem's one genuine
 > recoverability hole, a straggler's processed output discarded — **shipped 2026-08-02 `905722d`**; `r2` —
-> the duplicate paid OCR on a phone retry — **shipped 2026-08-02 `96f223b`**. Both entries are in
-> `SUITE_TODO_DONE.md`, and between them they retire most of the two now-closed deferred architecture
-> entries. Next is `r5`. **Sequencing constraint:** do `r4` **before** `W17.stg1` (both touch
+> the duplicate paid OCR on a phone retry — **shipped 2026-08-02 `96f223b`**; `r5` — the in-flight document
+> no Box could re-pin — **shipped 2026-08-02 `d67b9cb`**. All three entries are in `SUITE_TODO_DONE.md`, and
+> between them they retire most of the two now-closed deferred architecture entries. Next is `r4`, which is
+> now the LAST hole in the same collection-correction path `r5` half-closed: `r5` fixed the record being
+> written (a Box arriving while the segment is in flight), `r4` fixes the record already written (a Box
+> arriving after it is staged, where the correction reaches `staged` but not `retained` and the rotation
+> review reverts it). **Sequencing constraint:** do `r4` **before** `W17.stg1` (both touch
 > `RetainedSegment`), which is enforced by a blocked-on.
 - [ ] **W3.cap-r3 [LOW]** `CaptureSession.swift:539/549` — `removePhoto`/`removePhotoIfSafe` delete a photo from `session.photos` but never tell `liveProcessor` to cancel that photo's in-flight OCR Task → deleting/reclassifying a page mid-OCR leaves a paid OCR call running + Task/result orphaned in `pageTasks`. | Capture | Tier-2
 - [ ] **W3.cap-r4 [MED · misfile]** `LiveCaptureProcessor.swift:385` — `backfillCollections` corrects `staged[i].collectionKey` for an out-of-order Box but never updates the parallel `retained[groupId].collectionKey`; the rotation-review regeneration path reads `collectionKey` from `retained` and overwrites the staged entry → silently reverts the correction → **misfiles the document into the wrong collection folder**. | Capture | Tier-2
-- [ ] **W3.cap-r5 [MED · misfile]** `LiveCaptureProcessor.swift:409` — `finalizeSegment` pins `collectionKey` (line 409) before its OCR/tag awaits, but `backfillCollections` skips groups already in `finalizedGroups` yet not yet in `staged`; an out-of-order relay Box delivered during that await can never re-pin the in-flight document → **misfile**. | Capture | Tier-2
 
 ## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`

@@ -1664,7 +1664,7 @@ milestone the Mac logs the collision and does not expand the existing no-op.
 
 ## Collection pinned in arrival order on relay transport  [MEDIUM — FIXED]
 
-**Status:** FIXED (2026-07-09).
+**Status:** FIXED (2026-07-09; **completed for the in-flight case 2026-08-02** — see the amendment below).
 
 On relay transport, network reordering could cause a document to arrive before its Box marker. The Mac
 pinned `groupCollectionKey` at arrival time, so such a document was assigned to the *previous* collection
@@ -1673,7 +1673,24 @@ pinned `groupCollectionKey` at arrival time, so such a document was assigned to 
 **Fix:** `LiveCaptureProcessor.backfillCollections()` — when a Box arrives, re-resolve collection assignments
 for all not-yet-finalized groups AND already-staged segments using the phone's capture sequence (`CaptureGroup.order`)
 as the source of truth. Also corrects `currentCollectionKey` to the highest-seq box (not the most-recently-arrived).
-Persists the corrected manifest so a crash doesn't revert the fix. (`LiveCaptureProcessor.swift:347–379`.)
+Persists the corrected manifest so a crash doesn't revert the fix.
+
+**Amended 2026-08-02 (`d67b9cb`, W3.cap-r5).** Those two loops left a gap *between* them. A group enters
+`finalizedGroups` the moment `finalizeSegment` starts but only reaches `staged` seconds later, after the
+per-page OCR awaits, the LLM tag call and the off-main write — and for that whole window it was skipped by the
+first loop (already finalized) *and* invisible to the second (not yet staged). So a Box arriving mid-finalize
+could not re-pin it, and the very misfile described above still happened, just in a narrower window. The first
+loop now skips only groups already in `staged`, and `finalizeSegment` binds the key it records **after** its
+last await instead of at the pin, so a correction made inside the window still reaches both
+`staged[].collectionKey` and `retained[].collectionKey`. Regression cover: recovery-driver Test 15
+(`scripts/test-recovery.sh`), which holds the window open with a gate on the stub OCR and delivers the Box
+inside it.
+
+⚠️ **Still open on this same path: `W3.cap-r4`** (`SUITE_TODO.md`) — a Box arriving *after* the segment is
+staged corrects `staged[i].collectionKey` but not `retained[groupId].collectionKey`, and the rotation-review
+regeneration reads `collectionKey` from `retained` and overwrites the staged entry, silently reverting the
+correction. Until that ships, this issue is closed for the in-flight case but not for a post-staging
+correction followed by a rotation review.
 
 ---
 
