@@ -397,6 +397,17 @@ final class LiveCaptureProcessor: ObservableObject {
         Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
     }
 
+    /// Where a group is filed RIGHT NOW — the single reader of collection membership outside finalize
+    /// (W3.cap-r4). `groupCollectionKey` is the live map `backfillCollections` corrects; its staged record
+    /// is the same value written out, and is the fallback for a group finalized while the map was empty
+    /// (see `finalizeSegment`). `currentCollectionKey` only backstops a group that is neither — unreachable
+    /// for a staged segment, and the same default a first capture would get.
+    private func liveCollectionKey(for groupId: String) -> String {
+        groupCollectionKey[groupId]
+            ?? staged.first { $0.groupId == groupId }?.collectionKey
+            ?? currentCollectionKey
+    }
+
     /// Re-assign collection keys for not-yet-finalized groups (and already-staged segments) using the
     /// phone's capture sequence as the source of truth. Called when a Box arrives out of relay order so
     /// documents that landed before their Box get corrected before (or after) finalize.
@@ -536,17 +547,17 @@ final class LiveCaptureProcessor: ObservableObject {
         // this group through `backfillCollections` (which no longer skips a finalized-but-not-yet-staged
         // group). Re-reading now is both safe and the LAST point a correction can still land: the key is
         // metadata about WHERE the segment gets filed, never an input to the bytes or the paths —
-        // `writeSegmentFiles` only carries it into the record it returns — and from here to the two
-        // assignments below there is no await for a Box to slip through. Both readers of that record file
-        // off this value: end-of-session collection grouping (`staged[].collectionKey`) and rotation-review
-        // regeneration (`retained[].collectionKey`). Falls back to the pinned value if the map was emptied.
-        let filedCollectionKey = groupCollectionKey[groupId] ?? collectionKey
-        outcome.collectionKey = filedCollectionKey
+        // `writeSegmentFiles` only carries it into the record it returns — and from here to the assignment
+        // below there is no await for a Box to slip through. End-of-session collection grouping reads it off
+        // that record (`staged[].collectionKey`); W3.cap-r4 retired the second copy that used to live on
+        // `retained[]`, so rotation-review regeneration now re-reads the live map instead of replaying a
+        // snapshot of it. Falls back to the pinned value if the map was emptied.
+        outcome.collectionKey = groupCollectionKey[groupId] ?? collectionKey
 
         staged.append(outcome)
         // Retain the write inputs so an end-of-session rotation review can regenerate this segment.
         retained[groupId] = RetainedSegment(
-            groupId: groupId, type: gType, collectionKey: filedCollectionKey, order: gOrder,
+            groupId: groupId, type: gType, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
@@ -624,10 +635,17 @@ final class LiveCaptureProcessor: ObservableObject {
     /// All inputs to `writeSegmentFiles` for one finalized segment, retained so the end-of-session
     /// rotation review can regenerate it with corrected page rotation. Persisted in the staging
     /// manifest so the review still works after a crash/relaunch resume.
+    ///
+    /// W3.cap-r4 — deliberately NO `collectionKey`. Which collection a segment belongs to is not a write
+    /// input at all (`writeSegmentFiles` only carries it into the record it returns); it is *live* state that
+    /// `backfillCollections` corrects whenever a Box arrives out of relay order. Keeping a second copy here
+    /// was the defect: the correction reached `staged[]` and `groupCollectionKey` but never this record, and
+    /// the rotation-review regeneration then wrote the stale key straight back over the corrected one —
+    /// silently filing the document into the previous collection. There is now exactly one reader,
+    /// `liveCollectionKey(for:)`, so there is nothing left to drift.
     private struct RetainedSegment: Sendable, Codable {
         let groupId: String
         let type: CaptureGroupType
-        let collectionKey: String
         let order: Int
         var pages: [PageWork]        // var: page rotation is updated before regeneration
         let baseTags: [String]
@@ -652,7 +670,6 @@ final class LiveCaptureProcessor: ObservableObject {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             groupId = try c.decode(String.self, forKey: .groupId)
             type = try c.decode(CaptureGroupType.self, forKey: .type)
-            collectionKey = try c.decode(String.self, forKey: .collectionKey)
             order = try c.decode(Int.self, forKey: .order)
             pages = try c.decode([PageWork].self, forKey: .pages)
             baseTags = try c.decode([String].self, forKey: .baseTags)
@@ -671,12 +688,12 @@ final class LiveCaptureProcessor: ObservableObject {
         }
 
         // Memberwise init (matches the synthesized one the callers already use).
-        init(groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
+        init(groupId: String, type: CaptureGroupType, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              stampUnread: Bool) {
-            self.groupId = groupId; self.type = type; self.collectionKey = collectionKey; self.order = order
+            self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName; self.writeJSON = writeJSON; self.jsonTags = jsonTags
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
@@ -1009,6 +1026,12 @@ final class LiveCaptureProcessor: ObservableObject {
             .compactMap { retained[$0] }
             .filter { seg in seg.pages.allSatisfy { fm.fileExists(atPath: $0.sourceURL.path) } }
         guard !segsToRegen.isEmpty, let stagingDir else { beginFinalize(); return }
+        // W3.cap-r4 — the collection is read live, never replayed from the retained record. Snapshotted here
+        // for the detached write (which only carries it through) and re-read once more after that write, on
+        // the way into `staged` — the same last-possible-moment discipline `finalizeSegment` uses, because
+        // the write below suspends and an out-of-order Box can still re-pin a segment while it runs.
+        let regenKeys: [String: String] = Dictionary(
+            uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
         // Legacy retained manifests had no per-run unread policy. Before this fix, activation set the
         // recovered session config on the global immediately before regeneration; this fallback preserves
         // that behavior while every new manifest carries the exact original value.
@@ -1017,7 +1040,8 @@ final class LiveCaptureProcessor: ObservableObject {
         Task { [weak self] in
             let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
                 segsToRegen.map { seg in
-                    Self.writeSegmentFiles(groupId: seg.groupId, type: seg.type, collectionKey: seg.collectionKey,
+                    Self.writeSegmentFiles(groupId: seg.groupId, type: seg.type,
+                                           collectionKey: regenKeys[seg.groupId] ?? "__unfiled__",
                                            order: seg.order, pages: seg.pages, baseTags: seg.baseTags,
                                            doMerge: seg.doMerge, model: seg.model, gatewayName: seg.gatewayName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
@@ -1029,9 +1053,13 @@ final class LiveCaptureProcessor: ObservableObject {
             }.value
             guard let self else { return }
             for outcome in regenerated {
-                if let idx = self.staged.firstIndex(where: { $0.groupId == outcome.groupId }) {
-                    self.staged[idx] = outcome
-                }
+                guard let idx = self.staged.firstIndex(where: { $0.groupId == outcome.groupId }) else { continue }
+                // W3.cap-r4 — regeneration replaces the staged RECORD, so it must not carry a stale
+                // collection with it: rotation is the only thing this pass is allowed to change. Re-read
+                // rather than keep `outcome.collectionKey`, which was fixed before the write above suspended.
+                var fresh = outcome
+                fresh.collectionKey = self.liveCollectionKey(for: outcome.groupId)
+                self.staged[idx] = fresh
             }
             self.persistManifest()
             self.isFinalizing = false
@@ -1474,12 +1502,12 @@ final class LiveCaptureProcessor: ObservableObject {
         await pageTasks[PageKey(photo)]?.value.text
     }
 
-    /// Test-only ($0, W3.cap-r5): the collection key on this segment's RETAINED write inputs — the second
-    /// copy of the decision, and the one the end-of-session rotation review regenerates from. Asserting only
-    /// the `staged` copy would let a fix that corrects the visible record while leaving `retained` on the
-    /// stale collection pass. `retained` and its element type are private, so the driver asks for the one
-    /// field it must check.
-    func _recoveryTestRetainedCollectionKey(for groupId: String) -> String? { retained[groupId]?.collectionKey }
+    /// Test-only ($0, W3.cap-r5 / W3.cap-r4): the collection the rotation review will regenerate this segment
+    /// into — the LIVE map, which W3.cap-r4 made the only copy of the decision (the retained record used to
+    /// keep a second one, and it went stale). Asserting the `staged` record alone would let a fix that
+    /// corrects the visible record while leaving regeneration pointed at the previous collection pass.
+    /// `groupCollectionKey` is private, so the driver asks for the one value it must check.
+    func _recoveryTestLiveCollectionKey(for groupId: String) -> String? { groupCollectionKey[groupId] }
 
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
     /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as

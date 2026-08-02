@@ -688,8 +688,8 @@ enum LiveCaptureRecoveryTestDriver {
             check("the in-flight document finishes staging", landed)
             check("an out-of-order Box delivered mid-finalize RE-PINS the in-flight document",
                   r5Key("D") == "B1")
-            check("...and the retained copy the rotation review regenerates from agrees",
-                  r5Proc._recoveryTestRetainedCollectionKey(for: "D") == "B1")
+            check("...and the live map the rotation review regenerates from agrees",
+                  r5Proc._recoveryTestLiveCollectionKey(for: "D") == "B1")
             check("a Box is still its own collection and is never re-pinned",
                   r5Key("B0") == "B0" && r5Key("B1") == "B1")
 
