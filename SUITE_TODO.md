@@ -398,9 +398,11 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   `statusMessage` on the way out. The order is not guaranteed, so the one signal that a paid job may still be
   running server-side can be clobbered before the operator reads it. `BatchCancelWiringContract` proves the
   message is *assigned*, and structurally cannot prove it *survives* (no live `processingTask` there).
-  **Gated on W16.bat3 deliberately, not incidentally:** while bat3 stands, that warning is sometimes a lie
-  (the journal is deleted downstream anyway) — making a sometimes-lie more reliably visible is the wrong fix
-  order. | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | none
+  **Was gated on W16.bat3 deliberately, not incidentally:** while bat3 stood, that warning was sometimes a
+  lie (the journal was deleted downstream anyway) and making a sometimes-lie more reliably visible is the
+  wrong fix order. ✅ **That gate is discharged — W16.bat3 shipped 2026-08-02 (`53e43e2` + the commit that
+  ticks this line), so the warning now tells the truth and making it survive is worth doing.**
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | none
 - [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
   ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED and the
   `W16.bat5-owner-ok` gate is ticked. ⚠️ **The owner also CHOSE the fix direction: the in-flight guard —
@@ -419,35 +421,21 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   re-read the journal's chunk IDs after the cancellations rather than trusting the pre-submit snapshot, or
   refuse to delete while a submit is in flight. W16.bat2's driver is the harness for proving it.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | high | none
-- [ ] **W16.bat3 — Stop during a paid batch poll DELETES the recovery journal, while the UI says it was kept**
-  **[XS fix · HIGH]** ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED
-  and the `W16.bat3-owner-ok` gate is ticked. Authorized because the precondition it was waiting on is now
-  met: `W16.bat2`'s driver shipped in `d65e04f`, so a regression test can prove the fix. **Binding
-  constraints:** keep-on-doubt governs (deletion is the irreversible act — whenever interruption is possible
-  but unconfirmed, the journal SURVIVES); scratch only, never the real `pending_batch.json`; and it must land
-  with a check that **fails on today's code and passes after**, covering the **resume path as well as the
-  fresh run** — a `cancel()`-level assertion is insufficient, since one already passes today while the real
-  path deletes. Full grant in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Note `W16.bat6` is gated on this item
-  **landing**, not on the authorization. Original filing follows. Historic: owner-gated money path with
-  no undo, so the daemon filed it rather than fixing it. Found by the W16.bat1-fu adversarial review; **pre-existing**, not introduced there.
-  ⚠️ **Gate re-pointed 2026-08-01:** this used to read `(blocked-on: W16.bat2)`, which was doing double duty as
-  the machine-readable hold gate. W16.bat2 has now shipped, so that gate would have released an owner-gated
-  money-path item into the actionable queue. The dependency is now the owner's decision itself
-  (`W16.bat3-owner-ok`, an unticked gate item in the plan's HOLD QUEUE) — a tag the daemon cannot satisfy.
-  `cancel()` (`+Pipeline.swift:1606`) cancels the processing task and then deletes the journal **only** if every
-  server-side cancellation was confirmed (the rule now lives in `performServerBatchCancellation`, `:1565`, and
-  is regression-tested by `BatchCancelContract` since W16.bat2) — otherwise it deliberately keeps it and says
-  *"the paid-batch journal was kept for recovery."* But the poll task then resumes and hits
-  `guard !Task.isCancelled else { return }` (`+OCR.swift:691`, `:703`), which returns **without** setting
-  `batchPollInterrupted`, so `performBatchOCR` (`:661-663`) runs `Self.deletePendingBatch()` unconditionally.
-  The resume path is identical (`+Pipeline.swift:911`, whose own `guard !Task.isCancelled` at `:915` sits
-  *after* the delete). Net: pressing Stop mid-poll can strand a paid, still-live server-side batch with no way
-  back, and tell the operator the opposite. Fix is one line in each cancellation guard
-  (`batchPollInterrupted = true`) — but it changes cancel semantics on the only path that spends real money, so
-  it wants the owner's eye. **W16.bat2's driver now exists** and is the harness for proving the fix; note it
-  proves the `cancel()` RULE only, and this bug is downstream of that seam, so a green
-  `BatchCancelContract` is not evidence either way here.
-  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | XS | high | none
+- [ ] **W16.bat3-fu — `performBatchOCR` has a FIFTH interrupted exit that runs no tail at all [S · MED].**
+  From the W16.bat3 adversarial review; **pre-existing**, not introduced there. W16.bat4 unified the
+  interruption tail, and its comment claims it covers "all four of `performBatchOCR`'s interrupted exits" —
+  but `guard markBatchSubmissionComplete() else { return }` (`+OCR.swift:647`) is a fifth. It returns without
+  setting `batchPollInterrupted`, without `isProcessing = false`, and without `finishInterruptedBatchPoll()`.
+  So when the paid batch WAS submitted but its final submission state could not be persisted, `startProcessing`
+  reads a **stale** flag (whatever the previous run left), falls through past the interruption branch, and
+  carries on into tagging/finalize on a run with no results — `isProcessing` still true, no Resume control,
+  while the message the operator just got says the batch "was kept for recovery". Since W16.bat3 the journal
+  itself is safe in the common shape (a stale `true` takes the keep path, and nothing on this exit deletes),
+  so this is a wedged-UI / false-finalize bug rather than a money-loss one — which is why it is filed here
+  rather than folded into bat3, whose grant covers the two cancellation guards only. Fix direction: route that
+  exit through `finishInterruptedBatchPoll()` like the other four, and set the flag explicitly instead of
+  inheriting it. Provable in `BatchInterruptTailContract` / section-17 style.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | none
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned

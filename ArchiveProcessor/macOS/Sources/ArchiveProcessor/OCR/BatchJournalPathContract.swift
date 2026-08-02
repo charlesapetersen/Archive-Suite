@@ -29,9 +29,10 @@ import Foundation
 ///
 /// ⚠️ **SCOPE.** This proves the journal's *location* and the *deleter's* behaviour. It does not prove the
 /// rule that decides when a cancellation is confirmed (`BatchCancelContract`, section 13) or the arguments
-/// `cancel()` feeds it (`BatchCancelWiringContract`, section 14) — and W16.bat3 remains open, so the poll's
-/// own cancellation guards can still delete the journal downstream of everything checked here. A green
-/// section 16 does not make pressing Stop safe end to end.
+/// `cancel()` feeds it (`BatchCancelWiringContract`, section 14), and it does not follow the poll that is
+/// unwinding downstream of all of them — whose cancellation guards used to delete the journal regardless
+/// (W16.bat3, now fixed and pinned by `BatchPollCancelContract`, section 17). A green section 16 alone does
+/// not make pressing Stop safe end to end.
 ///
 /// Run from `BatchResumeTestDriver` (section 16) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`, which is what sets `ARCHIVEPROC_TEST_STATE_ROOT`.

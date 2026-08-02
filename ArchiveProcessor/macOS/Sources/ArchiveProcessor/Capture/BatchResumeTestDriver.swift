@@ -36,8 +36,9 @@ import AppKit
 ///  13. The **`cancel()` journal-retention rule** (`BatchCancelContract`, W16.bat2): the paid-batch recovery
 ///      journal is deleted if and only if every chunk's server-side cancellation was confirmed — swept over
 ///      every provider × chunk-count × refusal shape, against a real file. Scope: the RULE, not the whole
-///      Stop path. W16.bat3 is an open, owner-gated bug elsewhere (the poll's cancellation guards delete the
-///      journal first regardless), so a green section 13 does NOT mean pressing Stop is safe end to end.
+///      Stop path — the poll's own cancellation guards used to delete the journal first regardless
+///      (W16.bat3), so a green section 13 alone does NOT mean pressing Stop is safe end to end; that half
+///      is section 17.
 ///  14. The **`cancel()` WIRING** (`BatchCancelWiringContract`, W16.bat2-fu): section 13 proves the rule, this
 ///      proves `cancel()` feeds it the truth — the live batch's own context, a canceller that closes over
 ///      *that provider's own client* (not merely one labelled with it), the journal's acknowledged chunk IDs

@@ -30,10 +30,10 @@ import Foundation
 /// and `theLiveCancellerIsTheBatchsOwnClient` press no Stop at all.
 ///
 /// ⚠️ **SCOPE — read before citing this file.** What is *not* covered, precisely:
-///   * This is the wiring, not the rule (that is `BatchCancelContract`) and not the whole Stop path:
-///     **W16.bat3 is open and owner-gated** — the poll's `guard !Task.isCancelled` returns without setting
-///     `batchPollInterrupted`, so `performBatchOCR` deletes the journal regardless of what `cancel()`
-///     decided. A green section here does not make pressing Stop safe end to end.
+///   * This is the wiring, not the rule (that is `BatchCancelContract`) and not the whole Stop path. The
+///     poll unwinding alongside `cancel()` used to delete the journal regardless of what `cancel()` had
+///     decided, and nothing here could see it — that was **W16.bat3**, now fixed and pinned by
+///     `BatchPollCancelContract` (section 17). Cite the two together for the whole Stop path.
 ///   * **The default deleter's body is run by no check HERE** — every scenario in this file replaces the
 ///     seam. It is no longer unverified, though: since W16.bat2-fu2 the journal directory is redirectable
 ///     under test, and `BatchJournalPathContract` (section 16) runs the shipped deleter against a real

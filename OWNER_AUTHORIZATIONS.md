@@ -122,7 +122,19 @@ its own date. Verbatim as recorded when granted.)*
   - ⛔ **SCRATCH ONLY**, and do not run `test-batch-resume.sh` against a real journal at any point while landing
     this. Tier-2 in full, premise re-confirmed by symbol first. **Does NOT authorize** any change to what
     `cancel()` deletes — that is `W16.bat3`/`W16.bat5`, granted separately below.
-- **`W16.bat3` — AUTHORIZED (granted 2026-08-01, morning-review walkthrough).** Set `batchPollInterrupted` in
+- **`W16.bat3` — ✅ DISCHARGED 2026-08-02** (`53e43e2` + the tracker commit that follows it; full record in
+  `SUITE_TODO_DONE.md`). Every ⛔ was met: keep-on-doubt was *verified*, not assumed — all four readers of
+  `batchPollInterrupted` were traced first, and the change is deletion-reducing on every path and adds a
+  delete to none; nothing ran against a real `pending_batch.json`, because the only two new checks that write
+  at the shipped journal path sit behind the same `redirectIsInForce` verdict section 16 uses; the regression
+  is measured rather than claimed (revert the two assignments and 4 of the 7 new checks redden, including the
+  journal file disappearing during a whole cancelled `resumeBatch` — so the **resume path is covered end to
+  end**, not only the fresh run); and the premise was re-confirmed by symbol, the file having indeed moved.
+  `cancel()`'s semantics were not touched and neither `W16.bat5` nor `W16.bat6` was started. One adjacent
+  defect the adversarial review surfaced was FILED rather than fixed, precisely because this grant does not
+  reach it: `W16.bat3-fu` (`performBatchOCR`'s *fifth* interrupted exit runs no tail at all). The grant is
+  retained verbatim below as the record.
+  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough).** Set `batchPollInterrupted` in
   both `guard !Task.isCancelled` early-returns (`OCRProcessor+OCR.swift:689`, `:701`) so `performBatchOCR:661-664`
   stops deleting the paid-batch recovery journal on a cancelled poll. Authorized because today the operator is
   told *"the paid-batch journal was kept for recovery"* while the journal is deleted anyway — the message and the

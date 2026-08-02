@@ -890,8 +890,30 @@ empty chunk to failed, and one anomalous chunk could block a run **permanently**
 every page was already on disk and only a long-expired result file was missing. Worth remembering when
 touching this path: *"don't consume it"* and *"don't let it finish"* are not the same requirement, and only
 the first one is a safety property. That review also surfaced two **pre-existing** defects, queued as
-**W16.bat3** (Stop mid-poll deletes the paid journal while the UI says it was kept — owner-gated) and
-**W16.bat4** (the Resume control is never surfaced after an interrupted first run).
+**W16.bat3** (Stop mid-poll deletes the paid journal while the UI says it was kept) and
+**W16.bat4** (the Resume control is never surfaced after an interrupted first run). **Both are now closed —
+see below.**
+
+**W16.bat3 — CLOSED 2026-08-02** (`53e43e2` + this commit). The first of those two, and the one that cost
+money. `cancel()` deletes the paid-batch journal **only** when every server-side cancellation was confirmed;
+otherwise it keeps it and tells the operator *"the paid-batch journal was kept for recovery."* But the poll
+task unwinding alongside it hit `guard !Task.isCancelled else { return }` in `pollBatchUntilComplete` and
+returned **silently** — `batchPollInterrupted` stayed false, and both callers read that flag to decide the
+journal's fate, so the first run's tail (`performBatchOCR`) and a resume (`resumeBatch`, whose own
+cancellation guard sits *below* its delete) removed it anyway. Pressing Stop mid-poll could therefore strand
+a paid, still-live server-side batch with no local record at all, while the UI said the opposite. Both
+guards now set the flag, which is deletion-**reducing** on every path — all four readers were traced, and no
+path gains a delete it did not have (keep-on-doubt: a stale journal costs a dismissed prompt, a deleted one
+costs the batch). `performBatchOCR`'s inline tail also became
+`retirePaidBatchJournalIfPollCompleted()` — identical condition, statements and order — so that direction
+can be driven against a real journal file instead of read. **7 new $0 checks**
+(`BatchPollCancelContract`, driver section 17; `test-batch-resume.sh` 258 → 265), with the discrimination
+measured: reverting the two assignments reddens 4 of them, including the journal file disappearing from
+disk during a whole cancelled `resumeBatch`. What it still does not pin is the first run's own call into the
+poll — reaching that needs a real paid submission — so that seam is held by structure, exactly as W16.bat4's
+call sites are. One adjacent defect the review surfaced is **open**: `performBatchOCR` has a *fifth*
+interrupted exit (`markBatchSubmissionComplete()` failing) that runs no tail at all → `SUITE_TODO.md`
+**W16.bat3-fu**.
 
 **W16.bat4 — CLOSED 2026-08-01** (`1515773` + `819494d` + this commit). The second of those two. Every
 `batchPollInterrupted` message tells the operator the paid batch was kept *so they can resume it*, and the
@@ -953,8 +975,9 @@ written statement of the providers' capabilities, no attempt a provider's rule c
 "kept for recovery" sentence present exactly when the file survived, and delete called at most once.
 Non-vacuity measured with **five neuters**, each reddening exactly its own checks — including one shaped
 like W16.bat3 (journal deleted while the outcome still claims it was kept), which reddens 13.
-Note what this does and does not buy: it pins the *rule*, not the *whole Stop path* — W16.bat3's bug lives
-in the poll's cancellation guards, downstream of this seam, and is still open and still owner-gated.
+Note what this does and does not buy: it pins the *rule*, not the *whole Stop path* — W16.bat3's bug lived
+in the poll's cancellation guards, downstream of this seam. That half is now closed too (see **W16.bat3**
+below) and pinned by `BatchPollCancelContract`, section 17; cite the two together for the whole Stop path.
 
 Original analysis below.
 

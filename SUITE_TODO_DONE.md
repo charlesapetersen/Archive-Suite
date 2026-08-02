@@ -1932,6 +1932,35 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   sites (driving either needs a real paid submission or the un-redirectable journal path — W16.bat2-fu2);
   what keeps them aligned meanwhile is structural, each being a bare `finishInterruptedBatchPoll(); return`.
   | files: OCR/OCRProcessor+Pipeline.swift | S | low | none
+- [x] **W16.bat3 — Stop during a paid batch poll DELETED the recovery journal, while the UI said it was kept
+  [XS fix · HIGH].** DONE 2026-08-02 `53e43e2` + this commit. Owner-authorized 2026-08-01 (grant now marked
+  discharged in `OWNER_AUTHORIZATIONS.md`). Was: `cancel()` deletes the journal **only** when every
+  server-side cancellation was confirmed, and otherwise keeps it and says *"the paid-batch journal was kept
+  for recovery"* — but the poll unwinding at the same time hit `guard !Task.isCancelled else { return }` in
+  `pollBatchUntilComplete` and returned **silently**, so `batchPollInterrupted` stayed false and BOTH callers
+  deleted the journal anyway: the first run through `performBatchOCR`'s tail, and a resume through
+  `resumeBatch` (whose own `guard !Task.isCancelled` sits *below* the delete). Pressing Stop mid-poll could
+  strand a paid, still-live server-side batch with no local record, and tell the operator the opposite. Both
+  guards now set the flag. All four readers of it were traced first: the change is deletion-**reducing** on
+  every path and adds a delete to none — the keep-on-doubt rule the grant made binding. Also extracted
+  `performBatchOCR`'s inline tail to `retirePaidBatchJournalIfPollCompleted()` — same condition, statements
+  and order — purely so that direction could be *driven* against a real journal file rather than read; the
+  surrounding function needs a paid submission to reach. **`BatchPollCancelContract`** (driver section 17)
+  adds **7 $0 checks** (`test-batch-resume.sh` 258 → 265): both cancellation exits report themselves
+  interrupted (swept over `LLMProvider.allCases`; the in-the-wait one timed, to show the sleep was aborted
+  rather than waited out), the first run's tail keeps an interrupted journal **and** still retires a
+  completed one, and a whole cancelled `resumeBatch` leaves the real journal file on disk with the Resume
+  control rendered. Discrimination **measured**: revert the two assignments and 4 of the 7 redden, including
+  the journal file itself disappearing from disk. No network and no keys — both guards precede the
+  `switch provider` — and the two checks that write at the shipped journal path sit behind the same
+  `redirectIsInForce` verdict section 16 uses, so nothing here can reach the operator's own journal.
+  Regression: `test-recovery.sh` 56/56 and `test-manifest-persistence.sh` 109/109 still ALL PASS. The
+  adversarial review found no keep-on-doubt violation; three findings were folded in (an overclaimed
+  discrimination in section 2, now stated as an honest limit; a hardcoded provider count; and section 3
+  documented as pinning the tail's rule rather than being the regression check), and a fourth — a **fifth**
+  interrupted exit in `performBatchOCR` that runs no tail at all — is filed as **W16.bat3-fu**. Unblocks
+  **W16.bat6**, whose gate was this item *landing*.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/BatchPollCancelContract.swift | XS | high | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
   honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid
