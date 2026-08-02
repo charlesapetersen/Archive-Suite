@@ -391,24 +391,24 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   `pending_run.json` fixture into the redirected directory first, so both sides have something to find, and
   assert the banner text matches. Do it in that contract, not by widening section 16. No production change.
   | files: OCR/BatchInterruptTailContract.swift | XS | low | none
-- [ ] **W16.bat5 — Stop mid-submit can delete the journal while a later Gemini chunk is already paid for**
-  ✅ **OWNER-AUTHORIZED 2026-08-01** (morning-review walkthrough) — the `[hold]` is LIFTED and the
-  `W16.bat5-owner-ok` gate is ticked. ⚠️ **The owner also CHOSE the fix direction: the in-flight guard —
-  refuse to delete the journal while a submit is in flight.** He considered and **rejected** the alternative
-  (re-reading the journal's chunk IDs after the cancellations) because it only *narrows* the window: a chunk
-  created between the re-read and the delete still slips, so it stays a TOCTOU race. Implement the invariant
-  ("a submit is in flight ⇒ the journal survives"), **do not ship the re-read as a substitute**, and if the
-  guard proves unimplementable as stated, STOP and flag it rather than falling back. Keep-on-doubt governs.
-  Full grant in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md). Original filing follows. Historic: money path with no undo,
-  same category as W16.bat3. **Pre-existing** (the W16.bat2 refactor did not move the snapshot point); found by
-  the W16.bat2 adversarial review. `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while a
-  Gemini submit loop may still be creating server-side chunks. If every chunk in that snapshot confirms, the
-  journal is **deleted** — and a chunk created after the snapshot is already billed with its ID recorded
-  nowhere. `recordSubmittedBatchChunk` does then fail on the nil `activePendingBatch` and abort the submit,
-  so the window is narrow, but the money is already spent by then. Fix direction (needs the owner's call):
-  re-read the journal's chunk IDs after the cancellations rather than trusting the pre-submit snapshot, or
-  refuse to delete while a submit is in flight. W16.bat2's driver is the harness for proving it.
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | high | none
+- [ ] **W16.bat5-fu — ⛔ `[hold]` NEEDS THE OWNER. The journal W16.bat5 now keeps still does not list the
+  chunk that was paid for after the snapshot [S · MED · money].** Found by the W16.bat5 adversarial pass
+  (2026-08-02); **the residual of that item's chosen direction, not a defect in it.** W16.bat5 stops
+  `cancel()` deleting the journal when a submission was unfinished, so a mid-submit Stop now leaves a local
+  record and a Resume banner where it used to leave nothing. But the record is still **short**: the chunk
+  created between the snapshot and the Stop is billed, and `cancel()` has nil'd `activePendingBatch` by the
+  time its `onJobCreated` callback runs, so `recordSubmittedBatchChunk` → `persistPendingBatchMutation`'s
+  missing-journal guard reports the interruption and returns `false` (`+Pipeline.swift`) — the ID is
+  written nowhere. Net effect today: the operator IS warned ("paid jobs may exist beyond the ones that were
+  cancelled") and `ArchiveProcessor/README.md` §"If a batch submission reports an uncertain outcome" tells
+  them to check the provider console before retrying, but the app cannot cancel or collect that job itself.
+  **Owner-gated** on the same precedent as `W16.bat7`: it is a change to what the cancel path does with the
+  journal, and every one of those has been granted item by item. **Fix direction (owner's call):** let a
+  post-Stop chunk ID still reach the journal — e.g. `cancel()` keeps the journal addressable for
+  append-only chunk recording instead of nilling it outright, or the callback writes a "created after
+  cancellation" ID list straight to disk. ⚠️ Both touch `cancel()` semantics, which is exactly why this is
+  not something to fold in quietly. Do NOT fold into `W16.bat7` — different sites, different trigger.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | med | owner
 - [ ] **W16.bat7 — ⛔ `[hold]` NEEDS THE OWNER. Four exits in `pollBatchUntilComplete` return a
   "poll completed" flag they never set, and the caller then DELETES the paid batch's journal
   [S · MED · money · defence-in-depth].** Found by the W16.bat3-fu adversarial pass (2026-08-02);

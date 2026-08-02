@@ -155,7 +155,22 @@ its own date. Verbatim as recorded when granted.)*
   - Tier-2 in full: re-confirm the premise by symbol (not line — the file has moved under W16.bat1/bat2), then
     adversarial self-review. **Does NOT authorize** any other change to cancel semantics, and does not authorize
     `W16.bat5` or `W16.bat6`.
-- **`W16.bat5` — AUTHORIZED (granted 2026-08-01, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
+- **`W16.bat5` — ✅ DISCHARGED 2026-08-02** (the commit that ships it; full record in `SUITE_TODO_DONE.md`).
+  Every ⛔ was met. **The required direction was implemented, and the rejected one was not used even as a
+  fallback:** the guard is the invariant "a submit is in flight ⇒ the journal survives", evaluated
+  **synchronously inside `cancel()`** from the flag that already brackets the submit loop — the journal's
+  own `submissionComplete`, written `false` before the first provider create request and flipped true after
+  the last. Nothing is re-read after the cancellations, and there is no suspension point between the read
+  and the decision, so no TOCTOU window remains; the guard proved implementable exactly as stated, so the
+  STOP-and-flag clause was never reached. Keep-on-doubt holds in the strong sense — the change is
+  deletion-**reducing** on every input and adds a delete to none, its only effect being that
+  `confirmed && submissionInFlight` used to delete and now keeps. SCRATCH ONLY was met by construction:
+  both contracts stub the deleter and operate on a temp fixture, so no check reaches the shipped journal
+  path at all. The regression is built on W16.bat2's driver and **measured** on two mutants (call site
+  neutered to `false` → 7 red; rule branch killed → 15 red), with a non-vacuity twin behind every named
+  check. Neither `W16.bat2-fu2`, `W16.bat6` nor any other cancel-semantics change was touched. The grant is
+  retained verbatim below as the record.
+  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
   THE OWNER: the in-flight guard.** Stop mid-submit can delete the paid-batch journal while a later Gemini chunk
   is already billed: `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while the submit loop may
   still be creating server-side chunks, so if every chunk in that stale snapshot confirms, the journal is deleted

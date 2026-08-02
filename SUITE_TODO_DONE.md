@@ -2066,6 +2066,68 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   HIGH → MED, because this change closed its dominant trigger. One further finding of its own is filed as
   **W16.bat3-fu2** (after a Stop, the submission-failure message is doubly wrong).
   | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/BatchMutationReportContract.swift, OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift | S | med | none
+- [x] **W16.bat5 — Stop mid-submit could delete the journal while a later Gemini chunk was already paid for
+  [S · HIGH · money].** DONE 2026-08-02, this commit. Owner-authorized 2026-08-01 **with the fix direction
+  chosen by him** (grant now marked discharged in `OWNER_AUTHORIZATIONS.md`). Was: `cancel()` snapshots the
+  batch's chunk IDs once, nils `activePendingBatch`, and its cancellation task deletes the recovery journal
+  if **every** chunk in that snapshot confirms. A Gemini submit creates its server-side jobs one at a time,
+  so a chunk created *after* the snapshot is already billed, its ID is journaled nowhere (the nil
+  `activePendingBatch` makes `recordSubmittedBatchChunk` fail), and the journal — the only local trace of
+  the run — is deleted on top of it. **Pre-existing**; found by the W16.bat2 adversarial review.
+  **Fix — the in-flight guard the owner specified, not the re-read he rejected.** The invariant is *a submit
+  is in flight ⇒ the journal survives*, and the flag bracketing the submit loop already existed: the
+  journal's own `submissionComplete`, written `false` before the first provider create request and flipped
+  true by `markBatchSubmissionComplete()` after the last. A new pure predicate
+  `batchSubmissionIsInFlight(_:)` reads it; `cancel()` evaluates it **synchronously, before dropping
+  `activePendingBatch`**, and hands the answer to `performServerBatchCancellation`, which now keeps the
+  journal on a fully confirmed cancellation whenever a submission was in flight. Reusing the durable flag
+  rather than adding a process-local bool is deliberate: there is no new set/clear pair for a later edit to
+  forget, and it cannot fall out of sync with the submission it describes. Reading it at Stop time (not in
+  the cancellation task) is what makes it a rule and not another race — by the time that task runs the
+  submit has aborted and a late read would answer "finished" and delete. `submissionInFlight` is a
+  **non-defaulted** parameter, so no future caller can omit it. The known chunks are still cancelled — the
+  guard keeps the journal, not the money — and the operator gets a **distinct** message
+  (`batchCancellationSubmissionInFlightMessage`): "we stopped everything we knew of, and there may be more"
+  is not "we could not stop it". **Deletion-reducing only, and deliberately conservative:** a journal whose
+  submission never completed reads as in-flight for the rest of its life (including across a resume), so a
+  few Stops that used to delete now keep. That is the intended reading — an unfinished submission means the
+  set of paid jobs is unknown, so confirming the known ones proves nothing about the rest — and the cost is
+  one press of the existing Resume/Dismiss banner's Dismiss (`OCRView.swift:331`), which every unconfirmed
+  Stop already required. `confirmed && !journalDeleted` is now a reachable outcome, documented as such on
+  `BatchCancellationOutcome` so no reader mistakes `confirmed` for "the file is gone". **20 new $0 checks**
+  (`test-batch-resume.sh` 277 → 297): the predicate against literals, a named mid-submit Stop in both the
+  rule (`BatchCancelContract`) and the wiring (`BatchCancelWiringContract`), and the in-flight dimension
+  folded into **both** sweeps rather than sampled — the rule sweep 132 → **264** trials (8 real deletions,
+  every one in the finished-submission half) and the wiring sweep 80 → **120** Stops (10 real deletions,
+  110 real keeps). Discrimination **measured** on two mutants: hard-code `submissionInFlight: false` at the
+  `cancel()` call site — the fix reduced to a silent no-op — and **7** redden, all in the wiring half, the
+  sweep naming the exact shape (`Anthropic/1 chunk/journal mid-submit/none refused`); kill the rule's
+  branch and **15** redden across both halves. Every named check has a non-vacuity twin: the same Stop with
+  `submissionComplete` true still deletes. Scratch only — no check here touches the shipped journal path
+  (both contracts stub the deleter and delete a temp fixture), no network, no keys, no cent. Regression:
+  `test-recovery.sh` 56/56 and `test-manifest-persistence.sh` 109/109 still ALL PASS. Clean build, 0 new
+  warnings. **The adversarial pass confirmed the guard sound on all six questions put to it** — no path
+  where a submit is genuinely in flight and the predicate says otherwise (the Gemini submit loop is
+  strictly sequential, nothing detached, and `activePendingBatch` is assigned one line before `activeBatch`
+  with no suspension between, so `cancel()` can never see a live batch without its journal); a resumed
+  batch never creates a new chunk, so the guard cannot be evaded through resume; no production reader of
+  `.confirmed`/`.journalDeleted` at all; and not the rejected direction, because `cancel()` is non-`async`
+  so the read and the decision are one uninterrupted MainActor turn. It also verified no wedge: a kept
+  journal stays self-consistent, renders the banner, and is escapable by **both** Dismiss and a Resume that
+  terminates (a server-cancelled chunk is a *completed* provider state). **Three findings were fixed here
+  rather than filed.** (1) MED — the operator message was factually WRONG in two reachable shapes: a Stop
+  during a RESUMED batch whose original submission never completed (resume is GET-only, so nothing is being
+  submitted and nothing is created after the Stop), and a submit that finished but whose marker write
+  failed. It now states the unfinished *record* rather than a time — the same class of defect the repo
+  already tracks as W16.bat3-fu2. (2) `confirmed`'s own doc still asserted the strong reading this change
+  invalidates, one line above the ⚠️ warning about it. (3) The predicate is a **superset** of "a create is
+  happening right now" and the doc denied it; the breadth is correct and is now written down, along with
+  the Anthropic/Mistral case where the keep is uniformity rather than safety. **One residual is FILED, not
+  fixed: `W16.bat5-fu`** — the journal this now keeps still does not list the chunk paid for after the
+  snapshot, because `cancel()` has nil'd `activePendingBatch` by the time that chunk's callback runs.
+  Inherent to the direction the owner chose, out of scope for this grant, and owner-gated on the same
+  precedent as W16.bat7.
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchCancelContract.swift, OCR/BatchCancelWiringContract.swift | S | high | none
 - **Split out as its own LOW entry (tracked in `ArchiveProcessor/KNOWN_ISSUES.md`, NOT queued):** *lost-create
   reconciliation* — if a provider accepts a create POST and the response is lost, the app records the ambiguity
   honestly but cannot list the provider's batches to re-adopt the orphan. Cost is one batch's spend possibly paid
