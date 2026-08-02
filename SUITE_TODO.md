@@ -918,20 +918,37 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   `NotesModel` plus an inline-edit affordance on the list cell, mirroring how folders and templates already
   rename (so it is an existing interaction pattern, not a new one), rather than only adding a title field to
   the metadata inspector.
-  ⚠️ **The one thing that needs deciding inside the item: does renaming a note rename its file on disk, or
-  only its front-matter title?** Both are defensible and they diverge on durable links. Resolve it against
-  `SPEC/tag-format.md` + the durable-link machinery in `packages/ArchiveCore` and state the choice in the
-  commit — do NOT leave it implicit. **This is free to get right now and stops being free later:** per the
-  2026-08-01 STANDING PREMISE, Notes holds only test material, so no migration is owed; and the DEVONthink
-  import is ON HOLD precisely so Notes' structure can settle before 7.5 GB lands in it.
+  ✅ **DECIDED by the owner 2026-08-02: renaming a note renames the file on disk too**, not just the
+  front-matter title. ⚠️ **This is ALREADY the store's behaviour — do not design it, and do not add a second
+  rename path.** `NoteStore.saveEntry` (`Store/NoteStore.swift:242-255`) treats the filename as *"a projection
+  of the title"* and `moveItem`s `<Title>.md` whenever the title changes, behind a component-boundary
+  `precondition` that both URLs stay inside the entry dir and an intra-dir `disambiguate` on collision. It is
+  covered today (`NoteStoreTests` rename case; `TemplateTests` rename-on-save). **So the owner's decision costs
+  nothing and adds no new risk** — a `renameNote` routed through the existing `mutateItem` path inherits it
+  automatically, exactly as `setDate`/`setQuality` do.
+  ⚠️ **The first version of this entry was WRONG about the risk, and the correction shrinks the item.** It
+  claimed the on-disk-rename question "diverges on durable links". It does not. A note's durable identity is
+  its **UUID folder** — the layout is `<root>/items/<uuid>/<Title>.md` — and the UUID never changes on rename,
+  so note-passage `SourceAnchor` provenance resolves by id, not by filename. **No link breaks. Do not budget a
+  link-migration step; there is nothing to migrate.** What is left is the model method + the UI affordance,
+  which is why this is nearer **S–M** than the **M** first filed.
+  **What genuinely remains to be checked inside the item** (one assertion, not a redesign): the store does
+  `moveItem` and *then* an atomic overwrite (`Data.write(options: [.atomic])`, `:259`), while
+  `NotesTagProjector` writes the managed Finder tags onto that same `.md`. Assert the projected subjects **and**
+  the `ArchiveSuite` marker are still on the file after a rename. ⚠️ If they are NOT, that is a **pre-existing
+  defect on every `mutateItem` path** (`setDate`/`setQuality`/`setBody` all do the same atomic overwrite) —
+  **file it separately; do NOT absorb it into this item or let it grow the diff.**
+  **Free to get right now and stops being free later:** per the 2026-08-01 STANDING PREMISE, Notes holds only
+  test material, so no migration is owed; and the DEVONthink import is ON HOLD precisely so Notes' structure
+  can settle before 7.5 GB lands in it.
   **Also unblocks `W21.vmgui-c-fu`'s second blocker** — W14.4 (c)'s stated trigger is renaming a note, which
   is why that check is currently untestable rather than merely un-hittable. It does NOT unblock the first
   blocker (the chip is an `NSTextAttachmentViewProvider` subview outside the accessibility tree), so
   `W21.vmgui-c-fu` still needs one of its own three options; note the cross-reference in both.
-  **Tier-2** — it writes to the note's durable identity, and if the file is renamed there is no undo.
-  Scratch copies only, never a real store. GUI confirm goes through the Notes VM lane (green 15/15 as of
-  `7d6bb40`), not the host screen.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift, Index/OrganizationStore.swift, Views/ | M | med | none
+  **Tier-2** — it writes to the note's durable identity and the rename has no undo (the store's own
+  `moveItem`, not a Trash round-trip). Scratch copies only, never a real store. GUI confirm goes through the
+  Notes VM lane (green 15/15 as of `7d6bb40`), not the host screen.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift, Views/NotesTableView.swift | S–M | med | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
