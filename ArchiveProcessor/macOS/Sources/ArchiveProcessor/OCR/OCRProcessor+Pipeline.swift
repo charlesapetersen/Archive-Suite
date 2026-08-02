@@ -763,20 +763,49 @@ extension OCRProcessor {
         return true
     }
 
+    /// The one way a paid-batch run says *"I was cut short"* (W16.bat3-fu).
+    ///
+    /// `batchPollInterrupted` is the single fact every caller reads to decide the journal's fate
+    /// (`retirePaidBatchJournalIfPollCompleted`, `resumePendingBatch`, `processFiles`), and **nothing resets
+    /// it at the start of a run** — the only `= false` in the app is inside `pollBatchUntilComplete`. So an
+    /// interrupted exit that stays quiet is not neutral: it hands this run's verdict to whatever the
+    /// *previous* run happened to leave behind. `true` is also the keep-on-doubt answer — every reader of
+    /// the flag treats it as "the journal survives", and none of them deletes on it.
+    ///
+    /// Deliberately does NOT touch the journal, the jobs, or any output: reporting an interruption and
+    /// acting on one are different jobs, and the acting is `finishInterruptedBatchPoll()`'s at the caller.
+    func reportInterruptedPaidBatch(_ message: String) {
+        statusMessage = message
+        batchPollInterrupted = true
+        isProcessing = false
+        processingTask?.cancel()
+    }
+
+    /// Shown when the in-memory journal is gone before a mutation could be applied. `cancel()` nils
+    /// `activePendingBatch` while a submit may still be running, so this is the shape a Stop pressed
+    /// mid-submit arrives in — not a corruption, and nothing here removed anything.
+    static let pendingBatchJournalClosedMessage =
+        "A paid batch step could not be recorded — its recovery journal had already been closed by Stop. Nothing further was removed; check for a pending batch before retrying."
+
     /// Atomically advance the in-memory + on-disk paid-batch journal. The old durable snapshot remains
     /// authoritative if the replacement fails; callers stop immediately instead of continuing past it.
+    ///
+    /// **Neither failure exit is silent** (W16.bat3-fu). It used to have one that was: the missing-journal
+    /// guard below `return false`d without a word, and `performBatchOCR`'s
+    /// `guard markBatchSubmissionComplete() else { return }` — its FIFTH interrupted exit — turned that into
+    /// a silent return from a run whose batch is already paid for.
     @discardableResult
     func persistPendingBatchMutation(
         failureMessage: String,
         _ mutation: (inout PendingBatch) -> Void
     ) -> Bool {
-        guard var candidate = activePendingBatch else { return false }
+        guard var candidate = activePendingBatch else {
+            reportInterruptedPaidBatch(Self.pendingBatchJournalClosedMessage)
+            return false
+        }
         mutation(&candidate)
         guard let persisted = Self.savePendingBatch(candidate) else {
-            statusMessage = failureMessage
-            batchPollInterrupted = true
-            isProcessing = false
-            processingTask?.cancel()
+            reportInterruptedPaidBatch(failureMessage)
             return false
         }
         activePendingBatch = persisted
@@ -880,7 +909,8 @@ extension OCRProcessor {
     ///
     /// Both entry points into a paid batch call this and nothing else, so the two cannot drift again: the
     /// resume path (`resumePendingBatch`, after `pollBatchUntilComplete` returns) and the first-run path
-    /// (`processFiles`, after `performBatchOCR` returns — which covers all four of its interrupted exits).
+    /// (`processFiles`, after `performBatchOCR` returns — which covers all FIVE of its interrupted exits;
+    /// the fifth, `guard markBatchSubmissionComplete()`, only started reporting itself in W16.bat3-fu).
     /// Pinned headlessly by `BatchInterruptTailContract` (W16.bat4).
     func finishInterruptedBatchPoll() {
         activeBatch = nil
@@ -2130,9 +2160,11 @@ extension OCRProcessor {
                 // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results.
                 // The SAME tail as the resume site (W16.bat4) — resetting `isProcessing` alone left the
                 // Resume control the interruption message names unrendered until the operator pressed Start
-                // and was refused, and leaked this run's temp JPEGs. Reached by all four of
+                // and was refused, and leaked this run's temp JPEGs. Reached by all FIVE of
                 // `performBatchOCR`'s interrupted exits: journal-save failure, a submission that stopped
-                // part-way, a journal/ID disagreement, and the poll's own timeout / error streak.
+                // part-way, a journal/ID disagreement, a `markBatchSubmissionComplete()` that could not
+                // persist (W16.bat3-fu — the one that used to leave silently), and the poll's own
+                // timeout / error streak.
                 if batchPollInterrupted {
                     finishInterruptedBatchPoll()
                     return

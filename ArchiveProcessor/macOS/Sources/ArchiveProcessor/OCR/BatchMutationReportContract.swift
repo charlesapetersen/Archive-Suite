@@ -1,0 +1,230 @@
+import Foundation
+
+/// **No paid-batch journal mutation fails in silence** (W16.bat3-fu) — headless, $0, no network, no keys.
+/// Drives the real `OCRProcessor.markBatchSubmissionComplete()` / `recordSubmittedBatchChunk(_:)` /
+/// `markBatchChunkConsumed(_:)`, the three mutators every paid-batch run advances its recovery journal
+/// through, and pins that a failure from any of them is *reported* rather than swallowed.
+///
+/// **Why this exists.** `performBatchOCR`'s fifth interrupted exit is
+/// `guard markBatchSubmissionComplete() else { return }`, and W16.bat4's tail comment claimed to cover "all
+/// four" of them. The save-failure half was in fact covered — `persistPendingBatchMutation` sets
+/// `batchPollInterrupted` on its way out, so `processFiles` runs the tail — but its *other* failure exit,
+/// the missing-`activePendingBatch` guard, returned `false` without a word. That is not a hypothetical
+/// shape: `cancel()` nils `activePendingBatch` (`+Pipeline.swift`, the `if let batch = activeBatch` block)
+/// while a Gemini submit loop may still be running, so a Stop pressed mid-submit lands in exactly it.
+///
+/// A silent `false` there is worse than it looks, because **nothing resets `batchPollInterrupted` at the
+/// start of a run** — the only `= false` in the app is inside `pollBatchUntilComplete`, which this exit
+/// never reaches. So the run's fate was decided by whatever the PREVIOUS run happened to leave in the flag:
+/// a stale `false` falls through the interruption branch on a paid batch with no results, and the operator
+/// is given no message at all about a job that may still be running server-side.
+///
+/// **The property, stated once:** a mutator that returns `false` has ALWAYS set `batchPollInterrupted`,
+/// stopped the run, told the operator something, and cancelled the run task — and a mutator that returns
+/// `true` has done none of those. `true` is the keep-on-doubt direction: every reader of the flag
+/// (`retirePaidBatchJournalIfPollCompleted`, `resumePendingBatch`, `processFiles`) treats it as "the journal
+/// survives", and not one of them deletes on it. So this contract can only ever move the app toward keeping
+/// a paid batch's only local record, never away from it.
+///
+/// ⚠️ **SCOPE — read before citing this file.**
+///   * This pins the three mutators and the shared helper under them, NOT `performBatchOCR:647` itself.
+///     Reaching that line needs a real paid submission, so the call site's own explicit
+///     `batchPollInterrupted = true` is structural (a bare four-line guard body) rather than driven here —
+///     the same honest limit `BatchInterruptTailContract` records for the tail's two call sites.
+///   * The `savePendingBatch`-failed exit is not driven either. Forcing a write to fail would mean making
+///     the redirected state directory unwritable mid-run, which every other section shares; that exit's
+///     reporting is the pre-existing behaviour this item did not change, and sections 1–3 below pin the
+///     helper both of them now route through.
+///   * Section 2 writes a real journal at the shipped path, so it runs only under the harness's redirect.
+///
+/// Run from `BatchResumeTestDriver` (section 18) under `BATCHRESUME_TEST=1`; see
+/// `scripts/test-batch-resume.sh`.
+@MainActor
+enum BatchMutationReportContract {
+
+    static func run(check: (String, Bool) -> Void, redirected: Bool) {
+        everyMutatorReportsAClosedJournal(check)
+        // Section 2 persists a journal at `OCRProcessor.pendingBatchURL` and removes it again.
+        guard redirected else {
+            // Two checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
+            // check count, so a refused run reports SOME FAILED rather than a shorter green report.
+            check("mutation report: the two checks that write a real journal — a HEALTHY mutation reporting "
+                  + "nothing, and a report deleting nothing — are SKIPPED (refused: the journal path did not "
+                  + "resolve away from Application Support)", false)
+            return
+        }
+        aHealthyMutationReportsNothing(check)
+        reportingRemovesNothingFromDisk(check)
+    }
+
+    // MARK: - Fixtures
+
+    /// A synthetic model — never sent anywhere. Built by hand rather than read from `provider.models` so no
+    /// check depends on `CustomModelStore`/UserDefaults.
+    private static func model() -> LLMModel {
+        LLMModel(id: "mutation-report-gemini", displayName: "Mutation Report Gemini",
+                 provider: .gemini, supportsThinking: false, returnsMd: false,
+                 inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+    }
+
+    private static func journal(chunkIds: [String]) -> OCRProcessor.PendingBatch {
+        OCRProcessor.PendingBatch(
+            batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
+            fileURLs: [URL(fileURLWithPath: "/tmp/mutation-report/scan-0.jpg")],
+            outputDirectory: URL(fileURLWithPath: "/tmp/mutation-report", isDirectory: true),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+            submittedChunkIds: chunkIds)
+    }
+
+    /// Everything observable about one mutator call.
+    private struct Reported {
+        let returnedFalse: Bool
+        /// `batchPollInterrupted` went from a deliberate `false` to `true` — the keep-on-doubt answer.
+        let flaggedInterrupted: Bool
+        let stoppedProcessing: Bool
+        /// `statusMessage` is no longer the sentinel, and is not empty.
+        let explainedItself: Bool
+        /// The run task was told to stop, observed on a REAL task rather than assumed.
+        let cancelledTheRun: Bool
+        /// Reporting is not acting: the in-memory journal state and the run's jobs are left as they were.
+        let leftTheRunAlone: Bool
+    }
+
+    /// Call one mutator on a processor whose journal has already been closed by Stop, and record everything.
+    ///
+    /// THE ONLY place this file builds that state, so no check can accidentally run a mutator against a
+    /// processor that still holds a journal — which is a different question with a different answer.
+    private static func withClosedJournal(_ mutate: (OCRProcessor) -> Bool) -> Reported {
+        let processor = OCRProcessor()
+        // Exactly what `cancel()` leaves behind: `activeBatch` and `activePendingBatch` both nil, while the
+        // submit loop that is about to call a mutator is still unwinding on its own task.
+        processor.activePendingBatch = nil
+        processor.batchPollInterrupted = false
+        processor.isProcessing = true
+        let sentinel = "mutation-report-sentinel-\(UUID().uuidString)"
+        processor.statusMessage = sentinel
+        let source = URL(fileURLWithPath: "/tmp/mutation-report/scan-0.jpg")
+        processor.jobs = [OCRJob(sourceURL: source)]
+
+        // A real, live run task. `reportInterruptedPaidBatch` cancels `processingTask`, and a check that
+        // asserted nothing about it would pass on an implementation that dropped the call.
+        let run = Task<Void, Never> { try? await Task.sleep(for: .seconds(30)) }
+        processor.processingTask = run
+
+        let returned = mutate(processor)
+        let cancelled = run.isCancelled
+        run.cancel()
+
+        return Reported(
+            returnedFalse: !returned,
+            flaggedInterrupted: processor.batchPollInterrupted,
+            stoppedProcessing: !processor.isProcessing,
+            explainedItself: processor.statusMessage != sentinel && !processor.statusMessage.isEmpty,
+            cancelledTheRun: cancelled,
+            leftTheRunAlone: processor.activePendingBatch == nil && processor.jobs.count == 1
+                && processor.jobs[0].sourceURL == source)
+    }
+
+    // MARK: - 1. The bug: a mutator that fails without saying so
+
+    private static func everyMutatorReportsAClosedJournal(_ check: (String, Bool) -> Void) {
+        // THE regression check. `markBatchSubmissionComplete()` is what `performBatchOCR`'s fifth
+        // interrupted exit guards on; before W16.bat3-fu it returned `false` here having set nothing, and
+        // the exit's bare `return` handed the run's verdict to the previous run's flag.
+        let submission = withClosedJournal { $0.markBatchSubmissionComplete() }
+        check("mutation report: markBatchSubmissionComplete on a journal Stop already closed reports the "
+              + "interruption — it does not return false in silence",
+              submission.returnedFalse && submission.flaggedInterrupted
+              && submission.stoppedProcessing && submission.explainedItself)
+
+        // The same helper serves all three mutators, and the other two reach it from the poll loop, where a
+        // silent `false` is worse still: `pollBatchUntilComplete` has just assigned `batchPollInterrupted =
+        // false`, so an unreported failure there returns a flag that says "the poll completed" and the
+        // caller RETIRES the journal of a batch whose results never landed.
+        let recorded = withClosedJournal { $0.recordSubmittedBatchChunk("batches/paid-chunk-1") }
+        check("mutation report: recordSubmittedBatchChunk reports it too — a chunk that is already billed "
+              + "must not fail to journal quietly",
+              recorded.returnedFalse && recorded.flaggedInterrupted
+              && recorded.stoppedProcessing && recorded.explainedItself)
+
+        let consumed = withClosedJournal { $0.markBatchChunkConsumed("batches/paid-chunk-1") }
+        check("mutation report: markBatchChunkConsumed reports it too, so the poll cannot return a "
+              + "\"completed\" flag on a chunk it failed to record",
+              consumed.returnedFalse && consumed.flaggedInterrupted
+              && consumed.stoppedProcessing && consumed.explainedItself)
+
+        // The two halves the three checks above do not name individually, swept across all three mutators:
+        // the run task is really cancelled (not merely `isProcessing = false`, which leaves the submit loop
+        // running), and reporting stays reporting — it does not start clearing the run's state, which is
+        // `finishInterruptedBatchPoll()`'s job at the caller.
+        let all = [submission, recorded, consumed]
+        check("mutation report: all three mutators cancel the run task they interrupted",
+              all.count == 3 && all.allSatisfy { $0.cancelledTheRun })
+        check("mutation report: and none of them touches the journal state or the run's jobs — reporting an "
+              + "interruption is not acting on one",
+              all.allSatisfy { $0.leftTheRunAlone })
+    }
+
+    // MARK: - 2. The other direction, so the property is not "always report"
+
+    /// Without this, an implementation that called `reportInterruptedPaidBatch` unconditionally — wedging
+    /// every healthy paid batch into a permanent "interrupted" — would satisfy section 1 completely.
+    private static func aHealthyMutationReportsNothing(_ check: (String, Bool) -> Void) {
+        let processor = OCRProcessor()
+        processor.activePendingBatch = journal(chunkIds: ["batches/healthy-0"])
+        processor.batchPollInterrupted = false
+        processor.isProcessing = true
+        let sentinel = "mutation-report-healthy-\(UUID().uuidString)"
+        processor.statusMessage = sentinel
+        let run = Task<Void, Never> { try? await Task.sleep(for: .seconds(30)) }
+        processor.processingTask = run
+
+        let returned = processor.markBatchSubmissionComplete()
+        let cancelled = run.isCancelled
+        run.cancel()
+        // Read back through the production write path's own result rather than the file, so a mutation that
+        // reported success without persisting anything is still caught.
+        let persisted = processor.activePendingBatch?.submissionComplete == true
+        OCRProcessor.deletePendingBatch()
+
+        check("mutation report: a HEALTHY markBatchSubmissionComplete persists the marker and returns true",
+              returned && persisted)
+        check("mutation report: and it reports nothing — the run keeps going, unflagged, with its message "
+              + "and its task intact",
+              !processor.batchPollInterrupted && processor.isProcessing
+              && processor.statusMessage == sentinel && !cancelled)
+    }
+
+    // MARK: - 3. Reporting an interruption removes nothing
+
+    /// The direction that costs money if it goes wrong. `reportInterruptedPaidBatch` is called on the exact
+    /// path where a paid server-side job may still be alive, so a "tidy up the journal" line added to it
+    /// would strand that job with no local record — the same failure `finishInterruptedBatchPoll()` is
+    /// pinned against, one layer down.
+    private static func reportingRemovesNothingFromDisk(_ check: (String, Bool) -> Void) {
+        let fm = FileManager.default
+        let bytes = Data(#"{"batchId":"batches/paid-job"}"#.utf8)
+        try? bytes.write(to: OCRProcessor.pendingBatchURL, options: .atomic)
+        let runManifest = OCRProcessor.pendingRunURL
+        let runBytes = Data(#"{"sentinel":"interrupted-run-manifest"}"#.utf8)
+        try? runBytes.write(to: runManifest, options: .atomic)
+        let bothExisted = fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)
+            && fm.fileExists(atPath: runManifest.path)
+
+        // In-memory journal closed, durable journal still on disk — precisely the state a Stop mid-submit
+        // leaves when the cancellation could not confirm every chunk, and the one in which the file is the
+        // operator's only way back to a paid job.
+        let reported = withClosedJournal { $0.markBatchSubmissionComplete() }
+
+        let batchIntact = (try? Data(contentsOf: OCRProcessor.pendingBatchURL)) == bytes
+        let runIntact = (try? Data(contentsOf: runManifest)) == runBytes
+        try? fm.removeItem(at: OCRProcessor.pendingBatchURL)
+        try? fm.removeItem(at: runManifest)
+
+        check("mutation report: reporting the interruption leaves the paid-batch journal byte-identical on "
+              + "disk — the server-side job keeps its only local record",
+              bothExisted && reported.returnedFalse && batchIntact)
+        check("mutation report: and it leaves the interrupted-run manifest alone as well", runIntact)
+    }
+}

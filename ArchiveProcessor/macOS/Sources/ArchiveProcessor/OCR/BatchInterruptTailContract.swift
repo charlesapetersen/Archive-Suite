@@ -303,7 +303,7 @@ enum BatchInterruptTailContract {
 
     private static func runningTheTailTwiceIsSafe(_ check: (String, Bool) -> Void) {
         // Both call sites `return` immediately after the tail, so today it runs once. That is a property of
-        // the callers, not of the tail — and one of the four interrupted exits it now covers
+        // the callers, not of the tail — and one of the five interrupted exits it now covers
         // (`performBatchOCR`'s submission-failure arm) already calls `checkForPendingBatch()` on its own way
         // out, so a second pass over the same state is not hypothetical.
         let tail = interrupt(twice: true)
@@ -316,9 +316,10 @@ enum BatchInterruptTailContract {
 
     // MARK: - The same invariants, from every state an interruption can arrive in
 
-    /// The four interrupted exits arrive here in different states: a journal-save failure has neither a live
+    /// The five interrupted exits arrive here in different states: a journal-save failure has neither a live
     /// batch nor journal state; a submission that stopped part-way has both and has already reset
-    /// `isProcessing`; a poll timeout has journal state but its `activeBatch` was cleared on the way out.
+    /// `isProcessing`; a poll timeout has journal state but its `activeBatch` was cleared on the way out;
+    /// a `markBatchSubmissionComplete()` closed out by Stop (W16.bat3-fu) has neither.
     /// The tail's outcome must not depend on which — so drive all of them, plus a run with no PDF inputs at
     /// all (nothing to clean up).
     private static func sweepEveryStartingState(_ check: (String, Bool) -> Void) {

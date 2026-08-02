@@ -70,6 +70,12 @@ import AppKit
 ///      Its section 5 (W16.bat6) covers the other half of that promise — the operator being *told* — by
 ///      pressing Stop with a live `processingTask` and asserting the kept-journal warning is still the
 ///      message on screen once the cancelled run has finished writing its own.
+///  18. **No journal MUTATION fails in silence** (`BatchMutationReportContract`, W16.bat3-fu): a layer below
+///      section 17, at the three mutators a paid batch advances its journal through. `performBatchOCR`'s
+///      FIFTH interrupted exit guards on `markBatchSubmissionComplete()`, whose missing-journal failure —
+///      the shape a Stop mid-submit lands in — returned `false` having set nothing, leaving the run to be
+///      judged on the flag a PREVIOUS run left behind. Pins both directions: a failed mutation always
+///      reports, a healthy one never does, and reporting removes nothing from disk.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -694,6 +700,14 @@ enum BatchResumeTestDriver {
         // guards sit before any provider call, so no request is made: no network, no keys, no cost. Its last
         // two checks write a real journal at the shipped path, so they use the same redirect verdict.
         await BatchPollCancelContract.run(check: check, redirected: journalsAreRedirected)
+
+        // --- 18: no paid-batch journal mutation fails in silence (W16.bat3-fu). ---
+        // Section 17 covers the poll's two cancellation exits; this one is a layer down, at the three
+        // mutators every paid-batch run advances its journal through. `performBatchOCR`'s FIFTH interrupted
+        // exit guards on one of them, and its missing-journal failure — the shape a Stop mid-submit lands in
+        // — used to return `false` without setting the flag both callers judge the run by. No provider call
+        // is made and no journal is written outside section 2/3, which use the same redirect verdict.
+        BatchMutationReportContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

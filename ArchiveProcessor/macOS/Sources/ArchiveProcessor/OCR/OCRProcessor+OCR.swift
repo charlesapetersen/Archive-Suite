@@ -644,7 +644,18 @@ extension OCRProcessor {
                 // Phase 4 adds a real OpenAIBatchClient. The throw is caught below → jobs marked failed.
                 throw OCRError.networkError("OpenAI batch is not supported in this version")
             }
-            guard markBatchSubmissionComplete() else { return }
+            // `performBatchOCR`'s FIFTH interrupted exit (W16.bat3-fu). The batch is PAID by the time
+            // control reaches here and every acknowledged chunk ID is already journaled — only the
+            // "submission finished" marker failed to persist, or Stop closed the journal out from under it.
+            // Back in `processFiles` this exit is judged purely on `batchPollInterrupted`, so say so
+            // explicitly rather than inheriting the flag a PREVIOUS run left set (nothing resets it at the
+            // start of a run). `markBatchSubmissionComplete()` now reports itself on both of its failure
+            // paths; this is the belt that keeps the exit correct if a future edit adds a quiet third.
+            guard markBatchSubmissionComplete() else {
+                batchPollInterrupted = true
+                isProcessing = false
+                return
+            }
         } catch {
             // A non-idempotent create can be accepted server-side even when its response is lost. Keep
             // the pre-submit journal in every failure case; acknowledged IDs remain resumable, while an
