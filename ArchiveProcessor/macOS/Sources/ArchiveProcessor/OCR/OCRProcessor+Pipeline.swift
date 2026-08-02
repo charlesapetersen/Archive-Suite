@@ -543,12 +543,92 @@ extension OCRProcessor {
     /// able to say *which* durable file a confirmed cancellation may remove, and be checked on it
     /// without touching the file itself (W16.bat2-fu → `BatchCancellationJournal`).
     nonisolated static let pendingBatchFileName = "pending_batch.json"
-    private static var pendingBatchURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let dir = appSupport.appendingPathComponent("ArchiveProcessor")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent(pendingBatchFileName)
+
+    // MARK: The directory the two durable journals live in — and its ONE test-only override (W16.bat2-fu2)
+
+    /// Environment variable naming a test-only base directory for `pending_batch.json` / `pending_run.json`,
+    /// on the same pattern as `ARCHIVEPROC_TEST_BACKUP_ROOT` — but gated twice, not once
+    /// (see `pendingStateDirectory`).
+    nonisolated static let pendingStateTestRootEnvKey = "ARCHIVEPROC_TEST_STATE_ROOT"
+    /// The headless batch-resume driver's own gate. The override above is honoured ONLY when this variable
+    /// reads exactly `"1"` — the same string `BatchResumeTestDriver.runIfRequested()` demands before it runs
+    /// at all, so the redirect cannot outlive the driver that needs it.
+    nonisolated static let batchResumeTestEnvKey = "BATCHRESUME_TEST"
+
+    /// The REAL, operator-facing state directory: `<Application Support>/ArchiveProcessor`. Computed in
+    /// exactly one place so the fail-closed fallback below cannot drift from the path production uses.
+    nonisolated static func realPendingStateDirectory(_ fm: FileManager = .default) -> URL {
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
+        return appSupport.appendingPathComponent("ArchiveProcessor")
+    }
+
+    /// Where the paid-batch journal and the interrupted-run manifest live — **fail closed** (W16.bat2-fu2).
+    ///
+    /// *Why an override exists at all.* Deleting `pending_batch.json` is the one act on the money path no
+    /// check could ever perform, because performing it deleted the operator's real journal — so the shipped
+    /// deleter (`makeBatchJournalDeleter`'s default) was verified by reading it, and mutating its body to
+    /// `{ }` left every check green. With the directory redirectable, a headless check can write a journal,
+    /// run the SHIPPED deleter, and watch the file go. The second half matters just as much: with the path
+    /// pinned to Application Support, anyone who later bolted an *un-seamed* deletion into the cancel block
+    /// would make *running `test-batch-resume.sh`* the thing that destroys a live journal.
+    ///
+    /// *Why it is gated twice.* A mis-read environment variable here does not fail a test — it **strands a
+    /// paid batch**: the app would look for a live server-side job's journal in a directory it was never
+    /// written to. So the override is honoured only when `BATCHRESUME_TEST` reads exactly `"1"` AND the
+    /// override names a usable ABSOLUTE directory. Unset, empty, whitespace, `"0"`, `"true"`, `"1 "`,
+    /// relative, `~`-relative, a path that names a file, or a path that cannot be created → the REAL
+    /// directory, every time. There is deliberately no other trigger: no `#if DEBUG`, no test-bundle
+    /// sniffing, no debug flag.
+    ///
+    /// Pure in its inputs on purpose. That is what lets `BatchJournalPathContract` hand it every bad reading
+    /// directly and assert the real path comes back — a fail-closed direction that no amount of env-var
+    /// mutation could check safely from inside a running app.
+    nonisolated static func pendingStateDirectory(testFlag: String?,
+                                                  overrideRoot: String?,
+                                                  fileManager fm: FileManager = .default) -> URL {
+        if let redirected = validatedPendingStateOverride(testFlag: testFlag, overrideRoot: overrideRoot,
+                                                          fileManager: fm) {
+            return redirected
+        }
+        let real = realPendingStateDirectory(fm)
+        try? fm.createDirectory(at: real, withIntermediateDirectories: true)
+        return real
+    }
+
+    /// The override directory, or `nil` if any part of the request is not exactly right. Every `return nil`
+    /// below is a fail-closed edge: the caller answers with the operator's real path.
+    private nonisolated static func validatedPendingStateOverride(testFlag: String?,
+                                                                  overrideRoot: String?,
+                                                                  fileManager fm: FileManager) -> URL? {
+        // Exact match, not `!= nil` and not a truthiness test: `"0"`, `"true"` and `"1 "` are all somebody
+        // being approximate about a variable that decides where a paid batch's only record is kept.
+        guard testFlag == "1" else { return nil }
+        // Absolute paths only. A relative or `~`-relative root would resolve against the app's working
+        // directory (or not at all), i.e. somewhere neither the test nor the operator meant.
+        guard let trimmed = overrideRoot?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.hasPrefix("/") else { return nil }
+        let candidate = URL(fileURLWithPath: trimmed, isDirectory: true)
+        try? fm.createDirectory(at: candidate, withIntermediateDirectories: true)
+        // Must actually BE a directory now — a root that names a regular file, or that could not be created,
+        // is unusable, and silently writing the journal beside it is worse than not redirecting.
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else { return nil }
+        return candidate
+    }
+
+    /// The live answer for this process, resolved from its environment.
+    nonisolated static var pendingStateDirectoryFromEnvironment: URL {
+        let env = ProcessInfo.processInfo.environment
+        return pendingStateDirectory(testFlag: env[batchResumeTestEnvKey],
+                                     overrideRoot: env[pendingStateTestRootEnvKey])
+    }
+
+    /// Internal rather than private so a check can assert *where this resolves* before it writes anything
+    /// near it — the guard that keeps `BatchJournalPathContract`'s destructive checks off the real journal.
+    nonisolated static var pendingBatchURL: URL {
+        pendingStateDirectoryFromEnvironment.appendingPathComponent(pendingBatchFileName)
     }
     @discardableResult
     static func savePendingBatch(_ batch: PendingBatch) -> PendingBatch? {
@@ -579,12 +659,11 @@ extension OCRProcessor {
     /// The interrupted-run manifest's file name. Named for the same reason as its batch sibling, and
     /// pinned as a DIFFERENT file: cancelling a paid batch must never take this one with it.
     nonisolated static let pendingRunFileName = "pending_run.json"
-    private static var pendingRunURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let dir = appSupport.appendingPathComponent("ArchiveProcessor")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent(pendingRunFileName)
+    /// Same directory, same override, same fail-closed rule (`pendingStateDirectory`) — and internal for the
+    /// same reason as its batch sibling: a check has to be able to prove the paid-batch cancellation left
+    /// THIS file alone, which means knowing where it is.
+    nonisolated static var pendingRunURL: URL {
+        pendingStateDirectoryFromEnvironment.appendingPathComponent(pendingRunFileName)
     }
     @discardableResult
     private static func savePendingRun(_ run: PendingRun) -> Bool {
