@@ -112,11 +112,13 @@ import AppKit
 ///      W16.bat10): what section 21 pins for the completion sweep, for every `handleOCRResult` caller and for
 ///      the writes *before* the detached PDF write. No race to stage — the caller already holds the stale
 ///      `(index, jobID)` pair — so replacing `jobs` and calling the real function reproduces it in one shot.
-///  24. **A busy-model retry prunes the job it was dispatched for, or nothing**
+///  24. **A busy-model retry reads nothing from a file list that moved under it**
 ///      (`RetryPruneIdentityContract`, W16.bat11): the residual of 23 — the one unguarded `jobs[index]` read
-///      left, in `retryHighUseFailures`, on an index chosen ten seconds and one network call earlier. Drives
-///      the real loop through the `NetworkSession.testTransport` seam, with the stub emptying or replacing
-///      the file list from inside the request, so the call site is under test with the guard. Writes no
+///      left, in `retryHighUseFailures`, on an index chosen ten seconds and one network call earlier. The fix
+///      is a DELETION (that prune was redundant with `handleOCRResult`'s, same pair, same condition, same
+///      identity guard), so this drives the real loop through the `NetworkSession.testTransport` seam and
+///      measures the loop's whole outcome: the app survives Clear pressed mid-call, the honestly retried
+///      file is still pruned once, and a run started mid-flight keeps its own failure entry. Writes no
 ///      manifest or journal, so it takes no redirect verdict; costs two real 10-second waits (the shipped
 ///      retry's own sleep). Like 21, a mutant here can TRAP this driver rather than print FAIL.
 ///
@@ -805,15 +807,16 @@ enum BatchResumeTestDriver {
         // path, so it takes the same redirect verdict.
         await StaleRunResultIdentityContract.run(check: check, redirected: journalsAreRedirected)
 
-        // --- 24: a busy-model retry prunes the job it was dispatched for, or nothing (W16.bat11). ---
+        // --- 24: a busy-model retry reads nothing from a file list that moved under it (W16.bat11). ---
         // The residual section 23 filed: the one `jobs[index]` read that neither W16.bat9 nor W16.bat10
         // reached, in `retryHighUseFailures`, on an index chosen ten seconds and one network call earlier.
         // Unlike section 23 this drives the real LOOP — `NetworkSession.testTransport` stands in for the
-        // wire and the stub empties/replaces the file list from inside the request, so the call site is
-        // under test alongside the guard. Still no keys, no network, no cost; it writes no manifest and no
-        // journal at all (its fixtures build neither), so it takes no redirect verdict. It DOES cost two
-        // real 10-second waits, which is the shipped retry's own sleep and the reason the window needed a
-        // seam rather than an enqueued task. A mutant here can TRAP this process rather than print FAIL.
+        // wire and the stub empties/replaces the file list from inside the request, so what is measured is
+        // the loop's own outcome rather than a helper's. Still no keys, no network, no cost; it writes no
+        // manifest and no journal at all (its fixtures build neither), so it takes no redirect verdict. It
+        // DOES cost two real 10-second waits, which is the shipped retry's own sleep and the reason the
+        // window needed a seam rather than an enqueued task. A mutant here can TRAP this process rather
+        // than print FAIL.
         await RetryPruneIdentityContract.run(check: check)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

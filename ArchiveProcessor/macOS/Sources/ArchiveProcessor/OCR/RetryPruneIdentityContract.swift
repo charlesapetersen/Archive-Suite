@@ -1,55 +1,61 @@
 import AppKit
 import Foundation
 
-/// **A busy-model retry prunes the job it was dispatched for, or nothing** (W16.bat11) — headless, $0, no
+/// **A busy-model retry reads nothing from a file list that moved under it** (W16.bat11) — headless, $0, no
 /// network, no keys.
 ///
 /// The bug this pins: `retryHighUseFailures` chose its indices, slept ten seconds, made a network call per
 /// file, and then read `jobs[index]` on that bare index — no bounds check, no identity check, and no
 /// `Task.isCancelled` between the suspension and the read. The operator can spend that window pressing Stop,
 /// then **Clear** (`jobs = []`), re-dropping files and pressing **Start**. Out of range the subscript **TRAPS
-/// the app**; in range it prunes the LIVE run's failure entry under a stopped row's filename, so the new
-/// run's own "N failed" summary and `.txt` log under-count. `W16.bat9` closed this class for the completion
-/// sweep and `W16.bat10` for every `handleOCRResult` caller's writes; this is the one read neither reached.
+/// the app**; in range it pruned the LIVE run's failure entry under a stopped row's filename, so the new
+/// run's own "N failed" summary and `.txt` log under-counted. `W16.bat9` closed this class for the completion
+/// sweep and `W16.bat10` for every `handleOCRResult` caller's writes; this was the one read neither reached.
 ///
-/// **This drives the real loop, not just the guard.** The two sections below install
-/// `NetworkSession.testTransport` (the fail-closed seam from `W16.bat7-fu`) and call the shipped
-/// `retryHighUseFailures` — real retry selection, real 10-second wait, real `GeminiClient`, real
-/// `handleOCRResult` — with the file list mutated *by the stub*, i.e. exactly while the main actor is
-/// suspended inside the OCR call. That costs this suite two 10-second sleeps, and buys the one thing a
-/// guard-only section cannot have: the CALL SITE is under test too. A mutant that keeps the guard but hands
-/// it a freshly-read `jobs[index].id` instead of the snapshotted `slot.jobID` reds §2 (the live row's id
-/// matches, so the wrong file is pruned) and traps in §1.
+/// **The fix it pins is a deletion, not a guard**, and that changes what this section can attribute. The
+/// retry's prune was redundant: `handleOCRResult` prunes the same name, off the same `(index, jobID)` pair,
+/// under the same `result.text != nil` condition, behind the identity guard `W16.bat10` gave it, with nothing
+/// observing `failedFiles` in between. So the prune now has one owner and the retry loop reads `jobs` only
+/// where it is main-actor-synchronous. §1's honest-prune check is therefore a check on `handleOCRResult`'s
+/// prune reached THROUGH the real retry loop — which is exactly the invariant that made the deletion safe,
+/// and it reds if that prune ever goes away.
+///
+/// **This drives the real loop, not a helper.** Both sections install `NetworkSession.testTransport` (the
+/// fail-closed seam from `W16.bat7-fu`) and call the shipped `retryHighUseFailures` — real retry selection,
+/// real 10-second wait, real `GeminiClient`, real `handleOCRResult` — with the file list mutated *by the stub*,
+/// i.e. exactly while the main actor is suspended inside the OCR call. That costs this suite two real
+/// 10-second waits, which is the shipped retry's own sleep and the reason the window needed a seam rather
+/// than the enqueued-main-actor-task trick that drove bat9 and bat10.
 ///
 /// **What is pinned.**
-///   * §1 The list emptied across the OCR call neither traps nor prunes — and the file that WAS retried
-///     honestly is still pruned in the same run, so the section cannot be satisfied by refusing everything.
-///   * §2 The list REPLACED across the OCR call (Stop → Clear → re-drop → Start, different files) leaves the
-///     new run's own failure entry alone. This is the quiet half of the bug: no crash, just a summary that
-///     under-counts.
-///   * §3 Three things the guard itself decides, driven directly because no timing is involved: the identity
-///     is the job INSTANCE's and not the file's (the same file re-dropped compares equal by `sourceURL`,
-///     which is the wrong fix `W16.bat9` shipped first), an honest pair still prunes, and a negative index is
-///     refused (`jobs.indices.contains` rather than `index < jobs.count`).
+///   * §1 The list emptied across the OCR call neither traps nor loses the run's bookkeeping: the file
+///     retried BEFORE the mutation is still pruned, and the one whose row vanished is left listed.
+///   * §2 The list REPLACED across the OCR call (Stop → Clear → re-drop DIFFERENT files → Start) leaves the
+///     new run's own failure entry alone. This is the quiet half of the bug — no crash, just a summary that
+///     under-counts — and it is the check a bounds-only "fix" fails.
 ///
 /// **What a mutant looks like here.** ⚠️ NOT YET MEASURED — the list below is what this section is BUILT to
 /// catch, and the commit that follows replaces it with what each mutant actually reddened:
-///   * the guard removed entirely — THE bug — → §1 does not FAIL, it **TRAPS this process** and no report is
+///   * the unguarded read put back — THE bug — → §1 does not FAIL, it **TRAPS this process** and no report is
 ///     written at all (the `BatchSweepClearedListContract` §21 signature), so the suite goes RED with no
 ///     output rather than with a FAIL line.
-///   * bounds only (`jobs.indices.contains(index)`) → **1 RED**: §2, the quiet case — in range, wrong row.
-///   * `jobs[index].sourceURL == fileURLs[index]` instead of the id → **1 RED**: §3's first check.
-///   * a bare `return` at the top of the guard → **2 RED**: §1's honest prune and §3's non-vacuity check.
-///   * `index < jobs.count` instead of `jobs.indices.contains(index)` → **1 RED**: §3's negative index.
+///   * the read put back with a bounds check only → §2, the quiet case: in range, wrong row.
+///   * `handleOCRResult`'s own prune neutered → §1's honest-prune check, which is what says the deletion did
+///     not simply drop the behaviour.
 ///
-/// Scope: the retry loop's prune. NOT the loop's other unguarded read (`jobs[index].status = .processing`),
-/// which is main-actor-synchronous with the cancellation guard above it — nothing can land in between — and
-/// NOT what `handleOCRResult` does with the same identity, which is `StaleRunResultIdentityContract`'s.
+/// Scope: what the retry loop reads across its OCR call. NOT the loop's `jobs[index].status = .processing`
+/// (`:1620`) or `fileURLs[index]` (`:1619`), which the adversarial pass confirmed unreachable rather than
+/// merely unguarded: `cancel()` cancels the `processingTask` all three call sites run on, **Clear** is
+/// disabled while `isProcessing`, and a row that vanishes mid-call makes `handleOCRResult` return `false`, so
+/// the loop exits before the next iteration's write. Production has no path that TRUNCATES `jobs` while
+/// keeping the surviving rows' ids — that, and only that, would reach those two — so no fixture here stages
+/// one. And NOT what `handleOCRResult` does with a stale identity, which is
+/// `StaleRunResultIdentityContract`'s.
 ///
 /// No manifest and no journal is written by any check here: no fixture builds a `PendingRun` or a
-/// `PendingBatch`, so `saveResultToPendingRun` takes its `activePendingRun == nil, activePendingBatch == nil`
-/// path and returns `true` without touching disk. Every file this section writes is under one temp directory
-/// it removes. That is why it needs no redirect verdict, unlike its siblings.
+/// `PendingBatch`, so `saveResultToPendingRun` takes its both-nil path and returns `true` without touching
+/// disk. Every file written is under one temp directory the fixture removes. That is why this section needs
+/// no redirect verdict, unlike its siblings.
 ///
 /// Run from `BatchResumeTestDriver` (section 24) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -59,27 +65,28 @@ enum RetryPruneIdentityContract {
     static func run(check: (String, Bool) -> Void) async {
         let dormantBefore = !NetworkSession.testTransportIsActive && NetworkSession.testTransport == nil
 
-        // MARK: 1. The list emptied across the OCR call — the crash, and the honest prune beside it
+        // MARK: 1. The list emptied across the OCR call — the crash, and the bookkeeping beside it
         //
         // Two retryable files, one real run. The stub answers the first honestly and empties `jobs` while
-        // answering the second, so the same loop produces both halves: a prune that must happen and a read
-        // that must not.
+        // answering the second, so the same loop produces both halves: bookkeeping that must still happen and
+        // a read that must not.
         let emptied = await retry(.emptyTheListOnRequest(2))
         check("retry prune: the app survives Clear pressed while a busy-model retry's OCR call is in flight "
               + "— reaching this check at all is most of it, because an unguarded read TRAPS this process "
               + "before any report is written (see this file's header)",
               emptied.mutationLandedDuringTheCall && emptied.listWasEmptyAfterwards)
-        check("retry prune: the file that was retried BEFORE the list was emptied is still pruned from the "
-              + "failure list, and both files really went through the provider client",
+        check("retry prune: the file retried BEFORE the list was emptied is still pruned from the failure "
+              + "list, and both files really went through the provider client — the prune the retry loop "
+              + "stopped doing itself is still done, once, by `handleOCRResult`",
               emptied.prunedTheHonestFile && emptied.requests == 2)
-        check("retry prune: the file whose row vanished mid-call is NOT pruned — nothing is read from a list "
-              + "that no longer has that index",
+        check("retry prune: the file whose row vanished mid-call is left listed — nothing is read from, or "
+              + "decided about, a list that no longer has that index",
               emptied.keptTheStaleFile)
 
         // MARK: 2. The list REPLACED across the OCR call — the quiet half
         //
         // Stop, Clear, re-drop different files, Start: the new run's jobs take the same indices, so a bounds
-        // check passes and the stale row's prune lands on a live file's failure entry instead.
+        // check passes and the stopped row's prune lands on a live file's failure entry instead.
         let replaced = await retry(.replaceTheListOnRequest(1))
         check("retry prune: a run started while the retry was in flight keeps its OWN failure entry — the "
               + "stopped run's retry does not prune the file that now sits at that index",
@@ -88,18 +95,6 @@ enum RetryPruneIdentityContract {
         check("retry prune: ...and prunes nothing else either — the whole failure list is as the new run "
               + "left it",
               replaced.failureListUnchanged)
-
-        // MARK: 3. What the guard itself decides
-        //
-        // No suspension is involved in any of these, so they are driven straight at the shipped guard.
-        check("retry prune: a row refilled with the very same file is still a different row — its identity "
-              + "is the job's id, so the new run's own failure entry for that filename survives",
-              !prune(.theSameFileReDropped))
-        check("retry prune: ...while the run's own live job still gets its failure entry pruned",
-              prune(.honest))
-        check("retry prune: a negative index is refused rather than trapped — the bounds half is "
-              + "`jobs.indices.contains`, not `index < jobs.count`",
-              !prune(.negativeIndex))
 
         check("retry prune: the transport seam was dormant before this section and is dormant again after "
               + "it — no stub outlives the checks that installed it",
@@ -124,7 +119,7 @@ enum RetryPruneIdentityContract {
         let mutationLandedDuringTheCall: Bool
         /// `jobs` is still empty afterwards (the emptied fixture's half of the same fact).
         let listWasEmptyAfterwards: Bool
-        /// The file retried before the mutation is gone from `failedFiles` (§1's non-vacuity).
+        /// The file retried before the mutation is gone from `failedFiles`.
         let prunedTheHonestFile: Bool
         /// The file whose row vanished across its own call is still listed.
         let keptTheStaleFile: Bool
@@ -153,29 +148,29 @@ enum RetryPruneIdentityContract {
         processor.isProcessing = true
         processor.jobs = stoppedRunSources.map { source in
             var job = OCRJob(sourceURL: source)
-            // `retrySlots` is built from the RESULT (`isRetryableError`), not the status, so the 503 below
-            // is what puts both files in it; `.failed` is only what the run would have left on screen.
+            // `retrySlots` is built from the RESULT (`isRetryableError`), not the status, so the 503 below is
+            // what puts both files in it; `.failed` is only what the run would have left on screen.
             job.status = .failed
             job.result = OCRResult(text: nil, classification: nil,
                                    errorMessage: "The model is experiencing high demand", errorCode: "503")
             return job
         }
-        // What the run recorded before the retry: both busy files failed. `fresh-0.jpg` is a failure the
-        // NEW run recorded for itself, and is the entry the quiet half of the bug destroys.
+        // What the run recorded before the retry: both busy files failed. `fresh-0.jpg` is a failure the NEW
+        // run recorded for itself, and is the entry the quiet half of the bug destroys.
         let failuresBefore = ["busy-0.jpg", "busy-1.jpg", "fresh-0.jpg"]
         processor.failedFiles = failuresBefore
 
         let transcript = Transcript()
         NetworkSession.testTransport = stub(mutation, on: processor, newRunSources: newRunSources,
                                            transcript: transcript)
+        // Deferred rather than assigned after the call: a trap inside the section must not leave a stub
+        // installed for whatever runs next.
+        defer { NetworkSession.testTransport = nil }
         // The real thing: real retry selection, real 10s wait, real client, real `handleOCRResult`.
         await processor.retryHighUseFailures(
             fileURLs: stoppedRunSources, provider: .gemini, model: model(), thinkingLevel: nil,
             apiKey: "retry-prune-not-a-key", outputDirectory: outDir,
             runConfig: runConfig(outputDirectory: outDir))
-        // Uninstalled only once the call has fully RETURNED, so no request it started is still looking for
-        // a stub.
-        NetworkSession.testTransport = nil
 
         let after = processor.failedFiles
         return Retried(
@@ -199,8 +194,8 @@ enum RetryPruneIdentityContract {
     }
 
     /// The literal Gemini `generateContent` body that stands in for the wire — the smallest shape
-    /// `GeminiClient.parseResponse` accepts as one page of text — plus the file-list mutation, performed on
-    /// the main actor from inside the request so it lands in the one window that matters.
+    /// `GeminiClient` accepts as one page of text — plus the file-list mutation, performed on the main actor
+    /// from inside the request so it lands in the one window that matters.
     private static func stub(_ mutation: Mutation, on processor: OCRProcessor, newRunSources: [URL],
                              transcript: Transcript)
         -> @Sendable (URLRequest) async throws -> (Data, URLResponse) {
@@ -233,43 +228,6 @@ enum RetryPruneIdentityContract {
             }
             return (Data(body.utf8), response)
         }
-    }
-
-    // MARK: - The guard itself
-
-    private enum Handed: Equatable {
-        /// The pair the loop holds for its own live job.
-        case honest
-        /// Cleared and re-dropped with the SAME file at the same index: equal by source, not by identity.
-        case theSameFileReDropped
-        /// Not reachable from `retrySlots` (which is built from `jobs.indices`), and pinned anyway: it is the
-        /// difference between the two ways of spelling the bounds half.
-        case negativeIndex
-    }
-
-    /// Whether the name was pruned. No file is created: the guard reads `sourceURL.lastPathComponent` and
-    /// nothing else, so a path that never existed is the honest fixture here.
-    private static func prune(_ handed: Handed) -> Bool {
-        let source = FileManager.default.temporaryDirectory
-            .appendingPathComponent("APRetryPruneGuard-\(UUID().uuidString)", isDirectory: true)
-            .appendingPathComponent("busy-0.jpg")
-        let processor = OCRProcessor()
-        processor.jobs = [OCRJob(sourceURL: source)]
-        // The pair bound at dispatch, before anything changed under it.
-        let dispatchedJobID = processor.jobs[0].id
-
-        switch handed {
-        case .honest, .negativeIndex:
-            break
-        case .theSameFileReDropped:
-            // The SAME file, dropped again: a fresh `OCRJob.id`, an identical `sourceURL`. `failedFiles` now
-            // holds THIS run's own failure for it, which is what a source-equality guard would destroy.
-            processor.jobs = [OCRJob(sourceURL: source)]
-        }
-        processor.failedFiles = ["busy-0.jpg"]
-        processor.clearFailedFile(forRetriedJobAt: handed == .negativeIndex ? -1 : 0,
-                                 jobID: handed == .honest ? processor.jobs[0].id : dispatchedJobID)
-        return !processor.failedFiles.contains("busy-0.jpg")
     }
 
     // MARK: - Fixtures
