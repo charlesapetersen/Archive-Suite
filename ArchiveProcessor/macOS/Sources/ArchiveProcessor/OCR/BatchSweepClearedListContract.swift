@@ -33,14 +33,19 @@ import Foundation
 /// fails rather than passing the rest for the wrong reason.
 ///
 /// **What a mutant looks like here.** Two of the four do not print `FAIL` — the driver process TRAPS and
-/// writes no report at all, so `test-batch-resume.sh` reports a missing report and exits 1. Measured:
-///   * the loop's slot re-validation reduced to the old `where jobs[i].status == .processing` → §3 traps
-///     (`Fatal error: Index out of range`, rc=133).
-///   * `slotIsStillOurs` removed from `handleOCRResult`'s post-await writes → §1 traps (rc=133).
-///   * that guard replaced by an early `return false` (the fix's first shape) → §2 goes RED: the resume
-///     snapshot has no record of a file that was fully OCRed and written.
-///   * both slot checks reduced to bounds only → §4 and §5 go RED: a stale sweep writes over the file that
-///     replaced the one it was sweeping, and over a whole new run's jobs.
+/// writes no report at all, so `test-batch-resume.sh` finds no report and exits 1 with the app log. All four
+/// measured 2026-08-03:
+///   * the loop's slot re-validation dropped back to a bare `jobs[slot.index].status == .processing` →
+///     **TRAPS** on the first cleared-list fixture (rc=133, `Fatal error: Index out of range`,
+///     `ContiguousArrayBuffer:692` — the reading subscript).
+///   * `slotIsStillOurs` removed from `handleOCRResult`'s post-await writes → **TRAPS** in §1's fixture
+///     (rc=133, `…:705` — the mutating subscript), which is the proof that fixing only the loop would have
+///     left the identical crash one frame down.
+///   * that guard replaced by an early `return false` (the fix's first shape) → **3 RED** (§2, §5, §6): the
+///     resume snapshot has no record of a file that was fully OCRed and written, and every vanished row
+///     reports the batch interrupted.
+///   * both slot checks reduced to bounds only → **2 RED** (§4, §5): the swept file's result lands on the
+///     file that replaced it, and a stale sweep marks a whole new run's jobs failed.
 ///
 /// Scope: the crash, the record, and the wrong-row writes. NOT Stop's own semantics — the sweep still has no
 /// `Task.isCancelled` check of its own (the poll's two are at `:737`/`:752`), which is deliberate and weighed

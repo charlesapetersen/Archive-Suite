@@ -462,6 +462,24 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   installs one and dormant again after. Never point it at a real endpoint. Literal provider response bodies
   only — `BatchParseContract` already has them.
   | files: OCR/NetworkSession.swift, OCR/BatchPollPersistFailureContract.swift, Capture/BatchResumeTestDriver.swift | M | med |
+- [ ] **W16.bat10 — a stopped run's in-flight result can still land on the NEXT run's jobs [S · LOW].**
+  Filed 2026-08-03 from the `W16.bat9` adversarial pass; the residual that item deliberately did not widen
+  into. `handleOCRResult` writes `jobs[index].result` / `.classification` / `.status` **before** its detached
+  PDF write (`+OCR.swift`, just past the entry guard), and those writes are bounds-checked but not
+  identity-checked. `W16.bat9` closed the post-await writes and the completion sweep's own loop, so the paid
+  sweep can no longer do this; every OTHER caller still can. The sequence is the same one bat9 was filed for
+  — Stop, Clear, re-drop, **Start** — with a result already in flight from the stopped run: the new run's
+  jobs take the same indices, so the stale result overwrites a live job's status and text with another
+  file's. No crash (the array is current at that point) and no data loss on disk; the harm is a run whose
+  on-screen record silently belongs to the previous one.
+  **Why it was not folded in:** the clean fix is a run-identity token threaded through `handleOCRResult`, not
+  another slot check — the obvious `jobs[index].sourceURL == url` entry guard works for five of the seven
+  callers but is WRONG for `retryOne`, which legitimately passes a rotated temp image as `url`. That is a
+  design choice about what identifies a run, so it wants deciding rather than patching.
+  Tier-2 (it edits the shared result-recording path on the money side). Drivable from
+  `BatchSweepClearedListContract`, which already reproduces the race headlessly — its §5 is this case one
+  frame up.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/BatchSweepClearedListContract.swift | S | low |
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
