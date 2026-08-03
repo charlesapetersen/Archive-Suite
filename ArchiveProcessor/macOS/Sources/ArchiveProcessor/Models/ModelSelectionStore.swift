@@ -35,8 +35,10 @@ final class ModelSelectionStore: ObservableObject {
         selectedModelIDs = Self.readIDs()
     }
 
-    /// UserDefaults key holding the selected model id for a given provider. `nonisolated` — it is pure
-    /// string formatting, and non-main callers legitimately need the key name.
+    /// UserDefaults key holding the selected model id for a given provider. `nonisolated` because it is
+    /// pure string formatting AND because nonisolated readers genuinely need it —
+    /// `SessionProcessingConfig.fromDefaults` (a `Sendable` struct's static, reachable off-main) resolves
+    /// the model itself against a possibly-scratch `UserDefaults` and must not re-spell this key by hand.
     nonisolated static func modelKey(for provider: LLMProvider) -> String {
         "selectedModelId_\(provider.rawValue)"
     }
@@ -109,7 +111,9 @@ final class ModelSelectionStore: ObservableObject {
     }
 
     /// The persisted output directory if it still exists, otherwise the user's Downloads folder.
-    /// `nonisolated` — plain UserDefaults, no published state, and `OCRView.init` reads it.
+    /// `nonisolated` because it touches no actor state — plain UserDefaults, nothing published. (It is
+    /// *not* needed for `OCRView.init`: conforming to `View` makes a type's members main-isolated, inits
+    /// included, so that call would have been fine either way.)
     nonisolated static func savedOutputDirectory() -> URL? {
         if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory),
            FileManager.default.fileExists(atPath: path) {

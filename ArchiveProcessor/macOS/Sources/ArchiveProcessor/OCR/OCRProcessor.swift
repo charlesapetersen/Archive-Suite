@@ -21,6 +21,18 @@ class OCRProcessor: ObservableObject {
     /// snapshot and all retry consumers serialized.
     var activeRunConfig: SessionProcessingConfig?
 
+    /// What the operator last chose in the end-of-run retry sheet, so a SECOND round of the same retry
+    /// loop reopens on their escalation instead of resetting.
+    ///
+    /// The loop tears the sheet down (`awaitingRetryDecision = false`), awaits the real network calls, and
+    /// raises it again for whatever still failed — a new sheet identity, so its `@State` re-seeds from
+    /// scratch. Without this, an operator who escalated Flash Lite → Pro and had 2 of 5 pages still fail
+    /// would be offered **Flash Lite again**, and the obvious second click would re-bill the exact model
+    /// that had already failed twice. Cleared at fresh-run start so one run never inherits another's
+    /// escalation. Deliberately NOT persisted and NOT written to `ModelSelectionStore`: it is scoped to
+    /// one retry conversation, not a change of the app-wide default.
+    var lastRetryChoice: (provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?)?
+
     // MARK: Live Capture staging (set by LiveCaptureView, consumed by OCRView → startProcessing)
     /// Ordered captured photo URLs waiting to be loaded as the input file list.
     @Published var stagedCaptureFiles: [URL] = []

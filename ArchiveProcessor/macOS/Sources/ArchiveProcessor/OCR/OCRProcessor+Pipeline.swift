@@ -2364,6 +2364,7 @@ extension OCRProcessor {
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
         activeRunConfig = runConfig
+        lastRetryChoice = nil   // a fresh run must not inherit the previous run's retry escalation
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig
@@ -2723,6 +2724,9 @@ extension OCRProcessor {
     }
     /// Called by UI when user chooses to retry failed files with a different provider/model.
     func retryFailedFiles(provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) {
+        // Remember the escalation: this loop may raise the sheet again for whatever still fails, and a
+        // fresh sheet would otherwise re-seed to the run's original model (see `lastRetryChoice`).
+        lastRetryChoice = (provider: provider, model: model, thinkingLevel: thinkingLevel)
         awaitingRetryDecision = false
         retryContinuation?.resume(returning: .retry(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey))
         retryContinuation = nil

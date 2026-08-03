@@ -18,7 +18,9 @@ struct ModelChoiceView: View {
             Picker("Provider", selection: Binding(
                 get: { provider },
                 set: { newProvider in
-                    model = newProvider.models[0]
+                    // That provider's SELECTED model, not its first one — switching provider mid-retry
+                    // shouldn't silently drop you onto the cheapest model of the family you moved to.
+                    model = ModelSelectionStore.savedModel(for: newProvider)
                     apiKey = KeychainHelper.load(account: newProvider.rawValue) ?? ""
                     provider = newProvider
                 }
@@ -57,7 +59,16 @@ struct ModelChoiceView: View {
 }
 
 /// Sheet wrapper around `ModelChoiceView` presented by the per-item `retryWithModel` / `changeRotation`
-/// actions in both panes. Seeds provider from the caller's current choice; returns the picked settings.
+/// actions in both panes. Seeds provider **and model** from the caller's current choice; returns the
+/// picked settings.
+///
+/// The caller passes the model in rather than this sheet reading `ModelSelectionStore` itself because the
+/// two callers have genuinely different notions of "current": Process Files means the app-wide selection,
+/// while Live Capture means the model its *session* was locked to at start, which a later Settings change
+/// deliberately does not alter. No store read here could tell those apart.
+///
+/// The choice made here is deliberately **not** written back to `ModelSelectionStore`: a retry is a
+/// one-off ("re-run this page on something bigger"), not a change of the app-wide default.
 struct ModelChoiceSheet: View {
     let title: String
     let subtitle: String?
@@ -73,8 +84,8 @@ struct ModelChoiceSheet: View {
     @State private var rotation: Int
 
     init(title: String, subtitle: String? = nil, includeRotation: Bool = false,
-         fileCountForEstimate: Int? = nil, initialProvider: LLMProvider,
-         initialRotation: Int = 0,
+         fileCountForEstimate: Int? = nil, initialProvider: LLMProvider, initialModel: LLMModel,
+         initialThinking: ThinkingLevel = .low, initialRotation: Int = 0,
          onApply: @escaping (LLMProvider, LLMModel, ThinkingLevel?, String, Int?) -> Void,
          onCancel: @escaping () -> Void) {
         self.title = title
@@ -84,9 +95,20 @@ struct ModelChoiceSheet: View {
         self.onApply = onApply
         self.onCancel = onCancel
         _provider = State(initialValue: initialProvider)
-        _model = State(initialValue: initialProvider.models.first ?? LLMModel.geminiModels[0])
+        _model = State(initialValue: Self.seedModel(initialModel, for: initialProvider))
+        _thinking = State(initialValue: initialThinking)
         _apiKey = State(initialValue: KeychainHelper.load(account: initialProvider.rawValue) ?? "")
         _rotation = State(initialValue: ((initialRotation % 360) + 360) % 360)
+    }
+
+    /// Accept the caller's model only if it is genuinely selectable for this provider — matching provider
+    /// is not enough. A caller can legitimately hold a snapshot (a locked Live Capture session config)
+    /// naming a custom model the operator has since deleted: the provider still matches, but the id is
+    /// absent from `provider.models`, which would leave the Model picker rendering **blank** while Retry
+    /// stayed enabled and fired the dead id at the API. Same resolution rule as
+    /// `ModelSelectionStore.model(for:)`, for the same reason.
+    private static func seedModel(_ candidate: LLMModel, for provider: LLMProvider) -> LLMModel {
+        provider.models.first { $0.id == candidate.id } ?? provider.models[0]
     }
 
     var body: some View {

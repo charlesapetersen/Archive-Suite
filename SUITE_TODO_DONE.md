@@ -74,7 +74,77 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   in-flight or resumed run. Verified: full clean build, Swift 6 language mode, zero warnings.
   **Not fixed here (pre-existing, surfaced by the same review):** `ModelChoiceSheet` / `OCRRetrySheet` seed
   their picker with the provider's *first* model rather than the selected one, so "Retry with model" opens on
-  Flash Lite even when a larger model is selected.
+  Flash Lite even when a larger model is selected. → shipped immediately after as **W25.modelsync-fu** below.
+
+- [x] **W25.modelsync-fu — the retry/re-run sheets opened on the wrong model, and one of them on the wrong
+  PROVIDER. ✅ DONE 2026-08-03** (this commit; owner-directed 2026-08-02 straight after W25.modelsync).
+  Surfaced as **pre-existing** by W25.modelsync's adversarial review. Investigating found **three** seeding
+  defects, not the one filed — and the unfiled one was the worst:
+  - **`OCRRetrySheet` hardcoded `.gemini` + `LLMModel.geminiModels[0]`** and nothing ever overwrote them, so
+    when an Anthropic / OpenAI / Mistral run hit OCR failures the sheet offered to retry them **on Gemini**,
+    on that family's cheapest model — and its `.onAppear` loaded the *Gemini* Keychain key to match. An
+    operator accepting the default would have re-OCR'd failures on a provider they never chose.
+  - **`ModelChoiceSheet.init`** seeded `initialProvider.models.first` — the filed bug. Hits per-file "Retry
+    with model" / "Rotate & re-run" in **both** Process Files and Live Capture.
+  - **`ModelChoiceView`'s in-sheet provider Picker** set `model = newProvider.models[0]`, so switching
+    provider *inside* the sheet also dropped onto that family's first model.
+  **The fix.** Both sheets take `initialProvider`/`initialModel`/`initialThinking` from the caller and resolve
+  the model by **membership in `provider.models`**, not merely a matching `provider` — the same rule
+  `ModelSelectionStore.model(for:)` uses, so a snapshot naming a since-deleted custom model can't leave the
+  Model picker blank with Retry still armed. The in-sheet provider switch reads
+  `ModelSelectionStore.savedModel(for:)`. Two deliberate decisions: (a) the retry choice is **never** written
+  back to the store — rescuing a few pages with a heavier model is a one-off and must not change what the next
+  full run uses, so both sheets keep independent `@State`; (b) **Live Capture seeds from `session.config`, not
+  the app-wide selection** — `CaptureSession.activateProcessingIfNeeded` snapshots and *locks* the config at
+  session start precisely so mid-session Settings changes don't affect the running session, so the app-wide
+  selection would misreport what actually OCR'd that segment. The caller passes the values in rather than each
+  sheet reading the store because only the caller knows which notion of "current" applies.
+  **A second adversarial pass rejected the first attempt at this fix — three more defects, all fixed here:**
+  - **Seeding from the LIVE selection was wrong.** `OCRView.selectedProvider`/`selectedModel` are live
+    (`@AppStorage` + the store), and ⌘⌥P cycles the provider app-wide **with no run-in-progress guard**, so a
+    200-file Mistral run + one ⌘⌥P mid-run ended with the retry sheet offering Anthropic, estimating in
+    Anthropic prices, and one click billing Anthropic for pages that failed on Mistral. Now seeded from
+    `processor.activeRunConfig` — the snapshot the run pinned at start, which the retry path
+    (`runConfigForRetry`) already trusted for everything else — via new `OCRView.runSeed`/`retrySeed`.
+  - **The modal retry loop re-seeded every round, discarding the escalation.** `retryFailedFiles` clears
+    `awaitingRetryDecision`, awaits real network calls, then re-raises the sheet for whatever still failed —
+    a new sheet identity, so its `@State` re-initialized. An operator who escalated Flash Lite → Pro and had
+    2 of 5 pages still fail was offered **Flash Lite again**, and the obvious second click re-billed the
+    model that had already failed twice. Added `OCRProcessor.lastRetryChoice`, recorded in
+    `retryFailedFiles` and cleared at fresh-run start so no run inherits another's escalation.
+  - **`thinkingLevel` was still hardcoded `.low`** — the *same* wrong-seed bug this item exists to fix, and
+    one that changes both output quality and output-token spend. A Sonnet run with Thinking = High retried at
+    Low and failed again while the operator believed they had retried the run's configuration. Now seeded
+    from `activeRunConfig.thinkingLevel` / the session config.
+  Also: the Live Capture retry sheet now passes `fileCountForEstimate` (the segment's `pageCount`), because
+  `ModelChoiceSheet` renders **no cost line at all** without one — so changing model there, which can move
+  you onto a far dearer model, was previously silent.
+  **Folded in (owner-approved, same commit) — two small pre-existing bugs in
+  `Capture/SessionProcessingConfig.fromDefaults`:**
+  - it hand-spelled `"selectedModelId_\(provider.rawValue)"` instead of calling
+    `ModelSelectionStore.modelKey(for:)`. One drifted string there would silently snapshot the wrong model
+    for a whole live session. (This is what makes `modelKey`'s `nonisolated` load-bearing: `fromDefaults` is
+    a `Sendable` struct's static, reachable off-main, and must also read a scratch `UserDefaults`.)
+  - `let builtIns = provider.models` then `(builtIns + custom)` **listed every custom model twice**, because
+    `provider.models` already includes them. Harmless for the `.first(where:)` it fed, but it read as a bug
+    and would have become one the moment anything counted or enumerated that array.
+  **Verification:** clean build, Swift 6, zero warnings. `Capture/` is Tier-2, and the on-point $0 gate is
+  `scripts/test-manifest-persistence.sh` — **109 checks, ALL PASS**, including `W16.cfg1` / `W16.cfg6` /
+  `W16.cfg6-fu2`, which exercise `fromDefaults` directly, and `W16.cfg6-fu3`, which exercises the
+  `ProcessingProfileStore.apply` scratch-suite path and so also re-proves that W25.modelsync's now-
+  unconditional `reloadFromDefaults()` does not leak a scratch suite into the live store.
+  **Correction folded in:** three doc comments from W25.modelsync claimed a SwiftUI `View.init` is not
+  main-isolated. It is — conforming to `View` makes a type's members main-isolated, `init` included (verified
+  against a no-conformance control that fails with `#ActorIsolatedCall`). The `nonisolated` markings on
+  `modelKey` / the output-directory helpers are still right, but the stated reason was wrong; the comments now
+  say why they actually hold — and `modelKey`'s is now genuinely load-bearing, since `fromDefaults` uses it.
+  **NOT fixed — filed instead, because the answer is an owner decision:** **W25.retry-backend** (in gateway /
+  Local Agent mode the retry sheets are decorative — `performOCRCall`'s localAgent → gateway → provider
+  precedence never reads them — while Live Capture's retry *drops* the backend for a metered call, which this
+  item's seed change made dearer) and **W25.retry-estimate** (retry quotes omit rotation + image scale). Both
+  are in `SUITE_TODO.md` → *Owner-reported bugs (2026-08-02) — follow-ons*, with the full write-up in
+  `ArchiveProcessor/KNOWN_ISSUES.md`. Fixing the seed did not fix those, and the code now says so rather than
+  claiming a parity it does not have.
 
 
 ## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)

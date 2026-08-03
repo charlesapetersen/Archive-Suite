@@ -119,6 +119,27 @@ struct OCRView: View {
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
     private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
 
+    /// What a retry/re-run sheet should OPEN on: the settings the run actually used, not the live Settings
+    /// selection. `activeRunConfig` is the snapshot the run pinned at start; the live selection can have
+    /// moved since (⌘⌥P cycles the provider app-wide with no run-in-progress guard, and Settings is
+    /// editable mid-run), and seeding from it would offer to retry Mistral failures on Anthropic. Falls
+    /// back to the live selection only for a run that pinned no snapshot.
+    private var runSeed: (provider: LLMProvider, model: LLMModel, thinking: ThinkingLevel) {
+        if let cfg = processor.activeRunConfig {
+            return (cfg.provider, cfg.model, cfg.thinkingLevel)
+        }
+        return (selectedProvider, selectedModel, selectedThinking)
+    }
+
+    /// Same, but for the end-of-run modal retry loop, which can raise its sheet more than once: an
+    /// escalation the operator already made in an earlier round wins over the run's original settings.
+    private var retrySeed: (provider: LLMProvider, model: LLMModel, thinking: ThinkingLevel) {
+        if let last = processor.lastRetryChoice {
+            return (last.provider, last.model, last.thinkingLevel ?? runSeed.thinking)
+        }
+        return runSeed
+    }
+
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
         let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
@@ -239,7 +260,9 @@ struct OCRView: View {
             CollectionReviewSheet(processor: processor)
         }
         .sheet(isPresented: $processor.awaitingRetryDecision) {
-            OCRRetrySheet(processor: processor)
+            let seed = retrySeed
+            OCRRetrySheet(processor: processor, initialProvider: seed.provider,
+                          initialModel: seed.model, initialThinking: seed.thinking)
         }
         // Per-item "retry with model" / "rotate & re-run" from the Files pane inline disclosure.
         .sheet(item: $fileModelChoiceTarget) { target in
@@ -248,7 +271,9 @@ struct OCRView: View {
                 subtitle: "Re-run OCR for this file; the old output is replaced.",
                 includeRotation: target.includeRotation,
                 fileCountForEstimate: 1,
-                initialProvider: selectedProvider,
+                initialProvider: runSeed.provider,
+                initialModel: runSeed.model,
+                initialThinking: runSeed.thinking,
                 initialRotation: processor.jobs.indices.contains(target.jobIndex)
                     ? (processor.jobs[target.jobIndex].result?.rotationDegrees ?? 0) : 0,
                 onApply: { provider, model, thinking, key, rotation in

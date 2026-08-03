@@ -204,10 +204,16 @@ struct SessionProcessingConfig: Sendable {
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let sizing = runSizing(d)
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        let modelId = d.string(forKey: "selectedModelId_\(provider.rawValue)") ?? ""
-        let builtIns = provider.models
-        let custom = CustomModelStore.shared.allCustomModels.filter { $0.provider == provider }
-        let model = (builtIns + custom).first { $0.id == modelId } ?? builtIns.first ?? provider.models[0]
+        // Ask `ModelSelectionStore` for the key rather than re-spelling `selectedModelId_<provider>` here —
+        // one drifted string would silently snapshot the wrong model for a whole live session. (The store
+        // is `@MainActor`, but `modelKey` is `nonisolated` precisely so this nonisolated reader can use it;
+        // resolution stays local because this function must also read a scratch `d`, not just `.standard`.)
+        let modelId = d.string(forKey: ModelSelectionStore.modelKey(for: provider)) ?? ""
+        // `provider.models` is ALREADY built-ins + that provider's custom models — concatenating the
+        // customs again listed every one of them twice. Harmless for this `.first(where:)`, but it read as
+        // a bug and would become one the moment anything counted or enumerated the array.
+        let candidates = provider.models
+        let model = candidates.first { $0.id == modelId } ?? candidates[0]
 
         let useGateway = d.bool(forKey: DefaultsKeys.useGateway)
         let gateway = GatewayConfig.fromDefaults(d)

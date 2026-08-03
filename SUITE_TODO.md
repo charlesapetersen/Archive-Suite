@@ -92,19 +92,28 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
-## Owner-reported bugs (2026-08-02)
+## Owner-reported bugs (2026-08-02) — follow-ons
 
-- [ ] **W25.modelsync-fu — the retry sheets open on the provider's FIRST model, not the selected one
-  [S · Processor].** ✅ Owner-directed 2026-08-02, immediately after W25.modelsync shipped. Surfaced by that
-  item's adversarial review as **pre-existing**, not introduced by it. `ModelChoiceSheet`
-  (`Views/Shared/ModelChoiceView.swift`) and `OCRRetrySheet` (`Views/OCRView+OCRRetrySheet.swift`) each seed a
-  private `@State selectedModel` from `initialProvider`'s first model instead of
-  `ModelSelectionStore.savedModel(for:)`, so per-file "Retry with model" / "Rotate & re-run" and the whole-run
-  retry sheet default to e.g. Flash Lite even when the failed run used Gemini 3.1 Pro — a re-OCR at the wrong
-  quality if accepted blind. Each sheet's own estimate matches what it will call, so this is a wrong-default,
-  not an estimate/run divergence. Keep them as independent `@State` (a retry is deliberately a one-off choice
-  that must NOT rewrite the app-wide selection) — only the seed changes. See
-  `ArchiveProcessor/KNOWN_ISSUES.md` → *W25.modelsync-fu*.
+- [ ] **W25.retry-backend — in gateway / Local Agent mode the retry sheets are decorative, and Live Capture's
+  retry silently bills a metered API [M · MONEY · needs: owner decision].** Found 2026-08-03 by the
+  adversarial review of W25.modelsync-fu; **pre-existing mechanism**, filed rather than fixed because the
+  right behaviour is an owner call. (a) Process Files: `retryOne` + the modal loop pass the run's
+  `gateway`/`localAgent`, and `performOCRCall`'s precedence is localAgent → gateway → provider, so the
+  sheet's provider/model are **never read** — in gateway mode it estimates and announces a model it never
+  calls, and re-runs the *same* gateway model that just failed. (b) Live Capture: `retryFailed` nils out
+  `gateway`/`localAgent` whenever an override is present, forcing the **direct metered API** — on a Local
+  Agent ($0/page) session a 6-page segment retry becomes 6 billed calls, and W25.modelsync-fu made that
+  branch *dearer* by seeding the session's selected model instead of the family's cheapest. (c) A
+  gateway-only operator can't retry at all: both sheets load the provider-named Keychain account, never
+  `"Gateway"`, and Retry is `.disabled(apiKey.isEmpty)`.
+  **Decide first:** should a retry reproduce the run's backend (drop the picker), stay a labelled escape
+  hatch to the direct API (must show the $0 → metered jump), or offer both? Full write-up:
+  `ArchiveProcessor/KNOWN_ISSUES.md` → *W25.retry-backend*.
+- [ ] **W25.retry-estimate — the retry cost quotes omit rotation and image scale [XS–S · LOW].** Same review.
+  Both retry estimates call `CostEstimator.estimate` without `rotationMode:`/`imageScale:` (defaulting `.off`
+  / `1.0`) while `retryOne` runs `detectRotation` with the run's real rotation mode, so an LLM rotation mode
+  makes extra paid calls per file that the quoted figure does not include. Pass the run's values from
+  `activeRunConfig` (now the retry sheets' seed anyway).
 
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
 

@@ -17,6 +17,8 @@ struct LiveCaptureView: View {
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
     /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
+    /// Only to seed the per-segment retry sheet when there is no session config to read it from.
+    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
 
     // A1 — shared Processing-list state: which segment is expanded, and the two per-item action sheets.
     @State private var expandedSegmentID: String?
@@ -86,7 +88,17 @@ struct LiveCaptureView: View {
                 title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
                 subtitle: "Re-run OCR for this segment; its old staged output is replaced.",
                 includeRotation: target.includeRotation,
-                initialProvider: session.config?.provider ?? .gemini,
+                // Price this retry. Without a count `ModelChoiceSheet` renders no cost line at all, so
+                // switching provider/model here — which CAN move you onto a far dearer model — was silent.
+                fileCountForEstimate: liveProc.statuses.first { $0.id == target.groupId }?.pageCount,
+                // The SESSION's provider/model, not the app-wide selection: `activateProcessingIfNeeded`
+                // snapshots and LOCKS the config at session start precisely so a mid-session Settings
+                // change can't alter a running session, so the live selection would misreport what OCR'd
+                // this segment. The fallback is unreachable today (no session ⇒ no retry list) but keeps
+                // the expression total.
+                initialProvider: session.config?.provider ?? selectedProvider,
+                initialModel: session.config?.model ?? ModelSelectionStore.savedModel(for: selectedProvider),
+                initialThinking: session.config?.thinkingLevel ?? .low,
                 onApply: { provider, model, thinking, apiKey, rotation in
                     let ov = LiveCaptureProcessor.OCROverride(
                         provider: provider, model: model, thinkingLevel: thinking,
