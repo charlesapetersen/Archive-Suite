@@ -2374,6 +2374,46 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   §"Batch Processing → If a batch submission reports an uncertain outcome"): it quotes the exact in-app message,
   says do **not** press Resume before checking the provider's own console, links all three consoles, and separates
   this from the benign *"stopped after N server jobs"* message. The reconciliation itself stays unbuilt by decision.
+- [x] **W16.bat5-fu — the journal `W16.bat5` keeps now lists the chunk paid for after the snapshot too
+  [S · MED · money].** DONE 2026-08-03, this commit (checkpoint `bf8365e`). ✅ Owner-authorized 2026-08-02
+  with the fix direction chosen by him: **let a post-Stop chunk ID still reach the journal.** The residual of
+  the direction he chose for `W16.bat5`, not a defect in it — `cancel()` had nil'd `activePendingBatch` by
+  the time a late `onJobCreated` ran, so `recordSubmittedBatchChunk` hit `persistPendingBatchMutation`'s
+  missing-journal guard, reported the interruption and returned `false` with the ID written **nowhere**; the
+  operator was warned and sent to the provider console for a paid job the app could neither cancel nor
+  collect. **Fix:** `cancel()` now records a `ClosedPaidBatchJournalAddress` — identity only (`submittedAt` +
+  `runFingerprint`), deliberately **not** a snapshot that could be written back — immediately before it nils
+  `activePendingBatch`, and a late `recordSubmittedBatchChunk` re-reads the file and appends its ID through
+  the production writer (so the comma-joined mirror and the lifecycle fingerprint are recomputed as the live
+  path recomputes them). **Both halves are load-bearing:** the ID lands in the list `resumeBatch` polls, AND
+  the mutator still returns `false`, so the Gemini callback still throws and the submit loop still stops
+  creating paid jobs — a Stop that recorded the ID and then kept spending would be worse than the bug. Four
+  refusals keep it ADDITIVE (the grant's ⛔): a live journal in memory (the normal persist path owns the
+  file); no file on disk (a confirmed cancellation deletes it, and re-creating it would resurrect a Resume
+  banner and lock `startProcessing` out); a journal whose identity is not this batch's (after a delete the
+  operator may have started another run — a stranger's ID would have its poll fetch another run's pages);
+  and a legacy pre-lifecycle journal, whose IDs are read from the comma-joined `batchId` so an append there
+  would be written and never read back. ⛔ **Stop stays instant** — nothing added waits, the load+save is one
+  uninterrupted MainActor turn (so the cancellation task's own delete cannot land between them), and the
+  quiesce-before-nil variant the owner rejected is not present; the constraint is **measured**, not argued.
+  Tier-2, scratch only: new `BatchClosedJournalAppendContract` (driver §22, 20 checks) drives the real
+  `cancel()` with both cancel-path seams stubbed and then the real mutator against a real journal at the
+  redirected path — **360 checks ALL PASS**, clean build, 0 new warnings. **Non-vacuity measured on nine
+  mutants**, each killed by the check it targets: no-append (pre-fix) → 4 FAIL incl. the regression check;
+  no identity check → foreign-journal; overwrite-instead-of-append → 3 FAIL; resurrect a deleted journal →
+  creates-none; `return true` → stops-spending; drop the legacy guard → legacy; write behind a live journal →
+  live-journal; synthesize an address from disk → no-address; hand-rolled write bypassing the writer → 2 FAIL.
+  **The adversarial pass found one real gap, fixed here rather than filed:** the checks proved the ID was *in
+  the file* but not that Resume would *offer* the file — `checkForPendingBatch()` runs every journal through
+  `pendingBatchIsSelfConsistent`, three of whose clauses an append can break, so a plausible hand-rolled
+  write would have produced a journal the app then refuses (mutant 9 confirms). Section 5 now pins the app's
+  own verdict. It also caught **two checks passing for the wrong reason** — the legacy and live-journal
+  fixtures were refused at the missing-file/identity guard before reaching the guard they name (measured:
+  deleting those guards left them green) — both fixtures now share the stopped batch's identity and put a
+  matching journal on disk, and the header records the trap. `ArchiveProcessor/README.md` §"If a batch
+  submission reports an uncertain outcome" updated: a Stop mid-submit now normally lands in the benign
+  "Resume can pick the batch up" bullet.
+  | files: OCR/OCRProcessor.swift, OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift, OCR/BatchClosedJournalAppendContract.swift, Capture/BatchResumeTestDriver.swift, README.md | S | med | **AUTHORIZED 2026-08-02 — discharged**
 - [x] **W16.bat4-fu — one interrupt-tail banner check went reliably vacuous when the journal path became
   redirectable [XS · LOW].** DONE 2026-08-02, this commit. From the W16.bat2-fu2 adversarial review.
   `BatchInterruptTailContract`'s "the recomputed banners are what `checkForPendingBatch()` alone produces"

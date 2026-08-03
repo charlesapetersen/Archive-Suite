@@ -394,30 +394,31 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat5-fu — ✅ AUTHORIZED by the owner 2026-08-02 (morning-review walkthrough). The journal
-  W16.bat5 now keeps still does not list the chunk that was paid for after the snapshot [S · MED · money].**
-  **Owner chose the FIRST fix direction: let a post-Stop chunk ID still reach the journal** — `cancel()` keeps
-  the journal addressable for append-only chunk recording rather than nilling it outright. He explicitly did
-  NOT choose "wait for submits to quiesce before nilling `activePendingBatch`" (it makes Stop non-instant and
-  a hung provider request would stall the teardown). Constraints in
-  [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md); moved out of the plan's HOLD QUEUE into the WORK QUEUE.
-  Found by the W16.bat5 adversarial pass
-  (2026-08-02); **the residual of that item's chosen direction, not a defect in it.** W16.bat5 stops
-  `cancel()` deleting the journal when a submission was unfinished, so a mid-submit Stop now leaves a local
-  record and a Resume banner where it used to leave nothing. But the record is still **short**: the chunk
-  created between the snapshot and the Stop is billed, and `cancel()` has nil'd `activePendingBatch` by the
-  time its `onJobCreated` callback runs, so `recordSubmittedBatchChunk` → `persistPendingBatchMutation`'s
-  missing-journal guard reports the interruption and returns `false` (`+Pipeline.swift`) — the ID is
-  written nowhere. Net effect today: the operator IS warned ("paid jobs may exist beyond the ones that were
-  cancelled") and `ArchiveProcessor/README.md` §"If a batch submission reports an uncertain outcome" tells
-  them to check the provider console before retrying, but the app cannot cancel or collect that job itself.
-  **Owner-gated** on the same precedent as `W16.bat7`: it is a change to what the cancel path does with the
-  journal, and every one of those has been granted item by item. **Fix direction (owner's call):** let a
-  post-Stop chunk ID still reach the journal — e.g. `cancel()` keeps the journal addressable for
-  append-only chunk recording instead of nilling it outright, or the callback writes a "created after
-  cancellation" ID list straight to disk. ⚠️ Both touch `cancel()` semantics, which is exactly why this is
-  not something to fold in quietly. Do NOT fold into `W16.bat7` — different sites, different trigger.
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | med | **AUTHORIZED 2026-08-02**
+- [ ] **W16.bat5-fu2 — ⛔ NEEDS THE OWNER. The other two journal mutators still lose their fact when Stop
+  closes the journal; for `markBatchChunkConsumed` that means a Resume re-materializes a chunk whose pages
+  were already written [S · LOW].** Filed 2026-08-03 from the `W16.bat5-fu` adversarial pass; the residual
+  that item deliberately did **not** widen into (its grant is explicit: no widening of `cancel()` beyond the
+  append path). `W16.bat5-fu` gives the closed journal an append path for `recordSubmittedBatchChunk` only.
+  The sibling mutators are unchanged, and the two cases are not alike:
+  * `markBatchSubmissionComplete` failing on a closed journal is **correct** — abandoning a submission should
+    leave `submissionComplete: false`, which is exactly the "may be short" state `W16.bat5` keeps the journal
+    for. Nothing to do here; recorded so a later reader does not "fix" it.
+  * `markBatchChunkConsumed` is the open question. It is reached at `+OCR.swift` (`case .materialize` →
+    `guard materialized, markBatchChunkConsumed(singleBatchId)`) immediately after `await
+    processBatchResults(...)`, so a Stop landing during that await nils `activePendingBatch` and the consumed
+    marker is lost. The journal is kept and the poll reports itself interrupted (W16.bat3/bat7), so nothing is
+    stranded and no provider charge is repeated — a completed batch's results are free to re-fetch. The
+    residual harm is **re-materialization**: on Resume that chunk is fetched again and its pages re-written.
+  **What still needs tracing before this is actionable** (not done, deliberately — one item per session): how
+  much of it the per-file journaling already absorbs. `PendingBatch.completedResults`/`completedOutputPaths`
+  are written per file *before* the chunk is marked consumed, and `resumeBatch` skips what they list — but
+  those writes go through the same `persistPendingBatchMutation` and so fail on the same closed journal, so
+  the exposure is probably limited to files materialized *after* the Stop. If that is right this is cosmetic
+  (duplicate PDFs at fresh non-colliding paths, per the B7 rule) rather than a money bug, and may not be worth
+  building. **Owner-gated** on the standing precedent: it is a change to what the cancel path does with the
+  journal, and every one of those has been granted item by item. Do NOT fold into `W16.bat5-fu` (shipped) or
+  `W16.bat8` (different file, different trigger).
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | **NEEDS OWNER**
 - [ ] **W16.bat8 — ⛔ NEEDS THE OWNER. A stale in-memory interrupted-run manifest makes a paid batch
   journal its results into the WRONG file, so a relaunch re-fetches chunks already paid for [S · MED ·
   money].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing**, and covered by no

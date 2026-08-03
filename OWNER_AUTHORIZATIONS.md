@@ -244,7 +244,15 @@ its own date. Verbatim as recorded when granted.)*
   - **Does NOT authorize** `W16.bat5-fu` or any other change to `cancel()` semantics — that is the separate
     grant immediately below. Do not fold the two together; different sites, different trigger.
 - **`W16.bat5-fu` — AUTHORIZED (granted 2026-08-02, morning-review walkthrough), WITH THE FIX DIRECTION
-  CHOSEN BY THE OWNER: let a post-Stop chunk ID still reach the journal.** This is the acknowledged
+  CHOSEN BY THE OWNER: let a post-Stop chunk ID still reach the journal.**
+  ✅ **DISCHARGED 2026-08-03 — shipped in the required direction, every ⛔ met.** `cancel()` keeps the journal
+  addressable by IDENTITY (`ClosedPaidBatchJournalAddress`: `submittedAt` + `runFingerprint`, never a
+  snapshot to write back) and a late `recordSubmittedBatchChunk` appends its ID to the file through the
+  production writer. The rejected quiesce variant was not shipped and Stop still returns instantly — measured
+  in the contract, not argued. Additive only: four refusals (live journal, no file, another batch's journal, a
+  legacy journal) mean the file can only ever GAIN an ID. Scratch only, `BatchClosedJournalAppendContract`
+  (driver §22), 360 checks ALL PASS, non-vacuity measured on nine mutants. Kept as a permanent record; see
+  `SUITE_TODO_DONE.md` for the full entry. This is the acknowledged
   **residual of the direction he chose for `W16.bat5` on 2026-08-01, not a defect in it.** `W16.bat5` stops
   `cancel()` deleting the journal when a submission was unfinished, so a mid-submit Stop now leaves a local
   record and a Resume banner. But the record is **short**: a chunk created between `cancel()`'s snapshot and

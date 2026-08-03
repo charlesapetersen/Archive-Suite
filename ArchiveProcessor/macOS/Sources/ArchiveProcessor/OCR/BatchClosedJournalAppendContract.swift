@@ -39,7 +39,7 @@ enum BatchClosedJournalAppendContract {
 
     static func run(check: (String, Bool) -> Void, redirected: Bool) async {
         guard redirected else {
-            // Nine checks are skipped, not silently: this one FAILs in their place.
+            // Every check below is skipped, not silently: this one FAILs in their place.
             check("closed-journal append: the whole contract is SKIPPED (refused: the journal path did not "
                   + "resolve away from Application Support), so nothing is known about whether a job created "
                   + "as Stop landed reaches the journal", false)
@@ -49,6 +49,7 @@ enum BatchClosedJournalAppendContract {
         await theAppendIsAdditiveAndNothingElseMoves(check)
         await itRefusesEveryJournalThatIsNotThisOne(check)
         theLiveJournalIsNotItsToWrite(check)
+        await theAppendedJournalIsOneResumeAccepts(check)
         await stopStaysInstant(check)
     }
 
@@ -78,6 +79,21 @@ enum BatchClosedJournalAppendContract {
             runFingerprint: fingerprint,
             lifecycleVersion: lifecycleVersion,
             submittedChunkIds: chunkIds, submissionComplete: false)
+    }
+
+    /// The same journal, but with an HONEST immutable fingerprint — the one
+    /// `pendingBatchIsSelfConsistent` recomputes from the fields beside it.
+    ///
+    /// The fixture above carries a made-up fingerprint, which is fine for every check that reads the file
+    /// back itself and wrong for the only check that asks the app's own resume guard about it.
+    private static func resumableJournal(submittedAt: Date) -> OCRProcessor.PendingBatch {
+        let files = [URL(fileURLWithPath: "/tmp/closed-append/scan-0.jpg")]
+        let output = URL(fileURLWithPath: "/tmp/closed-append", isDirectory: true)
+        return journal(
+            fingerprint: OCRProcessor.runFingerprint(
+                files: files, outputDirectory: output, taggingMode: .automatic,
+                enableTagging: false, batchMode: true, preserveInputOrder: true),
+            submittedAt: submittedAt)
     }
 
     private static func context() -> OCRProcessor.BatchContext {
@@ -338,7 +354,40 @@ enum BatchClosedJournalAppendContract {
               unaddressed.refused && unaddressed.intact)
     }
 
-    // MARK: - 5. The owner's ⛔: Stop stays instant
+    // MARK: - 5. "Resume can pick it up" is the app's own verdict, not this file's
+
+    /// Found by the adversarial pass on the fix, and the gap between "the ID is in the file" and the claim
+    /// the operator is actually given. `checkForPendingBatch()` runs every journal it finds through
+    /// `pendingBatchIsSelfConsistent`, and an inconsistent one is NOT offered for resume — it raises the
+    /// torn/tampered warning instead. So an append that wrote the ID and left the journal's own integrity
+    /// fields stale would satisfy every check above and still leave the paid job uncollectable.
+    ///
+    /// Three of that guard's clauses are ones an append can break: the comma-joined `batchId` mirror must
+    /// equal the joined list, the IDs must be duplicate-free, and the lifecycle fingerprint must be the one
+    /// recomputed over the journal as a whole. The production writer maintains all three — which is exactly
+    /// why the append goes through it instead of encoding the struct itself.
+    private static func theAppendedJournalIsOneResumeAccepts(_ check: (String, Bool) -> Void) async {
+        let fixture = resumableJournal(submittedAt: Date(timeIntervalSince1970: 1_700_000_002))
+        // A fixture whose fingerprint is wrong to begin with would make this vacuous: the guard would fail
+        // before and after, or pass for a reason the append cannot affect. Pin the starting point — as the
+        // journal is WRITTEN, since the lifecycle fingerprint the guard checks is one the writer computes
+        // (an unpersisted struct carries none and is never self-consistent).
+        let asWritten = OCRProcessor.preparedPendingBatchForPersistence(fixture)
+        check("closed-journal append: (precondition) the fixture is a journal the resume guard accepts "
+              + "BEFORE anything is appended",
+              asWritten.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+
+        let result = await stopThenRecord("batches/late", journal: fixture)
+        let accepted = result.onDisk.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false
+        check("closed-journal append: the appended journal still passes the app's own resume guard — the ID "
+              + "is not just in the file, the file is still one Resume will offer",
+              accepted && result.onDisk?.submittedChunkIds.contains("batches/late") == true)
+        check("closed-journal append: and its derived comma-joined mirror was recomputed with it, so the "
+              + "journal does not disagree with itself about which jobs were paid for",
+              result.onDisk?.batchId == result.onDisk?.submittedChunkIds.joined(separator: ","))
+    }
+
+    // MARK: - 6. The owner's ⛔: Stop stays instant
 
     /// The owner rejected "wait for in-flight submits to quiesce before nilling `activePendingBatch`"
     /// precisely because it makes Stop non-instant — a hung provider request would stall the teardown. This

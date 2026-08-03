@@ -967,6 +967,11 @@ extension OCRProcessor {
     ///
     /// Synchronous on the MainActor by construction: the load and the save are one uninterrupted turn, so
     /// the cancellation task's own journal delete cannot land between them.
+    ///
+    /// Takes an ID its caller has already trimmed and validated (`recordSubmittedBatchChunk` does both
+    /// before calling), and writes through `savePendingBatch` rather than encoding the struct itself — the
+    /// resume guard checks the comma-joined mirror and the lifecycle fingerprint the writer recomputes, so
+    /// a hand-rolled write would produce a journal the app then refuses to offer for resume.
     @discardableResult
     func appendChunkIdToClosedPaidBatchJournal(_ chunkId: String) -> Bool {
         guard activePendingBatch == nil, let address = closedPaidBatchJournalAddress else { return false }

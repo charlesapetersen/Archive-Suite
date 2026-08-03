@@ -116,10 +116,14 @@ the app **does** know what it made. Read the sentence that follows it, because i
 whether Resume is enough:
 
 - *"The recovery journal was kept, so Resume can pick the batch up."* — the benign case. All N jobs are
-  recorded; press Resume.
+  recorded; press Resume. **A Stop pressed mid-submission normally lands here.** A job the provider created
+  in the instant Stop arrived is still written into the journal, and you will see the sentence *"A paid batch
+  job was created just as Stop landed. Its server ID was added to the recovery journal, so Resume can still
+  reach it."* The submission stops either way — Stop is never answered by creating more jobs.
 - *"…but K server jobs are missing from it, so Resume will not reach them."* — K jobs were created and
-  billed, but the app could not write their IDs down (a Stop pressed mid-submission, or a failed journal
-  write). Resume collects the rest; the K missing ones need the provider console, as above.
+  billed, but the app could not write their IDs down (a failed journal write, or a Stop that arrived after
+  the journal had already been removed). Resume collects the rest; the K missing ones need the provider
+  console, as above.
 - *"No recovery journal is on disk…"* — the app has no local record at all. Go to the provider console.
 
 The count in that message is always the number of jobs the app **created**, not the number it managed to
