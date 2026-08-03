@@ -1488,6 +1488,47 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
 
+- [x] **W16.bat10 — a stopped run's in-flight result could still land on the NEXT run's jobs [S · LOW].**
+  DONE 2026-08-03 — `b9a4ac1` (the fix) + `52608df` (the driven regression) + `b68ddb2` (mutants + the one
+  that survived) + this commit. Filed from the `W16.bat9` adversarial pass; the residual that item
+  deliberately did not widen into. **Pre-existing.**
+  `handleOCRResult` bound its `jobs[index]` writes on `guard index >= 0 && index < jobs.count` — bounds, and
+  nothing else. Every caller picks its index BEFORE a network round-trip, and the operator can spend that
+  round-trip pressing Stop, then **Clear** (`jobs = []`), re-dropping files and pressing **Start**. The new
+  run's jobs take the same indices, so the bounds check passed and a stale result overwrote a LIVE job's
+  status and text with another file's — and, because the output name is derived from `jobs[index].sourceURL`,
+  wrote a PDF named for the row it landed on holding the text of the file that was actually OCRed. bat9 had
+  closed this for the completion sweep and for the writes AFTER the detached PDF write; this closes it for
+  the writes before, and for the other six callers.
+  **The token is the JOB's `id`, not the run's and not `url`.** `OCRJob.id` is a fresh UUID per instance, so
+  a list cleared and re-dropped with the very same files at the very same indices still compares unequal — no
+  assignment site has to remember to bump a generation counter, because the identity travels in the data.
+  `jobs[index].sourceURL == url`, the guard the item warned about, is WRONG: `retryOne` legitimately passes a
+  rotated temp JPEG. The parameter is REQUIRED rather than optional for the reason `rotationMode` is
+  (W16.cfg6) — the compiler, not a code review, is what stops the next call site falling back to bounds-only.
+  Refusing at the entry writes NOTHING and reports "not persisted", which is deletion-reducing on every path:
+  no PDF exists yet at that point, so there is nothing for a resume to be told about (the distinction from
+  the post-await bail-out bat9 rejected), and every reader of `false` treats it as an interruption and KEEPS
+  the paid journal. Threading it surfaced two subscripts that had to NOT be added — both task groups' refill
+  sites run after a `handleOCRResult` that may have suspended, so they take an immutable snapshot beside the
+  `.processing` loop instead of re-reading `jobs`.
+  New `StaleRunResultIdentityContract` (driver section 23; test-batch-resume 360 → 371) drives the real
+  function with five fixtures, three of which exist to stop a wrong fix passing. **Five mutants measured:**
+  bounds-only → 5 RED; `sourceURL == url` → 2 RED; a bare `return false` → 17 RED (fourteen of them in
+  sections 20/21/22, which drive this function for real); refusing but returning `true` → 3 RED. The fifth —
+  reverting the completion sweep's own slot check from the job id back to `sourceURL` — **SURVIVED all 370**,
+  because every `BatchSweepClearedListContract` fixture re-drops a *different* file; new §5b re-drops the
+  SAME ones and reddens it alone. There the writes are refused one frame down either way, so what the slot
+  check decides is whether a batch that genuinely finished is reported interrupted and keeps its journal.
+  Adversarial pass: all eight call sites verified to bind the identity at dispatch; no production path
+  replaces `jobs` mid-run, so no honest write is refused; every post-await `jobs[index]` write stays behind
+  `slotIsStillOurs`. It filed one residual — **W16.bat11**, an unguarded `jobs[index]` read in
+  `retryHighUseFailures` that can still TRAP. Verified $0/headless: batch-resume 371 ALL PASS ×3 consecutive
+  runs, plus tagwarn 74 / multipage-reocr 29 / merge-safety 15 / manifest-persistence 109 / recovery 89, all
+  ALL PASS; clean build, no new warnings. The smoke test's paid OCR round-trip was NOT run (it spends real
+  money to exercise request shapes this change does not touch); its $0 components ran green.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift, OCR/StaleRunResultIdentityContract.swift, OCR/BatchSweepClearedListContract.swift, Capture/BatchResumeTestDriver.swift | S | low | none
+
 - [x] **W16.bat9 — the paid-batch completion sweep could TRAP (app crash) if the file list was cleared while
   it was mid-write [S · MED].** DONE 2026-08-03 — `5437355` (first shape) + `22a9a99` (the driven crash) +
   `5aa75b3` (the adversarial pass's rework) + this commit. Found by the `W16.bat7` adversarial pass;
