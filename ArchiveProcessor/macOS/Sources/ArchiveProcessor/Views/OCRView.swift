@@ -51,8 +51,18 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
 
+    /// The model for the current provider, read live from the shared store so a change made in the
+    /// Settings window updates this window's cost estimate — and the model a run launches with —
+    /// immediately, exactly like the `@AppStorage` settings above. (Never re-introduce a `@State`
+    /// mirror here: that is what left this window a model behind. See `ModelSelectionStore`.)
+    ///
+    /// Read-only by design: this window has no model picker, and a setter here would be keyed on the
+    /// `@AppStorage` provider — so a future caller changing provider and model together could file the
+    /// choice under the outgoing provider. Write via `ModelSelectionStore.saveModel(_:for:)` with an
+    /// explicit provider instead.
+    private var selectedModel: LLMModel { modelStore.model(for: selectedProvider) }
+
     // Initialized from persisted state in init()
-    @State private var selectedModel: LLMModel
     @State private var apiKey: String
     @State private var outputDirectory: URL?
 
@@ -95,29 +105,19 @@ struct OCRView: View {
         var id: Int { jobIndex }
     }
 
+    /// Observed, not read directly: `selectedModel` resolves against `provider.models`, which includes
+    /// this store's custom models — so adding or deleting one has to re-render this view too.
     @ObservedObject private var customModelStore = CustomModelStore.shared
+    @ObservedObject private var modelStore = ModelSelectionStore.shared
 
     init(processor: OCRProcessor) {
         _processor = ObservedObject(wrappedValue: processor)
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
         _apiKey = State(initialValue: "")
         _outputDirectory = State(initialValue: ModelSelectionStore.savedOutputDirectory())
     }
 
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
     private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
-
-    private var currentModels: [LLMModel] {
-        let builtIn: [LLMModel]
-        switch selectedProvider {
-        case .anthropic: builtIn = LLMModel.anthropicModels
-        case .gemini: builtIn = LLMModel.geminiModels
-        case .mistral: builtIn = LLMModel.mistralModels
-        case .openai: builtIn = LLMModel.openaiModels
-        }
-        return builtIn + customModelStore.allCustomModels.filter { $0.provider == selectedProvider }
-    }
 
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
@@ -222,19 +222,14 @@ struct OCRView: View {
             startProcessing()
         }
         .onChange(of: scenePhase) { _, phase in
-            // Returning from the Settings window: pick up any changed key / model / output folder.
+            // Returning from the Settings window: pick up any changed key / output folder. (The model is
+            // no longer re-synced here — it is read live from `ModelSelectionStore`, which also covers the
+            // case this never did: Settings open *beside* this window, where a macOS `WindowGroup` sees no
+            // scene-phase transition at all.)
             guard phase == .active else { return }
             apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
-            }
-            let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
-            if let m = currentModels.first(where: { $0.id == modelId }) {
-                selectedModel = m
-            } else if !currentModels.contains(where: { $0.id == selectedModel.id }) {
-                // Saved model gone (e.g. a deleted custom model) and the current selection is no longer
-                // valid → fall back to a valid model so a run can't use a ghost model id.
-                selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
             }
         }
         .sheet(isPresented: $showKeychainSheet) {
@@ -289,9 +284,6 @@ struct OCRView: View {
         }
         .reviewWindow(isPresented: $processor.awaitingManualSegTag) {
             ManualSegmentTagView(processor: processor)
-        }
-        .onChange(of: selectedModel) { _, newModel in
-            ModelSelectionStore.saveModel(newModel, for: selectedProvider)
         }
         .onChange(of: apiKey) { _, newKey in
             let account = useGateway ? "Gateway" : selectedProvider.rawValue
@@ -519,11 +511,11 @@ struct OCRView: View {
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
     }
 
-    /// Re-point the per-provider selected model + API-key field after `selectedProvider` changes from
-    /// anywhere (the ⌘⌥P cycle shortcut, an applied profile, or a return from Settings), so a run never
-    /// uses a model that belongs to a different provider or the wrong Keychain account.
+    /// Re-point the API-key field after `selectedProvider` changes from anywhere (the ⌘⌥P cycle
+    /// shortcut, an applied profile, or a return from Settings), so a run never uses the wrong Keychain
+    /// account. The model needs no hook — `selectedModel` reads the store keyed by the *current*
+    /// provider, so it re-points on the same render.
     private func syncForProviderChange() {
-        selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
         apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
     }
 

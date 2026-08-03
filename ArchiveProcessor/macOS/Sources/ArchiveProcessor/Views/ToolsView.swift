@@ -14,7 +14,19 @@ struct ToolsView: View {
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
     @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
 
-    @State private var selectedModel: LLMModel
+    @ObservedObject private var modelStore = ModelSelectionStore.shared
+    /// Observed, not read directly: `selectedModel` resolves against `provider.models`, which includes
+    /// this store's custom models — so deleting the selected one has to re-render this tab too.
+    @ObservedObject private var customModelStore = CustomModelStore.shared
+
+    /// Read live from the shared store, so a diagnostic can never run against the model this tab was
+    /// showing before the Settings window changed it (see `ModelSelectionStore`).
+    ///
+    /// Read-only by design: the one place this tab picks a model (the Compare Models winner) changes the
+    /// provider at the same moment, so it writes `ModelSelectionStore.saveModel(_:for:)` with that
+    /// provider explicitly rather than through a setter keyed on the `@AppStorage` provider.
+    private var selectedModel: LLMModel { modelStore.model(for: selectedProvider) }
+
     @State private var apiKey: String = ""
 
     @State private var showResolutionDropSheet = false
@@ -38,20 +50,12 @@ struct ToolsView: View {
     @State private var resolutionTask: Task<Void, Never>?
     @State private var modelTestTask: Task<Void, Never>?
 
-    init() {
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: provider)) ?? ""
-        _selectedModel = State(initialValue: provider.models.first { $0.id == modelId } ?? provider.models[0])
-    }
-
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
     private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
 
-    /// Re-read the selected model (for the current provider) and the matching Keychain key. Mirrors the
-    /// init's resolution so switching provider/gateway in Settings updates the Tools diagnostics live.
-    private func reloadModelAndKey() {
-        let modelId = UserDefaults.standard.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
-        selectedModel = selectedProvider.models.first { $0.id == modelId } ?? selectedProvider.models[0]
+    /// Re-read the Keychain key for the current provider/gateway. The model needs no reload — it is read
+    /// live from `ModelSelectionStore`, keyed by the current provider.
+    private func reloadKey() {
         apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
     }
 
@@ -96,13 +100,13 @@ struct ToolsView: View {
             .frame(maxWidth: 620, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onAppear { reloadModelAndKey() }
+        .onAppear { reloadKey() }
         // Stay in sync when the provider / gateway / key is changed in the Settings window while the Tools
-        // tab remains visible (no tab switch → no onAppear), so a diagnostic never runs against a stale
-        // model id or the wrong provider's key. (Note: a model change for the SAME provider is persisted to
-        // selectedModelId_<provider>, which isn't observed here — reopening the tab still refreshes it.)
-        .onChange(of: selectedProvider) { _, _ in reloadModelAndKey() }
-        .onChange(of: useGateway) { _, _ in reloadModelAndKey() }
+        // tab remains visible (no tab switch → no onAppear), so a diagnostic never runs against the wrong
+        // provider's key. A model change for the SAME provider needs no hook: `ModelSelectionStore`
+        // publishes it, and `selectedModel` re-reads on the resulting render.
+        .onChange(of: selectedProvider) { _, _ in reloadKey() }
+        .onChange(of: useGateway) { _, _ in reloadKey() }
         .sheet(isPresented: $showHistory) {
             ProcessingHistoryView(onDismiss: { showHistory = false })
         }
@@ -150,8 +154,10 @@ struct ToolsView: View {
                 onSelect: { provider, model in
                     modelTestTask?.cancel()   // user picked a model — stop the remaining paid test calls
                     selectedProvider = provider
-                    selectedModel = model
-                    UserDefaults.standard.set(model.id, forKey: ModelSelectionStore.modelKey(for: provider))
+                    // Write for the winning provider explicitly (not via `selectedModel`, whose setter is
+                    // keyed on the @AppStorage provider that may not have landed yet) so the choice can't
+                    // be filed under the previous provider.
+                    ModelSelectionStore.saveModel(model, for: provider)
                     apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
                     showModelTestResults = false
                 },

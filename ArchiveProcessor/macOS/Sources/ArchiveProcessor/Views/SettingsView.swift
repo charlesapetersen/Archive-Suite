@@ -80,7 +80,7 @@ struct SettingsView: View {
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @ObservedObject private var profileStore = ProcessingProfileStore.shared
-    @State private var selectedModel: LLMModel
+    @ObservedObject private var modelStore = ModelSelectionStore.shared
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
     @State private var mistralKey = ""
@@ -103,25 +103,20 @@ struct SettingsView: View {
     @State private var renamingProfileID: UUID? = nil
     @State private var renameProfileName = ""
 
-    init() {
-        let provider = LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        _selectedModel = State(initialValue: ModelSelectionStore.savedModel(for: provider))
-    }
-
     private var models: [LLMModel] {
         selectedProvider.models   // already includes this provider's custom models — don't concat (dupes)
     }
 
-    /// Keep `selectedModel` valid: after a provider switch or a custom-model deletion, if the current
-    /// selection is no longer in the list the Picker shows blank and processing would use a ghost model
-    /// id — so re-point to the same id (fields may have changed) or fall back to the saved/first model.
-    private func ensureValidModelSelection() {
-        if let match = models.first(where: { $0.id == selectedModel.id }) {
-            if match != selectedModel { selectedModel = match }
-        } else {
-            selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
-        }
+    /// The model for the current provider, read live from the shared store (see `ModelSelectionStore`)
+    /// rather than mirrored into `@State`, so this pane and the Process Files window can never disagree
+    /// about which model a run would use. The store's fallback also means the value is always a member
+    /// of `models` — a provider switch or a deleted custom model can't leave the Picker blank or a
+    /// ghost id in play, which is what `ensureValidModelSelection()` used to patch up by hand.
+    private var selectedModel: LLMModel {
+        get { modelStore.model(for: selectedProvider) }
+        nonmutating set { modelStore.setModel(newValue, for: selectedProvider) }
     }
+
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
 
@@ -159,8 +154,8 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
         .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
             // A profile just wrote new values into UserDefaults. @AppStorage picks up the scalar settings
-            // automatically; re-sync the derived @State (selected model, key fields) that don't.
-            selectedModel = ModelSelectionStore.savedModel(for: selectedProvider)
+            // automatically and `ModelSelectionStore` republishes the model ids; only the Keychain-backed
+            // key fields are left to re-sync by hand.
             reloadKeys()
         }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
@@ -377,12 +372,9 @@ struct SettingsView: View {
             } else if useLocalAgent {
                 localAgentControls
             } else {
-                Picker(selection: Binding(
-                    get: { selectedProvider },
-                    set: { p in
-                        selectedModel = ModelSelectionStore.savedModel(for: p)
-                        selectedProvider = p
-                    })) {
+                // Plain `$selectedProvider`: the model follows automatically, because `selectedModel`
+                // reads the store keyed by whatever the provider currently is.
+                Picker(selection: $selectedProvider) {
                     ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
                 } label: {
                     HStack {
@@ -390,7 +382,7 @@ struct SettingsView: View {
                         HelpButton(text: "Which LLM service performs OCR and tagging. Each has its own models, pricing, and API key.")
                     }
                 }
-                Picker(selection: $selectedModel) {
+                Picker(selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
                     ForEach(models) { m in
                         Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
                     }
@@ -400,11 +392,6 @@ struct SettingsView: View {
                         HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                     }
                 }
-                .onChange(of: selectedModel) { _, m in
-                    ModelSelectionStore.saveModel(m, for: selectedProvider)
-                }
-                .onChange(of: selectedProvider) { _, _ in ensureValidModelSelection() }
-                .onChange(of: customModelStore.allCustomModels) { _, _ in ensureValidModelSelection() }
                 if selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }

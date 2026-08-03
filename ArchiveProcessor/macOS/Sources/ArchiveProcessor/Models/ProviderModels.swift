@@ -488,9 +488,13 @@ final class CustomModelStore: ObservableObject, @unchecked Sendable {
         save()
     }
 
-    func removeById(_ id: String) {
+    @MainActor func removeById(_ id: String) {
         allCustomModels.removeAll { $0.id == id }
         save()
+        // A provider still pointing at the deleted id would read as its fallback while the dead id stayed
+        // on disk — and would spring back to life if that id were ever re-added, silently selecting a
+        // model (and a price) the user had thrown away. Heal the stored selection now.
+        ModelSelectionStore.shared.healUnresolvableSelections()
     }
 
     func isCustom(_ model: LLMModel) -> Bool {

@@ -92,6 +92,20 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
+## Owner-reported bugs (2026-08-02)
+
+- [ ] **W25.modelsync-fu — the retry sheets open on the provider's FIRST model, not the selected one
+  [S · Processor].** ✅ Owner-directed 2026-08-02, immediately after W25.modelsync shipped. Surfaced by that
+  item's adversarial review as **pre-existing**, not introduced by it. `ModelChoiceSheet`
+  (`Views/Shared/ModelChoiceView.swift`) and `OCRRetrySheet` (`Views/OCRView+OCRRetrySheet.swift`) each seed a
+  private `@State selectedModel` from `initialProvider`'s first model instead of
+  `ModelSelectionStore.savedModel(for:)`, so per-file "Retry with model" / "Rotate & re-run" and the whole-run
+  retry sheet default to e.g. Flash Lite even when the failed run used Gemini 3.1 Pro — a re-OCR at the wrong
+  quality if accepted blind. Each sheet's own estimate matches what it will call, so this is a wrong-default,
+  not an estimate/run divergence. Keep them as independent `@State` (a retry is deliberately a one-off choice
+  that must NOT rewrite the app-wide selection) — only the seed changes. See
+  `ArchiveProcessor/KNOWN_ISSUES.md` → *W25.modelsync-fu*.
+
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
 
 **Source.** An owner-commissioned static full-suite review by Codex, 2026-07-29, against remote `main`

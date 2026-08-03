@@ -4,6 +4,41 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ⚠️ OPEN (W25.modelsync-fu): "Retry with model" opens on the provider's first model, not the selected one
+
+**Found 2026-08-02** (adversarial review of the W25.modelsync fix; pre-existing, not introduced by it).
+`ModelChoiceSheet` (`Views/Shared/ModelChoiceView.swift`) and `OCRRetrySheet`
+(`Views/OCRView+OCRRetrySheet.swift`) each own a private `@State selectedModel` seeded from
+`initialProvider`'s **first** model rather than from `ModelSelectionStore`. So a per-file "Retry with
+model" / "Rotate & re-run", and the whole-run retry sheet, open on e.g. Gemini Flash Lite even when the
+run that just failed used Gemini 3.1 Pro. The sheet's own cost estimate is consistent with what it will
+call, so this is a wrong-default (and a silent re-OCR at the wrong quality if accepted blind), not an
+estimate/run divergence. Fix = seed from `ModelSelectionStore.savedModel(for:)`.
+
+---
+
+## ✅ FIXED (W25.modelsync): a model change in Settings did not reach the Process Files estimate — or the run
+
+**Found 2026-08-02** (owner-reported). **Fixed 2026-08-02** — see `SUITE_TODO_DONE.md` → *Owner-reported
+bugs (2026-08-02)* for the full write-up and the four adversarial-review follow-on fixes.
+
+**What was wrong.** The per-provider selected model (`selectedModelId_<provider>`) is the only processing
+setting that cannot be `@AppStorage` — the property wrapper needs a fixed key, and this one varies by
+provider — so `OCRView`, `SettingsView` and `ToolsView` each mirrored it into a plain `@State` seeded once
+in `init()`, and `ModelSelectionStore`'s bare `UserDefaults.set` notified nobody. The Settings cost pane
+read its own `@State` and updated; the main window did not. Because `startProcessing` passes that same
+stale value, **a run launched from the main window called the previous model** — real money at the wrong
+price, with the estimate faithfully describing the stale run.
+
+**The fix.** `ModelSelectionStore` is now a `@MainActor ObservableObject`; all three views read it live.
+`@MainActor` (not `@unchecked Sendable`) is deliberate: the cached ids are exactly the state a stray
+background write would corrupt into a wrong paid model, so the compiler enforces it.
+
+**Watch for:** anything that writes `selectedModelId_<provider>` with `UserDefaults.set` directly instead
+of `ModelSelectionStore.saveModel(_:for:)` re-introduces the staleness for every observer.
+
+---
+
 ## ✅ FIXED (W23.m5 + W23.h5-fu): Process Files reported tags as applied after discarding the write failure
 
 **Found 2026-07-29** (owner-commissioned Codex full-suite review, confirmed finding). **Fixed

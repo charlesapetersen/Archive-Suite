@@ -111,7 +111,8 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
     // MARK: - Snapshot / Apply
 
     /// Capture the current durable processing settings into a new named profile (does not persist it).
-    func snapshotCurrent(name: String) -> ProcessingProfile {
+    /// `@MainActor` because it reads the main-isolated `ModelSelectionStore`; every caller is a UI action.
+    @MainActor func snapshotCurrent(name: String) -> ProcessingProfile {
         let d = UserDefaults.standard
         var values: [String: ProfileValue] = [:]
         for desc in Self.descriptors {
@@ -146,7 +147,10 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
     ///
     /// - Parameter d: the defaults to write. Defaults to `.standard`; the parameter exists so the
     ///   headless driver can exercise this on a scratch suite instead of the real app's settings.
-    func apply(_ profile: ProcessingProfile, to d: UserDefaults = .standard) {
+    ///
+    /// `@MainActor` because it republishes the main-isolated `ModelSelectionStore`; both callers (the
+    /// Settings Apply button and the `@MainActor` manifest driver) already run there.
+    @MainActor func apply(_ profile: ProcessingProfile, to d: UserDefaults = .standard) {
         // Per-provider model ids first, so a subsequent provider change lands on the right model.
         for (providerRaw, modelId) in profile.modelIdByProvider {
             if let provider = LLMProvider(rawValue: providerRaw) {
@@ -162,13 +166,22 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
             }
         }
         SessionProcessingConfig.normalizeSizingDefaults(d)
+        // The model ids above went straight into `d` (this is the one bulk writer), so tell the store to
+        // re-read — otherwise the observing views keep showing the pre-profile model, and Live Capture,
+        // which reads the raw key itself (`SessionProcessingConfig`), would run a different model than
+        // the Process Files estimate quotes. Called unconditionally *on purpose*: `reloadFromDefaults`
+        // always re-reads `.standard`, so a scratch-suite `d` finds nothing changed and publishes
+        // nothing. Gating on `d === UserDefaults.standard` would instead fail OPEN for a future caller
+        // that writes the app's own domain through some other UserDefaults instance.
+        ModelSelectionStore.shared.reloadFromDefaults()
         NotificationCenter.default.post(name: .processingProfileApplied, object: nil)
         NotificationCenter.default.post(name: .apiKeyChanged, object: nil)   // provider may have changed → reload key fields
     }
 
     // MARK: - CRUD
 
-    func saveCurrent(as name: String) {
+    /// `@MainActor` via `snapshotCurrent`; called from the Settings "Save profile" alert button.
+    @MainActor func saveCurrent(as name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         profiles.append(snapshotCurrent(name: trimmed))

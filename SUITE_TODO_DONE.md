@@ -16,6 +16,67 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Owner-reported bugs (2026-08-02)
+
+- [x] **W25.modelsync [MED · money] — changing the model in Settings did not change the Process Files cost
+  estimate, and the run used the OLD model. ✅ DONE 2026-08-02** (this commit; fix + adversarial-review
+  fixes + trackers).
+  **Reported by the owner:** "when I change the model for OCR, the Estimate per 1,000 files updates in the
+  settings panel, but no change happens with the cost estimate in the main UI panel."
+  **What was wrong.** Every *other* processing setting is `@AppStorage` — a live UserDefaults observer — so
+  changing it in the ⌘, Settings scene re-renders the main `WindowGroup` immediately. The selected model is
+  the one exception: its key is **per-provider** (`selectedModelId_<provider>`), so it cannot be `@AppStorage`
+  (the wrapper needs a fixed key at init), and `ModelSelectionStore` was a stateless `enum` whose
+  `UserDefaults.set` notifies nobody. `OCRView`, `SettingsView` **and** `ToolsView` each held the model as a
+  plain `@State` seeded once in `init()`. Settings' pinned cost pane reads its *own* `@State`, so it updated;
+  the main window kept the value it was born with. **Not cosmetic:** `startProcessing` passes the same stale
+  `selectedModel`, so a run started from that window called the *previous* model — the estimate was honest
+  about the run, both were simply a model behind. `ToolsView` had the identical bug and a comment documenting
+  it (a diagnostic could bill against a stale model id).
+  Three catch-up paths existed and none covers the reported flow: `.onChange(of: selectedProvider)` fires only
+  on a *provider* change; `.onReceive(.processingProfileApplied)` only on Apply-a-profile; and the
+  `.onChange(of: scenePhase)` "returning from Settings" re-sync cannot fire while the Settings window sits
+  **open beside** the main window — which is exactly when the owner saw the two panes disagree.
+  **The fix.** `ModelSelectionStore` becomes a `@MainActor ObservableObject` singleton publishing
+  `selectedModelIDs` (provider.rawValue → id); the three views drop their `@State` mirror for a computed
+  property over it, so one write updates every window on the same render. The static API is unchanged, so
+  non-view callers (`ProcessingProfileStore.snapshotCurrent`) read the same resolution. Deleted as now
+  redundant: `SettingsView.ensureValidModelSelection()`, `OCRView.currentModels` + its scenePhase model
+  branch, `ToolsView.reloadModelAndKey`'s model half — the store's `provider.models[0]` fallback makes a
+  ghost id unresolvable-by-construction rather than patched up per view.
+  **Tier-2 (adversarial, 3 independent lenses — SwiftUI state / Swift-6 concurrency / money path).** All
+  three converged on four real defects in the first cut, every premise re-verified before acting; all four
+  are fixed in this commit:
+  - **Ghost id never healed.** The read-time fallback masked a deleted custom model's id but left it on
+    disk, and `ManageModelsView`'s duplicate check only sees models that *currently* exist — so re-adding
+    that id later silently resurrected a discarded selection and the next run billed at it. The old
+    `ensureValidModelSelection` + `.onChange(of: selectedModel)` pair used to *persist* the correction.
+    Now healed at the choke point: `CustomModelStore.removeById` → `healUnresolvableSelections()` (which
+    sweeps every provider, so it also clears ghosts left by builds before this one).
+  - **`publish()` read the `@Published` dictionary on the caller's thread** before its `Thread.isMainThread`
+    hop — the exact unsynchronized CoW-buffer access the hop existed to prevent, hidden by
+    `@unchecked Sendable`. Fixed properly: the type is now `@MainActor` (every reader/writer already was),
+    so it is a compile error rather than a convention; the hop is gone. `modelKey` /
+    `saved+saveOutputDirectory` stay `nonisolated` (pure UserDefaults; `OCRView.init` reads one).
+  - **Two dead `nonmutating set` accessors** in `OCRView`/`ToolsView` — neither view writes the model, and a
+    setter keyed on the `@AppStorage` provider is a trap for a future caller changing both at once. Both are
+    now get-only; the one real writer (`ToolsView`'s Compare-Models winner) passes its provider explicitly.
+  - **`d === UserDefaults.standard` failed OPEN** in `ProcessingProfileStore.apply` while `readIDs()`
+    hardcodes `.standard`. Now unconditional: a scratch-suite `d` leaves `.standard` unchanged, so the
+    `!=` guard makes it a no-op — it fails *closed* instead. Matters because
+    `SessionProcessingConfig` reads the raw key itself, so a cache/disk split would have let Live Capture
+    run one model while Process Files quoted another.
+  Cleared by the reviewers: re-render coverage in all three views (adding the `customModelStore` observer to
+  `ToolsView` is load-bearing, not cosmetic — the model resolves through `provider.models`), write-site
+  ordering (no misfiled provider; ⌘⌥P and profile-apply both correct), Picker `.tag()` matching, publish
+  feedback loops, sheet seeding, and — the one that matters for money — **`OCRProcessor` pins the model once
+  at run start** (`currentModel`/`runConfig.model`), so a live model change still cannot leak into an
+  in-flight or resumed run. Verified: full clean build, Swift 6 language mode, zero warnings.
+  **Not fixed here (pre-existing, surfaced by the same review):** `ModelChoiceSheet` / `OCRRetrySheet` seed
+  their picker with the provider's *first* model rather than the selected one, so "Retry with model" opens on
+  Flash Lite even when a larger model is selected.
+
+
 ## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)
 
 - [x] **Autonomous 2-week unattended hardening** — `execution-plans/autonomous-2wk-hardening.md` — **DONE
