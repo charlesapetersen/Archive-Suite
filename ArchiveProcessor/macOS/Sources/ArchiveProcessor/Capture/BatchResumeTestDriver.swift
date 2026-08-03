@@ -784,6 +784,16 @@ enum BatchResumeTestDriver {
         // "Stop must stay instant" constraint is measured here rather than read off the source.
         await BatchClosedJournalAppendContract.run(check: check, redirected: journalsAreRedirected)
 
+        // --- 23: a stopped run's result does not land on the next run's jobs (W16.bat10). ---
+        // Section 21 pins this for the completion sweep and for the writes `handleOCRResult` makes AFTER its
+        // detached PDF write; this is the residual it deliberately did not widen into — the writes before,
+        // for the other six callers. No race to stage: the caller already holds a stale `(index, jobID)`
+        // pair when it calls, so replacing `jobs` and calling the real function reproduces it in one shot.
+        // Its §3 is the discriminator the item asked for — `retryOne` passes a rotated temp image, so a
+        // URL-based guard would refuse an honest write. Every check writes a real manifest at the shipped
+        // path, so it takes the same redirect verdict.
+        await StaleRunResultIdentityContract.run(check: check, redirected: journalsAreRedirected)
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["BATCHRESUME_TEST_OUT"]
