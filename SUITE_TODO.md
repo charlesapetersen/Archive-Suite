@@ -441,6 +441,27 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   ⛔ **HOLD QUEUE — money path.** Every change to what the paid-batch journal records has been granted item
   by item (bat2-fu2, bat3, bat5, bat6, bat7); this changes it too. Do NOT auto-fix. Tier-2, scratch only.
   | files: OCR/OCRProcessor+Pipeline.swift | S | med | **NEEDS OWNER**
+- [ ] **W16.bat7-fu — close the coverage gap W16.bat7 shipped with: drive the poll's THREE provider-arm
+  persist-failure exits through a headless transport seam [M · MED].** `W16.bat7` fixed all four exits but
+  could only *measure* one — the completion sweep, which runs after the loop. The other three
+  (`processBatchResults` in the Anthropic and Mistral arms, and the `materialized` half of the Gemini arm's
+  guard) sit below the `switch provider`, past a status check, so reaching them needs either a real paid batch
+  or a seam. `BatchPollPersistFailureContract`'s header states that limit honestly; this item removes it.
+  ⚠️ **A prior killed session had already built most of it — do NOT start from scratch.** Uncommitted WIP is
+  in the stray worktree `../suite-wt-20260802-122142-12795` (branch `wt/autonomous-20260802-122142-12795`, on
+  top of `f417301`): a `NetworkSession.testTransport` seam (a `@Sendable (URLRequest) async throws ->
+  (Data, URLResponse)` stand-in installed at `data(for:policy:)`, nil in production, gated on BOTH
+  `BATCHRESUME_TEST == "1"` and a closure being installed — the same two-condition fail-closed shape as the
+  journal redirect, with a pure `testTransportIsEnabled(flag:)` so the refusal directions are sweepable), plus
+  its own draft of the contract (311 lines, 7 checks) and driver wiring. **Read that WIP first**, then rebase
+  it onto the shipped `c8d332b` (which already renamed/extracted the sweep and landed a 5-check version of the
+  contract, so the two drafts must be merged, not concatenated). Preserve the worktree until this ships.
+  ⚠️ **Tier-2, and the seam is the risky part, not the checks:** it decides whether a process talks to the
+  network at all on the one path that spends money. Pin the fail-closed direction explicitly (flag absent /
+  `"0"` / `"true"` / `"1 "` / closure nil → real transport), and assert the seam is dormant before the section
+  installs one and dormant again after. Never point it at a real endpoint. Literal provider response bodies
+  only — `BatchParseContract` already has them.
+  | files: OCR/NetworkSession.swift, OCR/BatchPollPersistFailureContract.swift, Capture/BatchResumeTestDriver.swift | M | med |
 - [ ] **W16.bat9 — the paid-batch completion sweep can TRAP (app crash) if the file list is cleared while it
   is mid-write [S · MED].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing** (identical
   before the W16.bat7 extraction). `sweepJobsWithNoBatchResult` (`+OCR.swift`) loops
