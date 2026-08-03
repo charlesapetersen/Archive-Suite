@@ -36,6 +36,10 @@ import ArchiveCore
 ///      document is still IN FLIGHT inside finalize (W3.cap-r5) or after it has staged (W3.cap-r4) — and in
 ///      the second case the correction survives the end-of-session rotation review, which regenerates the
 ///      segment and used to write the pre-correction collection straight back over it.
+///  13. A page that LEAVES the session (W3.cap-r3) — deleted in the Captured pane, or tombstoned because the
+///      phone reclassified it — takes its in-flight paid OCR call with it: the call is cancelled and its
+///      Task dropped, exactly one page's worth, while a page removed MID-FINALIZE deliberately keeps the
+///      call finalize is about to read.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -808,6 +812,147 @@ enum LiveCaptureRecoveryTestDriver {
             }
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
+        }
+
+        // --- Test 17 (W3.cap-r3): a page that LEAVES the session must take its paid OCR call with it. Both
+        // removal paths — the operator's delete in the Captured pane, and the Mac tombstoning the old copy of
+        // a page the phone reclassified (`X-Replaces`) — dropped the photo and trashed its source without
+        // telling the processor anything. The OCR call started on arrival ran to completion, billed, for a
+        // page nobody would ever read, and its Task + result sat in `pageTasks` under a key nothing looks up
+        // again; no other path drops a single page's entry. Driven through the REAL removal paths with the $0
+        // stub held on a gate, so the call is genuinely IN FLIGHT at the moment the page is deleted — the
+        // only state in which there is anything to cancel. ---
+        if isolatedBackup {
+            // Same isolation as Test 16, and load-bearing for the same reason: `CaptureSession.init` adopts
+            // the newest backup session that still holds unprocessed photos, and the tests above leave theirs
+            // behind. Inheriting their photos would put pages in this session that it never ingested — and
+            // `paidStarts()` counts starts for the whole run, so the counts below would read someone else's.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let r3Out = tmp.appendingPathComponent("r3out", isDirectory: true)
+            let r3Staging = tmp.appendingPathComponent("APStaging-r3-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: r3Staging, withIntermediateDirectories: true)
+            let r3Session = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            r3Session._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — see Test 15: a document only reaches the LLM in `.automatic`, so the
+                    // mid-finalize case below finalizes for real, for $0, with no network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: r3Out, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: r3Staging)
+            let r3Proc = r3Session.liveProcessor
+            let r3Bytes = Data("synthetic page bytes".utf8)
+            // The gate keeps every page this test ingests parked mid-OCR. A finished Task cannot be shown to
+            // have been cancelled, so an un-gated page would make every assertion below vacuous.
+            let r3Gate = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await r3Gate.wait() }
+            func r3Send(_ gid: String, _ seq: Int) {
+                r3Session.ingest(jpeg: r3Bytes, groupId: gid, seq: seq, type: .document,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func r3Settle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            func photo(_ gid: String, _ seq: Int) -> CapturedPhoto? {
+                r3Session.photos.first { $0.groupId == gid && $0.seq == seq }
+            }
+            func cancelled(_ p: CapturedPhoto) -> Bool {
+                LiveCaptureProcessor._recoveryTestOCRTasks[LiveCaptureProcessor.PageKey(p)]?.isCancelled ?? false
+            }
+
+            // 1. THE BUG: the operator deletes a page in the Captured pane while its OCR is still in flight.
+            r3Send("R1", 1)
+            let p1 = photo("R1", 1)
+            check("the deleted-mid-OCR page was really ingested and bought a call",
+                  p1 != nil && paidStarts() == 1)
+            if let p1 {
+                // Non-vacuity: the call must be LIVE and reachable at the moment of the delete, or "cancelled
+                // + gone" afterwards would be true of a page that had simply already finished.
+                check("...its call is in flight, uncancelled, and held in pageTasks before the delete",
+                      !cancelled(p1) && r3Proc._recoveryTestHasPageTask(for: p1))
+
+                r3Session.removePhoto(p1)
+
+                check("deleting the page CANCELS its paid OCR call", cancelled(p1))
+                check("...and drops its Task out of pageTasks (nothing orphaned)",
+                      !r3Proc._recoveryTestHasPageTask(for: p1))
+                check("...and the page really did leave the session", photo("R1", 1) == nil)
+                // The started-once guard (W3.cap-r2) has to be retired WITH the task: this page has no OCR
+                // any more, so if the phone re-sends it, it must be free to buy a new call. Leaving the guard
+                // armed over an absent task would file the page as "OCR not started" instead — silently
+                // text-less. This is also the behavioural read of `startedPages`, which is private.
+                r3Send("R1", 1)
+                check("...so a later arrival of that same page is free to buy its own call",
+                      photo("R1", 1) != nil && paidStarts() == 2)
+            }
+
+            // 2. The cancel is scoped to the ONE page. A fix that cancelled the group (or the session) would
+            //    silently throw away the sibling pages the operator is still capturing.
+            r3Send("R2", 1)
+            r3Send("R2", 2)
+            let s1 = photo("R2", 1), s2 = photo("R2", 2)
+            check("a two-page group has both pages in flight", s1 != nil && s2 != nil && paidStarts() == 4)
+            if let s1, let s2 {
+                r3Session.removePhoto(s1)
+                check("deleting one page of a group cancels exactly that page", cancelled(s1))
+                check("...and leaves its sibling's call running and reachable",
+                      !cancelled(s2) && r3Proc._recoveryTestHasPageTask(for: s2))
+            }
+
+            // 3. The reclassify path (`X-Replaces`): the phone moved a page into another group, so the Mac
+            //    tombstones the old copy. The OCR bought for that old copy is money nobody will read either.
+            r3Send("R3", 7)
+            let t1 = photo("R3", 7)
+            check("the reclassified page's old copy is in flight", t1 != nil && paidStarts() == 5)
+            if let t1 {
+                r3Session.removePhotoIfSafe(groupId: "R3", seq: 7)
+                check("tombstoning a reclassified page's old copy cancels its OCR too", cancelled(t1))
+                check("...and orphans nothing in pageTasks", !r3Proc._recoveryTestHasPageTask(for: t1))
+                check("...and the old copy is gone from the session", photo("R3", 7) == nil)
+            }
+
+            // 4. The deliberate carve-out, and the reason this fix is a guard rather than an unconditional
+            //    cancel: while the segment is MID-FINALIZE, finalize is the task's consumer. It snapshotted
+            //    the group before its awaits and is about to read this page's result into the segment's text,
+            //    so the call is already bought — cancelling there would discard paid output instead of saving
+            //    any. Without this check, "cancel unconditionally" passes every assertion above.
+            r3Send("R4", 1)
+            let f1 = photo("R4", 1)
+            r3Proc.segmentResolved(groupId: "R4")
+            let parked = await r3Settle { r3Proc.isFinalized("R4") }
+            check("the segment is genuinely mid-finalize (finalized, not yet staged)",
+                  parked && f1 != nil && r3Proc.retainedText(for: "R4") == nil)
+            if let f1 {
+                r3Session.removePhoto(f1)
+                check("a page removed MID-FINALIZE keeps its call — finalize is about to read it",
+                      !cancelled(f1) && r3Proc._recoveryTestHasPageTask(for: f1))
+                r3Gate.open()   // release every parked page; finalize can now finish
+                let consumed = await r3Settle { r3Proc.retainedText(for: "R4") != nil }
+                check("...and finalize really does consume the result it was left",
+                      consumed && r3Proc.retainedText(for: "R4") == "stub page text")
+            }
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

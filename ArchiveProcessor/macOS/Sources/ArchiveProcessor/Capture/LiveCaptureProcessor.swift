@@ -368,7 +368,9 @@ final class LiveCaptureProcessor: ObservableObject {
             // result (and therefore its segment's `finalizeSegment`) suspended while it delivers a Box.
             Self._recoveryTestOCRStarts.append(key)
             let gate = Self._recoveryTestOCRGate
-            pageTasks[key] = Task<OCRResult, Never> { await gate?(); return stub }
+            let stubTask = Task<OCRResult, Never> { await gate?(); return stub }
+            pageTasks[key] = stubTask
+            Self._recoveryTestOCRTasks[key] = stubTask   // W3.cap-r3: a handle that survives the removal
         } else {
             pageTasks[key] = Self.ocrTask(
                 imageURL: photo.url,
@@ -1525,6 +1527,18 @@ final class LiveCaptureProcessor: ObservableObject {
     /// so the driver arms it for the one page it wants held and clears it again immediately. Nil in
     /// production — only the recovery driver ever assigns it.
     static var _recoveryTestOCRGate: (@Sendable () async -> Void)?
+
+    /// Test-only ($0, W3.cap-r3): every stub OCR Task `photoIngested` started, kept reachable OUTSIDE
+    /// `pageTasks`. The fix's whole effect is that the page's entry is gone from `pageTasks` afterwards,
+    /// which is precisely what makes the Task unreachable from every other vantage — so this second handle is
+    /// the only way a driver can tell a genuine `cancel()` from a silent drop (both leave `pageTasks` empty,
+    /// but only one stops the paid call). Never read in production; the recovery driver clears it when done.
+    static var _recoveryTestOCRTasks: [PageKey: Task<OCRResult, Never>] = [:]
+
+    /// Test-only ($0, W3.cap-r3): whether `pageTasks` still holds this page — WITHOUT awaiting it.
+    /// `_recoveryTestPageOCRText` cannot answer this: a page parked on the test gate has no value to await
+    /// yet, so on the unfixed code (entry still present) that probe would HANG instead of failing.
+    func _recoveryTestHasPageTask(for photo: CapturedPhoto) -> Bool { pageTasks[PageKey(photo)] != nil }
 
     /// Test-only ($0, W3.cap-r2): the OCR result `finalizeSegment` would await for this page, looked up the
     /// way finalize looks it up (`pageTasks[PageKey(photo)]`). Counting starts alone cannot catch a fix that
