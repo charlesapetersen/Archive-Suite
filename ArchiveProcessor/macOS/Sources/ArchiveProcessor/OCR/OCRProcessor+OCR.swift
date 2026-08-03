@@ -1562,6 +1562,32 @@ extension OCRProcessor {
             || msg.contains("unavailable") || msg.contains("overloaded")
             || msg.contains("rate limit")
     }
+    /// Prune a retried file from this run's failure list — but only if the row at `index` is still the job
+    /// the retry was dispatched for (W16.bat11).
+    ///
+    /// `retryHighUseFailures` picks its indices before a 10-second sleep and then a network round-trip per
+    /// file, and the operator can spend that window pressing Stop, then **Clear** (`jobs = []`), re-dropping
+    /// files and pressing **Start**. Reading `jobs[index]` afterwards on the bare index is the
+    /// `W16.bat9`/`W16.bat10` crash class at the one site neither reached: out of range it **TRAPS** the app,
+    /// and in range it prunes the LIVE run's failure entry under a stale row's filename, so that run's own
+    /// "N failed" summary and `.txt` log silently under-count.
+    ///
+    /// The identity is the job's `id`, for the same reason it is in `handleOCRResult`: a list cleared and
+    /// re-dropped with the very same file at the same index compares equal by `sourceURL` and unequal by id —
+    /// and that is precisely the case that erases a genuine failure the NEW run recorded for that file.
+    ///
+    /// Kept here rather than left to `handleOCRResult` (which prunes the same name two lines later, off its
+    /// own guarded `sourceURL`): the retry loop is where this run decides the file stopped being a failure,
+    /// and a guard at the read is local and testable where the redundancy is an invariant two functions
+    /// apart. Nothing observable depends on which of the two prunes first — they prune the same name.
+    ///
+    /// A `Task.isCancelled` bail-out is deliberately NOT part of this: the paid call has already been made
+    /// and its text is in hand, so a Stop must not turn a succeeded retry back into a listed failure.
+    func clearFailedFile(forRetriedJobAt index: Int, jobID: OCRJob.ID) {
+        guard jobs.indices.contains(index), jobs[index].id == jobID else { return }
+        let sourceFileName = jobs[index].sourceURL.lastPathComponent
+        failedFiles.removeAll { $0 == sourceFileName }
+    }
     func retryHighUseFailures(
         fileURLs: [URL],
         provider: LLMProvider,
@@ -1607,11 +1633,9 @@ extension OCRProcessor {
                 standardImageMB: ocrRun.standardImageMB
             )
 
-            // Update failed files list if retry succeeded
-            if result.text != nil {
-                let sourceFileName = jobs[index].sourceURL.lastPathComponent
-                failedFiles.removeAll { $0 == sourceFileName }
-            }
+            // Update failed files list if retry succeeded — on the job this retry was dispatched for, not
+            // on whatever now sits at its index (W16.bat11).
+            if result.text != nil { clearFailedFile(forRetriedJobAt: index, jobID: slot.jobID) }
             guard await handleOCRResult(
                 result, index: index, jobID: slot.jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }
