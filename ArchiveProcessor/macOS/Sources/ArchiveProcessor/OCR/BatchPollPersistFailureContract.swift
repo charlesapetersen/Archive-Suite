@@ -110,6 +110,126 @@ enum BatchPollPersistFailureContract {
         check("poll persist: and a sweep that completed still retires it, so a kept journal is a consequence "
               + "of the failure rather than the new default",
               wrote.journalExistedBefore && !wrote.journalSurvived && !wrote.batchStillLive)
+
+        // MARK: 4/5/6. The three exits below the `switch provider` (W16.bat7-fu)
+        //
+        // Sections 1–3 drive the ONE exit that is reachable for free. These three drive the rest — a real
+        // poll through a real provider arm, with the wire replaced. Each provider gets its own pair of
+        // directions plus a dormancy re-check; see `aProviderArmThatCouldNotPersist`.
+        for provider in [LLMProvider.anthropic, .mistral, .gemini] {
+            await aProviderArmThatCouldNotPersist(provider, check)
+        }
+    }
+
+    // MARK: - 4/5/6. A provider arm whose results could not be PERSISTED
+
+    /// One provider arm's `guard … else { return }`, driven whole (W16.bat7-fu): the real
+    /// `pollBatchUntilComplete`, the real batch client, the real status/results parse, the real
+    /// `processBatchResults` → `handleOCRResult` → persistence chain, a real journal on disk, and the real
+    /// first-run tail — with only the wire replaced by literal provider bodies.
+    ///
+    /// **The trigger is `handleOCRResult`'s bounds guard, and that is not a contrivance.**
+    /// `processBatchResults` admits an entry on `index < fileURLs.count` and then hands it to a guard that
+    /// measures `jobs.count`; the two disagree whenever the arrays do, and nothing else in the app reports
+    /// that mismatch. Both directions are driven from the SAME fixture, one job apart — which is what makes
+    /// the interrupted one meaningful rather than just red: the only difference between "the journal is kept"
+    /// and "the journal is retired" is whether `jobs` was long enough to hold the result the provider
+    /// returned for index 1.
+    ///
+    /// **Non-vacuous by construction, not by luck.** The refusal happens at `handleOCRResult`'s ENTRY, before
+    /// `saveResultToPendingRun` — so `persistPendingBatchMutation`'s own `reportInterruptedPaidBatch`
+    /// (W16.bat3-fu) never runs, and the arm's own `batchPollInterrupted = true` is the only thing in the
+    /// process that can set the flag. Measured: reverting that one assignment per arm reddens exactly that
+    /// arm's interrupted check and nothing else.
+    ///
+    /// For Gemini this is specifically the **`materialized`** half of
+    /// `guard materialized, markBatchChunkConsumed(…)`. Swift short-circuits the comma, so a false
+    /// `materialized` never evaluates `markBatchChunkConsumed` — the half that reports itself is not the half
+    /// being driven. The status fixture carries INLINE results, so `resultsSource` resolves the whole chunk
+    /// from that one response and no download URL is ever built.
+    private static func aProviderArmThatCouldNotPersist(
+        _ provider: LLMProvider, _ check: (String, Bool) -> Void
+    ) async {
+        let dormantBefore = !NetworkSession.testTransportIsActive && NetworkSession.testTransport == nil
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent(
+            "APPollPersistArm-\(provider.rawValue)-\(UUID().uuidString)", isDirectory: true)
+        let outDir = dir.appendingPathComponent("out", isDirectory: true)
+        try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: dir) }
+        // Two REAL JPEGs, for the same reason the sweep section uses one: a source the PDF writer cannot
+        // read is a second way `handleOCRResult` can rewrite a job, and only the persistence step is the
+        // subject here.
+        let sources = (0..<2).map { dir.appendingPathComponent("arm-src-\($0).jpg") }
+        for url in sources { try? realJPEG()?.write(to: url) }
+
+        /// One whole run of the poll. `jobCount` is the entire variable: at 1, the provider's result for
+        /// index 1 arrives for a job that does not exist and the arm unwinds; at 2 it lands.
+        func poll(jobCount: Int) async -> (interrupted: Bool, journalExistedBefore: Bool,
+                                           journalSurvived: Bool, requests: Int) {
+            let chunkId = "batches/w16bat7fu-\(provider.rawValue.lowercased())"
+            let saved = OCRProcessor.savePendingBatch(
+                OCRProcessor.PendingBatch(
+                    batchId: chunkId, provider: provider, model: model(provider), thinkingLevel: .low,
+                    fileURLs: sources, outputDirectory: outDir, enableTagging: false,
+                    sendPreviousImage: false, submittedAt: Date(), taggingMode: TaggingMode.none,
+                    // Spelled `TaggingMode.none` on purpose: the parameter is `TaggingMode?`, so a bare
+                    // `.none` is Optional's nil — a DIFFERENT fingerprint from the journal's own mode above.
+                    runFingerprint: OCRProcessor.runFingerprint(
+                        files: sources, outputDirectory: outDir, taggingMode: TaggingMode.none,
+                        enableTagging: false, batchMode: true, preserveInputOrder: true),
+                    lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+                    submittedChunkIds: [chunkId]))
+            let existed = saved != nil && fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)
+            // Deferred rather than called at the end: the tail below is *meant* to leave this file on disk
+            // in the interrupted case, so removing it has to be the one thing that cannot be skipped.
+            defer { OCRProcessor.deletePendingBatch() }
+
+            let processor = OCRProcessor()
+            processor.activePendingBatch = saved
+            processor.batchPollInterrupted = false
+            processor.isProcessing = true
+            // `activePendingRun` stays nil, which is what routes `saveResultToPendingRun` to the paid-batch
+            // journal. The sweep section above needs the opposite; these arms need this.
+            processor.jobs = sources.prefix(jobCount).map { url in
+                var job = OCRJob(sourceURL: url)
+                // `.processing` is load-bearing here too — the completion sweep after the loop only visits
+                // jobs the batch left in flight, and the healthy direction has to reach it.
+                job.status = .processing
+                return job
+            }
+
+            let transcript = Transcript()
+            NetworkSession.testTransport = stub(for: provider, chunkId: chunkId, transcript: transcript)
+            await processor.pollBatchUntilComplete(
+                batchId: chunkId, provider: provider, model: model(provider), thinkingLevel: .low,
+                apiKey: "poll-persist-not-a-key", fileURLs: sources, outputDirectory: outDir,
+                runConfig: runConfig(provider, outputDirectory: outDir),
+                pollInterval: .zero)
+            // Uninstalled only once the poll has fully RETURNED: its task group and the detached PDF write
+            // are both awaited by then, so no request this run started can still be looking for a stub.
+            NetworkSession.testTransport = nil
+
+            // The destructive half of the caller's decision, run for real against the file on disk.
+            processor.retirePaidBatchJournalIfPollCompleted()
+            return (processor.batchPollInterrupted, existed,
+                    fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path), transcript.requests)
+        }
+
+        let stopped = await poll(jobCount: 1)
+        check("poll persist (\(provider.rawValue) arm): a result the run could not PERSIST reports the poll "
+              + "interrupted, and the paid batch's journal is still on disk after the first run's tail",
+              stopped.requests > 0 && stopped.journalExistedBefore
+                  && stopped.interrupted && stopped.journalSurvived)
+        let healthy = await poll(jobCount: 2)
+        check("poll persist (\(provider.rawValue) arm): the SAME fixture one job longer persists, leaves the "
+              + "poll uninterrupted and still retires the journal — one index apart is the whole difference",
+              healthy.requests > 0 && healthy.journalExistedBefore
+                  && !healthy.interrupted && !healthy.journalSurvived)
+        check("poll persist (\(provider.rawValue) arm): the seam was dormant before this section and is "
+              + "dormant again after it — no stub outlives the checks that installed it",
+              dormantBefore && !NetworkSession.testTransportIsActive
+                  && NetworkSession.testTransport == nil)
     }
 
     // MARK: - 0. The transport seam cannot be reached by a shipped build
@@ -158,10 +278,84 @@ enum BatchPollPersistFailureContract {
 
     /// A synthetic model — never sent anywhere. Built by hand rather than read from `provider.models` so no
     /// check depends on `CustomModelStore`/UserDefaults.
-    private static func model() -> LLMModel {
-        LLMModel(id: "poll-persist-gemini", displayName: "Poll Persist Gemini",
-                 provider: .gemini, supportsThinking: false, returnsMd: false,
+    private static func model() -> LLMModel { model(.gemini) }
+
+    private static func model(_ provider: LLMProvider) -> LLMModel {
+        LLMModel(id: "poll-persist-\(provider.rawValue.lowercased())",
+                 displayName: "Poll Persist \(provider.rawValue)",
+                 provider: provider, supportsThinking: false, returnsMd: false,
                  inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+    }
+
+    /// A real 64×64 JPEG. Used wherever a source has to be genuinely decodable so that `PDFGenerator` is not
+    /// a second way `handleOCRResult` can rewrite a job's result.
+    private static func realJPEG() -> Data? {
+        NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64, bitsPerSample: 8,
+                         samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)?
+            .representation(using: .jpeg, properties: [:])
+    }
+
+    /// What the stub was asked for. A MainActor box because the stub closure runs off this actor and the
+    /// count is read back after the poll has returned — asserting it is how a check proves the arm really
+    /// went through its provider client rather than short-circuiting somewhere above the `switch provider`.
+    @MainActor private final class Transcript {
+        var requests = 0
+        var urls: [String] = []
+    }
+
+    /// The literal provider bodies that stand in for the wire, dispatched on the request URL. Each is the
+    /// smallest shape its REAL parse seam accepts as *one finished chunk carrying one result for index 1* —
+    /// the index the interrupted run has no job for. (`BatchParseContract` is what pins these shapes against
+    /// the parsers in general; here they only need to be accepted.)
+    private static func stub(for provider: LLMProvider, chunkId: String, transcript: Transcript)
+        -> @Sendable (URLRequest) async throws -> (Data, URLResponse) {
+        let anthropicResults = "https://api.anthropic.com/v1/messages/batches/\(chunkId)/results"
+        return { request in
+            guard let url = request.url else { throw URLError(.badURL) }
+            let text = url.absoluteString
+            await MainActor.run { transcript.requests += 1; transcript.urls.append(text) }
+            let body: String
+            switch provider {
+            case .anthropic:
+                body = text.hasSuffix("/results")
+                    ? #"{"custom_id":"file-1","result":{"type":"succeeded","message":{"content":[{"type":"text","text":"page one"}]}}}"#
+                    : #"{"processing_status":"ended","request_counts":{"processing":0,"succeeded":1,"errored":0,"expired":0,"canceled":0},"results_url":"\#(anthropicResults)"}"#
+            case .mistral:
+                body = text.hasSuffix("/content")
+                    ? #"{"custom_id":"file-1","response":{"status_code":200,"body":{"pages":[{"markdown":"page one"}]}}}"#
+                    : #"{"status":"SUCCESS","total_requests":1,"completed_requests":1,"succeeded_requests":1,"failed_requests":0,"output_file":"w16bat7fu-out"}"#
+            case .gemini:
+                // INLINE results, so the whole chunk resolves from this one response and `resultsSource`
+                // never builds a download URL — which is what keeps this to the `materialized` half of the
+                // Gemini guard rather than dragging the file-download arm in.
+                body = #"{"metadata":{"state":"BATCH_STATE_SUCCEEDED"},"response":{"inlinedResponses":{"inlinedResponses":[{"metadata":{"key":"1"},"response":{"candidates":[{"content":{"parts":[{"text":"page one"}]}}]}}]}}}"#
+            case .openai:
+                // No stub is ever installed for OpenAI (it does not enter the batch path at all —
+                // `supportsBatch == false`). Refuse rather than answer, and with a code
+                // `performWithRetry` does NOT treat as retryable, so a mistake here cannot make the suite
+                // sit through real backoff.
+                throw URLError(.unsupportedURL)
+            }
+            guard let response = HTTPURLResponse(url: url, statusCode: 200,
+                                                 httpVersion: "HTTP/1.1", headerFields: nil) else {
+                throw URLError(.badServerResponse)
+            }
+            return (Data(body.utf8), response)
+        }
+    }
+
+    /// A run configuration with rotation **OFF**. Not cosmetic: `processBatchResults` runs rotation detection
+    /// per entry, and any LLM mode would make a real comparative call — through the stub while one is
+    /// installed, over the wire if the seam were ever missed. `.off` returns nil before either.
+    private static func runConfig(_ provider: LLMProvider, outputDirectory: URL) -> SessionProcessingConfig {
+        SessionProcessingConfig(
+            provider: provider, model: model(provider), thinkingLevel: .low,
+            apiKey: "poll-persist-not-a-key", taggingMode: .none, rotationMode: .off,
+            mergeDocuments: false, outputDirectory: outputDirectory, contextCharCount: 0,
+            sendPreviousImage: false, customOCRPrompt: "", imageScale: 1.0,
+            enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
+            outputImageFile: false, pdfImageMB: 1.0, exportedImageMB: 1.0, textColumns: 1)
     }
 
     /// One run of the real sweep over one job that got no result, followed by the real first-run tail.
@@ -181,10 +375,7 @@ enum BatchPollPersistFailureContract {
         // in `handleOCRResult` is the persistence step under test. (With junk bytes the PDF write can throw
         // instead, which rewrites the job's result and would blur what section 1 is measuring.)
         let source = dir.appendingPathComponent("sweep-source.jpg")
-        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64, bitsPerSample: 8,
-                                      samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
-                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        if let jpeg = bitmap?.representation(using: .jpeg, properties: [:]) { try? jpeg.write(to: source) }
+        try? realJPEG()?.write(to: source)
 
         // A real journal on disk AND in memory: this is a paid batch that reached a terminal state, which is
         // the only state the sweep ever runs in.

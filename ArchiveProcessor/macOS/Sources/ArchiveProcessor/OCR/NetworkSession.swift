@@ -114,6 +114,13 @@ enum NetworkSession {
     /// `"1"`, and a closure has been installed. A shipped build satisfies neither: nothing outside
     /// `BatchPollPersistFailureContract` assigns this, and that contract only runs under the same flag.
     /// There is deliberately no other trigger — no `#if DEBUG`, no test-bundle sniffing.
+    ///
+    /// ⚠️ **Scope it exactly: this covers `data(for:policy:)`, not "the process cannot reach the network."**
+    /// Every OCR / rotation / tagging / batch call goes through here, so it covers everything any paid path
+    /// does. Two call sites deliberately do NOT: `KeyValidator` (the Settings "check my key" probes) and
+    /// `Net/DriveClient`, both of which hold `URLSession.shared` directly. Neither is on a path this
+    /// contract drives, but a future check that installs a stub and then expects *silence* should know that.
+    /// Nothing here is a substitute for not pointing a check at a real endpoint.
     nonisolated(unsafe) static var testTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))?
 
     /// Whether the flag permits the seam, from the raw environment value. Pure, so every fail-closed
