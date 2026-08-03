@@ -1574,6 +1574,9 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   sit on the far side of a provider call and reaching them costs a real paid batch, so their bodies — one
   statement, textually identical to the driven one — are structural. The contract's header says so; cite it
   for "the poll's persist-failure exit keeps the journal", not for "all four exits are covered by a test."
+  ⬆️ **That limit is CLOSED as of `W16.bat7-fu` (2026-08-03, below):** all three provider-arm exits are now
+  driven through a fail-closed transport seam, each with its own measured mutant, so the header — and this
+  entry — no longer carry that caveat. Cite the contract for all four exits.
   **Two findings filed from the adversarial pass, neither a defect in this change:** `W16.bat8` (a stale
   in-memory run manifest makes a paid batch journal its results into the wrong file → duplicate charges on
   resume; **owner-gated, money**) and `W16.bat9` (the sweep's loop can trap if `jobs` is cleared mid-write).
@@ -1581,6 +1584,52 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   reachable only in a state "which could not be constructed from the current call graph." It can be, and the
   contract's header now traces how — so the exit is live, not merely defensive.
   Clean Debug build, 0 new warnings; `scripts/test-batch-resume.sh` ALL PASS (321 checks, sections 1-20).
+
+- [x] **W16.bat7-fu — the coverage gap `W16.bat7` shipped with is closed: the poll's THREE provider-arm
+  persist-failure exits are DRIVEN, through a headless transport seam [M · MED].** DONE 2026-08-03 —
+  `9ce8f51` (the seam + its refusal sweep) → `018ddfe` (the three arms + the measured mutants) → this commit
+  (the header the fix makes false, and the trackers). No new grant needed: `W16.bat7`'s is discharged and this
+  changes no production decision — it adds a test-only seam and nine checks.
+  `W16.bat7` fixed all four exits but could only MEASURE one. The completion sweep runs after the loop; the
+  other three (`processBatchResults` in the Anthropic and Mistral arms, and the `materialized` half of the
+  Gemini arm's guard) sit below the `switch provider`, past a real provider status check, so reaching them
+  cost either a paid batch or a seam.
+  **The seam.** `NetworkSession.testTransport` — a `@Sendable (URLRequest) async throws -> (Data, URLResponse)`
+  stand-in resolved at `data(for:policy:)`, the public entry point every batch client goes through (not
+  `performWithRetry`'s existing private `transport:`). It diverts a request only when `BATCHRESUME_TEST` reads
+  exactly `"1"` **and** a closure has been installed; the only assignment in the tree is inside
+  `BatchPollPersistFailureContract`, which itself runs only under that flag. Same two-condition fail-closed
+  shape, and the same reasoning, as the journal redirect in `OCRProcessor.pendingStateDirectory` — no
+  `#if DEBUG`, no test-bundle sniffing. Production takes a BRANCH to the byte-identical call it always made,
+  and the closure is tested before the flag so a shipped build does no `ProcessInfo.environment` work per
+  request. Also `pollBatchUntilComplete(pollInterval:)`, a defaulted parameter (nil in production) so the
+  exits can be driven without waiting out the 30s/60s schedule.
+  **What is driven.** A real poll per provider through the real batch client, the real status/results parsers,
+  the real `processBatchResults` → `handleOCRResult` → persistence chain, a real journal on disk, and the real
+  `retirePaidBatchJournalIfPollCompleted()` tail — only the wire replaced, by literal provider bodies. The
+  trigger is `handleOCRResult`'s bounds guard, a real array disagreement (`processBatchResults` admits an entry
+  on `index < fileURLs.count`, then hands it to a guard measuring `jobs.count`). Both directions run the SAME
+  fixture one job apart, so what separates "the journal is kept" from "the journal is retired" is only whether
+  `jobs` was long enough for the result the provider returned for index 1.
+  **Non-vacuity, measured on four mutants — one-to-one attribution:** dropping `batchPollInterrupted = true`
+  from the Anthropic exit reddens exactly the Anthropic interrupted check, Mistral exactly Mistral's, the
+  Gemini `materialized` half exactly Gemini's; and the counterweight (entry `= false` → `= true`, i.e. wedge
+  every batch into "interrupted") reddens exactly the three HEALTHY checks. So neither direction can be
+  satisfied by an implementation that always keeps, or never keeps. It is non-vacuous because the refusal lands
+  at `handleOCRResult`'s ENTRY — before `saveResultToPendingRun`, so `persistPendingBatchMutation`'s own
+  `reportInterruptedPaidBatch` (W16.bat3-fu) cannot set the flag upstream of the exit under test. Gemini's is
+  the `materialized` half specifically: Swift short-circuits the comma, so a false `materialized` never
+  evaluates `markBatchChunkConsumed`, which is the half that already reports itself.
+  Each section also asserts the seam was dormant before it ran and dormant again after, and section 0 sweeps
+  eleven approximate spellings of the flag (`nil`, `""`, `" "`, `"0"`, `"true"`, `"TRUE"`, `"yes"`, `"1 "`,
+  `" 1"`, `"01"`, `"11"`) through the pure `testTransportIsEnabled(flag:)` before any stub exists. The seam's
+  doc also records what it does NOT cover — `KeyValidator` and `Net/DriveClient` hold `URLSession.shared`
+  directly; neither is on a path driven here.
+  Tier-2 (Net/, money path): temp fixtures only, never a real endpoint, never the operator's
+  `pending_batch.json` (every check past section 0 is refused unless the harness's state-root redirect is in
+  force). Clean Debug build, 0 new warnings; `scripts/test-batch-resume.sh` ALL PASS — 331 → **340** checks.
+  The killed session's WIP that this started from (stray worktree `suite-wt-20260802-122142-12795`) is
+  superseded and removed.
 
 - [x] **W16.bat3-fu2 — after a Stop, the submission-failure message tells the operator the opposite of what
   happened [S · MED].** DONE 2026-08-02 — `80dc4bd` (code + contract) and this commit (docs). Found by the

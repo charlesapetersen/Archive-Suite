@@ -11,25 +11,39 @@ import Foundation
 /// of the poll's exits then `return`ed without touching it, so a run unwinding from a step that could not
 /// WRITE reported "the poll finished cleanly" and the journal was retired under a live paid job.
 ///
-/// **What is driven here, and what cannot be.** Three of the four exits sit on the far side of a provider
-/// call (`guard await processBatchResults(…)` in the Anthropic and Mistral arms, and the `materialized` half
-/// of the Gemini arm's guard) — reaching them costs a real paid batch, the same limit
-/// `BatchInterruptTailContract` and `BatchPollCancelContract` §3 both record. The FOURTH is the completion
-/// sweep, and it is reachable for free because it runs *after* the loop: it was extracted into
-/// `sweepJobsWithNoBatchResult` so it could be driven rather than read, and every check below runs that real
-/// function, the real `handleOCRResult` under it, the real persistence path under that, and the real
-/// first-run tail after it. The other three exits' bodies are one statement, textually identical to the one
-/// driven here. **Cite this file for "the poll's persist-failure exit keeps the journal", not for "all four
-/// exits are covered by a test."**
+/// **All four exits are driven — in two different ways, for two different reasons** (the second half is
+/// W16.bat7-fu; before it, only the first was true and this header said so).
+///   * **The completion sweep** (sections 1–3) is reachable for free because it runs *after* the loop. It was
+///     extracted into `sweepJobsWithNoBatchResult` so it could be driven rather than read, and those checks
+///     run that real function, the real `handleOCRResult` under it, the real persistence path under that, and
+///     the real first-run tail after it.
+///   * **The three exits below the `switch provider`** (sections 4/5/6) — `guard await
+///     processBatchResults(…)` in the Anthropic and Mistral arms, and the `materialized` half of the Gemini
+///     arm's guard — sit past a real provider status check, so reaching them used to cost a real paid batch
+///     (the same limit `BatchInterruptTailContract` and `BatchPollCancelContract` §3 still record for their
+///     own subjects). They are now driven through `NetworkSession.testTransport`, a fail-closed seam that
+///     answers the status/result requests from literal provider bodies. Section 0 sweeps that seam's refusal
+///     directions BEFORE any stub exists, and each provider section re-asserts it is dormant afterwards.
 ///
-/// **How the write is made to fail — no stub, and no seam that did not already exist.** A DIRECTORY is
-/// created where the interrupted-run manifest goes, so `savePendingRun`'s `Data.write(to:options:.atomic)`
-/// throws for real inside `saveResultToPendingRun`. That path is chosen deliberately over the paid-batch
-/// journal's: `persistPendingBatchMutation` already reports the interruption itself (W16.bat3-fu), which
-/// would set the flag one layer *upstream* of the exit under test and make every check here green before the
-/// fix ran — the exact vacuity the grant for this item forbids. `saveResultToPendingRun`'s pending-**run**
-/// branch sets `isProcessing`/`processingTask?.cancel()` and does NOT set `batchPollInterrupted`, so the
-/// sweep's own assignment is the only thing that can.
+/// So this file may now be cited for **"the poll's persist-failure exits keep the journal"** — all four of
+/// them, each with its own measured mutant (see the two "how the failure is forced" notes below, and the
+/// per-section headers). What it is still NOT is a claim about the OpenAI arm, which does not enter the batch
+/// path at all.
+///
+/// **How the failure is forced, mechanism 1 (the sweep, sections 1–3) — no stub, and no seam that did not
+/// already exist.** A DIRECTORY is created where the interrupted-run manifest goes, so `savePendingRun`'s
+/// `Data.write(to:options:.atomic)` throws for real inside `saveResultToPendingRun`. That path is chosen
+/// deliberately over the paid-batch journal's: `persistPendingBatchMutation` already reports the interruption
+/// itself (W16.bat3-fu), which would set the flag one layer *upstream* of the exit under test and make these
+/// checks green before the fix ran — the exact vacuity the grant for this item forbids.
+/// `saveResultToPendingRun`'s pending-**run** branch sets `isProcessing`/`processingTask?.cancel()` and does
+/// NOT set `batchPollInterrupted`, so the sweep's own assignment is the only thing that can.
+///
+/// **Mechanism 2 (the provider arms, sections 4/5/6) — `handleOCRResult`'s entry guard.** The same vacuity
+/// rule is satisfied a different way there: the refusal happens at the ENTRY, before
+/// `saveResultToPendingRun` is called at all, so no upstream reporter runs and the arm's own assignment is
+/// again the only candidate. See `aProviderArmThatCouldNotPersist` for why that guard is a real array
+/// disagreement rather than a contrivance.
 ///
 /// ⚠️ **The state that reaches that branch is REACHABLE in production, and the earlier claim that it was not
 /// is withdrawn** (found by this item's adversarial pass, 2026-08-03). It needs `activePendingRun` non-nil
@@ -47,12 +61,14 @@ import Foundation
 ///
 /// So the exit these checks drive is live, not merely defensive. It is *also* why the owner authorized all
 /// four exits rather than the one narrow arm: the exits were safe only because something upstream happened to
-/// report, which is the coupling that broke in W16.bat3-fu. This section pins the exit's own behaviour
+/// report, which is the coupling that broke in W16.bat3-fu. These sections pin each exit's own behaviour
 /// independently of that upstream, so a change there cannot silently re-open the hole.
 ///
-/// Every check writes and then removes a manifest at the shipped paths, so the whole section is refused
-/// unless the harness's redirect is in force (`BatchJournalPathContract.redirectIsInForce`) — blocking
-/// `pending_run.json` with a directory is safe in a temp state root and unacceptable in the operator's.
+/// Every check from section 1 on writes and then removes a real journal (and, for the sweep, a real run
+/// manifest) at the SHIPPED paths, so all of them are refused unless the harness's redirect is in force
+/// (`BatchJournalPathContract.redirectIsInForce`) — blocking `pending_run.json` with a directory is safe in a
+/// temp state root and unacceptable in the operator's. **Section 0 is the exception and needs no redirect:**
+/// it touches no file, which is also why it runs first, before any stub could exist.
 ///
 /// Run from `BatchResumeTestDriver` (section 20) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -65,10 +81,12 @@ enum BatchPollPersistFailureContract {
         // directions are pinned before it is ever installed. Needs no redirect — it writes nothing.
         theTransportSeamIsFailClosed(check)
         guard redirected else {
-            // FOUR checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
-            // check count, so a refused run reports SOME FAILED rather than a shorter green report.
-            check("poll persist: the whole section is SKIPPED (refused: the journal path did not resolve away "
-                  + "from Application Support, and every check here blocks and restores a real manifest path)",
+            // The remaining FOURTEEN checks are skipped, not silently: this one FAILs in their place, and no
+            // caller asserts a check count, so a refused run reports SOME FAILED rather than a shorter green
+            // report. Section 0 above has already run — it needs no redirect.
+            check("poll persist: every check past the seam sweep is SKIPPED (refused: the journal path did "
+                  + "not resolve away from Application Support, and all of them write a real journal — the "
+                  + "sweep ones also block and restore a real manifest path)",
                   false)
             return
         }

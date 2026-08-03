@@ -88,10 +88,12 @@ import AppKit
 ///      named, and the mutator's own explanation leading rather than overwritten. Drives the real exit
 ///      against a real journal (same redirect gate).
 ///  20. **A poll step that could not PERSIST does not report the batch finished cleanly**
-///      (`BatchPollPersistFailureContract`, W16.bat7): the poll's persist-failure exits, as opposed to
-///      section 17's cancellation ones. Drives the real completion sweep against a genuinely failing atomic
-///      write, and the real first-run tail after it. Its header states what it does NOT cover: the three
-///      exits behind a provider call are read, not driven.
+///      (`BatchPollPersistFailureContract`, W16.bat7 + W16.bat7-fu): the poll's persist-failure exits, as
+///      opposed to section 17's cancellation ones. All FOUR are driven now. The completion sweep runs against
+///      a genuinely failing atomic write and the real first-run tail after it; the three exits behind a
+///      provider call run a real poll through a real batch client with only the wire replaced, via the
+///      fail-closed `NetworkSession.testTransport` seam — whose refusal directions the section sweeps before
+///      it installs anything, and whose dormancy it re-asserts after. Still no keys, no network, no cost.
 ///  21. **Clearing the file list mid-sweep does not kill the app** (`BatchSweepClearedListContract`,
 ///      W16.bat9): the same sweep as section 20, driven for whether the process survives rather than for
 ///      what it reports. It re-subscripts a snapshotted index range across a detached PDF write while Stop
@@ -739,14 +741,18 @@ enum BatchResumeTestDriver {
         // journal at the shipped path, so it uses the same redirect verdict and removes what it wrote.
         BatchSubmissionMessageContract.run(check: check, redirected: journalsAreRedirected)
 
-        // --- 20: a poll step that could not PERSIST does not report the batch finished cleanly (W16.bat7). ---
+        // --- 20: a poll step that could not PERSIST does not report the batch finished cleanly
+        // (W16.bat7 + W16.bat7-fu). ---
         // Section 17 covers the poll's two CANCELLATION exits; these are its persist-failure exits, which
         // unwind from a step that could not write and used to return a flag saying the poll completed — so
-        // the tail retired the journal of a paid job whose outputs never landed. Drives the real completion
-        // sweep (extracted as `sweepJobsWithNoBatchResult` to make that exit reachable), the real persistence
-        // path under it with a genuinely failing atomic write, and the real first-run tail after it. No
-        // provider call, no keys, no cost; every check writes and removes a manifest at the shipped paths,
-        // so it takes the same redirect verdict and is refused outright without it.
+        // the tail retired the journal of a paid job whose outputs never landed. All FOUR are driven. The
+        // completion sweep (extracted as `sweepJobsWithNoBatchResult` to make that exit reachable) runs
+        // against a genuinely failing atomic write and the real first-run tail; the three exits below the
+        // `switch provider` run a real poll through a real batch client, with the wire replaced by
+        // `NetworkSession.testTransport` — a seam gated on BOTH this suite's flag and an installed closure,
+        // whose refusals are swept before anything is installed. Still no keys, no network, no cost; every
+        // check past that sweep writes and removes a journal at the shipped paths, so it takes the same
+        // redirect verdict and is refused outright without it.
         await BatchPollPersistFailureContract.run(check: check, redirected: journalsAreRedirected)
 
         // --- 21: clearing the file list mid-sweep does not kill the app (W16.bat9). ---
