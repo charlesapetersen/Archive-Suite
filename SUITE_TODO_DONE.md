@@ -1488,6 +1488,49 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
 
+- [x] **W16.bat9 — the paid-batch completion sweep could TRAP (app crash) if the file list was cleared while
+  it was mid-write [S · MED].** DONE 2026-08-03 — `5437355` (the fix) + `22a9a99` (the measured regression) +
+  this commit. Found by the `W16.bat7` adversarial pass; **pre-existing** (identical before that item's
+  extraction).
+  `sweepJobsWithNoBatchResult` looped `for i in jobs.indices where jobs[i].status == .processing`:
+  `jobs.indices` is snapshotted ONCE while the `where` clause re-subscripts `jobs[i]` every iteration —
+  across the `await` in `handleOCRResult`, which awaits a **detached** task and so keeps running after the
+  parent is cancelled. `cancel()` sets `isProcessing = false` synchronously (its own comment: the run "goes
+  on unwinding afterwards"), which un-disables the **Clear** button (`.disabled(processor.isProcessing)`,
+  action `processor.jobs = []`). One click during that suspension and the next subscript was out of range:
+  SIGTRAP on the money path.
+  **Fixed at TWO sites, because it is one window seen from two frames.** The filed "smallest fix" — the
+  sweep's `where` clause re-reading `jobs.indices` — is necessary but NOT sufficient, and this item's own
+  trace is what found that: `handleOCRResult` re-subscripts `jobs[index]` three times *after* its detached
+  PDF write, with only an entry bounds guard taken seconds earlier, so with the sweep alone fixed the
+  identical crash still lands one frame down whenever the PDF write fails or copy-source tags are applied
+  (measured — see the mutants below). The second guard checks IDENTITY, not just bounds
+  (`jobs[index].sourceURL == sourceURL`): a list cleared and re-dropped leaves an in-range slot holding a
+  DIFFERENT file, and writing this file's result and status over that one is the same bug without the crash.
+  Its answer, `false`, is the answer the entry guard already gives to "that index is not this file's job any
+  more", so the caller keeps the paid batch's journal rather than retiring it on a result recorded against
+  nothing. `OCRJob.sourceURL` is a `let` and `jobs` is only ever replaced wholesale (run start, Clear), so
+  the identity test cannot fire on any legitimate mid-run mutation.
+  **How it is measured.** New `BatchSweepClearedListContract` (driver section 21; `test-batch-resume`
+  321 → 327 checks) drives the real sweep, the real `handleOCRResult`, the real persistence path and the real
+  first-run tail with `jobs` mutated underneath it three ways — cleared, shrunk, and refilled with another
+  file. No seam and no stub: a `Task { @MainActor in … }` enqueued before the sweep starts can only be
+  reached at its first genuine suspension, the detached PDF write, which is exactly when a click on Clear
+  lands. Each fixture records whether its mutation really landed *while the sweep was in flight*, so a
+  fixture that failed to reproduce the race fails a check of its own instead of passing the rest for the
+  wrong reason; two of the three make `PDFDocument.write(to:)` fail for real (a read-only output directory)
+  because the trap they reproduce is in the branch past the write.
+  **Non-vacuity, measured on three mutants — and two of them do not print FAIL, they TRAP the driver**, which
+  is the honest shape of this bug: drop the sweep's `jobs.indices.contains(i)` → §2 traps (rc=133, "Index out
+  of range", `ContiguousArrayBuffer:692`); drop the post-await guard → §1 traps (rc=133, `…:705`); reduce
+  that guard to bounds only → §3 goes RED normally (1 FAIL of 327). `test-processfiles-tagwarn.sh`, which
+  drives `handleOCRResult` on the post-run retry path, is unchanged and green (74 checks).
+  **Deliberately NOT done:** the `Task.isCancelled` guard the filing offered to weigh. Aborting the sweep on
+  cancellation changes what a cancelled paid batch records — it would leave jobs `.processing` for good with
+  no failure output — and the crash is fixed without it. The sweep still has no cancellation check of its
+  own; that is now a stated scope line in the contract's header rather than an oversight.
+  | files: OCR/OCRProcessor+OCR.swift, OCR/BatchSweepClearedListContract.swift, Capture/BatchResumeTestDriver.swift | S | med |
+
 - [x] **W16.bat7 — four exits in `pollBatchUntilComplete` returned a "poll completed" flag they never set,
   and the caller then DELETED the paid batch's journal [S · MED · money].** DONE 2026-08-03 — `f417301`
   (the fix) + this commit (the extraction, the measured regression, and the docs). ✅ Owner-AUTHORIZED

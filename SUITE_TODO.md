@@ -462,27 +462,6 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   installs one and dormant again after. Never point it at a real endpoint. Literal provider response bodies
   only — `BatchParseContract` already has them.
   | files: OCR/NetworkSession.swift, OCR/BatchPollPersistFailureContract.swift, Capture/BatchResumeTestDriver.swift | M | med |
-- [ ] **W16.bat9 — the paid-batch completion sweep can TRAP (app crash) if the file list is cleared while it
-  is mid-write [S · MED].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing** (identical
-  before the W16.bat7 extraction). `sweepJobsWithNoBatchResult` (`+OCR.swift`) loops
-  `for i in jobs.indices where jobs[i].status == .processing`: `jobs.indices` is snapshotted ONCE, while the
-  `where` clause re-reads `jobs[i]` on every iteration — across the `await` in `handleOCRResult`, which awaits
-  a **detached** `Task` (`:1287`) and therefore keeps running after the parent task is cancelled. `cancel()`
-  sets `isProcessing = false` synchronously (`+Pipeline.swift:2044`) and says in its own comment that the run
-  "goes on unwinding afterwards", which un-disables the **Clear** button (`Views/OCRView.swift:537-539`,
-  `.disabled(processor.isProcessing)`) whose action is `processor.jobs = []`. One click during the sweep's
-  suspension and the next iteration's `jobs[i]` is out of range → SIGTRAP, *before* `handleOCRResult`'s own
-  bounds guard (`:1254`) could return `false`. Verified reachable by tracing the chain and by reproducing the
-  loop shape standalone (exit 133, `EXC_BREAKPOINT`).
-  Not a data-loss bug — the process dies before `retirePaidBatchJournalIfPollCompleted()` runs, so the paid
-  journal survives — but it is a crash on the money path, and the sweep is the one exit with no
-  `Task.isCancelled` check of its own (contrast the poll's two, `:737`/`:752`).
-  **Smallest fix: `where jobs.indices.contains(i) && jobs[i].status == .processing`** (the `where` clause
-  re-evaluates `jobs.indices` against the current array). Consider also a `Task.isCancelled` guard so a
-  cancelled run stops sweeping rather than finishing a list nobody is waiting for — but that changes what a
-  cancelled paid batch records, so weigh it separately. Tier-2; drive it from
-  `BatchPollPersistFailureContract`, which already owns this function.
-  | files: OCR/OCRProcessor+OCR.swift | S | med |
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned

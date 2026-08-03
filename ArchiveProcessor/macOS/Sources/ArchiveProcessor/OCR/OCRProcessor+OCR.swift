@@ -962,23 +962,35 @@ extension OCRProcessor {
     /// paid batch's journal must survive (W16.bat7). Extracted from the tail of `pollBatchUntilComplete`
     /// for exactly the reason `retirePaidBatchJournalIfPollCompleted` was: reaching it needs a real paid
     /// submission, so that exit could only be read, never driven (`BatchPollPersistFailureContract`).
-    /// Behaviour is unchanged — same loop, same guard, same order, and the caller's `return` is now this
-    /// function's `false`.
+    /// The extraction itself changed no behaviour — same loop, same guard, same order, and the caller's
+    /// `return` became this function's `false`. The loop has since been re-shaped by W16.bat9 (below), which
+    /// is a behaviour change on one input only: a `jobs` array mutated while this is suspended.
     func sweepJobsWithNoBatchResult(
         model: LLMModel,
         outputDirectory: URL,
         runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
-        // W16.bat9 — `jobs.indices` is snapshotted ONCE when the loop starts, but `handleOCRResult` below
-        // suspends on a DETACHED PDF write, and a detached task goes on running after this run is cancelled.
-        // `cancel()` clears `isProcessing` synchronously (and says so: the run "goes on unwinding
-        // afterwards"), which re-enables the **Clear** button — whose action is `jobs = []`. One click during
-        // that suspension and the next iteration's `jobs[i]` is out of range: SIGTRAP, on the money path,
-        // before `handleOCRResult`'s own bounds guard could return `false`. Re-reading `jobs.indices` in the
-        // `where` clause fixes it because the clause — unlike the sequence being iterated — is re-evaluated
-        // against the CURRENT array every iteration.
-        for i in jobs.indices where jobs.indices.contains(i) && jobs[i].status == .processing {
-            let url = jobs[i].sourceURL
+        // W16.bat9 — the list this sweep is FOR, snapshotted before it can suspend. `handleOCRResult` below
+        // suspends on a DETACHED PDF write, and a detached task goes on running after this run is cancelled:
+        // `cancel()` clears `isProcessing` synchronously (and says so — the run "goes on unwinding
+        // afterwards"), which re-enables the **Clear** button, whose action is `jobs = []`. The old
+        // `for i in jobs.indices where jobs[i].status == .processing` iterated an index range captured once
+        // and re-subscripted the CURRENT array, so one click during a suspension put the next `jobs[i]` out
+        // of range: SIGTRAP on the money path, before `handleOCRResult`'s own bounds guard could report
+        // anything. Re-validating each slot against the snapshot on arrival covers both ways that goes wrong
+        // — the row is gone (out of range), or the row is a different file's. The second is not hypothetical:
+        // Stop, Clear, re-drop and Start gives the NEW run's jobs the same indices and the same `.processing`
+        // status, and a bounds-only check would let this stale sweep mark them failed and write failure
+        // outputs over a live run.
+        let sweptSlots: [(index: Int, source: URL)] = jobs.indices
+            .filter { jobs[$0].status == .processing }
+            .map { (index: $0, source: jobs[$0].sourceURL) }
+        for slot in sweptSlots {
+            guard slot.index < jobs.count,
+                  jobs[slot.index].sourceURL == slot.source,
+                  jobs[slot.index].status == .processing else { continue }
+            let i = slot.index
+            let url = slot.source
             let readable = ImageEncoding.loadImageAsJPEG(url: url, scale: 1.0) != nil
             let synthetic = OCRResult(
                 text: nil, classification: nil, rotationDegrees: 0,
@@ -1320,18 +1332,23 @@ extension OCRProcessor {
         }.value
         // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
         // longest suspension in this function (seconds, for a real page), and `jobs` can be emptied or
-        // replaced across it: Stop re-enables **Clear**, whose action is `jobs = []`. The entry guard's
-        // answer to "that index is not this file's job any more" is `false`; this is the same answer at the
-        // later point where it can become true. Both halves are load-bearing — an out-of-range subscript
-        // below TRAPS the app, and an in-range slot now holding a DIFFERENT file (cleared, then re-dropped)
-        // would take this file's result and status, silently, over that file's own.
-        guard index < jobs.count, jobs[index].sourceURL == sourceURL else { return false }
+        // replaced across it: Stop re-enables **Clear**, whose action is `jobs = []`. The entry guard was
+        // passed before all of that. Both halves below are load-bearing — an out-of-range subscript TRAPS
+        // the app, and an in-range slot now holding a DIFFERENT file (cleared, then re-dropped) would take
+        // this file's result and status, silently, over that file's own.
+        //
+        // What is guarded is exactly the three `jobs[index]` writes, and NOTHING else: `jobs` is the on-screen
+        // list, while the output PDF is already on disk and the journal below is what a resume reads. Bailing
+        // out with `false` here instead — the first shape of this fix — would have skipped
+        // `saveResultToPendingRun`, and on the non-batch path that record is the only thing stopping a resume
+        // from OCRing this file a SECOND time, at cost. A vanished row must not buy a second paid call.
+        let slotIsStillOurs = index < jobs.count && jobs[index].sourceURL == sourceURL
         if pdfResult.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
             // phantom entry pointing downstream consumers at a nonexistent file (M1 fix).
             outputURLMap[sourceURL] = outputURL
-            if let tags = pdfResult.tags {
+            if let tags = pdfResult.tags, slotIsStillOurs {
                 jobs[index].appliedTags = tags
             }
             if let tagWriteOK = pdfResult.tagWriteOK {
@@ -1345,14 +1362,16 @@ extension OCRProcessor {
             // renders as "No OCR text" — blaming the model for a failed output WRITE. Keep the OCR text and
             // `rotationDegrees` (all `OCRResult` fields are `let`, so this must be rebuilt, not mutated —
             // dropping rotationDegrees here would silently lose the detected rotation) and add the reason.
-            jobs[index].result = OCRResult(
-                text: result.text,
-                classification: result.classification,
-                rotationDegrees: result.rotationDegrees,
-                errorMessage: "OCR succeeded but the output PDF could not be written. Check that the output "
-                            + "folder exists and is writable, and that there is free disk space.",
-                errorCode: "pdf_write_failed")
-            jobs[index].status = .failed
+            if slotIsStillOurs {
+                jobs[index].result = OCRResult(
+                    text: result.text,
+                    classification: result.classification,
+                    rotationDegrees: result.rotationDegrees,
+                    errorMessage: "OCR succeeded but the output PDF could not be written. Check that the "
+                                + "output folder exists and is writable, and that there is free disk space.",
+                    errorCode: "pdf_write_failed")
+                jobs[index].status = .failed
+            }
             let name = sourceURL.lastPathComponent
             if !failedFiles.contains(name) { failedFiles.append(name) }
         }
