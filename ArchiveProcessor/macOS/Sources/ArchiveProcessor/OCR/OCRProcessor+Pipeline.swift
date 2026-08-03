@@ -1778,14 +1778,20 @@ extension OCRProcessor {
             var completed = 0
             let concurrency = Self.schedulingWorkerCount(for: runConfig)
             for i in indices { jobs[i].status = .processing }
+            // W16.bat10 — the identity of every slot this resume is for, snapshotted before the group can
+            // suspend; the refill site below runs after a `handleOCRResult` that may have awaited a detached
+            // PDF write, so re-reading the live `jobs` there could subscript an array that Clear emptied.
+            // Parallel to `indices`, so a slot number resolves both without an optional to unwrap.
+            let jobIDs: [OCRJob.ID] = indices.map { jobs[$0].id }
             statusMessage = "OCR 0/\(remaining) remaining… (parallel)"
 
-            await withTaskGroup(of: (Int, OCRResult).self) { group in
+            await withTaskGroup(of: (Int, OCRJob.ID, OCRResult).self) { group in
                 var nextSlot = 0
 
                 for _ in 0..<min(concurrency, remaining) {
                     let index = indices[nextSlot]
                     let url = fileURLs[index]
+                    let jobID = jobIDs[nextSlot]
                     let prevImageURL = (segmentationContext.sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                     nextSlot += 1
                     let scale = segmentationContext.imageScale
@@ -1800,14 +1806,14 @@ extension OCRProcessor {
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB
                         )
-                        return (index, result)
+                        return (index, jobID, result)
                     }
                 }
 
-                for await (index, result) in group {
+                for await (index, jobID, result) in group {
                     guard !Task.isCancelled else { group.cancelAll(); return }
                     guard await handleOCRResult(
-                        result, index: index, url: fileURLs[index], model: model,
+                        result, index: index, jobID: jobID, url: fileURLs[index], model: model,
                         outputDirectory: outputDirectory, runConfig: runConfig) else {
                         group.cancelAll()
                         return
@@ -1819,6 +1825,7 @@ extension OCRProcessor {
                     if nextSlot < remaining {
                         let idx = indices[nextSlot]
                         let url = fileURLs[idx]
+                        let nextJobID = jobIDs[nextSlot]
                         let prevImageURL = (segmentationContext.sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                         nextSlot += 1
                         let scale = segmentationContext.imageScale
@@ -1833,7 +1840,7 @@ extension OCRProcessor {
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB
                             )
-                            return (idx, result)
+                            return (idx, nextJobID, result)
                         }
                     }
                 }
@@ -1844,6 +1851,8 @@ extension OCRProcessor {
                 guard !Task.isCancelled else { return }
                 let url = fileURLs[index]
                 jobs[index].status = .processing
+                // W16.bat10 — bound with the index, before this file's round-trip.
+                let jobID = jobs[index].id
 
                 let previousText: String?
                 if index > 0, let prevResult = jobs[index - 1].result, segmentationContext.previousTextCharCount > 0 {
@@ -1880,7 +1889,7 @@ extension OCRProcessor {
                 }
 
                 guard await handleOCRResult(
-                    result, index: index, url: url, model: model,
+                    result, index: index, jobID: jobID, url: url, model: model,
                     outputDirectory: outputDirectory, runConfig: runConfig) else { return }
                 progress = Double(alreadyCompleted + attempt + 1) / Double(totalFiles) * 0.7
                 statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles) complete"
@@ -2789,6 +2798,10 @@ extension OCRProcessor {
                   rotation: Int? = nil, runConfig: SessionProcessingConfig? = nil) async -> Bool {
         guard jobs.indices.contains(index) else { return false }
         jobs[index].status = .processing
+        // W16.bat10 — the row this retry is FOR. `ocrURL` cannot stand in for it: for a pre-OCRed PDF (or a
+        // rotate-and-re-run) it is a temp JPEG that is deliberately NOT the job's source, which is exactly
+        // why the identity threaded into `handleOCRResult` is the job's id rather than a URL comparison.
+        let jobID = jobs[index].id
         let ocrURL = imageURL ?? jobs[index].sourceURL
         let effectiveRunConfig = runConfigForRetry(runConfig)
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
@@ -2803,8 +2816,8 @@ extension OCRProcessor {
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
         let persisted = await handleOCRResult(
-            result, index: index, url: ocrURL, model: model, outputDirectory: outputDirectory,
-            runConfig: effectiveRunConfig)
+            result, index: index, jobID: jobID, url: ocrURL, model: model,
+            outputDirectory: outputDirectory, runConfig: effectiveRunConfig)
         return persisted && result.text != nil
     }
     /// Request notification permission (call once at app launch).

@@ -191,7 +191,8 @@ enum ProcessFilesTagWarningTestDriver {
                                   inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
         _ = await retrier.handleOCRResult(
             OCRResult(text: "retried text", classification: nil, errorMessage: nil, errorCode: nil),
-            index: 0, url: retrySource, model: retryModel, outputDirectory: retryDir)
+            index: 0, jobID: retrier.jobs[0].id, url: retrySource, model: retryModel,
+            outputDirectory: retryDir)
         check("a retry that re-writes the PDF without re-tagging leaves the warning standing",
               retrier.untaggedOutputs == ["IMG_9001.jpg"])
         check("...and that retry really did produce a fresh output", retrier.outputURLMap[retrySource] != nil)

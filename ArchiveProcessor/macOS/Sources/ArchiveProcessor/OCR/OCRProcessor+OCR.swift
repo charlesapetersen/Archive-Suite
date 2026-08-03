@@ -991,12 +991,14 @@ extension OCRProcessor {
         // Stop, Clear, re-drop and Start gives the NEW run's jobs the same indices and the same `.processing`
         // status, and a bounds-only check would let this stale sweep mark them failed and write failure
         // outputs over a live run.
-        let sweptSlots: [(index: Int, source: URL)] = jobs.indices
+        // W16.bat10 — the slot's identity is the JOB's id, not its source URL: a list cleared and re-dropped
+        // with the same file at the same index passes a source comparison and fails this one.
+        let sweptSlots: [(index: Int, source: URL, jobID: OCRJob.ID)] = jobs.indices
             .filter { jobs[$0].status == .processing }
-            .map { (index: $0, source: jobs[$0].sourceURL) }
+            .map { (index: $0, source: jobs[$0].sourceURL, jobID: jobs[$0].id) }
         for slot in sweptSlots {
             guard slot.index < jobs.count,
-                  jobs[slot.index].sourceURL == slot.source,
+                  jobs[slot.index].id == slot.jobID,
                   jobs[slot.index].status == .processing else { continue }
             let i = slot.index
             let url = slot.source
@@ -1011,7 +1013,7 @@ extension OCRProcessor {
             // `handleOCRResult`'s own `guard index >= 0 && index < jobs.count`, which reports nothing.
             // A sweep that could not record its failure outputs has not finished cleanly either.
             guard await handleOCRResult(
-                synthetic, index: i, url: url, model: model,
+                synthetic, index: i, jobID: slot.jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig)
             else { batchPollInterrupted = true; return false }
         }
@@ -1029,11 +1031,17 @@ extension OCRProcessor {
         // A resumed paid batch restores these keys from disk. Skip them before output-path allocation so
         // re-fetching an incompletely acknowledged chunk cannot create duplicate "(2)" PDFs.
         let alreadyCompleted = Set(activePendingBatch?.completedResults.keys.map { $0 } ?? [])
-        let entries: [(index: Int, url: URL, result: OCRResult)] = results.compactMap { (customId, result) in
+        // W16.bat10 — the job identity is read HERE, on the main actor, before the rotation detection below
+        // can suspend: that is the run this chunk's results belong to. It is deliberately optional rather
+        // than a filter, because an entry whose index is past `jobs` must keep reporting "not persisted" the
+        // way today's bounds guard does (a silent drop would let the poll call the batch clean and retire a
+        // paid journal).
+        let entries: [(index: Int, url: URL, jobID: OCRJob.ID?, result: OCRResult)]
+            = results.compactMap { (customId, result) in
             let indexStr = customId.replacingOccurrences(of: "file-", with: "")
             guard !alreadyCompleted.contains(indexStr),
                   let index = Int(indexStr), index >= 0, index < fileURLs.count else { return nil }
-            return (index, fileURLs[index], result)
+            return (index, fileURLs[index], jobs.indices.contains(index) ? jobs[index].id : nil, result)
         }
         guard !entries.isEmpty else { return true }
 
@@ -1045,7 +1053,7 @@ extension OCRProcessor {
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         var allPersisted = true
-        await withTaskGroup(of: (Int, URL, OCRResult).self) { group in
+        await withTaskGroup(of: (Int, URL, OCRJob.ID?, OCRResult).self) { group in
             var iter = entries.makeIterator()
 
             func addNext() -> Bool {
@@ -1055,16 +1063,24 @@ extension OCRProcessor {
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
-                    return (entry.index, entry.url, Self.mergeRotation(into: entry.result, correction: correction))
+                    return (entry.index, entry.url, entry.jobID,
+                            Self.mergeRotation(into: entry.result, correction: correction))
                 }
                 return true
             }
 
             for _ in 0..<min(maxConcurrent, entries.count) { _ = addNext() }
 
-            for await (index, url, resolved) in group {
+            for await (index, url, jobID, resolved) in group {
+                // No job at that index when the chunk was parsed — the same verdict the bounds guard inside
+                // `handleOCRResult` gives today, reached one frame earlier.
+                guard let jobID else {
+                    allPersisted = false
+                    group.cancelAll()
+                    return
+                }
                 guard await handleOCRResult(
-                    resolved, index: index, url: url, model: model,
+                    resolved, index: index, jobID: jobID, url: url, model: model,
                     outputDirectory: outputDirectory, runConfig: runConfig) else {
                     allPersisted = false
                     group.cancelAll()
@@ -1138,6 +1154,8 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
             let url = fileURLs[index]
             jobs[index].status = .processing
+            // W16.bat10 — bound with the index, before the round-trip that gives Stop/Clear/Start its window.
+            let jobID = jobs[index].id
 
             let contextText: String?
             if let prev = previousText, segmentationContext.previousTextCharCount > 0 {
@@ -1184,7 +1202,7 @@ extension OCRProcessor {
             }
 
             guard await handleOCRResult(
-                result, index: index, url: url, model: model,
+                result, index: index, jobID: jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }
             previousText = result.text
             previousImageURL = url
@@ -1214,15 +1232,20 @@ extension OCRProcessor {
 
         // Mark all as processing
         for i in 0..<total { jobs[i].status = .processing }
+        // W16.bat10 — the run's job identities, snapshotted HERE and never re-read from the live array. The
+        // refill site below runs after a `handleOCRResult` that may have suspended on its detached PDF write,
+        // so a `jobs[idx].id` there would be the very unguarded subscript W16.bat9 was filed for.
+        let jobIDs: [OCRJob.ID] = (0..<total).map { jobs[$0].id }
         statusMessage = "OCR 0/\(total)… (parallel, \(concurrency) workers)"
 
-        await withTaskGroup(of: (Int, OCRResult).self) { group in
+        await withTaskGroup(of: (Int, OCRJob.ID, OCRResult).self) { group in
             var nextIndex = 0
 
             // Seed initial batch
             for _ in 0..<min(concurrency, total) {
                 let index = nextIndex
                 let url = fileURLs[index]
+                let jobID = jobIDs[index]
                 let prevImageURL = (sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                 nextIndex += 1
                 group.addTask {
@@ -1235,16 +1258,16 @@ extension OCRProcessor {
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB
                     )
-                    return (index, result)
+                    return (index, jobID, result)
                 }
             }
 
             // Collect results and feed new tasks
-            for await (index, result) in group {
+            for await (index, jobID, result) in group {
                 guard !Task.isCancelled else { group.cancelAll(); return }
                 let url = fileURLs[index]
                 guard await handleOCRResult(
-                    result, index: index, url: url, model: model,
+                    result, index: index, jobID: jobID, url: url, model: model,
                     outputDirectory: outputDirectory, runConfig: runConfig) else {
                     group.cancelAll()
                     return
@@ -1258,6 +1281,7 @@ extension OCRProcessor {
                 if nextIndex < total {
                     let idx = nextIndex
                     let nextURL = fileURLs[idx]
+                    let nextJobID = jobIDs[idx]
                     let prevImageURL = (sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                     nextIndex += 1
                     group.addTask {
@@ -1270,17 +1294,40 @@ extension OCRProcessor {
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB
                         )
-                        return (idx, result)
+                        return (idx, nextJobID, result)
                     }
                 }
             }
         }
     }
+    /// Record one OCR result against the job it was dispatched for.
+    ///
+    /// **`jobID` is what makes `index` an address (W16.bat10).** An index alone is not one: every caller
+    /// binds its index *before* a network round-trip, and by the time the result lands the operator may have
+    /// pressed Stop, then **Clear** (`jobs = []`), re-dropped files and pressed **Start**. The new run's jobs
+    /// take the same indices, so the entry bounds guard passes and the stale result lands on a LIVE job —
+    /// overwriting its status and text with another file's, and naming the output PDF after the row it
+    /// landed on rather than the file that was OCRed. `W16.bat9` closed that for the completion sweep and for
+    /// the writes *after* the detached PDF write; this closes it for every caller and for the writes before.
+    ///
+    /// It is the job's own `id`, not the run's, and not `url`: `OCRJob.id` is a fresh `UUID` per instance, so
+    /// a re-dropped list cannot collide with the one it replaced even when it holds the very same files — and
+    /// no assignment site has to remember to bump a counter, because the identity travels in the data. `url`
+    /// is deliberately NOT the token: `retryOne` legitimately passes a rotated temp image, so a
+    /// `jobs[index].sourceURL == url` guard would refuse an honest write.
+    ///
+    /// It is REQUIRED rather than optional for the reason `rotationMode` is (W16.cfg6): the compiler, not a
+    /// code review, is what stops a future call site from silently falling back to bounds-only.
     func handleOCRResult(
-        _ result: OCRResult, index: Int, url: URL, model: LLMModel, outputDirectory: URL,
-        runConfig: SessionProcessingConfig? = nil
+        _ result: OCRResult, index: Int, jobID: OCRJob.ID, url: URL, model: LLMModel,
+        outputDirectory: URL, runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
-        guard index >= 0 && index < jobs.count else { return false }
+        // Refusing here writes NOTHING and reports "not persisted" — which is the honest answer and the
+        // keep-on-doubt one: no PDF has been generated yet at this point, so there is no output on disk for
+        // a resume to be told about (that is the distinction from the post-await bail-out `W16.bat9`
+        // rejected, where the file *had* been written and skipping the record bought a second paid call).
+        // Every reader of `false` treats it as an interruption and therefore KEEPS the paid journal.
+        guard index >= 0 && index < jobs.count, jobs[index].id == jobID else { return false }
         let sourceURL = jobs[index].sourceURL
         jobs[index].result = result
         jobs[index].classification = result.classification
@@ -1351,7 +1398,10 @@ extension OCRProcessor {
         // out with `false` here instead — the first shape of this fix — would have skipped
         // `saveResultToPendingRun`, and on the non-batch path that record is the only thing stopping a resume
         // from OCRing this file a SECOND time, at cost. A vanished row must not buy a second paid call.
-        let slotIsStillOurs = index < jobs.count && jobs[index].sourceURL == sourceURL
+        // W16.bat10 — the same identity the entry guard used, re-asked. Was `sourceURL`-based (W16.bat9);
+        // the job id is strictly stronger, because a list cleared and re-dropped with the SAME file at the
+        // same index compares equal by source and unequal by id.
+        let slotIsStillOurs = index < jobs.count && jobs[index].id == jobID
         if pdfResult.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
@@ -1521,7 +1571,13 @@ extension OCRProcessor {
         outputDirectory: URL,
         runConfig: SessionProcessingConfig? = nil
     ) async {
-        let retryIndices = jobs.indices.filter { isRetryableError(jobs[$0].result) }
+        // W16.bat10 — each retried slot's identity, taken with the index. Snapshotted rather than re-read in
+        // the loop: this function sleeps 10s and then awaits a network call per file, so the live array is
+        // not the one these indices were chosen from by the time each result lands.
+        let retrySlots: [(index: Int, jobID: OCRJob.ID)] = jobs.indices
+            .filter { isRetryableError(jobs[$0].result) }
+            .map { (index: $0, jobID: jobs[$0].id) }
+        let retryIndices = retrySlots.map(\.index)
         guard !retryIndices.isEmpty else { return }
         let gateway = currentGateway
         let localAgent = currentLocalAgent
@@ -1531,8 +1587,9 @@ extension OCRProcessor {
         try? await Task.sleep(for: .seconds(10))
         guard !Task.isCancelled else { return }
 
-        for (attempt, index) in retryIndices.enumerated() {
+        for (attempt, slot) in retrySlots.enumerated() {
             guard !Task.isCancelled else { return }
+            let index = slot.index
             let url = fileURLs[index]
             jobs[index].status = .processing
             statusMessage = "Retrying \(attempt + 1)/\(retryIndices.count): \(url.lastPathComponent)…"
@@ -1556,7 +1613,7 @@ extension OCRProcessor {
                 failedFiles.removeAll { $0 == sourceFileName }
             }
             guard await handleOCRResult(
-                result, index: index, url: url, model: model,
+                result, index: index, jobID: slot.jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }
         }
     }
