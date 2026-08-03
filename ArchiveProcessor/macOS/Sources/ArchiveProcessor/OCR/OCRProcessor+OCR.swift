@@ -969,7 +969,15 @@ extension OCRProcessor {
         outputDirectory: URL,
         runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
-        for i in jobs.indices where jobs[i].status == .processing {
+        // W16.bat9 — `jobs.indices` is snapshotted ONCE when the loop starts, but `handleOCRResult` below
+        // suspends on a DETACHED PDF write, and a detached task goes on running after this run is cancelled.
+        // `cancel()` clears `isProcessing` synchronously (and says so: the run "goes on unwinding
+        // afterwards"), which re-enables the **Clear** button — whose action is `jobs = []`. One click during
+        // that suspension and the next iteration's `jobs[i]` is out of range: SIGTRAP, on the money path,
+        // before `handleOCRResult`'s own bounds guard could return `false`. Re-reading `jobs.indices` in the
+        // `where` clause fixes it because the clause — unlike the sequence being iterated — is re-evaluated
+        // against the CURRENT array every iteration.
+        for i in jobs.indices where jobs.indices.contains(i) && jobs[i].status == .processing {
             let url = jobs[i].sourceURL
             let readable = ImageEncoding.loadImageAsJPEG(url: url, scale: 1.0) != nil
             let synthetic = OCRResult(
@@ -1310,6 +1318,14 @@ extension OCRProcessor {
                 return (false, nil, nil, nil)
             }
         }.value
+        // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
+        // longest suspension in this function (seconds, for a real page), and `jobs` can be emptied or
+        // replaced across it: Stop re-enables **Clear**, whose action is `jobs = []`. The entry guard's
+        // answer to "that index is not this file's job any more" is `false`; this is the same answer at the
+        // later point where it can become true. Both halves are load-bearing — an out-of-range subscript
+        // below TRAPS the app, and an in-range slot now holding a DIFFERENT file (cleared, then re-dropped)
+        // would take this file's result and status, silently, over that file's own.
+        guard index < jobs.count, jobs[index].sourceURL == sourceURL else { return false }
         if pdfResult.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
