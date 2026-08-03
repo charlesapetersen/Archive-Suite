@@ -729,6 +729,16 @@ enum BatchResumeTestDriver {
         // journal at the shipped path, so it uses the same redirect verdict and removes what it wrote.
         BatchSubmissionMessageContract.run(check: check, redirected: journalsAreRedirected)
 
+        // --- 20: a poll step that could not PERSIST does not report the batch finished cleanly (W16.bat7). ---
+        // Section 17 covers the poll's two CANCELLATION exits; these are its persist-failure exits, which
+        // unwind from a step that could not write and used to return a flag saying the poll completed — so
+        // the tail retired the journal of a paid job whose outputs never landed. Drives the real completion
+        // sweep (extracted as `sweepJobsWithNoBatchResult` to make that exit reachable), the real persistence
+        // path under it with a genuinely failing atomic write, and the real first-run tail after it. No
+        // provider call, no keys, no cost; every check writes and removes a manifest at the shipped paths,
+        // so it takes the same redirect verdict and is refused outright without it.
+        await BatchPollPersistFailureContract.run(check: check, redirected: journalsAreRedirected)
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["BATCHRESUME_TEST_OUT"]

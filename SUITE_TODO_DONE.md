@@ -1488,6 +1488,44 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
 
+- [x] **W16.bat7 — four exits in `pollBatchUntilComplete` returned a "poll completed" flag they never set,
+  and the caller then DELETED the paid batch's journal [S · MED · money].** DONE 2026-08-03 — `f417301`
+  (the fix) + this commit (the extraction, the measured regression, and the docs). ✅ Owner-AUTHORIZED
+  2026-08-02, **ALL FOUR EXITS** — the narrow one-exit variant was offered and declined, because leaving three
+  exits safe-only-by-upstream is the coupling that broke in `W16.bat3-fu`. Grant discharged in
+  `OWNER_AUTHORIZATIONS.md`.
+  `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry, and that one flag is what both
+  callers read to decide whether the paid batch's recovery journal — a server-side job the operator has
+  already paid for, and its only local record — is kept or DELETED. Four exits then returned without touching
+  it, so a run unwinding from a step that could not WRITE reported "the poll finished cleanly": the first run
+  retired the journal (`retirePaidBatchJournalIfPollCompleted`) and a resume ran `deletePendingBatch()` and
+  carried on into tagging/finalize. All four now set it — the Anthropic and Mistral arms' `processBatchResults`
+  guards, the `materialized` half of the Gemini arm's guard, and the completion sweep's `handleOCRResult`
+  guard.
+  **How it is measured.** The completion sweep was extracted into `sweepJobsWithNoBatchResult` — behaviour
+  unchanged, for exactly the reason `retirePaidBatchJournalIfPollCompleted` was extracted in `W16.bat3`: the
+  surrounding poll needs a real paid submission, so that exit could only be READ, never driven. New
+  `BatchPollPersistFailureContract` (driver section 20; `test-batch-resume` 316 → 321 checks) then runs the
+  real sweep, the real `handleOCRResult`, the real persistence path under it, and the real first-run tail —
+  forcing a genuine `Data.write` failure by creating a DIRECTORY at the redirected `pending_run.json` path, so
+  no stub and no new seam. The whole section is refused unless the harness's redirect is in force. Its last
+  two checks are the money statement in the only unit that matters: after a sweep that could not persist, the
+  real journal FILE is still on disk; after one that completed, it is retired.
+  **Non-vacuity, measured on three mutants:** revert the four assignments (pre-fix code) → **2 redden**,
+  including the journal file disappearing from disk; set the flag unconditionally → **2 redden** (the
+  anti-"report everything as interrupted" pair); neuter the sweep to a bare `return true` → **4 redden**.
+  Reverting only the three provider-arm assignments reddens nothing, which is the honest limit: those three
+  sit on the far side of a provider call and reaching them costs a real paid batch, so their bodies — one
+  statement, textually identical to the driven one — are structural. The contract's header says so; cite it
+  for "the poll's persist-failure exit keeps the journal", not for "all four exits are covered by a test."
+  **Two findings filed from the adversarial pass, neither a defect in this change:** `W16.bat8` (a stale
+  in-memory run manifest makes a paid batch journal its results into the wrong file → duplicate charges on
+  resume; **owner-gated, money**) and `W16.bat9` (the sweep's loop can trap if `jobs` is cleared mid-write).
+  `W16.bat8` also **withdrew a claim this item shipped with**: the sweep's persist-failure exit was filed as
+  reachable only in a state "which could not be constructed from the current call graph." It can be, and the
+  contract's header now traces how — so the exit is live, not merely defensive.
+  Clean Debug build, 0 new warnings; `scripts/test-batch-resume.sh` ALL PASS (321 checks, sections 1-20).
+
 - [x] **W16.bat3-fu2 — after a Stop, the submission-failure message tells the operator the opposite of what
   happened [S · MED].** DONE 2026-08-02 — `80dc4bd` (code + contract) and this commit (docs). Found by the
   W16.bat3-fu second read; **pre-existing**. `performBatchOCR`'s catch computed

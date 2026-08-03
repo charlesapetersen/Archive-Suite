@@ -418,43 +418,50 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   cancellation" ID list straight to disk. ⚠️ Both touch `cancel()` semantics, which is exactly why this is
   not something to fold in quietly. Do NOT fold into `W16.bat7` — different sites, different trigger.
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | med | **AUTHORIZED 2026-08-02**
-- [ ] **W16.bat7 — ✅ AUTHORIZED by the owner 2026-08-02 (morning-review walkthrough). Four exits in
-  `pollBatchUntilComplete` return a "poll completed" flag they never set, and the caller then DELETES the
-  paid batch's journal [S · MED · money · defence-in-depth].** **Owner authorized fixing ALL FOUR exits**,
-  having been shown the option of fixing only `handleOCRResult`'s bounds guard (the single concretely
-  reachable trigger) and declined it — leaving three exits safe-only-by-upstream is the exact coupling that
-  broke in bat3-fu. Constraints in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md); moved out of the
-  plan's HOLD QUEUE into the WORK QUEUE.
-  Found by the W16.bat3-fu adversarial pass (2026-08-02);
-  **pre-existing**, and covered by NO grant the owner had given at the time — bat3 was the two cancellation
-  guards, bat5 the in-flight submit, bat6 the warning's ordering. It was owner-gated on
-  precedent rather than on the letter of the STEP-2.0 rule: at MED it is not automatically hold-queue, but
-  every change to what this path deletes had been granted item by item. `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`)
-  and four of its exits then `return` without touching it again: `guard await processBatchResults(…)
-  else { return }` in the Anthropic (`:766`) and Mistral (`:789`) arms; the `materialized` half of
-  `guard materialized, markBatchChunkConsumed(…) else { return }` in the Gemini arm (`:875`); and
-  `guard await handleOCRResult(synthetic, …) else { return }` in the completion sweep (`:955`). The caller
-  then reads a flag saying the poll finished cleanly — the first run retires the journal
-  (`retirePaidBatchJournalIfPollCompleted`) and a resume runs `Self.deletePendingBatch()` and carries on into
-  tagging/finalize.
-  ⚠️ **Severity was revised DOWN from HIGH on the second read — the honest scope matters here.** As first
-  filed this said the trigger was "`handleOCRResult` could not persist an output", which is no longer true:
-  W16.bat3-fu closed the dominant path. `handleOCRResult` returns `false` in exactly two ways
-  (`+OCR.swift`, verified by enumerating its returns) — its index guard, and `saveResultToPendingRun` — and
-  `saveResultToPendingRun`'s **batch** branch (`+Pipeline.swift:724-735`) now goes through
-  `persistPendingBatchMutation` → `reportInterruptedPaidBatch`, so it sets the flag upstream and these four
-  exits are already safe in that shape. The `markBatchChunkConsumed` half of `:875` is likewise fixed. What
-  is genuinely still silent: **(a)** `handleOCRResult`'s `guard index >= 0 && index < jobs.count` — a bounds
-  bug, and the one concretely reachable trigger left; **(b)** `saveResultToPendingRun`'s pending-**run**
-  branch (`:745-761`), which sets `isProcessing`/`processingTask?.cancel()` but not `batchPollInterrupted` —
-  reachable only with `activePendingRun` non-nil *alongside* a live batch, which could not be constructed
-  from the current call graph, so treat it as defensive.
-  So this is now **defence-in-depth, not a live money-loss bug**: the four exits are safe only because
-  something upstream happens to report, which is exactly the coupling that broke in bat3-fu. Fix direction
-  (owner's call): set `batchPollInterrupted = true` at all four before returning — deletion-reducing, every
-  reader treats `true` as keep. Forcing a real write failure to drive it needs a seam that does not exist
-  yet, so budget for extracting one. ⚠️ Do NOT fold into W16.bat5 — different sites, different trigger.
-  | files: OCR/OCRProcessor+OCR.swift, OCR/OCRProcessor+Pipeline.swift | S | med | **AUTHORIZED 2026-08-02**
+- [ ] **W16.bat8 — ⛔ NEEDS THE OWNER. A stale in-memory interrupted-run manifest makes a paid batch
+  journal its results into the WRONG file, so a relaunch re-fetches chunks already paid for [S · MED ·
+  money].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing**, and covered by no
+  grant. `saveResultToPendingRun` (`+Pipeline.swift:724`) routes to the paid-batch journal only when
+  `activePendingRun == nil`; with a stale non-nil value it writes every batch result into the pending-**RUN**
+  manifest instead, leaving `batch.completedResults` empty. `resumeBatch` keys its skip-what-is-done logic off
+  exactly that map, so a relaunch mid-batch re-downloads and re-materializes chunks the operator has already
+  paid for and already has PDFs for — the duplicate-output/duplicate-charge hazard the comment at
+  `+Pipeline.swift:721-723` exists to prevent.
+  **The chain is reachable** (traced, not inferred): a non-batch run's incremental manifest write fails →
+  `saveResultToPendingRun:756-761` sets `isProcessing = false` and calls `processingTask?.cancel()`, leaving
+  `activePendingRun` SET → the run unwinds through `guard !Task.isCancelled else { return }` (`:2578`) and
+  never reaches the `activePendingRun = nil` two lines below → the operator presses **Dismiss** on the
+  interrupted-run banner and `dismissPendingRun()` (`:1052-1055`) deletes the file + clears the banner but
+  leaves the in-memory manifest → `startProcessing`'s recovery guard (`:2162`) reads DISK, so it now passes →
+  the batch branch never assigns `activePendingRun`, so the stale value is still there when results land.
+  `cancel()` DOES clear it (`:2125-2126`), which is why the chain starts from a write failure, not a Stop.
+  **Smallest root cause: `dismissPendingRun()` clears the banner but not the state it describes.** A second
+  candidate is making `saveResultToPendingRun` prefer a live paid batch over any run manifest — that is a
+  change to which durable file a paid result lands in, which is why this is owner-gated rather than folded in.
+  ⛔ **HOLD QUEUE — money path.** Every change to what the paid-batch journal records has been granted item
+  by item (bat2-fu2, bat3, bat5, bat6, bat7); this changes it too. Do NOT auto-fix. Tier-2, scratch only.
+  | files: OCR/OCRProcessor+Pipeline.swift | S | med | **NEEDS OWNER**
+- [ ] **W16.bat9 — the paid-batch completion sweep can TRAP (app crash) if the file list is cleared while it
+  is mid-write [S · MED].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing** (identical
+  before the W16.bat7 extraction). `sweepJobsWithNoBatchResult` (`+OCR.swift`) loops
+  `for i in jobs.indices where jobs[i].status == .processing`: `jobs.indices` is snapshotted ONCE, while the
+  `where` clause re-reads `jobs[i]` on every iteration — across the `await` in `handleOCRResult`, which awaits
+  a **detached** `Task` (`:1287`) and therefore keeps running after the parent task is cancelled. `cancel()`
+  sets `isProcessing = false` synchronously (`+Pipeline.swift:2044`) and says in its own comment that the run
+  "goes on unwinding afterwards", which un-disables the **Clear** button (`Views/OCRView.swift:537-539`,
+  `.disabled(processor.isProcessing)`) whose action is `processor.jobs = []`. One click during the sweep's
+  suspension and the next iteration's `jobs[i]` is out of range → SIGTRAP, *before* `handleOCRResult`'s own
+  bounds guard (`:1254`) could return `false`. Verified reachable by tracing the chain and by reproducing the
+  loop shape standalone (exit 133, `EXC_BREAKPOINT`).
+  Not a data-loss bug — the process dies before `retirePaidBatchJournalIfPollCompleted()` runs, so the paid
+  journal survives — but it is a crash on the money path, and the sweep is the one exit with no
+  `Task.isCancelled` check of its own (contrast the poll's two, `:737`/`:752`).
+  **Smallest fix: `where jobs.indices.contains(i) && jobs[i].status == .processing`** (the `where` clause
+  re-evaluates `jobs.indices` against the current array). Consider also a `Task.isCancelled` guard so a
+  cancelled run stops sweeping rather than finishing a list nobody is waiting for — but that changes what a
+  cancelled paid batch records, so weigh it separately. Tier-2; drive it from
+  `BatchPollPersistFailureContract`, which already owns this function.
+  | files: OCR/OCRProcessor+OCR.swift | S | med |
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned

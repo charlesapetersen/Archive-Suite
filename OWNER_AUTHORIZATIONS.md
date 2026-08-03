@@ -205,7 +205,16 @@ its own date. Verbatim as recorded when granted.)*
     in flight, i.e. a check that fails on today's snapshot behaviour and passes after. Tier-2 in full, premise
     re-confirmed by symbol first. **Does NOT authorize** `W16.bat2-fu2`, `W16.bat6`, or any other cancel-semantics
     change.
-- **`W16.bat7` — AUTHORIZED (granted 2026-08-02, morning-review walkthrough), ALL FOUR EXITS.**
+- **`W16.bat7` — ✅ DISCHARGED 2026-08-03** (`f417301` production + the contract/tracker commit that follows
+  it; full record in `SUITE_TODO_DONE.md`). All four exits were fixed, as granted; the completion sweep was
+  extracted so the one reachable exit could be DRIVEN, and `BatchPollPersistFailureContract` (driver section
+  20) forces a real write failure and pins that the real journal FILE survives on disk — non-vacuity measured
+  on three mutants. The grant's honesty clause got used in the direction it was written for: the item shipped
+  saying the failing branch was reachable "only in a state that could not be constructed from the current call
+  graph", the adversarial pass proved otherwise, and both the withdrawn claim and the separate money bug
+  behind it (**`W16.bat8`, needs the owner**) are recorded rather than quietly dropped.
+  Original grant, for the record — **AUTHORIZED (granted 2026-08-02, morning-review walkthrough), ALL FOUR
+  EXITS.**
   `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`) and four exits
   then return without touching it again — `processBatchResults` in the Anthropic (`:766`) and Mistral (`:789`)
   arms, the `materialized` half of the Gemini arm's guard (`:875`), and `handleOCRResult` in the completion

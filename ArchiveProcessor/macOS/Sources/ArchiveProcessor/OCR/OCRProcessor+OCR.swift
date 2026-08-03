@@ -719,7 +719,8 @@ extension OCRProcessor {
         // callers read this one fact to choose between keeping and DELETING the paid batch's recovery
         // journal, so a `return` that leaves it `false` is this run positively asserting "the poll finished
         // cleanly". Four of them used to do exactly that while unwinding from a downstream step that could
-        // NOT persist (W16.bat7) — they now all set it, marked `// W16.bat7` at each site.
+        // NOT persist (W16.bat7) — they now all set it, marked `// W16.bat7` at each site. The fourth sits
+        // in `sweepJobsWithNoBatchResult`, extracted below so that one can be driven rather than read.
         batchPollInterrupted = false
         var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
         // How many times a chunk has come back terminal-but-empty, and the chunks already given up on
@@ -947,11 +948,27 @@ extension OCRProcessor {
         // as-is (do NOT mark them failed) and return with the pending batch preserved — the caller keeps
         // it resumable. Only sweep to failure on a genuine terminal completion.
         guard !batchPollInterrupted else { return }
-        // The whole batch is complete: any job still `.processing` got no result.
-        // Done ONCE here (not per-chunk in processBatchResults) so multi-chunk Gemini batches don't
-        // falsely fail files whose chunk finished on a later poll. Give each a proper failure output
-        // with a specific reason — in particular, distinguish a locally-unreadable source image
-        // (silently skipped at submit time) from "the provider returned no result for this file".
+        guard await sweepJobsWithNoBatchResult(
+            model: model, outputDirectory: outputDirectory, runConfig: runConfig) else { return }
+    }
+    /// The completion sweep. The whole batch reached a terminal state, so any job still `.processing` got no
+    /// result: give each a proper failure output with a specific reason — in particular, distinguish a
+    /// locally-unreadable source image (silently skipped at submit time) from "the provider returned no
+    /// result for this file". Done ONCE here (not per-chunk in `processBatchResults`) so multi-chunk Gemini
+    /// batches don't falsely fail files whose chunk finished on a later poll.
+    ///
+    /// Returns `false` when a failure output could not be RECORDED — and in that case it has already set
+    /// `batchPollInterrupted`, because a sweep that cannot write has not finished the poll cleanly and the
+    /// paid batch's journal must survive (W16.bat7). Extracted from the tail of `pollBatchUntilComplete`
+    /// for exactly the reason `retirePaidBatchJournalIfPollCompleted` was: reaching it needs a real paid
+    /// submission, so that exit could only be read, never driven (`BatchPollPersistFailureContract`).
+    /// Behaviour is unchanged — same loop, same guard, same order, and the caller's `return` is now this
+    /// function's `false`.
+    func sweepJobsWithNoBatchResult(
+        model: LLMModel,
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil
+    ) async -> Bool {
         for i in jobs.indices where jobs[i].status == .processing {
             let url = jobs[i].sourceURL
             let readable = ImageEncoding.loadImageAsJPEG(url: url, scale: 1.0) != nil
@@ -967,8 +984,9 @@ extension OCRProcessor {
             guard await handleOCRResult(
                 synthetic, index: i, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig)
-            else { batchPollInterrupted = true; return }
+            else { batchPollInterrupted = true; return false }
         }
+        return true
     }
     private func processBatchResults(
         _ results: [String: OCRResult],
