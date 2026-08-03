@@ -941,12 +941,41 @@ enum LiveCaptureRecoveryTestDriver {
                   parked && f1 != nil && r3Proc.retainedText(for: "R4") == nil)
             if let f1 {
                 r3Session.removePhoto(f1)
-                check("a page removed MID-FINALIZE keeps its call — finalize is about to read it",
-                      !cancelled(f1) && r3Proc._recoveryTestHasPageTask(for: f1))
+                check("a page removed MID-FINALIZE is not cancelled", !cancelled(f1))
+                check("...and its Task stays in pageTasks for finalize to read",
+                      r3Proc._recoveryTestHasPageTask(for: f1))
                 r3Gate.open()   // release every parked page; finalize can now finish
                 let consumed = await r3Settle { r3Proc.retainedText(for: "R4") != nil }
                 check("...and finalize really does consume the result it was left",
                       consumed && r3Proc.retainedText(for: "R4") == "stub page text")
+            }
+
+            // 5. The same carve-out, measured on the OUTPUT rather than on the mechanism. Scenario 4 can only
+            //    assert the Task's state: finalize had already read that one page's Task out of `pageTasks`
+            //    before it suspended, so removing the entry afterwards costs it nothing, and the test gate is
+            //    cancellation-blind by design (Test 15 needs it to park, not to throw). Here the removed page
+            //    is the SECOND of two, and finalize is parked on the FIRST — so its entry has not been read
+            //    yet and an unconditional cancel really does lose it. The segment's retained text is then
+            //    short by a page: the operator paid for two pages of OCR and the record keeps one. That is
+            //    the consequence the guard exists to prevent, and it is what makes this more than a
+            //    restatement of the implementation.
+            let gate5 = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await gate5.wait() }
+            r3Send("R5", 1)
+            r3Send("R5", 2)
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+            let g2 = photo("R5", 2)
+            r3Proc.segmentResolved(groupId: "R5")
+            let parked5 = await r3Settle { r3Proc.isFinalized("R5") }
+            check("a two-page segment is mid-finalize, parked on its FIRST page",
+                  parked5 && g2 != nil && r3Proc.retainedText(for: "R5") == nil)
+            if let g2 {
+                r3Session.removePhoto(g2)
+                gate5.open()
+                let done5 = await r3Settle { r3Proc.retainedText(for: "R5") != nil }
+                let pages = (r3Proc.retainedText(for: "R5") ?? "").components(separatedBy: "stub page text").count - 1
+                check("deleting the not-yet-read page mid-finalize does NOT drop the OCR it already paid for",
+                      done5 && pages == 2)
             }
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
