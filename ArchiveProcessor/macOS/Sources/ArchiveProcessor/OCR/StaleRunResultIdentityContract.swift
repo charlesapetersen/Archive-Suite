@@ -33,6 +33,20 @@ import Foundation
 ///     deletion-reducing; it never buys a second paid call, because at the point it refuses no output has
 ///     been written for a resume to be told about.
 ///
+/// **What a mutant looks like here.** Four measured 2026-08-03, against the whole 371-check driver:
+///   * the entry guard back to bounds only — THE bug — → **5 RED**: all three of §1 (the row takes the
+///     stopped run's status and text, an output PDF is written under the live run's filename holding it,
+///     and the new run's resume snapshot records an index it never OCRed), plus §4 and §5's journal check.
+///     §5's second check stays green, which is the honest reading: the stale result is *journaled* into the
+///     live paid batch, and it is the tail — not this function — that would then retire that journal.
+///   * `jobs[index].sourceURL == url` — the wrong fix the item names — → **2 RED**: §3, because `retryOne`'s
+///     rotated temp image is refused an honest write, and §4, because the same file re-dropped compares
+///     equal by source.
+///   * a bare `return false` at the top → **17 RED**: §2 and §3 here, and fourteen more across sections
+///     20/21/22, which drive this same function for real. Refusing everything is not a fix.
+///   * the guard refusing but reporting success (`return true`) → **3 RED** (§1's third check, §4, §5's
+///     first): a refusal that claims "persisted" lets a caller retire a paid journal as clean.
+///
 /// Scope: what `handleOCRResult` writes. NOT what its callers do with `false` — every reader of that treats
 /// it as an interruption and therefore keeps the paid journal, which is sections 20/21's subject.
 ///

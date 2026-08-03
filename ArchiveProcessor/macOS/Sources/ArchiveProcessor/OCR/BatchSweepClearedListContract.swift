@@ -23,7 +23,10 @@ import Foundation
 ///   * Nothing is written to a row that is no longer this file's (§4, §5). Bounds alone cannot tell a
 ///     re-dropped list from the honest one, and Stop → Clear → re-drop → Start hands a *live new run* the
 ///     same indices and the same `.processing` status. §5 is that case: the stale sweep must not mark a
-///     running job failed and write failure outputs over it.
+///     running job failed and write failure outputs over it. §5b (`W16.bat10`) is the same case with the
+///     SAME files re-dropped, which a source comparison reads as the honest list — there the writes are
+///     refused one frame down either way, and what the slot check decides is whether a batch that finished
+///     is reported interrupted.
 ///
 /// **How the race is reproduced without a GUI.** No seam and no stub: a `Task { @MainActor in … }` is
 /// enqueued before the sweep starts, so the main actor can only reach it at the sweep's first real
@@ -46,6 +49,9 @@ import Foundation
 ///     reports the batch interrupted.
 ///   * both slot checks reduced to bounds only → **2 RED** (§4, §5): the swept file's result lands on the
 ///     file that replaced it, and a stale sweep marks a whole new run's jobs failed.
+/// A fifth, measured 2026-08-03 when `W16.bat10` retightened the loop's slot check from `sourceURL` to the
+/// job's `id`: reverting just that comparison **SURVIVED all 370 checks**, because every fixture here
+/// re-drops a *different* file. §5b was added for it and reddens it alone.
 ///
 /// Scope: the crash, the record, and the wrong-row writes. NOT Stop's own semantics — the sweep still has no
 /// `Task.isCancelled` check of its own (the poll's two are at `:737`/`:752`), which is deliberate and weighed
@@ -63,7 +69,7 @@ enum BatchSweepClearedListContract {
 
     static func run(check: (String, Bool) -> Void, redirected: Bool) async {
         guard redirected else {
-            // SEVEN checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
+            // NINE checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
             // check count, so a refused run reports SOME FAILED rather than a shorter green report.
             check("sweep cleared: the whole section is SKIPPED (refused: the journal path did not resolve "
                   + "away from Application Support, and every fixture writes a real journal there)",
@@ -75,6 +81,7 @@ enum BatchSweepClearedListContract {
         let shrunk = await sweep(.shrinkTheList)
         let replaced = await sweep(.replaceTheListWithAnotherFile)
         let newRun = await sweep(.replaceTheListWithANewRun)
+        let reDropped = await sweep(.replaceTheListWithTheSameFilesReDropped)
 
         // MARK: 1. THE regression — the list is emptied while a failure output is being written
         //
@@ -133,6 +140,22 @@ enum BatchSweepClearedListContract {
               + "started after it — they keep their status, their results and their files",
               newRun.mutationLandedDuringSweep && newRun.newRunUntouched && newRun.returnedTrue)
 
+        // MARK: 5b. …and the same run re-dropped with the SAME files, which a source comparison cannot tell
+        //
+        // W16.bat10. The loop's slot re-validation was `jobs[slot.index].sourceURL == slot.source` until
+        // that item made it the job's `id`; here the two disagree, because Clear → re-drop → Start hands the
+        // new run the same files at the same indices. What is at stake is only the VERDICT — the entry guard
+        // one frame down refuses the write either way, so nothing lands on the new run's rows. But under the
+        // source comparison the sweep hands the stale slot on, `handleOCRResult` refuses it, and the sweep
+        // reports the poll interrupted: a paid batch that genuinely finished keeps its journal and offers a
+        // Resume with nothing to resume. Skipping the vanished slot quietly is the honest answer.
+        check("sweep cleared: a list re-dropped with the very same files is still a different run — the "
+              + "leftover sweep skips its slots instead of reporting the poll interrupted, and the journal "
+              + "of a batch that really finished is still retired",
+              reDropped.mutationLandedDuringSweep && reDropped.reDroppedRunUntouched
+                  && reDropped.returnedTrue && !reDropped.flaggedInterrupted
+                  && reDropped.journalExistedBefore && !reDropped.journalSurvived)
+
         // MARK: 6. What it costs, in the only unit that matters
         //
         // The crash was never data loss — the process died before `retirePaidBatchJournalIfPollCompleted()`
@@ -160,6 +183,10 @@ enum BatchSweepClearedListContract {
         case replaceTheListWithAnotherFile
         /// Cleared, re-dropped and STARTED: a live run's jobs, at the same indices, all `.processing`.
         case replaceTheListWithANewRun
+        /// The same thing with the SAME files re-dropped — equal to the swept slots by source URL, and a
+        /// fresh `OCRJob.id` each. The one arrangement a source comparison cannot tell from the honest one
+        /// (W16.bat10).
+        case replaceTheListWithTheSameFilesReDropped
     }
 
     /// Everything observable about one run of the real sweep with the list mutated underneath it.
@@ -183,6 +210,9 @@ enum BatchSweepClearedListContract {
         let intruderUntouched: Bool
         /// Every job of the run started underneath the sweep is untouched by it.
         let newRunUntouched: Bool
+        /// The same, for a run re-dropped with the ORIGINAL files: same sources, fresh rows, all still
+        /// `.processing` with no result and no failure recorded against the second one.
+        let reDroppedRunUntouched: Bool
         let journalExistedBefore: Bool
         let journalSurvived: Bool
     }
@@ -233,7 +263,8 @@ enum BatchSweepClearedListContract {
         let sourceCount: Int
         switch mutation {
         case .shrinkTheList: sourceCount = 3
-        case .clearTheList, .replaceTheListWithANewRun: sourceCount = 2
+        case .clearTheList, .replaceTheListWithANewRun,
+             .replaceTheListWithTheSameFilesReDropped: sourceCount = 2
         case .clearTheListAfterASuccessfulWrite, .replaceTheListWithAnotherFile: sourceCount = 1
         }
         let sources = (0..<sourceCount).map { makeJPEG("sweep-source-\($0).jpg", in: dir) }
@@ -304,6 +335,14 @@ enum BatchSweepClearedListContract {
                     job.status = .processing        // exactly what `startProcessing` does
                     return job
                 }
+            case .replaceTheListWithTheSameFilesReDropped:
+                // The same files, dropped again and started: every `OCRJob` is a fresh instance, so these
+                // rows are equal to the swept slots by source URL and unequal by id.
+                processor.jobs = sources.map { source in
+                    var job = OCRJob(sourceURL: source)
+                    job.status = .processing
+                    return job
+                }
             }
         }
 
@@ -325,6 +364,15 @@ enum BatchSweepClearedListContract {
                 job.sourceURL == source && job.status == .processing && job.result == nil
             }
             && !processor.failedFiles.contains(newRunSources[0].lastPathComponent)
+        // The re-dropped run holds the same files as the swept slots, so "untouched" is asked of the
+        // rows: fresh instances, still `.processing`, no result. Index 0 was already in flight when the
+        // mutation landed, so only index 1 — the slot the loop re-validates AFTER the mutation — can carry
+        // the wrong write, and `failedFiles` is asked of that one for the same reason.
+        let reDroppedUntouched = processor.jobs.count == sources.count
+            && zip(processor.jobs, sources).allSatisfy { job, source in
+                job.sourceURL == source && job.status == .processing && job.result == nil
+            }
+            && sources.count > 1 && !processor.failedFiles.contains(sources[1].lastPathComponent)
         // Read BEFORE the tail, which may legitimately delete the journal these came from.
         let journaledResult = processor.activePendingRun?.completedResults["0"] != nil
             || processor.activePendingBatch?.completedResults["0"] != nil
@@ -347,6 +395,7 @@ enum BatchSweepClearedListContract {
                 && first?.result?.errorCode == "no_result",
             intruderUntouched: intruderUntouched,
             newRunUntouched: newRunUntouched,
+            reDroppedRunUntouched: reDroppedUntouched,
             journalExistedBefore: journalExisted, journalSurvived: survived)
     }
 }
