@@ -99,6 +99,15 @@ import AppKit
 ///      what it reports. It re-subscripts a snapshotted index range across a detached PDF write while Stop
 ///      has already re-enabled the Clear button. A mutant does not print FAIL here — it TRAPS this driver
 ///      and no report is written at all.
+///  22. **A paid job created as Stop landed still reaches the journal**
+///      (`BatchClosedJournalAppendContract`, W16.bat5-fu): the residual of the sections above. The journal
+///      W16.bat5 keeps did not list the chunk created between `cancel()`'s snapshot and the Stop — by the
+///      time its callback ran, `activePendingBatch` was nil and the ID went nowhere durable. Drives the real
+///      `cancel()` (both seams stubbed) and then the real `recordSubmittedBatchChunk`, and pins both halves:
+///      the ID is APPENDED to the file Resume reads, and the mutator still returns false so the submit loop
+///      still stops spending. Its refusals (no file, another run's journal, a legacy one, a live one) and the
+///      owner's "Stop stays instant" constraint are measured, not argued. Real journal at the shipped path,
+///      so it takes the same redirect verdict.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -764,6 +773,16 @@ enum BatchResumeTestDriver {
         // journal at the shipped path, so it takes the same redirect verdict. A mutant here does not print
         // FAIL — it TRAPS this process and no report is written at all (see the file's header).
         await BatchSweepClearedListContract.run(check: check, redirected: journalsAreRedirected)
+
+        // --- 22: a paid job created as Stop landed still reaches the journal (W16.bat5-fu). ---
+        // Sections 13–19 end at "the journal survives the Stop and the operator is told the truth about it."
+        // This is the residual of that: the journal W16.bat5 keeps does not list the chunk created between
+        // `cancel()`'s snapshot and the Stop, because `cancel()` has nil'd `activePendingBatch` before its
+        // callback runs. Drives the real `cancel()` (both seams stubbed) and then the real mutator, and pins
+        // both halves — the ID is appended to the file Resume reads, and the submission still stops. Every
+        // check writes a real journal at the shipped path, so it takes the same redirect verdict; the owner's
+        // "Stop must stay instant" constraint is measured here rather than read off the source.
+        await BatchClosedJournalAppendContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

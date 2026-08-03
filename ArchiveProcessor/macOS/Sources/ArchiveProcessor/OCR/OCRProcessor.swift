@@ -264,6 +264,21 @@ class OCRProcessor: ObservableObject {
     /// gone by the time it reached the operator. Recording it here lets the summary lead with the cause
     /// instead of replacing it. Cleared alongside `paidJobsCreatedThisSubmission`.
     var lastPaidBatchInterruptionReport: String?
+    /// The journal `cancel()` closed, kept ADDRESSABLE so a job created after the Stop can still be
+    /// recorded in it (W16.bat5-fu).
+    ///
+    /// `paidJobsCreatedThisSubmission` above remembers the late job's ID in *memory*, which is enough to
+    /// count it and warn about it — and not enough to do anything with it. A Gemini submission creates its
+    /// server-side jobs one at a time, so a chunk created between `cancel()`'s snapshot and the Stop is
+    /// billed with its ID written nowhere durable: the app can then neither cancel nor collect it, and the
+    /// operator's only recourse is the provider console. This is an ADDRESS (identity), never a copy of the
+    /// journal — the append re-reads the file and writes what is really there, so nothing that happened to
+    /// the journal after Stop can be rolled back by a stale snapshot.
+    ///
+    /// Set by `cancel()` immediately before it nils `activePendingBatch`; cleared when a new submission
+    /// installs a journal of its own. Consulted only while `activePendingBatch == nil`, and only after the
+    /// on-disk journal is confirmed to BE this batch — see `appendChunkIdToClosedPaidBatchJournal(_:)`.
+    var closedPaidBatchJournalAddress: ClosedPaidBatchJournalAddress?
 
     // MARK: Cancel-path seams (W16.bat2-fu — so the WIRING is testable, not just the rule)
     /// The in-flight server-side batch cancellation `cancel()` spawned, retained so a headless driver

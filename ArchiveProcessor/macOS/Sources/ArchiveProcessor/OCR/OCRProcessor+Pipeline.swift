@@ -919,6 +919,76 @@ extension OCRProcessor {
         return true
     }
 
+    // MARK: - Recording a job created after Stop closed the journal (W16.bat5-fu)
+
+    /// Which paid-batch journal `cancel()` closed — enough to recognise it again on disk, and nothing more.
+    ///
+    /// Deliberately NOT the `PendingBatch` itself. A snapshot could be written back, and writing back a
+    /// snapshot taken at Stop would undo anything the journal gained afterwards; an address can only ever be
+    /// compared. `submittedAt` is stamped once per submission and `runFingerprint` covers the run's inputs,
+    /// destination and settings, so together they answer "is the file on disk still THIS batch's journal?"
+    /// — the question that keeps a late chunk ID off a *different* run's paid batch.
+    struct ClosedPaidBatchJournalAddress: Equatable, Sendable {
+        let submittedAt: Date
+        let runFingerprint: String?
+
+        init?(_ pendingBatch: PendingBatch?) {
+            guard let pendingBatch else { return nil }
+            submittedAt = pendingBatch.submittedAt
+            runFingerprint = pendingBatch.runFingerprint
+        }
+
+        func matches(_ candidate: PendingBatch) -> Bool {
+            candidate.submittedAt == submittedAt && candidate.runFingerprint == runFingerprint
+        }
+    }
+
+    /// Append one server job ID to the paid-batch journal a Stop already closed (W16.bat5-fu).
+    ///
+    /// **Append-only, and only ever onto a journal that is already there.** It re-reads the file, adds the ID
+    /// to `submittedChunkIds` if it is missing, and writes the result back through the production writer (so
+    /// the derived comma-joined mirror and the lifecycle fingerprint are recomputed exactly as the live path
+    /// recomputes them). Every other field is carried through untouched. It never creates a journal, never
+    /// replaces one it could not read, and never restores `activePendingBatch` — the run is over; only the
+    /// operator's way back to a paid job is being repaired.
+    ///
+    /// Four refusals, each of which would otherwise make the app do something worse than losing the ID:
+    ///   * **No address, or a live journal.** Only `cancel()` sets the address, and only while
+    ///     `activePendingBatch` is nil is the closed journal the right place to write — with a live journal
+    ///     the normal `persistPendingBatchMutation` path owns the file.
+    ///   * **No file on disk.** A confirmed cancellation deletes the journal; re-creating it here would
+    ///     resurrect a Resume banner for a batch that was really cancelled, and `startProcessing` refuses to
+    ///     start while one exists. A journal that failed to decode is likewise left exactly as it is rather
+    ///     than overwritten — a torn file is still the operator's only record of the paid job.
+    ///   * **A different batch's journal.** After a delete the operator may have started another run; adding
+    ///     a stranger's job ID to a LIVE batch's journal would make its poll fetch another run's pages.
+    ///   * **A legacy (pre-lifecycle) journal.** `effectiveChunkIds` reads a legacy manifest's comma-joined
+    ///     `batchId`, not `submittedChunkIds`, so an append there would be written and never read back.
+    ///
+    /// Synchronous on the MainActor by construction: the load and the save are one uninterrupted turn, so
+    /// the cancellation task's own journal delete cannot land between them.
+    @discardableResult
+    func appendChunkIdToClosedPaidBatchJournal(_ chunkId: String) -> Bool {
+        guard activePendingBatch == nil, let address = closedPaidBatchJournalAddress else { return false }
+        guard let onDisk = Self.loadPendingBatch(), address.matches(onDisk),
+              onDisk.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return false }
+        // Already recorded — by the submit loop before the Stop, or by a retried callback. Report success:
+        // the ID *is* in the journal, which is the whole property this function exists to provide.
+        guard !onDisk.effectiveChunkIds.contains(chunkId) else { return true }
+        var appended = onDisk
+        appended.submittedChunkIds.append(chunkId)
+        return Self.savePendingBatch(appended) != nil
+    }
+
+    /// Shown when a job created as Stop landed was recorded in the journal `cancel()` had already closed.
+    ///
+    /// The submission still stops here — this is the same interruption
+    /// `pendingBatchJournalClosedMessage` describes, and pressing Stop must not be answered by continuing to
+    /// spend. What changed is that the operator is no longer being sent to the provider console for a job the
+    /// app now knows about: it is in the journal Resume reads.
+    static let pendingBatchChunkRecordedAfterStopMessage =
+        "A paid batch job was created just as Stop landed. Its server ID was added to the recovery journal, so Resume can still reach it. Submission stopped; nothing was removed."
+
     @discardableResult
     func recordSubmittedBatchChunk(_ chunkId: String) -> Bool {
         let normalized = chunkId.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -932,6 +1002,18 @@ extension OCRProcessor {
         }
         guard !normalized.isEmpty, !normalized.contains(",") else { return false }
         if activePendingBatch?.submittedChunkIds.contains(normalized) == true { return true }
+        // The journal may be CLOSED and still on disk (W16.bat5-fu). That is what a Stop pressed mid-submit
+        // leaves — `cancel()` nils `activePendingBatch`, and keeps the file whenever the submission had not
+        // finished — and this callback runs for a job the provider has ALREADY created and billed. Write the
+        // ID into the file rather than losing it. Returning `false` regardless is deliberate and load-bearing:
+        // it is what makes the submit loop throw and stop creating more paid jobs after a Stop. The ID is
+        // recovered; the run is still over.
+        if appendChunkIdToClosedPaidBatchJournal(normalized) {
+            // `cancelRun: false` for the same reason the missing-journal guard below uses it: post-Stop,
+            // `processingTask` is nil or a NEWER run's — see `reportInterruptedPaidBatch`'s doc.
+            reportInterruptedPaidBatch(Self.pendingBatchChunkRecordedAfterStopMessage, cancelRun: false)
+            return false
+        }
         return persistPendingBatchMutation(
             failureMessage: "A paid batch chunk was created, but its server ID could not be saved. Submission stopped."
         ) { $0.submittedChunkIds.append(normalized) }
@@ -2083,6 +2165,13 @@ extension OCRProcessor {
             // journal to read, which is the deleting direction. `cancel()` has no `await`, so this read and
             // the decision that uses it are one uninterrupted MainActor turn: no window, not a re-read.
             let submissionInFlight = Self.batchSubmissionIsInFlight(activePendingBatch)
+            // Closed, not unreachable (W16.bat5-fu). Dropping the journal is what stops the cancelled run
+            // from advancing it, and it must keep doing that — but a Gemini submit loop creates one paid job
+            // at a time, so a create can still be in flight right now and its ID would land nowhere. Keep the
+            // journal ADDRESSABLE (identity only, never a snapshot to write back) so that one late callback
+            // can append its ID to the file. Nothing here waits: the owner rejected quiescing in-flight
+            // submits before this line precisely because a hung provider request would stall Stop.
+            closedPaidBatchJournalAddress = ClosedPaidBatchJournalAddress(activePendingBatch)
             activePendingBatch = nil
             // Built synchronously (constructing a client opens no connection) so the choices are made
             // from state that is still current, not from whatever it became by the time the Task ran.

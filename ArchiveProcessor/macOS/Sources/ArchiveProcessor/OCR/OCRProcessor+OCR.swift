@@ -613,6 +613,10 @@ extension OCRProcessor {
             return
         }
         activePendingBatch = persistedInitialBatch
+        // This submission owns the journal now, so no previous Stop's address may be consulted again
+        // (W16.bat5-fu). The identity check would refuse a stale one anyway; clearing it here means the
+        // property never outlives the batch it names.
+        closedPaidBatchJournalAddress = nil
         activeBatch = BatchContext(
             batchId: "", apiKey: apiKey, model: model,
             thinkingLevel: thinkingLevel, provider: provider)
