@@ -87,6 +87,16 @@ import AppKit
 ///      from a tally a Stop cannot clear, "kept" only about a file on disk, created-but-unrecorded jobs
 ///      named, and the mutator's own explanation leading rather than overwritten. Drives the real exit
 ///      against a real journal (same redirect gate).
+///  20. **A poll step that could not PERSIST does not report the batch finished cleanly**
+///      (`BatchPollPersistFailureContract`, W16.bat7): the poll's persist-failure exits, as opposed to
+///      section 17's cancellation ones. Drives the real completion sweep against a genuinely failing atomic
+///      write, and the real first-run tail after it. Its header states what it does NOT cover: the three
+///      exits behind a provider call are read, not driven.
+///  21. **Clearing the file list mid-sweep does not kill the app** (`BatchSweepClearedListContract`,
+///      W16.bat9): the same sweep as section 20, driven for whether the process survives rather than for
+///      what it reports. It re-subscripts a snapshotted index range across a detached PDF write while Stop
+///      has already re-enabled the Clear button. A mutant does not print FAIL here — it TRAPS this driver
+///      and no report is written at all.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -738,6 +748,16 @@ enum BatchResumeTestDriver {
         // provider call, no keys, no cost; every check writes and removes a manifest at the shipped paths,
         // so it takes the same redirect verdict and is refused outright without it.
         await BatchPollPersistFailureContract.run(check: check, redirected: journalsAreRedirected)
+
+        // --- 21: clearing the file list mid-sweep does not kill the app (W16.bat9). ---
+        // Section 20 drives the same completion sweep for what it REPORTS; this one drives it for whether
+        // the process is still alive to report anything. The sweep re-subscripts a snapshotted index range
+        // across a detached PDF write, and Stop re-enables the Clear button (`jobs = []`) while that write
+        // is in flight — so the crash needs no seam to reproduce, only a main-actor task enqueued before
+        // the sweep starts. No provider call, no keys, no cost; two of its checks write and remove a real
+        // journal at the shipped path, so it takes the same redirect verdict. A mutant here does not print
+        // FAIL — it TRAPS this process and no report is written at all (see the file's header).
+        await BatchSweepClearedListContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
