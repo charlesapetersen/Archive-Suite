@@ -60,6 +60,10 @@ import Foundation
 enum BatchPollPersistFailureContract {
 
     static func run(check: (String, Bool) -> Void, redirected: Bool) async {
+        // First, and before any file is touched: the seam that makes the provider-arm sections possible is
+        // the one thing in this file that could do harm if it were live in a shipped build, so its refusal
+        // directions are pinned before it is ever installed. Needs no redirect — it writes nothing.
+        theTransportSeamIsFailClosed(check)
         guard redirected else {
             // FOUR checks are skipped, not silently: this one FAILs in their place, and no caller asserts a
             // check count, so a refused run reports SOME FAILED rather than a shorter green report.
@@ -106,6 +110,31 @@ enum BatchPollPersistFailureContract {
         check("poll persist: and a sweep that completed still retires it, so a kept journal is a consequence "
               + "of the failure rather than the new default",
               wrote.journalExistedBefore && !wrote.journalSurvived && !wrote.batchStillLive)
+    }
+
+    // MARK: - 0. The transport seam cannot be reached by a shipped build
+
+    /// `NetworkSession.testTransport` is what lets the provider-arm sections run a real paid-batch poll for
+    /// $0, and it is also the only seam in this suite that decides whether a process talks to a **paid**
+    /// endpoint at all. So it is gated exactly like the journal redirect
+    /// (`OCRProcessor.pendingStateDirectory`) — an exact `"1"`, nothing approximate — and additionally on a
+    /// closure having been installed, which nothing outside this file ever does.
+    ///
+    /// Both halves are checked, because either one alone would be a weaker gate than it looks:
+    ///   * the flag half is swept through the PURE `testTransportIsEnabled(flag:)`, so eleven approximate
+    ///     spellings can be refused without mutating this process's environment;
+    ///   * the closure half is read LIVE — the flag really is `"1"` here (the driver only runs under it), so
+    ///     `testTransportIsActive == false` at this point is the genuine reading that the shipped transport
+    ///     is what a request would take right now.
+    private static func theTransportSeamIsFailClosed(_ check: (String, Bool) -> Void) {
+        let refused = [nil, "", " ", "0", "true", "TRUE", "yes", "1 ", " 1", "01", "11"]
+        let allRefused = refused.allSatisfy { !NetworkSession.testTransportIsEnabled(flag: $0) }
+        check("poll persist: only an exact \"1\" enables the test transport — \(refused.count) approximate "
+              + "spellings are all refused",
+              allRefused && NetworkSession.testTransportIsEnabled(flag: "1"))
+        check("poll persist: the flag alone diverts nothing — with no closure installed the seam is dormant "
+              + "and a request would take the shipped transport",
+              !NetworkSession.testTransportIsActive && NetworkSession.testTransport == nil)
     }
 
     // MARK: - Fixtures

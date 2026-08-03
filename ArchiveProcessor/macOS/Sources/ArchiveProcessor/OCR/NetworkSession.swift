@@ -93,6 +93,53 @@ enum NetworkSession {
     /// a cosmetic status line.
     nonisolated(unsafe) static var lastRateLimitedAt: Date?
 
+    // MARK: - The headless no-network seam (W16.bat7-fu)
+
+    /// A stand-in for the wire, installed by a headless contract and **nil in production**.
+    ///
+    /// Three of `pollBatchUntilComplete`'s four "a downstream step could not persist" exits sit *below* the
+    /// `switch provider`, past a provider status check, so nothing could drive them without either a real
+    /// paid batch or a seam — which is why they shipped fixed but unpinned (`W16.bat7`, and the honest limit
+    /// recorded in `BatchPollPersistFailureContract`'s header). This is the seam: literal provider bodies in
+    /// place of `shared.data(for:)`.
+    ///
+    /// It sits here, at `data(for:policy:)`, rather than at `performWithRetry`'s existing `transport`
+    /// parameter (which `testPerformWithRetry` already injects) because the callers under test go through
+    /// the public entry point, not the private one — and because covering the entry point means a check
+    /// cannot accidentally leave one client's requests on the wire.
+    ///
+    /// **Gated exactly like the journal redirect** (`OCRProcessor.pendingStateDirectory`) and for a stronger
+    /// reason: that one decides *where* a file is written, this one decides whether the process talks to a
+    /// paid endpoint at all. Two independent conditions must BOTH hold — `BATCHRESUME_TEST` reads exactly
+    /// `"1"`, and a closure has been installed. A shipped build satisfies neither: nothing outside
+    /// `BatchPollPersistFailureContract` assigns this, and that contract only runs under the same flag.
+    /// There is deliberately no other trigger — no `#if DEBUG`, no test-bundle sniffing.
+    nonisolated(unsafe) static var testTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))?
+
+    /// Whether the flag permits the seam, from the raw environment value. Pure, so every fail-closed
+    /// direction can be swept for $0 without mutating this process's environment. Exact match, not a
+    /// truthiness test: `"true"`, `"0"` and `"1 "` are all somebody being approximate about whether a
+    /// process spends money.
+    nonisolated static func testTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
+
+    /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
+    /// one place and read once per request, so the flag and the closure can never be judged separately.
+    ///
+    /// The closure is tested FIRST on purpose. It costs a nil check, whereas
+    /// `ProcessInfo.processInfo.environment` materializes a dictionary — and in production the answer is
+    /// already decided by the nil, so a shipped build does no environment work per request. Which half is
+    /// read first cannot weaken the gate: both must hold either way.
+    nonisolated static var activeTestTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))? {
+        guard let stub = testTransport,
+              testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[OCRProcessor.batchResumeTestEnvKey])
+        else { return nil }
+        return stub
+    }
+
+    /// Internal so a check can assert the seam is dormant before it installs one and dormant again after.
+    nonisolated static var testTransportIsActive: Bool { activeTestTransport != nil }
+
     /// Perform a data request through the global limiter, retrying transient transport errors
     /// and rate-limit/overload responses with exponential backoff + jitter (honoring
     /// `Retry-After` when present).
@@ -106,7 +153,17 @@ enum NetworkSession {
             // Cancellation can race with a waiter being granted. Refuse to start the request, then release
             // the legitimately granted slot through the shared catch path.
             try Task.checkCancellation()
-            let result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
+            // W16.bat7-fu — the production call is the one with no `transport:` argument. The seam adds a
+            // BRANCH rather than changing a default, so a build that cannot reach `activeTestTransport`
+            // cannot reach a stub either, and the retry/backoff/limiter semantics below are identical on
+            // both sides (a stubbed transport is retried exactly like a real one).
+            let result: (Data, URLResponse)
+            if let stub = activeTestTransport {
+                result = try await performWithRetry(
+                    request, policy: policy, maxRetries: maxRetries, transport: stub)
+            } else {
+                result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
+            }
             await limiter.release()
             return result
         } catch {

@@ -710,7 +710,12 @@ extension OCRProcessor {
         apiKey: String,
         fileURLs: [URL],
         outputDirectory: URL,
-        runConfig: SessionProcessingConfig? = nil
+        runConfig: SessionProcessingConfig? = nil,
+        /// Test-only override of the wait between status checks (W16.bat7-fu). An ordinary defaulted
+        /// parameter rather than a global: production passes nothing and gets the shipped 30s/60s schedule
+        /// below, while the headless contract passes ~0 so it can drive the poll's *exits* without spending
+        /// 30 seconds per scenario. It cannot change what the poll decides — only how long it waits first.
+        pollInterval: Duration? = nil
     ) async {
         var pollCount = 0
         var consecutiveErrors = 0
@@ -742,7 +747,7 @@ extension OCRProcessor {
             }
 
             // Poll every 30s for the first ~5 min (few batches finish faster), then back off to 60s.
-            let interval: Duration = pollCount < 10 ? .seconds(30) : .seconds(60)
+            let interval: Duration = pollInterval ?? (pollCount < 10 ? .seconds(30) : .seconds(60))
             try? await Task.sleep(for: interval)
             pollCount += 1
 
