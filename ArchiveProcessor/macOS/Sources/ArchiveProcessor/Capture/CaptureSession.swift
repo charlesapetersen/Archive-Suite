@@ -590,6 +590,10 @@ final class CaptureSession: ObservableObject {
     }
 
     func removePhoto(_ photo: CapturedPhoto) {
+        // W3.cap-r3 — stop this page's paid OCR BEFORE its source goes to the Trash: the page is leaving the
+        // session, so nobody will ever read the result. (No-op unless live, and while its segment is
+        // mid-finalize — see `photoRemoved`.)
+        if processingMode == .live { liveProcessor.photoRemoved(photo) }
         Self.trashOrRemove(photo.url)   // to Trash, not a hard delete — recoverable
         photos.removeAll { $0.id == photo.id }
         writeManifest()
@@ -602,6 +606,10 @@ final class CaptureSession: ObservableObject {
     func removePhotoIfSafe(groupId: String, seq: Int) {
         if processingMode == .live && liveProcessor.isFinalized(groupId) { return }
         guard let idx = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) else { return }
+        // W3.cap-r3 — the phone moved this page to another group, so the OCR started for the OLD copy is
+        // money nobody will read. Cancel it before the source is trashed. (The new group's own copy was
+        // ingested under a different `(groupId, seq)`; both callers skip `rg == groupId`.)
+        if processingMode == .live { liveProcessor.photoRemoved(photos[idx]) }
         Self.trashOrRemove(photos[idx].url)   // to Trash, not a hard delete — recoverable
         photos.remove(at: idx)
         writeManifest()

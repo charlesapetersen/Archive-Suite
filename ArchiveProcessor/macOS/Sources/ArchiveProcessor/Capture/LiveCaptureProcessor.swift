@@ -391,6 +391,36 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
+    /// A page LEFT the session (W3.cap-r3) — the operator deleted it in the Captured pane, or the phone
+    /// reclassified it into a new group and the Mac tombstoned the old copy (`X-Replaces`). Cancel that
+    /// page's in-flight OCR and forget the page, so a paid call for a page that no longer exists STOPS
+    /// instead of running to completion with its Task and its result stranded in `pageTasks` for the rest of
+    /// the session. Nothing else would drop that one entry: `finalizeSegment` only clears the pages of the
+    /// segment it just staged, `retryFailed` only the group being re-run, and `clearSessionState` only when
+    /// the operator clears everything — so before this, deleting a page mid-OCR leaked both the spend and
+    /// the entry.
+    ///
+    /// Deliberately a NO-OP while this segment is being finalized. From `finalizeSegment`'s
+    /// `finalizedGroups.insert` until it clears the entry itself, finalize IS this task's consumer: it took a
+    /// snapshot of the group before its awaits and is going to read this page's result into the segment's
+    /// text. The call is already bought there, so cancelling would discard paid output rather than save
+    /// anything — and it cannot strand the entry either, because finalize's only other exits are the B8
+    /// clear-generation guards and `clearSessionState` empties `pageTasks` wholesale.
+    ///
+    /// `startedPages` is dropped alongside the task, exactly as `retryFailed` does when it re-runs a group:
+    /// this page's OCR is now GONE, so if the same `(groupId, seq)` ever arrives again it has to be allowed
+    /// to buy a call. Leaving W3.cap-r2's started-once guard armed for a page with no task would spend
+    /// nothing and instead file that page as "OCR not started" — a silently text-less archival document,
+    /// which is the worse of the two failures. The reclassify path can't reach that trade at all: both
+    /// callers skip `rg == groupId`, so the key retired here is never the key just ingested.
+    func photoRemoved(_ photo: CapturedPhoto) {
+        guard session.processingMode == .live, !finalizedGroups.contains(photo.groupId) else { return }
+        let key = PageKey(photo)
+        pageTasks[key]?.cancel()
+        pageTasks[key] = nil
+        startedPages.remove(key)
+    }
+
     /// A document segment's Mac tag card was resolved (Save/Skip) → finalize it.
     func segmentResolved(groupId: String) {
         guard session.processingMode == .live else { return }
