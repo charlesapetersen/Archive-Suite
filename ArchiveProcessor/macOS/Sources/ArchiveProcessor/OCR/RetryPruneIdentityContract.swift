@@ -34,14 +34,17 @@ import Foundation
 ///     new run's own failure entry alone. This is the quiet half of the bug — no crash, just a summary that
 ///     under-counts — and it is the check a bounds-only "fix" fails.
 ///
-/// **What a mutant looks like here.** ⚠️ NOT YET MEASURED — the list below is what this section is BUILT to
-/// catch, and the commit that follows replaces it with what each mutant actually reddened:
-///   * the unguarded read put back — THE bug — → §1 does not FAIL, it **TRAPS this process** and no report is
-///     written at all (the `BatchSweepClearedListContract` §21 signature), so the suite goes RED with no
-///     output rather than with a FAIL line.
-///   * the read put back with a bounds check only → §2, the quiet case: in range, wrong row.
-///   * `handleOCRResult`'s own prune neutered → §1's honest-prune check, which is what says the deletion did
-///     not simply drop the behaviour.
+/// **What a mutant looks like here.** Three measured 2026-08-03 against the whole 377-check driver:
+///   * the unguarded read put back — THE bug — → **no report at all**: it does not FAIL, it **TRAPS this
+///     process** (0 of 377 checks written, the `BatchSweepClearedListContract` §21 signature), because §1
+///     empties the list across the call and the subscript is then out of range.
+///   * the read put back with a BOUNDS check only → **2 RED**, both of §2: the new run's own failure entry for
+///     the file now at that index is pruned, and the failure list is no longer what that run left. This is
+///     the quiet case, and it is why bounds alone was never the fix.
+///   * `handleOCRResult`'s own prune neutered (`failedFiles.removeAll` at `+OCR.swift:1342` deleted) → **1
+///     RED**: §1's honest-prune check, and nothing else in 377. That is the measurement the deletion rests
+///     on — it says this behaviour has exactly one owner now, that the retry loop still reaches it, and that
+///     dropping it would be caught here rather than silently.
 ///
 /// Scope: what the retry loop reads across its OCR call. NOT the loop's `jobs[index].status = .processing`
 /// (`:1620`) or `fileURLs[index]` (`:1619`), which the adversarial pass confirmed unreachable rather than

@@ -1488,6 +1488,50 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Known-issues work — Wave 16 (Processor: LAN credential · run config · paid-batch; owner-reviewed 2026-07-18)
 
+- [x] **W16.bat11 — `retryHighUseFailures` read `jobs[index]` across its OCR call with no guard at all
+  [S · MED].** DONE 2026-08-03 — `7bdf854` (the guard, later withdrawn) + `24c6fad` (the driven regression) +
+  `b138615` (the adversarial pass's rework: the read DELETED) + this commit. Filed 2026-08-03 from the
+  `W16.bat10` adversarial pass; **pre-existing** (bat10 changed only the loop's iteration variable there).
+  `OCR/OCRProcessor+OCR.swift:1612` subscripted the live array after `await Self.performOCRCall(...)` with
+  neither a bounds check nor an identity check, and with no `Task.isCancelled` between the suspension and the
+  read: Stop during a busy retry → **Clear** (`jobs = []`) → the in-flight call returns with text →
+  **SIGTRAP**. Re-dropped instead of cleared it was quiet rather than fatal — the LIVE run's failure entry was
+  pruned under a stopped row's filename, so that run's own "N failed" summary and `.txt` log under-counted.
+  Reachable from all three pipeline call sites (`+Pipeline.swift:1275`, `:1619`, `:2543`).
+  **Shipped as a DELETION, not the two-clause guard this item prescribed — that is the item's one real
+  finding.** The guard shipped first (`7bdf854`) and the Tier-2 adversarial pass refuted it: the prune was
+  redundant. `handleOCRResult` prunes the same filename, off the same `(index, jobID)` pair, under the same
+  `result.text != nil` condition, behind the identity guard `W16.bat10` gave it — and nothing observes
+  `failedFiles` between the two. So in every case both pruned the same name (honest) or both refused (stale),
+  and the guard only bought a second copy of an invariant. The READ is gone instead: the prune has ONE owner,
+  the loop reads `jobs` only where it is main-actor-synchronous, and the trap is fixed by the strongest
+  available means — the subscript does not exist. Recorded at the site so it is not "restored". Measured, not
+  argued: neutering `handleOCRResult`'s prune reds the retry's own honest-prune check and **nothing else in
+  377**.
+  New `RetryPruneIdentityContract` (driver section 24; test-batch-resume 371 → 377) drives the REAL loop
+  through the `NetworkSession.testTransport` seam (`W16.bat7-fu`) — real retry selection, real 10-second
+  sleep, real `GeminiClient`, real `handleOCRResult` — with the STUB mutating the file list from inside the
+  request, i.e. exactly while the main actor is suspended in the OCR call. That is the seam the item predicted
+  the driver would need, and it puts the call site under test rather than a helper. Costs two real 10-second
+  waits (suite 12s → 32s). **Three mutants measured:** the unguarded read put back → **no report at all** (it
+  TRAPS the driver, 0 of 377 checks written); the read put back with bounds only → **2 RED**, both of §2, the
+  quiet case; `handleOCRResult`'s own prune neutered → **1 RED**, §1's honest prune.
+  **Adversarial pass** (independent) refuted two things, both fixed here: the redundancy above, and the
+  header's claim that §1 proved non-vacuity for the guard — it never did, because `handleOCRResult` pruned
+  that name regardless. With the deletion the same check becomes attributable and reds if that prune ever goes
+  away. It also confirmed the item's exclusion of the loop's two OTHER unguarded reads (`jobs[index].status =
+  .processing` at `:1594`, `fileURLs[index]`) with a stronger reason than the item gave: `cancel()` cancels
+  the `processingTask` all three call sites run on, **Clear** is `.disabled(processor.isProcessing)`, and a
+  row that vanishes mid-call makes `handleOCRResult` return `false` so the loop exits before the next
+  iteration's write. Only a path that TRUNCATES `jobs` while keeping the surviving rows' ids would reach them,
+  and production has none — every mutation of `jobs` is a whole-array reassignment at a run's entry or the
+  Clear button. **No residual filed.**
+  Verified $0/headless: batch-resume 377 ALL PASS ×2 consecutive runs, plus tagwarn 74 / multipage-reocr 29 /
+  merge-safety 15 / manifest-persistence 109 / recovery 89, all ALL PASS; clean build, no new warnings. The
+  smoke test's paid OCR round-trip was NOT run (it spends real money on request shapes this change does not
+  touch).
+  | files: OCR/OCRProcessor+OCR.swift, OCR/RetryPruneIdentityContract.swift, Capture/BatchResumeTestDriver.swift | S | med | none
+
 - [x] **W16.bat10 — a stopped run's in-flight result could still land on the NEXT run's jobs [S · LOW].**
   DONE 2026-08-03 — `b9a4ac1` (the fix) + `52608df` (the driven regression) + `b68ddb2` (mutants + the one
   that survived) + this commit. Filed from the `W16.bat9` adversarial pass; the residual that item

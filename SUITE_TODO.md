@@ -442,27 +442,6 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   ⛔ **HOLD QUEUE — money path.** Every change to what the paid-batch journal records has been granted item
   by item (bat2-fu2, bat3, bat5, bat6, bat7); this changes it too. Do NOT auto-fix. Tier-2, scratch only.
   | files: OCR/OCRProcessor+Pipeline.swift | S | med | **NEEDS OWNER**
-- [ ] **W16.bat11 — `retryHighUseFailures` reads `jobs[index]` across its OCR call with no guard at all
-  [S · MED].** Filed 2026-08-03 from the `W16.bat10` adversarial pass; **pre-existing** (bat10 changed only
-  the loop's iteration variable there). `OCR/OCRProcessor+OCR.swift:1612` — inside the busy-retry loop, after
-  `await Self.performOCRCall(...)` returns, `if result.text != nil { let sourceFileName =
-  jobs[index].sourceURL… }` subscripts the live array with an index chosen before the call, with **neither a
-  bounds check nor an identity check**, and with no `Task.isCancelled` guard between the suspension and the
-  read. That is the `W16.bat9` crash class at a site bat9 did not reach: Stop during a busy retry →
-  `cancel()` sets `isProcessing = false` synchronously → the **Clear** button un-disables → `jobs = []` → the
-  in-flight call returns with text → **SIGTRAP** (index out of range). Re-drop instead of clear and it is
-  quiet rather than fatal: the wrong file's name is pruned from `failedFiles`, so the run's own failure
-  summary under-counts. Reachable from three pipeline call sites (`+Pipeline.swift:1275`, `:1619`, `:2543`) —
-  a fresh run and both resume paths.
-  **The fix is small but must not ship unmeasured.** bat10 already threads the identity: the loop holds
-  `slot.jobID`, so the read becomes `if result.text != nil, jobs.indices.contains(index), jobs[index].id ==
-  slot.jobID`. What it wants is a driver, and that is the whole cost of the item — this function does a real
-  10s `Task.sleep` and a real network call per file, so reproducing the window headlessly needs a seam (or a
-  `handleOCRResult`-style extraction) rather than the enqueued-main-actor-task trick that drove bat9 and
-  bat10. Tier-2 (money path, and a crash). — the loop's OTHER unguarded read, `jobs[index].status =
-  .processing` at `:1594`, is NOT part of this: it is main-actor-synchronous with the cancellation guard
-  above it, so nothing can land in between.
-  | files: OCR/OCRProcessor+OCR.swift | S | med |
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
