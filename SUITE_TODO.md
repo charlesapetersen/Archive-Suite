@@ -1203,8 +1203,40 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > end to end**: `r5` fixed the record being written, `r4` the record already written — by DELETING the
 > retained second copy of the key rather than syncing it, so there is one reader and nothing left to drift.
 > That also **unblocks `W17.stg1`**, which touches the same `RetainedSegment` (its `(blocked-on: W3.cap-r4)`
-> now resolves). Only `r3` is left.
-- [ ] **W3.cap-r3 [LOW]** `CaptureSession.swift:539/549` — `removePhoto`/`removePhotoIfSafe` delete a photo from `session.photos` but never tell `liveProcessor` to cancel that photo's in-flight OCR Task → deleting/reclassifying a page mid-OCR leaves a paid OCR call running + Task/result orphaned in `pageTasks`. | Capture | Tier-2
+> now resolves). `r3` — the page deleted mid-OCR whose paid call kept running — **shipped 2026-08-03
+> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed** and this
+> section is done except the three residuals below, all of which its adversarial pass found in PRE-EXISTING
+> code rather than in the fix.
+- [ ] **W3.cap-r3-fu1 [MED]** `LiveCaptureProcessor.swift:600/1216` — `startedPages` outlives its task on
+  three paths, so a re-arriving page is filed with NO OCR. `finalizeSegment` clears `pageTasks` for the pages
+  it staged but never their `startedPages` keys; `executePlans` calls `startedPages.removeAll()` only inside
+  the `stagingSafeToReclaim` branch (not the straggler / partial-failure branches); and `photoRemoved`'s
+  mid-finalize carve-out deliberately leaves the key armed. In all three the key is armed with no task behind
+  it, and `photoIngested`'s `!startedPages.contains(key)` guard returns BEFORE the "late page arrived"
+  handling — so a page the phone re-sends after its group finalized is added to `session.photos` by `ingest`,
+  silently buys no call, and finalize reads `pageTasks[key] == nil` → "OCR not started". With a real image and
+  text-bearing siblings the segment still reports `.staged`, so nothing warns the operator. Pre-existing and
+  unchanged by `cap-r3` (its carve-out reproduces the pre-fix behaviour exactly). ⚠️ The naive fix is WRONG:
+  retiring the key inside the carve-out lets a re-arrival overwrite `pageTasks[key]` and double-buy the page
+  finalize is about to read. Fix at one of the two right seams instead — retire keys for pages no longer in
+  `session.photos` at the END of `finalizeSegment`, or gate the re-arrival on presence-of-task rather than on
+  started-ness. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu2 [LOW · latent]** `LiveCaptureProcessor.swift:291` — `retryFailed` drops `pageTasks[k]`
+  without `.cancel()`: the exact mutant (M2) `cap-r3` was measured against, in production, 130 lines above
+  the fix. Currently unreachable by construction — a retryable group has already passed `finalizeSegment`'s
+  `:600` clear, and `.ocr`/`.tagging` map to `.processing`, for which `SegmentItem.actions(for:)` returns `[]`
+  — so no test can red it today and both adversarial passes rated it latent, not live. Worth closing for
+  symmetry (no entry dropped without cancelling first) so the next edit that makes retry reachable mid-flight
+  doesn't reopen a paid leak; say in the commit that it is a no-op today and why. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
+  `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
+  the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page
+  (`.placeholder` → `.succeededPlaceholderImage` + the finish warning; the source is retained by W23.h5 and
+  the file is recoverable from the Trash). Degraded-but-warned rather than lossy, which is why it is LOW —
+  but it is also the opposite of what the operator asked for: they wanted the page GONE and the staged
+  document now carries a placeholder page for it. Decide the intended behaviour (refuse the delete for a
+  staged segment, as `removePhotoIfSafe` does, vs. exclude the page and re-stage) rather than leaving it
+  incidental. Pre-existing. | Capture | Tier-2
 
 ## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`

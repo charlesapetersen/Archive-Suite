@@ -3280,6 +3280,61 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3 [LOW → money] — ✅ DONE 2026-08-03** (`5c3938e` fix; `c510af2` + `1ddc083` test + mutants;
+  `72b2e1c` the adversarial pass's fix; this commit, trackers). **The last of the six WS11 Capture findings —
+  this section is now closed.** The filed premise held: `removePhoto` / `removePhotoIfSafe` dropped a photo
+  out of `session.photos` and sent its source to the Trash without telling `liveProcessor` anything, so the
+  OCR call bought for that page on arrival ran to completion — billed, for a page nobody will ever read — with
+  its `Task` and result stranded in `pageTasks` under a key nothing looks up again. No other path drops a
+  single page's entry (`finalizeSegment` clears only the segment it just staged, `retryFailed` only the group
+  being re-run, `clearSessionState` only a whole-session Clear), so both the spend and the entry leaked.
+  New `photoRemoved(_:)` trigger, symmetric with `photoIngested(_:)`: cancel the page's task, drop it from
+  `pageTasks`, retire its `startedPages` key — called from both removal paths BEFORE the source is trashed.
+  Two deliberate decisions, both the kind a later reader would "simplify" away and both now pinned by a test:
+  it is a **NO-OP while the segment is mid-finalize** (from `finalizedGroups.insert` until finalize clears the
+  entry itself, finalize IS the consumer — it snapshotted the group before its awaits and is about to read
+  this page's result into the segment's text, so cancelling would discard paid output rather than save any),
+  and **`startedPages` is retired with the task** (as `retryFailed` already does) because a page with no task
+  must be free to buy a new call if it ever arrives again — leaving W3.cap-r2's started-once guard armed over
+  an absent task would save nothing and file the page as "OCR not started", a silently text-less archival
+  document, which is the worse failure.
+  **What the cancel actually saves, scoped honestly** (the adversarial pass showed the first wording was too
+  strong): `NetworkSession` honours cancellation at four points, so a call still queued behind the 5-slot
+  `RequestLimiter` — the common state in a capture burst — or parked in 429 backoff is never sent and the
+  whole charge is saved; a call the provider has already ACCEPTED may be billed anyway, exactly as the
+  no-repeat-after-timeout rule already assumes. Cancelling there still frees a slot for a page that WILL be
+  read and never costs more. The strongest money case is the reclassify path, where the new group has already
+  re-bought the same image, so the old copy's call was pure waste.
+  Tier-2: **two independent adversarial passes** (correctness/concurrency and money/test-adequacy lenses),
+  both of which traced every `finalizedGroups` mutation and every `finalizeSegment` exit and confirmed the
+  carve-out cannot strand an entry, that `pageTasks` has exactly one production consumer, that both
+  `X-Replaces` callers do skip `rg == groupId`, and that no fourth removal path bypasses the trigger. One
+  pass found a REAL defect introduced by checkpoint 1 — the delete cancelled by `(groupId, seq)` and removed
+  from the list by `CapturedPhoto.id`, a fresh UUID minted per VALUE that `ingest`'s idempotent re-upload
+  replaces. A stale SwiftUI row value therefore cancelled the LIVE page's call while `removeAll` removed
+  nothing, leaving a page in the session with no task and its source trashed → filed as "OCR not started"
+  over a placeholder image. Pre-fix that window kept the text, so the divergence WIDENED the harm; `72b2e1c`
+  puts both halves on `(groupId, seq)` (the identity `PageKey`, the manifest and the relay SPEC already use,
+  and the one `removePhotoIfSafe` always used), making an absent key a whole no-op. **7 mutants measured**:
+  M1 `photoRemoved` → no-op (the original bug) 8 red · M2 drop only `cancel()`, keep the bookkeeping 3 red ·
+  M3 drop `startedPages.remove` 3 red · M4 drop the `!finalizedGroups` guard 3 red · M5 drop the
+  `removePhotoIfSafe` call site 2 red · M6 the checkpoint-1 form (cancel by key, remove by id) 2 red · M7 the
+  plausible WRONG fix (agree on `id`, so a stale value silently does nothing) 1 red — M7 is what earns the
+  second new check, since agreeing on `id` leaves nothing broken behind and only "the delete lands" reds.
+  M4 originally red only ONE check, resting on a mechanism assertion with no consequence, so scenario 5 was
+  added — a two-page segment parked on its FIRST page with the SECOND deleted, where an unconditional cancel
+  really does cost the operator a paid page of retained text. `test-recovery.sh` **ALL PASS, 89 → 113**;
+  adjacent suites on the same build: `test-manifest-persistence.sh` ALL PASS (109), `test-network-session.sh`
+  ALL PASS, `test-filerelay.sh` PASS 10/10 including `reclassify-chain(A3)`, which drives the very
+  `removePhotoIfSafe` path this hooks. Build clean, no new warnings. (The Processor scheme has no test action,
+  so these headless drivers ARE its smoke test.)
+  **One deliberate, bounded trade, recorded rather than filed:** deleting a page whose OCR had already
+  COMPLETED and then re-delivering the same `(groupId, seq)` now buys a second call, where pre-fix the cached
+  result was reused for free. It is one call, and it buys correct output for a page that IS in the session —
+  the alternative (keeping the entry) is what files a text-less page. Residuals the passes found in
+  PRE-EXISTING code are queued as `W3.cap-r3-fu1` (`startedPages` outliving its task on three paths),
+  `-fu2` (`retryFailed`'s uncancelled drop, latent) and `-fu3` (`removePhoto` has no `isFinalized` guard).
+
 - [x] **W3.cap-r4 [MED · misfile] — ✅ DONE 2026-08-02** (`d719e3f` fix; this commit, test + trackers).
   The filed premise held exactly. `backfillCollections` corrects an out-of-order Box's document in the live
   map `groupCollectionKey` **and** in the visible `staged[]` record, but `RetainedSegment` carried a THIRD
