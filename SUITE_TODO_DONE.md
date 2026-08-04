@@ -3344,6 +3344,58 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   window is modal to the pointer only; making it modal to focus + AX interacts with the VM lane's own test, so
   it is `(blocked-on: W21.vmgui-d)`.
 
+- [x] **W3.cap-r3-fu11 [LOW · data · re-graded MED → LOW by fu10] — ✅ DONE 2026-08-04** (`fb833ea` fix;
+  `c903bb8` Test 22; this commit, five mutants + the adversarial pass + trackers). The Captured pane's Clear
+  button was `session.clear(); liveProc.clearSessionState()` — **two calls and no gate**, live in the exact
+  window `W3.cap-r3-fu7` closed for the retry, and strictly more destructive there: `session.clear()` Trashes
+  the source photos the detached `writeSegmentFiles` is still reading, and the state reset empties
+  `staged`/`retained` under the loop about to `staged.firstIndex` them, so the regeneration's `guard let idx`
+  finds nothing, its partially-rewritten `_processed` files are orphaned and the sources are in the Trash.
+  Recoverable (Trash, per the Recovery Core Directive) — which is why LOW, not a data-loss item.
+  **The fix is ONE DOOR with ONE GUARD**, the shape `fu5` (one exit from `finalizedGroups`) and `fu6` (one
+  labeller) converged on: new `LiveCaptureProcessor.clearSession()` = `guard !isFinalizing` → `session.clear()`
+  → `clearSessionState()`, and `clearSessionState()` is now **`private`** so that is the only way in. The view
+  calls it and carries `.disabled(liveProc.isFinalizing)`.
+  ⚠️ **Why the guard could not live on the button**, which is the part worth carrying forward: not (only) the
+  deferred-callback argument `retryFailed` makes, but **ATOMICITY**. A refusal that splits the pair produces an
+  outcome worse than either half — sources in the Trash while `staged` still lists the segments pointing at
+  them — so the two have to refuse together, which a two-statement button action cannot promise. Reachability
+  is the *second*, independent reason: `fu10` settled that the scrim eats the pointer, so what the view's
+  `.disabled` actually defends is the keyboard/VoiceOver route (`W3.cap-r3-fu10-fu1`), not the mouse.
+  **SCOPED to `isFinalizing`**, deliberately not widened to `requestFinish`'s triple — same call `retryFailed`
+  made: those states put a modal sheet over the panel and clearing from under an unconfirmed collection sheet
+  is a legitimate abort with no write in flight. Mutant M4 is 1 RED on that, so the WIDTH is tested, not
+  merely preferred.
+  **Driver Test 22, six checks, all driven for real** (real ingest → OCR stub → real `writeSegmentFiles` →
+  real `finishSession()` → real rotation review → real `applyRotationReviewAndFinalize`), scratch-only, $0.
+  Check 4 is deliberately COMPOUND — sources on disk, sources in the pane, `staged`, `finalizedGroups`,
+  `retained`, output files — because a check per half would pass on a single-sided guard.
+  **NON-VACUITY measured on FIVE mutants, one-to-one:** M1 the guard deleted (the shipped defect) → **2 RED**
+  (4, 5); M2 `session.clear()` hoisted above the guard → **2 RED** (4, 5); M3 the mirror, `clearSessionState()`
+  hoisted above it → **2 RED** (4, 5 — predicted as 1 and recorded as measured: emptying `staged` alone
+  strands the regeneration, so the state half is not the harmless side of the split); M4 widened to the triple
+  → **1 RED** (6, the width); M5 the view's `.disabled` deleted → **0 RED**, unavoidably (a SwiftUI modifier is
+  invisible to a headless driver — same limit as fu7's P6/P7, and it needs a **keyboard-driven** XCUITest in
+  `W21.vmgui-d`, not a clicking one, since the scrim already eats clicks).
+  **This CLOSES the `staged`-implies-`finalized` enumeration** at `applyRotationReviewAndFinalize`: all three
+  entrants (`retryFailed`, `finalize`, `clearSessionState`) now refuse, where before only two did and the
+  argument rested on MainActor synchronicity alone. That comment, and the scrim's hazard list in the view, are
+  corrected — `removePhoto` (`W3.cap-r3-fu3`) is now the only one of the four still relying on the overlay.
+  **The adversarial pass's finding, recorded at `clearSession()` rather than filed:** gating Clear is not the
+  same decision as gating a retry, because **Clear is the operator's escape hatch** — a stuck `isFinalizing`
+  makes a retry annoying but strands the session. Checked rather than assumed: the flag is set in exactly two
+  places and both clear it immediately after their single `await` with no branch, `throw` or early `return`
+  between, and neither `writeSegmentFiles` nor `executePlans` is throwing, so there is no reachable stick.
+  What would create one — an early `return` added into either of those two gaps — is named in the comment.
+  **⚠️ An ops fact the mutant pass turned up, which fed back into `W21.recovery-timeout`:** the ALL-PASS suite
+  runs in 15 s but M1 and M3 take **81 s and 79 s**, past `test-recovery.sh`'s 60 s wait — so a real
+  regression of this guard prints "timed out", not a FAIL. The first mutant pass duly misread M1's missing
+  report as 0 RED. The failing case is systematically slower than the passing one, so that wait is calibrated
+  against the wrong run; `W21.recovery-timeout` now carries the numbers. (A second self-inflicted lesson from
+  the same pass, for whoever writes the next one: the harness reverted mutants with `git checkout -- .`, which
+  also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
+  first, then revert per-file.) | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu7 [LOW · latent · race] — ✅ DONE 2026-08-04** (`765897b` fix + Test 21; `68160b0` five
   mutants; this commit, trackers + the adversarial pass). The item's own suggestion was the cheap one and it
   was right, but not sufficient on its own. `applyRotationReviewAndFinalize` sets `isFinalizing` and then

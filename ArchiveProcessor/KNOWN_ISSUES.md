@@ -1640,11 +1640,19 @@ not the `LiveCaptureProcessor`'s staged/segment list that drives the Processing 
 (or reconcile) the processor's segment state so both panes clear as one. `Views/LiveCaptureView.swift`,
 `Capture/LiveCaptureProcessor.swift`, `Capture/CaptureSession.swift`.
 
-**FIXED in code (pending owner GUI-verification).** The Clear button now calls a new
-`LiveCaptureProcessor.clearSessionState()` alongside `CaptureSession.clear()`, so the Processing pane's
-in-memory segment/staged state resets together with the Captured pane. It is a **pure in-memory/UI reset** —
+**FIXED in code (pending owner GUI-verification).** The Clear button resets the Processing pane's in-memory
+segment/staged state together with the Captured pane. It is a **pure in-memory/UI reset** —
 no on-disk deletion beyond what `session.clear()` already did (received photos → Trash); any already-staged
 `_processed` output stays recoverable in the backup folder, so the Recovery Core Directive is unchanged.
+
+**Superseded shape (`W3.cap-r3-fu11`, 2026-08-04, `fb833ea`/`c903bb8`).** The fix originally landed as two
+calls in the button's action — `session.clear(); liveProc.clearSessionState()` — which is a pair that a
+refusal can split. It is now ONE model call, `LiveCaptureProcessor.clearSession()`, behind one
+`guard !isFinalizing`; `clearSessionState()` is `private` so that is the only way in, and the button carries
+`.disabled(liveProc.isFinalizing)`. Reason: in the rotation-review regeneration window the ungated Clear
+Trashed the source photos the detached `writeSegmentFiles` was still reading and emptied `staged`/`retained`
+under the loop about to index them. Both panes still clear as one — that is exactly what the atomicity buys.
+Driver Test 22 covers it (five mutants; `SUITE_TODO_DONE.md`).
 
 ---
 

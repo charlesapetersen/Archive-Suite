@@ -1611,6 +1611,21 @@ final class LiveCaptureProcessor: ObservableObject {
     /// This is the LAST entrant to the `staged`-implies-`finalized` argument at
     /// `applyRotationReviewAndFinalize` — with `retryFailed` and `finalize` already refusing, that
     /// enumeration is now closed by refusals rather than only by MainActor synchronicity.
+    ///
+    /// ⚠️ THE ONE ASYMMETRY WITH `retryFailed`, named because gating Clear is not the same decision as
+    /// gating a retry even though the guard is identical. **Clear is the operator's escape hatch** — the way
+    /// out of a session that has gone wrong — so a stuck `isFinalizing` costs more here than there: a retry
+    /// that stays disabled is an annoyance, a Clear that stays disabled strands the session. This was
+    /// checked rather than assumed, and the flag has no reachable stick: it is set true in exactly two
+    /// places, and both clear it immediately after their single `await`, with no branch, no `throw` and no
+    /// early `return` in between (`applyRotationReviewAndFinalize`'s Task tail, and `finalize`'s
+    /// `showFinalizeSheet = false; isFinalizing = false`). Neither `writeSegmentFiles` nor `executePlans`
+    /// is throwing, so neither await can unwind past its reset; the only non-clearing exit is
+    /// `guard let self else`, where a deallocated processor makes the flag moot. **What would break that:
+    /// adding any early `return` between one of those awaits and its `isFinalizing = false`.** If that ever
+    /// happens, this guard needs a timeout or a force-clear affordance, and `retryFailed`'s does not.
+    /// (Reasoned from the code — but from Swift control flow, not from hit-testing, which is the kind of
+    /// code read `W3.cap-r3-fu10` had to walk back.)
     func clearSession() {
         guard !isFinalizing else { return }
         session.clear()

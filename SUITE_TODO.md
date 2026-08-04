@@ -855,7 +855,15 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   timeout; the green suite now takes **~28 s** and has grown 89 → 113 → 127 → 133 checks in four sessions,
   several of the newer sections holding a real 10 s settle. Nothing is wrong today, but the margin is halved
   and the failure mode is bad: a spurious timeout looks exactly like a real hang, and either way it prints no
-  verdict at all (that ambiguity is exactly what left `fu2`'s M4 mutant undiagnosed). Fix is cheap — raise
+  verdict at all (that ambiguity is exactly what left `fu2`'s M4 mutant undiagnosed).
+  🔺 **NO LONGER HYPOTHETICAL — measured 2026-08-04 by `W3.cap-r3-fu11`, and it cost that item a round.** Its
+  mutant pass observed the ALL-PASS suite at **15 s** (163 checks) but **81 s and 79 s on two of the five
+  mutants** (M1 and M3): a Clear that gets through strands the regeneration, and every downstream settle then
+  runs to its timeout. So a REAL regression of a data-safety guard does not print `FAIL: …` — it blows the
+  60 s wait and prints "Recovery data-safety test timed out", which reads as a hang. Worse, the first mutant
+  pass read that missing report as **0 RED**, i.e. as the guard being untested, which is the exact wrong
+  conclusion. The pattern generalises: the failing case is systematically SLOWER than the passing one, so the
+  wait is calibrated against precisely the wrong run. Fix is cheap — raise
   the wait (180 s), or better, poll for process EXIT as well as the report file so a genuine crash/hang is
   distinguished from "not finished yet" in the message. Same shape in the sibling drivers
   (`test-manifest-persistence.sh`, `test-merge-safety.sh`, `test-batch-resume.sh`), so fix the pattern once
@@ -1221,9 +1229,14 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > whole: **no `pageTasks` entry leaves the map with a RUNNING call behind it**, on every path that frees one
 > (`finalizeSegment`'s own clear drops without cancelling, correctly — it runs after every one of those pages
 > was awaited). Still open: **`-fu3`** and **`-fu4`**, both behaviour decisions rather than bug fixes, plus
-> **`-fu8`** (the resume path's third label, which `-fu6`'s pass found) and **three that `-fu7` produced**:
-> **`-fu9`** (a SUSPECTED sheet suppression), **`-fu10`** (does the finishing throbber's scrim block input?) and
-> **`-fu11`** (Clear is ungated in the same window and is more destructive than the retry). **`-fu7` — the
+> **`-fu8`** (the resume path's third label, which `-fu6`'s pass found) and **one of the three `-fu7`
+> produced**: **`-fu9`** (a SUSPECTED sheet suppression). The other two are closed — **`-fu10`** (does the
+> finishing throbber's scrim block input? — decided: it is MEANT to, `0ee6179`) and **`-fu11` — Clear, ungated
+> in the same window and more destructive than the retry — shipped 2026-08-04 `fb833ea`/`c903bb8`** (entry in
+> `SUITE_TODO_DONE.md`): the button's two calls are now one `clearSession()` behind one `guard !isFinalizing`,
+> with `clearSessionState` made `private` so that is the only door. **With it the `staged`-implies-`finalized`
+> enumeration at `applyRotationReviewAndFinalize` is CLOSED** — all three entrants refuse, where the argument
+> previously rested on MainActor synchronicity alone. **`-fu7` — the
 > retry that was still live while the rotation review regenerated — shipped 2026-08-04
 > `765897b`/`68160b0`** (entry in `SUITE_TODO_DONE.md`): `retryFailed` refuses while `isFinalizing`, and the
 > bulk button + the per-item menu stop offering what it would refuse. The refusal is deliberately narrow (that
@@ -1256,39 +1269,16 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   control behind the overlay, and with no `.accessibilityAddTraits(.isModal)` a VoiceOver client can activate
   what the pointer cannot. So the decision is expressed at partial strength, and every future affordance added
   to this panel inherits the same silent hole. The one-liners that would close it (`.isModal` on the overlay,
-  or `.disabled(liveProc.isFinishingScrimUp)` on the panel content) would also make `W3.cap-r3-fu11` moot and
+  or `.disabled(liveProc.isFinishingScrimUp)` on the panel content) would
   retire fu7's unkillable P6/P7 mutants — but `.isModal` can hide from XCUITest the very buttons
   `W21.vmgui-d`'s own hit-test assertion needs to find, which is why this waits for the lane rather than
-  guessing. ⚠️ The `(blocked-on:)` is on THIS item only — `W3.cap-r3-fu11` is not gated by it. Filed
+  guessing. ⚠️ **Updated 2026-08-04:** an earlier version also said these one-liners "would make
+  `W3.cap-r3-fu11` moot". They would not, and fu11 has since **SHIPPED** (`fb833ea`/`c903bb8`) with a
+  model-layer `guard !isFinalizing` in `clearSession()` — because a view-layer barrier, `.isModal` included,
+  cannot make the Clear button's two halves refuse ATOMICALLY, which is the property that item turned on. So
+  this item's value is unchanged and is now purely what its title says: making the window modal to focus and
+  AX for **future** affordances, and killing fu7's P6/P7 + fu11's M5 as measurements. Filed
   2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
-- [ ] **W3.cap-r3-fu11 [LOW · data · same window as fu7 — re-graded from MED by fu10]** `LiveCaptureView:396`
-  (was `:363` before fu10's insertion) — the **Clear button carries
-  no `isFinalizing` gate**, and in the rotation-review regeneration window it is strictly more destructive than
-  the retry `W3.cap-r3-fu7` just refused. `session.clear()` Trashes the received source photos while the
-  detached `writeSegmentFiles` is reading them, and `liveProc.clearSessionState()` empties `staged`/`retained`
-  under the loop that is about to `staged.firstIndex` them — so the regeneration's `guard let idx` finds
-  nothing, its partially-rewritten `_processed` files are orphaned, and the sources are in the Trash.
-  Recoverable (Trash, per the Recovery Core Directive) but a strictly worse outcome than the money leak fu7
-  closed, in the identical window. ⚠️ Note the citation trap this came out of: fu7's item text said "matching
-  the Clear button (`LiveCaptureView:405`)" — `:405` is the **Finish session** button, which IS gated; Clear is
-  `:363` and is not. Both fu7's comment and the tracker entry are corrected. Also note this is the LAST
-  remaining entrant to the `staged`-implies-`finalized` argument at
-  `LiveCaptureProcessor.applyRotationReviewAndFinalize` (`retryFailed` and `finalize` both now refuse while
-  `isFinalizing`) — so gating Clear would close that enumeration entirely. Gating a DELETE path is its own
-  decision and its own Tier-2 gate, which is why fu7 did not absorb it.
-  ✅ **`W3.cap-r3-fu10` has now DISCHARGED the severity half** (shipped 2026-08-04 `0ee6179`): the window's
-  throbber scrim is meant to freeze the panel, and Clear sits under it — `clearSessionState()` has exactly
-  ONE production caller, that button, with no `.keyboardShortcut` and no menu command routing to it (checked:
-  the app's only commands are ⌘R "Start Processing", Files-tab-only, and ⌘⌥P provider-cycle). So **no mouse
-  path to this survives**, and it is **re-graded MED → LOW**. What survives is the keyboard/AX route a scrim
-  does not cover (`W3.cap-r3-fu10-fu1`), which needs a non-default macOS setting or VoiceOver. The fix is
-  unchanged and still worth doing — gating a delete path is right independent of how it is reached, and this
-  is the last entrant to the `staged`-implies-`finalized` enumeration at `applyRotationReviewAndFinalize` —
-  but it is no longer urgent, and anything that removes or narrows the scrim puts it straight back to MED.
-  ⚠️ Two caveats on the re-grade: fu10 settled the INTENT from a code read, not an observation (the overlay
-  sits over an AppKit-backed `HSplitView`, so `W21.vmgui-d` should confirm), and the keyboard leg is likewise
-  reasoned rather than measured. Actionability was never gated: no `(blocked-on:)`.
-  Found 2026-08-04 by `W3.cap-r3-fu7`'s adversarial pass; pre-existing. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu9 [LOW · SUSPECTED · presentation]** `LiveCaptureView:81-117` — the Live Capture tab
   attaches `showRotationReview`, `modelChoiceTarget` and `textViewerTarget` as three separate `.sheet`
   modifiers, and `W3.cap-r3-fu7`'s scope decision rests on the claim that a per-item sheet already on screen

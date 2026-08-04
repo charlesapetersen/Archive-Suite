@@ -2109,7 +2109,42 @@ enum LiveCaptureRecoveryTestDriver {
         // A check per half would pass on a mutant that gated only one, which is the outcome worse than
         // either. Check 4 is therefore deliberately compound.
         //
-        // NON-VACUITY: measured, and recorded in the checkpoint that made the measurements. ---
+        // NON-VACUITY, measured (2026-08-04). Every mutant was built and run; the counts are observed:
+        //   M1 the `guard !isFinalizing` in `clearSession()` deleted (the shipped defect)
+        //      → 2 RED: checks 4 and 5. The Clear Trashes both sources and empties `staged`/`retained`/
+        //      `finalizedGroups`, and the regeneration that follows then has no index to publish into, so
+        //      the segment never comes back. This is the mutant the section exists for.
+        //   M2 the guard kept but `session.clear()` hoisted ABOVE it — the destructive half ungated, i.e.
+        //      exactly the split the one-door shape exists to make impossible
+        //      → 2 RED: checks 4 and 5. The worse-than-either outcome, and the one a per-half check set
+        //      would have missed: `staged` still lists a segment whose sources are in the Trash.
+        //   M3 the mirror — `clearSessionState()` hoisted above the guard, the STATE half ungated
+        //      → 2 RED: checks 4 and 5. Predicted as 1 (check 4 only) and measured as 2; recorded as
+        //      measured. The second RED is the informative one — emptying `staged` alone is enough to strand
+        //      the regeneration, so the state half is not the "harmless" side of the split it looks like.
+        //   M4 the guard WIDENED to `requestFinish`'s triple — also refusing while `showFinalizeSheet` /
+        //      `showRotationReview` is up
+        //      → 1 RED, check 6. The WIDTH measurement, mirroring Test 21's P5: `beginFinalize` has raised
+        //      the collection sheet by then, so a widened guard turns the intended window into a ban and is
+        //      caught. The widening was considered and declined on its own merits (see `clearSession`);
+        //      this is what makes that a tested decision rather than a preference.
+        //   M5 the view's `.disabled(liveProc.isFinalizing)` on the Clear button deleted
+        //      → 0 RED, and unavoidably so — a SwiftUI modifier's effect is not observable from a headless
+        //      driver at all. Same limit as Test 21's P7, and the same route out: `W3.cap-r3-fu10` settled
+        //      that the scrim eats the POINTER, so the only thing that modifier defends is the
+        //      keyboard/VoiceOver path, and killing it needs a KEYBOARD-driven XCUITest in the Processor VM
+        //      lane (`W21.vmgui-d`) — ⇥+Space with Full Keyboard Access on, not a clicking test. Recorded
+        //      so that lane writes the right test instead of reading a clicking 0 RED as coverage.
+        //
+        // ⚠️ AN OPS FACT THIS MEASUREMENT TURNED UP, worth more than the mutant counts. M1 and M3 both make
+        // the WHOLE driver take ~80 s (81 s and 79 s observed, against a 15 s ALL-PASS baseline), because a
+        // Clear that gets through strands the regeneration and every downstream settle runs to its timeout.
+        // `test-recovery.sh` waits 60 s for the report — so a REAL regression of this fix does not present
+        // as `FAIL: a Clear mid-regeneration…`, it presents as "Recovery data-safety test timed out", which
+        // is indistinguishable from a hang. That is `W21.recovery-timeout` stopping being hypothetical, and
+        // its tracker entry now carries these numbers. It also cost this item a round: the first mutant pass
+        // read M1's missing report as 0 RED. If you are reading a timeout here, raise the wait before you
+        // conclude anything. ---
         if isolatedBackup {
             if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
                !testRoot.isEmpty {
