@@ -443,6 +443,66 @@ struct LiveCaptureView: View {
             .help("Stop waiting to finish. Nothing captured or processed is lost — the session stays open.")
     }
 
+    /// Clear resets BOTH panes as one (B1): `CaptureSession.clear()` empties the Captured pane (received
+    /// photos → Trash, recoverable) and the processing-side reset drops the Processing pane's in-memory
+    /// segment/staged state (also cancels any pending Finish + summary). No on-disk deletion beyond what
+    /// `session.clear()` already does; staged `_processed` output stays recoverable in the backup folder
+    /// (Recovery Core Directive intact).
+    ///
+    /// W3.cap-r3-fu11 — the two halves are ONE model call now, and it refuses while a finish is regenerating.
+    /// This used to read `session.clear(); liveProc.clearSessionState()`, which is a pair a refusal could
+    /// split — and the split is worse than either half: the sources go to the Trash while `staged` still lists
+    /// the segments pointing at them. The load-bearing guard is inside `clearSession()`; this `.disabled` is
+    /// the operator-facing half, so the affordance is visibly off rather than silently ignored. It is also the
+    /// only layer covering the KEYBOARD and VoiceOver routes: `W3.cap-r3-fu10` decided the throbber's scrim
+    /// freezes the panel, but a scrim stops the pointer and nothing else (`W3.cap-r3-fu10-fu1`). Matches the
+    /// Finish button, which was already gated — note the trap this came out of, since it cost one round of
+    /// mis-citation: Finish is the `.disabled(… || liveProc.isFinalizing)` in `liveFinishControls`, NOT this.
+    ///
+    /// Extracted from the header by `W3.cap-r3-fu12`, which draws it from a second place (the emptied pane).
+    /// The `.accessibilityIdentifier` is new with that item and is not decoration: no headless driver can read
+    /// this view, so the only thing that can ever prove the button DRAWS where it should is `W21.vmgui-d`'s
+    /// Processor GUI lane, and it needs something to press.
+    @ViewBuilder private var clearButton: some View {
+        Button("Clear") { liveProc.clearSession() }
+            .disabled(liveProc.isFinalizing)
+            .accessibilityIdentifier("live.clear")
+    }
+
+    /// Live mode, session active. Always show Finish so the user sees where the session ends — grayed with a
+    /// spinner while segments are still being OCR'd/tagged (so it's clear work is happening, not just a
+    /// "Clear" button), and enabled once at least one segment has finished (staged). If Finish is tapped while
+    /// segments are still processing, we WAIT for them (`pendingFinish`) so none are missing from the rotation
+    /// review, and any un-tagged/open segment is recovered.
+    ///
+    /// Extracted from the header by `W3.cap-r3-fu12` for the same reason `pendingFinishRow` was by
+    /// `W3.cap-r3-fu9-fu1`: it now has two call sites (photos present, and the emptied-but-unfiled pane), and a
+    /// copy-paste is how the two would drift apart. `processing` reads `liveProc.processingCount`, which since
+    /// fu12 excludes rows whose group has left the session — see that property: unfiltered, this spinner
+    /// becomes one that can never stop in the very state the second call site exists for.
+    @ViewBuilder private var liveFinishControls: some View {
+        let processing = liveProc.processingCount > 0
+        HStack(spacing: 8) {
+            if liveProc.pendingFinish {
+                pendingFinishRow
+            } else if processing && liveProc.staged.isEmpty {
+                ProgressView().controlSize(.small)
+                Text("Processing…").font(.caption).foregroundStyle(.secondary)
+            }
+            Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
+                liveProc.requestFinish()
+            }
+            .buttonStyle(.borderedProminent)
+            // Enabled once anything is captured (not only when staged): Finish also recovers an un-ended/
+            // un-tagged segment (completeAllOpenDocGroups). Kept TAPPABLE while a finish is pending so a
+            // newly-added, still-un-tagged segment can be recovered by re-tapping (no deadlock) — new photos
+            // extend the same pending finish rather than cancelling it. Only blocked during the actual file
+            // move (isFinalizing).
+            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing)
+            .accessibilityIdentifier("live.finish")
+        }
+    }
+
     private var capturePanel: some View {
         VStack(spacing: 0) {
             HStack {
@@ -456,26 +516,7 @@ struct LiveCaptureView: View {
                 }
                 Spacer()
                 if !session.photos.isEmpty {
-                    // Clear resets BOTH panes as one (B1): CaptureSession.clear() empties the Captured pane
-                    // (received photos → Trash, recoverable) and the processing-side reset drops the
-                    // Processing pane's in-memory segment/staged state (also cancels any pending Finish +
-                    // summary). No on-disk deletion beyond what session.clear() already does; staged
-                    // _processed output stays recoverable in the backup folder (Recovery Core Directive
-                    // intact).
-                    //
-                    // W3.cap-r3-fu11 — the two halves are ONE model call now, and it refuses while a finish
-                    // is regenerating. This used to read `session.clear(); liveProc.clearSessionState()`,
-                    // which is a pair a refusal could split — and the split is worse than either half: the
-                    // sources go to the Trash while `staged` still lists the segments pointing at them. The
-                    // load-bearing guard is inside `clearSession()`; this `.disabled` is the operator-facing
-                    // half, so the affordance is visibly off rather than silently ignored. It is also the
-                    // only layer covering the KEYBOARD and VoiceOver routes: `W3.cap-r3-fu10` decided the
-                    // throbber's scrim freezes the panel, but a scrim stops the pointer and nothing else
-                    // (`W3.cap-r3-fu10-fu1`). Matches the Finish button below, which was already gated —
-                    // note the trap this came out of, since it cost one round of mis-citation: Finish is the
-                    // `.disabled(… || liveProc.isFinalizing)` further down, NOT this button.
-                    Button("Clear") { liveProc.clearSession() }
-                        .disabled(liveProc.isFinalizing)
+                    clearButton
                     if liveProcessingMode != LiveProcessingMode.live.rawValue {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)
@@ -487,51 +528,40 @@ struct LiveCaptureView: View {
                         Button("Process \(session.photos.count) →") { session.activateProcessingIfNeeded() }
                             .buttonStyle(.borderedProminent)
                     } else {
-                        // Live mode, session active. Always show Finish so the user sees where the
-                        // session ends — grayed with a spinner while segments are still being OCR'd/
-                        // tagged (so it's clear work is happening, not just a "Clear" button), and
-                        // enabled once at least one segment has finished (staged). If Finish is tapped
-                        // while segments are still processing, we WAIT for them (pendingFinish) so none are
-                        // missing from the rotation review, and any un-tagged/open segment is recovered.
-                        let processing = liveProc.statuses.contains { $0.phase == .ocr || $0.phase == .tagging }
-                        HStack(spacing: 8) {
-                            if liveProc.pendingFinish {
-                                pendingFinishRow
-                            } else if processing && liveProc.staged.isEmpty {
-                                ProgressView().controlSize(.small)
-                                Text("Processing…").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
-                                liveProc.requestFinish()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            // Enabled once anything is captured (not only when staged): Finish also recovers
-                            // an un-ended/un-tagged segment (completeAllOpenDocGroups). Kept TAPPABLE while a
-                            // finish is pending so a newly-added, still-un-tagged segment can be recovered by
-                            // re-tapping (no deadlock) — new photos extend the same pending finish rather than
-                            // cancelling it. Only blocked during the actual file move (isFinalizing).
-                            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing)
-                        }
+                        liveFinishControls
                     }
-                } else if liveProc.pendingFinish {
-                    // W3.cap-r3-fu9-fu1 — a pending Finish with an EMPTY Captured pane, which is why the row
-                    // above is not the only renderer. Everything in the block above — Clear, Finish, the
-                    // waiting message — is gated on `!session.photos.isEmpty`, and `pendingFinish` outlives
-                    // that condition: `CaptureSession.removePhoto` (the per-thumbnail ✕) neither clears the
-                    // flag nor re-enters `proceedToFinishIfReady`, so deleting the last page while a finish
-                    // waits on a still-heartbeating phone leaves the finish armed with the entire control
-                    // cluster unrendered and no indication anything is pending.
+                } else if liveProc.hasUnfiledWork {
+                    // W3.cap-r3-fu12 — THE EMPTIED PANE, and the whole point of this arm: the cluster above is
+                    // gated on `!session.photos.isEmpty`, but the session's unfiled work is not. Delete every
+                    // received page with the per-thumbnail ✕ and the segments already OCR'd, tagged and written
+                    // to `_processed/` are still there — with, before this item, no Finish to file them and no
+                    // Clear to abandon them. The pane just said "Waiting for photos…". Recovery existed (shoot
+                    // one more photo and the cluster returns) but nothing said so.
                     //
-                    // That state was found by this item's own adversarial pass, and it matters here
-                    // specifically: an escape hatch nested inside the very predicate that hides the thing it
-                    // is an escape FROM closes nothing. It is not self-healing while the phone keeps
-                    // heartbeating a non-zero count either — `phonePendingActive`'s 20 s staleness clock only
-                    // starts once the phone goes quiet, so the 5 s watchdog re-evaluates and re-holds.
+                    // THE DECISION, since the item was filed as one rather than as a bug: the pane offers the
+                    // SAME two controls it always did. Finish, because the OCR behind those segments is already
+                    // BOUGHT and filing them is the only way the operator sees it — stranding paid work behind
+                    // an undiscoverable gesture is the money-path harm, and the button's own
+                    // `.disabled(liveProc.statuses.isEmpty …)` already keyed off the roster rather than the
+                    // photos, so the gate was the only thing in the way. Clear, because abandoning is the other
+                    // half of the same choice and an operator who cannot abandon is stuck. (Undo: delete this
+                    // arm and restore `else if liveProc.pendingFinish { HStack(spacing: 8) { pendingFinishRow } }`,
+                    // which is what `W3.cap-r3-fu9-fu1` shipped here.)
                     //
-                    // Deliberately the ROW ONLY — no Finish, no Clear. A pane with no photos but live staged
-                    // segments has never offered those, and deciding what it should offer is a separate
-                    // question from giving a pending finish an exit (filed as `W3.cap-r3-fu12`).
-                    HStack(spacing: 8) { pendingFinishRow }
+                    // It also un-strands a case the item did not name: a finish whose move PARTLY failed leaves
+                    // the failed groups in `statuses`/`staged` while `clearFiled` retires only the FILED
+                    // sources, so a pane emptied of the rest showed the green "Session complete" summary with
+                    // no way to re-Finish or discard what did not make it.
+                    //
+                    // WHY THE SAME SUBVIEWS rather than a tailored copy: `W3.cap-r3-fu9-fu1` shipped its Cancel
+                    // button in two renderers, and its own comment warns that a copy-paste is how one of them
+                    // drifts. So both arms compose `clearButton`/`liveFinishControls`; the arms differ only in
+                    // WHEN they draw, never in what. `hasUnfiledWork` includes `pendingFinish`, so this arm
+                    // fires in every state fu9-fu1's did (that row is inside `liveFinishControls`) — and no
+                    // `session.processingMode` term is added on purpose: it would be the one thing that could
+                    // narrow fu9-fu1's escape back out of existence.
+                    clearButton
+                    liveFinishControls
                 }
             }
             .padding(.bottom, 8)

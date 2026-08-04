@@ -91,8 +91,54 @@ final class LiveCaptureProcessor: ObservableObject {
     /// True after the operator hit "Finish session" while segments are still being OCR'd/tagged: we hold
     /// off the rotation review / collection naming until every segment is staged, so none are missed.
     @Published private(set) var pendingFinish = false
-    /// Segments still being processed (OCR or tagging), for the "waiting" message shown while pendingFinish.
-    var processingCount: Int { statuses.filter { $0.phase == .ocr || $0.phase == .tagging }.count }
+    /// Segments still being processed (OCR or tagging) **that can still resolve** — the count behind the
+    /// pending-finish row's "(N left)" and the capture panel's "Processing…" spinner.
+    ///
+    /// The `session.groups` term is not a refinement; it is the difference between the panel describing the
+    /// wait and the panel inventing one. A `.ocr`/`.tagging` row whose group has LEFT the session — every page
+    /// deleted with the thumbnail ✕, or reclassified away by `X-Replaces` — can never resolve: no group means
+    /// no tag card and no `finalizeSegment`, and `photoRemoved` cancels the page's task while leaving the row.
+    /// `proceedToFinishIfReady` has always excluded exactly those rows from the hold; this is that same
+    /// predicate, now in ONE place, so the finish cannot be waiting on one set while the UI names another.
+    ///
+    /// Fixed here as part of `W3.cap-r3-fu12` rather than filed for later, because that item is what makes it
+    /// VISIBLE: the disagreement was survivable only while the Captured pane hid its whole control cluster in
+    /// the very state that produces an orphaned row (pane emptied), and fu12 draws the cluster there. Left
+    /// unfiltered it would have become a "Processing…" spinner that can never stop.
+    ///
+    /// ⚠️ CONSEQUENCE, accepted rather than papered over: `session.groups` is derived from `session.photos`,
+    /// so with the pane empty this is ALWAYS 0 and the pending-finish row reads "(0 left)". That is reachable
+    /// for at most the ≤1.5 s `perItemSheetGrace` tail — a still-sending phone takes the row's other branch,
+    /// and the two remaining holds (a Mac tag card, a per-item sheet) put a `.sheet` over the row — and it is
+    /// TRUE there: nothing is left to process, the finish is waiting out the grace. Deliberately NOT given a
+    /// third message branch for a 1.5 s window; the alternative was a count naming work the finish had
+    /// already stopped waiting for.
+    var processingCount: Int {
+        statuses.filter { s in
+            (s.phase == .ocr || s.phase == .tagging) && session.groups.contains { $0.id == s.id }
+        }.count
+    }
+    /// `W3.cap-r3-fu12` — does this session still hold work that **Finish** would file, or **Clear** abandon?
+    /// The Captured pane's control cluster (Clear + Finish) is gated on this whenever the pane itself is
+    /// empty; see `LiveCaptureView`'s header for the decision and how to undo it.
+    ///
+    /// Named on the model for the reason `isFinishingScrimUp` was: a headless driver can read a model
+    /// property and cannot read a `View`'s predicate, so putting the gate here is what makes it measurable at
+    /// all (recovery driver Test 25). The view leg — that the cluster actually DRAWS on it — stays
+    /// `W21.vmgui-d`'s to close, exactly as `W3.cap-r3-fu9-fu1`'s M1/M6 recorded for its own button.
+    ///
+    /// `statuses` rather than `staged`, and the WIDER of the two on purpose: it is the session's segment
+    /// roster. A row exists from the moment OCR starts until the segment's group is actually FILED (`finalize`
+    /// drops filed groups from `statuses` and `staged` together), so this covers the staged-but-unfiled
+    /// segments the item is named for, a segment that FAILED to file (still unfiled — still needs the
+    /// buttons), and an orphaned in-flight row. A fully successful finish empties it, so the cluster does not
+    /// linger over the "Session complete" summary.
+    ///
+    /// The `pendingFinish` disjunct should be implied — `requestFinish` is only reachable from a button
+    /// disabled on `statuses.isEmpty` — and is kept anyway, because `W3.cap-r3-fu9-fu1` ships a renderer that
+    /// draws on `pendingFinish` ALONE and this gate must not be what takes an armed finish's only escape
+    /// hatch away again.
+    var hasUnfiledWork: Bool { !statuses.isEmpty || pendingFinish }
     @Published private(set) var isFinalizing = false
     /// W3.cap-r3-fu10 — the window in which the Live Capture panel is DELIBERATELY blocked to the pointer.
     /// `LiveCaptureView`'s "Finishing — processing segments…" overlay is up for exactly this predicate, and
@@ -1370,9 +1416,12 @@ final class LiveCaptureProcessor: ObservableObject {
         // Only count segments that still EXIST — a status left at .ocr/.tagging for a group whose photos
         // were deleted (thumbnail X) or reclassified away (X-Replaces) can never resolve (no group → no tag
         // card, no finalizeSegment), so it must not block the finish forever. Finalized groups are .staged/.failed.
-        let stillProcessing = statuses.contains { s in
-            (s.phase == .ocr || s.phase == .tagging) && session.groups.contains { $0.id == s.id }
-        }
+        //
+        // W3.cap-r3-fu12 — this predicate IS `processingCount`, and reads it rather than restating it. It used
+        // to be spelled out twice: here, and unfiltered in the property the UI shows, so the panel could name
+        // a page the finish had already stopped waiting for. One definition, so the wait and the message
+        // describing it cannot come apart again.
+        let stillProcessing = processingCount > 0
         // Also wait while a FRESH phone heartbeat says it still has photos to send, so a segment whose pages
         // are all still in flight isn't omitted. A stale heartbeat (phone disconnected) does NOT block — the
         // Finish button stays tappable as the escape.
