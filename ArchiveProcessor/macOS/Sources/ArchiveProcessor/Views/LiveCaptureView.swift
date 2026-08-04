@@ -20,17 +20,14 @@ struct LiveCaptureView: View {
     /// Only to seed the per-segment retry sheet when there is no session config to read it from.
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
 
-    // A1 — shared Processing-list state: which segment is expanded, and the two per-item action sheets.
+    // A1 — shared Processing-list state: which segment is expanded.
     @State private var expandedSegmentID: String?
-    @State private var textViewerTarget: SegmentTextTarget?
-    @State private var modelChoiceTarget: ModelChoiceTarget?
 
-    struct SegmentTextTarget: Identifiable { let id: String }
-    struct ModelChoiceTarget: Identifiable {
-        let groupId: String
-        let includeRotation: Bool
-        var id: String { groupId + (includeRotation ? "-rot" : "-mdl") }
-    }
+    // W3.cap-r3-fu9 — the two per-item action sheets' targets are NOT `@State` here: they live on
+    // `liveProc`, because the finish flow has to be able to see that one of them is up before it raises the
+    // rotation review over it. The rationale (and the three ways SwiftUI could mishandle the concurrent
+    // presentation) is at `LiveCaptureProcessor.modelChoiceTarget`. Keeping no view-local copy is the point
+    // — it makes the wiring compile-enforced instead of something a later edit can quietly bypass.
 
     var body: some View {
         HSplitView {
@@ -146,7 +143,7 @@ struct LiveCaptureView: View {
         }
         // Per-item "retry with model" / "rotate & re-run": pick provider/model (+ rotation), then re-OCR
         // just this segment via the generalized retry path.
-        .sheet(item: $modelChoiceTarget) { target in
+        .sheet(item: $liveProc.modelChoiceTarget) { target in
             ModelChoiceSheet(
                 title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
                 subtitle: "Re-run OCR for this segment; its old staged output is replaced.",
@@ -167,16 +164,16 @@ struct LiveCaptureView: View {
                         provider: provider, model: model, thinkingLevel: thinking,
                         apiKey: apiKey, rotation: rotation)
                     liveProc.retryFailed(groupIds: [target.groupId], override: ov)
-                    modelChoiceTarget = nil
+                    liveProc.modelChoiceTarget = nil
                 },
-                onCancel: { modelChoiceTarget = nil })
+                onCancel: { liveProc.modelChoiceTarget = nil })
         }
         // Per-item "view text": the retained OCR text + any error reason.
-        .sheet(item: $textViewerTarget) { target in
+        .sheet(item: $liveProc.textViewerTarget) { target in
             SegmentTextViewerSheet(
                 text: liveProc.retainedText(for: target.id),
                 errorMessage: liveProc.statuses.first(where: { $0.id == target.id })?.errorMessage,
-                onDismiss: { textViewerTarget = nil })
+                onDismiss: { liveProc.textViewerTarget = nil })
         }
     }
 
@@ -187,11 +184,11 @@ struct LiveCaptureView: View {
         case .retry:
             liveProc.retryFailed(groupIds: [id])
         case .retryWithModel:
-            modelChoiceTarget = ModelChoiceTarget(groupId: id, includeRotation: false)
+            liveProc.modelChoiceTarget = .init(groupId: id, includeRotation: false)
         case .changeRotation:
-            modelChoiceTarget = ModelChoiceTarget(groupId: id, includeRotation: true)
+            liveProc.modelChoiceTarget = .init(groupId: id, includeRotation: true)
         case .viewText:
-            textViewerTarget = SegmentTextTarget(id: id)
+            liveProc.textViewerTarget = .init(id: id)
         case .revealFiles:
             let urls = liveProc.stagedURLs(for: id)
             if !urls.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(urls) }

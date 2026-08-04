@@ -127,6 +127,72 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
     @Published private(set) var failedGroupIds: Set<String> = []
 
+    // MARK: Per-item sheet targets (W3.cap-r3-fu9)
+
+    /// One segment's "Retry with model" / "Rotate & re-run" sheet.
+    struct ModelChoiceTarget: Identifiable, Equatable {
+        let groupId: String
+        let includeRotation: Bool
+        var id: String { groupId + (includeRotation ? "-rot" : "-mdl") }
+    }
+    /// One segment's "View text" sheet.
+    struct SegmentTextTarget: Identifiable, Equatable { let id: String }
+
+    /// The Processing list's two PER-ITEM sheets — "Retry with model" / "Rotate & re-run", and
+    /// "View text". Owned HERE rather than in `LiveCaptureView`'s `@State` since `W3.cap-r3-fu9`, because
+    /// **the finish flow has to be able to see them.**
+    ///
+    /// `finishSession` is the ONE writer of `showRotationReview`, and one of its two callers —
+    /// `proceedToFinishIfReady` — fires from BACKGROUND events (a segment staging, a phone heartbeat, the
+    /// 5 s watchdog) with no operator click anywhere in the chain. So the review can be raised at a moment
+    /// when one of these sheets is already on screen, and the app then depends on what SwiftUI does with a
+    /// second concurrent presentation — five `.sheet` modifiers are chained on one view. That behaviour was
+    /// NOT observed (a headless driver cannot see presentation at all, and the Processor has no VM GUI lane
+    /// yet — `W21.vmgui-d`), and all three possibilities are bad in a different way:
+    ///
+    ///   • SUPPRESSED (the new presentation is dropped) — the review is silently SKIPPED, and because
+    ///     `requestFinish` guards `!showRotationReview` while the only writers that clear it are the
+    ///     invisible sheet's own buttons, **Finish is then dead for the rest of the session** with staged
+    ///     output nobody can file. This is the hazard `W3.cap-r3-fu9` was filed for.
+    ///   • QUEUED (shown after the first sheet closes) — the deferred Apply's `retryFailed` runs first and
+    ///     sets `retained[gid] = nil`, so the review that then appears describes pages from a segment being
+    ///     re-OCR'd, and `applyRotationReviewAndFinalize`'s `guard var seg = retained[…]` silently DROPS
+    ///     that group's rotation edits.
+    ///   • STACKED (both presented, review on top) — benign for the review, but dismissing it drops the
+    ///     operator back onto a still-presented model sheet whose Apply now lands inside `isFinalizing`,
+    ///     which is the one entry `W3.cap-r3-fu7`'s `retryFailed` guard is the whole defence for (and where
+    ///     its refusal is silent).
+    ///
+    /// So the fix is NOT to guess which one happens: `proceedToFinishIfReady` refuses to START the finish
+    /// flow while either sheet is up, which makes the concurrent-presentation state unreachable in all
+    /// three. That guard needs this state to be model state — a second copy published out of the view would
+    /// be exactly the two-records-one-fact shape `W3.cap-r3-fu1`/`-fu6` were filed for. It also means the
+    /// wiring is COMPILE-enforced rather than test-enforced: the view has no per-item `@State` left to fall
+    /// back to, so it cannot silently stop feeding this.
+    ///
+    /// Writable on purpose — `.sheet(item:)` clears its binding on dismissal, and that write is exactly the
+    /// signal `perItemSheetDidChange` needs.
+    @Published var modelChoiceTarget: ModelChoiceTarget? {
+        didSet { perItemSheetDidChange(wasUp: oldValue != nil) }
+    }
+    @Published var textViewerTarget: SegmentTextTarget? {
+        didSet { perItemSheetDidChange(wasUp: oldValue != nil) }
+    }
+
+    /// True while one of the two per-item sheets is on screen — i.e. while the Live Capture window is
+    /// already showing a modal that is not the finish flow's own. Read by `proceedToFinishIfReady`.
+    var perItemSheetUp: Bool { modelChoiceTarget != nil || textViewerTarget != nil }
+
+    /// A per-item sheet closed: if a Finish is waiting on it, advance now instead of waiting up to 5 s for
+    /// the watchdog. Deliberately on the NEXT MainActor turn rather than inline: this runs from inside the
+    /// dismissal's own write, and raising a new sheet in the same update as the one being torn down is the
+    /// concurrent-presentation state the guard above exists to avoid. (Correctness does not depend on this
+    /// hop — `startFinishWatchdog` re-evaluates every 5 s regardless — it is the latency that does.)
+    private func perItemSheetDidChange(wasUp: Bool) {
+        guard wasUp, !perItemSheetUp, pendingFinish else { return }
+        Task { @MainActor [weak self] in self?.proceedToFinishIfReady() }
+    }
+
     private unowned let session: CaptureSession
     private var config: SessionProcessingConfig?
     private var stagingDir: URL?
@@ -1224,7 +1290,17 @@ final class LiveCaptureProcessor: ObservableObject {
         // Also wait while a FRESH phone heartbeat says it still has photos to send, so a segment whose pages
         // are all still in flight isn't omitted. A stale heartbeat (phone disconnected) does NOT block — the
         // Finish button stays tappable as the escape.
-        guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive else { return }
+        // W3.cap-r3-fu9 — and wait while one of the Processing list's PER-ITEM sheets is up. Same class as
+        // the `pendingTagGroup` term beside it: a modal the operator has open, which the finish must not
+        // walk into. The difference is that this one is not the finish flow's own, so raising the rotation
+        // review here would put two concurrent `.sheet` presentations on one view — see `modelChoiceTarget`
+        // for the three things SwiftUI might then do and why none of them is acceptable in a money path.
+        // Refusing here rather than in `finishSession` is load-bearing: `pendingFinish` is cleared on the
+        // line below, so a refusal one level in would DISCARD the finish (nothing re-arms it) instead of
+        // holding it. Held, this is self-healing — the watchdog re-evaluates every 5 s, `perItemSheetDidChange`
+        // nudges the moment the sheet closes, and `cancelPendingFinish` is the operator's escape.
+        guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive,
+              !perItemSheetUp else { return }
         pendingFinish = false
         finishSession()
     }
