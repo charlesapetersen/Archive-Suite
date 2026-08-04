@@ -1789,24 +1789,29 @@ enum LiveCaptureRecoveryTestDriver {
         // The DOUBLE SPEND is order-independent: the retry always re-ingests. The fix is a refusal, which
         // forecloses every ordering at once, so the checks measure the refusal and its money consequence.
         //
-        // NON-VACUITY, measured (2026-08-04):
+        // NON-VACUITY, measured (2026-08-04). Every mutant was built and run; the counts are observed:
         //   P1 the `guard !isFinalizing` in `retryFailed` deleted (the shipped defect)
-        //      → RED, checks 4 and 5: the retry buys 2 more paid calls and takes the segment's staged record,
-        //      its `finalizedGroups` entry and its output files with it, mid-write. This is the mutant the
-        //      section exists for.
-        //   P2 the guard weakened to the bulk-only shape — refusing only when `groupIds == nil`
-        //      → RED, checks 4 and 5. Pins that the PER-ITEM entry is gated too (the item's open question),
-        //      not just the bulk button.
+        //      → 3 RED: checks 4, 5 and 8. The retry buys 2 more paid calls and takes the segment's staged
+        //      record, its `finalizedGroups` entry and its output files with it, mid-write. Check 8 goes down
+        //      as a consequence rather than on its own account — the window's retries already spent the calls
+        //      it counts — which is worth knowing when reading a future regression: 4 and 5 are the ones that
+        //      name the defect. This is the mutant the section exists for.
+        //   P2 the guard weakened to the bulk-only shape — `!(isFinalizing && groupIds == nil)`, refusing only
+        //      the "Retry N failed" button and letting every single-group call through
+        //      → 3 RED: the same three. Pins that the PER-ITEM entry is gated too, which is the item's open
+        //      question answered as a measurement rather than a preference.
         //   P3 `SegmentItem.gate` returning its input unchanged (the UI half reverted)
-        //      → RED, check 7. The menu offers a retry it would be refused for.
+        //      → 1 RED, check 7. The menu offers a retry that `retryFailed` would refuse.
         //   P4 `gate` filtering `.retry` only, leaving `.retryWithModel`/`.changeRotation`
-        //      → RED, check 7. Both of those reach `retryFailed` through the model sheet.
-        //   P5 the guard widened to also refuse while `showFinalizeSheet` is up
-        //      → 0 RED. Recorded as a deliberate non-gate rather than an untested one: check 8 only proves the
-        //      refusal ENDS with the window, and it runs after `beginFinalize()` has raised that sheet, so a
-        //      widened guard would make check 8 fail — which is the point of measuring it. (It does: this
-        //      reads 0 RED only because the widening was NOT taken. See `retryFailed`'s comment and
-        //      `W3.cap-r3-fu9`.)
+        //      → 1 RED, check 7. Both of those reach `retryFailed` through the model sheet, so a gate that
+        //      stops at the plain retry stops at the cheapest third of the money path.
+        //   P5 the guard WIDENED to `requestFinish`'s triple — also refusing while `showFinalizeSheet` /
+        //      `showRotationReview` is up
+        //      → 1 RED, check 8. Recorded because it is the mutant that shows the section constrains the
+        //      guard's WIDTH and not merely its presence: `beginFinalize` has raised the collection sheet by
+        //      the time check 8 runs, so a widened guard turns the intended window into a ban and is caught.
+        //      The widening was considered and declined on its own merits (see `retryFailed`'s comment and
+        //      `W3.cap-r3-fu9`); this is what makes that a tested decision.
         // Checks 1–3 and 6 are premises, not catchers. ---
         if isolatedBackup {
             if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
