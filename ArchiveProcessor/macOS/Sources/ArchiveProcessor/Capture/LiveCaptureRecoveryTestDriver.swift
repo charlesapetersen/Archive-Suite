@@ -2910,24 +2910,33 @@ enum LiveCaptureRecoveryTestDriver {
         //     `.ocr`/`.tagging` row; unfiltered, "Processing…" would draw forever in exactly the state this
         //     item makes visible.
         //
-        // NON-VACUITY, measured (2026-08-04) — every mutant BUILT and RUN to a written report:
+        // NON-VACUITY, measured (2026-08-04) — every mutant below was BUILT and RUN to a written report, so a
+        // 0 RED here is a measurement and not a strand. Baseline 187 checks, 0 RED, 0 Swift warnings. Two of
+        // the five came back with numbers the author had predicted wrong, and both are recorded as measured:
         //   M1 the `else if liveProc.hasUnfiledWork` arm reverted to fu9-fu1's `else if liveProc.pendingFinish
         //      { HStack(spacing: 8) { pendingFinishRow } }` — i.e. the shipped defect, exactly as it stood
         //      -> 0 RED. RUN rather than predicted, because it is this item's own leg. Recorded as the priced
         //      gap it is (`W21.vmgui-d`).
-        //   M2 `hasUnfiledWork` weakened to `!staged.isEmpty` (the reading the item's own title suggests)
-        //      -> 0 RED here, and that is the honest result: every state this section reaches has a staged
-        //      segment whenever it has a roster. The `statuses` spelling is defended by ARGUMENT, not by this
-        //      driver — it additionally covers a segment that failed to file and an orphaned in-flight row —
-        //      and check 7 is the closest this gets to it (a roster with nothing staged).
-        //   M3 `hasUnfiledWork` widened to `true` -> 1 RED, check 5. The gate that never turns off: the
-        //      cluster would draw over the finished-session summary with nothing left to finish.
+        //   M2 `hasUnfiledWork` weakened to `!staged.isEmpty` — the reading the item's own TITLE suggests
+        //      ("staged, unfiled segments") -> predicted 0 RED, **measured 1**, check 7. The prediction was
+        //      that every state reached here has something staged whenever it has a roster; check 7 is exactly
+        //      the state where that is false (the orphaned row survives a Clear'd session with nothing staged),
+        //      so the wider `statuses` spelling IS measured rather than merely argued — and measured on the
+        //      case that matters, since an operator holding only an orphaned row still needs Clear offered.
+        //   M3 `hasUnfiledWork` widened to `true` -> predicted 1 RED, **measured 2**, checks 5 and 6. The gate
+        //      that never turns off: the cluster would draw over the green "Session complete" summary offering
+        //      to finish a session with nothing in it. Both checks assert the OFF direction, which the
+        //      prediction had only counted once.
         //   M4 `processingCount`'s `session.groups` term deleted (the pre-fu12 spelling) -> 1 RED, check 7.
         //      The forever-spinner leg, and also the one that would have put the count back out of step with
-        //      `proceedToFinishIfReady`.
-        //   M5 `finalize`'s `statuses.removeAll { filedGroups.contains($0.id) }` deleted -> 2 RED, checks 5
-        //      and 6. Not a mutant of this item's code, and run deliberately: it is what shows check 5 is
-        //      reading the roster the gate reads rather than passing on `staged` alone.
+        //      `proceedToFinishIfReady` — which now reads this same property.
+        //   M5 `finalize`'s `self.statuses.removeAll { filedGroups.contains($0.id) }` deleted -> 2 RED. NOT a
+        //      mutant of this item's code, run deliberately to show check 5 reads the roster the gate reads
+        //      rather than passing on `staged` alone. Predicted "checks 5 and 6"; measured check 5 plus a
+        //      PRE-EXISTING check from `W3.cap-r3-fu5`'s section ("…so the button counts exactly the segment
+        //      that is still failed, and it has a row"). Check 6 is green under it, because
+        //      `clearSessionState` empties `statuses` unconditionally. Worth keeping in that corrected form:
+        //      the invariant this item leans on was already partly guarded elsewhere in the driver.
         //
         // COST (`W21.recovery-timeout`): no wall-clock waits — only settles, and one gate the section opens
         // itself. Side effects outside its temp dir: three stub JPEGs to the Trash (the ✕ is

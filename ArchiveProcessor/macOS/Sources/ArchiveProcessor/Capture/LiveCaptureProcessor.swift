@@ -132,7 +132,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// drops filed groups from `statuses` and `staged` together), so this covers the staged-but-unfiled
     /// segments the item is named for, a segment that FAILED to file (still unfiled — still needs the
     /// buttons), and an orphaned in-flight row. A fully successful finish empties it, so the cluster does not
-    /// linger over the "Session complete" summary.
+    /// linger over the "Session complete" summary. That width is MEASURED rather than merely argued: Test 25's
+    /// check 7 holds an orphaned row with nothing staged, and weakening this to `!staged.isEmpty` fails it (M2).
     ///
     /// The `pendingFinish` disjunct should be implied — `requestFinish` is only reachable from a button
     /// disabled on `statuses.isEmpty` — and is kept anyway, because `W3.cap-r3-fu9-fu1` ships a renderer that
