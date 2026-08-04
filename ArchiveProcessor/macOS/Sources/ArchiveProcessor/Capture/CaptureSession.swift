@@ -589,13 +589,26 @@ final class CaptureSession: ObservableObject {
         return finalURL
     }
 
+    /// The operator deleted a page in the Captured pane.
+    ///
+    /// Resolved by `(groupId, seq)` — the page's durable identity, the same key `PageKey`, the manifest and
+    /// `SPEC/relay-object-format.md` use — and deliberately NOT by `CapturedPhoto.id`, which is a fresh
+    /// `UUID` minted per *value*. An idempotent re-upload (the phone resuming after a dropped ack) replaces
+    /// the value in `photos` under the same key with a new `id`, so a SwiftUI row closure rendered before
+    /// that replace hands us a photo whose `id` is no longer present. This used to remove by `id` while
+    /// cancelling the OCR by key, and in that window the two disagreed: the cancel landed on the LIVE page
+    /// and `removeAll` removed nothing, leaving a page in the session with no task and its source in the
+    /// Trash — which finalize files as "OCR not started" over a placeholder image, i.e. a silently
+    /// text-less archival document. One identity for both halves, so they cannot diverge; a key that isn't
+    /// present is a no-op (nothing trashed either — that stale-value trash was the pre-existing half).
     func removePhoto(_ photo: CapturedPhoto) {
+        guard let idx = photos.firstIndex(where: { $0.groupId == photo.groupId && $0.seq == photo.seq }) else { return }
         // W3.cap-r3 — stop this page's paid OCR BEFORE its source goes to the Trash: the page is leaving the
         // session, so nobody will ever read the result. (No-op unless live, and while its segment is
         // mid-finalize — see `photoRemoved`.)
-        if processingMode == .live { liveProcessor.photoRemoved(photo) }
-        Self.trashOrRemove(photo.url)   // to Trash, not a hard delete — recoverable
-        photos.removeAll { $0.id == photo.id }
+        if processingMode == .live { liveProcessor.photoRemoved(photos[idx]) }
+        Self.trashOrRemove(photos[idx].url)   // to Trash, not a hard delete — recoverable
+        photos.remove(at: idx)
         writeManifest()
     }
 

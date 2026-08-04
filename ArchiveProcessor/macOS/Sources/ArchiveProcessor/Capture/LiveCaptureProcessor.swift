@@ -395,12 +395,22 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// A page LEFT the session (W3.cap-r3) — the operator deleted it in the Captured pane, or the phone
     /// reclassified it into a new group and the Mac tombstoned the old copy (`X-Replaces`). Cancel that
-    /// page's in-flight OCR and forget the page, so a paid call for a page that no longer exists STOPS
+    /// page's in-flight OCR and forget the page, so a call for a page that no longer exists is dropped
     /// instead of running to completion with its Task and its result stranded in `pageTasks` for the rest of
     /// the session. Nothing else would drop that one entry: `finalizeSegment` only clears the pages of the
     /// segment it just staged, `retryFailed` only the group being re-run, and `clearSessionState` only when
     /// the operator clears everything — so before this, deleting a page mid-OCR leaked both the spend and
     /// the entry.
+    ///
+    /// What the cancel actually saves, stated honestly, because "stops the paid call" is only sometimes the
+    /// whole truth: `NetworkSession` honours cancellation at four points — `RequestLimiter.acquire`, the
+    /// `checkCancellation` before the send, the `Task.isCancelled` guard between retry attempts, and the
+    /// `URLSession` task itself. A call still QUEUED behind the limiter (the common state in a capture
+    /// burst, where pages arrive faster than five concurrent requests drain) or parked in 429 backoff is
+    /// never sent at all: the whole charge is saved. A call the provider has already ACCEPTED may well be
+    /// billed anyway — closing the socket does not un-bill a generation, which is the same assumption
+    /// `NetworkSession`'s no-repeat-after-timeout rule already rests on. There cancelling still frees a
+    /// limiter slot for a page that WILL be read, and never costs more than letting it run.
     ///
     /// Deliberately a NO-OP while this segment is being finalized. From `finalizeSegment`'s
     /// `finalizedGroups.insert` until it clears the entry itself, finalize IS this task's consumer: it took a

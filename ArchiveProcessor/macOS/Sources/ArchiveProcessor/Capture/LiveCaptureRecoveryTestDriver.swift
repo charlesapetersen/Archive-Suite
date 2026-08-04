@@ -978,6 +978,49 @@ enum LiveCaptureRecoveryTestDriver {
                       done5 && pages == 2)
             }
 
+            // 6. The IDENTITY the delete resolves — found by the adversarial pass over the fix above, and the
+            //    one way this fix could have made things worse than the bug it closes. `CapturedPhoto.id` is
+            //    a fresh UUID minted per VALUE (and `==` compares only `id`), while an idempotent re-upload —
+            //    the phone resuming after a dropped ack — replaces the value in `photos` under the SAME
+            //    `(groupId, seq)` with a NEW id. A SwiftUI row closure rendered before that replace therefore
+            //    hands the delete a photo whose `id` is gone. The cancel keys on `(groupId, seq)`; the
+            //    removal used to key on `id`. In that window the two disagreed: the cancel killed the LIVE
+            //    page's call and `removeAll` removed nothing, so a page stayed in the session with no task
+            //    and its source in the Trash — which finalize files as "OCR not started" over a placeholder
+            //    image, i.e. a silently text-less archival document. Pre-fix that same window trashed the
+            //    file but left the OCR running, so the text survived; keying the two halves differently is
+            //    what widened the harm.
+            let gate6 = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await gate6.wait() }
+            r3Send("R6", 1)
+            r3Send("R6", 2)
+            let stale2 = photo("R6", 2)     // the value a row closure captured…
+            r3Send("R6", 2)                 // …then the phone re-uploads that page: same key, NEW value/id
+            let live2 = photo("R6", 2)
+            check("an idempotent re-upload replaces the page's value under the same key, with a new id",
+                  stale2 != nil && live2 != nil && stale2?.id != live2?.id
+                      && stale2?.groupId == live2?.groupId && stale2?.seq == live2?.seq)
+            if let stale2, let live2 {
+                // Non-vacuity: the live page's call has to be in flight and reachable here, or the
+                // "left behind with its call cancelled" invariant below could not distinguish anything.
+                check("...and the live page's call is in flight and reachable before the delete",
+                      !cancelled(live2) && r3Proc._recoveryTestHasPageTask(for: live2))
+                r3Session.removePhoto(stale2)   // the operator's ✕, holding the pre-replace value
+                check("deleting through a stale value still removes the page it names", photo("R6", 2) == nil)
+                // The harm, stated as an invariant over what is LEFT rather than over the mechanism: no page
+                // may remain in the session with its paid call cancelled, its Task gone, or its source
+                // trashed under it. Pre-fix, page 2 is still listed and fails all three.
+                let orphaned = r3Session.photos.filter { $0.groupId == "R6" }.filter {
+                    cancelled($0) || !r3Proc._recoveryTestHasPageTask(for: $0)
+                        || !fm.fileExists(atPath: $0.url.path)
+                }
+                check("...leaving no page in the session whose call was cancelled or whose source was trashed",
+                      orphaned.isEmpty)
+                check("...and the sibling page it did not name is untouched",
+                      photo("R6", 1).map { !cancelled($0) && r3Proc._recoveryTestHasPageTask(for: $0) } == true)
+                gate6.open()   // release R6's parked pages; nothing after this ingests
+            }
+
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
