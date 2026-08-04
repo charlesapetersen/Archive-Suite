@@ -40,6 +40,10 @@ import ArchiveCore
 ///      phone reclassified it — takes its in-flight paid OCR call with it: the call is cancelled and its
 ///      Task dropped, exactly one page's worth, while a page removed MID-FINALIZE deliberately keeps the
 ///      call finalize is about to read.
+///  14. A retry (W3.cap-r3-fu2) cancels the calls it is about to make unreachable before it drops them —
+///      exactly the group being retried, without touching another segment's in-flight call, and without
+///      eating the fresh calls it buys to replace them. Latent in production (nothing offers a retry for a
+///      segment mid-OCR); the section pins that gate too.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1193,6 +1197,137 @@ enum LiveCaptureRecoveryTestDriver {
                   paidStarts() == 6)
             fuGate4.open()
 
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+        }
+
+        // --- Test 18 (W3.cap-r3-fu2): a retry must CANCEL the calls it is about to make unreachable.
+        // `retryFailed` deletes the group's staged output and its retained inputs, then re-ingests every page
+        // — so each old `pageTasks` entry is replaced and nothing can ever read what those calls return. It
+        // used to drop them without `cancel()`, which is the exact mutant (M2) W3.cap-r3 was measured against,
+        // living in production 130 lines above that fix.
+        //
+        // HONEST SCOPE, because this is the one thing a reader could take the wrong way: the defect is LATENT,
+        // and this section enters `retryFailed` through the API rather than through the UI **because the UI
+        // cannot reach it**. Every route into a retry runs past `finalizeSegment`'s own clear (`:630`) first —
+        // the bulk button passes `failedGroupIds`, which only `markFailed` writes, and `markFailed` runs after
+        // that clear; the per-item menu offers `.retry` only for `.failed`/`.succeededNoText`/
+        // `.succeededPlaceholderImage`, never for a segment mid-OCR. Check 2 below PINS that gate, so the day
+        // an edit makes a retry reachable mid-flight this driver says so out loud. What the section proves is
+        // that the mechanism is right whenever it IS reached: cancel first, drop second, exactly this group. ---
+        if isolatedBackup {
+            // Same isolation as Tests 16/17, load-bearing for the same reason: `CaptureSession.init` adopts
+            // the newest backup session that still holds unprocessed photos, so inherited photos would put
+            // pages in this session it never ingested and `paidStarts()` counts starts for the whole run.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let ruOut = tmp.appendingPathComponent("fu2out", isDirectory: true)
+            let ruStaging = tmp.appendingPathComponent("APStaging-fu2-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: ruStaging, withIntermediateDirectories: true)
+            let ruSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            ruSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — a document only reaches the LLM in `.automatic`, so the re-finalize the
+                    // retry triggers runs for real, for $0, with no network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: ruOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: ruStaging)
+            let ruProc = ruSession.liveProcessor
+            let ruBytes = Data("synthetic page bytes".utf8)
+            func ruSend(_ gid: String, _ seq: Int) {
+                ruSession.ingest(jpeg: ruBytes, groupId: gid, seq: seq, type: .document,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func ruSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            func ruPhoto(_ gid: String, _ seq: Int) -> CapturedPhoto? {
+                ruSession.photos.first { $0.groupId == gid && $0.seq == seq }
+            }
+            // The handle kept OUTSIDE `pageTasks` (W3.cap-r3): dropping the entry is exactly what makes the
+            // Task unreachable everywhere else, so this is the only vantage from which a genuine `cancel()`
+            // can be told from a silent drop — both leave `pageTasks` without that key.
+            func ruTask(_ p: CapturedPhoto) -> Task<OCRResult, Never>? {
+                LiveCaptureProcessor._recoveryTestOCRTasks[LiveCaptureProcessor.PageKey(p)]
+            }
+            func textPages(_ gid: String) -> Int {
+                (ruProc.retainedText(for: gid) ?? "").components(separatedBy: "stub page text").count - 1
+            }
+
+            // 1. Two pages of the group to be retried, plus a page of a DIFFERENT group, all parked mid-OCR.
+            //    A finished Task cannot be shown to have been cancelled, so without the gate every assertion
+            //    below would be vacuous.
+            let ruGate = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await ruGate.wait() }
+            ruSend("U1", 1)
+            ruSend("U1", 2)
+            ruSend("U2", 1)
+            LiveCaptureProcessor._recoveryTestOCRGate = nil   // hold only these three; the re-ingest runs free
+            let u1 = ruPhoto("U1", 1), u2 = ruPhoto("U1", 2), other = ruPhoto("U2", 1)
+            // Captured BEFORE the retry: the re-ingest inside it overwrites these entries with the new Tasks.
+            let oldT1 = u1.flatMap(ruTask), oldT2 = u2.flatMap(ruTask)
+            check("the group's two pages bought calls that are genuinely in flight and uncancelled",
+                  u1 != nil && u2 != nil && other != nil && paidStarts() == 3
+                      && oldT1?.isCancelled == false && oldT2?.isCancelled == false
+                      && u1.map { ruProc._recoveryTestHasPageTask(for: $0) } == true)
+
+            // 2. The reachability claim this item rests on, pinned rather than asserted in prose: a segment in
+            //    this state renders as `.processing`, and the shared per-item menu offers it NOTHING. If a
+            //    future edit offers a retry here, this check fails — and whoever sees it should re-read the
+            //    comment on `retryFailed`'s cancel loop, which is what keeps that edit safe.
+            let midOCR = ruProc.statuses.first { $0.id == "U1" }
+            check("no retry is offered for a segment mid-OCR — the reason the drop-without-cancel was latent",
+                  midOCR?.phase == .ocr
+                      && midOCR.map { SegmentItem.actions(for: SegmentItem.state(for: $0)).isEmpty } == true)
+
+            // 3. THE FIX. The retry replaces every one of this group's entries, so the calls it drops can
+            //    never be read again — they have to be cancelled on the way out.
+            ruProc.retryFailed(groupIds: ["U1"])
+            check("a retry CANCELS the in-flight calls it is dropping",
+                  oldT1?.isCancelled == true && oldT2?.isCancelled == true)
+
+            // 4. Scoped to the group being retried. A fix that cancelled `pageTasks.values` wholesale would
+            //    silently kill the calls of every other segment the operator is still capturing.
+            check("...and leaves another group's in-flight call running and reachable",
+                  other.map { ruTask($0)?.isCancelled == false
+                              && ruProc._recoveryTestHasPageTask(for: $0) } == true)
+
+            // 5. The retry still does its own job — cancelling must not eat the replacements. Its whole point
+            //    is to buy this group's OCR again, so each page gets a fresh, uncancelled call under the same
+            //    key, and it is not the one just cancelled.
+            let newT1 = u1.flatMap(ruTask), newT2 = u2.flatMap(ruTask)
+            check("...while re-ingesting the group: a fresh call per page, neither of them the cancelled one",
+                  paidStarts() == 5 && newT1 != nil && newT2 != nil
+                      && newT1?.isCancelled == false && newT2?.isCancelled == false
+                      && newT1 != oldT1 && newT2 != oldT2)
+
+            // 6. Measured on the OUTPUT rather than the mechanism: the re-finalize the retry triggers reads
+            //    the NEW calls, so the segment is staged with both pages of text. A cancel placed after the
+            //    re-ingest (the plausible wrong edit) would be cancelling the calls finalize is about to read.
+            let restaged = await ruSettle { ruProc.staged.contains { $0.groupId == "U1" } }
+            check("...and the retried segment stages with both pages of the OCR it just paid for",
+                  restaged && textPages("U1") == 2)
+
+            ruGate.open()   // release the three parked pages; nothing after this reads them
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
