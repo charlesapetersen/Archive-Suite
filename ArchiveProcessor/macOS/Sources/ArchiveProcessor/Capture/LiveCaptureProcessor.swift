@@ -703,11 +703,34 @@ final class LiveCaptureProcessor: ObservableObject {
             stampUnread: stampUnread)
         persistManifest()
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
-        // A1 — discriminated failure taxonomy (labeling ONLY; the data-safety gate is unchanged). The
-        // `outcome` (pdfURLs / pagesComplete) already fed the StagedSegment above, and finalize/deletion
-        // keys off `executePlans`' filedGroupIds + `pagesComplete`, NEVER off `failedGroupIds`. So splitting
-        // the label here — and un-conflating the filed image-only doc into `.succeededNoText` — cannot change
-        // when/what gets deleted; it only fixes what the operator sees and what bulk-retry re-runs.
+        labelStagedRecord(groupId, type: gType, outcome: outcome, results: results)
+        proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last
+    }
+
+    /// A1 — the discriminated failure/label taxonomy for ONE freshly-written staged record (labeling ONLY;
+    /// the data-safety gate is unchanged). The `outcome` (pdfURLs / pagesComplete) is the record that just
+    /// went into `staged`, and finalize/deletion keys off `executePlans`' filedGroupIds + `pagesComplete`,
+    /// NEVER off `failedGroupIds`. So splitting the label here — and un-conflating the filed image-only doc
+    /// into `.succeededNoText` — cannot change when/what gets deleted; it only fixes what the operator sees
+    /// and what bulk-retry re-runs.
+    ///
+    /// W3.cap-r3-fu6 — extracted so there is exactly ONE labeller for the TWO sites that write a record.
+    /// `finalizeSegment` calls it on the first write; `applyRotationReviewAndFinalize` replaces the record
+    /// WHOLESALE and used to leave the old label sitting on the new bytes, which could disagree in both
+    /// directions: a `.noOutput` segment that regenerated cleanly stayed `.failed` and stayed in
+    /// `failedGroupIds` (so the collection sheet warned about a segment that was fine, and obeying that
+    /// warning re-bought its OCR), and a `.staged` segment whose regeneration produced nothing kept its
+    /// success label over an empty record that finalize then silently declined to file.
+    ///
+    /// `results` is the per-page OCR, in page order. Both callers have it EXACTLY, not approximately:
+    /// `finalizeSegment` passes what it awaited, and the regeneration passes `RetainedSegment.pages`'
+    /// `result`s — the same values, since a rotation edit rebuilds `OCRResult` preserving `text`,
+    /// `errorMessage` and `errorCode` (and `PageWork` is Codable, so they survive a manifest resume). Note
+    /// this is why the regeneration must NOT reach for `RetainedSegment.texts` instead: `texts` maps a nil
+    /// text to `""`, so `anyText` computed from it would conflate "OCR returned nothing" with "OCR returned
+    /// an empty string" — the one distinction `.succeededNoText` exists to draw.
+    private func labelStagedRecord(_ groupId: String, type: CaptureGroupType,
+                                   outcome: StagedSegment, results: [OCRResult]) {
         let producedOutput = !outcome.pdfURLs.isEmpty
         let pagesComplete = outcome.pagesComplete ?? true
         let anyText = results.contains { $0.text != nil }
@@ -728,7 +751,7 @@ final class LiveCaptureProcessor: ObservableObject {
             failedGroupIds.remove(groupId)
             setStatusDetail(groupId, kind: nil, error: firstError)
             setPhase(groupId, .succeededPlaceholderImage)
-        } else if gType == .document && !anyText {
+        } else if type == .document && !anyText {
             // Complete image-only PDF (every page produced a PDF, but no OCR text). It IS staged and WILL be
             // filed by executePlans exactly as before — this is a WARNING, not a hard failure. Drop it from
             // failedGroupIds so bulk "Retry failed" stops over-counting a successfully-filed doc.
@@ -740,7 +763,6 @@ final class LiveCaptureProcessor: ObservableObject {
             setStatusDetail(groupId, kind: nil, error: nil)
             setPhase(groupId, .staged)
         }
-        proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/priority are layered on later.
@@ -1145,11 +1167,13 @@ final class LiveCaptureProcessor: ObservableObject {
             let new = ((page.rotationDegrees % 360) + 360) % 360
             guard new != old else { continue }
             let pw = seg.pages[page.pageIndex]
-            let r = pw.result
+            // `with` rather than a hand-retyped five-field init — it is the shared "change only the rotation,
+            // preserve text/errorMessage/errorCode" seam, and it exists because a re-type here is exactly how
+            // `errorCode` was silently dropped once before (W9.1). It matters more now that `labelStagedRecord`
+            // re-reads `text`/`errorMessage` off these results below.
             seg.pages[page.pageIndex] = PageWork(
                 sourceURL: pw.sourceURL,
-                result: OCRResult(text: r.text, classification: r.classification, rotationDegrees: new,
-                                  errorMessage: r.errorMessage, errorCode: r.errorCode),
+                result: pw.result.with(classification: pw.result.classification, rotationDegrees: new),
                 priority: pw.priority)
             retained[page.groupId] = seg
             changedGroups.insert(page.groupId)
@@ -1171,6 +1195,14 @@ final class LiveCaptureProcessor: ObservableObject {
         // `??` branch is unreachable (the map is built from this very array).
         let regenKeys: [String: String] = Dictionary(
             uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
+        // W3.cap-r3-fu6 — the write INPUTS, keyed by group, so the label below is re-derived from exactly
+        // what the regeneration was handed rather than from `retained` re-read after the suspension. Same
+        // last-possible-moment discipline as `regenKeys`, inverted on purpose: the collection is live state
+        // and must be re-read late, whereas the OCR is an input to these very bytes and must NOT drift from
+        // them. (`retained[gid]` happens to be identical today — nothing on this path mutates it while the
+        // detached write runs — but that is a property of the surroundings, not of this line.)
+        let regenInputs: [String: RetainedSegment] = Dictionary(
+            uniqueKeysWithValues: segsToRegen.map { ($0.groupId, $0) })
         // Legacy retained manifests had no per-run unread policy. Before this fix, activation set the
         // recovered session config on the global immediately before regeneration; this fallback preserves
         // that behavior while every new manifest carries the exact original value.
@@ -1199,6 +1231,16 @@ final class LiveCaptureProcessor: ObservableObject {
                 var fresh = outcome
                 fresh.collectionKey = self.liveCollectionKey(for: outcome.groupId)
                 self.staged[idx] = fresh
+                // W3.cap-r3-fu6 — the record is new, so its LABEL has to be re-derived too. Replacing the
+                // record and keeping the old label let the two disagree in both directions (see
+                // `labelStagedRecord`). Inside the `guard` on purpose: if the staged record is gone, there is
+                // nothing this pass wrote and nothing to describe. `regenInputs` is non-nil for every element
+                // of `regenerated` (both are built from `segsToRegen`), so the `if let` is a total function
+                // written defensively rather than a branch with a second behaviour.
+                if let input = regenInputs[outcome.groupId] {
+                    self.labelStagedRecord(outcome.groupId, type: input.type, outcome: fresh,
+                                           results: input.pages.map(\.result))
+                }
             }
             self.persistManifest()
             self.isFinalizing = false
