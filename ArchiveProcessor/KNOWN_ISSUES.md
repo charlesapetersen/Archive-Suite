@@ -422,7 +422,11 @@ the source — the same "warn, don't withhold-filing" shape as W3.cap-r1's `tags
   retry/rotate actions, plus a finalize-summary warning naming how many photos were kept and why.
 - Backward compatible: `placeholderSources` is optional, so a legacy staging manifest behaves exactly as
   before. The rotation-review regeneration path replaces the whole `StagedSegment`, so the flag self-heals
-  when a retry succeeds and re-arms if it fails.
+  when a retry succeeds and re-arms if it fails. ⚠️ The *record* always self-healed there; the **row
+  describing it did not** until `W3.cap-r3-fu6` (`61fc680`, 2026-08-04) sent both writers through one
+  `labelStagedRecord`. Before that, a regeneration could leave a `.failed` label on a record that now files
+  (the sheet then warning about it, inviting a retry that re-buys the OCR) or a success label on one that
+  now holds nothing.
 
 **Regression:** `LiveCaptureRecoveryTestDriver` Tests 9–11 via `scripts/test-recovery.sh` ($0, no OCR,
 no network, no GUI, synthetic temp files) — detection, the pure retirement gate, and the wiring between

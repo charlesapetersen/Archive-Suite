@@ -1233,10 +1233,25 @@ final class LiveCaptureProcessor: ObservableObject {
                 self.staged[idx] = fresh
                 // W3.cap-r3-fu6 — the record is new, so its LABEL has to be re-derived too. Replacing the
                 // record and keeping the old label let the two disagree in both directions (see
-                // `labelStagedRecord`). Inside the `guard` on purpose: if the staged record is gone, there is
-                // nothing this pass wrote and nothing to describe. `regenInputs` is non-nil for every element
-                // of `regenerated` (both are built from `segsToRegen`), so the `if let` is a total function
-                // written defensively rather than a branch with a second behaviour.
+                // `labelStagedRecord`). `regenInputs` is non-nil for every element of `regenerated` (both are
+                // built from `segsToRegen`), so the `if let` is a total function written defensively rather
+                // than a branch with a second behaviour.
+                //
+                // ⚠️ Inside the `guard let idx` on purpose, and that placement is load-bearing rather than
+                // tidy. This is the FIRST site that can `markFailed` a group outside `finalizeSegment`, and
+                // `markFailed` INSERTS into `failedGroupIds` — so it has to hold HERE that the group is still
+                // in `finalizedGroups`, or this would break the `failedGroupIds ⊆ finalizedGroups` subset
+                // `W3.cap-r3-fu5` made structural (and which `retryFailed`'s cancel-loop latency argument
+                // rests on in turn). It does, because every exit from `finalizedGroups` also drops the group
+                // from `staged`: `retryFailed` releases then `staged.removeAll`, `clearSessionState` does
+                // `staged.removeAll()` then `releaseAllFinalizedGroups`, and `finalize` drops the filed groups
+                // from `staged` a line before releasing them — each pair synchronous on the MainActor with no
+                // await between, so this loop cannot resume inside the gap. Being staged therefore IMPLIES
+                // being finalized, and the guard is what buys it. The reverse window (finalized but not yet
+                // staged, between `finalizeSegment`'s insert and its append) is the harmless direction. Move
+                // this call outside the guard and the subset stops being sound. The other reason for the
+                // placement is the plain one: if the staged record is gone, this pass wrote nothing that
+                // needs describing.
                 if let input = regenInputs[outcome.groupId] {
                     self.labelStagedRecord(outcome.groupId, type: input.type, outcome: fresh,
                                            results: input.pages.map(\.result))

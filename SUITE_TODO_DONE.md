@@ -3280,6 +3280,73 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu6 [LOW · bookkeeping] — ✅ DONE 2026-08-04** (`61fc680` fix; `b2ff7d1` test + mutants;
+  this commit, the adversarial pass's corrections + trackers). The item's own recommendation was the right
+  one: extract the taxonomy so there is ONE labeller. `finalizeSegment`'s A1 branch is now
+  `labelStagedRecord(_:type:outcome:results:)`, and both writers of a staged record go through it — the first
+  write, and `applyRotationReviewAndFinalize`'s regeneration, which replaced the record WHOLESALE and left
+  the old label sitting on the new bytes. Both directions the item named are closed and both are now driven:
+  forward, a segment that failed `.noOutput` for a transient write error and regenerates cleanly stops being
+  counted failed, so the collection sheet no longer warns "N segment(s) failed to process and are NOT
+  filed — Retry them before finalizing" about a segment that is fine (that warning is the money half: obeying
+  it hits `retryFailed`, which deletes the freshly regenerated output and re-buys the OCR, and unlike the fu5
+  chain it needs no special shape — the segment is still staged, so the retry always lands); backward, a
+  `.staged` segment whose regeneration produces nothing stops wearing a success label over an empty record
+  that `executePlans` then skipped silently, and is now `.failed`/`.noOutput` and offered for retry, which is
+  the only way it is recoverable.
+  **The item's ⚠️ was wrong, and checking rather than approximating is the point.** It warned that
+  `anyText`/`firstError` are unavailable on the regeneration path (`RetainedSegment.texts`, not `OCRResult`s)
+  and said not to approximate `anyText` without checking how `texts` represents a text-less page. They ARE
+  available, exactly: `RetainedSegment.pages` is `[PageWork]` and `PageWork.result` IS the page's `OCRResult`,
+  so the regeneration passes the same values `finalizeSegment` awaited — a rotation edit rebuilds `OCRResult`
+  preserving `text`/`errorMessage`/`errorCode` (now via `OCRResult.with`, the shared seam, rather than a
+  hand-retyped five-field init — the re-type is how `errorCode` was once dropped, W9.1), and `PageWork` is
+  Codable so they survive a manifest resume. `texts` would have been wrong for exactly the reason the item
+  suspected: it maps a nil text to `""`, conflating "OCR returned nothing" with "OCR returned an empty
+  string" — the one distinction `.succeededNoText` exists to draw. So no deliberate decision about what the
+  regeneration leg passes was needed; the answer was that it passes the real thing.
+  **This CHANGES a fu5 measurement, which is recorded rather than quietly inherited.** fu5's mutant M1 (the
+  `finalize` call site back to a bare `finalizedGroups.remove`) read 2 RED; as of this fix it reads **0 RED**.
+  Not a regression in Test 19 — fu6 removed the reachability M1 needed. The regeneration re-derives the
+  label, so the group leaves `failedGroupIds` at check 4 instead of at the finalize, and no other path can
+  put a filable record in the failed set: `markFailed` is the only writer that inserts, it fires only for
+  `.noOutput` (no PDFs) or `.incompleteOutput` (`pagesComplete == false`), and `executePlans` skips both. Read
+  as "the defect fu5 fixed can no longer be CONSTRUCTED", NOT "fu5 was unnecessary" — it was real and
+  shipped. `releaseFinalizedGroup`'s pairing is kept (right on its own merits, and the invariant is
+  load-bearing for `retryFailed`'s cancel-loop latency argument) and its live coverage is now fu5's M2, 9 RED
+  in Test 17. Recorded in three places so the next reader cannot mistake it: the M1 line, the `finalize` call
+  site, and Test 19 check 5's note.
+  **Verification.** Driver Test 19 check 4 FLIPPED — it existed to PIN the stale label and said so — and now
+  asserts the SPECIFIC label the taxonomy owes the regenerated record (`.succeededPlaceholderImage`, no
+  reason line) plus `failedGroupIds == ["V2"]`, so a fix that reconciled the sets by blanket-clearing them
+  would still be caught. New **Test 20** drives the backward half for real: a two-page merged document stages
+  cleanly, the staging dir stops accepting writes, the operator straightens a page, the regeneration produces
+  nothing. `mergeDocuments: true` is load-bearing there — regeneration writes each page back to the SAME
+  path, so with per-page PDFs still on disk a failed write is masked by the previous run's file; the
+  successful first write merges and deletes them, so the targets are genuinely absent (asserted, since the
+  section is vacuous otherwise). Real decodable JPEG bytes, so the segment reaches the plain `.staged` label
+  the item names. 4 mutants: **N1** (the regeneration's label call deleted) **3 RED** — Test 19 check 4 plus
+  Test 20 checks 5 and 6, the shipped defect in both directions; **N2** (label from `texts`) 0 RED, an honest
+  limit — nothing stages a document whose OCR returns an EMPTY STRING rather than nil, the only separating
+  input, and building one needs a per-page stub instead of the driver's single shared one; **N3** (label from
+  `retained` re-read instead of the `regenInputs` snapshot) 0 RED and expected to be, since nothing mutates
+  `retained` while the detached write runs — the snapshot is defensive, not covered; **M1** re-measured as
+  above. `test-recovery.sh` **148 checks ALL PASS**; six adjacent headless $0 drivers green unchanged
+  (manifest-persistence, merge-safety, multipage-reocr, output-file-safety, collection-organize,
+  processfiles-tagwarn) — the extraction moved the first-write branch verbatim and those are what would
+  notice otherwise. Build clean, no new warnings. No migration written because there is nothing to migrate.
+  **The adversarial pass proved the new invariant risk and found two residuals.** The regeneration can now
+  `markFailed`, which INSERTS into `failedGroupIds` — so it had to be shown that the group is still in
+  `finalizedGroups` there, or fu5's subset would break on the very path fu5 was about. It is, and
+  structurally: every exit from `finalizedGroups` also drops the group from `staged`
+  (`retryFailed`/`clearSessionState`/`finalize` each do both, synchronously with no await between), and the
+  new label sits behind the existing `guard let idx = staged.firstIndex(...)`. Two residuals filed, both
+  PRE-EXISTING and neither introduced here: **`W3.cap-r3-fu7`** (the "Retry N failed" button is not disabled
+  during the regeneration, so a click inside that window races `staged[idx] = fresh`) and
+  **`W3.cap-r3-fu8`** (the manifest-resume path is a THIRD labeller, hardcoding `phase: .staged`).
+  Deliberately NOT folded in: fu8 would newly put resumed segments into the retry set, a money-path
+  behaviour change that wants its own gate. Leaves `-fu3`, `-fu4`, `-fu7`, `-fu8` open.
+
 - [x] **W3.cap-r3-fu5 [LOW · bookkeeping · contingent] — ✅ DONE 2026-08-03** (`2d15fae` fix; `f091ea2` test +
   mutants; this commit, trackers). The item asked for a DECISION — clear `failedGroupIds` at finalize, or
   assert the invariant somewhere it can be seen to hold — and the answer was neither exactly: make it
