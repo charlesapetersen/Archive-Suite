@@ -1301,9 +1301,45 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
-    /// Abort a pending Finish (e.g. the operator hit Clear instead of resolving the surfaced cards), so the
-    /// Finish button can't stay wedged disabled with nothing left to advance it.
-    func cancelPendingFinish() { pendingFinish = false }
+    /// The operator's escape from a pending Finish: un-arm the WAIT that `requestFinish` armed, so the
+    /// session drops back to ordinary capture instead of sitting on a hold with no way out.
+    ///
+    /// ⚠️ `W3.cap-r3-fu9-fu1` — **until this item, this method had no caller in the shipped UI at all.** It
+    /// existed and did the right thing, but the only thing that called it was `ManifestPersistenceTestDriver`,
+    /// which is why `proceedToFinishIfReady`'s comment describing it as "the operator's escape" was false
+    /// (an adversarial pass on `W3.cap-r3-fu9` caught the claim). The actual escape was **Clear**, which
+    /// Trashes every source photo of the session — a wildly disproportionate price for "I pressed Finish too
+    /// early" — and Clear is itself only rendered while `session.photos` is non-empty, so on a drained
+    /// session there was no exit at all. Re-tapping Finish is not one either: `requestFinish` just re-arms.
+    /// `LiveCaptureView`'s "Cancel finish" button, beside the waiting message, is now the caller.
+    ///
+    /// WHAT IT DELIBERATELY DOES **NOT** DO:
+    ///  • **It does not roll back `requestFinish`'s `completeAllOpenDocGroups()`.** That force-completion is a
+    ///    durable RECOVERY — it surfaces the Mac tag card for a doc group the operator never ended — not part
+    ///    of the wait, and un-completing an already-persisted completion is precisely the rollback
+    ///    `requestFinish`'s own failure branch treats as a hazard. Cancel un-arms the wait; it does not
+    ///    rewind the session.
+    ///  • **It cancels no OCR, drops no `staged`/`retained`, and touches no file.** Nothing already paid for
+    ///    is discarded and nothing on disk moves. That is the whole difference from Clear, and the reason
+    ///    this needs no `isFinalizing`-style refusal: there is no write it can interrupt.
+    ///  • **It does not tear down `startFinishWatchdog`'s sleeping Task.** The watchdog is `guard
+    ///    pendingFinish` and returns at its next 5 s wake. A re-tap of Finish inside that window starts a
+    ///    SECOND poller (`requestFinish` sees `wasPending == false`), which is harmless: every tick runs on
+    ///    the MainActor through the idempotent, guarded `proceedToFinishIfReady`, so the loser of a tick
+    ///    returns having done nothing, and each stale loop exits the first wake it sees `pendingFinish`
+    ///    false. Pre-existing and unchanged in kind — `clearSessionState` has always cleared `pendingFinish`
+    ///    behind the watchdog's back the same way.
+    ///
+    /// `guard pendingFinish` so a call with nothing armed cannot overwrite the status line with a message
+    /// about something that was not happening. The view renders the button inside that same predicate, so
+    /// this is the `W3.cap-r3-fu11` shape: the view decides what the operator is OFFERED, the model decides
+    /// what actually happens.
+    func cancelPendingFinish() {
+        guard pendingFinish else { return }
+        pendingFinish = false
+        session.statusMessage =
+            "Finish cancelled — the session is still open. Tap Finish session again when you're ready."
+    }
 
     /// The phone's un-sent count changed (a `POST /phone/status` heartbeat). Re-evaluate a pending Finish
     /// so it advances the moment the phone has drained (and processing is done).
@@ -1331,11 +1367,12 @@ final class LiveCaptureProcessor: ObservableObject {
         // Refusing here rather than in `finishSession` is load-bearing: `pendingFinish` is cleared on the
         // line below, so a refusal one level in would DISCARD the finish (nothing re-arms it) instead of
         // holding it. Held, this is self-healing on a timer — `startFinishWatchdog` re-evaluates every 5 s and
-        // `perItemSheetDidChange` re-evaluates once its grace expires. ⚠️ NOT via `cancelPendingFinish()`,
-        // which an earlier draft of this comment called "the operator's escape": that method has no caller in
-        // the shipped UI at all (an adversarial pass caught the claim). The only operator-driven way out of a
-        // pending finish today is the Clear button, which Trashes the session's sources — filed as
-        // `W3.cap-r3-fu9-fu1`.
+        // `perItemSheetDidChange` re-evaluates once its grace expires. The operator ALSO has an explicit way
+        // out — `cancelPendingFinish()`, wired to the "Cancel finish" button since `W3.cap-r3-fu9-fu1`. ⚠️ It
+        // is not what makes this hold safe, and an earlier draft of this comment leaned on it as if it were:
+        // when that was written the method had no caller in the shipped UI at all (an adversarial pass caught
+        // the claim), so the only way out was Clear, which Trashes the session's sources. The self-healing
+        // timer above is the argument; the button is the operator's convenience on top of it.
         guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive,
               !perItemSheetUp else { return }
         pendingFinish = false

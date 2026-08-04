@@ -463,6 +463,26 @@ struct LiveCaptureView: View {
                                     Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
+                                // W3.cap-r3-fu9-fu1 — the operator's way OUT of the wait, beside the message
+                                // that explains what it is waiting for. Before this button the only exit was
+                                // Clear, which Trashes every source photo of the session, and Clear is only
+                                // rendered while `session.photos` is non-empty — so once the phone had drained
+                                // there was no exit at all. Re-tapping Finish is not one either (`requestFinish`
+                                // re-arms). See `LiveCaptureProcessor.cancelPendingFinish` for what cancelling
+                                // does and does not undo: it un-arms the wait, and nothing else — no OCR is
+                                // cancelled, no staged output dropped, no file touched.
+                                //
+                                // Rendered on exactly `pendingFinish`, which is also the model call's own
+                                // guard, so the affordance and the refusal agree by construction. NOT given a
+                                // `.disabled(liveProc.isFinalizing)` like Clear and Finish, and that is a
+                                // decision rather than an oversight: `pendingFinish` cannot be true alongside
+                                // `isFinalizing` (see `isFinishingScrimUp`'s note — `proceedToFinishIfReady`
+                                // clears it on the line before `finishSession`, and `requestFinish` guards
+                                // `!isFinalizing`), so this branch never draws during a regeneration and the
+                                // modifier would be dead code asserting a reachability that does not exist.
+                                Button("Cancel finish") { liveProc.cancelPendingFinish() }
+                                    .accessibilityIdentifier("live.cancel-finish")
+                                    .help("Stop waiting to finish. Nothing captured or processed is lost — the session stays open.")
                             } else if processing && liveProc.staged.isEmpty {
                                 ProgressView().controlSize(.small)
                                 Text("Processing…").font(.caption).foregroundStyle(.secondary)
