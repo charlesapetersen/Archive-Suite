@@ -2909,41 +2909,77 @@ enum LiveCaptureRecoveryTestDriver {
         //     fix. `session.groups` is derived from `session.photos`, so an emptied pane orphans every
         //     `.ocr`/`.tagging` row; unfiltered, "Processing…" would draw forever in exactly the state this
         //     item makes visible.
+        //   • the two gates COME APART, and Finish is withheld where it would be inert (check 8). This is the
+        //     correction the adversarial pass forced, and it is the one place the section indicts its own
+        //     earlier self: check 7 creates a roster of nothing but an orphaned row and asserts
+        //     `hasUnfiledWork`, i.e. it blessed drawing the cluster there — while the button it blessed did
+        //     nothing at all when pressed. `canFinish` is the term that withholds it; check 8 presses it anyway
+        //     to pin that the model layer was already refusing, silently.
         //
         // NON-VACUITY, measured (2026-08-04) — every mutant below was BUILT and RUN to a written report, so a
-        // 0 RED here is a measurement and not a strand. Baseline 187 checks, 0 RED, 0 Swift warnings. Two of
-        // the five came back with numbers the author had predicted wrong, and both are recorded as measured:
+        // 0 RED here is a measurement and not a strand. Baseline **188 checks, 0 RED, 0 Swift warnings**, and
+        // all seven were RE-RUN against that baseline after the adversarial pass added check 8 (M2 and M4 each
+        // gained a second RED from it, which is the clearest single sign that check 8 was the missing one):
         //   M1 the `else if liveProc.hasUnfiledWork` arm reverted to fu9-fu1's `else if liveProc.pendingFinish
         //      { HStack(spacing: 8) { pendingFinishRow } }` — i.e. the shipped defect, exactly as it stood
         //      -> 0 RED. RUN rather than predicted, because it is this item's own leg. Recorded as the priced
         //      gap it is (`W21.vmgui-d`).
         //   M2 `hasUnfiledWork` weakened to `!staged.isEmpty` — the reading the item's own TITLE suggests
-        //      ("staged, unfiled segments") -> predicted 0 RED, **measured 1**, check 7. The prediction was
-        //      that every state reached here has something staged whenever it has a roster; check 7 is exactly
-        //      the state where that is false (the orphaned row survives a Clear'd session with nothing staged),
-        //      so the wider `statuses` spelling IS measured rather than merely argued — and measured on the
-        //      case that matters, since an operator holding only an orphaned row still needs Clear offered.
-        //   M3 `hasUnfiledWork` widened to `true` -> predicted 1 RED, **measured 2**, checks 5 and 6. The gate
-        //      that never turns off: the cluster would draw over the green "Session complete" summary offering
-        //      to finish a session with nothing in it. Both checks assert the OFF direction, which the
-        //      prediction had only counted once.
-        //   M4 `processingCount`'s `session.groups` term deleted (the pre-fu12 spelling) -> 1 RED, check 7.
-        //      The forever-spinner leg, and also the one that would have put the count back out of step with
-        //      `proceedToFinishIfReady` — which now reads this same property.
+        //      ("staged, unfiled segments") -> **2 RED, checks 7 and 8**. Worth reading as a history: it was
+        //      PREDICTED 0 (the author's reasoning being that every state here has something staged whenever it
+        //      has a roster), measured 1 at the 187 baseline, and is 2 now. Check 7 is exactly the state where
+        //      the prediction is false — an orphaned row surviving a Clear'd session with nothing staged — so
+        //      the wider `statuses` spelling is measured rather than argued, on the case that matters: an
+        //      operator holding only an orphaned row still needs **Clear** offered.
+        //   M3 `hasUnfiledWork` widened to `true` -> **2 RED, checks 5 and 6** (predicted 1). The gate that
+        //      never turns off: the cluster would draw over the green "Session complete" summary offering to
+        //      finish a session with nothing in it. Both checks assert the OFF direction; the prediction had
+        //      counted it once.
+        //   M4 `processingCount`'s `session.groups` term deleted -> **2 RED, checks 7 and 8**. The
+        //      forever-spinner leg. ⚠️ NOT "the pre-fu12 spelling", which is what an earlier draft called it:
+        //      `proceedToFinishIfReady` now READS this property, so deleting the term removes it from the
+        //      finish hold as well, and pre-fu12 the hold had the filter while the UI count did not. The
+        //      combination this mutant creates never shipped. It is still the right test of the new coupling —
+        //      just not a re-creation of the old bug.
         //   M5 `finalize`'s `self.statuses.removeAll { filedGroups.contains($0.id) }` deleted -> 2 RED. NOT a
         //      mutant of this item's code, run deliberately to show check 5 reads the roster the gate reads
         //      rather than passing on `staged` alone. Predicted "checks 5 and 6"; measured check 5 plus a
         //      PRE-EXISTING check from `W3.cap-r3-fu5`'s section ("…so the button counts exactly the segment
-        //      that is still failed, and it has a row"). Check 6 is green under it, because
-        //      `clearSessionState` empties `statuses` unconditionally. Worth keeping in that corrected form:
-        //      the invariant this item leans on was already partly guarded elsewhere in the driver.
+        //      that is still failed, and it has a row"). Check 6 is green under it because `clearSessionState`
+        //      empties `statuses` unconditionally. Kept in that corrected form, because it says something worth
+        //      knowing: the invariant this item leans on was already partly guarded elsewhere in the driver.
+        //   M6 the `|| pendingFinish` disjunct deleted from `hasUnfiledWork` -> **0 RED**, and recorded rather
+        //      than quietly dropped. The disjunct is genuinely UNREACHABLE (an adversarial pass traced it:
+        //      `requestFinish` is the only writer that raises the flag, and the only two `statuses.removeAll`
+        //      sites are `finalize`, reached with the flag already false, and `clearSessionState`, which lowers
+        //      it) — so this is a 0 RED that says "dead code", not "untested behaviour". It stays in because
+        //      `W3.cap-r3-fu9-fu1` ships a renderer that draws on `pendingFinish` alone and this gate must not
+        //      be what deletes that escape; the honest status is "belt-and-braces, unmeasured, argued".
+        //   M7 `canFinish` widened to `true` — i.e. the state this item SHIPPED before its adversarial pass,
+        //      a `.borderedProminent` Finish drawn and enabled over a roster it cannot act on -> **1 RED,
+        //      check 8**. The one mutant that is a re-creation of a defect that really existed in this diff.
         //
         // COST (`W21.recovery-timeout`): no wall-clock waits — only settles, and one gate the section opens
         // itself. Side effects outside its temp dir: three stub JPEGs to the Trash (the ✕ is
         // `CaptureSession.removePhoto`, recoverable by design — driving the operator's real gesture is worth
-        // that). FILE SAFETY: every finalize destination is an explicit `chosenExisting` under `tmp`, so the
-        // move can never consult `currentOutputDirectory`, whose non-test fallback is the operator's real
-        // output folder. ---
+        // that).
+        //
+        // ⚠️ FILE SAFETY — STATED CORRECTLY, because the first version of this paragraph was FALSE and an
+        // adversarial pass caught it. It claimed "every finalize destination is an explicit `chosenExisting`
+        // under `tmp`, so the move can never consult `currentOutputDirectory`". `finalize` evaluates
+        // `currentOutputDirectory` UNCONDITIONALLY, one line after its guard and before any draft is looked at;
+        // `chosenExisting` only wins the folder CHOICE afterwards. And check 4's `requestFinish` reaches
+        // `beginFinalize`, which does not merely evaluate that path but ENUMERATES it on disk
+        // (`existingCollectionFolders`). What actually keeps this section out of the operator's real output
+        // folder is two things, and a future author needs both: `test-recovery.sh` exports
+        // `LIVECAPTURE_TESTOUT`, which `currentOutputDirectory` prefers over the Settings folder; and check 5
+        // passes a HAND-BUILT draft (`chosenExisting: uwFiled`) rather than `uwProc.drafts`, every one of which
+        // carries `chosenExisting: nil`. ⛔ So do NOT "improve" check 5 by driving the real sheet's drafts: run
+        // the driver without `LIVECAPTURE_TESTOUT` and that refactor creates a collection folder in the
+        // operator's real output directory. This is the same hazard Test 20 refused to drive `finalize` for,
+        // stated there correctly and here wrongly until the pass compared the two. Nothing is written outside
+        // `tmp` as the section stands — the enumeration is read-only — but the MECHANISM was mis-located, which
+        // in this file is itself the defect. ---
         if isolatedBackup {
             // Prune the throwaway backup root FIRST, for the reason Test 24 records: `CaptureSession()` adopts
             // orphaned photos out of the session folders earlier sections left behind, and check 1's
@@ -3033,8 +3069,17 @@ enum LiveCaptureRecoveryTestDriver {
             //    so this says the cluster's condition holds AND the button inside it would be pressable, which
             //    is the whole model-side claim of the decision. Before this item both were true here and the
             //    view asked `session.photos` anyway.
+            //
+            //    ⚠️ HONEST LIMIT, added after an adversarial pass called this out: as an assertion about
+            //    `hasUnfiledWork` this check DISCRIMINATES NOTHING. `hasUnfiledWork` is `!statuses.isEmpty ||
+            //    pendingFinish`, so its first term is implied by the second term of this very check — any
+            //    implementation of the shape `!statuses.isEmpty || X` passes, and so does M2's `!staged.isEmpty`
+            //    (measured). It is a PREMISE, worth stating because it names the state the header now reads;
+            //    all of the gate's discriminating power lives in checks 5 and 6 (the OFF direction), 7 (the
+            //    width) and 8 (`canFinish` coming apart from it).
             check("...and the gate the header now draws on is TRUE there, with Finish's own predicate open (fu12)",
-                  uwProc.hasUnfiledWork && !uwProc.statuses.isEmpty && !uwProc.isFinalizing)
+                  uwProc.hasUnfiledWork && !uwProc.statuses.isEmpty && !uwProc.isFinalizing
+                      && uwProc.canFinish)
 
             // 4. THE DECISION, first half: Finish from the emptied pane REACHES collection naming. The term
             //    worth reading is the premise, not the result — `requestFinish` starts with
@@ -3107,6 +3152,33 @@ enum LiveCaptureRecoveryTestDriver {
                   u3InOCR && uwSession.groups.isEmpty
                       && uwProc.statuses.contains { $0.id == "U3" && $0.phase == .ocr }
                       && uwProc.processingCount == 0 && uwProc.hasUnfiledWork)
+
+            // 8. …AND FINISH IS NOT OFFERED IN THAT SAME STATE, which is the correction this item's adversarial
+            //    pass forced. Check 7 above leaves the app holding a roster of nothing but an orphaned row, and
+            //    the first version of this item drew a `.borderedProminent` "Finish session →" there, ENABLED:
+            //    `statuses` non-empty, not finalizing. Pressing it did nothing whatsoever — `requestFinish`
+            //    arms the flag and spawns a watchdog, `proceedToFinishIfReady` finds every hold open (this
+            //    item's own `processingCount` filter is what lets it through), lowers the flag, and
+            //    `finishSession` returns on `guard !staged.isEmpty`. No sheet, no status message, no state
+            //    change, one orphaned Task per press. The pass's sharpest point was that check 7 did not merely
+            //    miss it — it CREATED the state and asserted `hasUnfiledWork`, i.e. it blessed drawing the
+            //    cluster there while never pressing the button.
+            //
+            //    So the two gates must come APART here, and that is what this asserts: `hasUnfiledWork` true
+            //    (the operator still needs **Clear** — narrowing the arm instead would have re-stranded them)
+            //    while `canFinish` is false (nothing to file, and no group that `completeAllOpenDocGroups`
+            //    could recover). The last two terms drive the press anyway and pin that it is inert: the
+            //    model-layer refusal is `finishSession`'s guard, and `canFinish` is only the operator-facing
+            //    half that stops it being offered — `W3.cap-r3-fu11`'s shape, and the same reason that item put
+            //    its load-bearing guard in `clearSession()` rather than in a `.disabled`.
+            let u8SummaryBefore = uwProc.finalizeSummary
+            uwProc.requestFinish()
+            let u8Settled = await uwSettle { !uwProc.pendingFinish }
+            check("...and Finish is NOT offered there — nothing to file, and pressing it anyway changes nothing (fu12)",
+                  uwProc.hasUnfiledWork && !uwProc.canFinish
+                      && u8Settled && !uwProc.showRotationReview && !uwProc.showFinalizeSheet
+                      && !uwProc.isFinalizing && uwProc.staged.isEmpty
+                      && uwProc.finalizeSummary == u8SummaryBefore)
 
             uwGate.open()
             if let uwPriorReview {

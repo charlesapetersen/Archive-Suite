@@ -96,28 +96,57 @@ final class LiveCaptureProcessor: ObservableObject {
     ///
     /// The `session.groups` term is not a refinement; it is the difference between the panel describing the
     /// wait and the panel inventing one. A `.ocr`/`.tagging` row whose group has LEFT the session — every page
-    /// deleted with the thumbnail ✕, or reclassified away by `X-Replaces` — can never resolve: no group means
-    /// no tag card and no `finalizeSegment`, and `photoRemoved` cancels the page's task while leaving the row.
-    /// `proceedToFinishIfReady` has always excluded exactly those rows from the hold; this is that same
-    /// predicate, now in ONE place, so the finish cannot be waiting on one set while the UI names another.
+    /// deleted with the thumbnail ✕, or reclassified away by `X-Replaces` — cannot resolve *while it is gone*:
+    /// no group means no tag card and no `finalizeSegment`, and `photoRemoved` cancels the page's task while
+    /// leaving the row. `proceedToFinishIfReady` has always excluded exactly those rows from the hold; this is
+    /// that same predicate, in ONE place, so the finish cannot wait on one set while the UI names another.
+    ///
+    /// ⚠️ "While it is gone" is deliberate, and an earlier draft of this said "can NEVER resolve" — which an
+    /// adversarial pass refuted. A re-paired phone re-uploads its retained captures (`phoneDidDisconnect`), so
+    /// `ingest` can bring the group back, and `photoRemoved` already dropped the `pageTasks` entry, so
+    /// `photoIngested` is free to buy a fresh call and `upsertStatus` reuses this very row. The predicate is
+    /// evaluated live, so the code is right either way; the absolute phrasing was not. (The same wording sits
+    /// on `proceedToFinishIfReady` and predates this item.)
     ///
     /// Fixed here as part of `W3.cap-r3-fu12` rather than filed for later, because that item is what makes it
     /// VISIBLE: the disagreement was survivable only while the Captured pane hid its whole control cluster in
     /// the very state that produces an orphaned row (pane emptied), and fu12 draws the cluster there. Left
     /// unfiltered it would have become a "Processing…" spinner that can never stop.
     ///
-    /// ⚠️ CONSEQUENCE, accepted rather than papered over: `session.groups` is derived from `session.photos`,
-    /// so with the pane empty this is ALWAYS 0 and the pending-finish row reads "(0 left)". That is reachable
-    /// for at most the ≤1.5 s `perItemSheetGrace` tail — a still-sending phone takes the row's other branch,
-    /// and the two remaining holds (a Mac tag card, a per-item sheet) put a `.sheet` over the row — and it is
-    /// TRUE there: nothing is left to process, the finish is waiting out the grace. Deliberately NOT given a
-    /// third message branch for a 1.5 s window; the alternative was a count naming work the finish had
-    /// already stopped waiting for.
+    /// ⚠️ THE GROUP-ID SET IS NOT A MICRO-OPTIMISATION. `session.groups` is a COMPUTED property that builds a
+    /// dictionary over every photo, sorts each group's pages and then sorts the groups — so the obvious
+    /// spelling (`session.groups.contains { … }` inside the filter) rebuilds all of that once PER STATUS ROW.
+    /// This is read from `LiveCaptureView`'s header body, which re-evaluates on every published change
+    /// including the `statusMessage` write that every arriving photo performs, so on a 100-group session that
+    /// ~100 dictionary-builds-and-sorts per render, twice over. Hoisted once instead. (Found by the same pass;
+    /// `filter{}.count` also gives up the short-circuit that `proceedToFinishIfReady`'s old `contains` had,
+    /// which is why the cheap set matters there too.)
     var processingCount: Int {
-        statuses.filter { s in
-            (s.phase == .ocr || s.phase == .tagging) && session.groups.contains { $0.id == s.id }
-        }.count
+        let live = Set(session.groups.map(\.id))
+        return statuses.filter { ($0.phase == .ocr || $0.phase == .tagging) && live.contains($0.id) }.count
     }
+    /// `W3.cap-r3-fu12`'s adversarial pass — can **Finish** actually DO anything right now? Distinct from
+    /// `hasUnfiledWork` below, and the two come apart in a state the first version of that item shipped a
+    /// primary button into.
+    ///
+    /// `finishSession` is gated on **`staged`**, while `pendingFinish` is cleared one level ABOVE it (in
+    /// `proceedToFinishIfReady`, the line before the call). So a Finish pressed with an empty `staged` and
+    /// nothing that will ever stage is a silent no-op: `requestFinish` arms the flag, spawns a watchdog Task,
+    /// `proceedToFinishIfReady` finds every hold open, lowers the flag again, and `finishSession` returns on
+    /// its guard. No sheet, no status line, no state change — one orphaned watchdog per press. That state is
+    /// reachable exactly where fu12 newly draws the cluster: the ✕ on the last page of a document still in OCR
+    /// leaves a roster with an orphaned row and nothing staged, so `hasUnfiledWork` is true (the operator does
+    /// still need **Clear**) while Finish has nothing to file.
+    ///
+    /// `!session.groups.isEmpty` is the second disjunct rather than something narrower because it preserves the
+    /// documented reason Finish is enabled before anything stages — it also RECOVERS an un-ended/un-tagged
+    /// segment via `completeAllOpenDocGroups`, and that case always has groups. With no groups at all, Finish
+    /// can only file `staged`, so `staged` is the whole question.
+    ///
+    /// This is the operator-facing half only (`LiveCaptureView` puts it in Finish's `.disabled`, so the
+    /// affordance is visibly off rather than silently ignored — `W3.cap-r3-fu11`'s shape). The model half is
+    /// `finishSession`'s guard, which already refuses; it just refuses without saying so.
+    var canFinish: Bool { !staged.isEmpty || !session.groups.isEmpty }
     /// `W3.cap-r3-fu12` — does this session still hold work that **Finish** would file, or **Clear** abandon?
     /// The Captured pane's control cluster (Clear + Finish) is gated on this whenever the pane itself is
     /// empty; see `LiveCaptureView`'s header for the decision and how to undo it.

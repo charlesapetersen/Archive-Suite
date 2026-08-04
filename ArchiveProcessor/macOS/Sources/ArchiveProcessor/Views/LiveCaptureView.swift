@@ -434,8 +434,24 @@ struct LiveCaptureView: View {
         if session.phonePendingActive {
             Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
                 .font(.caption).foregroundStyle(.secondary)
-        } else {
+        } else if liveProc.processingCount > 0 {
             Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            // W3.cap-r3-fu12's adversarial pass — the third branch, added because the count branch LIED here.
+            // `processingCount` excludes rows whose group has left the session, and `pendingFinish` is lowered
+            // only by a CALL to `proceedToFinishIfReady`. So delete the last page of the document a pending
+            // finish is waiting on (the ✕) and the count drops to 0 while the flag stays up: the row went on
+            // reading "Finishing when processing completes (0 left)" until the next re-evaluation.
+            //
+            // ⚠️ That window is the 5 s `startFinishWatchdog` tick, NOT the ≤1.5 s `perItemSheetGrace` tail an
+            // earlier draft of `processingCount`'s own comment claimed — `removePhoto` neither clears the flag
+            // nor re-enters the gate (the fact `W3.cap-r3-fu9-fu1` documents), so nothing sooner runs. Same
+            // window when a stale phone heartbeat lapses at its 20 s boundary, which is the case the watchdog
+            // exists for. So this is an ordinary operator-triggered path, not a rare sheet-teardown tail, and
+            // that is what turned "not worth a third branch" into "worth a third branch". Bounded, never a
+            // hang: every arming starts a watchdog and the watchdog lowers the flag unconditionally.
+            Text("Finishing — nothing left to process. Completing as soon as the session settles (a few seconds); Cancel finish if you'd rather not wait.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         Button("Cancel finish") { liveProc.cancelPendingFinish() }
@@ -463,10 +479,20 @@ struct LiveCaptureView: View {
     /// The `.accessibilityIdentifier` is new with that item and is not decoration: no headless driver can read
     /// this view, so the only thing that can ever prove the button DRAWS where it should is `W21.vmgui-d`'s
     /// Processor GUI lane, and it needs something to press.
+    /// The `.help` is new with `W3.cap-r3-fu12` and came out of its adversarial pass, which pointed out that
+    /// this was the only button in the cluster without one — and that the label's one honest meaning in the
+    /// photos-present arm ("throw away the photos you can see") is exactly the meaning that is ABSENT in the
+    /// second arm, where `photos` is already empty and what Clear discards is the app's memory of processed,
+    /// paid-for segments. It sits immediately beside "Cancel finish", which costs nothing. So the tooltip says
+    /// what is dropped and what survives, in both arms. ⚠️ It does NOT make the label self-describing, and
+    /// there is still no count and no confirmation — that, plus the fact that Clear also wipes
+    /// `finalizeSummary` (the only on-screen record of what a PARTLY-failed finish did not file), is filed as
+    /// `W3.cap-r3-fu12-fu1` rather than decided here.
     @ViewBuilder private var clearButton: some View {
         Button("Clear") { liveProc.clearSession() }
             .disabled(liveProc.isFinalizing)
             .accessibilityIdentifier("live.clear")
+            .help("Abandon this session: received photos go to the Trash (recoverable) and the app forgets every processed segment. Already-processed PDFs stay in the Backup Folder's _processed subfolder — but they are no longer offered for filing.")
     }
 
     /// Live mode, session active. Always show Finish so the user sees where the session ends — grayed with a
@@ -498,7 +524,16 @@ struct LiveCaptureView: View {
             // newly-added, still-un-tagged segment can be recovered by re-tapping (no deadlock) — new photos
             // extend the same pending finish rather than cancelling it. Only blocked during the actual file
             // move (isFinalizing).
-            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing)
+            //
+            // `!liveProc.canFinish` was ADDED by `W3.cap-r3-fu12`'s adversarial pass, and it is the term that
+            // keeps this button from lying in the state that item newly draws it in: with a roster of nothing
+            // but an orphaned row, `finishSession` returns on its own `guard !staged.isEmpty` and the press
+            // does nothing at all — no sheet, no status line, one orphaned watchdog Task. See `canFinish` for
+            // why the second disjunct is `!session.groups.isEmpty`: it preserves exactly the recovery case the
+            // three lines above describe. ADDED to the existing terms rather than replacing them — the
+            // `statuses.isEmpty` term arguably implies it, but this is a money path and a derived-equivalence
+            // argument is not worth the trade for one `||`.
+            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing || !liveProc.canFinish)
             .accessibilityIdentifier("live.finish")
         }
     }
@@ -552,6 +587,21 @@ struct LiveCaptureView: View {
                     // the failed groups in `statuses`/`staged` while `clearFiled` retires only the FILED
                     // sources, so a pane emptied of the rest showed the green "Session complete" summary with
                     // no way to re-Finish or discard what did not make it.
+                    //
+                    // ⚠️ TWO COSTS THIS ARM CARRIES, both found by the item's adversarial pass and neither
+                    // papered over. (i) In that same partial-finalize case, **Clear** wipes `finalizeSummary`
+                    // — the only on-screen record of what did not file — along with the roster, so the arm's
+                    // best justification and its most destructive affordance are the same two lines of code.
+                    // Labelled via `clearButton`'s new `.help`; a count and/or a confirmation is
+                    // `W3.cap-r3-fu12-fu1`, deliberately left as a decision rather than guessed at here.
+                    // (ii) With "Review rotation" ON (default OFF), Finish from a ✕-emptied pane raises a
+                    // review over pages whose sources are all in the Trash, and
+                    // `applyRotationReviewAndFinalize`'s `allSatisfy { fileExists }` filter then discards every
+                    // correction SILENTLY and files the PDFs unrotated. Pre-existing — that filter's own
+                    // comment cites "the operator hit Clear before Finish", which is unreachable since Clear
+                    // also empties `staged` — but this arm promotes it from a two-step recovery to one tap.
+                    // Filed as `W3.cap-r3-fu12-fu2`, NOT fixed here: the fix belongs in `finishSession`'s page
+                    // seeding, which is the finalize path and wants its own Tier-2 gate.
                     //
                     // WHY THE SAME SUBVIEWS rather than a tailored copy: `W3.cap-r3-fu9-fu1` shipped its Cancel
                     // button in two renderers, and its own comment warns that a copy-paste is how one of them
