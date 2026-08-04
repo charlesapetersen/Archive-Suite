@@ -57,7 +57,9 @@ struct LiveCaptureView: View {
         // (2) Every MUTATING affordance under it is a hazard in this window: retry re-buys the OCR
         // (`W3.cap-r3-fu7`), Clear Trashes the sources the detached write is still reading
         // (`W3.cap-r3-fu11`), removing a photo strands a placeholder page (`W3.cap-r3-fu3`), and Finish is
-        // already `.disabled`. ⚠️ Not "nothing under it is worth reaching", which an earlier draft claimed
+        // already `.disabled`. Three of those four now ALSO refuse at the model layer — `retryFailed`,
+        // `clearSession` and `finalize` — which is what the scrim being pointer-only makes necessary rather
+        // than redundant; `removePhoto` (`W3.cap-r3-fu3`) is the one still relying on this overlay alone. ⚠️ Not "nothing under it is worth reaching", which an earlier draft claimed
         // and the adversarial pass refuted: `SegmentItem.actions(for:finalizing:)` deliberately KEEPS
         // `.viewText`/`.revealFiles` while finalizing, and driver check 7 asserts it, so freezing takes two
         // read-only affordances with it. That is accepted collateral, not an oversight — the window is short,
@@ -417,11 +419,25 @@ struct LiveCaptureView: View {
                 Spacer()
                 if !session.photos.isEmpty {
                     // Clear resets BOTH panes as one (B1): CaptureSession.clear() empties the Captured pane
-                    // (received photos → Trash, recoverable) and clearSessionState() resets the Processing
-                    // pane's in-memory segment/staged state (also cancels any pending Finish + summary). No
-                    // on-disk deletion beyond what session.clear() already does; staged _processed output
-                    // stays recoverable in the backup folder (Recovery Core Directive intact).
-                    Button("Clear") { session.clear(); liveProc.clearSessionState() }
+                    // (received photos → Trash, recoverable) and the processing-side reset drops the
+                    // Processing pane's in-memory segment/staged state (also cancels any pending Finish +
+                    // summary). No on-disk deletion beyond what session.clear() already does; staged
+                    // _processed output stays recoverable in the backup folder (Recovery Core Directive
+                    // intact).
+                    //
+                    // W3.cap-r3-fu11 — the two halves are ONE model call now, and it refuses while a finish
+                    // is regenerating. This used to read `session.clear(); liveProc.clearSessionState()`,
+                    // which is a pair a refusal could split — and the split is worse than either half: the
+                    // sources go to the Trash while `staged` still lists the segments pointing at them. The
+                    // load-bearing guard is inside `clearSession()`; this `.disabled` is the operator-facing
+                    // half, so the affordance is visibly off rather than silently ignored. It is also the
+                    // only layer covering the KEYBOARD and VoiceOver routes: `W3.cap-r3-fu10` decided the
+                    // throbber's scrim freezes the panel, but a scrim stops the pointer and nothing else
+                    // (`W3.cap-r3-fu10-fu1`). Matches the Finish button below, which was already gated —
+                    // note the trap this came out of, since it cost one round of mis-citation: Finish is the
+                    // `.disabled(… || liveProc.isFinalizing)` further down, NOT this button.
+                    Button("Clear") { liveProc.clearSession() }
+                        .disabled(liveProc.isFinalizing)
                     if liveProcessingMode != LiveProcessingMode.live.rawValue {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .buttonStyle(.borderedProminent)

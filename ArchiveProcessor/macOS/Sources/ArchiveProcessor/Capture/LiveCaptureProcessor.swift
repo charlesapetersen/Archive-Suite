@@ -1347,10 +1347,11 @@ final class LiveCaptureProcessor: ObservableObject {
                 // rests on in turn). It does, because every exit from `finalizedGroups` also drops the group
                 // from `staged`. Since `W3.cap-r3-fu7`, TWO of the three cannot even be entered while this loop
                 // is pending: `retryFailed` now refuses while `isFinalizing`, and `finalize` already did
-                // (`guard config != nil, let stagingDir, !isFinalizing`). So `clearSessionState` is the only
-                // remaining entrant — and it is the one still reachable from the UI, since the Clear button is
-                // ungated in this window (`W3.cap-r3-fu11`). The enumeration below is kept WHOLE anyway,
-                // because it is the synchronicity and not the refusals that makes the argument sound:
+                // (`guard config != nil, let stagingDir, !isFinalizing`). Since `W3.cap-r3-fu11` the THIRD
+                // refuses too — `clearSessionState` is `private` behind `clearSession()`, which carries the
+                // same guard — so all three entrants are now closed by refusal and not one of them can be
+                // entered while this loop is pending. The enumeration below is kept WHOLE anyway, because it
+                // is the synchronicity and not the refusals that makes the argument sound:
                 // `retryFailed` releases then `staged.removeAll`, `clearSessionState` does
                 // `staged.removeAll()` then `releaseAllFinalizedGroups`, and `finalize` drops the filed groups
                 // from `staged` a line before releasing them — each pair synchronous on the MainActor with no
@@ -1569,9 +1570,59 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Clear the "Finalized …" summary (called when new capture begins, or on a manual Clear).
     func clearFinalizeSummary() { if finalizeSummary != nil { finalizeSummary = nil } }
 
+    /// The Captured-pane **Clear** button, whole: Trash the received source photos AND reset the Processing
+    /// pane that describes them. THE one door — `clearSessionState` below is `private` precisely so this is
+    /// the only way in, because the two halves have to succeed or refuse together (see the guard).
+    ///
+    /// W3.cap-r3-fu11 — refuse while a finish is regenerating, at the MODEL layer, for the same reason
+    /// `retryFailed` does (read its comment for the shape of the window and how it is held open).
+    /// `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files from
+    /// a DETACHED task; for the length of that write the Live Capture panel is on screen with no sheet over
+    /// it (`isFinishingScrimUp`). A Clear landing there is strictly worse than the retry `W3.cap-r3-fu7`
+    /// refused, in the identical window: `session.clear()` Trashes the source photos the in-flight
+    /// `writeSegmentFiles` is still reading, and the state reset empties `staged`/`retained` under the loop
+    /// that is about to `staged.firstIndex` them — so the regeneration's `guard let idx` finds nothing, its
+    /// partially-rewritten `_processed` files are orphaned, and the sources are in the Trash. Recoverable
+    /// (Trash, per the Recovery Core Directive), which is why this is LOW and not MED.
+    ///
+    /// WHY THE GUARD IS HERE AND NOT ONLY ON THE BUTTON — two separate reasons, neither sufficient alone:
+    ///  • ATOMICITY. The button used to be `session.clear(); liveProc.clearSessionState()`, two calls a
+    ///    refusal could split. Gating only the state half is the WORST outcome available — the sources go to
+    ///    the Trash while `staged` still lists the segments that point at them. One call, one guard, so the
+    ///    pair cannot disagree.
+    ///  • REACHABILITY. `W3.cap-r3-fu10` decided the throbber's scrim is MEANT to freeze the panel, so no
+    ///    MOUSE path to Clear survives the window; the view's `.disabled` covers the keyboard/VoiceOver
+    ///    routes a scrim does not (`W3.cap-r3-fu10-fu1`). But a `.disabled` computed when the button was
+    ///    drawn is a statement about the draw, not about the press — the same argument `retryFailed` makes
+    ///    about its deferred sheet Apply — and this is the one place every route converges. The view edit is
+    ///    there so the operator is not offered something that would be refused; this is what makes the
+    ///    refusal true.
+    ///
+    /// SCOPED to `isFinalizing` deliberately, and NOT widened to `requestFinish`'s
+    /// `!showFinalizeSheet, !showRotationReview` triple — the same scope decision, on the same grounds, as
+    /// `retryFailed`. Those two states put a modal sheet over the panel, and clearing from under a collection
+    /// sheet the operator has not confirmed yet is a legitimate abort with no write in flight, not a hazard.
+    /// (`isFinalizing` is also true for the finalize MOVE itself, where `showFinalizeSheet` is up — that is
+    /// covered here, and rightly: a Clear during the move races `executePlans`.) Driver Test 22 check 4
+    /// measures the refusal and check 6 measures its WIDTH.
+    ///
+    /// The refusal is SILENT (the button is disabled, so the state is visible before the press) and is a
+    /// WINDOW, not a ban: the window is the length of one regeneration write, and Clear works again after it.
+    /// This is the LAST entrant to the `staged`-implies-`finalized` argument at
+    /// `applyRotationReviewAndFinalize` — with `retryFailed` and `finalize` already refusing, that
+    /// enumeration is now closed by refusals rather than only by MainActor synchronicity.
+    func clearSession() {
+        guard !isFinalizing else { return }
+        session.clear()
+        clearSessionState()
+    }
+
     /// Reconcile the Processing pane with a Captured-pane **Clear** (B1): reset the in-memory/UI state that
     /// drives the Processing list so both panes empty as one. This is the processing-side mirror of
     /// `CaptureSession.clear()` (which sends the received source photos to the Trash — recoverable).
+    ///
+    /// `private` since `W3.cap-r3-fu11`: its ONLY caller is `clearSession()` above, which is where the
+    /// `isFinalizing` refusal lives. Do not add a second caller — call `clearSession()`, or move the guard.
     ///
     /// DATA SAFETY (Recovery Core Directive, unchanged): this is a **pure in-memory/UI reset** — it performs
     /// **no** on-disk deletion. Any already-staged processed output stays exactly where it was, in the
@@ -1579,7 +1630,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// left untouched on disk. So Clear never hard-deletes a staged/un-filed page: it only forgets the
     /// segments in memory so the pane agrees with the (now-cleared) Captured pane. In-flight OCR `pageTasks`
     /// are dropped (their results are simply discarded); a fresh capture after Clear starts a new segment.
-    func clearSessionState() {
+    private func clearSessionState() {
         // B8: advance the generation so any in-flight `finalizeSegment` that suspended at an await before this
         // Clear bails at its next post-await guard instead of repopulating the just-cleared pane / writing a
         // stale manifest. And CANCEL each outstanding OCR task before dropping it, so its work stops rather
