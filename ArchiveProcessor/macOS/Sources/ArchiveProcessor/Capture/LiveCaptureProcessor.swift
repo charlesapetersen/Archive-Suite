@@ -291,7 +291,31 @@ final class LiveCaptureProcessor: ObservableObject {
             failedGroupIds.remove(gid)
             staged.removeAll { $0.groupId == gid }
             retained[gid] = nil
-            for p in group.photos { pageTasks[PageKey(p)] = nil }
+            // W3.cap-r3-fu2 — cancel before dropping, in the order `photoRemoved` uses. A retry is a decision
+            // to buy this group's OCR again: the old calls' every output is deleted just above (staged files,
+            // `retained`) and the re-ingest below replaces each entry, so a call left running here is spend
+            // nobody can read. Dropping the entry is precisely what makes it unreachable, so the cancel has to
+            // come first or not at all.
+            //
+            // It is a NO-OP as the code stands, and that is worth stating rather than implying a live bug was
+            // fixed. No group that reaches here can still hold a running call: `finalizeSegment` awaits every
+            // page and clears these same entries (`:630`) BEFORE `markFailed` adds the group to
+            // `failedGroupIds` — the bulk button's whole input — and the per-item menu offers a retry only for
+            // `.failed`/`.succeededNoText`/`.succeededPlaceholderImage`, all of them past that same clear
+            // (`.ocr`/`.tagging` render as `.processing`, whose `actions(for:)` is `[]`). A page arriving for
+            // such a group afterwards cannot start one either: the group is still in `finalizedGroups`, so
+            // `photoIngested` takes the late-page branch. Nor is this the mid-finalize trade `photoRemoved`
+            // carves out for — a group suspended inside finalize is `.tagging`, so it is unreachable here too,
+            // and if it ever became reachable this line already lost that page (finalize reads the entry we
+            // just dropped as "OCR not started"), which the cancel makes visible rather than worse.
+            //
+            // The symmetry is the point: no entry leaves `pageTasks` without its call being cancelled first,
+            // so the next edit that makes a retry reachable mid-flight cannot inherit a paid leak.
+            for p in group.photos {
+                let k = PageKey(p)
+                pageTasks[k]?.cancel()
+                pageTasks[k] = nil
+            }
             groupOCROverride[gid] = override    // nil clears any prior override
             setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
             setPhase(gid, .ocr)
