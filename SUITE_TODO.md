@@ -1204,23 +1204,11 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > retained second copy of the key rather than syncing it, so there is one reader and nothing left to drift.
 > That also **unblocks `W17.stg1`**, which touches the same `RetainedSegment` (its `(blocked-on: W3.cap-r4)`
 > now resolves). `r3` — the page deleted mid-OCR whose paid call kept running — **shipped 2026-08-03
-> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed** and this
-> section is done except the three residuals below, all of which its adversarial pass found in PRE-EXISTING
-> code rather than in the fix.
-- [ ] **W3.cap-r3-fu1 [MED]** `LiveCaptureProcessor.swift:600/1216` — `startedPages` outlives its task on
-  three paths, so a re-arriving page is filed with NO OCR. `finalizeSegment` clears `pageTasks` for the pages
-  it staged but never their `startedPages` keys; `executePlans` calls `startedPages.removeAll()` only inside
-  the `stagingSafeToReclaim` branch (not the straggler / partial-failure branches); and `photoRemoved`'s
-  mid-finalize carve-out deliberately leaves the key armed. In all three the key is armed with no task behind
-  it, and `photoIngested`'s `!startedPages.contains(key)` guard returns BEFORE the "late page arrived"
-  handling — so a page the phone re-sends after its group finalized is added to `session.photos` by `ingest`,
-  silently buys no call, and finalize reads `pageTasks[key] == nil` → "OCR not started". With a real image and
-  text-bearing siblings the segment still reports `.staged`, so nothing warns the operator. Pre-existing and
-  unchanged by `cap-r3` (its carve-out reproduces the pre-fix behaviour exactly). ⚠️ The naive fix is WRONG:
-  retiring the key inside the carve-out lets a re-arrival overwrite `pageTasks[key]` and double-buy the page
-  finalize is about to read. Fix at one of the two right seams instead — retire keys for pages no longer in
-  `session.photos` at the END of `finalizeSegment`, or gate the re-arrival on presence-of-task rather than on
-  started-ness. | Capture | Tier-2
+> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed**, and the
+> first of its three residuals — **`-fu1`, the started-once guard that outlived its call — shipped
+> 2026-08-03 `1a84d1c`/`54981e0`** (entry in `SUITE_TODO_DONE.md`). This section is now done except the two
+> residuals below plus **`-fu4`**, which `-fu1`'s own adversarial pass found. All of them are in PRE-EXISTING
+> code rather than in any of the fixes.
 - [ ] **W3.cap-r3-fu2 [LOW · latent]** `LiveCaptureProcessor.swift:291` — `retryFailed` drops `pageTasks[k]`
   without `.cancel()`: the exact mutant (M2) `cap-r3` was measured against, in production, 130 lines above
   the fix. Currently unreachable by construction — a retryable group has already passed `finalizeSegment`'s
@@ -1237,6 +1225,20 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   document now carries a placeholder page for it. Decide the intended behaviour (refuse the delete for a
   staged segment, as `removePhotoIfSafe` does, vs. exclude the page and re-stage) rather than leaving it
   incidental. Pre-existing. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu4 [LOW · behaviour decision]** `LiveCaptureProcessor.swift:1215` — after Finish the app
+  forgets that a groupId was ever filed, so a late re-upload silently opens a SECOND document for it instead
+  of being told it cannot join. `finalize` drops each filed group from `finalizedGroups`, which is the only
+  record that it finalized — so the "a late page arrived … kept in the Backup Folder, start a NEW segment"
+  message the app shows for that same re-upload two seconds EARLIER (while the segment is staged) stops
+  applying the moment the batch files, and the page is treated as belonging to a brand-new group. Post-`fu1`
+  it at least buys its OCR and the second document carries text (pre-`fu1` that document was filed with none,
+  which is why `fu1` ranked above this); either way the operator ends up with an extra one-page document they
+  did not ask for, and no message. Found by `fu1`'s adversarial pass, which deliberately left it: closing it
+  needs a durable "filed this session" set, or keeping `finalizedGroups` populated and fixing what else reads
+  it (`isFinalized` gates `CaptureSession.removePhotoIfSafe`, which would then refuse to remove pages of a
+  group whose sources are already retired). That is a behaviour decision like `-fu3`'s, not a bug fix. ⚠️ Do
+  NOT "fix" it by re-arming a started-once guard over a page with no call — that is exactly the `fu1` bug.
+  Pre-existing. | Capture | Tier-2
 
 ## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`

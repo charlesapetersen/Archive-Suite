@@ -666,6 +666,8 @@ exists. Retained below only as the historical proposal.
    proposal (it needs owner design input precisely because an adoption mistake binds results to the wrong photo).
 2. **A cheaper fix delivered the stable-identity pillar — and has now SHIPPED.** `W3.cap-r2` (`96f223b`,
    2026-08-02) re-keyed `pageTasks` + `startedPages` (was `startedPhotoIds`) on a `PageKey(groupId, seq)`
+   — `startedPages` itself was retired by `W3.cap-r3-fu1` (`1a84d1c`), which made `pageTasks` the sole
+   started-once record once the duplicate was shown to go stale on three paths —
    instead of the ephemeral `CapturedPhoto.id` (`CaptureModels.swift:23`), which `ingest` re-mints on the
    replace path. That closed the real, **money-costing** bug — a phone auto-retry after a dropped ack
    bypassed the dedup guard and triggered a **duplicate paid OCR call** — with **no** persisted generation

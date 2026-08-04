@@ -3280,6 +3280,52 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu1 [MED] — ✅ DONE 2026-08-03** (`1a84d1c` fix; `54981e0` test; this commit, mutants +
+  trackers). The filed premise held on all three paths. `photoIngested`'s W3.cap-r2 started-once guard read a
+  SECOND record of its own — a `startedPages: Set<PageKey>` inserted beside the OCR Task — and that copy
+  outlived the work it was guarding wherever the Task was freed without it: `finalizeSegment` clears
+  `pageTasks` for the pages it staged, `finalize`'s reclaim branch emptied the set WHOLESALE while its
+  straggler / partial branches emptied nothing at all (all three of them dropping the filed group from
+  `finalizedGroups` first), and `photoRemoved`'s mid-finalize carve-out keeps the key on purpose. So the guard
+  came to mean "this page once had a call" instead of "this page has one", and it sits ABOVE the late-page
+  branch: a page the phone re-sent after its group finalized returned there — no call, no warning — and once
+  the group had been filed a later finalize read the empty entry as "OCR not started" and staged a silently
+  text-less archival document.
+  **Fixed at the second of the two seams the finding named** — gate on presence-of-task, `pageTasks[key] ==
+  nil` — and the second record is **DELETED**, the same shape as `cap-r4` (one reader, nothing left to drift)
+  rather than a hand-sync between two sets. Presence-of-Task is strictly stronger than started-ness for a
+  page's whole pre-finalize life, because a COMPLETED Task stays in the map until finalize clears it: `cap-r2`'s
+  dropped-ack dedup is unchanged, and the mid-finalize carve-out still de-duplicates a re-arrival instead of
+  letting it overwrite the entry finalize is suspended on. Two behaviour deltas, both toward the operator: a
+  page re-sent for a still-staged group now reaches the "a late page arrived" message it could never reach, and
+  a page re-sent after its group was filed buys the OCR it needs instead of being archived text-less (one page
+  of spend, versus a text-less document — the same trade `cap-r3` recorded). One incidental fix: the reclaim
+  branch's wholesale reset also disarmed pages still mid-OCR in groups the batch never planned, so a
+  dropped-ack re-upload of one could buy its call twice.
+  **The finding's ⚠️ was half right, and the correction matters for the next reader.** It warned that retiring
+  the key inside the carve-out would let a re-arrival "overwrite `pageTasks[key]` and double-buy" — measured
+  (M2), it does NOT double-buy: `finalizedGroups` still holds the group mid-finalize, so the re-arrival returns
+  at the late-page branch before any assignment. What that naive fix actually costs is a **mislabel plus a lost
+  paid page** — the operator is told a "late page arrived" for a page that IS being read, and finalize then
+  reads `nil` for it, so the segment keeps ONE of the two pages of OCR they paid for. Same verdict on the fix,
+  different reason; the money claim was over-stated.
+  Tier-2: adversarial self-review traced every `pageTasks` mutation, every `finalizeSegment` exit, and every
+  `finalizedGroups` insert/remove, confirming there is no state where a nil entry coexists with a live consumer
+  outside `finalizedGroups` — i.e. the invariant is exactly "a page may buy a call iff no Task exists for it
+  and its group is not currently finalized". `retryFailed`'s missing `cancel()` was deliberately left alone
+  (that is `-fu2`). **4 mutants measured, all killed:** M1 the pre-fix two-record design (the original bug)
+  **8 red**, incl. the no-warning and the one-page-of-text checks · M2 the naive carve-out retirement **4 red**
+  (2 of `cap-r3`'s + the new mislabel + the lost page) · M3 the guard removed outright **5 red**, incl.
+  `cap-r2`'s own dedup check, so the guard is still doing its original job · M4 the reclaim branch resetting
+  the record wholesale **2 red**, exactly scenario 4 and nothing else. New Test 17 in the recovery driver: 14
+  checks over the four states a page can re-arrive in (staged · filed · mid-finalize · post-reclaim), each
+  driven through the REAL `ingest` → `finalizeSegment` → `finalize` path with the $0 stub, so what they count
+  is what the operator would be charged; the harm is measured on the record finalize wrote, not on the guard.
+  `test-recovery.sh` **ALL PASS, 113 → 127**. Build clean, no new warnings. (The Processor scheme has no test
+  action, so these headless drivers ARE its smoke test.) Residual filed from this pass: **`W3.cap-r3-fu4`** —
+  after Finish the app forgets a groupId was ever filed, so a late re-upload opens a second document for it
+  instead of being told it cannot join.
+
 - [x] **W3.cap-r3 [LOW → money] — ✅ DONE 2026-08-03** (`5c3938e` fix; `c510af2` + `1ddc083` test + mutants;
   `72b2e1c` the adversarial pass's fix; this commit, trackers). **The last of the six WS11 Capture findings —
   this section is now closed.** The filed premise held: `removePhoto` / `removePhotoIfSafe` dropped a photo
