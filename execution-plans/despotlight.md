@@ -350,7 +350,20 @@ as follows, in order of preference:
    Reader. The argument against it is therefore cost and invasiveness, **not** capability — say that
    honestly rather than implying it is impossible, or someone will "fix" it later.
 
-**This is a genuine capability reduction, not a like-for-like swap** — be explicit about it in the commit.
+⚠️ **REVISED 2026-08-04 — prefer keeping the scope, not narrowing it.** Two independent measurements of the
+actual vocabulary changed this recommendation: **~7,051 distinct tag names** exist under `$HOME` (excluding
+`~/Library`), **~157,401 tagged files**, and **~99% of them live under `~/Desktop`**. So a walk of
+**`~/Desktop`** reproduces essentially all of Spotlight's answer at a cost this plan has already shown is
+trivial — no narrowing required, and no `$HOME` sweep either. Prefer that over option 3's capability
+reduction; keep options 1–2 (persisted, monotonic vocabulary) as the *storage* design.
+
+**The concrete deliverable that comes with it:** the Processor is unsandboxed but its `Info.plist` carries
+only `NSLocalNetworkUsageDescription` (`:29`), so reading `~/Desktop` needs an
+**`NSDesktopFolderUsageDescription`** string — a real, user-visible TCC prompt that must be worded honestly.
+That is the one honest cost of keeping the scope, and it belongs in `W26.vocab`.
+
+**If the scope IS narrowed anyway, it is a genuine capability reduction, not a like-for-like swap** — be
+explicit about it in the commit.
 Also: **eight consumer sites** depend on `SystemTagsProvider`'s API surface, and the `isReady` →
 *"building tag suggestions…"* UI state exists **solely because the Spotlight gather was slow**. With a
 persisted vocabulary, suggestions are available instantly on launch, so that state can likely be retired —
@@ -494,15 +507,71 @@ have their own version of that failure**, and neither is hypothetical — both w
 
 ### 4a.1 `TagReading.read` reports "no tags" when it means "couldn't read"
 
-`TagReading.read` returns **`.success(tagNames: [])`** — semantically *"confirmed to have no tags"* — for a
-file that demonstrably carries `["Unread", …]`, when sandbox access to that path is denied
-(`ArchiveCore/Tags/TagReading.swift:29-38`). A walker built naively on it would classify every tagged file
-in an inaccessible tree as *untagged* and render the **exact same lie**, with Spotlight nowhere in sight.
+⚠️ **CORRECTED 2026-08-04 by a second, more careful measurement — the first was wrong (see §4a.3).** The
+trap is real but far narrower than originally written, and the difference decides where the fix belongs:
 
-**Required:** `CorpusWalker` must distinguish three outcomes per file — *has tags*, *verified no tags*,
-*could not be read* — and the third must **never** be silently folded into the second. A file that cannot
-be read is a `DiscoveryStatus.failed` contributor, not an absence. Fix this in `W26.walk1`; consider
-tightening `TagReading.read` itself (it is shared, so that is a Tier-2 change touching both apps).
+| Denial shape | `resourceValues(forKeys:[.tagNamesKey,.labelNumberKey])` | Honest? |
+|---|---|---|
+| Parent directory unreadable (`chmod 000`) | **THROWS** `NSCocoaErrorDomain/257` | ✅ already honest |
+| ACL denying `read`/`readattr`/`readextattr` | **THROWS** `NSCocoaErrorDomain/257` | ✅ already honest |
+| **File itself unreadable, parent traversable** | **NO THROW → `tagNames == nil`** | 🔴 **the whole bug** |
+| Parent `0o111` (traverse-only, not listable) | reads fine, full tags | ✅ correct |
+
+So `TagReading.read` **already** returns `.failure` for both *tree-level* denials. The single leak is the
+third row: the call succeeds, `tagNames` is `nil`, and `TagReading.swift:34`'s `values.tagNames ?? []`
+reports *"confirmed no tags"* about a file carrying `["Unread", …]`. In exactly that case
+`access(path, R_OK) == -1` and `getxattr(...) == -1` with `EACCES(13)`, so the condition is cheaply
+detectable.
+
+**Required, and precisely scoped:** probe **only on the `tagNames == nil` branch** — one `access(R_OK)` (or
+`getxattr`) there separates *verified empty* from *unreadable*. A blanket pre-check on every file is wasted
+work at 150k and was this plan's earlier, wrong prescription; adding a `.denied` case to `TagReadResult` has
+the largest blast radius of the three options (§9 non-goals). `CorpusWalker` must still surface three
+outcomes — *has tags*, *verified none*, *could not read* — with the third feeding `.degraded`, never an
+absence.
+
+### 4a.1b 🔴 THE SAME COERCION IS IN THE AUDITED WRITE PATH — and it destroys tags
+
+**This is the most serious finding in the wave, it has nothing to do with Spotlight, and no design agent
+found it. `TagWrite.swift:252-261`:**
+
+```swift
+// §2/§3 fresh read inside coordination; a read FAILURE aborts (never treated as empty).
+do {
+    let rv = try writeURL.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
+    before = rv.tagNames ?? []          // ← the comment's promise is broken right here
+    beforeLabel = rv.labelNumber
+} catch { throw TagWriteError.unreadable(error.localizedDescription) }
+```
+
+The comment promises *"a read FAILURE aborts (never treated as empty)"* — but in the §4a.1 third-row case
+**the read does not throw**, so the `catch` never fires and `before` becomes `[]` for a file that carries
+real tags. `transform([], nil)` then computes a delta against nothing, and line 271 writes it.
+
+**Reproduced twice on scratch files:**
+
+```
+mode 0o200 (write-only, no read)      read: no-throw, before=[]   write: SUCCEEDED
+    tags on disk: ["Unread","Subj","P9"] → ["Read"]     *** Subj and P9 destroyed ***
+ACL deny readextattr (perms 0644)     read: no-throw, before=[]   write: SUCCEEDED
+    tags on disk: ["Unread","Subj","P9"] → ["Read"]     *** destroyed ***
+mode 0o000 (no read, no write)        read: no-throw, before=[]   write: failed (-5000)
+    tags preserved — but the reported `.before` is still wrong, so the UNDO delta is wrong
+```
+
+This is a direct violation of the Core Directive (*"MUST NOT mangle, drop, or lose any tag
+unintentionally"*) reachable on any file whose xattrs are unreadable but writable, and the `0o000` row shows
+that even when the write fails the recorded `before`/inverse is corrupt.
+
+**Exposure on the real corpus today: ZERO — measured, not assumed.** A read-only scan of all **123,028**
+files found `owner lacks read bit: 0`, `getxattr EACCES: 0`. (51 files matched a nil-tags-with-xattr-present
+pattern; all inspected samples decode to a literal **empty array** with normal `-rw-r--r--` perms — benign
+residue of removed tags, not denial.) So this is a **latent** bug, not an active fire — but modes and ACLs
+arrive from network copies, restores and archive extractions, and the corpus is irreplaceable.
+
+**Therefore `W26.deny` is the wave's first item, Tier-2, and it fixes BOTH call sites** — `TagReading.swift:34`
+and `TagWrite.swift:257` — routing the writer's §2/§3 fresh read through the corrected primitive so its
+comment becomes true. It is independent of everything else here and must not wait behind the walker.
 
 ### 4a.2 `FileManager.enumerator` silently skips what it cannot read
 
@@ -516,30 +585,27 @@ the flaw.
 skip list as a degraded walk (`.failed` or a distinct `.partial`). **The walk must be honest about what it
 could not see** — that single rule is what this whole wave is buying.
 
-### 4a.3 The measured mechanism — `resourceValues` does not throw, it returns `nil`
+### 4a.3 A cautionary note on how this was nearly got wrong — reuse a `URL` and you measure nothing
 
-Verified 2026-08-04 on a tagged scratch file inside a `chmod 000` directory:
+The first measurement of §4a.1 concluded that **parent-directory** denial produced the silent `nil`. That was
+**wrong**, and the reason is the trap this repo already documents: the test probed a control case on a `URL`
+value, then sealed the parent and probed **the same `URL` object again**. `URL.resourceValues` **caches on
+the backing `NSURL`**, so the second answer was served from cache. The corrected run in §4a.1 builds a
+**fresh `URL` from the path string immediately before every probe** and corroborates each result at the
+syscall layer (`access(R_OK)`, `getxattr` + `errno`), which is what surfaced the true third-row case.
 
-```
-A readable+tagged (control):      NO THROW -> tagNames=["Unread", "Subj"]
-C tagged file in chmod-000 DIR:   NO THROW -> tagNames=nil          ← the whole bug
-D enumerator(no errorHandler) saw: ["a.txt", "sub"]   ← listed sub, silently never descended
-E errorHandler FIRED for sub: 257                      ← NSFileReadNoPermissionError
-```
+Two consequences for the implementer:
 
-**`TagReading.read` is not sloppy** — it explicitly separates `.success` from `.failure` and carries a
-CRITICAL comment forbidding exactly this coercion (`TagReading.swift:5-9`), because
-`CoordinatedTagWriter` refuses to write on `.failure` (Safety Protocol §3). The defect is narrower and
-subtler: **`resourceValues` does not throw here at all.** It returns success with `tagNames == nil`, and
-line 34's `values.tagNames ?? []` converts *"I could not read this"* into *"confirmed empty"*. The comment
-at `:32-33` — *"a nil `tagNames` legitimately means 'no tags' (confirmed empty)"* — **encodes a false
-assumption**, and it is the one load-bearing line in the file.
+1. **Any test of freshness, denial, or tag change must construct a new `URL` per probe** (or use `stat(2)` /
+   `getxattr` directly). A test that reuses a `URL` value will pass while asserting nothing — and the failure
+   is invisible, because the cached value is a *plausible* value.
+2. `TagReading.read` itself is **not** sloppy: it separates `.success` from `.failure` and carries a CRITICAL
+   comment forbidding this coercion (`TagReading.swift:5-9`). Its one bad line is the `:32-33` comment
+   asserting *"a nil `tagNames` legitimately means 'no tags' (confirmed empty)"*, which is false in exactly
+   the third-row case — and `:34` then acts on it.
 
-**Consequence beyond discovery:** the write guard that Safety Protocol §3 relies on can be bypassed by this
-path, since it yields `.success`, not `.failure`. Practically it is hard to reach (an unreadable parent
-directory means the file was never enumerated), but the fix belongs in **`TagReading` itself** — shared
-ArchiveCore, both apps, therefore **Tier-2** — not only in the walker. Distinguish *nil-because-absent*
-from *nil-because-unreadable* (probe the parent's readability, or re-`stat` and compare).
+This is the same hazard recorded as `url-resourcevalues-caches` (measured W23.m11-fu). It cost one wrong
+conclusion in this very plan; treat §5.1 as load-bearing, not decorative.
 
 ### 4a.4 🔴 And it reproduces on cloud storage — with a hang, not just a lie
 
@@ -708,7 +774,9 @@ each leaving the app **working**.
 
 | Tag | Title | Effort | Risk | Tier | needs | blocked-on |
 |---|---|---|---|---|---|---|
-| `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | — |
+| `W26.deny` | 🔴 **Fix the read coercion in BOTH `TagReading.swift:34` and `TagWrite.swift:257`** | S | med | **2** | none | — |
+| `W26.lint` | Extend `lint-write-surface.sh` to cover `packages/ArchiveCore` | S | low | 1 | none | — |
+| `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny` |
 | `W26.walk2` | Reader discovery → `CorpusWalker`; delete `PendingWrite`; honest `DiscoveryStatus` | L | med | 2 | none | `W26.walk1` |
 | `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
 | `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
@@ -717,14 +785,31 @@ each leaving the app **working**.
 | `W26.reinfect` | Rewrite the open JPEGS-index item off `NSMetadataQuery` + add its blocking edge | S | low | 1 | none | — |
 | `W26.scripts` | Fixture scripts drop `mdimport`/`mdfind` polling | S | low | 1 | none | `W26.walk2` |
 | `W26.docs` | Docs/SPEC stop claiming Spotlight (incl. `ArchiveReader/CLAUDE.md:106`) | S | low | 1 | none | `W26.walk2` |
-| `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab`, `W26.oracle`, `W26.reinfect` |
+| `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab`, `W26.oracle`, `W26.reinfect`, `W26.deny`, `W26.lint` |
 
 `W26.oracle` and `W26.reinfect` are **unblocked and can go first** — neither depends on the walker.
 `W26.reinfect` is deliberately early: it is cheap, and every day it is undone is a day the JPEGS item
 could ship a second `NSMetadataQuery` into the codebase this wave exists to clear.
 
+**`W26.deny` goes first and is not optional.** It is a live Core Directive violation (§4a.1b), it is
+independent of Spotlight, and every later item builds on the corrected primitive. **`W26.lint` closes a
+governance hole this plan itself would otherwise open:** `ArchiveReader/scripts/lint-write-surface.sh:10`
+hardcodes `SRC="macOS/Sources/ArchiveReader"`, so moving discovery into `packages/ArchiveCore` moves it
+**out of the Core Directive's automated enforcement**. (Note the same gap already exempts ArchiveCore's own
+`TagWrite.swift` — which is precisely where §4a.1b's bug has been sitting unlinted.) Extend `SRC` to cover
+`packages/ArchiveCore/Sources/ArchiveCore`, keeping the *tag-write* rule's allow-list pointed at the audited
+writer.
+
 **Per-item test gates** (an item is not done without one that would *fail* if the work were wrong):
 
+- `W26.deny` — the reproduction from §4a.1b, as a test: a scratch file tagged `["Unread","Subj","P9"]` set to
+  `mode 0o200` (and a second with an ACL denying `readextattr`), then a `TagWriter` "mark Read". **Today it
+  destroys `Subj` and `P9`; after the fix the write must ABORT with `TagWriteError.unreadable`** and the tags
+  must be byte-identical afterwards. Add the `0o000` variant asserting the recorded `before`/inverse is not
+  `[]`. Plus a `TagReading` unit test for all four rows of §4a.1's table. ⚠️ Build every probe from a **fresh
+  `URL`** (§4a.3) or the test will pass while asserting nothing.
+- `W26.lint` — `./ArchiveReader/scripts/lint-write-surface.sh` fails when a `setResourceValue` is planted in
+  a new ArchiveCore file outside the audited writer, and passes on a clean tree.
 - `W26.walk1` — scratch fixture with tagged/untagged/hidden/nested/package files + an em-dash+NBSP
   filename; assert the exact expected set. Assert the walker performs **zero** writes (pre/post xattr +
   mtime snapshot of the fixture).

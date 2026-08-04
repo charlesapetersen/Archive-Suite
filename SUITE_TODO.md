@@ -155,34 +155,61 @@ report xattr-only tag writes (`ItemXattrMod`), so live updates need no polling.
 put first) and *ahead of* the older W16/W3.cap/W17–W22 backlog. `W26.walk1`+`W26.walk2` are the two items
 that stop the incident recurring — **say the word and they go to the top of the queue.**
 
-🔴 **THE FIX HAS TWO WAYS OF REPRODUCING THE BUG — both measured 2026-08-04, both must be closed in
-`W26.walk1`.** (a) **`TagReading.read` returns `.success(tagNames: [])`** — semantically *"confirmed to have
-no tags"* — for a file that demonstrably carries `["Unread", …]` when sandbox access to the path is denied
-(`ArchiveCore/Tags/TagReading.swift:29-38`). A walker built naively on it would call every tagged file in an
-inaccessible tree *untagged* and tell the **same lie**, with Spotlight nowhere in sight. (b)
-**`FileManager.enumerator(at:includingPropertiesForKeys:options:)` — the overload with no `errorHandler:` —
-silently skips unreadable directories**, and that is the overload the working DEBUG fixture loader uses
-(`ArchiveLibrary.swift:97-99`), so copying it verbatim inherits the flaw. **Required:** three distinct
-outcomes per file (*has tags* / *verified none* / *could not read*), the `errorHandler:` variant, and a
-surfaced count of everything skipped. **Every layer must be able to say "I don't know" separately from
-"there is nothing" — Spotlight could not, which is why the app lied.**
+🔴 **THE FIX HAS TWO WAYS OF REPRODUCING THE BUG — and the first is ALSO A LIVE TAG-DESTROYING BUG in the
+audited write path, unrelated to Spotlight. See `W26.deny`; it goes first.**
 
-**Measured mechanism** (tagged scratch file inside a `chmod 000` dir): `resourceValues` **does not throw** —
-it returns success with `tagNames == nil`, and `TagReading.swift:34`'s `values.tagNames ?? []` turns *"could
-not read"* into *"confirmed empty"*. `TagReading` is otherwise careful (it separates `.success`/`.failure`
-and `CoordinatedTagWriter` refuses to write on `.failure`, Safety §3) — the one bad line is the `:32-33`
-comment asserting *"a nil `tagNames` legitimately means no tags"*. **So the real fix is in `TagReading`
-itself — shared ArchiveCore, both apps, therefore Tier-2** — plus the walker. Note the write guard Safety §3
-relies on is bypassable via this path (it yields `.success`, not `.failure`), though it is hard to reach.
-⚠️ **GENUINE OPEN DECISION — resolve it explicitly in W26.walk1 and record the choice.** Three independent
-designs all declined to add a `.denied` case to `TagReadResult`, because it ripples through every
-`TagReading` caller in **all three apps** plus `CoordinatedTagWriter`'s §3 refusal logic — they'd have the
-walker probe the parent's readability instead. That contradicts the Safety-§3 argument above. **Narrow
-reading (recommended): fix the walker now (cheap, unblocks the wave) and file the `TagReadResult` question as
-its own Tier-2 item carrying the Safety §3 argument** — rather than smuggling a three-app enum change into a
-discovery task. Do not let this be decided silently either way.
-Also confirmed: `enumerator` **without** `errorHandler:` listed the sealed dir but silently never descended;
-**with** `errorHandler:` it fired code 257 (`NSFileReadNoPermissionError`).
+**(a) The read coercion — CORRECTED 2026-08-04 by a second, careful measurement (the first was wrong).** The
+trap is far narrower than first written, and the difference decides where the fix goes. With a **fresh `URL`**
+per probe, corroborated by `access`/`getxattr`+`errno`: parent-directory denial (`chmod 000`) **THROWS**
+`NSCocoaErrorDomain/257`; an **ACL** denying `read`/`readattr`/`readextattr` **THROWS 257**; a parent at
+`0o111` (traverse-only) **reads fine** — all three already honest. **The single leak is a file that is itself
+unreadable with a traversable parent: the call does NOT throw and yields `tagNames == nil`,** which
+`TagReading.swift:34`'s `values.tagNames ?? []` reports as *"confirmed no tags"* about a file carrying
+`["Unread", …]`. There `access(R_OK) == -1` and `getxattr == -1/EACCES(13)`, so it is cheap to detect.
+**Probe ONLY on the `tagNames == nil` branch** — a blanket pre-check is wasted work at 150k (this plan's
+earlier, wrong prescription), and a new `TagReadResult.denied` case has the largest blast radius (all three
+designs declined it; see plan §9). ⚠️ **Why the first measurement was wrong — it will bite the tests too:**
+it reused one `URL` object across probes and `URL.resourceValues` **caches on the backing `NSURL`**, so the
+answer came from cache. **Construct a fresh `URL` per probe (or use `stat`/`getxattr`), or a test passes while
+asserting nothing.**
+
+**(b) `FileManager.enumerator(at:includingPropertiesForKeys:options:)` — the overload with no `errorHandler:`
+— silently skips unreadable directories**, and that is the overload the working DEBUG fixture loader uses
+(`ArchiveLibrary.swift:97-99`), so copying it verbatim inherits the flaw. Confirmed: without the handler it
+listed a sealed dir but never descended; **with** it, code 257 fired. **Required:** three distinct outcomes
+per file (*has tags* / *verified none* / *could not read*), the `errorHandler:` variant, and a surfaced count
+of everything skipped. **Every layer must be able to say "I don't know" separately from "there is nothing" —
+Spotlight could not, which is why the app lied.**
+
+- [ ] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2 ·
+  needs: none].** `TagWrite.swift:252-261` carries the comment *"a read FAILURE aborts (never treated as
+  empty)"* and then does `before = rv.tagNames ?? []` at `:257`. In the case above **the read does not
+  throw**, so the `catch` never fires, `before` becomes `[]` for a file with real tags, `transform([], nil)`
+  computes a delta against nothing, and `:271` writes it. **Reproduced twice on scratch files:** `mode 0o200`
+  (write-only, no read) → read no-throw, `before=[]`, write **SUCCEEDED**, disk went
+  `["Unread","Subj","P9"]` → `["Read"]` — **`Subj` and `P9` destroyed**; an **ACL denying `readextattr`** at
+  perms `0644` → identical destruction. With `mode 0o000` the write fails (-5000) so tags survive, **but the
+  recorded `before`/inverse is still `[]`, so UNDO is corrupt.** Direct violation of the Core Directive
+  (*"MUST NOT mangle, drop, or lose any tag unintentionally"*) and **independent of Spotlight** — a bug even
+  if this wave never happened. **Exposure on the real corpus today: ZERO, measured not assumed** — a read-only
+  scan of all 123,028 files found `owner lacks read bit: 0`, `getxattr EACCES: 0` (51 files match
+  nil-tags-with-xattr-present, but samples decode to a literal **empty array** at `-rw-r--r--` — benign
+  residue of removed tags). So it is **latent, not an active fire** — but modes and ACLs arrive from network
+  copies, restores and archive extractions, and the corpus is irreplaceable. **Fix BOTH call sites**
+  (`TagReading.swift:34` + `TagWrite.swift:257`), routing the writer's §2/§3 fresh read through the corrected
+  primitive so its comment becomes true. **Goes FIRST — every later item builds on this primitive.**
+  **Test:** the reproduction inverted — the write must ABORT with `TagWriteError.unreadable` and tags must be
+  byte-identical afterwards; plus the `0o000` variant asserting `before`/inverse is not `[]`; plus a
+  `TagReading` unit test covering all four denial shapes. Build every probe from a **fresh `URL`**. Also file
+  it in `ArchiveReader/KNOWN_ISSUES.md`.
+- [ ] **W26.lint — extend the write-surface lint to cover ArchiveCore [S · low · Tier-1 · needs: none].**
+  `ArchiveReader/scripts/lint-write-surface.sh:10` hardcodes `SRC="macOS/Sources/ArchiveReader"`, so moving
+  discovery into `packages/ArchiveCore` (which this plan does) moves it **out of the Core Directive's
+  automated enforcement** — and the same gap already exempts ArchiveCore's own `TagWrite.swift`, which is
+  exactly where `W26.deny`'s bug sat unlinted. Extend `SRC` to include
+  `packages/ArchiveCore/Sources/ArchiveCore`, keeping the tag-write allow-list pointed at the audited writer.
+  **Test:** the lint FAILS when a `setResourceValue` is planted in a new ArchiveCore file outside the writer,
+  and passes on a clean tree.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -196,7 +223,7 @@ root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would al
 `PDFTextExtractor`/`ContentIndexer` silently downloading dataless files — broader, flagged, not decided.)
 
 - [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
-  needs: none].** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
+  needs: none] (blocked-on: W26.deny).** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
   `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
   DEBUG fixture loader) + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable.
   Shared by both apps. **Test:** scratch fixture with tagged/untagged/hidden/nested/package files and an
@@ -377,7 +404,7 @@ root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would al
   (vocabulary narrowing); `SPEC/tag-format.md` (how tags are **read** — the tag vocabulary itself is
   unchanged, so this is *not* a contract change); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
-  (blocked-on: W26.fsev, W26.idx, W26.vocab).** Full-scale run against a **scratch copy** (never the real
+  (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
   corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline, memory ceiling, a
   **no-write assertion across the whole tree**, and cancel-mid-walk leaves no partial removals. Confirm
   `grep -rn "NSMetadataQuery\|kMDItem\|mdfind"` over `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and

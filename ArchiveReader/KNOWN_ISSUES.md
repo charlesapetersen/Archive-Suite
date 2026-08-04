@@ -2,6 +2,50 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## 🔴 OPEN (W26.deny) — `TagWriter` can DESTROY tags on a file whose xattrs are unreadable-but-writable
+
+**Found 2026-08-04** while auditing Spotlight removal; **independent of Spotlight** and of that wave.
+Tracked as `W26.deny` in `SUITE_TODO.md` (Tier-2, goes first). Affects `packages/ArchiveCore` — filed here
+because Reader tag safety is documented here.
+
+`TagWrite.swift:252-261` states *"§2/§3 fresh read inside coordination; a read FAILURE aborts (never treated
+as empty)"* and then does:
+
+```swift
+let rv = try writeURL.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
+before = rv.tagNames ?? []          // ← breaks the promise directly above
+```
+
+**The `catch` never fires in the dangerous case.** Measured: `resourceValues` throws `NSCocoaErrorDomain/257`
+for parent-directory denial and for an ACL denying `read`/`readattr`/`readextattr` — both already safe — but
+for **a file that is itself unreadable with a traversable parent it SUCCEEDS with `tagNames == nil`**. So
+`before = []`, `transform([], nil)` computes a delta against nothing, and `:271` commits it.
+
+**Reproduced twice on scratch files** (tags `["Unread","Subj","P9"]`, then a "mark Read"):
+
+| Setup | read | write | result |
+|---|---|---|---|
+| `mode 0o200` (write-only) | no throw, `before=[]` | **SUCCEEDED** | `["Read"]` — **`Subj`/`P9` destroyed** |
+| ACL `deny readextattr`, perms `0644` | no throw, `before=[]` | **SUCCEEDED** | `["Read"]` — **destroyed** |
+| `mode 0o000` | no throw, `before=[]` | fails (−5000) | tags survive, but `before`/inverse is `[]` → **undo corrupt** |
+
+Violates the Core Directive (*"MUST NOT mangle, drop, or lose any tag unintentionally"*).
+
+**Exposure on the real corpus: ZERO — measured, not assumed.** Read-only scan of all **123,028** files under
+`~/Desktop/Google Drive/Archival Photos`: `owner lacks read bit: 0`, `getxattr EACCES: 0`. (51 files match
+"nil tags yet `_kMDItemUserTags` present"; inspected samples decode to a literal **empty array** at
+`-rw-r--r--` — benign residue of removed tags, not denial.) So **latent, not an active fire** — but modes and
+ACLs arrive from network copies, restores and archive extractions, and the corpus is irreplaceable.
+
+**Fix:** correct both call sites — `TagReading.swift:34` and `TagWrite.swift:257` — by probing
+`access(R_OK)`/`getxattr` **only on the `tagNames == nil` branch** (parent/ACL denial already throws, so a
+blanket pre-check is wasted work at 150k), and route the writer's fresh read through the corrected primitive.
+
+⚠️ **Testing gotcha that already caused one wrong conclusion here:** `URL.resourceValues` **caches on the
+backing `NSURL`**, so a probe that reuses a `URL` value returns a stale answer and the test passes while
+asserting nothing. Build a fresh `URL` per probe, or use `stat(2)`/`getxattr`. See *@Published willSet
+timing* below and the `url-resourcevalues-caches` note (W23.m11-fu) for the same class of trap.
+
 ## ✅ FIXED (W23.l2) — a cancelled prune task could still defeat the two-emission absence gate
 
 **2026-07-31.** `ContentIndexer.pruneIfSettled` cancels the prior prune task before starting a new one,
