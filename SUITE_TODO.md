@@ -167,6 +167,27 @@ outcomes per file (*has tags* / *verified none* / *could not read*), the `errorH
 surfaced count of everything skipped. **Every layer must be able to say "I don't know" separately from
 "there is nothing" — Spotlight could not, which is why the app lied.**
 
+**Measured mechanism** (tagged scratch file inside a `chmod 000` dir): `resourceValues` **does not throw** —
+it returns success with `tagNames == nil`, and `TagReading.swift:34`'s `values.tagNames ?? []` turns *"could
+not read"* into *"confirmed empty"*. `TagReading` is otherwise careful (it separates `.success`/`.failure`
+and `CoordinatedTagWriter` refuses to write on `.failure`, Safety §3) — the one bad line is the `:32-33`
+comment asserting *"a nil `tagNames` legitimately means no tags"*. **So the real fix is in `TagReading`
+itself — shared ArchiveCore, both apps, therefore Tier-2** — plus the walker. Note the write guard Safety §3
+relies on is bypassable via this path (it yields `.success`, not `.failure`), though it is hard to reach.
+Also confirmed: `enumerator` **without** `errorHandler:` listed the sealed dir but silently never descended;
+**with** `errorHandler:` it fired code 257 (`NSFileReadNoPermissionError`).
+
+🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
+(Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
+`getattrlistbulk` fails **`errno 60` (Operation timed out) after 0.54 s**. Mitigation is proven and is one
+call — `setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)`
+returns 0 and converts the stall into an immediate clean error. ⚠️ **The policy is PER-THREAD and Swift's
+cooperative pool reuses threads, so setting it inside `Task.detached` neither guarantees coverage nor avoids
+leaking it into unrelated work — the scan MUST run on a dedicated `Thread` that sets it first.** Hard
+requirement on W26.walk1. (The owner's corpus is local and needs none of this; the *walker* is general and a
+root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would also stop
+`PDFTextExtractor`/`ContentIndexer` silently downloading dataless files — broader, flagged, not decided.)
+
 - [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
   needs: none].** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
   `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
@@ -196,8 +217,22 @@ surfaced count of everything skipped. **Every layer must be able to say "I don't
   permanently. Promote the DEBUG fixture path into the real walker so `-ARUITestRootPath` selects a fixture
   *root*, not a different discovery *mechanism*. Add `DiscoveryStatus` (`.walking(done:total:)` — real
   progress Spotlight could never give — `.ok`, `.failed(reason:)`, `.emptyButReadable(scanned:)`), mirroring
-  `ContentIndexer.Failure`; **only `.emptyButReadable` may say "no tagged PDFs", and it must cite the count
-  scanned.** ⚠️ **Three things that will bite:** (a) `applyVerifiedWrites` has **five callers** —
+  `ContentIndexer.Failure`. ⚠️ **`isGathering: Bool` must be replaced outright, not reinterpreted** — today it
+  renders a full-screen spinner that **blanks the list** (`NavigationWindowView.swift:163-170`), so a warm
+  start would either blank real rows or lie that the view is settled. Use
+  `phase: LibraryPhase = .noRoot | .firstScan(done:seen:) | .revalidating(asOf:) | .settled(asOf:) | .degraded(Failure, asOf:)`
+  (full-screen spinner is correct **only** in `.firstScan`), with a pure `Outcome -> Failure?` mapping so
+  health is decided in one unit-testable place. **The empty-state copy needs a DENOMINATOR:** *"no
+  Read/Unread-tagged PDFs"* may render **only** when the last scan's `outcome = complete` AND
+  `dir_errors = 0` AND `files_seen > 0`, and must then say *"Scanned 1,849 files in this folder; none carry a
+  Read or Unread tag."* That one guard makes today's incident unrepresentable. Copy `ContentIndexer`'s
+  generation-token discipline verbatim (`:176-179`) so a root switch mid-scan can't publish stale batches.
+  ⚠️ **The absence rule INVERTS and is the likeliest way to lose index rows:** a deterministic walk has no
+  transient drop (so `ContentIndexer.swift:280-284`'s justification evaporates) but gains a worse hazard — a
+  scan ending early yields a legitimately-complete-looking short list. Three tiers: (1) `outcome != complete`
+  or `dir_errors > 0` → **absence is not actionable at all**, keep unseen rows as `verified = 0`;
+  (2) clean scan → absence is real; (3) keep a confirmation count across clean scans for the FSEvents
+  coalescing case. **Do not delete the gate and do not keep it as-is** — re-derive it from the `scan` table. ⚠️ **Three things that will bite:** (a) `applyVerifiedWrites` has **five callers** —
   `NavigationModel.swift:839` (mark), `:862` (group edit), `:952` (inline edit), `:998` (corpus-wide rename),
   `:1050` (undo) — rewrite all five to a direct row replacement from the verified `.after`/`.afterLabel`
   they already pass in, reusing `rebuilt` (`:139-142`). (b) **`isGathering` is a correctness gate, not
@@ -259,7 +294,20 @@ surfaced count of everything skipped. **Every layer must be able to say "I don't
   W23.m11-fu — a 100→250-byte rewrite read back unchanged on the same `URL` value), so a revalidation pass
   that reuses `URL` values is **silently a no-op**. Use `stat(2)` via `withUnsafeFileSystemRepresentation`
   for every freshness check. Also: store paths byte-exactly (em dash + NBSP filenames) — never round-trip
-  through NFC/NFD, or every launch re-indexes the corpus. ⚠️ **The Reader's write-surface lint
+  through NFC/NFD, or every launch re-indexes the corpus. **Schema:** an `entry` table storing the **raw**
+  tag array only (`DocumentTags.parse` is the single parse authority — persisting derived facets would fork
+  it) with fingerprint `(mtime, ctime, size, ino)` — **`ctime` is load-bearing, not belt-and-braces, because
+  a tag write bumps ctime ONLY** — plus a `tracked` and a `verified` flag; **and a `scan` provenance table**
+  (`started`, `finished`, `files_seen`, `dir_errors`, `outcome`) which is what lets honest status survive a
+  relaunch at all (`ContentIndexer`'s `Failure` is `@Published` in memory and lost on quit, so a warm start
+  today cannot tell "these rows are correct" from "these are what a half-failed scan saw"). Name it
+  `library-index-v1.sqlite3`; bump the filename for any schema change — **not stylistic: the write-surface
+  lint bans file-delete APIs app-wide, so the app literally cannot remove a superseded DB.** Recommend
+  persisting **all** regular files, not just tagged ones (measured: +60 MB, 1.3× rows) so a newly-tagged file
+  is a one-row update — owner call. **No back-pressure machinery:** the walk is ~10× cheaper than the tag
+  read it feeds, so two sequential phases suffice (walk → one `SELECT` → diff → read tags for the diff only);
+  no `AsyncStream`, no semaphore. Batch at 500 to match `ContentIndex` (500→2000 spread is 15%, not a lever).
+  ⚠️ **The Reader's write-surface lint
   (`ArchiveReader/scripts/lint-write-surface.sh:20-25`) bans `createFile`, `FileHandle forWriting`,
   `.write(to:)` and the `FileManager` mutators across the WHOLE app target**, so this cache must persist
   through the **SQLite3 C API** exactly as `ContentIndex.swift` does — not `Data.write(to:)`, not

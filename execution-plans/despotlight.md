@@ -163,6 +163,30 @@ per file: 82 us          extrapolated to 150k: 12.4 s
 | `resourceValues` (tags+label+type+mtime), serial | 16 ms (9 µs/file) | 15 ms | ~1.3 s |
 | same, **parallel** (width 12) | 4 ms (2 µs/file) | 5 ms | **~0.4 s** |
 
+**Refined by a second, independent benchmark pass the same day** (12 cores, same real corpus). The API
+choice for the *walk* matters far more than parallelism does:
+
+| Stage | Measured | At 150k |
+|---|---|---|
+| Walk via **`getattrlistbulk`** (mtime+ctime+size+ino), 123,028 files | **0.348 s** (2.8 µs/file) | ~0.42 s warm |
+| Walk via `FileManager.enumerator` (the figure in the table above) | 10.15 s | ~12.4 s |
+| Tag read, `TagReading.read` serial | 64.5 µs/file | ~9.7 s |
+| Tag read, `TagReading.read` in a `TaskGroup` (3.2× win) | ~20 µs/file | ~3.0 s |
+| **Whole Spotlight-free discovery** | — | **~4.2 s warm / ~6.7 s cold** |
+| Warm start: load + rebuild 150,000 persisted rows | 0.61–0.64 s | (4.3 µs/row) |
+
+Two notes on method: parallelism is **not** the main lever, and dropping to raw `getxattr` + binary-plist
+decode does **not** pay off as folklore suggests (2× serially, but it loses to `TaskGroup`-parallelised
+`resourceValues` and forfeits the audited path) — so **use `TagReading.read` as the read primitive** and get
+the win from concurrency width. Cold figures come from an untouched 162,945-file sibling tree, since a true
+cold cache needs `sudo purge`.
+
+**And the "too slow at 150k" objection is dead by a factor of ~460×:** the PDF content extraction the app
+**already performs unconditionally** over the whole corpus costs **9,706 µs/file** (measured: PDFKit open +
+page-2 text over 300 real multi-page OCR'd PDFs), against **21 µs/file** for the entire discovery walk and
+tag read. No work item needs a "is a full walk affordable?" spike, and **no design may reintroduce Spotlight
+as a performance optimisation.**
+
 **Conclusions that the plan rests on:**
 
 1. **A complete, correct cold discovery pass over the real 102k-PDF corpus takes ~10 seconds
@@ -270,13 +294,40 @@ from **"this folder has no tagged PDFs."** Mirror `ContentIndexer.Failure`
 (`.unavailable(detail:)` / `.incomplete(rows:)` → "Search index unavailable", with a tooltip explaining
 the index is a rebuildable cache).
 
-New `DiscoveryStatus`: `.idle`, `.walking(done:total:)`, `.ok(count:)`,
-`.failed(reason:)` (permission denied, root unreachable, bookmark stale, volume unmounted),
-`.emptyButReadable(scanned:)`.
+⚠️ **`isGathering: Bool` is not expressive enough and must be replaced outright.** Today the overlay is
+binary: either `isGathering` — which renders a full-screen spinner that **blanks the list**
+(`NavigationWindowView.swift:163-170`) — or settled. A warm start has *real rows on screen* while
+revalidating, so a boolean would either blank them or lie that the view is settled.
 
-- `.emptyButReadable` is the **only** state permitted to say "no tagged PDFs were found" — and it now
-  says it with evidence: *"Scanned 1,849 files in this folder; none carry a Read or Unread tag."*
-- `.failed` says what failed and what to do, and **never** implies anything about the corpus.
+```swift
+enum LibraryPhase {
+    case noRoot
+    case firstScan(done: Int, seen: Int)     // full-screen spinner is correct ONLY here
+    case revalidating(asOf: Date)            // rows stay on screen; subtle affordance only
+    case settled(asOf: Date)
+    case degraded(Failure, asOf: Date?)
+}
+```
+
+`Failure` mirrors `ContentIndexer.Failure`'s proven shape (`ContentIndexer.swift:19-44`, `:456-473`) —
+`Equatable + Sendable`, a `message` for the status bar, a `detail` for the tooltip, and a **pure
+`Outcome -> Failure?` mapping so health is decided in one place and is unit-testable**:
+`.indexUnavailable(detail:)`, `.rootUnreadable(path:errno:)`, `.scanIncomplete(dirErrors:)`.
+
+**The anti-pattern fix is one guard, and it needs a denominator.** *"No Read/Unread-tagged PDFs were found
+in this folder"* is currently rendered on the sole condition that the list is empty — **it has no idea
+whether anything was successfully scanned.** New rule:
+
+> That copy may appear **only** when the last scan's `outcome = complete` **AND** `dir_errors = 0`
+> **AND** `files_seen > 0` — and it must then **state the denominator**:
+> *"Scanned 1,849 files in this folder; none carry a Read or Unread tag."*
+
+Anything else is `.degraded`, which says what failed and what to do, and **never** implies anything about
+the corpus. That single guard is what makes today's incident unrepresentable.
+
+**Copy the generation-token discipline verbatim** from `ContentIndexer` (`:176-179`): every scan launch
+bumps a `scanGeneration`, and every progress / batch / finish hop is `guard gen == scanGeneration`, so a
+root switch mid-scan cannot let stale batches publish over the new root.
 
 ### 4.4 `SystemTagsProvider` (Processor) — the home-wide-scope problem
 
@@ -373,20 +424,56 @@ dependency and would put the 8-case content-index test suite in the blast radius
 change. Keep them separate; both are disposable caches.
 
 ```sql
-CREATE TABLE files (
-  path        TEXT PRIMARY KEY,   -- absolute; see normalisation note below
-  root        TEXT NOT NULL,      -- owning root, for prefix eviction
-  name        TEXT NOT NULL,
-  mtime       REAL NOT NULL,      -- from stat(2), NOT resourceValues (see §5)
-  size        INTEGER NOT NULL,
-  uti         TEXT,
-  tags        TEXT NOT NULL,      -- JSON array, verbatim, order preserved
-  label       INTEGER,
-  scanned_at  REAL NOT NULL
+-- Store the RAW tag array only. DocumentTags.parse(raw:labelNumber:) is the single parse authority
+-- (ArchiveLibrary.swift:110-115, :205-207 both build ArchiveFile through it), so persisting derived
+-- facets (read_state / priority / year) would fork that authority and let the DB disagree with the parser.
+CREATE TABLE entry (
+  path      TEXT PRIMARY KEY,     -- byte-exact as the walk returned it; never NFC/NFD-normalised (§5.3)
+  root_id   INTEGER NOT NULL,
+  name      TEXT NOT NULL,
+  ext       TEXT NOT NULL DEFAULT '',
+  mtime     REAL NOT NULL,        -- content mtime: feeds ContentIndexer's extraction skip
+  ctime     REAL NOT NULL,        -- LOAD-BEARING: a tag write bumps ctime ONLY (§5.12)
+  size      INTEGER NOT NULL DEFAULT 0,
+  ino       INTEGER NOT NULL DEFAULT 0,
+  tags_raw  TEXT NOT NULL,        -- verbatim array, order preserved
+  label     INTEGER,
+  tracked   INTEGER NOT NULL,     -- 1 = carries Read/Unread
+  verified  INTEGER NOT NULL      -- 0 = carried over from a scan that did not complete cleanly
 );
-CREATE INDEX files_root ON files(root);
-CREATE INDEX files_mtime ON files(mtime);
+CREATE INDEX entry_root ON entry(root_id, tracked);
+
+-- Scan provenance. THIS is what makes honest status survive a relaunch: ContentIndexer's Failure is
+-- @Published in memory only (ContentIndexer.swift:19-47) and is lost on quit, so a warm start currently
+-- cannot tell "these 1,849 rows are correct" from "these are what a half-failed scan managed to see".
+CREATE TABLE scan (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  root_id    INTEGER NOT NULL,
+  started    REAL NOT NULL,
+  finished   REAL,                -- NULL = did not complete (crash / cancel / quit mid-scan)
+  dirs_seen  INTEGER NOT NULL DEFAULT 0,
+  files_seen INTEGER NOT NULL DEFAULT 0,
+  dir_errors INTEGER NOT NULL DEFAULT 0,   -- from the errorHandler (§4a.2) — gates the empty state
+  outcome    TEXT                          -- complete | partial | failed
+);
 ```
+
+**Name it `library-index-v1.sqlite3`** and bump to `-v2` for any schema change. The filename-bump
+convention is not stylistic: **the write-surface lint bans file-delete APIs app-wide, so the app literally
+cannot remove a superseded DB** — bumping the name is the only available "migration". No versioned readers,
+no migration code (2026-08-01 no-migration directive).
+
+**Recommend persisting ALL regular files, not just tagged ones** (`tracked` distinguishes them). Measured
+cost on the real corpus: **60 MB and 1.3× the rows** — cheap, and it means an untagged file that *becomes*
+tagged is a one-row update rather than invisible until a full re-walk. Flagged for the owner as a size/benefit
+call.
+
+**No back-pressure machinery is needed.** Because the walk is ~10× cheaper than the tag read it feeds, two
+sequential phases are the simplest correct design (proven: two complete 123,028-entry fingerprint
+dictionaries built and diffed in one process): (A) walk on the policy-guarded dedicated `Thread` →
+`[Fingerprint]`; (B) one `SELECT path,mtime,ctime,size,ino FROM entry WHERE root_id=?` → diff map;
+(C) read tags only for the diff. **No `AsyncStream`, no bounded continuation, no semaphore.** Batch upserts
+at 500 rows purely to match `ContentIndex` — measured spread from 500→2000 is 15%, i.e. not a real lever.
 
 - **The filesystem and its xattrs remain the sole source of truth.** This DB is a disposable cache;
   deleting it loses nothing (same guarantee `ContentIndex` already documents). It is stored **outside
@@ -429,8 +516,56 @@ the flaw.
 skip list as a degraded walk (`.failed` or a distinct `.partial`). **The walk must be honest about what it
 could not see** — that single rule is what this whole wave is buying.
 
+### 4a.3 The measured mechanism — `resourceValues` does not throw, it returns `nil`
+
+Verified 2026-08-04 on a tagged scratch file inside a `chmod 000` directory:
+
+```
+A readable+tagged (control):      NO THROW -> tagNames=["Unread", "Subj"]
+C tagged file in chmod-000 DIR:   NO THROW -> tagNames=nil          ← the whole bug
+D enumerator(no errorHandler) saw: ["a.txt", "sub"]   ← listed sub, silently never descended
+E errorHandler FIRED for sub: 257                      ← NSFileReadNoPermissionError
+```
+
+**`TagReading.read` is not sloppy** — it explicitly separates `.success` from `.failure` and carries a
+CRITICAL comment forbidding exactly this coercion (`TagReading.swift:5-9`), because
+`CoordinatedTagWriter` refuses to write on `.failure` (Safety Protocol §3). The defect is narrower and
+subtler: **`resourceValues` does not throw here at all.** It returns success with `tagNames == nil`, and
+line 34's `values.tagNames ?? []` converts *"I could not read this"* into *"confirmed empty"*. The comment
+at `:32-33` — *"a nil `tagNames` legitimately means 'no tags' (confirmed empty)"* — **encodes a false
+assumption**, and it is the one load-bearing line in the file.
+
+**Consequence beyond discovery:** the write guard that Safety Protocol §3 relies on can be bypassed by this
+path, since it yields `.success`, not `.failure`. Practically it is hard to reach (an unreadable parent
+directory means the file was never enumerated), but the fix belongs in **`TagReading` itself** — shared
+ArchiveCore, both apps, therefore **Tier-2** — not only in the walker. Distinguish *nil-because-absent*
+from *nil-because-unreadable* (probe the parent's readability, or re-`stat` and compare).
+
+### 4a.4 🔴 And it reproduces on cloud storage — with a hang, not just a lie
+
+Also reproduced 2026-08-04, against a **real** `~/Library/CloudStorage/GoogleDrive-…` directory (Google
+Drive.app installed but not signed in): the no-`errorHandler` enumerator returns the **same silent empty
+result**, and `getattrlistbulk` there fails with **`errno 60` (Operation timed out) after 0.54 s**.
+
+**The mitigation is proven and it is one call:**
+`setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)`
+returns 0 and turns that timeout into a clean, immediate error instead of a stall.
+
+⚠️ **But the policy is PER-THREAD, and Swift's cooperative pool reuses threads across unrelated tasks.**
+Setting it inside a `Task.detached` body therefore both (a) fails to guarantee it covers the whole walk and
+(b) **leaks the policy into unrelated work that happens to land on that thread.** So: **the scan must run
+on a dedicated `Thread`** that sets the policy first. This is a hard requirement on `W26.walk1`, not an
+optimisation.
+
+This does not contradict §2 — the owner's corpus is genuinely local and needs no placeholder handling. It
+means the **walker is a general component** and a user can point a root anywhere, so it must fail fast and
+loudly rather than hang. (Open question for the owner: `IOPOL_SCOPE_PROCESS` would also stop
+`PDFTextExtractor`/`ContentIndexer` silently downloading dataless files — broader, but a bigger behavioural
+change. Flagged, not decided.)
+
 > **The design principle, stated once:** every layer must be able to say *"I don't know"* separately from
-> *"there is nothing."* Spotlight could not, which is why the app lied. Do not rebuild that.
+> *"there is nothing."* Spotlight could not, which is why the app lied. Do not rebuild that — in the
+> walker, in `TagReading`, or in the index.
 
 ## 5. Verified traps the implementer must respect
 
@@ -500,11 +635,19 @@ could not see** — that single rule is what this whole wave is buying.
     `.contentModificationDateKey` for the content-index skip (not ctime, or every tag edit would force a
     full re-OCR-extraction of the corpus) **and** detect tag changes by comparing the tag array itself (or
     ctime) separately. Conflating the two breaks either freshness or performance.
-13. **The two-consecutive-absence prune gate must NOT be deleted.** `ContentIndexer.swift:283` justifies it
-    in terms of *"Spotlight's transient-drop window"* — comment-only, and the rationale changes, but a
-    walk/FSEvents source has its own transient-absence mode (a cancelled pass, a coalesced drop). The gate
-    counts **emissions, not time**, which was tuned to Spotlight's behaviour; **re-tune it, do not remove
-    it.** Update the comment (`W26.docs`), keep and re-justify the mechanism.
+13. **The absence rule INVERTS — and this is the item most likely to lose data if rushed.**
+    `ContentIndexer.swift:280-284`'s two-consecutive-emission gate exists to close *"Spotlight's transient-drop
+    window"*. A deterministic walk has **no** transient drop — so the old justification evaporates — but it
+    acquires a **strictly worse** hazard the old gate cannot see: a scan that ends early (permission error,
+    cancel, quit, unmounted volume) yields a *legitimately complete-looking* short list, and every unseen
+    row looks deleted. Replace it with a three-tier rule keyed on scan provenance:
+    1. `outcome != complete` **or** `dir_errors > 0` → **absence is not actionable at all.** Keep unseen
+       rows and mark them `verified = 0`. The files may be perfect and simply unreachable — exactly the
+       incident, one layer down.
+    2. `outcome = complete` and `dir_errors = 0` → absence is real; apply it.
+    3. Retain a confirmation count across *clean* scans for the FSEvents-coalescing case (§4.5), since a
+       dropped-to-subtree re-walk can still momentarily under-report.
+    **Do not delete the gate and do not keep it as-is** — re-derive it from the `scan` table.
 14. **Bookmark resolution success is not proof of readability.** Resolving the bookmark and getting `true`
     from `startAccessingSecurityScopedResource` does **not** mean the root can be read. The Reader's
     existing lifetime shape is already correct for a long-lived walk + watch (one process-lifetime
