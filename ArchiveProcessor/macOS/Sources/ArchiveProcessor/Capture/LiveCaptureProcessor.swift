@@ -179,18 +179,51 @@ final class LiveCaptureProcessor: ObservableObject {
         didSet { perItemSheetDidChange(wasUp: oldValue != nil) }
     }
 
-    /// True while one of the two per-item sheets is on screen — i.e. while the Live Capture window is
-    /// already showing a modal that is not the finish flow's own. Read by `proceedToFinishIfReady`.
-    var perItemSheetUp: Bool { modelChoiceTarget != nil || textViewerTarget != nil }
+    /// How long after the last per-item sheet target is cleared the finish stays held anyway.
+    ///
+    /// ⚠️ THE MOST DELICATE PART OF `W3.cap-r3-fu9`, and it exists because a cleared target is NOT the sheet
+    /// leaving the screen. `.sheet(item:)` — and `ModelChoiceSheet`'s own `onApply`/`onCancel` and
+    /// `SegmentTextViewerSheet`'s `onDismiss` — write nil while AppKit is still animating the sheet OUT,
+    /// ~0.2–0.4 s. The first version of this fix advanced the finish one MainActor turn after that write
+    /// (microseconds), which raised the rotation review DURING the outgoing sheet's teardown and so made the
+    /// concurrent-presentation state this item exists to prevent the ORDINARY path rather than a rare race.
+    /// An adversarial pass caught it before it shipped. 1.5 s is a 4–5× margin over a macOS sheet dismissal.
+    ///
+    /// Deliberately a bounded OVER-hold rather than a presentation callback (`.onDisappear` on the sheet
+    /// body), and the asymmetry is the argument: releasing too EARLY re-opens a hazard whose worst outcome is
+    /// unrecoverable — a dropped presentation leaves `showRotationReview` true with no sheet on screen, its
+    /// only writers are that sheet's own buttons, and `clearSessionState` does not clear it, so Finish would
+    /// be dead for the rest of the session — whereas holding too LONG costs seconds and expires by itself. A
+    /// signal fed from the view could also leak and then hold forever; a deadline cannot.
+    static let perItemSheetGrace: TimeInterval = 1.5
 
-    /// A per-item sheet closed: if a Finish is waiting on it, advance now instead of waiting up to 5 s for
-    /// the watchdog. Deliberately on the NEXT MainActor turn rather than inline: this runs from inside the
-    /// dismissal's own write, and raising a new sheet in the same update as the one being torn down is the
-    /// concurrent-presentation state the guard above exists to avoid. (Correctness does not depend on this
-    /// hop — `startFinishWatchdog` re-evaluates every 5 s regardless — it is the latency that does.)
+    /// When the last per-item sheet target was cleared. Only ever read through `perItemSheetUp`.
+    private var perItemSheetClearedAt: Date?
+
+    /// True while one of the two per-item sheets is on screen — or may still be, for `perItemSheetGrace`
+    /// after its target was cleared. Read by `proceedToFinishIfReady`.
+    var perItemSheetUp: Bool {
+        if modelChoiceTarget != nil || textViewerTarget != nil { return true }
+        if let t = perItemSheetClearedAt, Date().timeIntervalSince(t) < Self.perItemSheetGrace { return true }
+        return false
+    }
+
+    /// A per-item sheet's target was cleared — it is dismissing. Start the grace, and if a Finish is waiting
+    /// on it, re-evaluate once that grace has expired.
+    ///
+    /// The delayed re-evaluation is LATENCY, not correctness: `startFinishWatchdog` re-evaluates every 5 s
+    /// regardless, so dropping this only means the operator waits up to that long to see the review after
+    /// closing a sheet. It must never be shortened below the grace, which is the entire point of the hop.
+    /// ⚠️ The condition is the raw targets, NOT `!perItemSheetUp` — during the grace that property is
+    /// deliberately still true, so testing it here would mean this never fires at all.
     private func perItemSheetDidChange(wasUp: Bool) {
-        guard wasUp, !perItemSheetUp, pendingFinish else { return }
-        Task { @MainActor [weak self] in self?.proceedToFinishIfReady() }
+        guard wasUp, modelChoiceTarget == nil, textViewerTarget == nil else { return }
+        perItemSheetClearedAt = Date()
+        guard pendingFinish else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64((Self.perItemSheetGrace + 0.1) * 1_000_000_000))
+            self?.proceedToFinishIfReady()
+        }
     }
 
     private unowned let session: CaptureSession
@@ -1297,8 +1330,12 @@ final class LiveCaptureProcessor: ObservableObject {
         // for the three things SwiftUI might then do and why none of them is acceptable in a money path.
         // Refusing here rather than in `finishSession` is load-bearing: `pendingFinish` is cleared on the
         // line below, so a refusal one level in would DISCARD the finish (nothing re-arms it) instead of
-        // holding it. Held, this is self-healing — the watchdog re-evaluates every 5 s, `perItemSheetDidChange`
-        // nudges the moment the sheet closes, and `cancelPendingFinish` is the operator's escape.
+        // holding it. Held, this is self-healing on a timer — `startFinishWatchdog` re-evaluates every 5 s and
+        // `perItemSheetDidChange` re-evaluates once its grace expires. ⚠️ NOT via `cancelPendingFinish()`,
+        // which an earlier draft of this comment called "the operator's escape": that method has no caller in
+        // the shipped UI at all (an adversarial pass caught the claim). The only operator-driven way out of a
+        // pending finish today is the Clear button, which Trashes the session's sources — filed as
+        // `W3.cap-r3-fu9-fu1`.
         guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive,
               !perItemSheetUp else { return }
         pendingFinish = false
@@ -1738,6 +1775,13 @@ final class LiveCaptureProcessor: ObservableObject {
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"
         pendingFinish = false
+        // W3.cap-r3-fu9 — the per-item sheet targets are session state too, and they are now an INPUT to the
+        // finish gate (`perItemSheetUp`), so a survivor is not merely a sheet over an empty pane: a target
+        // left set names a group that no longer exists and would hold the NEXT session's Finish indefinitely.
+        // Latent rather than live (reaching Clear needs the window-modal sheet down), and cleared here for
+        // the same reason everything above it is.
+        modelChoiceTarget = nil
+        textViewerTarget = nil
         clearFinalizeSummary()
     }
 

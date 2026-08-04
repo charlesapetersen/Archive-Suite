@@ -863,7 +863,17 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   60 s wait and prints "Recovery data-safety test timed out", which reads as a hang. Worse, the first mutant
   pass read that missing report as **0 RED**, i.e. as the guard being untested, which is the exact wrong
   conclusion. The pattern generalises: the failing case is systematically SLOWER than the passing one, so the
-  wait is calibrated against precisely the wrong run. Fix is cheap — raise
+  wait is calibrated against precisely the wrong run.
+  🔺 **A SECOND, INDEPENDENT WAY IT BLOWS — measured 2026-08-04 by `W3.cap-r3-fu9`: parasitic CPU load.** The
+  same green suite (170 checks) ran **73 s → timeout** and then **19 s → ALL PASS** on the same commit, minutes
+  apart; the only difference was 8 orphaned busy-loop shells from an earlier session's load test eating ~1.3
+  cores (killed in between — see that session's Morning Review note). So the wait is calibrated not just against
+  the wrong RUN but against the wrong MACHINE STATE, and an iteration-counted `Task.sleep` settle stretches ~6×
+  under load, which no amount of check-level care fixes (that item's own new section had to switch its negative
+  wait to a wall-clock DEADLINE for the same reason). It also cost a debugging round: the first failing run
+  looked like a logic bug in the new section. **Whatever the fix, make the timeout message name what it
+  measured** (elapsed, checks completed, last check seen) so the next reader is not left choosing between
+  "hang", "slow machine" and "real FAIL". Fix is cheap — raise
   the wait (180 s), or better, poll for process EXIT as well as the report file so a genuine crash/hang is
   distinguished from "not finished yet" in the message. Same shape in the sibling drivers
   (`test-manifest-persistence.sh`, `test-merge-safety.sh`, `test-batch-resume.sh`), so fix the pattern once
@@ -1279,32 +1289,17 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   this item's value is unchanged and is now purely what its title says: making the window modal to focus and
   AX for **future** affordances, and killing fu7's P6/P7 + fu11's M5 as measurements. Filed
   2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
-- [ ] **W3.cap-r3-fu9 [LOW · SUSPECTED · presentation]** `LiveCaptureView:81-117` — the Live Capture tab
-  attaches `showRotationReview`, `modelChoiceTarget` and `textViewerTarget` as three separate `.sheet`
-  modifiers, and `W3.cap-r3-fu7`'s scope decision rests on the claim that a per-item sheet already on screen
-  can SUPPRESS the rotation-review sheet. If that claim is true the consequences are worse than the retry
-  hazard fu7 closed: `finishSession` sets `showRotationReview = true` with no sheet visible, so the operator's
-  rotation review is silently skipped, nothing in production calls `applyRotationReviewAndFinalize` (only the
-  headless E2E path at `CaptureSession.swift:109` does), `cancelRotationReview`'s only caller is the invisible
-  sheet's Cancel — and `requestFinish` guards `!showRotationReview`, so **Finish is then dead for the rest of
-  the session** with staged output nobody can file. The second-order effect is the one fu7 named: the model
-  sheet's deferred Apply then calls `retryFailed` in a finish state fu7 deliberately did NOT gate, because the
-  right fix is a single sheet router / not losing the review, not a silent refusal inside a money path.
-  ⚠️ **Verify before fixing — the premise may simply be false.** The one-sheet-per-view limit applies to
-  modifiers at the SAME level; these are CHAINED, and current macOS SwiftUI may present them stacked quite
-  happily, in which case this item closes as unreachable and fu7's scope note should be corrected to say so.
-  A headless driver cannot see sheet presentation, so settling it needs the VM GUI lane (`W21.vmgui-d` gives
-  the Processor one) or a careful read of the modifier chain. (An earlier version said to pair this with
-  `W3.cap-r3-fu10`; fu10 shipped 2026-08-04 `0ee6179` off a code read and needed no lane, so this stands
-  alone. What fu10 DID leave for the lane is its own residual, `W3.cap-r3-fu10-fu1`, plus the hit-test
-  observation — those two and this one are the Processor lane's opening backlog.) **A second, independent leg the adversarial pass found:** a deferred Apply landing while
-  `showRotationReview` is up calls `retryFailed`, which sets `retained[gid] = nil` — and
-  `applyRotationReviewAndFinalize` then hits `guard var seg = retained[page.groupId]` and silently DROPS that
-  group's rotation edits. So the sheet-state window loses operator work even where it costs no money, which is
-  an argument for refusing there; ⚠️ if that is the fix chosen, driver Test 21 check 8 asserts the opposite
-  (a retry succeeding under `showFinalizeSheet`, which is what pins fu7's P5 width mutant) and must be
-  rewritten, not read as a regression. Found 2026-08-04 by `W3.cap-r3-fu7`'s reachability analysis and its
-  adversarial pass; pre-existing, unrelated to that fix. | Capture/Views | Tier-2
+- [ ] **W3.cap-r3-fu9-fu1 [LOW · ops/UX]** `LiveCaptureProcessor.cancelPendingFinish()` — **a pending Finish
+  has no operator-visible escape.** The method exists and does exactly the right thing, but its only caller is
+  `ManifestPersistenceTestDriver`; nothing in the shipped UI calls it. So while a Finish is pending — waiting on
+  a tag card, on in-flight OCR, on the phone's drain, or (since `W3.cap-r3-fu9`) on a per-item sheet — the only
+  way out is the **Clear** button, which Trashes every source photo of the session, and Clear is itself only
+  rendered while `session.photos` is non-empty. Re-tapping Finish is not an escape either (`requestFinish` just
+  re-arms). Wire it: a "Cancel finish" affordance shown while `pendingFinish`, beside the waiting message that
+  already explains what the finish is waiting for. ⚠️ `proceedToFinishIfReady`'s comment called
+  `cancelPendingFinish` "the operator's escape" until fu9's adversarial pass showed it was false; the comment
+  now says so, and this item is the fix. Found 2026-08-04 by that pass; **pre-existing** — fu9 adds one more
+  state in which a hold can happen, it did not create the gap. | Capture/Views | Tier-2 (Capture)
 - [ ] **W3.cap-r3-fu8 [LOW · bookkeeping]** `LiveCaptureProcessor` manifest-resume path (~`staged = restored`)
   — a **THIRD labeller**, and the last one that can disagree with its record. Resume rebuilds a status row per
   restored segment with `phase: .staged` hardcoded, so a `.noOutput`/`.incompleteOutput` record recovered from

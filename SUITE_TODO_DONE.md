@@ -3396,6 +3396,69 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W3.cap-r3-fu9 [LOW · SUSPECTED → closed by construction · presentation] — ✅ DONE 2026-08-04**
+  (`7fd8cbb` first fix; `db38627` Test 23 + round-1 mutants; this commit, the adversarial pass + the fix it
+  forced + trackers). `LiveCaptureView` attaches FIVE `.sheet` modifiers to one view, and the item asked
+  whether a per-item sheet already on screen can SUPPRESS the rotation-review sheet — which if true skips the
+  operator's review silently and then DEADLOCKS Finish for the rest of the session (`requestFinish` guards
+  `!showRotationReview`, the only writers that clear it are the invisible sheet's own buttons, and
+  `clearSessionState` does not clear it either), leaving paid, staged output nobody can file.
+  ⚠️ **THE PREMISE WAS NOT VERIFIED, and the fix does not need it to be.** A headless driver cannot see sheet
+  presentation at all and the Processor has no VM GUI lane yet (`W21.vmgui-d`), so rather than guess, the three
+  things SwiftUI might do with two concurrent presentations were enumerated — and every one is a real failure:
+  **suppressed** = the item's own hazard; **queued** = the deferred Apply's `retryFailed` nils `retained[gid]`
+  first, so the review that then appears describes a segment being re-OCR'd and `applyRotationReviewAndFinalize`
+  silently DROPS its rotation edits (the item's second leg); **stacked** = dismissing the review drops the
+  operator back onto a still-presented model sheet whose Apply now lands inside `isFinalizing`, the one entry
+  `fu7`'s guard is the whole defence for. So the STATE was made unreachable instead of the behaviour predicted.
+  **THE FIX is one term in one guard plus a grace window.** `proceedToFinishIfReady` refuses to START the
+  finish while either per-item sheet is up — the same class as the `pendingTagGroup` term already beside it (a
+  modal the operator has open, which the finish must not walk into) — and `perItemSheetUp` stays true for
+  `perItemSheetGrace` (1.5 s) after the last target clears. Placement is load-bearing: `pendingFinish` is
+  cleared on the line before `finishSession()`, so the same refusal one level in would DISCARD the finish.
+  🔺 **THE GRACE IS THERE BECAUSE THE ADVERSARIAL PASS BROKE THE FIRST VERSION**, and this is the part worth
+  carrying forward: **a cleared target is not the sheet leaving the screen.** `.sheet(item:)`, and the sheet's
+  own Apply/Cancel/Dismiss, write nil while AppKit is still animating the sheet OUT (~0.2–0.4 s). v1 advanced
+  the finish one MainActor turn after that write — microseconds — so it raised the review DURING the outgoing
+  sheet's teardown and turned the concurrent-presentation state into the ORDINARY path rather than the rare
+  race the item was filed for, with the worst of the three outcomes (a dropped presentation is unrecoverable:
+  Finish dead for the session, and Clear no escape). Two of three reviewers found it independently. The grace
+  is deliberately a bounded OVER-hold rather than an `.onDisappear` signal from the view: releasing early
+  re-opens an unrecoverable hazard, holding long costs seconds and expires by itself, and a view-fed signal
+  could leak and hold forever.
+  **Reachability needs no click:** `finishSession` is the only writer of `showRotationReview`, and
+  `proceedToFinishIfReady`'s callers are background events (a segment staging, a phone heartbeat, a 5 s
+  watchdog). The operator presses Finish while the phone is still draining, opens "Rotate & re-run" while
+  waiting, and the drain completing raises the review under their open sheet.
+  **The two targets moved out of `LiveCaptureView`'s `@State` onto `LiveCaptureProcessor`** — the guard must
+  see them, and a second published copy would be the two-records-one-fact shape `fu1`/`fu6` were filed for.
+  `clearSessionState` now resets them too, since a survivor would hold the NEXT session's Finish.
+  **Test 23 (9 checks)** drives the REAL `requestFinish` (Tests 21/22 could call `finishSession()` directly;
+  this cannot, because the background entrant is the point), in the operator-reachable order the first draft
+  got wrong — the tag card is modal, so it is resolved BEFORE a per-item sheet can be opened. Check 4 asserts
+  every other term of the guard independently false, so the hold is attributable to the sheet alone; check 6
+  asserts the grace as a PAIR (up across the teardown, down after it), since either half alone is satisfiable
+  by a mistake. Mutants, all built and run to a written report on a 150 s wait (baseline 172 checks, 0 RED, 0 Swift
+  warnings): M1 the guard term deleted → **1 RED** (check 4); **M2 the grace deleted, i.e. v1 → 1 RED**
+  (check 6), the kill for the defect the pass found; M3 the delayed hop shortened back to one turn →
+  **0 RED**, which is the right answer and the measurement that says the protection lives in the grace and
+  not in the hop; M4 the guard moved into `finishSession` → **3 RED** (checks 4, 7, 8). M5 (the view→model
+  leg) is buildable and would be 0 RED — not run, and priced as a gap for `W21.vmgui-d`.
+  ⚠️ **What this does NOT cover, priced rather than implied.** The VIEW→model leg is UNCOVERED: an earlier
+  draft called it "compile-enforced" because the view's `@State` was deleted, and the adversarial pass built
+  the counterexample (re-adding a `@State` target and repointing the sheet compiles cleanly, leaves
+  `perItemSheetUp` permanently false, and makes the guard a silent no-op with 0 RED anywhere) — so it is
+  `W21.vmgui-d`'s to close, and M5 records the cost. Nothing here observes the 5 s watchdog either; an earlier
+  draft waited 5.5 s to "cover a tick", which is unbacked (a tick that never armed is indistinguishable from
+  one that fired and was held), so that wait was cut to 0.75 s and the claim withdrawn.
+  **Knock-ons recorded rather than left implicit:** `fu7`'s deferred-Apply entry is no longer reachable in
+  production, so that guard is defence-in-depth now and its SILENT-refusal cost is not live (its DONE entry and
+  `retryFailed`'s comment both say so); Test 21's check 8, which flagged itself as coupled to a fu9 fix that
+  "refuses during the sheet states", stands unchanged because this fix holds the FINISH instead — discharged,
+  not pending. One residual filed: **`W3.cap-r3-fu9-fu1`** — `cancelPendingFinish()` has no caller in the
+  shipped UI, so a pending finish's only operator escape is the Clear button, which Trashes the sources; the
+  guard's comment claimed otherwise until the pass caught it. | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu7 [LOW · latent · race] — ✅ DONE 2026-08-04** (`765897b` fix + Test 21; `68160b0` five
   mutants; this commit, trackers + the adversarial pass). The item's own suggestion was the cheap one and it
   was right, but not sufficient on its own. `applyRotationReviewAndFinalize` sets `isFinalizing` and then
@@ -3427,7 +3490,11 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   would have papered over is filed instead as **`W3.cap-r3-fu9`**: whether an already-open per-item sheet can
   suppress the rotation-review sheet, which if true is a worse bug than this one (the review is skipped and
   `requestFinish`'s own guard then deadlocks Finish) and wants a presentation-layer fix, not a silent refusal
-  inside a money path.
+  inside a money path. **fu9 shipped 2026-08-04 and settled it the other way round:** the presentation question
+  is still unobserved, but the finish flow no longer STARTS while a per-item sheet is up, so the
+  concurrent-presentation state is unreachable — which also makes THIS item's deferred-Apply entry unreachable
+  in production. P5's narrowness therefore still holds, and this guard is now defence-in-depth rather than the
+  sole defence on that path.
   **Test 21 (8 checks) drives the real window with no gate object.** `isFinalizing = true` is set
   synchronously before the `Task`, and everything that closes the window again runs on the MainActor after an
   await on the detached write — so a retry issued on the same MainActor turn is genuinely inside the window
