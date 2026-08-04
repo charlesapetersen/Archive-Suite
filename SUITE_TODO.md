@@ -1289,17 +1289,20 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   this item's value is unchanged and is now purely what its title says: making the window modal to focus and
   AX for **future** affordances, and killing fu7's P6/P7 + fu11's M5 as measurements. Filed
   2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
-- [ ] **W3.cap-r3-fu9-fu1 [LOW · ops/UX]** `LiveCaptureProcessor.cancelPendingFinish()` — **a pending Finish
-  has no operator-visible escape.** The method exists and does exactly the right thing, but its only caller is
-  `ManifestPersistenceTestDriver`; nothing in the shipped UI calls it. So while a Finish is pending — waiting on
-  a tag card, on in-flight OCR, on the phone's drain, or (since `W3.cap-r3-fu9`) on a per-item sheet — the only
-  way out is the **Clear** button, which Trashes every source photo of the session, and Clear is itself only
-  rendered while `session.photos` is non-empty. Re-tapping Finish is not an escape either (`requestFinish` just
-  re-arms). Wire it: a "Cancel finish" affordance shown while `pendingFinish`, beside the waiting message that
-  already explains what the finish is waiting for. ⚠️ `proceedToFinishIfReady`'s comment called
-  `cancelPendingFinish` "the operator's escape" until fu9's adversarial pass showed it was false; the comment
-  now says so, and this item is the fix. Found 2026-08-04 by that pass; **pre-existing** — fu9 adds one more
-  state in which a hold can happen, it did not create the gap. | Capture/Views | Tier-2 (Capture)
+- [ ] **W3.cap-r3-fu12 [LOW · behaviour decision]** `LiveCaptureView` capture-panel header — **an emptied
+  Captured pane hides Finish and Clear even when the session still holds unfiled staged segments.** The whole
+  control cluster is gated on `!session.photos.isEmpty` (line ~417), but `liveProc.staged` is independent of
+  it: delete every received page with the per-thumbnail ✕ and the segments already OCR'd, tagged and written
+  to `_processed/` are still there, unfiled, with no Finish button to file them and no Clear to abandon them.
+  The pane instead shows "Waiting for photos…". Recovery is possible but non-obvious (shoot one more photo and
+  the cluster returns). Found 2026-08-04 by `W3.cap-r3-fu9-fu1`'s adversarial pass, which had to answer "what
+  should the empty-pane state offer?" to place that item's second renderer, and deliberately answered only the
+  narrow part (the pending-finish row) — deciding what ELSE belongs there is a UX call, not a bug fix.
+  ⚠️ Pre-existing and **not** created by fu9-fu1: that item only made the state visible, by drawing the
+  pending-finish row in it. The reachability is measured — recovery driver Test 24 check 7 drives exactly this
+  state (`pendingFinish` armed, `photos` empty, `staged` non-empty). Decide first whether Finish should be
+  offered against staged-but-photoless segments at all; if yes, note that its `.disabled` already keys off
+  `liveProc.statuses`, not `session.photos`, so the gate is the only thing in the way. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu8 [LOW · bookkeeping]** `LiveCaptureProcessor` manifest-resume path (~`staged = restored`)
   — a **THIRD labeller**, and the last one that can disagree with its record. Resume rebuilds a status row per
   restored segment with `phase: .staged` hardcoded, so a `.noOutput`/`.incompleteOutput` record recovered from

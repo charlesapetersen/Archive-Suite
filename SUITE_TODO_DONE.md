@@ -3396,6 +3396,51 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W3.cap-r3-fu9-fu1 [LOW · ops/UX] — ✅ DONE 2026-08-04** (`124652f` the button + the guard; `f311f75`
+  Test 24 + round-1 mutants; `483dc8a` the adversarial pass and the fix it forced; this commit, trackers).
+  `LiveCaptureProcessor.cancelPendingFinish()` was correct code with **no caller in the shipped UI** — its only
+  caller was `ManifestPersistenceTestDriver` — so the only way out of a pending Finish was **Clear**, which
+  Trashes every source photo of the session. Now wired to a "Cancel finish" button in the pending-finish row,
+  beside the message that already explains what the finish is waiting for. Cancelling un-arms the wait and
+  nothing else: no OCR cancelled, no `staged`/`retained` dropped, no file touched, and `requestFinish`'s
+  `completeAllOpenDocGroups()` recovery deliberately NOT rewound (there is no supported undo — that rollback
+  fires only when the manifest write failed). `guard pendingFinish` so a cancel with nothing armed cannot
+  narrate a finish that was not happening.
+  🔺 **THE ADVERSARIAL PASS SENT THE FIX BACK, and the lesson has the same shape as fu9's: an escape hatch
+  nested inside the predicate that hides the thing it is an escape FROM closes nothing.** All three skeptics
+  converged on it independently — v1 put the button inside `if !session.photos.isEmpty`, the very gate all
+  three of its own new comments cited as the reason Clear was inadequate. The state is reachable and is now
+  MEASURED rather than argued (check 7): arm a Finish held by a still-heartbeating phone, delete the received
+  pages with the ✕, and `pendingFinish` survives — `CaptureSession.removePhoto` neither clears it nor re-enters
+  `proceedToFinishIfReady` — with the entire control cluster unrendered and nothing on screen saying a finish
+  is pending. Not self-healing either: `phonePendingActive`'s 20 s staleness clock starts only once the phone
+  goes quiet, so the 5 s watchdog re-holds. Fixed by extracting `pendingFinishRow` and rendering it in TWO
+  places, the second an `else if liveProc.pendingFinish` arm for the emptied pane. Row only — what else an
+  empty pane with live staged segments should offer is filed as **`W3.cap-r3-fu12`**.
+  The pass also corrected four claims, none behavioural: the four-holds enumeration OVERSTATED the fix (a
+  finish held by a tag card or a live per-item sheet is held *by a modal over the panel the button lives in*,
+  so the button is unpressable there and dismissing the sheet is itself the exit — and Clear was never
+  reachable there either; the button serves the in-flight-OCR and phone-drain holds, which are the two that
+  can persist indefinitely with nothing on screen to resolve); the `guard` was written as if it made the status
+  write safe, when a cancel with a finish armed can still overwrite the late-page "kept in the Backup Folder"
+  notice (kept the write — every arriving photo already overwrites that line, so it is not a new class of loss
+  — and said so instead of implying otherwise); the `completeAllOpenDocGroups` citation was backwards; and,
+  pre-existing but leaned on by the new comment, `isFinishingScrimUp`'s note claimed `finishSession` has two
+  callers including `requestFinish` when it has one (the conclusion it supports — `pendingFinish ∧
+  isFinalizing` unreachable, so the omitted `.disabled` is right — was independently re-traced and holds).
+  Two test weaknesses fixed and re-measured: check 5's 0.5 s negative window discriminated NOTHING (`.staged`
+  and `proceedToFinishIfReady` are set in one MainActor turn, so the sample was already after the named event,
+  and the only deferred resumers — the 1.6 s grace hop and the 5 s watchdog — sat outside the window), so it is
+  gone and the section now has no wall-clock waits at all (`W21.recovery-timeout`); and check 6 asserted a
+  LEVEL, which under M3 was green for exactly the wrong reason (`requestFinish` no-ops against an
+  already-raised review) — now a false→true transition, and M3 went 3 RED → 5 RED.
+  Driver 172 → 180, ALL PASS. Mutants, all built and run: M1 (button deleted — the shipped defect) 0 RED, the
+  priced view→model gap (`W21.vmgui-d`); M2 (guard deleted) 1 RED; M3 5 RED; M4 (cancel widened to cancel
+  `pageTasks`) 1 RED — but only after check 3 gained a task-handle term, since the stub OCR ignores
+  cancellation and the obvious "did it still stage?" assertion measured 0 RED; M5/M6 not run, with reasons
+  recorded. Build clean, 0 Swift warnings; manifest-persistence driver (the method's pre-existing caller)
+  ALL PASS. | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu9 [LOW · SUSPECTED → closed by construction · presentation] — ✅ DONE 2026-08-04**
   (`7fd8cbb` first fix; `db38627` Test 23 + round-1 mutants; this commit, the adversarial pass + the fix it
   forced + trackers). `LiveCaptureView` attaches FIVE `.sheet` modifiers to one view, and the item asked
