@@ -161,9 +161,19 @@ that stop the incident recurring — **say the word and they go to the top of th
   DEBUG fixture loader) + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable.
   Shared by both apps. **Test:** scratch fixture with tagged/untagged/hidden/nested/package files and an
   em-dash+NBSP filename → assert the exact expected set, **and** assert zero writes (pre/post xattr+mtime
-  snapshot of the whole fixture). Note there is currently **no test of Reader discovery whatsoever** — the
-  only `ArchiveLibrary` test file is `ArchiveLibraryOverrideTests.swift`, all 8 cases covering the
-  Spotlight-lag override; that gap is how a Release build with no fallback shipped.
+  snapshot of the whole fixture). Note there is currently **no test of Reader discovery whatsoever** —
+  `grep 'ArchiveLibrary(' ArchiveReader/macOS/Tests` returns **zero hits**, and the only `ArchiveLibrary`
+  test file is `ArchiveLibraryOverrideTests.swift`, all 8 cases covering the Spotlight-lag override (deleted
+  by W26.walk2, so the suite total drops by 8 — say so, or a green run with fewer tests reads as a
+  regression). ⚠️ **DECIDE SYNC-VS-ASYNC BEFORE WRITING THE WALKER — existing tests force it:**
+  `DocumentPageLinkTests.swift:229-233`/`:239-240` and `RootMarkerStateTests.swift:143` already drive the
+  DEBUG walker *as the production path* and assert **synchronously** that a freshly-tagged scratch PDF is in
+  `model.library.files` immediately after `NavigationModel()` returns. **An async walker breaks both.**
+  Either keep a synchronous settle path or adopt Notes' `awaitSettled()` seam
+  (`ArchiveNotes/.../NotesModel.swift:286-300`) and convert them. **Copy the Notes shape generally** — it
+  already does walk → index → `awaitSettled` → `markIndexReady` → `adoptIndexFailure`, and
+  `ReaderLinkResolver.swift:235-266` is the already-reviewed off-actor enumerator pattern (private
+  `FileManager`, `nextObject()` not `for-in`).
 - [ ] **W26.walk2 — Reader discovery → `CorpusWalker`; delete the `PendingWrite` subsystem; honest
   `DiscoveryStatus` [L · med · Tier-2 · needs: none] (blocked-on: W26.walk1).** Rip `NSMetadataQuery`,
   both observers, both `searchScopes` branches (incl. the dead `NSMetadataQueryLocalComputerScope`
@@ -175,9 +185,23 @@ that stop the incident recurring — **say the word and they go to the top of th
   *root*, not a different discovery *mechanism*. Add `DiscoveryStatus` (`.walking(done:total:)` — real
   progress Spotlight could never give — `.ok`, `.failed(reason:)`, `.emptyButReadable(scanned:)`), mirroring
   `ContentIndexer.Failure`; **only `.emptyButReadable` may say "no tagged PDFs", and it must cite the count
-  scanned.** **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still list
-  every tagged file (**this test fails today** and is the regression guard for the whole wave), plus
-  `.failed` on an unreadable root and `.emptyButReadable` only on a genuinely untagged one.
+  scanned.** ⚠️ **Three things that will bite:** (a) `applyVerifiedWrites` has **five callers** —
+  `NavigationModel.swift:839` (mark), `:862` (group edit), `:952` (inline edit), `:998` (corpus-wide rename),
+  `:1050` (undo) — rewrite all five to a direct row replacement from the verified `.after`/`.afterLabel`
+  they already pass in, reusing `rebuilt` (`:139-142`). (b) **`isGathering` is a correctness gate, not
+  cosmetic:** `pruneIfSettled` (`NavigationModel.swift:649-651`) gates **deletion of content-index rows** on
+  `isGathering == false`, so a walker that clears it during a partial pass would evict rows for files the
+  walk had not reached yet — it must go false **only after a complete pass**, and a cancelled/failed pass
+  must leave pruning blocked. (c) a background walk publishing from a detached task **must keep the
+  `.receive(on:)` hop** at `NavigationModel.swift:110-117` or it re-opens the GUI-only *"showed 0 of N"* bug
+  that unit tests provably missed (`ArchiveReader/KNOWN_ISSUES.md:166-173`) — so this item needs a
+  functional/GUI gate, not just unit tests. Also un-fence the `UniformTypeIdentifiers` import
+  (`ArchiveLibrary.swift:4-6`) and gate the **Release** build. No entitlement or `project.yml` change is
+  needed anywhere. **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still
+  list every tagged file (**this test fails today** and is the regression guard for the whole wave), plus
+  `.failed` on an unreadable root and `.emptyButReadable` only on a genuinely untagged one. Re-run (do not
+  assume) `DeepLinkTests.swift:118-123`, whose case depends on a root with **no** discoverable files, and
+  re-validate `FixtureUITestCase.swift:75-80` `waitForRows` timeouts across the 15 fixture UI tests.
 - [ ] **W26.fsev — `CorpusWatcher` (FSEvents) replaces `DidUpdate` [M · med · Tier-2 · needs: none]
   (blocked-on: W26.walk2).** `kFSEventStreamCreateFlagFileEvents` on the security-scoped root, with
   `start/stopAccessingSecurityScopedResource` balanced across the **stream's whole lifetime**. ⚠️ **Flags
@@ -200,7 +224,11 @@ that stop the incident recurring — **say the word and they go to the top of th
   W23.m11-fu — a 100→250-byte rewrite read back unchanged on the same `URL` value), so a revalidation pass
   that reuses `URL` values is **silently a no-op**. Use `stat(2)` via `withUnsafeFileSystemRepresentation`
   for every freshness check. Also: store paths byte-exactly (em dash + NBSP filenames) — never round-trip
-  through NFC/NFD, or every launch re-indexes the corpus. **Test:** cold index → quit → warm start shows
+  through NFC/NFD, or every launch re-indexes the corpus. ⚠️ **The Reader's write-surface lint
+  (`ArchiveReader/scripts/lint-write-surface.sh:20-25`) bans `createFile`, `FileHandle forWriting`,
+  `.write(to:)` and the `FileManager` mutators across the WHOLE app target**, so this cache must persist
+  through the **SQLite3 C API** exactly as `ContentIndex.swift` does — not `Data.write(to:)`, not
+  `FileManager`. Don't discover that at the lint gate. **Test:** cold index → quit → warm start shows
   rows before any walk finishes, **and** a file whose tags changed while the app was closed is corrected on
   revalidation (this is the test that catches the caching trap).
 - [ ] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low ·
@@ -212,6 +240,22 @@ that stop the incident recurring — **say the word and they go to the top of th
   tags on unrelated personal files stop appearing, which is an improvement for an archival tagging UI.
   **Do not walk `$HOME` to emulate Spotlight** (slow, invasive, trips TCC across unrelated dirs).
   **Test:** vocabulary survives relaunch, accumulates across roots, and no `$HOME` walk occurs.
+- [ ] **W26.oracle — Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` [S · low · Tier-1 ·
+  needs: none].** `ArchiveProcessor/scripts/assert_mac.py:43` reads Finder tags via
+  `sh("mdls", "-name", "kMDItemUserTags", p)` (consumed `:44`, `:55`). **During the 2026-08-04 incident this
+  oracle would have reported empty tags and failed an otherwise-passing build** — the same failure mode as
+  the Reader, in the test lane. Swap in `tier2_assert.py`'s Spotlight-free `disk_tags()`. **Unblocked — can
+  go first.** **Test:** the Tier-2 assertion suite passes on a fixture whose volume has indexing disabled
+  (`mdutil -i off` on a scratch DMG, or simply never `mdimport`-ed) — today's oracle fails that.
+- [ ] **W26.reinfect — stop the approved JPEGS item from re-introducing `NSMetadataQuery` [S · low ·
+  Tier-1 · needs: none].** `SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the
+  JPEGS tree (**a second `NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of
+  partners need relocation resolution no path rule can do."* If it ships during this wave it re-infects the
+  codebase with the exact dependency the owner is removing. Rewrite it to a **walk-built stem index** (same
+  `CorpusWalker`, second root) and add `(blocked-on: W26.walk1)` to it. **Unblocked — do this early; it is
+  cheap and every day it is undone is a day the re-infection can land.** **Test:**
+  `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's historical notes, and
+  `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
 - [ ] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none]
   (blocked-on: W26.walk2).** `ArchiveReader/scripts/make-gui-fixture.sh` (lines 16, 179, 186) and
   `smoke-setup.sh` (lines 22, 26) force-index fixture copies then **poll `mdfind` until tags appear** — a

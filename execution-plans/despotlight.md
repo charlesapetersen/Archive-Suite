@@ -89,9 +89,55 @@ of fixture-setup flake.
 fast"*), plus the *Verified Facts* line "Spotlight exposes tags as `kMDItemUserTags`" (true of macOS,
 but no longer how we read them). Check `SPEC/tag-format.md`, `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
 
+### Site 6 — `ArchiveProcessor/scripts/assert_mac.py:43` — a **test oracle** reading tags via `mdls`
+
+```python
+tags = "\n".join(sh("mdls", "-name", "kMDItemUserTags", p) for p in pdfs)
+```
+Consumed at `:44` (`name_tag_blob`) and `:55`. **During the 2026-08-04 incident this oracle would have
+reported empty tags and failed an otherwise-passing build** — the same failure mode as the Reader, in the
+test lane. Replace with `tier2_assert.py`'s `disk_tags()`. Independently shippable; was not in the
+original inventory.
+
+### Site 7 — a **future re-infection** already approved in the backlog
+
+`SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the JPEGS tree (**a second
+`NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of partners need relocation
+resolution no path rule can do."* If that ships before or during this wave it **re-introduces the exact
+dependency the owner is removing.** Rewrite it to a walk-built stem index (same walker, second root) and
+add a `(blocked-on: W26.walk1)` edge so it cannot start first. Highest-value find in the doc lane.
+
+### Site 8 — a load-bearing claim that may itself rest on a Spotlight myth
+
+`ArchiveProcessor/TESTING.md:72`: *"All PDF / Finder-tag / sidecar verification is done externally … reading
+tags in-process contends with Spotlight and wedges."* The Processor's **entire out-of-process test
+verification architecture** rests on that diagnosis — but `TagReading.read` uses `url.resourceValues`
+(`TagReading.swift:29-38`), which **does not go through Spotlight at all**. So the stated mechanism is
+dubious and the real cause is more likely the main-actor context named in the same comment. **Flag it;
+do not silently keep or delete that architecture.** Investigating it is out of scope for this wave.
+
 ### Confirmed clean
 
-**Archive Notes and `packages/ArchiveCore` contain no Spotlight usage at all.** This is a two-app change.
+**Archive Notes and `packages/ArchiveCore` contain no Spotlight usage at all** (two benign prose mentions
+in Notes, one of which already documents that Notes discovery is *not* Spotlight). No entitlement and no
+`project.yml` change is needed anywhere: **there is no Spotlight-specific entitlement in the suite.** This
+is a pure code + doc change. One real build consequence: un-fencing the walker means the
+`UniformTypeIdentifiers` import at `ArchiveLibrary.swift:4-6` must come out of `#if DEBUG`, and the
+**Release** build must be gated (not just Debug).
+
+### The better precedent: Archive Notes, end-to-end
+
+`ContentIndex` is the right *storage* precedent, but **Archive Notes already implements this whole
+pattern** — a filesystem walk feeding a disposable FTS5 index, with a readiness flag, a settle await,
+health adoption, and tests around all of it. Copy the shape rather than invent it:
+
+- `ArchiveNotes/.../Core/NotesModel.swift:286-300` — `buildIndexFromDisk`: `allItemRefs` → `startIndexing`
+  → **`awaitSettled`** → `reloadItems` → **`markIndexReady`** → `adoptIndexFailure`.
+- `awaitSettled()` is the **test seam** that answers the sync/async question in §5.6.
+- `markIndexReady` is the `isGathering` analogue; `adoptIndexFailure` (`:311-321`) is the honest-degraded
+  precedent.
+- `ArchiveNotes/.../ReaderLinkResolver.swift:235-266` — the **already-reviewed** pattern for an off-actor
+  enumerator (private `FileManager` instance, `nextObject()` rather than `for-in`). Use it verbatim.
 
 ---
 
@@ -194,6 +240,27 @@ Read-only, deterministic discovery. Shared by both apps (the repo's DRY + shared
   removing the DEBUG/Release divergence that hid this bug.
 - `start(scope:)` runs the walk off the main actor, publishing batches; `isGathering` drives the
   existing spinner, now with real progress (`n of m`), which Spotlight could never provide.
+
+⚠️ **`applyVerifiedWrites` has five callers that will not compile if its signature changes** —
+`NavigationModel.swift:839` (mark), `:862` (group edit), `:952` (inline edit — carries the *"one O(N+M)
+overlay pass (was per-file O(N×M))"* note), `:998` (corpus-wide rename), `:1050` (undo). Rewrite all five
+to a direct row replacement from the verified `.after`/`.afterLabel` they *already pass in*, reusing
+`rebuilt` (`:139-142`): same batch shape, one publish, no dict, no timer. Safety §11 still holds — only
+verified results move a row.
+
+⚠️ **`isGathering` and `scopeDescription` are correctness gates, not cosmetics.** Declared at
+`ArchiveLibrary.swift:17-18`, four consumers, two load-bearing: `pruneIfSettled`
+(`NavigationModel.swift:649-651`) gates **deletion of content-index rows** on `isGathering == false`, and
+the deep-link reveal give-up counter depends on it. **A walker that leaves `isGathering` false during a
+partial pass would let `pruneIfSettled` evict index rows for files the walk has not reached yet.**
+Redefine precisely: true while a pass is in flight, false **only after a pass completes**; a cancelled or
+failed pass must leave pruning blocked.
+
+⚠️ **Publisher ordering.** `NavigationModel.swift:110-117` uses a `willSet` publisher + a
+`MainActor.assumeIsolated` sink whose `.receive(on:)` hop fixes a **GUI-only** bug that unit tests
+provably missed (root cause at `ArchiveReader/KNOWN_ISSUES.md:166-173` — *"showed 0 of N"*). A background
+walk publishing batches from a detached task **must keep that hop** — hence `W26.walk2` needs a
+functional/GUI gate, not only unit tests.
 
 ### 4.3 Honest states — the actual UX fix
 
@@ -315,10 +382,42 @@ CREATE INDEX files_mtime ON files(mtime);
    byte-identically (or key on the file-system representation) — never round-trip through an NFC/NFD
    normalisation, or warm-start lookups will miss and re-index the whole corpus every launch.
 4. **FSEvents flags are unioned across the coalescing window** (§4.5) — re-read, don't trust flags.
-5. **No test currently covers Reader discovery at all.** The only `ArchiveLibrary` test file is
-   `ArchiveLibraryOverrideTests.swift` (8 cases), and every one of them tests the Spotlight-lag override
-   subsystem. That gap is precisely how a Release build with no discovery fallback shipped. **W26.walk1
-   must land a real discovery test on a scratch fixture** — the first one this code has ever had.
+5. **No test currently covers Reader discovery at all.** `grep 'ArchiveLibrary(' ArchiveReader/macOS/Tests`
+   returns **zero hits** — nothing anywhere constructs it. The only `ArchiveLibrary` test file is
+   `ArchiveLibraryOverrideTests.swift` (8 cases: `testConvergedExactMatchDropsOverride`,
+   `testConvergedIgnoresTagOrderAndCase`, `testLabelDifferenceIsNotConverged`, `testNilLabelEqualsZeroLabel`,
+   `testStaleEchoKeepsShowingVerifiedValue`, `testDoublyStaleValueStillDoesNotBackslide`,
+   `testExpiredOverrideYieldsToSpotlight`, …), every one testing the Spotlight-lag override. That gap is
+   precisely how a Release build with no discovery fallback shipped. **The whole file is deleted and
+   `W26.walk1` must land the replacement tests in the same work item** — the suite total drops by 8, so
+   say it up front or a green run with fewer tests reads as a regression.
+6. ⚠️ **SYNC-VS-ASYNC IS THE FIRST DECISION, AND IT IS FORCED BY EXISTING TESTS.** Two test files already
+   drive the DEBUG walker *as the production path* and assert **synchronously** that a freshly-tagged
+   scratch PDF is in `model.library.files` immediately after `NavigationModel()` returns:
+   `DocumentPageLinkTests.swift:229-233` + `:239-240` (*"precondition: the scratch PDF is discoverable"*)
+   and `RootMarkerStateTests.swift:143`. **If the new walker is async, both break.** These are
+   simultaneously the plan's free head start and its hardest constraint. Decide the API shape **before**
+   writing the walker: either keep a synchronous settle path for tests, or adopt Notes'
+   `awaitSettled()` seam (`NotesModel.swift:286-300`) and convert both tests. Do not discover this at
+   the build gate.
+7. **The Reader's write-surface lint bans ordinary file writes across the whole app target.**
+   `ArchiveReader/scripts/lint-write-surface.sh:20-25` rejects `removeItem|moveItem|trashItem|replaceItem|
+   createFile|FileHandle forWriting|PDFDocument.write|.write(to:)` anywhere under
+   `macOS/Sources/ArchiveReader/`. So **`LibraryIndex` must persist through the SQLite3 C API** exactly as
+   `ContentIndex.swift` does — not `Data.write(to:)`, not `FileManager`. (This constraint already forced
+   one design decision in `ContentIndexer`.) The read-only `FileManager.enumerator` walk itself is fine.
+8. **`DeepLinkTests.swift` sets `-ARUITestRootPath` in four places** (`:45-46`, `:60-61`, `:90-91`,
+   `:115-116`) and one case (`testRevealAndSelectGuidMatch`, `:118-123`) depends on the root having **no
+   discoverable files**. Those temp dirs hold only a marker JSON, so a real walk should still find zero
+   tagged PDFs and the deferral should hold — but **re-run it, do not assume**; this is the case most
+   likely to change meaning silently.
+9. **15 fixture-based UI tests inherit a readiness assumption.** `FixtureUITestCase.swift:53`, `:62-64`
+   (*"loads synchronously off disk (DEBUG `-ARUITestRootPath` path)"* — comment becomes false), `:75-80`
+   (`waitForRows`). Re-validate the `waitForRows` timeouts against the new walker's latency on the
+   12-file fixture; if the walker goes async, the GUI lane flakes here first.
+10. **`NavigationUITests.swift:46-48`** states the exclusion rule in Spotlight terms but its assertion
+    becomes the **end-to-end pin that the walker's membership rule equals the old predicate.** Keep the
+    assertion, fix the comment, and promote it to an explicit equivalence check.
 
 ---
 
@@ -349,9 +448,15 @@ each leaving the app **working**.
 | `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
 | `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |
+| `W26.oracle` | Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` | S | low | 1 | none | — |
+| `W26.reinfect` | Rewrite the open JPEGS-index item off `NSMetadataQuery` + add its blocking edge | S | low | 1 | none | — |
 | `W26.scripts` | Fixture scripts drop `mdimport`/`mdfind` polling | S | low | 1 | none | `W26.walk2` |
 | `W26.docs` | Docs/SPEC stop claiming Spotlight (incl. `ArchiveReader/CLAUDE.md:106`) | S | low | 1 | none | `W26.walk2` |
-| `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab` |
+| `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab`, `W26.oracle`, `W26.reinfect` |
+
+`W26.oracle` and `W26.reinfect` are **unblocked and can go first** — neither depends on the walker.
+`W26.reinfect` is deliberately early: it is cheap, and every day it is undone is a day the JPEGS item
+could ship a second `NSMetadataQuery` into the codebase this wave exists to clear.
 
 **Per-item test gates** (an item is not done without one that would *fail* if the work were wrong):
 
@@ -369,6 +474,11 @@ each leaving the app **working**.
   file whose tags changed **while the app was not running** is corrected on revalidation (this is the
   test that catches the `resourceValues` caching trap, §5.1).
 - `W26.vocab` — vocabulary survives relaunch and accumulates across roots; no `$HOME` walk occurs.
+- `W26.oracle` — the Tier-2 assertion suite passes on a fixture whose volume has **indexing disabled**
+  (`mdutil -i off` on a scratch DMG, or simply never `mdimport`-ed). Today's `mdls` oracle fails that;
+  `disk_tags()` must not. This is the incident reproduced inside the *test lane*.
+- `W26.reinfect` — `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's own
+  historical notes, and `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
 - `W26.verify` — full-scale run against a **scratch copy** (never the real corpus), 100k+ files:
   timings, memory ceiling, no-write assertion across the whole tree, and cancel-mid-walk leaves no
   partial removals.
@@ -408,7 +518,34 @@ The Reader's Core Directive is untouched and this plan **narrows** the write sur
 
 ## 10. Docs that move with the code (same commit, per convention)
 
-`ArchiveReader/CLAUDE.md` (§Verified Facts, the Implementation Map, line 106), `ArchiveProcessor/CLAUDE.md`
-(vocabulary narrowing), `SPEC/tag-format.md` (how tags are *read* — the tag vocabulary itself is
-unchanged, so this is not a contract change), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`,
-`SUITE_TODO.md` → `SUITE_TODO_DONE.md` as items ship. **Delete this plan when `W26.verify` passes.**
+The audited list, so `W26.docs` is a checklist rather than a hunt:
+
+- `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`)…"*), its §Verified Facts
+  Spotlight line, the Implementation Map, **and `:319` + `:429-431`** (the *"behind a `FileAccessProvider`
+  abstraction: switching posture is an entitlement/config change, not …"* claim — false once whole-Mac
+  becomes "walk N granted roots", which is new code).
+- `ArchiveReader/POTENTIAL_FEATURES.md:17-19` — claims whole-Mac search is a one-line entitlement flip.
+  Deleting the `NSMetadataQueryLocalComputerScope` branch makes that untrue; restate the cost honestly.
+- `ArchiveReader/Core/ArchiveFile.swift:5-7` and `:38-46` — the doc encodes the *"from the
+  Spotlight-provided tag array — the fast path, no per-file I/O"* invariant **twice**, and `liveIdentity()`
+  exists specifically to preserve it (identity capture is deliberately lazy so it never runs at bulk
+  discovery). The premise is abandoned; **keeping identity capture lazy is still right** (a stale identity
+  is worse than a fresh one) — say so explicitly rather than leaving the contradiction.
+- Four source comments citing *"the Spotlight echo"* as the rationale for change-signature gating and the
+  inline-edit re-render guards: `Core/LibraryChangeSignature.swift:5`, `NavigationModel.swift:620-621`
+  and `:1015`. **Every mechanism stays correct** (a re-walk also emits identically-valued snapshots) —
+  only the rationale is falsified. Retarget the wording to *"a repeat emission from a re-walk"* so a
+  reviewer does not read them as dead code.
+- `NavigationWindowView.swift:157-158` — overlay doc naming Spotlight.
+- `Tests/ArchiveReaderUITests/FixtureUITestCase.swift:62-64` and `NavigationUITests.swift:46-48` (§5.9/5.10).
+- `ArchiveProcessor/CLAUDE.md` — vocabulary narrowing (§4.4.3); `ArchiveProcessor/TESTING.md:72` — flag the
+  dubious Spotlight-contention premise (§ Site 8) without acting on it.
+- `SPEC/tag-format.md` — how tags are *read*. The tag vocabulary itself is unchanged, so **this is not a
+  shared-contract change** and does not trip the both-apps-together rule.
+- `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`; `SUITE_TODO.md` → `SUITE_TODO_DONE.md` as items ship.
+
+**A side benefit worth recording:** `ops/gui/tart-lib.sh:74` runs `make-gui-fixture.sh` **inside a guest
+VM**, where a cold Spotlight index is the least reliable thing in the environment. `W26.scripts` removes
+that dependency from the GUI lane entirely — no `tart-lib.sh` edit required.
+
+**Delete this plan when `W26.verify` passes.**
