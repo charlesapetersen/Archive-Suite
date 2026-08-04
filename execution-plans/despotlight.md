@@ -293,7 +293,17 @@ as follows, in order of preference:
 3. **Accept the narrowing explicitly.** Tags on unrelated personal files outside any archive root will
    no longer appear as suggestions. That is a *behaviour change and an improvement* for an archival
    tagging UI; record it in the Processor's `CLAUDE.md` and in `SUITE_TODO`. **Do not** walk `$HOME` to
-   emulate Spotlight — that would be slow, invasive, and would trip TCC prompts across unrelated dirs.
+   emulate Spotlight — slow, invasive, and it would trip TCC prompts across unrelated directories.
+   ⚠️ **Note the corrected premise:** the **Processor is UNSANDBOXED** (its entitlements carry no
+   `app-sandbox` key at all), so a home-wide walk is *legally available* to it in a way it is not to the
+   Reader. The argument against it is therefore cost and invasiveness, **not** capability — say that
+   honestly rather than implying it is impossible, or someone will "fix" it later.
+
+**This is a genuine capability reduction, not a like-for-like swap** — be explicit about it in the commit.
+Also: **eight consumer sites** depend on `SystemTagsProvider`'s API surface, and the `isReady` →
+*"building tag suggestions…"* UI state exists **solely because the Spotlight gather was slow**. With a
+persisted vocabulary, suggestions are available instantly on launch, so that state can likely be retired —
+check all eight consumers before removing it.
 
 ### 4.5 `CorpusWatcher` — new (W26.fsev), FSEvents live updates
 
@@ -308,9 +318,36 @@ byte-free tag write above *also* reported `ItemRenamed`, which never happened. T
 > Treat every event as **"this path may have changed — re-`stat` and re-read its tags"**, never as
 > "this specific thing happened." Flags may be used to *skip* work, never to *decide* semantics.
 
-- Recovery flags to handle explicitly: `MustScanSubDirs` (→ re-walk that subtree),
-  `RootChanged` (→ re-resolve the bookmark, re-walk), `EventIdsWrapped`/`HistoryDone` (→ full re-walk),
-  `Unmount`/`Mount`.
+- **Coalescing and drop-to-subtree are the COMMON path at this corpus's scale, not a rare edge.** Measured:
+  **12,060 xattr tag writes in 0.30 s produced only 1,088 delivered events in 37 batches.** A bulk
+  Read/Unread operation over a few thousand files *will* collapse into subtree re-walk requests, so the
+  re-walk path is mainline code that must be efficient — not an error handler. Apple states explicitly that
+  flags are **hints, not a replayable log**; observed one event coalescing a file's creation *and* its
+  subsequent tag write.
+- Recovery flags, all reducible to two primitives — *"re-read these paths"* and *"re-walk this subtree"*:
+  `MustScanSubDirs` (0x1, with `UserDropped` 0x2 / `KernelDropped` 0x4) → re-walk that subtree;
+  `RootChanged` → re-resolve the bookmark + re-walk; `EventIdsWrapped`/`HistoryDone` → full re-walk;
+  `Unmount`/`Mount` → stop/restart.
+- **Own-write detection has a proper API — use it instead of a side channel.**
+  `kFSEventStreamCreateFlagMarkSelf` tags the app's own writes with
+  `kFSEventStreamEventFlagOwnEvent` (0x80000); verified that a *different* process making the
+  byte-identical `setResourceValue` call is **not** so tagged. This is more reliable than `TagWriter`
+  publishing a URL list, and it distinguishes our write from Finder's even when the values match.
+- **`FSEventStreamSetDispatchQueue` is required — run-loop scheduling is deprecated as of macOS 13.**
+  Teardown order is mandated by the header: `Stop`, then **`Invalidate` while the stream is still
+  scheduled**, then `Release`. Getting this wrong is a crash, not a warning.
+- **Resume across an app quit:** `sinceWhen` replay works and is the right mechanism — but **event IDs are
+  not delivered in ascending order**, and with `kFSEventStreamCreateFlagFullHistory` some delivered IDs are
+  *lower* than the one requested. Persist a high-water mark conservatively (and treat a replay gap as
+  "re-walk", per the principle in §4a).
+- **`FSEventStreamFlushSync` gives tests a deterministic synchronisation point** — which is precisely the
+  reason the fixture scripts currently poll `mdfind`, so it is what makes `W26.scripts` possible.
+- **`kqueue`/`DispatchSource.makeFileSystemObjectSource` is disqualified at this scale** (`EVFILT_VNODE`
+  needs one open file descriptor per watched file — 123k fds), and `NSFilePresenter` is disqualified on
+  semantics. FSEvents is the only viable choice; do not re-litigate it.
+- **Verify, don't assume, that the root is on a volume `fseventsd` journals.** The real corpus is on local
+  APFS (so it is covered), but the root is user-chosen and could be on a volume with no journal — in which
+  case the watcher must degrade to periodic re-walks *and say so* rather than going quietly deaf.
 - Sandbox: the stream is created on the **security-scoped root**, with
   `start/stopAccessingSecurityScopedResource` balanced across the *stream's whole lifetime*, not per
   read. Entitlements already present (`app-sandbox`, `files.user-selected.read-only`,
@@ -362,6 +399,38 @@ CREATE INDEX files_mtime ON files(mtime);
   two-snapshot prune gates and `rootPrefix` eviction, `ContentIndexer.swift:361-420`; reuse that shape.)
 
 ---
+
+## 4a. 🔴 The two ways the FIX reproduces the BUG — read this first
+
+The incident was a **silent empty result** mistaken for a true negative. **Both halves of the replacement
+have their own version of that failure**, and neither is hypothetical — both were measured 2026-08-04.
+
+### 4a.1 `TagReading.read` reports "no tags" when it means "couldn't read"
+
+`TagReading.read` returns **`.success(tagNames: [])`** — semantically *"confirmed to have no tags"* — for a
+file that demonstrably carries `["Unread", …]`, when sandbox access to that path is denied
+(`ArchiveCore/Tags/TagReading.swift:29-38`). A walker built naively on it would classify every tagged file
+in an inaccessible tree as *untagged* and render the **exact same lie**, with Spotlight nowhere in sight.
+
+**Required:** `CorpusWalker` must distinguish three outcomes per file — *has tags*, *verified no tags*,
+*could not be read* — and the third must **never** be silently folded into the second. A file that cannot
+be read is a `DiscoveryStatus.failed` contributor, not an absence. Fix this in `W26.walk1`; consider
+tightening `TagReading.read` itself (it is shared, so that is a Tier-2 change touching both apps).
+
+### 4a.2 `FileManager.enumerator` silently skips what it cannot read
+
+`FileManager.enumerator(at:includingPropertiesForKeys:options:)` — **the overload without an
+`errorHandler:`** — silently skips unreadable directories and keeps going. A walk over a corpus with one
+permission-denied subtree returns a smaller set with **no error and no signal**. The already-working DEBUG
+fixture loader uses exactly this overload (`ArchiveLibrary.swift:97-99`), so copying it verbatim inherits
+the flaw.
+
+**Required:** use the `errorHandler:` variant, count and surface every skipped path, and treat a non-empty
+skip list as a degraded walk (`.failed` or a distinct `.partial`). **The walk must be honest about what it
+could not see** — that single rule is what this whole wave is buying.
+
+> **The design principle, stated once:** every layer must be able to say *"I don't know"* separately from
+> *"there is nothing."* Spotlight could not, which is why the app lied. Do not rebuild that.
 
 ## 5. Verified traps the implementer must respect
 
@@ -418,6 +487,33 @@ CREATE INDEX files_mtime ON files(mtime);
 10. **`NavigationUITests.swift:46-48`** states the exclusion rule in Spotlight terms but its assertion
     becomes the **end-to-end pin that the walker's membership rule equals the old predicate.** Keep the
     assertion, fix the comment, and promote it to an explicit equivalence check.
+11. 🔴 **`pruneIfSettled` computes `indexedUnderRoot.subtracting(currentPaths)` — a streaming discovery
+    source breaks it outright.** With a partial `currentPaths`, *everything not yet walked looks deleted*.
+    Its safety rests on five gates and **two are broken by a naive incremental/streaming source**. This is
+    the sharpened form of §4.2's `isGathering` warning: publishing batches progressively (which the plan
+    wants, for a responsive UI) is exactly what endangers it. **Either** prune only from a *complete*
+    snapshot, **or** gate pruning on a walk-completion generation counter — decide in `W26.walk2`, before
+    `W26.idx` builds on it.
+12. 🔴 **A Finder tag write does not change mtime — it changes ctime.** `ContentIndexer`'s incremental skip
+    is keyed on **content** mtime, so a tag-only edit is correctly *not* a re-extraction trigger — but it
+    also means **mtime cannot be used to detect a tag change.** The walker must vend
+    `.contentModificationDateKey` for the content-index skip (not ctime, or every tag edit would force a
+    full re-OCR-extraction of the corpus) **and** detect tag changes by comparing the tag array itself (or
+    ctime) separately. Conflating the two breaks either freshness or performance.
+13. **The two-consecutive-absence prune gate must NOT be deleted.** `ContentIndexer.swift:283` justifies it
+    in terms of *"Spotlight's transient-drop window"* — comment-only, and the rationale changes, but a
+    walk/FSEvents source has its own transient-absence mode (a cancelled pass, a coalesced drop). The gate
+    counts **emissions, not time**, which was tuned to Spotlight's behaviour; **re-tune it, do not remove
+    it.** Update the comment (`W26.docs`), keep and re-justify the mechanism.
+14. **Bookmark resolution success is not proof of readability.** Resolving the bookmark and getting `true`
+    from `startAccessingSecurityScopedResource` does **not** mean the root can be read. The Reader's
+    existing lifetime shape is already correct for a long-lived walk + watch (one process-lifetime
+    `startAccessing`, balanced by one `stopAccessing`), so the sandbox side needs no redesign — but adopt a
+    **combined probe** (resolve + start + an actual test read) before declaring a root healthy, or
+    `.failed` will never fire when it should.
+15. **Entitlement correction:** the Reader's production entitlements grant user-selected **read-write**, not
+    read-only. That does not license any write — the Core Directive and the write-surface lint (§5.7) are
+    what constrain it — but do not cite "read-only entitlement" as a safety argument, because it is false.
 
 ---
 
@@ -542,7 +638,36 @@ The audited list, so `W26.docs` is a checklist rather than a hunt:
   dubious Spotlight-contention premise (§ Site 8) without acting on it.
 - `SPEC/tag-format.md` — how tags are *read*. The tag vocabulary itself is unchanged, so **this is not a
   shared-contract change** and does not trip the both-apps-together rule.
-- `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`; `SUITE_TODO.md` → `SUITE_TODO_DONE.md` as items ship.
+- `ArchiveReader/CLAUDE.md` carries **eight** statements that become false — including a **§Decisions
+  entry** (which the owner ships as settled) plus the architecture and stack sections. Treat the §Decisions
+  one carefully: it is a record of an owner decision, so **supersede it with a dated new decision** rather
+  than editing history.
+- `ArchiveReader/KNOWN_ISSUES.md` — **five** affected passages, including a *"Verified facts to rely on"*
+  entry **that the incident itself falsified**, and a whole section documenting the Spotlight-lag mechanism
+  being deleted.
+- ⚠️ **`SPEC/tag-format.md` names `ArchiveLibrary` as the Spotlight consumer in its API table.** That row
+  *is* the contract both apps must interpret identically, so this one edit **does** touch the shared
+  contract and must land with both apps together (CLAUDE.md §"The shared contract is the risk"). The tag
+  *vocabulary* is still unchanged — it is the reader-side API row that moves.
+- ⚠️ **`REVIEW.md` assigns "Spotlight consistency" as a standing review concern for Reader/Search — and the
+  autonomous daemon reads that file to pick review units.** Leaving it stale sends future review sessions
+  hunting a subsystem that no longer exists.
+- `ArchiveReader/SMOKE_TEST.md` — the historical record of the 2026-07-05 two-bug incident **whose fix #2 is
+  what this wave deletes**; one PASS criterion is phrased in Spotlight-window terms. Keep the history,
+  re-word the criterion.
+- The **suite-level `README.md`** makes a user-facing **product claim** about Spotlight, in prose *and* in
+  the architecture diagram. Two Processor docs describe `SystemTagsProvider` as Spotlight-sourced (its
+  implementation map + file tree). A cross-app **execution plan** states the Reader's deep-link reveal
+  contract in Spotlight terms, **and Notes depends on that contract**.
+- `AGENTS.md`; `SUITE_TODO.md` → `SUITE_TODO_DONE.md` as items ship.
+
+⚠️ **Do not mechanically find-and-replace.** Three `Spotlight`/`kMDItem` matches in the tree are
+**xattr / Finder-comment references, not Spotlight queries** (including two benign prose mentions in Notes,
+one of which already documents that Notes discovery is *not* Spotlight). They must survive untouched.
+
+**A second dividend:** `SUITE_TODO_DONE.md` records **two GUI verifications that were deferred precisely
+because the scratch corpus was not Spotlight-indexed.** Removing Spotlight discharges them — check them off
+rather than re-deferring.
 
 **A side benefit worth recording:** `ops/gui/tart-lib.sh:74` runs `make-gui-fixture.sh` **inside a guest
 VM**, where a cold Spotlight index is the least reliable thing in the environment. `W26.scripts` removes

@@ -155,6 +155,18 @@ report xattr-only tag writes (`ItemXattrMod`), so live updates need no polling.
 put first) and *ahead of* the older W16/W3.cap/W17–W22 backlog. `W26.walk1`+`W26.walk2` are the two items
 that stop the incident recurring — **say the word and they go to the top of the queue.**
 
+🔴 **THE FIX HAS TWO WAYS OF REPRODUCING THE BUG — both measured 2026-08-04, both must be closed in
+`W26.walk1`.** (a) **`TagReading.read` returns `.success(tagNames: [])`** — semantically *"confirmed to have
+no tags"* — for a file that demonstrably carries `["Unread", …]` when sandbox access to the path is denied
+(`ArchiveCore/Tags/TagReading.swift:29-38`). A walker built naively on it would call every tagged file in an
+inaccessible tree *untagged* and tell the **same lie**, with Spotlight nowhere in sight. (b)
+**`FileManager.enumerator(at:includingPropertiesForKeys:options:)` — the overload with no `errorHandler:` —
+silently skips unreadable directories**, and that is the overload the working DEBUG fixture loader uses
+(`ArchiveLibrary.swift:97-99`), so copying it verbatim inherits the flaw. **Required:** three distinct
+outcomes per file (*has tags* / *verified none* / *could not read*), the `errorHandler:` variant, and a
+surfaced count of everything skipped. **Every layer must be able to say "I don't know" separately from
+"there is nothing" — Spotlight could not, which is why the app lied.**
+
 - [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
   needs: none].** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
   `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
@@ -192,7 +204,16 @@ that stop the incident recurring — **say the word and they go to the top of th
   cosmetic:** `pruneIfSettled` (`NavigationModel.swift:649-651`) gates **deletion of content-index rows** on
   `isGathering == false`, so a walker that clears it during a partial pass would evict rows for files the
   walk had not reached yet — it must go false **only after a complete pass**, and a cancelled/failed pass
-  must leave pruning blocked. (c) a background walk publishing from a detached task **must keep the
+  must leave pruning blocked. Sharpened: `pruneIfSettled` computes `indexedUnderRoot.subtracting(currentPaths)`,
+  so with a **partial** `currentPaths` *everything not yet walked looks deleted* — batching for a responsive
+  UI is exactly what endangers it. Either prune only from a **complete** snapshot or gate pruning on a
+  walk-completion generation counter, and decide it here, before W26.idx builds on it. Also: **keep the
+  two-consecutive-absence prune gate** (`ContentIndexer.swift:283`) — its comment blames "Spotlight's
+  transient-drop window", but a walk/FSEvents source has its own transient-absence mode; it counts
+  **emissions, not time**, so **re-tune it rather than remove it**. And note **a Finder tag write changes
+  ctime, not mtime**: the walker must vend `.contentModificationDateKey` for the content-index skip (using
+  ctime would force a full re-extraction of the corpus on every tag edit) while detecting tag changes by
+  comparing the tag array itself. (c) a background walk publishing from a detached task **must keep the
   `.receive(on:)` hop** at `NavigationModel.swift:110-117` or it re-opens the GUI-only *"showed 0 of N"* bug
   that unit tests provably missed (`ArchiveReader/KNOWN_ISSUES.md:166-173`) — so this item needs a
   functional/GUI gate, not just unit tests. Also un-fence the `UniformTypeIdentifiers` import
@@ -209,9 +230,23 @@ that stop the incident recurring — **say the word and they go to the top of th
   which never happened. **Treat every event as "re-`stat` and re-read this path", never as "this happened."**
   Handle `MustScanSubDirs` (re-walk subtree), `RootChanged` (re-resolve bookmark + re-walk),
   `EventIdsWrapped`/`HistoryDone` (full re-walk), mount/unmount. Ignore atomic-write temp siblings
-  (measured: `a.txt.sb-858602c2-RXb79N`). Suppress the app's own `TagWriter` writes. **Test:** a
-  third-party `setResourceValue` (simulating Finder) is picked up with no Spotlight involved;
-  `MustScanSubDirs` triggers a subtree re-walk.
+  (measured: `a.txt.sb-858602c2-RXb79N`). **Use `kFSEventStreamCreateFlagMarkSelf` +
+  `kFSEventStreamEventFlagOwnEvent` (0x80000) for self-write suppression** — verified that a *different*
+  process making the byte-identical `setResourceValue` call is not so tagged, which beats a `TagWriter` URL
+  side-channel. ⚠️ **Coalescing is the MAINLINE path at this scale, not an edge case:** 12,060 xattr tag
+  writes in 0.30 s delivered only **1,088 events in 37 batches**, so a bulk Read/Unread operation collapses
+  into subtree re-walks — that path is production code, not an error handler.
+  **`FSEventStreamSetDispatchQueue` is required** (run-loop scheduling deprecated as of macOS 13) and
+  teardown order is header-mandated: Stop → Invalidate **while still scheduled** → Release. `sinceWhen`
+  replay across a quit works, but **event IDs are not delivered in ascending order** (and `FullHistory` can
+  deliver IDs *lower* than requested) — keep the high-water mark conservative and treat any gap as
+  "re-walk". `kqueue` is disqualified (one fd per watched file, 123k files); `NSFilePresenter` on semantics.
+  Verify the root's volume is `fseventsd`-journalled; if not, degrade to periodic re-walks **and say so**
+  rather than going quietly deaf. Note FSEvents needs **no file-access entitlement at all** (the
+  notification channel is not path-gated), so events can arrive for paths the app cannot read — see the
+  silent-empty rule above. **Test:** a third-party `setResourceValue` (simulating Finder) is picked up with
+  no Spotlight involved; `MustScanSubDirs` triggers a subtree re-walk; `FSEventStreamFlushSync` provides the
+  deterministic sync point that makes W26.scripts possible.
 - [ ] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2 ·
   needs: none] (blocked-on: W26.walk2).** Follow the proven `ContentIndex` precedent exactly: an `actor`
   over **system SQLite** (`import SQLite3`, no third-party dep), in `.applicationSupportDirectory`, schema
