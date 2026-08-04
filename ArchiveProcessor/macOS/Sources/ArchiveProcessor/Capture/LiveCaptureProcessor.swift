@@ -110,10 +110,13 @@ final class LiveCaptureProcessor: ObservableObject {
     /// `finishSession` contains no such guard (its only guard is `!staged.isEmpty`), and the adversarial pass
     /// caught it. The real argument is two steps further out, and worth writing down because a reader who
     /// checks the easy version finds nothing there: `showRotationReview = true` has exactly ONE writer,
-    /// `finishSession`, whose two callers are `requestFinish` — which does carry
-    /// `guard !showFinalizeSheet, !showRotationReview, !isFinalizing` — and `proceedToFinishIfReady`, which is
-    /// `guard pendingFinish` and clears `pendingFinish` before calling, and `pendingFinish` cannot be true
-    /// alongside `isFinalizing`. `applyRotationReviewAndFinalize` then clears the flag on the line before
+    /// `finishSession`, whose single caller is `proceedToFinishIfReady` — which is `guard pendingFinish` and
+    /// clears `pendingFinish` on the line before the call. `requestFinish` reaches `finishSession` only
+    /// through that function, and carries `guard !showFinalizeSheet, !showRotationReview, !isFinalizing`
+    /// itself. (⚠️ This sentence used to say `finishSession` had TWO callers, `requestFinish` among them;
+    /// `requestFinish` calls `proceedToFinishIfReady`, not `finishSession`. Corrected by `W3.cap-r3-fu9-fu1`'s
+    /// pass, which needed this note as the authority for its own `pendingFinish ∧ isFinalizing` argument —
+    /// the conclusion was right, the cited chain was not.) `applyRotationReviewAndFinalize` then clears the flag on the line before
     /// `isFinalizing = true`. So the state is unreachable because of `requestFinish`'s guard, NOT because of
     /// anything local to `finishSession`; remove that guard and this term stops being redundant.
     ///
@@ -1309,16 +1312,21 @@ final class LiveCaptureProcessor: ObservableObject {
     /// which is why `proceedToFinishIfReady`'s comment describing it as "the operator's escape" was false
     /// (an adversarial pass on `W3.cap-r3-fu9` caught the claim). The actual escape was **Clear**, which
     /// Trashes every source photo of the session — a wildly disproportionate price for "I pressed Finish too
-    /// early" — and Clear is itself only rendered while `session.photos` is non-empty, so on a drained
-    /// session there was no exit at all. Re-tapping Finish is not one either: `requestFinish` just re-arms.
-    /// `LiveCaptureView`'s "Cancel finish" button, beside the waiting message, is now the caller.
+    /// early". Re-tapping Finish is not one either: `requestFinish` just re-arms. `LiveCaptureView`'s
+    /// "Cancel finish" button, in `pendingFinishRow`, is now the caller.
+    ///
+    /// ⚠️ It does NOT cover all four holds, and the view says which — a finish held by an outstanding Mac
+    /// tag card or by a live per-item sheet is held *by a modal over the panel the button lives in*, so the
+    /// button is unreachable there and dismissing the sheet is itself the exit. This serves the in-flight-OCR
+    /// and phone-drain holds. Both of those were previously exit-less, which is the gap that mattered: they
+    /// are the two that can last indefinitely with nothing on screen to resolve.
     ///
     /// WHAT IT DELIBERATELY DOES **NOT** DO:
     ///  • **It does not roll back `requestFinish`'s `completeAllOpenDocGroups()`.** That force-completion is a
-    ///    durable RECOVERY — it surfaces the Mac tag card for a doc group the operator never ended — not part
-    ///    of the wait, and un-completing an already-persisted completion is precisely the rollback
-    ///    `requestFinish`'s own failure branch treats as a hazard. Cancel un-arms the wait; it does not
-    ///    rewind the session.
+    ///    durable RECOVERY — it surfaces the Mac tag card for a doc group the operator never ended — and it
+    ///    is not part of the wait. There is also no supported way to undo it: `completeAllOpenDocGroups`
+    ///    rolls a completion back only when its own `writeManifest()` FAILED, i.e. only one that never
+    ///    reached disk. Cancel un-arms the wait; it does not rewind the session.
     ///  • **It cancels no OCR, drops no `staged`/`retained`, and touches no file.** Nothing already paid for
     ///    is discarded and nothing on disk moves. That is the whole difference from Clear, and the reason
     ///    this needs no `isFinalizing`-style refusal: there is no write it can interrupt.
@@ -1334,6 +1342,15 @@ final class LiveCaptureProcessor: ObservableObject {
     /// about something that was not happening. The view renders the button inside that same predicate, so
     /// this is the `W3.cap-r3-fu11` shape: the view decides what the operator is OFFERED, the model decides
     /// what actually happens.
+    ///
+    /// ⚠️ THE GUARD DOES NOT MAKE THE STATUS WRITE SAFE IN GENERAL, and an earlier draft of this comment
+    /// implied it did. `statusMessage` is one shared line with many writers, and a cancel while a finish IS
+    /// armed can still overwrite one that mattered — reachably, the late-page notice ("A late page arrived
+    /// for an already-finished document — kept in the Backup Folder, not this collection"), which can land
+    /// while the finish waits on another group's OCR. Kept anyway, because that line is inherently transient:
+    /// every arriving photo already overwrites it with "Received N photos", so a cancel is not a new class of
+    /// loss — and an explicit operator action deserves explicit feedback. What the guard buys is narrower and
+    /// worth having: a cancel that does NOTHING says nothing.
     func cancelPendingFinish() {
         guard pendingFinish else { return }
         pendingFinish = false

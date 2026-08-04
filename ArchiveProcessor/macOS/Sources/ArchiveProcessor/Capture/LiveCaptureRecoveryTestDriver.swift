@@ -2555,11 +2555,24 @@ enum LiveCaptureRecoveryTestDriver {
         // session its source photos.
         //
         // WHAT WAS ACTUALLY BROKEN, since it is unusual: `cancelPendingFinish()` was correct code with no
-        // caller. Nothing in the shipped UI reached it, so while a Finish was pending — on a tag card, on
-        // in-flight OCR, on the phone's drain, or (since `W3.cap-r3-fu9`) on a per-item sheet — the operator's
-        // only exit was **Clear**, which Trashes every source photo of the session, and Clear is only rendered
-        // while `session.photos` is non-empty. Re-tapping Finish is not an exit (`requestFinish` re-arms). So
-        // the bug was a MISSING BUTTON, and the fix is one button plus a guard.
+        // caller. Nothing in the shipped UI reached it, so while a Finish was pending the operator's only exit
+        // was **Clear**, which Trashes every source photo of the session. Re-tapping Finish is not an exit
+        // (`requestFinish` re-arms). So the bug was a MISSING BUTTON.
+        //
+        // ⚠️ WHICH HOLDS THE BUTTON RESCUES — the first draft of this note said "on a tag card, on in-flight
+        // OCR, on the phone's drain, or on a per-item sheet", i.e. all four terms of
+        // `proceedToFinishIfReady`'s guard, and that was wrong. Two of the four hold the finish BY putting a
+        // `.sheet` over the capture panel the button lives in, so the button is behind it and unpressable;
+        // for those, dismissing the sheet is itself the exit, and Clear was never reachable there either. The
+        // button serves the in-flight-OCR and phone-drain holds — which are the two that matter, being the
+        // two that can persist indefinitely with nothing on screen to resolve. This section drives the OCR
+        // one (check 2 resolves the tag card precisely so the hold is attributable to processing alone).
+        //
+        // And the fix is NOT "one button": it is one button rendered in TWO places. The pane's whole control
+        // cluster is gated on `!session.photos.isEmpty` and `pendingFinish` outlives that gate, so an escape
+        // nested inside it disappears in exactly the state it is needed (checks 7-8, and the fix's second
+        // renderer). That was found by this item's own adversarial pass, after the first version shipped the
+        // button inside the gate while three of its own comments cited that same gate as the defect.
         //
         // WHICH IS EXACTLY WHY THE COVERAGE HAS TO BE STATED BEFORE THE CHECKS. A headless driver calls the
         // model method directly, so on its own it re-proves what was already true and says nothing about the
@@ -2576,33 +2589,65 @@ enum LiveCaptureRecoveryTestDriver {
         //     Clear contrast measured rather than asserted in prose: Test 22 drives the Clear that DOES Trash
         //     the sources, so the two together say what the operator now gains.
         //   • the cancel is a CANCEL, not a deferral: when the hold clears the finish does NOT quietly resume,
-        //     and the OCR that was in flight during the cancel still lands (check 5). A cancel that discarded
-        //     paid work in progress would be the money-path over-reach.
-        //   • it is not a one-way door — Finish works again afterwards (check 6). Cheap to check and the whole
-        //     value of the affordance: an escape that wedged the session would be worse than Clear.
+        //     and the OCR that was in flight during the cancel still lands (check 5). Discarding paid work in
+        //     progress would be the money-path over-reach; the term that actually catches it is in check 3
+        //     (see M4 — the obvious version of this assertion does not work).
+        //   • it is not a one-way door — Finish works again afterwards (check 6), asserted as a transition
+        //     rather than a level. The whole value of the affordance: an escape that wedged the session would
+        //     be worse than Clear.
         //   • the `guard pendingFinish` is not decorative (check 4).
+        //   • `pendingFinish` and a non-empty Captured pane genuinely come apart (checks 7-8), which is the
+        //     premise the fix's second renderer rests on and the one thing here that is about WHERE the
+        //     button is rather than what cancelling does.
         //
-        // NON-VACUITY, measured (2026-08-04). Baseline 178 checks, 0 RED, 0 Swift warnings:
+        // NON-VACUITY, measured (2026-08-04) — every mutant BUILT and RUN to a written report, so a 0 RED
+        // below is a measurement and not a strand. Baseline 180 checks, 0 RED, 0 Swift warnings. M2-M4 were
+        // measured twice — once against the 178-check pre-adversarial-pass baseline and again against this
+        // one, since the pass added checks 7-8 and tightened 5 and 6; the numbers below are the SECOND run,
+        // and where they differ from the first, the difference is recorded because it is what the pass
+        // bought. M1's class-level 0 RED is unchanged by construction (see M6):
         //   M1 the `Button("Cancel finish")` deleted from `LiveCaptureView` — i.e. the shipped defect, exactly
-        //      as it stood before this item -> 0 RED. RUN, not predicted, because this is the item's own leg
-        //      and a comfortable prediction was not good enough: nothing here reads the view. Recorded as the
-        //      priced gap it is (`W21.vmgui-d`).
+        //      as it stood before this item -> 0 RED. RUN rather than predicted, because this is the item's
+        //      own leg and a comfortable prediction was not good enough: nothing here reads the view. Recorded
+        //      as the priced gap it is (`W21.vmgui-d`).
         //   M2 `guard pendingFinish` deleted from `cancelPendingFinish()` -> 1 RED, check 4. The no-op leg:
         //      without it a cancel with nothing armed overwrites the status line with a message about a finish
         //      that was not happening.
-        //   M3 `pendingFinish = false` deleted, so cancelling only writes the status message -> 2 RED,
-        //      checks 3 and 5. The convincing-looking failure — the UI says "cancelled" and the finish then
-        //      raises the rotation review by itself the moment the gate opens.
+        //   M3 `pendingFinish = false` deleted, so cancelling only writes the status message -> predicted 2
+        //      RED, measured 3 pre-pass, and **5 against the 180-check baseline**: checks 3, 4, 5, 6 and 8.
+        //      The convincing-looking failure — the UI says "cancelled" and the finish then raises the
+        //      rotation review by itself the moment the gate opens. Two of those five are worth reading
+        //      carefully rather than counting. Check 4 falls OVER-DETERMINEDLY, and the first draft of this
+        //      line mis-credited it: its `!pendingFinish` term is the same term as check 3's and is already
+        //      false, so it goes RED whether or not the sentinel is overwritten — that is NOT evidence the
+        //      no-op leg is separately sensitive to M3 (M2 is what shows that leg has teeth). Check 6 is the
+        //      opposite story: it was GREEN under M3 before the adversarial pass, because `requestFinish`
+        //      no-ops against the already-raised review and the level-style assertion could not tell that
+        //      from a working Finish. Adding `cfNoReviewBefore` turned it into a transition, and it now
+        //      fails — the pass's finding, measured.
         //   M4 the cancel widened to also cancel the in-flight OCR (`for t in pageTasks.values { t.cancel() }`,
-        //      the "cancel means cancel everything" reading) -> 1 RED, check 5. The segment never stages and
-        //      the two paid calls are bought for nothing. This is the mutant that makes check 5's paid-call
-        //      term load-bearing rather than decorative.
+        //      the "cancel means cancel everything" reading) -> 1 RED, check 3, via the task-handle term.
+        //      ⚠️ Run TWICE, and the first run is the point: against check 5's stage-and-paid-count terms
+        //      alone it was **0 RED**, because the driver's stub OCR never consults `Task.isCancelled` and so
+        //      returns its text cancelled or not. Check 3's `_recoveryTestOCRTasks … !isCancelled` term was
+        //      added in response and re-measured. Left standing as the reminder that "the segment still
+        //      staged" is not by itself evidence that in-flight paid work was left alone.
         //   M5 the cancel widened to `session.clear()` (conflating the two exits) is the OTHER over-reach and
         //      would be caught by check 3's photo/source terms. NOT RUN: it Trashes the fixture photos to the
         //      real Trash, and Test 22 already drives that Clear for its own purposes.
+        //   M6 the fix's SECOND renderer deleted — the `else if liveProc.pendingFinish` arm in
+        //      `LiveCaptureView`'s header, i.e. the button back inside the `!session.photos.isEmpty` gate,
+        //      which is where the first version of this fix put it -> 0 RED. NOT re-run, and that is a
+        //      statement about the driver rather than a shortcut: M1 already MEASURED that deleting the
+        //      button's action changes nothing here, and M6 is the same class (a view-only edit that no check
+        //      reads). Checks 7-8 deliberately cover the MODEL half — that the state the renderer exists for
+        //      is reachable and the escape works from it — which is the most a headless driver can say.
+        //      Whether the row actually DRAWS there is `W21.vmgui-d`'s to close.
         //
-        // COST (`W21.recovery-timeout`): ~0.5 s of negative window in check 5, no other wait — the section
-        // parks its OCR at a gate rather than racing it, so everything else is synchronous. ---
+        // COST (`W21.recovery-timeout`): NO wall-clock waits at all — the section parks its OCR at a gate
+        // rather than racing it, and the adversarial pass deleted check 5's 0.5 s negative window once it was
+        // shown to discriminate nothing (see check 5). Only settles, which return as soon as their condition
+        // holds. Its one side effect outside the temp dir is check 7's two Trashed stub JPEGs. ---
         if isolatedBackup {
             // Prune the throwaway backup root FIRST, exactly as Test 23 does and for a reason this section
             // learned the hard way: `CaptureSession()` recovers orphaned photos out of the session folders
@@ -2688,13 +2733,26 @@ enum LiveCaptureRecoveryTestDriver {
             //    previously had to be spelled **Clear**, which Trashes every one of these files (Test 22
             //    drives that path). The paid-call term says the same thing about money: cancelling buys
             //    nothing and refunds nothing, it just stops waiting.
+            //
+            //    ⚠️ THE TASK-HANDLE TERM IS NOT REDUNDANT WITH CHECK 5, and it is here because the obvious
+            //    version of the money assertion does not work. A cancel that also cancelled `pageTasks` (the
+            //    "cancel means cancel everything" reading, M4) is INVISIBLE to "did the segment stage and did
+            //    the paid count stay put": the driver's stub OCR is `Task { await gate?(); return stub }`,
+            //    which never consults `Task.isCancelled`, so a cancelled stub still returns its text and the
+            //    segment stages exactly as if nothing happened. That was measured, not assumed — M4 was run
+            //    against check 5 alone first and came back 0 RED. `pageTasks[key]` and the driver's
+            //    `_recoveryTestOCRTasks[key]` are the SAME `Task` object (see the stub branch in `ingest`), so
+            //    reading `isCancelled` off the driver's handle is the one place the hazard is observable here.
+            //    The count term keeps `allSatisfy` from passing vacuously on an empty dictionary.
             let cfSourcesBefore = cfSession.photos.map(\.url)
             cfProc.cancelPendingFinish()
             let cfSourcesSurvive = cfSourcesBefore.count == 2
                 && cfSourcesBefore.allSatisfy { fm.fileExists(atPath: $0.path) }
+            let cfTasks = LiveCaptureProcessor._recoveryTestOCRTasks
             check("the operator can leave a pending Finish, and it costs the session nothing (fu9-fu1)",
                   !cfProc.pendingFinish && cfSession.photos.count == 2 && cfSourcesSurvive
                       && cfProc.processingCount == 1 && cfPaidStarts() == cfPaidInFlight
+                      && cfTasks.count == 2 && cfTasks.values.allSatisfy { !$0.isCancelled }
                       && cfProc.staged.isEmpty
                       && !cfProc.showRotationReview && !cfProc.showFinalizeSheet && !cfProc.isFinalizing
                       && cfSession.statusMessage.contains("Finish cancelled"))
@@ -2712,20 +2770,26 @@ enum LiveCaptureRecoveryTestDriver {
             //    hold that the finish was waiting on, which is the exact event that would have advanced it:
             //    `finalizeSegment`'s trailing `proceedToFinishIfReady`. It must find nothing armed. Meanwhile
             //    the two calls that were in flight during the cancel still land — the segment stages, its text
-            //    is retained, its PDF exists — with no third call bought. A `cancel` that also cancelled
-            //    `pageTasks` (M4) fails here, and that is the money leg.
+            //    is retained, its PDF exists — with no third call bought.
+            //
+            //    ⚠️ These terms do NOT catch a cancel that also cancels `pageTasks` (M4); the stub OCR ignores
+            //    cancellation, so the segment stages either way. That leg is check 3's task-handle term, and
+            //    it lives there rather than here precisely because this check reads as if it covered it.
+            //
+            //    ⚠️ THE RESUME TERMS ARE SAMPLED ONCE, not polled, and an earlier draft's 0.5 s negative
+            //    window is deleted rather than kept for comfort — an adversarial pass showed it could not
+            //    discriminate anything. `labelStagedRecord` sets `.staged` and calls `proceedToFinishIfReady`
+            //    in the SAME MainActor turn with no suspension between them, so by the time a 25 ms poll can
+            //    observe `.staged` at all, the entrant named above has already run: the sample is strictly
+            //    after the event. And the only DEFERRED resumers the code has are `perItemSheetDidChange`'s
+            //    hop (grace + 0.1 s ≈ 1.6 s) and the 5 s watchdog — both outside 0.5 s, so the window covered
+            //    neither. Those two legs are therefore NOT asserted here; both are `guard pendingFinish` on
+            //    the same flag this check reads false, and waiting them out would cost 5 s against
+            //    `W21.recovery-timeout`'s shrinking headroom for no new information.
             cfGate.open()
             let cfStaged = await cfSettle { cfProc.statuses.first { $0.id == "C1" }?.phase == .staged }
-            var cfResumed = false
-            let cfDeadline = Date().addingTimeInterval(0.5)
-            while Date() < cfDeadline {
-                if cfProc.showRotationReview || cfProc.showFinalizeSheet || cfProc.isFinalizing
-                    || cfProc.pendingFinish {
-                    cfResumed = true
-                    break
-                }
-                try? await Task.sleep(nanoseconds: 25_000_000)
-            }
+            let cfResumed = cfProc.showRotationReview || cfProc.showFinalizeSheet || cfProc.isFinalizing
+                || cfProc.pendingFinish
             let cfRecord = cfProc.staged.first { $0.groupId == "C1" }
             check("a cancelled finish does not resume, and the paid work in flight is not thrown away (fu9-fu1)",
                   cfStaged && !cfResumed && cfPaidStarts() == cfPaidInFlight
@@ -2737,13 +2801,55 @@ enum LiveCaptureRecoveryTestDriver {
             // 6. …and the escape is not a one-way door. Finish again, with nothing left holding it, and the
             //    session finishes normally. An affordance that un-armed the wait but left the flow wedged
             //    would be strictly worse than the Clear it replaces.
+            //
+            //    `cfNoReviewBefore` makes this a TRANSITION rather than a level, and it is not padding: an
+            //    adversarial pass found the level version green for the wrong reason under M3. `requestFinish`
+            //    opens `guard !showRotationReview`, so with a review already up (which is exactly what M3's
+            //    spurious resume leaves behind) it returns immediately, `cfSettle` sees the pre-existing
+            //    review on its zeroth evaluation, and the check passes without this call having done anything.
+            let cfNoReviewBefore = !cfProc.showRotationReview
             cfProc.requestFinish()
             let cfReview = await cfSettle { cfProc.showRotationReview }
             check("Finish still works after a cancel — the escape is not a one-way door (fu9-fu1)",
-                  cfReview && !cfProc.pendingFinish
+                  cfNoReviewBefore && cfReview && !cfProc.pendingFinish
                       && cfProc.rotationReviewPages.filter { $0.groupId == "C1" }.count == 2)
 
             cfProc.cancelRotationReview()
+
+            // 7. THE PREMISE OF THE SECOND RENDERER, measured rather than argued. `LiveCaptureView` now draws
+            //    the pending-finish row in TWO places, because everything in the Captured pane's header —
+            //    Clear, Finish, the waiting message, and the new Cancel — is gated on `!session.photos.isEmpty`
+            //    while `pendingFinish` is not. This check is the claim that those two can come apart: arm a
+            //    finish held by a still-heartbeating phone, then delete every received page with the
+            //    per-thumbnail ✕, and the flag is STILL set with the pane empty. That is the state in which
+            //    an escape hatch nested inside the photo gate would have closed nothing — the whole reason
+            //    this item's adversarial pass sent the fix back.
+            //
+            //    Non-vacuity is in the last two terms: `staged` is non-empty (the session still holds unfiled
+            //    work, so this is not a session that has simply ended) and the phone hold is LIVE, so the 5 s
+            //    watchdog re-evaluates and re-holds rather than healing it. Without them the state could be
+            //    dismissed as transient.
+            //
+            //    ⚠️ COST, named because it is the section's only side effect outside its temp dir: the ✕ is
+            //    `CaptureSession.removePhoto`, which sends each source to the **Trash** (recoverable, by
+            //    design). Two 64×64 stub JPEGs per run. Driving the operator's real gesture is worth that;
+            //    calling `photoRemoved` directly would prove only half the property.
+            cfSession.updatePhonePending(1)
+            cfProc.requestFinish()
+            let cfArmedBeforeEmptying = cfProc.pendingFinish
+            for p in cfSession.photos { cfSession.removePhoto(p) }
+            check("a pending Finish outlives an emptied Captured pane — the state the second renderer exists for (fu9-fu1)",
+                  cfArmedBeforeEmptying && cfSession.photos.isEmpty && cfProc.pendingFinish
+                      && !cfProc.staged.isEmpty && cfSession.phonePendingActive)
+
+            // 8. …and the escape works from THERE, which is the point of rendering it there. Same model call,
+            //    a state the view previously drew nothing in at all.
+            cfProc.cancelPendingFinish()
+            check("the escape works from the emptied pane, and still costs the session nothing (fu9-fu1)",
+                  !cfProc.pendingFinish && cfProc.staged.count == 1
+                      && cfProc.staged.first?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && cfSession.statusMessage.contains("Finish cancelled"))
+
             if let cfPriorReview {
                 UserDefaults.standard.set(cfPriorReview, forKey: DefaultsKeys.reviewRotation)
             } else {

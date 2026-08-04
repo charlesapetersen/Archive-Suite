@@ -402,6 +402,47 @@ struct LiveCaptureView: View {
 
     // MARK: Right — live grouped photos
 
+    /// W3.cap-r3-fu9-fu1 — the pending-Finish row: the throbber, the message saying what the finish is
+    /// waiting for, and the operator's way OUT of the wait.
+    ///
+    /// Extracted because it has TWO renderers with different surroundings — beside the Finish button in the
+    /// normal header, and alone when the Captured pane has been emptied out from under an armed finish (see
+    /// that call site for why the second one exists). A copy-paste would let the escape drift out of one of
+    /// them, which is the shape of the bug this item is fixing in the first place.
+    ///
+    /// ⚠️ WHICH HOLDS THE BUTTON ACTUALLY RESCUES, stated because the obvious reading is wrong. A finish can
+    /// be held by four things — an outstanding Mac tag card, in-flight OCR, the phone still draining, or
+    /// (since `W3.cap-r3-fu9`) a per-item sheet — and this button serves only the middle two, plus the
+    /// ≤1.5 s `perItemSheetGrace` tail. The other two hold the finish by putting a `.sheet` over this whole
+    /// panel, so the button is behind it and cannot be pressed; for those, dismissing the sheet IS the exit
+    /// (the tag card's Apply/Skip, the per-item sheet's own Cancel), and Clear was never reachable in that
+    /// state either. Do not "fix" that by adding a `.disabled` or a second button here — covering the tag
+    /// card would mean an affordance inside `SegmentTagCard` itself, which is a different item.
+    ///
+    /// Before this row had a Cancel at all, the only way out of the wait was **Clear**, which Trashes every
+    /// source photo of the session; re-tapping Finish is not one either (`requestFinish` just re-arms). See
+    /// `LiveCaptureProcessor.cancelPendingFinish` for exactly what cancelling does and does not undo — it
+    /// un-arms the wait, and nothing else: no OCR cancelled, no staged output dropped, no file touched.
+    ///
+    /// NOT given a `.disabled(liveProc.isFinalizing)` like Clear and Finish, and that is a decision rather
+    /// than an oversight: `pendingFinish` cannot be true alongside `isFinalizing` — `requestFinish` is the
+    /// only writer that raises it and it guards `!isFinalizing`, while both `isFinalizing = true` sites are
+    /// reached only with one of the finish flow's own modals already up. So this row never draws during a
+    /// regeneration, and the modifier would be dead code asserting a reachability that does not exist.
+    @ViewBuilder private var pendingFinishRow: some View {
+        ProgressView().controlSize(.small)
+        if session.phonePendingActive {
+            Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Button("Cancel finish") { liveProc.cancelPendingFinish() }
+            .accessibilityIdentifier("live.cancel-finish")
+            .help("Stop waiting to finish. Nothing captured or processed is lost — the session stays open.")
+    }
+
     private var capturePanel: some View {
         VStack(spacing: 0) {
             HStack {
@@ -455,34 +496,7 @@ struct LiveCaptureView: View {
                         let processing = liveProc.statuses.contains { $0.phase == .ocr || $0.phase == .tagging }
                         HStack(spacing: 8) {
                             if liveProc.pendingFinish {
-                                ProgressView().controlSize(.small)
-                                if session.phonePendingActive {
-                                    Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                } else {
-                                    Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                // W3.cap-r3-fu9-fu1 — the operator's way OUT of the wait, beside the message
-                                // that explains what it is waiting for. Before this button the only exit was
-                                // Clear, which Trashes every source photo of the session, and Clear is only
-                                // rendered while `session.photos` is non-empty — so once the phone had drained
-                                // there was no exit at all. Re-tapping Finish is not one either (`requestFinish`
-                                // re-arms). See `LiveCaptureProcessor.cancelPendingFinish` for what cancelling
-                                // does and does not undo: it un-arms the wait, and nothing else — no OCR is
-                                // cancelled, no staged output dropped, no file touched.
-                                //
-                                // Rendered on exactly `pendingFinish`, which is also the model call's own
-                                // guard, so the affordance and the refusal agree by construction. NOT given a
-                                // `.disabled(liveProc.isFinalizing)` like Clear and Finish, and that is a
-                                // decision rather than an oversight: `pendingFinish` cannot be true alongside
-                                // `isFinalizing` (see `isFinishingScrimUp`'s note — `proceedToFinishIfReady`
-                                // clears it on the line before `finishSession`, and `requestFinish` guards
-                                // `!isFinalizing`), so this branch never draws during a regeneration and the
-                                // modifier would be dead code asserting a reachability that does not exist.
-                                Button("Cancel finish") { liveProc.cancelPendingFinish() }
-                                    .accessibilityIdentifier("live.cancel-finish")
-                                    .help("Stop waiting to finish. Nothing captured or processed is lost — the session stays open.")
+                                pendingFinishRow
                             } else if processing && liveProc.staged.isEmpty {
                                 ProgressView().controlSize(.small)
                                 Text("Processing…").font(.caption).foregroundStyle(.secondary)
@@ -499,6 +513,25 @@ struct LiveCaptureView: View {
                             .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing)
                         }
                     }
+                } else if liveProc.pendingFinish {
+                    // W3.cap-r3-fu9-fu1 — a pending Finish with an EMPTY Captured pane, which is why the row
+                    // above is not the only renderer. Everything in the block above — Clear, Finish, the
+                    // waiting message — is gated on `!session.photos.isEmpty`, and `pendingFinish` outlives
+                    // that condition: `CaptureSession.removePhoto` (the per-thumbnail ✕) neither clears the
+                    // flag nor re-enters `proceedToFinishIfReady`, so deleting the last page while a finish
+                    // waits on a still-heartbeating phone leaves the finish armed with the entire control
+                    // cluster unrendered and no indication anything is pending.
+                    //
+                    // That state was found by this item's own adversarial pass, and it matters here
+                    // specifically: an escape hatch nested inside the very predicate that hides the thing it
+                    // is an escape FROM closes nothing. It is not self-healing while the phone keeps
+                    // heartbeating a non-zero count either — `phonePendingActive`'s 20 s staleness clock only
+                    // starts once the phone goes quiet, so the 5 s watchdog re-evaluates and re-holds.
+                    //
+                    // Deliberately the ROW ONLY — no Finish, no Clear. A pane with no photos but live staged
+                    // segments has never offered those, and deciding what it should offer is a separate
+                    // question from giving a pending finish an exit (filed as `W3.cap-r3-fu12`).
+                    HStack(spacing: 8) { pendingFinishRow }
                 }
             }
             .padding(.bottom, 8)
