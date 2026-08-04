@@ -776,7 +776,7 @@ each leaving the app **working**.
 |---|---|---|---|---|---|---|
 | `W26.deny` | 🔴 **Fix the read coercion in BOTH `TagReading.swift:34` and `TagWrite.swift:257`** | S | med | **2** | none | — |
 | `W26.lint` | Extend `lint-write-surface.sh` to cover `packages/ArchiveCore` | S | low | 1 | none | — |
-| `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny` |
+| `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
 | `W26.walk2` | Reader discovery → `CorpusWalker`; delete `PendingWrite`; honest `DiscoveryStatus` | L | med | 2 | none | `W26.walk1` |
 | `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
 | `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
@@ -832,6 +832,149 @@ writer.
 - `W26.verify` — full-scale run against a **scratch copy** (never the real corpus), 100k+ files:
   timings, memory ceiling, no-write assertion across the whole tree, and cancel-mid-walk leaves no
   partial removals.
+
+---
+
+## 7a. Defects found by the adversarial stress pass — each must be closed by the named item
+
+Two adversarial lenses (file-safety/Core-Directive; daemon-shippability) attacked this plan. Everything below
+was **verified against the code before being written down**. They are ordered by severity, not by item.
+
+### 7a.1 🔴 A persisted index turns seconds of staleness into DAYS — and one write path is unconditional
+
+`renameTag` (`NavigationModel.swift:976-1004`) selects `library.files.filter { $0.subjects.contains(old) }`
+from the **in-memory library**, then applies `TagDelta(add: [new], remove: [old])` to every file in that set.
+`TagDelta.add` is documented *"skipped if already present"* — idempotent, but **never conditional on `old`
+still being there**. So a file whose `old` tag was removed in Finder since the scan still receives `new`.
+
+Scenario: the index says 4,000 files carry `Rosevelt`; the owner has since fixed 600 of them in Finder. A
+rename `Rosevelt → Roosevelt` during `.revalidating` **adds `Roosevelt` to those 600** — a subject tag on
+files that should not have it.
+
+**Important framing:** this is a **pre-existing** bug (Spotlight lag or a long-closed window produce the same
+staleness) — but `W26.idx` **durably amplifies it** from seconds to *days across restarts*. That makes it
+this wave's responsibility.
+
+- **Fix (`W26.idx`, with a test):** a conditional rename primitive —
+  `TagWriter.renameToken(from:to:on:expecting:)` whose `transform` returns `nil` unless the **fresh** array
+  still contains `old` (reusing the existing `shouldRemoveTag` matching). A no-op is the correct outcome.
+- **Fix (`W26.idx`):** `ArchiveFile` gains `provenance: .disk(readAt:) | .cache(asOf:)`. Rows sourced from the
+  index are **cache-provenance**, and any *bulk* operation over a cache-provenance selection must re-verify
+  the selection first. Note the general case is safer than it looks — `TagWriter` recomputes against a
+  **fresh** read (`TagWrite.swift:256`) and deltas are *relative*, so `mark(.read)` is correct regardless of
+  what else changed. **The exposure is the stale SELECTION SET and the stale TOKEN, not the delta arithmetic.**
+
+### 7a.2 🔴 Deleting `PendingWrite` removes the only write-vs-walk ORDERING guard
+
+§3's justification — *"a re-walk reads the same disk through the same primitive, so it converges"* — is
+**wrong about ordering**. Convergence is not sequencing.
+
+Scenario: the owner multi-selects 2,000 `Unread` rows and marks them Read. `mark(.read)` writes them one at a
+time; an FSEvents debounce expires around write #300 and a full re-walk begins, reading files #300–#2000
+**while their writes are still pending**. The walk's emission can then land *after* `applyVerifiedWrites` and
+publish pre-write values over verified ones.
+
+- **Fix (`W26.walk2`, in the SAME commit as the deletion):** replace the TTL/convergence overlay with a
+  strictly simpler **sequence guard** — `ArchiveLibrary` keeps
+  `verifiedWrites: [URL: (after: [String], afterLabel: Int?, seq: UInt64)]` and a monotonic counter; a walk
+  emission carries the generation it started at, and a row whose `verifiedWrites[url].seq` is newer than the
+  emission's generation keeps the verified value. **No TTL, no timer, no convergence comparison** — this is
+  ~15 lines replacing ~80, and it is a genuine ordering guarantee rather than a race that usually settles.
+
+### 7a.3 🔴 The promoted code has a THIRD silent-drop path — in five lines
+
+The body being lifted to Release silently drops files twice (verified):
+
+```swift
+let rv = try? url.resourceValues(forKeys: Set(keys))                 // :102  error swallowed
+guard rv?.isRegularFile == true else { continue }                    // :103  → vanishes
+guard case let .success(tagNames, labelNumber) = TagReading.read(url) else { continue }   // :104 → vanishes
+```
+
+A `.failure` from `TagReading.read` — the exact case `W26.deny` exists to make honest — is `continue`d. So an
+unreadable file leaves the library with **no error, no count, no signal**, and the scan still reports
+complete with `dirErrors == 0`. Promoting this verbatim would defeat `W26.deny` one item later.
+
+- **Fix (`W26.walk1`):** a `.failure` must be **counted and surfaced** (`tagFailures > 0` ⇒ the scan is not
+  clean ⇒ absence is not actionable, per §5.13 tier 1), and the row must be **kept** where one previously
+  existed. Never `continue`.
+- **Fix (`W26.walk1`):** if a `getxattr` size-0 probe is used as a cheap pre-filter, **only `errno == ENOATTR`
+  (or a returned size of 0) may conclude "no tags."** `EACCES`, `EPERM`, `EIO`, `ENOTSUP` **must** fall
+  through to `TagReading.read`. Otherwise `W26.deny`'s bug is reintroduced *and persisted* into the index.
+
+### 7a.4 The prune gate is wider than `.firstScan`
+
+`pruneIfSettled` fires on `if !library.isGathering, !filesToIndex.isEmpty, …` (`NavigationModel.swift:649`).
+When `isGathering` is derived from `LibraryPhase`, it must read **true for every phase that is not
+`.settled`** — so `.revalidating` **and** `.degraded` also block pruning. Deriving it only from `.firstScan`
+would let a degraded or mid-revalidation pass delete content-index rows. (`W26.walk2`.)
+
+### 7a.5 A live re-read failure must KEEP the row
+
+`W26.fsev`'s re-read of a dirty path must remove a row **only on a positive determination of absence** —
+`lstat`/`access` reporting `ENOENT`, or a fingerprint showing a different inode at that path. **Any
+`TagReading.read` `.failure` keeps the row**, marks it unverified, and contributes to `.degraded`. Otherwise a
+file momentarily locked by Time Machine, antivirus, or another process silently drops out of a `.settled`
+library with `dirErrors == 0`.
+
+### 7a.6 Schema: key on `(root_id, path)` — nested roots already exist
+
+`path` as a **global** primary key is wrong: nested Reader roots exist inside the corpus, so scanning a
+subfolder root rewrites `root_id` for those paths and the parent root's next revalidation sees them as
+missing. Use `PRIMARY KEY (root_id, path)`, and define root identity as the **conjunction** of resolved path
+**and** marker GUID. (`W26.idx`.)
+
+### 7a.7 "Read-only verification" is false as written — pointing the app at a folder WRITES
+
+`W26.verify`'s no-write assertion cannot hold if the measurement is taken by driving the app: selecting a
+root **writes `.archive-suite-root.json`** (a fresh GUID if absent). Two consequences:
+
+- Take the timing/scale measurement **out of the app** — a headless ArchiveCore driver calling the walker
+  directly (`swift run` or an `ArchiveCoreTests` performance case). Then the read-only assertion is true.
+- Any acceptance step that *does* drive the app must declare the marker write as a **known, owner-sanctioned
+  exception**, and must not point at a folder lacking a marker unless creating one is intended.
+
+Related: `W26.verify`'s completion grep is **unsatisfiable as written**, because this wave's own items add new
+`kMDItem`/Spotlight mentions (the xattr name itself, the `KNOWN_ISSUES` entry, this plan's history). Split it:
+(1) no `NSMetadataQuery|NSMetadataItem|MDQuery|CoreSpotlight|CSSearchable|mdfind|mdls|mdimport|mdutil` outside
+passages **explicitly annotated as history**; (2) `kMDItemUserTags` permitted **only** as the xattr name in the
+read primitive.
+
+### 7a.8 Ordering and gate corrections
+
+- **`W26.lint` must land BEFORE any ArchiveCore discovery code** — otherwise `W26.walk1` authors and commits
+  the new engine entirely outside Core Directive enforcement. `W26.walk1` is therefore
+  `(blocked-on: W26.deny, W26.lint)`.
+- **The lint's enumerator rule must be multi-line aware.** Verified: `grep -rn 'enumerator(at:'` matches
+  **zero** occurrences in this repo (the call is written across lines) while `\.enumerator\(` matches 4. A rule
+  keyed on `enumerator(at:` would pass vacuously — the worst kind of green.
+- **Allowlist by `(file, exact pattern)`, not by file.** A file-level allowlist in ArchiveCore becomes a
+  permanent unchecked hole in the package that now hosts the corpus walker.
+- **`W26.walk2` must ship `rescan()` AND its user-visible trigger** (a "Rescan Archive Folder" command,
+  ⌘⌥R — ⌘R is Mark Read). It deletes `DidUpdate`/`DidFinishGathering`, and `W26.fsev` is a later item, so
+  without this the Reader has **no way to refresh at all** in between. The plan already names manual refresh
+  as the accepted interim; that makes shipping it part of the same item, not a follow-up.
+- **`W26.walk2` must state that the scan runs OFF the main actor.** The promoted body is a *synchronous
+  MainActor* function; at 150k that is a ~10 s beachball, and none of the current gates would catch it. Set
+  `phase = .firstScan` synchronously on the MainActor, then run the walk detached at `.utility`.
+- **`W26.idx` must state that something WRITES the index.** The plan describes the read/warm-start side; add
+  an explicit first deliverable: at the end of every scan pass, `upsertBatch` all regular files seen under the
+  scan generation (500-row batches).
+
+### 7a.9 The regression guard would pass vacuously
+
+`W26.walk2`'s headline test — *"a fixture Spotlight has never indexed must still list every tagged file"* —
+**passes today** if it sets `-ARUITestRootPath`, because that key (`ArchiveLibrary.swift:66`) selects the
+existing DEBUG walker. It would prove nothing. The test must construct `ArchiveLibrary()` **directly** with
+`ARUITestRootPath` **absent** from `UserDefaults` (assert its absence), so it exercises the real production
+path. This is the single most important test in the wave; it must fail for the right reason today.
+
+### Rejected
+
+One lens raised a **CRITICAL** "the wave's tags collide with an existing W26 set; add `W26.retire` to delete
+the old entries." **Not applicable** — that is an artifact of the review comparing a *parallel, independently
+invented* item set against the one actually committed here. There is exactly one W26 set in the trackers and
+`next-queue-item.sh` resolves all of it. **Do not create `W26.retire`; do not delete any W26 entry.**
 
 ---
 

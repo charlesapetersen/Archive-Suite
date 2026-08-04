@@ -222,10 +222,30 @@ requirement on W26.walk1. (The owner's corpus is local and needs none of this; t
 root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would also stop
 `PDFTextExtractor`/`ContentIndexer` silently downloading dataless files — broader, flagged, not decided.)
 
+⚠️ **An adversarial stress pass (file-safety + daemon-shippability lenses) raised 26 defects against the first
+draft of this wave. All are recorded in the plan's §7a against the item that must close each. READ §7a BEFORE
+STARTING ANY ITEM** — several take the form *"the obvious implementation reintroduces the bug this wave exists
+to fix."* The four that most change the work: (1) the code being promoted **silently drops** unreadable files
+at `ArchiveLibrary.swift:102,104` (`guard case .success … else { continue }`), which would defeat `W26.deny`
+one item later; (2) deleting `PendingWrite` removes the only **write-vs-walk ordering** guard — the plan's
+"it converges" justification confused convergence with sequencing; (3) `renameTag`'s ADD is **unconditional**,
+so a persisted index turns seconds of staleness into days and can add a subject tag to files that no longer
+carry the old one; (4) the wave's **headline regression test passes vacuously** unless it asserts
+`ARUITestRootPath` is absent. §7a also records one **rejected** review suggestion (`W26.retire`) — do **not**
+delete any W26 entry.
+
 - [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
-  needs: none] (blocked-on: W26.deny).** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
+  needs: none] (blocked-on: W26.deny, W26.lint).** ⚠️ **`W26.lint` must land first**, or this item authors and
+  commits the entire new engine **outside** the Core Directive's automated enforcement.
+  New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
   `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
-  DEBUG fixture loader) + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable.
+  DEBUG fixture loader — **but NOT its error handling: `:102`'s `try?` and `:104`'s
+  `guard case .success … else { continue }` silently drop unreadable files; a `.failure` must be COUNTED and
+  SURFACED (`tagFailures > 0` ⇒ scan not clean ⇒ absence not actionable) and any existing row KEPT**)
+  + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable. If a `getxattr` size-0
+  pre-filter is used, **only `errno == ENOATTR` or a returned size of 0 may conclude "no tags"** — `EACCES`,
+  `EPERM`, `EIO`, `ENOTSUP` must fall through to `TagReading.read`, or `W26.deny`'s bug returns *and gets
+  persisted*.
   Shared by both apps. **Test:** scratch fixture with tagged/untagged/hidden/nested/package files and an
   em-dash+NBSP filename → assert the exact expected set, **and** assert zero writes (pre/post xattr+mtime
   snapshot of the whole fixture). Note there is currently **no test of Reader discovery whatsoever** —
