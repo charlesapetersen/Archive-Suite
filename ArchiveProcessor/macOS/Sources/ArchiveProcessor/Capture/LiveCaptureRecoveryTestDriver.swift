@@ -53,6 +53,11 @@ import ArchiveCore
 ///      cleanly stops being counted failed (Test 19 — otherwise the sheet warns about a segment that is fine
 ///      and the retry it invites re-buys the OCR), and one whose regeneration produces nothing stops wearing
 ///      a success label over an empty record (Test 20 — otherwise finalize skips it silently).
+///  17. A retry pressed WHILE that rotation review is regenerating (W3.cap-r3-fu7) is refused — the one finish
+///      state with no sheet over the Live Capture panel used to let a click re-buy the segment's OCR and race
+///      the write that was about to replace its record. Refused in `retryFailed` (so the model sheet's
+///      deferred Apply is covered too) and withheld from the per-item menu, and only for the length of the
+///      window (Test 21).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1325,10 +1330,15 @@ enum LiveCaptureRecoveryTestDriver {
             //    bulk retry's input. It cannot see the lifecycle path of `W3.cap-r3-fu5` — a group that fails,
             //    is later filed by the rotation review, and used to stay in `failedGroupIds` after losing its
             //    late-page cover — because nothing in this session ever fails. Test 19 drives that one.
+            //    `finalizing: false` below is on purpose: this leg is about the STATE offering nothing, so it
+            //    must not be able to pass because of `W3.cap-r3-fu7`'s separate mid-regeneration gate, which
+            //    Test 21 drives.
             let midOCR = ruProc.statuses.first { $0.id == "U1" }
+            let midOCRActions = midOCR.map {
+                SegmentItem.actions(for: SegmentItem.state(for: $0), finalizing: false)
+            }
             check("no retry is offered for a segment mid-OCR — the reason the drop-without-cancel was latent",
-                  midOCR?.phase == .ocr
-                      && midOCR.map { SegmentItem.actions(for: SegmentItem.state(for: $0)).isEmpty } == true)
+                  midOCR?.phase == .ocr && midOCRActions?.isEmpty == true)
             check("...and the bulk retry cannot reach it either: a mid-OCR group is in no failed set",
                   !ruProc.failedGroupIds.contains("U1") && !ruProc.failedGroupIds.contains("U2"))
 
@@ -1750,6 +1760,199 @@ enum LiveCaptureRecoveryTestDriver {
                       && bwProc.failedGroupIds == ["B1"]
                       && bwProc.statuses.contains { $0.id == "B1" && $0.phase == .failed }
                       && bwSources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- Test 21 (W3.cap-r3-fu7): a retry pressed WHILE the end-of-session rotation review is
+        // regenerating. `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes the changed
+        // segments from a DETACHED task, and that is the one finish state with no sheet over the Live Capture
+        // panel — `LiveCaptureView:48` shows a throbber for precisely `isFinalizing && !showFinalizeSheet &&
+        // !showRotationReview`. So the panel's "Retry N failed" button and the expanded row's per-item retry
+        // were both live in a window where a retry deletes the segment's staged output, drops `retained`, and
+        // re-ingests every page — buying the OCR a SECOND time — while the regeneration's write is still in
+        // flight and about to `staged[idx] = fresh` over whatever the re-run appended.
+        //
+        // HOW the window is held open, and why no gate object is needed. `isFinalizing = true` is set
+        // SYNCHRONOUSLY before the `Task`, and everything that closes the window again (`staged[idx] = fresh`,
+        // `isFinalizing = false`, `beginFinalize()`) runs on the MainActor *after* an await on the detached
+        // write. So a retry issued on the same MainActor turn as `applyRotationReviewAndFinalize()`, with no
+        // await between, is genuinely inside the window with the write genuinely running on another thread.
+        // Check 3 asserts that state rather than trusting it.
+        //
+        // WHAT is asserted, and why it is not the record overwrite itself. The overwrite half is
+        // order-dependent — whether the regeneration's `firstIndex` finds the retry's freshly appended record
+        // (overwrite, pointing at deleted files) or finds nothing (the fresh record silently skipped) depends
+        // on which resumes first — so pinning one ordering would pin an artifact of this run's scheduling.
+        // The DOUBLE SPEND is order-independent: the retry always re-ingests. The fix is a refusal, which
+        // forecloses every ordering at once, so the checks measure the refusal and its money consequence.
+        //
+        // NON-VACUITY, measured (2026-08-04):
+        //   P1 the `guard !isFinalizing` in `retryFailed` deleted (the shipped defect)
+        //      → RED, checks 4 and 5: the retry buys 2 more paid calls and takes the segment's staged record,
+        //      its `finalizedGroups` entry and its output files with it, mid-write. This is the mutant the
+        //      section exists for.
+        //   P2 the guard weakened to the bulk-only shape — refusing only when `groupIds == nil`
+        //      → RED, checks 4 and 5. Pins that the PER-ITEM entry is gated too (the item's open question),
+        //      not just the bulk button.
+        //   P3 `SegmentItem.gate` returning its input unchanged (the UI half reverted)
+        //      → RED, check 7. The menu offers a retry it would be refused for.
+        //   P4 `gate` filtering `.retry` only, leaving `.retryWithModel`/`.changeRotation`
+        //      → RED, check 7. Both of those reach `retryFailed` through the model sheet.
+        //   P5 the guard widened to also refuse while `showFinalizeSheet` is up
+        //      → 0 RED. Recorded as a deliberate non-gate rather than an untested one: check 8 only proves the
+        //      refusal ENDS with the window, and it runs after `beginFinalize()` has raised that sheet, so a
+        //      widened guard would make check 8 fail — which is the point of measuring it. (It does: this
+        //      reads 0 RED only because the widening was NOT taken. See `retryFailed`'s comment and
+        //      `W3.cap-r3-fu9`.)
+        // Checks 1–3 and 6 are premises, not catchers. ---
+        if isolatedBackup {
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let rfOut = tmp.appendingPathComponent("fu7out", isDirectory: true)
+            let rfStaging = tmp.appendingPathComponent("APStaging-fu7-\(String(UUID().uuidString.prefix(8)))",
+                                                      isDirectory: true)
+            try? fm.createDirectory(at: rfStaging, withIntermediateDirectories: true)
+            let rfSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            rfSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — no document reaches the LLM, so this runs for real, for $0, no network.
+                    taggingMode: .human, rotationMode: .off,
+                    // No merge here (unlike Test 20): this section wants the regeneration to SUCCEED, so the
+                    // per-page PDFs it rewrites may stay exactly where the first write put them.
+                    mergeDocuments: false,
+                    outputDirectory: rfOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: rfStaging)
+            let rfProc = rfSession.liveProcessor
+            func rfSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            // A real, decodable JPEG: the segment has to reach the plain `.staged` label (a placeholder page
+            // would make it `.succeededPlaceholderImage`) and the regeneration has to be able to rewrite it.
+            let rfBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let rfJPEG = rfBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+
+            // 1. PREMISE. A two-page document stages cleanly, having bought exactly one call per page.
+            for seq in [1, 2] {
+                rfSession.ingest(jpeg: rfJPEG, groupId: "F1", seq: seq,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            rfProc.segmentResolved(groupId: "F1")
+            let rfStagedOK = await rfSettle { rfProc.statuses.first { $0.id == "F1" }?.phase == .staged }
+            let rfPaidAfterStage = paidStarts()
+            let rfSources = rfSession.photos.filter { $0.groupId == "F1" }.map(\.url)
+            check("a two-page document stages cleanly, having bought exactly one paid call per page",
+                  rfStagedOK && rfPaidAfterStage == 2 && rfSources.count == 2
+                      && rfProc.failedGroupIds.isEmpty && rfProc.isFinalized("F1")
+                      && rfProc.staged.first { $0.groupId == "F1" }?.pdfURLs.isEmpty == false)
+
+            // 2. PREMISE. Its pages reach the rotation review, through the real Finish, with the operator's
+            //    own "Review rotation" preference restored around the one synchronous call that reads it.
+            let rfPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+            rfProc.finishSession()
+            if let rfPriorReview {
+                UserDefaults.standard.set(rfPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            check("a STAGED segment's pages enter the end-of-session rotation review",
+                  rfProc.showRotationReview
+                      && rfProc.rotationReviewPages.filter { $0.groupId == "F1" }.count == 2)
+
+            // 3. PREMISE, and the one that makes the rest non-vacuous: the operator straightens a page, and
+            //    the regeneration is IN FLIGHT — `isFinalizing`, no sheet over the panel (so the retry
+            //    affordances are on screen), and the record + its file still the pre-write ones. Everything
+            //    from here to check 5 runs on this same MainActor turn, so the detached write cannot land in
+            //    the middle of it.
+            for i in rfProc.rotationReviewPages.indices
+            where rfProc.rotationReviewPages[i].groupId == "F1" && rfProc.rotationReviewPages[i].pageIndex == 0 {
+                rfProc.rotationReviewPages[i].rotationDegrees = 90
+            }
+            let rfPDFsBefore = rfProc.staged.first { $0.groupId == "F1" }?.pdfURLs ?? []
+            rfProc.applyRotationReviewAndFinalize()
+            check("the regeneration is in flight, with the panel on screen and nothing over it",
+                  rfProc.isFinalizing && !rfProc.showFinalizeSheet && !rfProc.showRotationReview
+                      && !rfPDFsBefore.isEmpty && rfPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 4. THE FIX, money half. Both retry entries are refused: the per-item one, and the one the model
+            //    sheet defers (`onApply` fires whenever the operator gets round to it, so no enabled-ness
+            //    computed when the button was drawn can speak for this moment — which is why the refusal has
+            //    to live in `retryFailed` and not only in the view).
+            rfProc.retryFailed(groupIds: ["F1"])
+            rfProc.retryFailed(groupIds: ["F1"], override: LiveCaptureProcessor.OCROverride(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "", rotation: 180))
+            check("a retry mid-regeneration buys NO second OCR — neither entry, override or not",
+                  paidStarts() == rfPaidAfterStage)
+
+            // 5. THE FIX, state half. Nothing the retry would have torn down moved: the staged record, the
+            //    `finalizedGroups` entry the late-page branch depends on, `retained`, and the output files the
+            //    regeneration is at this instant writing over.
+            check("...and it tears nothing down under the write: record, finalized entry and files all intact",
+                  rfProc.staged.contains { $0.groupId == "F1" }
+                      && rfProc.isFinalized("F1")
+                      && rfProc.retainedText(for: "F1") != nil
+                      && rfPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 6. PREMISE. The regeneration then lands normally — the refusal cost the finish nothing. The
+            //    segment is still filable, still unfailed, and both sources are still in the backup folder.
+            let rfRegen = await rfSettle { !rfProc.isFinalizing && rfProc.showFinalizeSheet }
+            let rfRecord = rfProc.staged.first { $0.groupId == "F1" }
+            check("the regeneration lands intact and the segment is still filable",
+                  rfRegen && rfProc.failedGroupIds.isEmpty
+                      && rfRecord?.pagesComplete != false
+                      && rfRecord?.pdfURLs.isEmpty == false
+                      && rfRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && rfSources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 7. THE FIX, UI half — the per-item menu, answering the item's open question with a measurement
+            //    rather than a decision note. Every state that offers a retry withholds the whole retry family
+            //    while finalizing and keeps the two read-only actions; and the SAME states still offer them
+            //    when not, so a gate that withheld unconditionally fails here too.
+            let rfGatedStates: [ItemState] = [.failed(.noOutput), .succeededNoText, .succeededPlaceholderImage]
+            let rfWithheld = rfGatedStates.allSatisfy { st in
+                let gated = SegmentItem.actions(for: st, finalizing: true)
+                let ungated = SegmentItem.actions(for: st, finalizing: false)
+                return !gated.contains(.retry) && !gated.contains(.retryWithModel)
+                    && !gated.contains(.changeRotation)
+                    && gated.contains(.viewText) && gated.contains(.revealFiles)
+                    && ungated.contains(.retry) && ungated.contains(.retryWithModel)
+            }
+            check("the per-item menu withholds the retry family mid-regeneration, and only then",
+                  rfWithheld
+                      && SegmentItem.actions(for: .succeeded, finalizing: true) == [.viewText, .revealFiles])
+
+            // 8. …and the refusal is a WINDOW, not a ban. Once the regeneration is done, the same per-item
+            //    retry works again and buys the segment's pages back — the recovery affordance the operator
+            //    depends on is unchanged outside the race. Deliberately last: it re-processes the segment.
+            //    This also measures the guard's WIDTH: `beginFinalize` has raised the collection sheet by now,
+            //    so a guard widened to `!showFinalizeSheet` (mutant P5) would fail here.
+            rfProc.retryFailed(groupIds: ["F1"])
+            let rfReStaged = await rfSettle { rfProc.statuses.first { $0.id == "F1" }?.phase == .staged }
+            check("after the window closes the retry works again — a window, not a ban",
+                  rfReStaged && paidStarts() == rfPaidAfterStage + 2
+                      && rfProc.staged.contains { $0.groupId == "F1" })
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []

@@ -582,12 +582,15 @@ private struct LiveProcessingBox: View {
     /// collapsed rows stay compact in the narrow control panel.
     private var segmentItems: [any ProcessableItem] {
         let pm = session.config.map { "\($0.provider.rawValue) · \($0.model.displayName)" }
+        // W3.cap-r3-fu7 — read once for the whole list: `liveProc` is observed, so flipping `isFinalizing`
+        // rebuilds these rows and the retry-family actions come and go with the regeneration window.
+        let finalizing = liveProc.isFinalizing
         return liveProc.statuses.map { s in
             let expanded = (expandedSegmentID == s.id)
             return SegmentItem(status: s,
                                ocrText: liveProc.retainedText(for: s.id),
                                providerModel: expanded ? pm : nil,
-                               expanded: expanded)
+                               expanded: expanded, finalizing: finalizing)
         }
     }
 
@@ -634,6 +637,12 @@ private struct LiveProcessingBox: View {
                             liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
                         }
                         .font(.caption).foregroundStyle(.red)
+                        // W3.cap-r3-fu7 — same gate as Clear (`:405`), for the same window: the
+                        // end-of-session rotation review regenerates segments from a detached task with this
+                        // panel visible and no sheet over it, and a retry pressed there re-buys the OCR the
+                        // regeneration is still writing. `retryFailed` refuses it outright; this is so the
+                        // button says so instead of looking like it did nothing.
+                        .disabled(liveProc.isFinalizing)
                     }
                 }
             }
@@ -1015,7 +1024,8 @@ struct SegmentItem: ProcessableItem {
     let providerModel: String?
     let availableActions: [ItemAction]
 
-    init(status s: LiveCaptureProcessor.SegmentStatus, ocrText: String?, providerModel: String?, expanded: Bool) {
+    init(status s: LiveCaptureProcessor.SegmentStatus, ocrText: String?, providerModel: String?,
+         expanded: Bool, finalizing: Bool) {
         self.itemID = s.id
         self.title = "\(s.index). \(s.type.rawValue.capitalized) · \(s.pageCount)p"
         self.subtitle = nil
@@ -1027,7 +1037,7 @@ struct SegmentItem: ProcessableItem {
         self.errorMessage = s.errorMessage
         self.errorCode = s.errorCode
         self.providerModel = providerModel
-        self.availableActions = expanded ? Self.actions(for: st) : []
+        self.availableActions = expanded ? Self.actions(for: st, finalizing: finalizing) : []
     }
 
     static func state(for s: LiveCaptureProcessor.SegmentStatus) -> ItemState {
@@ -1051,21 +1061,42 @@ struct SegmentItem: ProcessableItem {
 
     /// Actions offered per state. Reclassify is Files-only; file-as-image-only isn't offered here (§4a
     /// already files a complete image-only doc automatically as `succeededNoText`).
-    static func actions(for state: ItemState) -> [ItemAction] {
+    ///
+    /// `finalizing` is `W3.cap-r3-fu7`: while a finish is regenerating segments, every action that leads to
+    /// `retryFailed` is withheld — `.retry` directly, `.retryWithModel`/`.changeRotation` through the model
+    /// sheet — because pressing one in that window re-buys the segment's OCR and races the regeneration's
+    /// record replace. The bulk "Retry N failed" button is gated on the same flag and `retryFailed` refuses
+    /// the call outright, which is the gate that actually holds; withholding here is so the menu does not
+    /// offer it. `.viewText`/`.revealFiles` are read-only and stay. Answering the item's open question: YES,
+    /// the per-item menu needs the same gate as the bulk button — it reaches the same function and spends the
+    /// same money, and the expanded row is on screen in exactly the window that is exposed, so gating only
+    /// the bulk button would have left the money path open through the menu beside it.
+    ///
+    /// `finalizing` has NO default on purpose: both call sites should have to say which case they mean, so a
+    /// third one cannot inherit "not finalizing" silently.
+    static func actions(for state: ItemState, finalizing: Bool) -> [ItemAction] {
         switch state {
         case .failed:
-            return [.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles]
+            return gate([.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles], finalizing)
         case .succeededNoText:
-            return [.retry, .retryWithModel, .viewText, .revealFiles]
+            return gate([.retry, .retryWithModel, .viewText, .revealFiles], finalizing)
         case .succeededPlaceholderImage:
             // Same recovery affordances: the source photo is deliberately still in the Backup Folder, so a
             // retry (optionally after a rotate) is exactly how the operator gets the scan into the archive.
-            return [.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles]
+            return gate([.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles], finalizing)
         case .succeeded:
             return [.viewText, .revealFiles]
         default:
             return []
         }
+    }
+
+    /// Drops the retry-family actions when a finish is mid-regeneration (`W3.cap-r3-fu7`). Expressed as a
+    /// filter over the state's own list rather than a second set of per-state literals, so a retry added to
+    /// one state later cannot be gated in one place and forgotten in the other.
+    private static func gate(_ actions: [ItemAction], _ finalizing: Bool) -> [ItemAction] {
+        guard finalizing else { return actions }
+        return actions.filter { $0 != .retry && $0 != .retryWithModel && $0 != .changeRotation }
     }
 }
 

@@ -275,6 +275,38 @@ final class LiveCaptureProcessor: ObservableObject {
     /// `.staged`/`.succeededNoText` segment is retryable too: old output is deleted first, so it's safe.
     func retryFailed(groupIds: Set<String>? = nil, override: OCROverride? = nil) {
         guard session.processingMode == .live else { return }
+        // W3.cap-r3-fu7 — refuse while a finish is regenerating, and refuse HERE rather than only in the UI.
+        // `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files
+        // from a DETACHED task, so for the length of that write the Live Capture panel is on screen and
+        // clickable (`LiveCaptureView:48` deliberately shows a throbber for exactly `isFinalizing &&
+        // !showFinalizeSheet && !showRotationReview`). A retry landing in that window deletes the segment's
+        // staged output, releases it, drops `retained` and re-ingests every page — buying its OCR a second
+        // time — and then the regeneration's `staged[idx] = fresh` overwrites whatever the re-run appended
+        // with a record pointing at files the retry had already deleted. Data-safe (the record is then
+        // unfilable, so `executePlans` skips it and its sources stay in the backup folder) but the money is
+        // spent and the operator is left with a record describing neither write.
+        //
+        // The model layer is the load-bearing gate, not the two `.disabled`/withheld-action edits that ship
+        // with it, because this is the ONE place all three entry points converge — and one of them is
+        // deferred: `LiveCaptureView`'s `modelChoiceTarget` sheet captures a group when it opens and calls
+        // back on Apply, which can be an arbitrary time later, so no enabled-ness computed when the button
+        // was drawn can speak for the moment the retry actually runs. The UI edits are there so the operator
+        // is not offered something that would be refused; this is what makes the refusal true.
+        //
+        // The accepted limit, stated rather than hidden: that same deferred Apply is the one path where the
+        // refusal is SILENT — the sheet closes and nothing happens. It costs the operator a second press
+        // after the throbber clears, and the alternative is a new operator-facing error channel for a race
+        // narrower than the sheet it would report through. The button paths do not have this problem: they
+        // are disabled/withheld for the length of the window, so the state is visible before the press.
+        //
+        // Scoped to `isFinalizing` DELIBERATELY, and not widened to `requestFinish`'s
+        // `!showFinalizeSheet, !showRotationReview` triple. Those two states put a modal sheet over the
+        // panel, so the panel's own retry affordances are unreachable in them — the only entry that survives
+        // a sheet is the deferred `modelChoiceTarget` Apply above, and reaching it needs a SECOND sheet to
+        // have been suppressed by the first (SwiftUI presents one sheet per view). That is a distinct claim
+        // about the presentation layer with a distinct fix, filed as `W3.cap-r3-fu9`, not something to
+        // absorb into a money-path refusal that no test here drives.
+        guard !isFinalizing else { return }
         let targets = groupIds ?? failedGroupIds
         let fm = FileManager.default
         var toReprocess: [String] = []
@@ -1243,7 +1275,11 @@ final class LiveCaptureProcessor: ObservableObject {
                 // in `finalizedGroups`, or this would break the `failedGroupIds ⊆ finalizedGroups` subset
                 // `W3.cap-r3-fu5` made structural (and which `retryFailed`'s cancel-loop latency argument
                 // rests on in turn). It does, because every exit from `finalizedGroups` also drops the group
-                // from `staged`: `retryFailed` releases then `staged.removeAll`, `clearSessionState` does
+                // from `staged` (and since `W3.cap-r3-fu7` the first of those cannot even be entered while
+                // this loop is pending — `retryFailed` refuses while `isFinalizing` — so what follows is now
+                // the argument for `clearSessionState`/`finalize` alone, kept whole because it is the
+                // synchronicity, not the refusal, that makes it sound):
+                // `retryFailed` releases then `staged.removeAll`, `clearSessionState` does
                 // `staged.removeAll()` then `releaseAllFinalizedGroups`, and `finalize` drops the filed groups
                 // from `staged` a line before releasing them — each pair synchronous on the MainActor with no
                 // await between, so this loop cannot resume inside the gap. Being staged therefore IMPLIES
