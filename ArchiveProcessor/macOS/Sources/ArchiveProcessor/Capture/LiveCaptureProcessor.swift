@@ -277,9 +277,24 @@ final class LiveCaptureProcessor: ObservableObject {
         guard session.processingMode == .live else { return }
         // W3.cap-r3-fu7 — refuse while a finish is regenerating, and refuse HERE rather than only in the UI.
         // `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files
-        // from a DETACHED task, so for the length of that write the Live Capture panel is on screen and
-        // clickable (`LiveCaptureView:48` deliberately shows a throbber for exactly `isFinalizing &&
-        // !showFinalizeSheet && !showRotationReview`). A retry landing in that window deletes the segment's
+        // from a DETACHED task, so for the length of that write the Live Capture panel is on screen with no
+        // sheet over it (`LiveCaptureView:48` shows a throbber for exactly `isFinalizing && !showFinalizeSheet
+        // && !showRotationReview`).
+        //
+        // ⚠️ ON SCREEN is not the same as REACHABLE, and the item that filed this — plus the first draft of
+        // this very comment — conflated the two. An independent adversarial pass caught it: that throbber's
+        // scrim is `Color.black.opacity(0.2).ignoresSafeArea()` inside an `.overlay`, with **no**
+        // `.allowsHitTesting(false)` (this repo adds that modifier where it wants an overlay to pass clicks
+        // through — `OCRView.swift:652`). A `Color` is hit-testable, so for the length of the window the scrim
+        // very likely swallows every click in the panel, and neither retry button was ever pressable there.
+        // Read this fix accordingly: the two view-layer edits that ship with it are DEFENCE-IN-DEPTH over a
+        // hazard the scrim already blocks, and the guard's live production value is the one entry a scrim
+        // cannot cover — the deferred sheet Apply below, whose own reachability rides on `W3.cap-r3-fu9`. The
+        // scrim's intent is undecided and is filed as `W3.cap-r3-fu10`: if blocking input is deliberate it
+        // should say so, and if it is not, adding `.allowsHitTesting(false)` makes these gates load-bearing
+        // rather than spare. Settling it needs the VM GUI lane; a code read is all that is claimed here.
+        //
+        // A retry landing in that window deletes the segment's
         // staged output, releases it, drops `retained` and re-ingests every page — buying its OCR a second
         // time — and then the regeneration's `staged[idx] = fresh` overwrites whatever the re-run appended
         // with a record pointing at files the retry had already deleted. Data-safe (the record is then
@@ -294,10 +309,14 @@ final class LiveCaptureProcessor: ObservableObject {
         // is not offered something that would be refused; this is what makes the refusal true.
         //
         // The accepted limit, stated rather than hidden: that same deferred Apply is the one path where the
-        // refusal is SILENT — the sheet closes and nothing happens. It costs the operator a second press
-        // after the throbber clears, and the alternative is a new operator-facing error channel for a race
-        // narrower than the sheet it would report through. The button paths do not have this problem: they
-        // are disabled/withheld for the length of the window, so the state is visible before the press.
+        // refusal is SILENT — `onApply` calls this, gets nothing, and then clears `modelChoiceTarget`
+        // unconditionally, so the sheet closes taking the operator's provider, model, thinking level, ROTATION
+        // choice and freshly TYPED API KEY with it. (The first draft of this note said "a second press", which
+        // undersold it — the adversarial pass priced it properly.) It is accepted rather than fixed because the
+        // alternative is a new operator-facing error channel for a path that may not be reachable at all
+        // (`W3.cap-r3-fu9`); if fu9 confirms it is, the right fix is to keep the sheet OPEN on a refusal, not
+        // to widen this guard. The button paths do not have the problem — they are disabled/withheld for the
+        // length of the window, so the state is visible before the press.
         //
         // Scoped to `isFinalizing` DELIBERATELY, and not widened to `requestFinish`'s
         // `!showFinalizeSheet, !showRotationReview` triple. Those two states put a modal sheet over the
@@ -306,6 +325,14 @@ final class LiveCaptureProcessor: ObservableObject {
         // have been suppressed by the first (SwiftUI presents one sheet per view). That is a distinct claim
         // about the presentation layer with a distinct fix, filed as `W3.cap-r3-fu9`, not something to
         // absorb into a money-path refusal that no test here drives.
+        //
+        // The window has NO TRAILING HOLE, and that rests on two adjacent-line facts worth naming because a
+        // reorder would silently open one. `applyRotationReviewAndFinalize` does `isFinalizing = false` and
+        // `beginFinalize()` with no await between them, and `finalize` does `showFinalizeSheet = false` and
+        // `isFinalizing = false` likewise — so there is no MainActor turn in which the panel is exposed AND
+        // this guard is already down. Put an await between either pair and the hazard comes back in the gap.
+        // (`beginFinalize`'s own `guard !staged.isEmpty` can leave no sheet up, but then there is nothing
+        // staged for a retry to race.)
         guard !isFinalizing else { return }
         let targets = groupIds ?? failedGroupIds
         let fm = FileManager.default
@@ -1275,10 +1302,12 @@ final class LiveCaptureProcessor: ObservableObject {
                 // in `finalizedGroups`, or this would break the `failedGroupIds ⊆ finalizedGroups` subset
                 // `W3.cap-r3-fu5` made structural (and which `retryFailed`'s cancel-loop latency argument
                 // rests on in turn). It does, because every exit from `finalizedGroups` also drops the group
-                // from `staged` (and since `W3.cap-r3-fu7` the first of those cannot even be entered while
-                // this loop is pending — `retryFailed` refuses while `isFinalizing` — so what follows is now
-                // the argument for `clearSessionState`/`finalize` alone, kept whole because it is the
-                // synchronicity, not the refusal, that makes it sound):
+                // from `staged`. Since `W3.cap-r3-fu7`, TWO of the three cannot even be entered while this loop
+                // is pending: `retryFailed` now refuses while `isFinalizing`, and `finalize` already did
+                // (`guard config != nil, let stagingDir, !isFinalizing`). So `clearSessionState` is the only
+                // remaining entrant — and it is the one still reachable from the UI, since the Clear button is
+                // ungated in this window (`W3.cap-r3-fu11`). The enumeration below is kept WHOLE anyway,
+                // because it is the synchronicity and not the refusals that makes the argument sound:
                 // `retryFailed` releases then `staged.removeAll`, `clearSessionState` does
                 // `staged.removeAll()` then `releaseAllFinalizedGroups`, and `finalize` drops the filed groups
                 // from `staged` a line before releasing them — each pair synchronous on the MainActor with no

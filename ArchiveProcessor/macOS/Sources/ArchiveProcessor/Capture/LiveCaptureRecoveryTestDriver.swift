@@ -1779,8 +1779,20 @@ enum LiveCaptureRecoveryTestDriver {
         // SYNCHRONOUSLY before the `Task`, and everything that closes the window again (`staged[idx] = fresh`,
         // `isFinalizing = false`, `beginFinalize()`) runs on the MainActor *after* an await on the detached
         // write. So a retry issued on the same MainActor turn as `applyRotationReviewAndFinalize()`, with no
-        // await between, is genuinely inside the window with the write genuinely running on another thread.
-        // Check 3 asserts that state rather than trusting it.
+        // await between, is inside the window by construction. Check 3 asserts that state rather than
+        // trusting it.
+        //
+        // ⚠️ Stated exactly, because the first draft of this comment overclaimed it and the adversarial pass
+        // nailed down why. `LiveCaptureProcessor` is `@MainActor`, so the `Task { … }` in
+        // `applyRotationReviewAndFinalize` is MainActor-ISOLATED — it cannot begin until the MainActor yields,
+        // which this test never does before check 5. So at checks 3–5 the outer Task has not started and the
+        // inner `Task.detached` has not even been CREATED, let alone run on another thread. What this section
+        // therefore proves is a FLAG-STATE refusal, not a simultaneous race: the retry is issued in exactly the
+        // state the exposed window has, and is refused. That is the property the fix turns on — the defect is
+        // the retry running at all, in a state from which the pending write will later publish over it — but it
+        // is weaker than "with the write running concurrently", which is not asserted anywhere and should not
+        // be claimed. Making the overlap literal would need a gate inside `writeSegmentFiles`; the refusal it
+        // would additionally demonstrate is the same one.
         //
         // WHAT is asserted, and why it is not the record overwrite itself. The overwrite half is
         // order-dependent — whether the regeneration's `firstIndex` finds the retry's freshly appended record
@@ -1791,8 +1803,10 @@ enum LiveCaptureRecoveryTestDriver {
         //
         // NON-VACUITY, measured (2026-08-04). Every mutant was built and run; the counts are observed:
         //   P1 the `guard !isFinalizing` in `retryFailed` deleted (the shipped defect)
-        //      → 3 RED: checks 4, 5 and 8. The retry buys 2 more paid calls and takes the segment's staged
-        //      record, its `finalizedGroups` entry and its output files with it, mid-write. Check 8 goes down
+        //      → 3 RED: checks 4, 5 and 8. The retry buys FOUR more paid calls — check 4 issues two retries,
+        //      and the second re-nils `pageTasks` so it re-buys too; the first draft of this note said two,
+        //      which the adversarial pass corrected — and takes the segment's staged
+        //      record, its `finalizedGroups` entry and its output files with it. Check 8 goes down
         //      as a consequence rather than on its own account — the window's retries already spent the calls
         //      it counts — which is worth knowing when reading a future regression: 4 and 5 are the ones that
         //      name the defect. This is the mutant the section exists for.
@@ -1812,6 +1826,19 @@ enum LiveCaptureRecoveryTestDriver {
         //      the time check 8 runs, so a widened guard turns the intended window into a ban and is caught.
         //      The widening was considered and declined on its own merits (see `retryFailed`'s comment and
         //      `W3.cap-r3-fu9`); this is what makes that a tested decision.
+        //   P6 `segmentItems`' `let finalizing = liveProc.isFinalizing` forced to `false` — the view WIRING of
+        //      the per-item gate, as opposed to the pure function check 7 exercises
+        //      → 0 RED, and recorded as a limit rather than fixed. Check 7 calls
+        //      `SegmentItem.actions(for:finalizing:)` directly, so nothing here proves the view passes the real
+        //      flag into it. Asserting that needs the view, i.e. the VM GUI lane.
+        //   P7 the bulk button's `.disabled(liveProc.isFinalizing)` deleted
+        //      → 0 RED, same reason and unavoidably so: a SwiftUI modifier's effect is not observable from a
+        //      headless driver at all.
+        //      ⚠️ P6 and P7 together are the honest scope statement for this section: of the fix's three edits,
+        //      only the `retryFailed` guard (P1/P2) and the pure action-gate function (P3/P4) are measured
+        //      here. Both unmeasured mutants are in the VIEW, both were found by the adversarial pass rather
+        //      than volunteered, and both are exactly where the item's reachability question also lands
+        //      (`W3.cap-r3-fu10`) — so one VM-lane session could close all three.
         // Checks 1–3 and 6 are premises, not catchers. ---
         if isolatedBackup {
             if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
@@ -1887,17 +1914,18 @@ enum LiveCaptureRecoveryTestDriver {
                       && rfProc.rotationReviewPages.filter { $0.groupId == "F1" }.count == 2)
 
             // 3. PREMISE, and the one that makes the rest non-vacuous: the operator straightens a page, and
-            //    the regeneration is IN FLIGHT — `isFinalizing`, no sheet over the panel (so the retry
-            //    affordances are on screen), and the record + its file still the pre-write ones. Everything
-            //    from here to check 5 runs on this same MainActor turn, so the detached write cannot land in
-            //    the middle of it.
+            //    the regeneration is PENDING and unpublished — `isFinalizing`, no sheet over the panel (so the
+            //    retry affordances are on screen, if not necessarily hit-testable — see the item's fu10 note),
+            //    and the record + its file still the pre-write ones. Everything from here to check 5 runs on
+            //    this same MainActor turn, so the write cannot land in the middle of it. (Not asserted, per the
+            //    ⚠️ above: that the write is *executing*. It is not — it has not even been dispatched.)
             for i in rfProc.rotationReviewPages.indices
             where rfProc.rotationReviewPages[i].groupId == "F1" && rfProc.rotationReviewPages[i].pageIndex == 0 {
                 rfProc.rotationReviewPages[i].rotationDegrees = 90
             }
             let rfPDFsBefore = rfProc.staged.first { $0.groupId == "F1" }?.pdfURLs ?? []
             rfProc.applyRotationReviewAndFinalize()
-            check("the regeneration is in flight, with the panel on screen and nothing over it",
+            check("the regeneration is pending and unpublished, with the panel on screen and nothing over it",
                   rfProc.isFinalizing && !rfProc.showFinalizeSheet && !rfProc.showRotationReview
                       && !rfPDFsBefore.isEmpty && rfPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) })
 
@@ -1913,7 +1941,7 @@ enum LiveCaptureRecoveryTestDriver {
 
             // 5. THE FIX, state half. Nothing the retry would have torn down moved: the staged record, the
             //    `finalizedGroups` entry the late-page branch depends on, `retained`, and the output files the
-            //    regeneration is at this instant writing over.
+            //    pending regeneration is about to write over.
             check("...and it tears nothing down under the write: record, finalized entry and files all intact",
                   rfProc.staged.contains { $0.groupId == "F1" }
                       && rfProc.isFinalized("F1")
@@ -1948,11 +1976,19 @@ enum LiveCaptureRecoveryTestDriver {
                   rfWithheld
                       && SegmentItem.actions(for: .succeeded, finalizing: true) == [.viewText, .revealFiles])
 
-            // 8. …and the refusal is a WINDOW, not a ban. Once the regeneration is done, the same per-item
-            //    retry works again and buys the segment's pages back — the recovery affordance the operator
-            //    depends on is unchanged outside the race. Deliberately last: it re-processes the segment.
-            //    This also measures the guard's WIDTH: `beginFinalize` has raised the collection sheet by now,
-            //    so a guard widened to `!showFinalizeSheet` (mutant P5) would fail here.
+            // 8. …and the refusal is a WINDOW, not a ban: once the regeneration is done, the same per-item
+            //    retry works again and buys the segment's pages back. Deliberately last, because it
+            //    re-processes the segment.
+            //
+            //    SCOPE, since the adversarial pass showed the first draft claimed more than this measures.
+            //    `beginFinalize` has raised the collection SHEET by the time this runs, so the state exercised
+            //    is "finish sheet up, not finalizing" — which is not a state the operator can press either
+            //    button in (the sheet is modal). So this is primarily the guard's WIDTH measurement (mutant P5
+            //    is 1 RED here), and only secondarily the not-a-ban claim; a check for the affordance as the
+            //    operator meets it would have to dismiss the sheet first, and would then lose the width
+            //    measurement. ⚠️ It also COUPLES this section to `W3.cap-r3-fu9`: because it asserts the retry
+            //    SUCCEEDS under `showFinalizeSheet`, a future fu9 fix that refuses during the sheet states
+            //    turns this check RED and must rewrite it rather than read it as a regression.
             rfProc.retryFailed(groupIds: ["F1"])
             let rfReStaged = await rfSettle { rfProc.statuses.first { $0.id == "F1" }?.phase == .staged }
             check("after the window closes the retry works again — a window, not a ban",

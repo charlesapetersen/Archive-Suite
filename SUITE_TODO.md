@@ -1221,7 +1221,22 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > whole: **no `pageTasks` entry leaves the map with a RUNNING call behind it**, on every path that frees one
 > (`finalizeSegment`'s own clear drops without cancelling, correctly — it runs after every one of those pages
 > was awaited). Still open: **`-fu3`** and **`-fu4`**, both behaviour decisions rather than bug fixes, plus
-> **`-fu7`** and **`-fu8`**, which `-fu6`'s pass found. **`-fu5` — the unenforced
+> **`-fu8`** (the resume path's third label, which `-fu6`'s pass found) and **three that `-fu7` produced**:
+> **`-fu9`** (a SUSPECTED sheet suppression), **`-fu10`** (does the finishing throbber's scrim block input?) and
+> **`-fu11`** (Clear is ungated in the same window and is more destructive than the retry). **`-fu7` — the
+> retry that was still live while the rotation review regenerated — shipped 2026-08-04
+> `765897b`/`68160b0`** (entry in `SUITE_TODO_DONE.md`): `retryFailed` refuses while `isFinalizing`, and the
+> bulk button + the per-item menu stop offering what it would refuse. The refusal is deliberately narrow (that
+> window only, not the two sheet states), and mutant P5 — widening it to `requestFinish`'s triple — is RED, so
+> the *scope* is tested and not merely preferred. ⚠️ **Read fu7 with `-fu10` beside it.** Its independent
+> adversarial pass established that the throbber fu7 cited as evidence the panel was CLICKABLE is a
+> hit-testable full-bleed scrim, so the two view-layer gates are most likely defence-in-depth over a hazard the
+> scrim already blocks, and the guard's live production value is the deferred model-sheet Apply (whose
+> reachability rides on `-fu9`). The guard is right either way and cost nothing; what fu10 decides is whether
+> this closed a live money leak or documented an unreachable one. Two of fu7's three edits are unmeasured above
+> the pure-function line (mutants P6/P7, both 0 RED — a SwiftUI modifier is invisible to a headless driver);
+> **one VM-lane session can close fu9, fu10 and both of those at once.**
+> **`-fu5` — the unenforced
 > `failedGroupIds ⊆ finalizedGroups` invariant several of these latency arguments lean on — shipped 2026-08-03
 > `2d15fae`/`f091ea2`** (entry in `SUITE_TODO_DONE.md`): `finalizedGroups` now has exactly two exits —
 > `releaseFinalizedGroup` per group and `releaseAllFinalizedGroups` for Clear — and both clear
@@ -1234,22 +1249,63 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu7 [LOW · latent · race]** `LiveCaptureProcessor.applyRotationReviewAndFinalize` — the
-  **"Retry N failed" button is not disabled while the rotation-review regeneration is running**, and the
-  panel is visible in exactly that window (`LiveCaptureView:48` deliberately shows a throbber for
-  `isFinalizing && !showFinalizeSheet && !showRotationReview`). `retryFailed` has no `isFinalizing` guard
-  either, so a click there deletes the segment's staged files, releases it, drops `retained`, and re-ingests
-  it — **buying its OCR again** — while the detached regeneration write is still in flight. When that write
-  lands, `staged[idx] = fresh` overwrites the record the fresh `finalizeSegment` just appended with the stale
-  regenerated one, pointing at files the retry deleted or clobbered. Data-safe (the segment is then unfilable,
-  so `executePlans` skips it and its sources are kept) but the money is spent and the operator is left with a
-  record describing neither write. Found 2026-08-04 by `W3.cap-r3-fu6`'s adversarial pass while proving that
-  fix cannot break `failedGroupIds ⊆ finalizedGroups` — it cannot (the label sits behind the `staged` guard,
-  and every exit from `finalizedGroups` also drops the group from `staged`), and this is the separate hazard
-  the same reasoning turned up. **Pre-existing in `W3.cap-r4`'s wholesale replace**, not introduced by fu6 —
-  if anything fu6 narrows it, since the record and its label now agree whichever write wins. The likely fix
-  is the cheap one: disable the bulk + per-item retry while `isFinalizing`, matching the Clear button
-  (`LiveCaptureView:405`). Decide whether the per-item menu needs the same gate. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu10 [MED · reachability decision · blocks a severity claim]** `LiveCaptureView:47-59` —
+  **is the "Finishing — processing segments…" throbber meant to BLOCK input, or only to explain the wait?**
+  Its scrim is `Color.black.opacity(0.2).ignoresSafeArea()` inside an `.overlay` with **no**
+  `.allowsHitTesting(false)`, and a SwiftUI `Color` is hit-testable — so it very likely swallows every click in
+  the Live Capture panel for the whole regeneration window. This repo does both things deliberately elsewhere
+  (`OCRView.swift:652` passes clicks through with `.allowsHitTesting(false)`; `ManualSegmentTagView.swift:299`
+  absorbs them with an explicit `.contentShape` + `onTapGesture`), so the omission here reads as unexamined
+  rather than intended. **This decides the severity of three shipped things**, which is why it is MED despite
+  changing no behaviour on its own: (a) `W3.cap-r3-fu7`'s two view-layer edits are no-ops if the scrim already
+  blocks the buttons, and load-bearing if it does not; (b) so is the ungated Clear in `W3.cap-r3-fu11`; (c)
+  fu7's mutants P1/P2 measured a driver-only entry path if the UI never had one. Decide it explicitly and say
+  so at the overlay: **blocking** → add the `.contentShape`/comment that makes it deliberate and re-label fu7's
+  gates belt-and-braces; **not blocking** → add `.allowsHitTesting(false)` and fu7/fu11 become live fixes.
+  ⚠️ Needs the VM GUI lane to settle by observation (`W21.vmgui-d` gives the Processor one) — a headless driver
+  cannot see hit-testing, and fu7's own P6/P7 mutants are 0 RED for exactly that reason. Found 2026-08-04 by
+  `W3.cap-r3-fu7`'s independent adversarial pass, which caught that fu7's filing (and its first-draft comments)
+  cited this very overlay as *evidence the panel was clickable* when it is the most likely reason it was not.
+  Pre-existing. | Capture/Views | Tier-2
+- [ ] **W3.cap-r3-fu11 [MED · data · same window as fu7]** `LiveCaptureView:363` — the **Clear button carries
+  no `isFinalizing` gate**, and in the rotation-review regeneration window it is strictly more destructive than
+  the retry `W3.cap-r3-fu7` just refused. `session.clear()` Trashes the received source photos while the
+  detached `writeSegmentFiles` is reading them, and `liveProc.clearSessionState()` empties `staged`/`retained`
+  under the loop that is about to `staged.firstIndex` them — so the regeneration's `guard let idx` finds
+  nothing, its partially-rewritten `_processed` files are orphaned, and the sources are in the Trash.
+  Recoverable (Trash, per the Recovery Core Directive) but a strictly worse outcome than the money leak fu7
+  closed, in the identical window. ⚠️ Note the citation trap this came out of: fu7's item text said "matching
+  the Clear button (`LiveCaptureView:405`)" — `:405` is the **Finish session** button, which IS gated; Clear is
+  `:363` and is not. Both fu7's comment and the tracker entry are corrected. Also note this is the LAST
+  remaining entrant to the `staged`-implies-`finalized` argument at
+  `LiveCaptureProcessor.applyRotationReviewAndFinalize` (`retryFailed` and `finalize` both now refuse while
+  `isFinalizing`) — so gating Clear would close that enumeration entirely. Gating a DELETE path is its own
+  decision and its own Tier-2 gate, which is why fu7 did not absorb it; severity depends on `W3.cap-r3-fu10`.
+  Found 2026-08-04 by `W3.cap-r3-fu7`'s adversarial pass; pre-existing. | Capture/Views | Tier-2
+- [ ] **W3.cap-r3-fu9 [LOW · SUSPECTED · presentation]** `LiveCaptureView:81-117` — the Live Capture tab
+  attaches `showRotationReview`, `modelChoiceTarget` and `textViewerTarget` as three separate `.sheet`
+  modifiers, and `W3.cap-r3-fu7`'s scope decision rests on the claim that a per-item sheet already on screen
+  can SUPPRESS the rotation-review sheet. If that claim is true the consequences are worse than the retry
+  hazard fu7 closed: `finishSession` sets `showRotationReview = true` with no sheet visible, so the operator's
+  rotation review is silently skipped, nothing in production calls `applyRotationReviewAndFinalize` (only the
+  headless E2E path at `CaptureSession.swift:109` does), `cancelRotationReview`'s only caller is the invisible
+  sheet's Cancel — and `requestFinish` guards `!showRotationReview`, so **Finish is then dead for the rest of
+  the session** with staged output nobody can file. The second-order effect is the one fu7 named: the model
+  sheet's deferred Apply then calls `retryFailed` in a finish state fu7 deliberately did NOT gate, because the
+  right fix is a single sheet router / not losing the review, not a silent refusal inside a money path.
+  ⚠️ **Verify before fixing — the premise may simply be false.** The one-sheet-per-view limit applies to
+  modifiers at the SAME level; these are CHAINED, and current macOS SwiftUI may present them stacked quite
+  happily, in which case this item closes as unreachable and fu7's scope note should be corrected to say so.
+  A headless driver cannot see sheet presentation, so settling it needs the VM GUI lane (`W21.vmgui-d` gives
+  the Processor one) or a careful read of the modifier chain — the same lane `W3.cap-r3-fu10` waits on, so do
+  them together. **A second, independent leg the adversarial pass found:** a deferred Apply landing while
+  `showRotationReview` is up calls `retryFailed`, which sets `retained[gid] = nil` — and
+  `applyRotationReviewAndFinalize` then hits `guard var seg = retained[page.groupId]` and silently DROPS that
+  group's rotation edits. So the sheet-state window loses operator work even where it costs no money, which is
+  an argument for refusing there; ⚠️ if that is the fix chosen, driver Test 21 check 8 asserts the opposite
+  (a retry succeeding under `showFinalizeSheet`, which is what pins fu7's P5 width mutant) and must be
+  rewritten, not read as a regression. Found 2026-08-04 by `W3.cap-r3-fu7`'s reachability analysis and its
+  adversarial pass; pre-existing, unrelated to that fix. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu8 [LOW · bookkeeping]** `LiveCaptureProcessor` manifest-resume path (~`staged = restored`)
   — a **THIRD labeller**, and the last one that can disagree with its record. Resume rebuilds a status row per
   restored segment with `phase: .staged` hardcoded, so a `.noOutput`/`.incompleteOutput` record recovered from

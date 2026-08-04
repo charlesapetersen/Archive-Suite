@@ -637,11 +637,17 @@ private struct LiveProcessingBox: View {
                             liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
                         }
                         .font(.caption).foregroundStyle(.red)
-                        // W3.cap-r3-fu7 — same gate as Clear (`:405`), for the same window: the
-                        // end-of-session rotation review regenerates segments from a detached task with this
-                        // panel visible and no sheet over it, and a retry pressed there re-buys the OCR the
-                        // regeneration is still writing. `retryFailed` refuses it outright; this is so the
-                        // button says so instead of looking like it did nothing.
+                        // W3.cap-r3-fu7 — the same gate the **Finish session** button already carries (`:405`),
+                        // for the same window: the end-of-session rotation review regenerates segments from a
+                        // detached task with this panel visible and no sheet over it, and a retry pressed there
+                        // re-buys the OCR the regeneration is still writing. `retryFailed` refuses it outright;
+                        // this is so the button says so instead of looking like it did nothing.
+                        // ⚠️ The item, and this comment's first draft, called `:405` "the Clear button" — it is
+                        // not, and the adversarial pass caught it. **Clear (`:363`) carries no gate at all**,
+                        // and in this window it is the more destructive of the two: it Trashes the sources the
+                        // detached `writeSegmentFiles` is reading and empties `staged`/`retained` under the
+                        // loop that is about to index them. Filed as `W3.cap-r3-fu11` — NOT fixed here, because
+                        // gating a delete path is its own decision and its own Tier-2 gate.
                         .disabled(liveProc.isFinalizing)
                     }
                 }
@@ -1085,15 +1091,19 @@ struct SegmentItem: ProcessableItem {
             // retry (optionally after a rotate) is exactly how the operator gets the scan into the archive.
             return gate([.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles], finalizing)
         case .succeeded:
-            return [.viewText, .revealFiles]
+            return gate([.viewText, .revealFiles], finalizing)
         default:
-            return []
+            return gate([], finalizing)
         }
     }
 
     /// Drops the retry-family actions when a finish is mid-regeneration (`W3.cap-r3-fu7`). Expressed as a
     /// filter over the state's own list rather than a second set of per-state literals, so a retry added to
-    /// one state later cannot be gated in one place and forgotten in the other.
+    /// one state later cannot be gated in one place and forgotten in the other. EVERY branch routes through
+    /// here, including the two that currently offer no retry at all — the adversarial pass caught that
+    /// exempting them made the sentence above false, since adding `.retry` to `.succeeded` later would have
+    /// produced exactly the ungated retry it claims is impossible. The calls are no-ops today; that is the
+    /// point.
     private static func gate(_ actions: [ItemAction], _ finalizing: Bool) -> [ItemAction] {
         guard finalizing else { return actions }
         return actions.filter { $0 != .retry && $0 != .retryWithModel && $0 != .changeRotation }

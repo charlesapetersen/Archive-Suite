@@ -3280,6 +3280,103 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu7 [LOW · latent · race] — ✅ DONE 2026-08-04** (`765897b` fix + Test 21; `68160b0` five
+  mutants; this commit, trackers + the adversarial pass). The item's own suggestion was the cheap one and it
+  was right, but not sufficient on its own. `applyRotationReviewAndFinalize` sets `isFinalizing` and then
+  writes each changed segment from a DETACHED task, and that is the ONE finish state with no sheet over the
+  Live Capture panel — `LiveCaptureView:48` shows a throbber for exactly `isFinalizing && !showFinalizeSheet
+  && !showRotationReview`. So both the bulk "Retry N failed" button and each expanded row's per-item retry
+  were live in a window where a retry deletes the segment's staged output, releases it, drops `retained` and
+  re-ingests every page — **buying its OCR a second time** — while the regeneration's write is in flight and
+  about to `staged[idx] = fresh` over whatever the re-run appended.
+  **Three edits, and the FIRST is the one that holds.** `retryFailed` gained `guard !isFinalizing`; the bulk
+  button gained `.disabled(liveProc.isFinalizing)` (the same gate as Clear, `:405`); and
+  `SegmentItem.actions(for:finalizing:)` withholds `.retry`/`.retryWithModel`/`.changeRotation` while
+  finalizing, keeping the read-only `.viewText`/`.revealFiles`. The model layer is where the refusal has to
+  live, because it is the one place all three entries converge and one of them is **deferred**: the
+  `modelChoiceTarget` sheet captures a group when it opens and calls back on Apply, so no enabled-ness computed
+  when the button was drawn can speak for the moment the retry actually runs. The two view edits exist so the
+  operator is not offered what would be refused — with the accepted limit stated at the guard, that the
+  deferred Apply is the one path where the refusal is silent.
+  **The item's open question — "does the per-item menu need the same gate?" — is answered YES, and MEASURED.**
+  Mutant P2 (the guard weakened to bulk-only, `!(isFinalizing && groupIds == nil)`) reads exactly as red as no
+  guard at all, because the per-item entry reaches the same `retryFailed` and spends the same money, and the
+  expanded row is on screen in precisely the exposed window. `finalizing` takes no default value, so a third
+  call site cannot inherit "not finalizing" silently; Test 17's existing call site now says `finalizing: false`
+  explicitly, which is what its own leg means.
+  **The refusal is deliberately NARROW, and the narrowness is itself tested.** It covers `isFinalizing` only —
+  not `requestFinish`'s `!showFinalizeSheet, !showRotationReview` triple — because those two put a modal sheet
+  over the panel, so its retry affordances are unreachable in them. Mutant P5 (widening the guard to the
+  triple) is 1 RED on check 8, which pins that the intended window did not become a ban. What the widening
+  would have papered over is filed instead as **`W3.cap-r3-fu9`**: whether an already-open per-item sheet can
+  suppress the rotation-review sheet, which if true is a worse bug than this one (the review is skipped and
+  `requestFinish`'s own guard then deadlocks Finish) and wants a presentation-layer fix, not a silent refusal
+  inside a money path.
+  **Test 21 (8 checks) drives the real window with no gate object.** `isFinalizing = true` is set
+  synchronously before the `Task`, and everything that closes the window again runs on the MainActor after an
+  await on the detached write — so a retry issued on the same MainActor turn is genuinely inside the window
+  with the write genuinely running on another thread; check 3 asserts that state rather than trusting it. What
+  is measured is the refusal and its money consequence, not the record overwrite itself: which of the two
+  orderings you get is an artifact of scheduling, whereas the double spend is order-independent and the refusal
+  forecloses every ordering. Check 8 pins that the refusal is a WINDOW and not a ban — once `beginFinalize` has
+  raised the collection sheet the same retry works again and buys the pages back, which is the recovery
+  affordance the operator depends on. 5 mutants: **P1 3 RED** (the shipped defect; its third is a consequence,
+  checks 4 and 5 are what name it), **P2 3 RED**, **P3 1 RED**, **P4 1 RED**, **P5 1 RED**, plus **P6/P7 0 RED**
+  (added by the adversarial pass — see below). `test-recovery.sh` 148 → **156 checks ALL PASS**, 13.6 s; build
+  clean, no new warnings; 5 adjacent $0 drivers green (`test-manifest-persistence`, `test-merge-safety`,
+  `test-output-file-safety`, `test-processfiles-tagwarn`, `test-collection-organize`; `test-drive-live` skipped,
+  it needs a Drive token).
+  **ADVERSARIAL (independent pass, opus/xhigh, read-only) — nine findings, and it changed what this item
+  CLAIMS more than what it does.** The guard itself came back sound: correctly placed (after the mode check,
+  before every mutation, so a refusal is total — no half-cleared `groupOCROverride`/`statuses`/`pageTasks`/
+  manifest), complete over the window (`isFinalizing` has exactly four writes, and both `true→false`
+  transitions are synchronous with the code that raises the next sheet, so there is no trailing gap), with no
+  legitimate caller silenced and no other UI path to `retryFailed` (the row's actions are inline `Button`s, not
+  a stale-snapshot `NSMenu`; the Files pane routes elsewhere entirely). What it demolished was the record:
+  1. **The reachability premise was backwards, and the item cited the blocker as the evidence.** fu7's filing —
+     and this commit's own first drafts — said the panel was "on screen and CLICKABLE" in the window, citing
+     `LiveCaptureView:48`'s throbber. That throbber's scrim is `Color.black.opacity(0.2).ignoresSafeArea()` in
+     an `.overlay` with **no** `.allowsHitTesting(false)`, and a `Color` is hit-testable — so it most likely
+     swallowed every click in the panel, meaning neither button was ever pressable there. Confirmed on the code
+     (and against this repo's own deliberate uses of the modifier both ways); the hit-test outcome itself needs
+     the VM lane. Consequence: the two view-layer edits are defence-in-depth, P1/P2's RED measured an entry the
+     UI could not take, and the guard's live value is the deferred sheet Apply. Filed as **`W3.cap-r3-fu10`**,
+     which now decides this item's true severity; corrected at the guard, in the SHIP ORDER note and in
+     `ArchiveProcessor/CLAUDE.md`.
+  2. **The "same gate as Clear (`:405`)" citation was wrong** — `:405` is the **Finish session** button. Clear
+     is `:363` and carries **no gate at all**, and in this window it is worse than the retry: it Trashes the
+     sources the detached write is reading and empties `staged`/`retained` under the loop about to index them.
+     Filed as **`W3.cap-r3-fu11`**, not absorbed here (gating a delete path is its own Tier-2 decision).
+  3. **Test 21's write was never "in flight."** `LiveCaptureProcessor` is `@MainActor`, so
+     `applyRotationReviewAndFinalize`'s `Task { … }` is MainActor-isolated and cannot start until the MainActor
+     yields — which the section never does before check 5 — so the inner `Task.detached` is not even created.
+     What the section proves is a FLAG-STATE refusal, not a simultaneous race. That is still the property the
+     fix turns on, but the stronger claim is now removed from the comment, the check label and this entry.
+  4. **Two of the three edits are unmeasured above the pure-function line.** Check 7 exercises
+     `SegmentItem.actions(for:finalizing:)` directly, so nothing proved the view passes the real flag in.
+     Measured rather than argued: **P6** (`let finalizing = false` in `segmentItems`) and **P7** (deleting the
+     bulk button's `.disabled`) are both **0 RED**, recorded as limits — a SwiftUI modifier is invisible to a
+     headless driver, so closing them is VM-lane work alongside fu9/fu10.
+  5. **Check 8 measures the guard's WIDTH, not the operator's affordance,** and couples this section to fu9: it
+     retries while `showFinalizeSheet` is up (a state no button is pressable in), and because it asserts that
+     retry SUCCEEDS, a fu9 fix that refuses during the sheet states turns it RED and must rewrite it. Both facts
+     are now stated at the check. The pass also found the *reason* fu9 might want that refusal: a deferred Apply
+     during `showRotationReview` nils `retained[gid]`, so the regeneration silently drops that group's rotation
+     edits — operator work lost with no money involved. Folded into fu9.
+  6. **`gate`'s stated completeness property was false** for `.succeeded` and `default`, which returned literals
+     bypassing it — exactly the "gated in one place and forgotten in the other" failure the comment claimed was
+     impossible. Fixed: every branch routes through `gate` (no-ops today, and that is the point).
+  7. **The silent-refusal limit was underpriced.** `onApply` clears `modelChoiceTarget` unconditionally, so a
+     refused Apply discards the operator's provider, model, thinking level, rotation AND freshly typed API key —
+     not "a second press". Corrected at the guard, with the right fix named (keep the sheet open, don't widen).
+  8. **The edited fu6 cross-reference over-credited the new guard's neighbours** — `finalize` already guarded
+     `!isFinalizing`, so `clearSessionState` is the *only* remaining entrant to that argument, and it is the one
+     still ungated in the UI (fu11). Corrected in place.
+  9. **P1's arithmetic was wrong** — check 4 issues two retries and the second re-buys as well, so the mutant
+     spends four extra calls, not two. Corrected in the mutant block.
+  Findings 6 and 7 and the corrections to 1, 2, 3, 8, 9 ship in this commit; 1, 2 and 5's second leg ship as
+  fu10/fu11 and a fu9 amendment; 4 ships as two recorded 0-RED mutants. Nothing the pass found required
+  reverting or reshaping the guard.
 - [x] **W3.cap-r3-fu6 [LOW · bookkeeping] — ✅ DONE 2026-08-04** (`61fc680` fix; `b2ff7d1` test + mutants;
   this commit, the adversarial pass's corrections + trackers). The item's own recommendation was the right
   one: extract the taxonomy so there is ONE labeller. `finalizeSegment`'s A1 branch is now
