@@ -1221,26 +1221,34 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > whole: **no `pageTasks` entry leaves the map with a RUNNING call behind it**, on every path that frees one
 > (`finalizeSegment`'s own clear drops without cancelling, correctly — it runs after every one of those pages
 > was awaited). Still open: **`-fu3`** and **`-fu4`**, both behaviour decisions rather than bug fixes, and
-> **`-fu5`**, which `-fu2`'s adversarial pass found — the unenforced `failedGroupIds ⊆ finalizedGroups`
-> invariant several of these latency arguments lean on. All in PRE-EXISTING code rather than in any of the
-> fixes.
-- [ ] **W3.cap-r3-fu5 [LOW · bookkeeping · contingent]** `LiveCaptureProcessor.finalize` /
-  `applyRotationReviewAndFinalize` — **nothing maintains `failedGroupIds ⊆ finalizedGroups`**, and several
-  latency arguments in this subsystem quietly depend on it (most recently `-fu2`'s: a failed group is
-  unreachable-with-a-live-task only because it keeps its late-page cover). `finalize` is not among the seven
-  writers of `failedGroupIds` — it removes a filed group from `finalizedGroups`, `statuses` and `retained`
-  and leaves the failed set alone — and a `.noOutput`/`.incompleteOutput` group IS in `staged` and `retained`
-  (both appended before the label branch), so it does enter the end-of-session rotation review, which
-  replaces the staged record wholesale without reconciling the failed set or the phase. So IF a regeneration
-  ever turns such a record filable (its original failure was transient — a write error, no free space —
-  rather than the missing staging dir, which fails regeneration the same way), the group is filed while still
-  counted failed: the operator gets a "Retry N failed" button with no matching row, and the group has lost
-  its late-page cover, so a phone dropped-ack re-upload can put a LIVE OCR task in front of the bulk retry.
-  **No deterministic trigger was demonstrated** — hence LOW and "contingent", not a reproduced bug — and
-  `-fu2`'s cancel already bounds the money half of the consequence. What wants deciding is whether `finalize`
-  should clear `failedGroupIds` for the groups it files (and the rotation review reconcile it), or whether
-  the invariant should simply be asserted somewhere it can be seen to hold. Found 2026-08-03 by `-fu2`'s
-  adversarial pass; pre-existing. | Capture | Tier-2
+> **`-fu6`**, which `-fu5`'s own pass found. **`-fu5` — the unenforced `failedGroupIds ⊆ finalizedGroups`
+> invariant several of these latency arguments lean on — shipped 2026-08-03 `2d15fae`/`f091ea2`** (entry in
+> `SUITE_TODO_DONE.md`): `finalizedGroups` now has exactly two exits — `releaseFinalizedGroup` per group and
+> `releaseAllFinalizedGroups` for Clear — and both clear `failedGroupIds` with it, so the subset rests on
+> that rather than on memory. Note what that does and does not settle — it makes the *sets* consistent; the
+> stale **label** on a regenerated record is `-fu6`. All in PRE-EXISTING code rather
+> than in any of the fixes.
+- [ ] **W3.cap-r3-fu6 [LOW · bookkeeping]** `LiveCaptureProcessor.applyRotationReviewAndFinalize:1161` — the
+  end-of-session rotation review replaces a segment's staged record **wholesale** but never re-derives its
+  LABEL, so a regenerated record and the row describing it can disagree in both directions. Forward: a
+  segment that failed `.noOutput`/`.incompleteOutput` for a transient write error and regenerates cleanly
+  stays `.failed` and stays in `failedGroupIds` — so the collection sheet warns "N segment(s) failed to
+  process and are NOT filed — Retry them from the Live Capture panel before finalizing" about a segment that
+  is fine, and an operator who obeys that warning hits `retryFailed`, which **deletes the freshly regenerated
+  output and re-buys the OCR**. That is the money half, and unlike the fu5 chain it was found beside it does
+  not need a special shape to bite: here the segment is still STAGED, so its group and sources are all
+  present and the retry always lands. (fu5's leftover entry only cost money in the narrower placeholder
+  sub-case, where the withheld source kept the group alive — see its `SUITE_TODO_DONE.md` entry.) Backward: a `.staged` segment whose REGENERATION fails (the sources pass
+  the exists-filter, but the write does not land now — disk filled) keeps its `.staged` label over a record
+  with no PDFs, and finalize then declines to file it with no failure shown anywhere. The fix is to run the
+  same taxonomy `finalizeSegment` runs (`producedOutput` / `pagesComplete` / `placeholderSources` /
+  `anyText`) over the regenerated record — ideally by extracting that branch so there is ONE labeller rather
+  than two. ⚠️ `anyText`/`firstError` are not available on this path (it has `RetainedSegment.texts`, not the
+  `OCRResult`s), so the extraction needs a deliberate decision about what the regeneration leg passes for
+  them — do not silently approximate `anyText` as "some retained text is non-empty" without checking how
+  `texts` represents a text-less page. Driver **Test 19 check 4 currently PINS the forward half as the
+  present behaviour**; closing this item flips that check, and the rest of Test 19 still holds. Found
+  2026-08-03 by `-fu5`'s pass while building its chain; pre-existing. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
   `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
   the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page

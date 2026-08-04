@@ -304,8 +304,9 @@ final class LiveCaptureProcessor: ObservableObject {
             // (`.ocr`/`.tagging` render as `.processing`, whose `actions(for:)` is `[]`). A page arriving for
             // such a group afterwards cannot start one either: the group is still in `finalizedGroups`, so
             // `photoIngested` takes the late-page branch. That last leg rests on `failedGroupIds` never
-            // outliving `finalizedGroups` — which `W3.cap-r3-fu5` made structural: `releaseFinalizedGroup`
-            // is now the only exit from `finalizedGroups` and it clears both sets together.
+            // outliving `finalizedGroups` — which `W3.cap-r3-fu5` made structural: both exits from
+            // `finalizedGroups` (`releaseFinalizedGroup` here, `releaseAllFinalizedGroups` for Clear) clear
+            // the two sets together. See that helper for what "structural" does and does not cover.
             //
             // ⚠️ If a future edit DOES make this reachable while a `finalizeSegment` is suspended on the group,
             // the fix is to refuse the retry (`guard !finalizedGroups.contains(gid)`), NOT to copy
@@ -345,11 +346,22 @@ final class LiveCaptureProcessor: ObservableObject {
     /// a reclassified photo's source out from under an already-staged live segment.
     func isFinalized(_ groupId: String) -> Bool { finalizedGroups.contains(groupId) }
 
-    /// THE one way a group leaves `finalizedGroups` (`W3.cap-r3-fu5`) — and it takes that group's
-    /// `failedGroupIds` entry with it, so `failedGroupIds ⊆ finalizedGroups` holds by CONSTRUCTION rather
-    /// than by every future caller remembering to pair the two removals.
+    /// The PER-GROUP way out of `finalizedGroups` (`W3.cap-r3-fu5`) — and it takes that group's
+    /// `failedGroupIds` entry with it. Together with `releaseAllFinalizedGroups` (the whole-session Clear)
+    /// that is BOTH exits, and both clear the pair, which is what `failedGroupIds ⊆ finalizedGroups` rests
+    /// on rather than every future caller remembering to pair two removals.
     ///
-    /// Why the subset is worth enforcing: `markFailed` is the only writer that INSERTS, and it runs inside
+    /// Scope of "by construction", stated exactly, because an earlier draft of this comment overstated it
+    /// and an independent adversarial pass caught it. (a) These are the only two exits *today*;
+    /// `finalizedGroups` is a bare `private var Set<String>`, so `.subtract` / `.filter` / a whole-set
+    /// assignment would bypass either helper with no compiler help. (b) `retryFailed` releases the group
+    /// SYNCHRONOUSLY but re-arms it only through `segmentResolved`'s `Task`, so a `finalizeSegment`
+    /// suspended on that group could resume inside the gap and `markFailed` it while it is out of
+    /// `finalizedGroups`. That is unreachable today for exactly the reason `retryFailed`'s cancel loop is a
+    /// no-op — nothing offers a retry for a segment mid-flight — a mild circularity worth naming rather
+    /// than hiding, since the cancel loop's own latency argument leans on this subset in turn.
+    ///
+    /// Why the subset is worth keeping: `markFailed` is the only writer that INSERTS, and it runs inside
     /// `finalizeSegment` after that group is already finalized, so the failed set can only ever be a subset
     /// — *provided* nothing drops the finalized entry alone. `retryFailed` always paired them; `finalize`
     /// did not, and that unpaired `remove` is what this closes. Several of this subsystem's latency
@@ -359,11 +371,19 @@ final class LiveCaptureProcessor: ObservableObject {
     ///
     /// It is also right on its own merits at both call sites, invariant aside. A group being re-processed is
     /// not a failed one (it is about to be re-OCR'd), and a group whose every PDF reached its collection is
-    /// not a failed one either — leaving that entry behind gives the operator a "Retry N failed" button for
-    /// a document already in the archive, and `retryFailed` would answer that button by buying its OCR again.
+    /// not a failed one either.
     private func releaseFinalizedGroup(_ groupId: String) {
         finalizedGroups.remove(groupId)
         failedGroupIds.remove(groupId)
+    }
+
+    /// The whole-session counterpart, for Clear. Same pairing for the same reason: the guarantee is that
+    /// there are exactly two exits and both clear both sets. Before `W3.cap-r3-fu5` this was two adjacent
+    /// `removeAll`s that happened to agree — the same "remember to keep them together" hazard `finalize`
+    /// had already lost, just with the two lines next to each other instead of one of them missing.
+    private func releaseAllFinalizedGroups() {
+        finalizedGroups.removeAll()
+        failedGroupIds.removeAll()
     }
 
     /// OCR text retained for a segment (joined across its pages), for the shared row's text viewer.
@@ -1294,7 +1314,18 @@ final class LiveCaptureProcessor: ObservableObject {
             // first write failed replaces the staged record wholesale, making it filable without touching
             // its label. The entry this used to leave behind outlived every row that explained it: the
             // status row is dropped one line above, so the operator got a "Retry 1 failed" button with
-            // nothing under it, pointed at a document already in the collection.
+            // nothing under it — and the collection sheet's "N segment(s) failed … NOT filed" warning —
+            // pointed at a document already in the collection.
+            //
+            // What pressing that button cost, corrected by the adversarial pass because the first version of
+            // this comment said "it re-buys the OCR" flatly and that is only the minority case. Usually it
+            // costs nothing: `clearFiled` below retires the filed sources, `session.groups` is derived from
+            // `photos`, so the group is GONE and `retryFailed`'s `else { failedGroupIds.remove(gid) }` guard
+            // self-clears the phantom on first press. The money case is the one where the filed record
+            // carries `placeholderSources` — the source is deliberately withheld, so the group survives and
+            // the retry really does re-ingest and re-buy. That is reachable in exactly this chain, because
+            // regeneration does not re-derive the label (`W3.cap-r3-fu6`), so a group can be in the failed
+            // set AND filed with a placeholder at the same time. Test 19 builds that shape.
             for gid in filedGroups { self.retained[gid] = nil; self.releaseFinalizedGroup(gid) }
             self.drafts.removeAll()
 
@@ -1384,8 +1415,7 @@ final class LiveCaptureProcessor: ObservableObject {
         for task in pageTasks.values { task.cancel() }
         statuses.removeAll()
         staged.removeAll()
-        failedGroupIds.removeAll()
-        finalizedGroups.removeAll()
+        releaseAllFinalizedGroups()   // W3.cap-r3-fu5 — the pair, together; see the helper
         retained.removeAll()
         groupCollectionKey.removeAll()
         groupOCROverride.removeAll()

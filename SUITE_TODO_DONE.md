@@ -3280,6 +3280,86 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu5 [LOW · bookkeeping · contingent] — ✅ DONE 2026-08-03** (`2d15fae` fix; `f091ea2` test +
+  mutants; this commit, trackers). The item asked for a DECISION — clear `failedGroupIds` at finalize, or
+  assert the invariant somewhere it can be seen to hold — and the answer was neither exactly: make it
+  **structural**. `finalizedGroups` now has exactly two exits — `releaseFinalizedGroup(_:)` per group and
+  `releaseAllFinalizedGroups()` for Clear — and both clear `failedGroupIds` with it, so
+  `failedGroupIds ⊆ finalizedGroups` rests on that rather than on every future caller remembering to pair
+  two removals. Same move `W3.cap-r4` made on the duplicated collection key: remove the way to drift rather
+  than sync the copies. ⚠️ The **first version claimed a SOLE exit and was wrong** — `clearSessionState` had
+  its own unguarded pair of `removeAll`s, i.e. the identical hazard one line apart; the adversarial pass
+  caught the claim and the second helper is the answer to it. "By construction" is also scoped honestly in
+  the code now: the set is a bare `private var`, so `.subtract`/`.filter`/whole-set assignment would bypass
+  both helpers with no compiler help, and `retryFailed`'s synchronous release + async re-arm leaves a gap a
+  suspended `finalizeSegment` could `markFailed` into — unreachable today for the same reason its cancel
+  loop is a no-op, which is a circularity the comment names rather than hides.
+  **The filed premise held, and the chain is narrower than "seven writers" suggested.** `markFailed` is the
+  sole INSERT and runs inside `finalizeSegment` after the group is already finalized, so the subset can only
+  break on a REMOVAL — and there are exactly three (`retryFailed`, `clearSessionState`, `finalize`), of which
+  only `finalize` dropped the finalized entry alone. The reachability the item called contingent was
+  **reproduced**: a `.noOutput` segment is appended to `staged`+`retained` before the label branch,
+  `finishSession` enumerates `retained.values` with no filter, and a rotation-review regeneration replaces
+  the staged record wholesale — so a transient write error that clears makes the record filable while the
+  group is still counted failed. What the leftover entry cost: `finalize` drops the status ROW one line
+  above, so the operator got a "Retry 1 failed" button with nothing under it — plus the collection sheet's
+  "N segment(s) failed … NOT filed" warning — aimed at a document already in the collection. **The money
+  claim needed narrowing and the adversarial pass is what narrowed it:** usually pressing that button costs
+  nothing, because `clearFiled` retires the filed sources, `session.groups` is derived from `photos`, and
+  `retryFailed`'s `else { failedGroupIds.remove(gid) }` guard self-clears the phantom on first press. It is
+  expensive only when the filed record carries `placeholderSources` — the source is deliberately withheld,
+  the group survives, and the retry really does re-ingest and re-buy the OCR. That sub-case IS reachable in
+  this exact chain (regeneration does not re-derive the label, so a group can be failed AND filed-with-a-
+  placeholder at once), and Test 19 turns out to build precisely it — now pinned by its own check.
+  New driver **Test 19** (`test-recovery.sh` **134 → 142**) builds that state for real rather than asserting
+  it: a staging dir chmod'd `0555` is the transient write error, then the REAL Finish → rotation review →
+  finalize path. TWO groups fail and only V1 is rotated, so V2 is a segment still genuinely failed when the
+  batch files V1. "Review rotation" is set and restored around the single synchronous call that reads it, so
+  the operator's own toggle is never left flipped. **Four mutants measured:** M1 the pre-fix
+  `finalizedGroups.remove(gid)` → **2 red**, both here · M2 `releaseFinalizedGroup` clearing only
+  `failedGroupIds` → **9 red** (1 here, 8 in Test 17, which needs the same removal) · M3
+  `failedGroupIds.removeAll()` → **1 red**, and only because of V2 · M4 `releaseAllFinalizedGroups` dropping
+  its `failedGroupIds.removeAll()` → **0 red**, recorded as an honest limit and NOT fixed: nothing here
+  drives Clear, so the pairing at that exit is convention in a way it is not at the per-group one, and
+  covering it needs a Clear-path section of its own. **Two predictions were wrong and the
+  measurement corrected them:** M2 was expected to be 1 red (it is 9, and — because Test 17's stalled settles
+  push the run past the harness's 60 s wait while the report is written only at the END — under
+  `test-recovery.sh` as shipped it reads as a bare TIMEOUT with no PASS/FAIL lines at all, which independently
+  corroborates `W21.recovery-timeout`: the GREEN suite is **14 s wall-clock measured here** (142 checks, so
+  46 s of headroom), but a mutant that strands ~8 bounded 10 s settles needs >60 s and the all-or-nothing
+  report turns that into silence rather than into the 9 REDs it actually has — 240 s was enough); and M3 was
+  expected to be caught by Test 18 (Test 18's scope check is
+  about `pageTasks`, not this set — **a first draft with a single group let M3 through the whole suite**, and
+  the sibling group was added for it). Test 19 also renames its own "the document really filed" premise,
+  which collided with Test 17's identically-worded check while the mutants were being read.
+  **Honest scope:** this makes the SETS consistent. It does NOT fix the stale LABEL on a regenerated record —
+  check 4 deliberately pins that as present behaviour — which is filed as **`W3.cap-r3-fu6`** and carries the
+  reachable-through-the-UI money consequence (the false "N failed" warning invites a retry that deletes the
+  regenerated output and re-buys the OCR). It also does not touch `-fu4`'s "a filed group loses its late-page
+  cover"; what it removes is the bulk retry that used to be racing that re-upload.
+  **Tier-2: an independent adversarial pass** (separate context, told to refute) found **no path on which
+  the shipped code behaves wrongly** — it independently re-derived the sole-INSERT claim, confirmed the three
+  suspension points between `finalizedGroups.insert` and `markFailed` are all guarded with no `await` left
+  before the label branch, could not construct a filed group that should still read as failed (`executePlans`
+  skips `pagesComplete == false` and requires `pdfExpected > 0`, and the two `succeeded*` labels already
+  leave the set), found no reader that depended on a filed group staying failed, and confirmed the mutant
+  arithmetic. Verdict **SHIP WITH FIX** — the fixes were to CLAIMS, and both shipped here: (a) "sole exit"
+  was false, `clearSessionState` was a second unguarded pair → `releaseAllFinalizedGroups` added and the
+  wording scoped; (b) "`retryFailed` would re-buy the OCR" was false in the ordinary case → narrowed to the
+  placeholder sub-case, in code and here. It also raised four LOWs, all accepted-and-recorded rather than
+  fixed: the async re-arm gap in `retryFailed`, the absence of any compiler barrier to a third exit, the two
+  `UserDefaults` residuals in Test 19 (a kill inside the window leaves the toggle ON; `object(forKey:)` reads
+  through the domain search list, so a global-domain value would be restored into the app domain), and the
+  extra `@Published` emissions from `Set.remove` on already-absent groups — that last one **declined
+  deliberately**: SwiftUI coalesces them inside the synchronous block, so no render differs, and a `contains`
+  guard would obscure a two-line invariant helper for no observable gain. Its finding that Test 19 only ever
+  builds the PLACEHOLDER shape was checked and is true — so rather than change the fixture, the section now
+  pins that shape explicitly, which is what makes the narrowed money claim measured instead of argued.
+  `test-recovery.sh` ALL PASS 142; manifest-persistence 109, multipage-reocr 29, merge-safety 15,
+  segment-json 30, filerelay 10/10 all green; build clean, no new warnings. The paid smoke test was NOT run:
+  it makes real Gemini/Mistral OCR calls and this change touches no request shape, matching how `-fu1`/`-fu2`
+  were verified. No migration written because there is nothing to migrate. Leaves `-fu3`, `-fu4`, `-fu6` open.
+
 - [x] **W3.cap-r3-fu2 [LOW · latent] — ✅ DONE 2026-08-03** (`3fdeb00` fix; `71cc4e6` test; this commit,
   mutants + trackers). `retryFailed` dropped every page's `pageTasks` entry without cancelling it — the exact
   mutant (M2) `cap-r3` was measured against, sitting in production 130 lines above that fix. **Shipped as the

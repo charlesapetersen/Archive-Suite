@@ -1388,7 +1388,7 @@ enum LiveCaptureRecoveryTestDriver {
         // "Retry 1 failed" button with no row under it, pointed at a document already in the collection — and
         // `retryFailed` would have answered that button by buying its OCR a second time.
         //
-        // NON-VACUITY, measured (2026-08-03), three mutants of `releaseFinalizedGroup` + its call site:
+        // NON-VACUITY, measured (2026-08-03), four mutants of the two release helpers + the finalize call site:
         //   M1 the pre-fix `finalizedGroups.remove(gid)` back at the finalize call site
         //      → 2 RED, both here: the subset check and the button check. This is the shipped defect.
         //   M2 `releaseFinalizedGroup` clearing ONLY `failedGroupIds` (the finalized leg dropped)
@@ -1399,8 +1399,12 @@ enum LiveCaptureRecoveryTestDriver {
         //      timeout with no PASS/FAIL lines at all. (Corroborates `W21.recovery-timeout`.)
         //   M3 `failedGroupIds.removeAll()` instead of removing this group
         //      → 1 RED, the button check. It is caught only because the section files V1 while V2 is still
-        //      genuinely failed: an earlier draft with a single group let M3 through all 141 checks, and
+        //      genuinely failed: an earlier draft with a single group let M3 through the WHOLE suite, and
         //      Test 18's scope check does not cover this (it is about `pageTasks`, not the failed set).
+        //   M4 `releaseAllFinalizedGroups` (the Clear exit) dropping its `failedGroupIds.removeAll()`
+        //      → 0 RED, recorded as an honest limit rather than fixed. Nothing here drives Clear, and the
+        //      two sets are emptied together at that site, so the pairing is convention there in a way it
+        //      is not at the per-group exit. Closing it would need a Clear-path section of its own.
         // Checks 1–3 are premises, not catchers — they exist so a green result cannot come from the segments
         // never failing, or from the regeneration never making V1 filable. ---
         if isolatedBackup {
@@ -1473,8 +1477,13 @@ enum LiveCaptureRecoveryTestDriver {
             // 2. PREMISE. A failed segment's pages still reach the end-of-session rotation review, because
             //    `finishSession` enumerates `retained.values` and nothing filters by label. Driven through the
             //    real Finish rather than by poking `rotationReviewPages`: the "Review rotation" default is the
-            //    only input, and it is set and restored around the single SYNCHRONOUS call that reads it, so
-            //    this never leaves the operator's own toggle flipped.
+            //    only input, and it is set and restored around the single SYNCHRONOUS call that reads it
+            //    (`finishSession` is not `async`, and there is no `await` in this block), so this never
+            //    leaves the operator's own toggle flipped. Two residuals an adversarial pass named, both
+            //    accepted: a crash or SIGTERM inside that window would leave it ON — this is the driver's
+            //    only isolation not done by env var — and `object(forKey:)` reads through the domain search
+            //    list, so a value inherited from a global domain would be written INTO the app domain by the
+            //    restore. Negligible for an app-private key, but it is not nothing.
             let priorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
             UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
             fvProc.finishSession()
@@ -1529,6 +1538,17 @@ enum LiveCaptureRecoveryTestDriver {
                       .contains { $0.pathExtension == "pdf" })
             check("a FILED group leaves the failed set with the finalized one — the subset survives the file",
                   !fvProc.failedGroupIds.contains("V1") && !fvProc.isFinalized("V1"))
+            // WHICH shape this section builds, pinned because the cost of the leftover entry depends on it
+            // and an adversarial pass corrected the fix's first claim about that. The synthetic bytes are
+            // not a decodable image, so `generate` embeds the deliberate PLACEHOLDER page and finalize
+            // WITHHOLDS V1's source — which keeps the group alive in `session.groups`. That is the minority
+            // case where a leftover failed entry is EXPENSIVE: `retryFailed` finds the group, re-ingests it
+            // and buys its OCR again. In the ordinary filed-with-a-real-scan case the source is retired,
+            // `groups` (derived from `photos`) no longer has it, and the phantom button self-clears at
+            // `retryFailed`'s `else` guard — confusing, but free. Both are wrong; only this one costs money.
+            check("...and this is the placeholder shape, where that entry was expensive and not cosmetic",
+                  fvSession.groups.contains { $0.id == "V1" }
+                      && fvSession.photos.contains { $0.groupId == "V1" })
             // The operator-visible shape of the same thing, and the pairing that made it confusing rather
             // than merely wrong: `failedGroupIds.count` IS the "Retry N failed" button, and the row that
             // would have explained the count is dropped by the same finalize. Asserted as an EQUALITY
