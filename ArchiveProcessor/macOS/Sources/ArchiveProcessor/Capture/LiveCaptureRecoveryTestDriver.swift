@@ -1028,6 +1028,177 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRGate = nil
         }
 
+        // --- Test 17 (W3.cap-r3-fu1): the started-once guard must not outlive the call it guards. W3.cap-r2
+        // made `photoIngested` refuse a second paid OCR call for a page it had already started, and recorded
+        // "already started" in a SET beside the Task. Three paths free the Task without retiring that key —
+        // `finalizeSegment` clears `pageTasks` for the pages it staged, `finalize` drops a FILED group out of
+        // `finalizedGroups` while its keys stay armed, and `photoRemoved`'s mid-finalize carve-out keeps the
+        // key on purpose — so the guard came to mean "this page once had a call" instead of "this page has
+        // one". A page the phone re-sent after its group finalized returned at that guard, ABOVE the
+        // late-page branch under it: it bought no call, raised no warning, and once the group had been filed
+        // a later finalize read the empty `pageTasks` entry as "OCR not started" and filed a silently
+        // text-less archival document. The guard now asks `pageTasks` itself, which is the only record left.
+        // Driven through the REAL ingest → finalizeSegment → finalize path with the $0 OCR stub, so what these
+        // checks count is what the operator would be charged. ---
+        if isolatedBackup {
+            // Same isolation as Tests 16/17, load-bearing for the same reason: `CaptureSession.init` adopts
+            // the newest backup session that still holds unprocessed photos, and every test above leaves
+            // theirs behind. Inherited photos would put pages in this session it never ingested, and
+            // `paidStarts()` counts starts for the whole run.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let fuOut = tmp.appendingPathComponent("fu1out", isDirectory: true)
+            let fuStaging = tmp.appendingPathComponent("APStaging-fu1-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: fuStaging, withIntermediateDirectories: true)
+            let fuSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            fuSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below
+                    // runs for real, for $0, with no network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: fuOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: fuStaging)
+            let fuProc = fuSession.liveProcessor
+            let fuBytes = Data("synthetic page bytes".utf8)
+            func fuSend(_ gid: String, _ seq: Int) {
+                fuSession.ingest(jpeg: fuBytes, groupId: gid, seq: seq, type: .document,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func fuSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            func fuPhoto(_ gid: String, _ seq: Int) -> CapturedPhoto? {
+                fuSession.photos.first { $0.groupId == gid && $0.seq == seq }
+            }
+            func textPages(_ gid: String) -> Int {
+                (fuProc.retainedText(for: gid) ?? "").components(separatedBy: "stub page text").count - 1
+            }
+            func lateWarned() -> Bool { fuSession.statusMessage.contains("late page arrived") }
+
+            // 1. The page is re-sent while its document is STAGED but not yet filed. The app has a message for
+            //    exactly this ("a late page arrived… kept in the Backup Folder"), and the stale guard made it
+            //    unreachable for the only pages that can reach that state: the page vanished into a `return`.
+            fuSend("F1", 1)
+            fuProc.segmentResolved(groupId: "F1")
+            let f1Staged = await fuSettle { fuProc.staged.contains { $0.groupId == "F1" } }
+            check("the document staged, so the re-send below is a genuine late arrival",
+                  f1Staged && paidStarts() == 1 && fuProc.isFinalized("F1") && !lateWarned())
+            fuSend("F1", 1)
+            check("a page re-sent for an already-staged document TELLS the operator instead of vanishing",
+                  lateWarned())
+            check("...and buys nothing — it cannot join a document that is already written",
+                  paidStarts() == 1)
+
+            // 2. THE HARM. The operator hits Finish, the document files, and `finalize` drops it from
+            //    `finalizedGroups` — so the late-page branch above no longer covers its pages, and the stale
+            //    key was the only thing left in front of them. Pre-fix a page re-sent NOW bought nothing and
+            //    the document it landed in carried no text for it.
+            let f1Key = fuProc.staged.first { $0.groupId == "F1" }?.collectionKey ?? "__unfiled__"
+            fuProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: f1Key, finalName: fuOut.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                chosenExisting: fuOut, segmentCount: 1, photoCount: 1)])
+            let filed = await fuSettle { !fuProc.isFinalizing && fuProc.staged.isEmpty }
+            check("the document really filed, so what follows is the post-filing state and not a partial",
+                  filed && !fuProc.isFinalized("F1"))
+            // Finish reclaimed the spent staging dir along with the batch (W3.cap-r6). Put it back, so the
+            // re-finalize below writes its output for the same reason a live session's would and the checks
+            // read the OCR rather than a missing directory.
+            try? fm.createDirectory(at: fuStaging, withIntermediateDirectories: true)
+            fuSend("F1", 1)   // the phone's dropped-ack re-upload, arriving after Finish
+            check("a page re-sent after its document was FILED buys the OCR call it needs", paidStarts() == 2)
+            fuSend("F1", 2)   // …and a genuinely new page of the same document, which always bought one
+            check("...and a genuinely new page still buys its own (the guard is not just disabled)",
+                  paidStarts() == 3)
+            fuProc.segmentResolved(groupId: "F1")
+            let refiled = await fuSettle { fuProc.retainedText(for: "F1") != nil }
+            // The consequence, measured on the record finalize wrote rather than on the guard: pre-fix the
+            // re-sent page is read as "OCR not started" and contributes an empty string, so the document goes
+            // out with ONE page of text where the operator captured two.
+            check("...so the document is filed with BOTH pages' text, not \"OCR not started\" for one of them",
+                  refiled && textPages("F1") == 2)
+            // …and this is why it had to be fixed at ingest: the sibling's text means no status ever says a
+            // page came out empty. `succeededNoText` (the one warning about missing text) needs the WHOLE
+            // segment to be text-less, so it never fires for the mixed case the phone actually produces.
+            check("...which nothing would have warned about: with a text-bearing sibling the segment is not "
+                  + "reported text-less",
+                  fuProc.statuses.first { $0.id == "F1" }?.phase != .succeededNoText)
+
+            // 3. The trap this fix had to avoid, and the reason it is keyed on the Task rather than retired in
+            //    the carve-out: a page removed MID-FINALIZE keeps the Task finalize is suspended on, so it
+            //    must keep the guard too. Retiring the key there would let the phone's re-send overwrite that
+            //    entry — buying the page a second time and handing finalize a different call's result — and
+            //    would tell the operator a "late page arrived" for a page that IS being included. Both guards
+            //    now cover the window (no Task is free, and the group is in `finalizedGroups`); these checks
+            //    pin the OUTCOME, which is what a future edit to either one must not change.
+            let fuGate = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await fuGate.wait() }
+            fuSend("F2", 1)
+            fuSend("F2", 2)
+            LiveCaptureProcessor._recoveryTestOCRGate = nil   // hold only F2's two pages
+            let f2p2 = fuPhoto("F2", 2)
+            fuProc.segmentResolved(groupId: "F2")
+            let parked = await fuSettle { fuProc.isFinalized("F2") }
+            check("a two-page segment is mid-finalize, parked on its FIRST page",
+                  parked && f2p2 != nil && paidStarts() == 5 && fuProc.retainedText(for: "F2") == nil)
+            if let f2p2 {
+                fuSession.removePhoto(f2p2)   // carve-out: not cancelled, its Task kept for finalize to read
+                fuSend("F2", 2)               // the phone re-sends it INSIDE that window
+                check("a page re-sent while finalize is suspended on its group buys NO second call",
+                      paidStarts() == 5)
+                check("...and is not mislabelled a late arrival — its call is the one being read",
+                      !lateWarned())
+                fuGate.open()
+                let consumed = await fuSettle { fuProc.retainedText(for: "F2") != nil }
+                check("...and finalize still reads both pages of OCR the operator paid for",
+                      consumed && textPages("F2") == 2)
+            }
+
+            // 4. The other end of the same duplication, and the reason the fix DELETED the second record
+            //    rather than kept it in sync: the reclaim branch of `finalize` used to empty that set
+            //    WHOLESALE when a batch filed cleanly. Reclaim needs nothing left staged — not nothing left
+            //    RUNNING — so a page still mid-OCR in a group this batch never planned was disarmed along
+            //    with the filed ones, and the phone's dropped-ack re-upload of it could buy its call a second
+            //    time. `pageTasks` cannot be emptied that way: the entry is the call.
+            let fuGate4 = TestGate()
+            LiveCaptureProcessor._recoveryTestOCRGate = { await fuGate4.wait() }
+            fuSend("F3", 1)                                   // still mid-OCR, and never planned below
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+            let f2Key = fuProc.staged.first { $0.groupId == "F2" }?.collectionKey ?? "__unfiled__"
+            fuProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: f2Key, finalName: fuOut.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                chosenExisting: fuOut, segmentCount: 1, photoCount: 1)])
+            let reclaimed = await fuSettle { !fuProc.isFinalizing && fuProc.staged.isEmpty }
+            check("a clean batch reclaims while a page of an unplanned group is still mid-OCR",
+                  reclaimed && paidStarts() == 6
+                      && fuPhoto("F3", 1).map { fuProc._recoveryTestHasPageTask(for: $0) } == true)
+            fuSend("F3", 1)
+            check("...and that page's re-upload still buys NO second call after the reclaim",
+                  paidStarts() == 6)
+            fuGate4.open()
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+        }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_RECOVERYTEST_OUT"]
