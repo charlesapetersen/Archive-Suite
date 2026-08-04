@@ -523,12 +523,33 @@ reports *"confirmed no tags"* about a file carrying `["Unread", …]`. In exactl
 `access(path, R_OK) == -1` and `getxattr(...) == -1` with `EACCES(13)`, so the condition is cheaply
 detectable.
 
-**Required, and precisely scoped:** probe **only on the `tagNames == nil` branch** — one `access(R_OK)` (or
-`getxattr`) there separates *verified empty* from *unreadable*. A blanket pre-check on every file is wasted
-work at 150k and was this plan's earlier, wrong prescription; adding a `.denied` case to `TagReadResult` has
-the largest blast radius of the three options (§9 non-goals). `CorpusWalker` must still surface three
-outcomes — *has tags*, *verified none*, *could not read* — with the third feeding `.degraded`, never an
-absence.
+**Required, and precisely scoped:** probe **only on the `tagNames == nil` branch**. A blanket pre-check on
+every file is wasted work at 150k and was this plan's earlier, wrong prescription; adding a `.denied` case to
+`TagReadResult` has the largest blast radius of the three options (§9 non-goals). `CorpusWalker` must still
+surface three outcomes — *has tags*, *verified none*, *could not read* — with the third feeding `.degraded`,
+never an absence.
+
+🔴 **THE PROBE MUST BE `getxattr`, NOT `access(R_OK)` — verified 2026-08-04.** An ACE denying **only**
+`readextattr` (narrower than the ACL row in the table above, which also denies `read`/`readattr` and
+therefore throws) produces:
+
+```
+resourceValues: no throw, tagNames=nil
+access(R_OK) = 0        ← the discriminator this plan first specified: FAILS to detect it
+getxattr     = -1 errno=13 (EACCES)   ← detects it
+```
+
+`access(R_OK)` tests readability of the **file data**, not of its extended attributes, so it passes cleanly
+while the xattr is unreadable — and the wave's first item would then coerce a tagged file to "no tags"
+exactly as before. **Use:**
+
+```c
+getxattr(path, "com.apple.metadata:_kMDItemUserTags", nil, 0, 0, XATTR_NOFOLLOW)
+```
+
+and return `.failure` when it returns `-1` with **any errno other than `ENOATTR` (93)**. `ENOATTR`, or a
+returned size of `0`, is the only honest "verified no tags". This is the same errno rule §7a.3 imposes on the
+optional size-0 pre-filter — one rule, applied in both places.
 
 ### 4a.1b 🔴 THE SAME COERCION IS IN THE AUDITED WRITE PATH — and it destroys tags
 
@@ -968,6 +989,100 @@ read primitive.
 existing DEBUG walker. It would prove nothing. The test must construct `ArchiveLibrary()` **directly** with
 `ARUITestRootPath` **absent** from `UserDefaults` (assert its absence), so it exercises the real production
 path. This is the single most important test in the wave; it must fail for the right reason today.
+
+### 7a.10 🔴 The dataless guard is on the CHEAPEST I/O and missing from the most expensive
+
+§4a.4's thread-scoped policy protects the **walk**. But tag xattrs on a placeholder are readable *without*
+materialising the file, whereas `PDFDocument(url:)` in `ContentIndexer` **downloads it**. So the flip would
+convert *"Spotlight sees nothing in a cloud tree"* into *"silently download every file in a cloud tree"* —
+a strictly worse failure, and one that costs bandwidth and disk rather than just showing a wrong list.
+
+**Rule:** *every* thread that touches a corpus file sets the thread-scoped dataless policy — the traversal
+`Thread` **and each tag-read worker and each content-extraction worker**. Additionally have `CorpusWalker`
+record per-entry datalessness (`getattrlistbulk` already returns the attribute) and persist it, so
+`ContentIndexer` can **skip** dataless files rather than materialise them. (`W26.walk1` + `W26.idx`.)
+
+### 7a.11 `.settled` is reachable from a TRUNCATED walk — and `.settled` is what authorises pruning
+
+`completed` means only *"the enumerator ended"*. If the root goes away mid-walk — external drive ejected, a
+File Provider domain dropping out — the remaining top-level children can **list empty rather than error**, so
+the pass finishes with `filesSeen: 40,000`, `dirErrors: 0`, `completed: true`. That is *clean and complete* by
+the §5.13 rule, and pruning then deletes ~110,000 rows for files that are perfectly fine.
+
+**Fix (`W26.walk2`):** `.settled` additionally requires a **post-pass root re-validation** — the root still
+exists, `access(R_OK) == 0`, and its `(f_fsid, st_ino)` are **identical to the values captured in the pre-pass
+precondition**. Capture them in the precondition specifically so this comparison is possible. A mismatch or
+a vanished root ⇒ `.degraded`, and absence is not actionable.
+
+### 7a.12 A mid-scan disappearance is not a tag failure — and must not poison cleanliness
+
+Measured by the reviewer: with two directories renamed mid-enumeration, the `errorHandler:` enumerator still
+yielded **403 of 1,203** paths that no longer existed. Persisting those rows would have `ContentIndexer` open
+them, get `nil` from `PDFDocument`, and record them as unreadable — a fabricated format-health problem.
+
+**Fix (`W26.walk1`):** a distinct `vanishedMidScan` counter. An `ENOENT` on the per-entry `stat`/tag read means
+the entry disappeared: **exclude it from `files`, never persist it, and do NOT count it as a `tagFailure`** (so
+it does not block pruning either). It is normal churn, not a denial.
+
+### 7a.13 Warm start must not claim currency from a scan that never finished
+
+The quit window is far wider than "seconds": the walk is ~9 s but the `ContentIndexer` pass behind it is
+~1,456 s at 150k, so *"quit mid-cold-index"* is a **~24-minute** window. Rows from that scan are committed in
+500-row batches, so the index legitimately holds e.g. 40,000 of 150,000 entries with `finished IS NULL`.
+
+**Fix (`W26.idx`):** publish `.revalidating(asOf:)` **only** when the newest scan row for the root has a
+non-NULL `finished` **and** a clean outcome. A NULL-`finished` or non-clean row publishes its rows as
+**unverified** (and must never authorise pruning). Otherwise the app asserts "as of Tuesday 14:03" about a
+list that was never complete.
+
+### 7a.14 The FSEvents mainline is an unthrottled full re-walk
+
+§4.5 already establishes that bursts **drop to a root-level re-scan** as the common case. Nothing yet bounds
+that: a 2,000-file group edit, or the Processor writing a batch over ten minutes, can start walk N, then have
+events 1 s later start walk N+1, and so on.
+
+**Fix (`W26.fsev`):** state the scheduling contract — **at most one full re-walk in flight and at most one
+queued, coalesced newest-wins**, plus a minimum interval between root-level re-walks. `ContentIndexer`'s own
+`pending` discipline (`:55-58`) is the precedent to copy verbatim.
+
+### 7a.15 Cloud-root detection: `MNT_LOCAL` cannot fire, so identify positively
+
+A `statfs`/`MNT_LOCAL` test does **not** flag `~/Library/CloudStorage/GoogleDrive-…` — a File Provider domain
+presents as a local mount, and `isReadableFile` returns true. Given the owner's corpus lives in a folder
+*named* "Google Drive", mis-picking the real Drive path is the single most likely wrong click in the folder
+picker.
+
+**Fix (`W26.walk2`):** identify a non-local root **positively** — resolved path inside `~/Library/CloudStorage`,
+or an `NSFileProviderManager` domain match — and **degrade honestly** rather than hanging or silently
+under-reporting. ⚠️ **This is in tension with §9's non-goal "do NOT refuse cloud-backed roots at selection
+time."** Both are defensible; the reconciliation this plan adopts is: **detect and warn, do not refuse** —
+proceed with the dataless guard on, show `.degraded` with the reason, and never present a partial cloud walk
+as `.settled`.
+
+### 7a.16 Correction to §4.4's revised vocabulary scope
+
+The `~/Desktop` harvest is **2.2× larger than §4.4's revision implies**: measured read-only, `~/Desktop` holds
+**343,595 files across 7,690 directories**, of which **286,419 are the corpus + JPEGS trees**. So the "just walk
+`~/Desktop`" recommendation is a ~2.8× corpus walk that runs **straight through the sacred corpus, possibly
+while the Processor is capturing/OCRing**.
+
+**Fix (`W26.vocab`):** state that real denominator rather than only the tagged-file count, run the harvest at
+`.utility` with a **worker width of 2**, and reuse the persisted index where one exists
+(`SELECT tags_raw …` was measured at 0.295 s for 150k rows) instead of re-walking. The scope decision stands;
+the cost claim needed correcting.
+
+### 7a.17 Path canonicalisation — sound advice, one premise not reproduced
+
+Guidance adopted: compose child URLs with
+`URL(fileURLWithFileSystemRepresentation:isDirectory:relativeTo:)` from the **raw name bytes**, never via
+`String(cString:)`, and key the index on the `fileSystemRepresentation` bytes. Three stores
+(`CorpusIndex`/`ContentIndex`/the live model) are joined by exact path equality, so one normalising producer
+would silently fork them.
+
+⚠️ **But the supporting claim — that the corpus contains an NFD filename — did not reproduce.** The cited
+`Lécuyer pollution in SV proofs.doc` is **NFC** (precomposed `c3 a9`; no `cc 81` combining acute). Treat the
+canonicalisation rule as **defensive practice**, which §5.3 already required, and **not** as a fix for a
+known-present NFD path. Do not cite an NFD corpus file as motivation.
 
 ### Rejected
 

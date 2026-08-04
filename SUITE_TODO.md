@@ -165,10 +165,17 @@ per probe, corroborated by `access`/`getxattr`+`errno`: parent-directory denial 
 `0o111` (traverse-only) **reads fine** — all three already honest. **The single leak is a file that is itself
 unreadable with a traversable parent: the call does NOT throw and yields `tagNames == nil`,** which
 `TagReading.swift:34`'s `values.tagNames ?? []` reports as *"confirmed no tags"* about a file carrying
-`["Unread", …]`. There `access(R_OK) == -1` and `getxattr == -1/EACCES(13)`, so it is cheap to detect.
-**Probe ONLY on the `tagNames == nil` branch** — a blanket pre-check is wasted work at 150k (this plan's
-earlier, wrong prescription), and a new `TagReadResult.denied` case has the largest blast radius (all three
-designs declined it; see plan §9). ⚠️ **Why the first measurement was wrong — it will bite the tests too:**
+`["Unread", …]`. **Probe ONLY on the `tagNames == nil` branch** — a blanket pre-check is wasted work at 150k
+(this plan's earlier, wrong prescription), and a new `TagReadResult.denied` case has the largest blast radius
+(all three designs declined it; see plan §9). 🔴 **AND THE PROBE MUST BE `getxattr`, NOT `access(R_OK)` —
+verified 2026-08-04.** An ACE denying **only** `readextattr` (narrower than the ACL case above, which also
+denies `read`/`readattr` and therefore throws) gives: `resourceValues` no-throw with `tagNames=nil`,
+**`access(R_OK) == 0`** — so `access` **fails to detect it** and would coerce a tagged file to "no tags"
+exactly as before — while `getxattr` returns `-1/EACCES(13)`. `access(R_OK)` tests the **file data**, not its
+extended attributes. Use
+`getxattr(path, "com.apple.metadata:_kMDItemUserTags", nil, 0, 0, XATTR_NOFOLLOW)` and return `.failure` on
+`-1` with **any errno other than `ENOATTR`(93)**; `ENOATTR` or a returned size of 0 is the only honest
+"verified no tags". ⚠️ **Why the first measurement was wrong — it will bite the tests too:**
 it reused one `URL` object across probes and `URL.resourceValues` **caches on the backing `NSURL`**, so the
 answer came from cache. **Construct a fresh `URL` per probe (or use `stat`/`getxattr`), or a test passes while
 asserting nothing.**
