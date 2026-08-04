@@ -58,6 +58,10 @@ import ArchiveCore
 ///      the write that was about to replace its record. Refused in `retryFailed` (so the model sheet's
 ///      deferred Apply is covered too) and withheld from the per-item menu, and only for the length of the
 ///      window (Test 21).
+///  18. That window's throbber scrim BLOCKS the panel deliberately (W3.cap-r3-fu10), so it is up for exactly
+///      `isFinishingScrimUp` and for no other state — down when idle, down under either sheet, and back down
+///      the moment the regeneration lands (Test 21 §3b). Only the COVERAGE is measurable here; whether the
+///      scrim then absorbs the click is a pixel question for the VM GUI lane.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1836,9 +1840,36 @@ enum LiveCaptureRecoveryTestDriver {
         //      headless driver at all.
         //      ⚠️ P6 and P7 together are the honest scope statement for this section: of the fix's three edits,
         //      only the `retryFailed` guard (P1/P2) and the pure action-gate function (P3/P4) are measured
-        //      here. Both unmeasured mutants are in the VIEW, both were found by the adversarial pass rather
-        //      than volunteered, and both are exactly where the item's reachability question also lands
-        //      (`W3.cap-r3-fu10`) — so one VM-lane session could close all three.
+        //      here. Both unmeasured mutants are in the VIEW, and both were found by the adversarial pass
+        //      rather than volunteered.
+        //      ⚠️⚠️ `W3.cap-r3-fu10` has since DECIDED the reachability question these two were parked behind,
+        //      and the answer changes what a VM-lane session can do with them rather than unblocking them. The
+        //      throbber's scrim blocks the pointer deliberately, so a CLICK-driven XCUITest cannot kill P6 or
+        //      P7 either: removing `.disabled` from a control the scrim is already eating the clicks for
+        //      changes nothing a click can observe. Killing them needs KEYBOARD-driven focus (⇥+Space with
+        //      Full Keyboard Access on), which is the one route the scrim does not block and therefore the one
+        //      route on which those two modifiers are the sole defence. Recorded here so `W21.vmgui-d` writes
+        //      the right test instead of writing a clicking one and reading its 0 RED as coverage.
+        //
+        // Section 3b (fu10's own coverage check) adds six more — four MEASURED 2026-08-04 and two that are
+        // 0 RED by construction — all on `LiveCaptureProcessor.isFinishingScrimUp` unless noted:
+        //   S1 `!showFinalizeSheet` dropped → 1 RED, 3b (the finalize-move state would claim a scrim behind
+        //      the sheet that is already the modality).
+        //   S2 `!showRotationReview` dropped → 1 RED, 3b. A SPECIFICATION kill, not a reachability one — no
+        //      path reaches `isFinalizing && showRotationReview` today; 3b constructs it by assignment and
+        //      says so.
+        //   S3 the whole property forced to `false` (the scrim never up) → 1 RED, 3b.
+        //   S4 forced to `true` (always up) → 2 RED: 3b (via the idle and review-sheet samples) AND check 6,
+        //      whose folded-in sample C is the only one taken after the window has closed. Predicted as 1 and
+        //      measured as 2; recorded as measured. The second RED is the useful one — it says sample C is
+        //      load-bearing rather than decorative, because it is the only place an always-on scrim is caught
+        //      in a state the test DROVE rather than assigned.
+        //   S5/S6 `.contentShape(Rectangle())` deleted, and the overlay's `if` deleted outright
+        //      → 0 RED and 0 RED BY CONSTRUCTION, which is the point rather than a gap: hit-testing and
+        //      SwiftUI rendering are both invisible from a headless driver. What the driver measures is WHEN
+        //      the panel is declared blocked; whether the scrim then eats the click is `W21.vmgui-d`'s
+        //      observation, and the throbber carries `accessibilityIdentifier("live.finishing-throbber")` so
+        //      that test can wait on the window and assert a panel button behind it is not `isHittable`.
         // Checks 1–3 and 6 are premises, not catchers. ---
         if isolatedBackup {
             if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
@@ -1898,6 +1929,8 @@ enum LiveCaptureRecoveryTestDriver {
                   rfStagedOK && rfPaidAfterStage == 2 && rfSources.count == 2
                       && rfProc.failedGroupIds.isEmpty && rfProc.isFinalized("F1")
                       && rfProc.staged.first { $0.groupId == "F1" }?.pdfURLs.isEmpty == false)
+            // W3.cap-r3-fu10 sample A — idle, everything staged: the panel is live, so no scrim.
+            let rfScrimIdle = rfProc.isFinishingScrimUp
 
             // 2. PREMISE. Its pages reach the rotation review, through the real Finish, with the operator's
             //    own "Review rotation" preference restored around the one synchronous call that reads it.
@@ -1912,10 +1945,16 @@ enum LiveCaptureRecoveryTestDriver {
             check("a STAGED segment's pages enter the end-of-session rotation review",
                   rfProc.showRotationReview
                       && rfProc.rotationReviewPages.filter { $0.groupId == "F1" }.count == 2)
+            // W3.cap-r3-fu10 sample B — the review SHEET is up and is the modality; no scrim behind it.
+            // ⚠️ Named honestly: this is a second IDLE-SIDE sample (`isFinalizing` is still false here), so it
+            // does not exercise the `!showRotationReview` term at all — 3b's poke is what kills S2. Kept
+            // because it is a real driven state on the way in, not because it adds a term.
+            let rfScrimReview = rfProc.isFinishingScrimUp
 
             // 3. PREMISE, and the one that makes the rest non-vacuous: the operator straightens a page, and
             //    the regeneration is PENDING and unpublished — `isFinalizing`, no sheet over the panel (so the
-            //    retry affordances are on screen, if not necessarily hit-testable — see the item's fu10 note),
+            //    retry affordances are on screen but — `W3.cap-r3-fu10` having decided it — NOT clickable, the
+            //    throbber's scrim eating the pointer on purpose; 3b below pins exactly when that scrim is up),
             //    and the record + its file still the pre-write ones. Everything from here to check 5 runs on
             //    this same MainActor turn, so the write cannot land in the middle of it. (Not asserted, per the
             //    ⚠️ above: that the write is *executing*. It is not — it has not even been dispatched.)
@@ -1928,6 +1967,44 @@ enum LiveCaptureRecoveryTestDriver {
             check("the regeneration is pending and unpublished, with the panel on screen and nothing over it",
                   rfProc.isFinalizing && !rfProc.showFinalizeSheet && !rfProc.showRotationReview
                       && !rfPDFsBefore.isEmpty && rfPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 3b. W3.cap-r3-fu10 — the scrim's COVERAGE: the panel is deliberately blocked for exactly the
+            //     window above, and for no other state. This is the half of that decision a headless driver
+            //     CAN measure. The other half — that the scrim absorbs the click — it cannot see at all, and
+            //     nothing here should be read as claiming it (see the mutant note above check 1's section).
+            //
+            //     Note what makes this worth a check rather than a tautology: check 3 asserts the state with
+            //     the triple written out, and this asserts the PROPERTY THE VIEW ACTUALLY BRANCHES ON. They
+            //     were the same expression written twice until this item extracted `isFinishingScrimUp`, and
+            //     a driver re-typing the view's condition is a driver that keeps passing while the view
+            //     drifts out from under it.
+            //
+            //     The two sheet states are reached by ASSIGNMENT, not by driving them. Both are `@Published
+            //     var`s, both pokes are restored on this same MainActor turn (the regeneration's `Task` is
+            //     MainActor-isolated and cannot interleave — see the ⚠️ above), and the last term asserts the
+            //     restore actually happened, so a botched one cannot leak into checks 4–8. Deliberately NOT
+            //     driven through the real `finalize(_:)`, which is the other way to reach `isFinalizing &&
+            //     showFinalizeSheet`: that MOVES staged output into `currentOutputDirectory`, and while
+            //     `test-recovery.sh` does set `LIVECAPTURE_TESTOUT` to keep that in a temp dir, the fallback
+            //     when it is unset is the operator's real configured output folder. Making a cosmetic mutant's
+            //     kill depend on the harness's env for its file safety is a bad trade when an assignment
+            //     reaches the same state and writes nothing.
+            //     `isFinalizing && showRotationReview` additionally has no reaching path today
+            //     (`applyRotationReviewAndFinalize` clears the flag first), so for that term the assignment is
+            //     the only way to state the rule at all — recorded as a SPECIFICATION check, not a
+            //     reachability claim.
+            let rfScrimOpen = rfProc.isFinishingScrimUp
+            rfProc.showFinalizeSheet = true
+            let rfScrimUnderFinalizeSheet = rfProc.isFinishingScrimUp
+            rfProc.showFinalizeSheet = false
+            rfProc.showRotationReview = true
+            let rfScrimUnderReviewSheet = rfProc.isFinishingScrimUp
+            rfProc.showRotationReview = false
+            check("the finishing scrim covers exactly the exposed window — up while regenerating, down idle, "
+                      + "down under either sheet",
+                  rfScrimOpen && !rfScrimIdle && !rfScrimReview
+                      && !rfScrimUnderFinalizeSheet && !rfScrimUnderReviewSheet
+                      && rfProc.isFinishingScrimUp)
 
             // 4. THE FIX, money half. Both retry entries are refused: the per-item one, and the one the model
             //    sheet defers (`onApply` fires whenever the operator gets round to it, so no enabled-ness
@@ -1953,7 +2030,11 @@ enum LiveCaptureRecoveryTestDriver {
             let rfRegen = await rfSettle { !rfProc.isFinalizing && rfProc.showFinalizeSheet }
             let rfRecord = rfProc.staged.first { $0.groupId == "F1" }
             check("the regeneration lands intact and the segment is still filable",
-                  rfRegen && rfProc.failedGroupIds.isEmpty
+                  // W3.cap-r3-fu10 sample C, folded in here rather than given its own check: the scrim comes
+                  // back DOWN once the window closes, observed in a state the test DROVE rather than assigned.
+                  // Check 3b's pokes prove the sheet terms; this proves the window is a window.
+                  !rfProc.isFinishingScrimUp
+                      && rfRegen && rfProc.failedGroupIds.isEmpty
                       && rfRecord?.pagesComplete != false
                       && rfRecord?.pdfURLs.isEmpty == false
                       && rfRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true

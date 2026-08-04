@@ -94,6 +94,35 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Segments still being processed (OCR or tagging), for the "waiting" message shown while pendingFinish.
     var processingCount: Int { statuses.filter { $0.phase == .ocr || $0.phase == .tagging }.count }
     @Published private(set) var isFinalizing = false
+    /// W3.cap-r3-fu10 — the window in which the Live Capture panel is DELIBERATELY blocked to the pointer.
+    /// `LiveCaptureView`'s "Finishing — processing segments…" overlay is up for exactly this predicate, and
+    /// its scrim absorbs clicks on purpose; the decision, and what it does and does not buy, is written at
+    /// the overlay itself (`LiveCaptureView`'s `.overlay`).
+    ///
+    /// Named here rather than left inline in the view for two reasons. The triple was restated in four
+    /// places — the view, this file's `retryFailed` comment, and twice in the recovery driver, once of them
+    /// as a hand-copied assertion — so the driver could have gone on passing while the view's own condition
+    /// drifted out from under it. And it makes the COVERAGE half of the decision (WHEN the panel is blocked)
+    /// measurable from a headless driver, which the hit-test half can never be.
+    ///
+    /// `!showRotationReview` is redundant on every path that exists today, but ⚠️ **not for the reason the
+    /// first draft of this comment gave.** It said `finishSession` refuses to raise the flag while finalizing;
+    /// `finishSession` contains no such guard (its only guard is `!staged.isEmpty`), and the adversarial pass
+    /// caught it. The real argument is two steps further out, and worth writing down because a reader who
+    /// checks the easy version finds nothing there: `showRotationReview = true` has exactly ONE writer,
+    /// `finishSession`, whose two callers are `requestFinish` — which does carry
+    /// `guard !showFinalizeSheet, !showRotationReview, !isFinalizing` — and `proceedToFinishIfReady`, which is
+    /// `guard pendingFinish` and clears `pendingFinish` before calling, and `pendingFinish` cannot be true
+    /// alongside `isFinalizing`. `applyRotationReviewAndFinalize` then clears the flag on the line before
+    /// `isFinalizing = true`. So the state is unreachable because of `requestFinish`'s guard, NOT because of
+    /// anything local to `finishSession`; remove that guard and this term stops being redundant.
+    ///
+    /// Kept because the rule the overlay implements is "the finish flow's own two modals are not doubled up
+    /// with a scrim", and naming both is what makes that readable. ⚠️ It is NOT "no sheet is over the panel":
+    /// the view attaches FIVE `.sheet` modifiers, and the other three (the tag card, the model-choice sheet,
+    /// the text viewer) can each be up in this window, floating ABOVE the scrim. Those are precisely the
+    /// entries the model-layer guards exist for — see `retryFailed`.
+    var isFinishingScrimUp: Bool { isFinalizing && !showFinalizeSheet && !showRotationReview }
     @Published private(set) var finalizeSummary: String?
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
     @Published private(set) var failedGroupIds: Set<String> = []
@@ -278,21 +307,35 @@ final class LiveCaptureProcessor: ObservableObject {
         // W3.cap-r3-fu7 — refuse while a finish is regenerating, and refuse HERE rather than only in the UI.
         // `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files
         // from a DETACHED task, so for the length of that write the Live Capture panel is on screen with no
-        // sheet over it (`LiveCaptureView:48` shows a throbber for exactly `isFinalizing && !showFinalizeSheet
-        // && !showRotationReview`).
+        // sheet over it (`isFinishingScrimUp` above is that state, and `LiveCaptureView`'s throbber overlay is
+        // up for exactly it).
         //
         // ⚠️ ON SCREEN is not the same as REACHABLE, and the item that filed this — plus the first draft of
-        // this very comment — conflated the two. An independent adversarial pass caught it: that throbber's
-        // scrim is `Color.black.opacity(0.2).ignoresSafeArea()` inside an `.overlay`, with **no**
-        // `.allowsHitTesting(false)` (this repo adds that modifier where it wants an overlay to pass clicks
-        // through — `OCRView.swift:652`). A `Color` is hit-testable, so for the length of the window the scrim
-        // very likely swallows every click in the panel, and neither retry button was ever pressable there.
-        // Read this fix accordingly: the two view-layer edits that ship with it are DEFENCE-IN-DEPTH over a
-        // hazard the scrim already blocks, and the guard's live production value is the one entry a scrim
-        // cannot cover — the deferred sheet Apply below, whose own reachability rides on `W3.cap-r3-fu9`. The
-        // scrim's intent is undecided and is filed as `W3.cap-r3-fu10`: if blocking input is deliberate it
-        // should say so, and if it is not, adding `.allowsHitTesting(false)` makes these gates load-bearing
-        // rather than spare. Settling it needs the VM GUI lane; a code read is all that is claimed here.
+        // this very comment — conflated the two. An independent adversarial pass caught it and filed the
+        // question as `W3.cap-r3-fu10`; **fu10 has now been decided: that throbber's scrim is MEANT to block
+        // the pointer** (the grounds, and the limits of what was observed rather than reasoned, are at the
+        // overlay). So "on screen" is settled — but the answer is NOT that these gates are spare, and the
+        // first draft's guess that they were is the part that was wrong. A scrim stops the pointer and
+        // nothing else, so the three entries split three ways:
+        //
+        //   • The bulk "Retry N failed" button and the expanded row's per-item retry, TO THE MOUSE: covered
+        //     twice. The scrim eats the click and the `.disabled`/withheld-action edits grey them out. This
+        //     is the only leg that is genuinely defence-in-depth, and it is the leg the first draft
+        //     generalized from.
+        //   • The same two buttons, TO THE KEYBOARD OR TO VOICEOVER: covered ONCE, here and in the view — not
+        //     by the scrim. Hit-testing is neither focus nor accessibility; with macOS "Keyboard navigation"
+        //     on (off by default) ⇥ still reaches a control behind an overlay, and there is no
+        //     `.accessibilityAddTraits(.isModal)` on the overlay to stop an AX client either. `.disabled` is
+        //     what removes the control from both. (Reasoned from the code, NOT observed — see the overlay.)
+        //   • The deferred `modelChoiceTarget` sheet Apply: covered ONCE, and only HERE. A presented sheet
+        //     floats ABOVE the overlay — the scrim's predicate does not mention `modelChoiceTarget`, so that
+        //     sheet is up with the scrim uselessly behind it — and its Apply fires whenever the operator gets
+        //     round to it. This guard is the whole defence on that path (its reachability rides on
+        //     `W3.cap-r3-fu9`).
+        //
+        // Which is the same conclusion the paragraph below reaches from the deferred-callback argument alone:
+        // the model layer is where the refusal has to be true. fu10 narrows what the VIEW edits are for
+        // (the keyboard, and telling the operator the affordance is off) without making them optional.
         //
         // A retry landing in that window deletes the segment's
         // staged output, releases it, drops `retained` and re-ingests every page — buying its OCR a second

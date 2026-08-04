@@ -44,17 +44,78 @@ struct LiveCaptureView: View {
         // appears — `isFinalizing` is true but no sheet is up, which used to look hung. Surface a throbber
         // so the operator sees work is still happening. (During the finalize move itself the sheet is up
         // with its own spinner, so this stays gated off then.)
+        //
+        // W3.cap-r3-fu10 — THIS SCRIM IS MEANT TO BLOCK INPUT. It shipped without saying so: `Color` is
+        // hit-testable and there was no `.allowsHitTesting(false)`, so it blocked as a side effect and the
+        // next reader could not tell an omission from a choice. The item asked for the INTENT to be decided
+        // and written down, so read the next paragraph as a decision (normative) and the one after it as the
+        // limits of what has actually been observed.
+        //
+        // DECIDED: frozen, not live, on three grounds. (1) This overlay stands in for the sheet that is not
+        // up yet — the comment above says so — and a sheet is modal, so freezing is what makes the whole
+        // `isFinalizing` window behave uniformly instead of splitting into a modal half and a live half.
+        // (2) Every MUTATING affordance under it is a hazard in this window: retry re-buys the OCR
+        // (`W3.cap-r3-fu7`), Clear Trashes the sources the detached write is still reading
+        // (`W3.cap-r3-fu11`), removing a photo strands a placeholder page (`W3.cap-r3-fu3`), and Finish is
+        // already `.disabled`. ⚠️ Not "nothing under it is worth reaching", which an earlier draft claimed
+        // and the adversarial pass refuted: `SegmentItem.actions(for:finalizing:)` deliberately KEEPS
+        // `.viewText`/`.revealFiles` while finalizing, and driver check 7 asserts it, so freezing takes two
+        // read-only affordances with it. That is accepted collateral, not an oversight — the window is short,
+        // the actions lose nothing by waiting, and passing clicks through to reach them would re-expose all
+        // four hazards above. It does mean check 7's preservation is, for the pointer, a statement about
+        // after the window rather than during it. (3) It is not a lock-out: the mode Picker is a sibling in
+        // `ContentView.mainContent`'s VStack — outside this view, so outside the frame this overlay is sized
+        // to, and `.ignoresSafeArea()` reclaims safe-area INSETS rather than a sibling's layout space. So the
+        // operator can still leave the tab.
+        //
+        // NOT YET OBSERVED, and deliberately separated from the decision above. That today's code ACHIEVES
+        // the freeze is a code-read inference, not a measurement: a `Color` is hit-testable, so an overlay of
+        // one should eat the clicks. The specific reason to keep the doubt is that this overlay sits over an
+        // **`HSplitView`**, which is AppKit-backed (`NSSplitView`) — overlaying bridged AppKit content is the
+        // case where the SwiftUI hit-test story is least certain, and the split DIVIDER especially may not be
+        // covered at all. That is the thing for `W21.vmgui-d` to look at, not the general platitude.
+        //
+        // WHAT A SCRIM DOES NOT BUY EVEN IF IT WORKS, which is why the model-layer guards stay. It stops the
+        // POINTER and nothing else. Three routes go straight through it: (a) a presented sheet floats ABOVE
+        // the overlay — the predicate does not mention `modelChoiceTarget`, so the model sheet is up with the
+        // scrim uselessly behind it; (b) keyboard focus, since hit testing is not the focus ring — with
+        // macOS's "Keyboard navigation" setting on (System Settings → Keyboard; OFF by default, and note it
+        // is a different feature from the Accessibility one named "Full Keyboard Access"), ⇥+Space still
+        // reaches a control behind an overlay; (c) accessibility clients, since there is no
+        // `.accessibilityAddTraits(.isModal)` here — VoiceOver can activate what the pointer cannot.
+        // ⚠️ (b) and (c) are REASONED, not measured, and are flagged as such rather than asserted, since
+        // inferring reachability without observing it is the exact error this item was filed to correct.
+        // `.disabled` covers (b) and (c) as well as (a); this modifier covers none of them. Neither layer
+        // subsumes the other. Closing (b)/(c) at the overlay — making the window modal to focus and AX and
+        // not only to the pointer — is filed as `W3.cap-r3-fu10-fu1`, because the obvious one-liners interact
+        // with the VM lane's own test (an `.isModal` container can hide the very buttons that test needs to
+        // find) and that is a decision to take with the lane in hand.
         .overlay {
-            if liveProc.isFinalizing && !liveProc.showFinalizeSheet && !liveProc.showRotationReview {
+            if liveProc.isFinishingScrimUp {
                 ZStack {
                     Color.black.opacity(0.2).ignoresSafeArea()
                     VStack(spacing: 10) {
                         ProgressView().controlSize(.large)
                         Text("Finishing — processing segments…").font(.callout).foregroundStyle(.secondary)
+                            // A stable hook for the Processor's future VM GUI lane (`W21.vmgui-d`): wait on
+                            // this, then assert a panel button behind the scrim is NOT `isHittable`. That is
+                            // the one observation that can confirm the paragraph above; a headless driver
+                            // cannot see hit-testing at all.
+                            .accessibilityIdentifier("live.finishing-throbber")
                     }
                     .padding(24)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
+                // The decision, in code rather than only in the comment: the whole overlay is one hit target.
+                // Same shape the app already uses to absorb clicks deliberately
+                // (`ManualSegmentTagView.swift:307`), minus its tap handler — there is nothing here to
+                // dismiss. ⚠️ The `.frame` is load-bearing, not decoration. A first draft claimed
+                // `.contentShape` alone would survive someone later removing the `Color`; it would not — the
+                // `Color` is the only greedy view in this ZStack, so without it the stack collapses to the
+                // padded throbber card and the hit target would shrink to that card. Pinning the frame open
+                // is what makes the claim true, so the blocking now survives both restyling AND removal.
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
             }
         }
         .onAppear {
@@ -637,13 +698,20 @@ private struct LiveProcessingBox: View {
                             liveProc.retryFailed(groupIds: liveProc.failedGroupIds)
                         }
                         .font(.caption).foregroundStyle(.red)
-                        // W3.cap-r3-fu7 — the same gate the **Finish session** button already carries (`:405`),
+                        // W3.cap-r3-fu7 — the same gate the **Finish session** button already carries (`:438`),
                         // for the same window: the end-of-session rotation review regenerates segments from a
                         // detached task with this panel visible and no sheet over it, and a retry pressed there
                         // re-buys the OCR the regeneration is still writing. `retryFailed` refuses it outright;
                         // this is so the button says so instead of looking like it did nothing.
-                        // ⚠️ The item, and this comment's first draft, called `:405` "the Clear button" — it is
-                        // not, and the adversarial pass caught it. **Clear (`:363`) carries no gate at all**,
+                        // ⚠️ `W3.cap-r3-fu10` decided that the throbber's scrim is MEANT to block the pointer,
+                        // which narrows what this modifier is for WITHOUT making it redundant: to the mouse it
+                        // is now the second of two layers, but a scrim is not a focus barrier or an AX
+                        // barrier, so this `.disabled` is what keeps ⇥+Space (macOS "Keyboard navigation",
+                        // off by default) and VoiceOver off the button. It also greys the button, which is how
+                        // the operator learns the affordance is off rather than merely dimmed along with
+                        // everything else behind the scrim.
+                        // ⚠️ The item, and this comment's first draft, called `:438` "the Clear button" — it is
+                        // not, and the adversarial pass caught it. **Clear (`:396`) carries no gate at all**,
                         // and in this window it is the more destructive of the two: it Trashes the sources the
                         // detached `writeSegmentFiles` is reading and empties `staged`/`retained` under the
                         // loop that is about to index them. Filed as `W3.cap-r3-fu11` — NOT fixed here, because
@@ -1077,6 +1145,13 @@ struct SegmentItem: ProcessableItem {
     /// the per-item menu needs the same gate as the bulk button — it reaches the same function and spends the
     /// same money, and the expanded row is on screen in exactly the window that is exposed, so gating only
     /// the bulk button would have left the money path open through the menu beside it.
+    ///
+    /// `W3.cap-r3-fu10` then decided that the window's throbber scrim is meant to block the pointer, so "on
+    /// screen" no longer implies "clickable". That does not retire this: a scrim is not a focus or AX barrier
+    /// (⇥+Space with macOS "Keyboard navigation" on, and VoiceOver, both reach straight through one), and
+    /// withholding is also what stops the menu ADVERTISING a retry that `retryFailed` would refuse. See the
+    /// overlay for the three-way split — and note the same decision freezes the `.viewText`/`.revealFiles`
+    /// this function deliberately KEEPS, which is accepted collateral, recorded there rather than here.
     ///
     /// `finalizing` has NO default on purpose: both call sites should have to say which case they mean, so a
     /// third one cannot inherit "not finalizing" silently.
