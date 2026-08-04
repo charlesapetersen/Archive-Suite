@@ -657,6 +657,32 @@ change. Flagged, not decided.)
 15. **Entitlement correction:** the Reader's production entitlements grant user-selected **read-write**, not
     read-only. That does not license any write — the Core Directive and the write-surface lint (§5.7) are
     what constrain it — but do not cite "read-only entitlement" as a safety argument, because it is false.
+16. 🔴 **Changing the mtime SOURCE silently triggers a full re-extraction of the whole corpus.** Verified:
+    `ContentIndexer.swift:112` computes `f.contentModified?.timeIntervalSince1970 ?? 0` and `:114` decides
+    work by **exact double inequality** (`stored != mtime`). Today `contentModified` comes from Spotlight's
+    `NSMetadataItemFSContentChangeDateKey` (`ArchiveLibrary.swift:196`); after the swap it comes from
+    `.contentModificationDateKey`. **If those two doubles differ by even one representable bit, every file
+    re-extracts.** Cost, using this plan's own measurement (9,706 µs/file × 102,478 PDFs):
+    **≈17 minutes of PDF text extraction**, once, in the background.
+    **Decide this deliberately in `W26.walk2` rather than discovering it:** (a) accept the one-time
+    re-extraction — simple, self-healing, and the index is explicitly disposable; or (b) compare with a
+    tolerance — which risks *masking real changes* and is worse. **Recommend (a), and say so in the commit**
+    so the post-deploy CPU burst is expected rather than alarming. Do **not** bump `content-index-v2` → `v3`:
+    that forces the same re-extraction *and* strands a DB the app cannot delete (§5.7).
+17. **Excluded folders must stay a POST-discovery filter — do not skip them during the walk.** Verified in
+    `NavigationModel.swift:636-650`: exclusion is applied *after* discovery by path prefix to produce
+    `filesToIndex`, and `pruneIfSettled` is then called with that **filtered** set against the **whole**
+    `rootPrefix` — the comment states the intent outright: *"Uses `filesToIndex` (excludes user-excluded
+    folders) so excluded paths are eligible for pruning."* So excluded files are deliberately present in
+    `library.files` (visible in the UI) but deliberately absent from the content index. A walker that skipped
+    excluded directories during enumeration would drop them from the UI entirely — a silent behaviour change
+    — while producing the *same* index outcome, which makes it hard to spot. **Return everything tagged; let
+    `NavigationModel` do the excluding.**
+18. **Do not persist an FSEvents `sinceWhen` checkpoint in v1** — this supersedes the softer "keep a
+    conservative high-water mark" in §4.5. Because event IDs are **not** delivered in ascending order and
+    `FullHistory` can deliver IDs *below* the one requested, "persist the last ID seen" **silently loses
+    events**. In v1, resume by re-walking on launch (which is ~4 s warm anyway) and use
+    `kFSEventStreamEventIdSinceNow`. Revisit only with a correctness argument, not a performance one.
 
 ---
 
@@ -754,6 +780,41 @@ The Reader's Core Directive is untouched and this plan **narrows** the write sur
 - **Emulating Spotlight's home-wide tag vocabulary** — see §4.4.3; explicitly declined.
 - **Migration or back-compat for any on-disk format.** Per the no-production-material directive; bump
   the DB filename and move on.
+
+**Non-goals that three independent designs converged on** (recorded because each is a plausible-sounding
+idea that a later reviewer will propose, and the reasoning against it is not obvious):
+
+- **Do NOT add a `.denied` case to `TagReadResult`.** It is the theoretically honest fix for §4a.1, but it
+  ripples through every `TagReading` caller in **all three apps** plus `CoordinatedTagWriter`'s §3 refusal
+  logic in `TagWrite.swift`. All three designs declined it independently, preferring the walker probe the
+  parent directory's readability instead. ⚠️ **This contradicts §4a.3's recommendation**, which argues the
+  fix belongs in `TagReading` because the Safety §3 write guard is bypassable through that path. **Genuine
+  open decision, not an oversight — resolve it explicitly in `W26.walk1` and record the choice.** The narrow
+  reading: fix the walker now (cheap, unblocks the wave), file the `TagReadResult` question as its own
+  Tier-2 item with the Safety §3 argument attached, rather than smuggling a three-app enum change into a
+  discovery task.
+- **Do NOT share one database between the apps, and do NOT add an App Group.** The Reader is sandboxed (its
+  Application Support lives inside `~/Library/Containers/com.archivereader.app/Data/`) and the Processor is
+  not, so a shared store means a new entitlement and a new cross-app coupling. **Share the walker CODE in
+  ArchiveCore; keep STORAGE per-app.** (The `SELECT tags_raw` vocabulary query is only 0.295 s at 150k rows,
+  so the Processor can simply do its own root-scoped read.)
+- **Do NOT build a shadow/dual-run mode** comparing the walk against Spotlight before the flip. It sounds
+  like the responsible move and is worthless here: **the Data volume's Spotlight index is dead on this
+  machine**, so the comparison baseline is an empty set. There is nothing to validate against.
+- **Do NOT add a periodic re-walk timer.** Prefer window-activation-triggered revalidation (only when the
+  last settle is older than ~5 minutes) plus an explicit ⌘⌥R. A timer would contend with `ContentIndexer`
+  for I/O on a corpus this size, for no correctness gain over FSEvents plus a launch walk.
+- **Do NOT refuse cloud-backed roots at selection time.** Detecting FileProvider/CloudStorage paths is
+  imperfect and refusal is a UX cliff; the §4a.4 thread-policy guard plus honest `.degraded` reporting is
+  the right shape — fail fast and explain, don't pre-emptively forbid.
+- **Do NOT adopt the shared walker in Archive Notes now.** Notes has zero Spotlight references and its own
+  working walk; adding a dependency buys nothing this wave.
+
+**One argument for the ArchiveCore placement, worth stating:** the membership predicate is **already
+duplicated today** — the `NSMetadataQuery` predicate at `ArchiveLibrary.swift:41-42` and the DEBUG walk's
+case-insensitive check at `:105-109` are two independent expressions of the same rule. A Reader-local fix
+would leave that duplication and let the Processor grow a third. One component in ArchiveCore, next to the
+audited writer it must agree with, collapses all three.
 
 ## 10. Docs that move with the code (same commit, per convention)
 

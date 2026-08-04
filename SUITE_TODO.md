@@ -174,6 +174,13 @@ and `CoordinatedTagWriter` refuses to write on `.failure`, Safety §3) — the o
 comment asserting *"a nil `tagNames` legitimately means no tags"*. **So the real fix is in `TagReading`
 itself — shared ArchiveCore, both apps, therefore Tier-2** — plus the walker. Note the write guard Safety §3
 relies on is bypassable via this path (it yields `.success`, not `.failure`), though it is hard to reach.
+⚠️ **GENUINE OPEN DECISION — resolve it explicitly in W26.walk1 and record the choice.** Three independent
+designs all declined to add a `.denied` case to `TagReadResult`, because it ripples through every
+`TagReading` caller in **all three apps** plus `CoordinatedTagWriter`'s §3 refusal logic — they'd have the
+walker probe the parent's readability instead. That contradicts the Safety-§3 argument above. **Narrow
+reading (recommended): fix the walker now (cheap, unblocks the wave) and file the `TagReadResult` question as
+its own Tier-2 item carrying the Safety §3 argument** — rather than smuggling a three-app enum change into a
+discovery task. Do not let this be decided silently either way.
 Also confirmed: `enumerator` **without** `errorHandler:` listed the sealed dir but silently never descended;
 **with** `errorHandler:` it fired code 257 (`NSFileReadNoPermissionError`).
 
@@ -253,7 +260,20 @@ root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would al
   that unit tests provably missed (`ArchiveReader/KNOWN_ISSUES.md:166-173`) — so this item needs a
   functional/GUI gate, not just unit tests. Also un-fence the `UniformTypeIdentifiers` import
   (`ArchiveLibrary.swift:4-6`) and gate the **Release** build. No entitlement or `project.yml` change is
-  needed anywhere. **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still
+  needed anywhere. 🔴 **Two more, both verified:** (d) **changing the mtime SOURCE re-extracts the whole
+  corpus.** `ContentIndexer.swift:112` uses `f.contentModified?.timeIntervalSince1970 ?? 0` and `:114`
+  compares by **exact double inequality**; `contentModified` comes from Spotlight's
+  `NSMetadataItemFSContentChangeDateKey` today (`ArchiveLibrary.swift:196`) and from
+  `.contentModificationDateKey` after — differ by one bit and **every file re-extracts** (≈17 min of PDF text
+  extraction at the measured 9,706 µs/file × 102,478 PDFs). **Decide deliberately: accept the one-time
+  re-extraction (recommended — simple, self-healing, index is disposable) or compare with a tolerance (worse
+  — masks real changes). Say which in the commit** so the CPU burst is expected. Do **not** bump
+  `content-index-v2` → `v3` (same re-extraction *plus* a stranded DB the app cannot delete). (e) **excluded
+  folders must stay a POST-discovery filter** — `NavigationModel.swift:636-650` filters *after* discovery and
+  hands `pruneIfSettled` the filtered set against the whole `rootPrefix` ("*so excluded paths are eligible for
+  pruning*"), so excluded files are deliberately in `library.files` but not in the index. Skipping them during
+  the walk would silently drop them from the UI while producing an identical index outcome. **Return
+  everything tagged; let `NavigationModel` exclude.** **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still
   list every tagged file (**this test fails today** and is the regression guard for the whole wave), plus
   `.failed` on an unreadable root and `.emptyButReadable` only on a genuinely untagged one. Re-run (do not
   assume) `DeepLinkTests.swift:118-123`, whose case depends on a root with **no** discoverable files, and
@@ -281,7 +301,14 @@ root can be pointed anywhere. Open for the owner: `IOPOL_SCOPE_PROCESS` would al
   notification channel is not path-gated), so events can arrive for paths the app cannot read — see the
   silent-empty rule above. **Test:** a third-party `setResourceValue` (simulating Finder) is picked up with
   no Spotlight involved; `MustScanSubDirs` triggers a subtree re-walk; `FSEventStreamFlushSync` provides the
-  deterministic sync point that makes W26.scripts possible.
+  deterministic sync point that makes W26.scripts possible. ⚠️ **Do NOT persist a `sinceWhen` checkpoint in
+  v1** (this supersedes the "conservative high-water mark" note above): because IDs are non-ascending and
+  `FullHistory` can deliver IDs *below* the request, "persist the last ID seen" **silently loses events**. Use
+  `kFSEventStreamEventIdSinceNow` and re-walk on launch (~4 s warm anyway); revisit only on a correctness
+  argument, never a performance one. Also: **no periodic re-walk timer** — prefer window-activation
+  revalidation (only when the last settle is >~5 min old) plus explicit ⌘⌥R, since a timer would contend with
+  `ContentIndexer` for I/O at this corpus size. There is currently **zero** FSEvents/kqueue usage anywhere in
+  the suite, so this is greenfield.
 - [ ] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2 ·
   needs: none] (blocked-on: W26.walk2).** Follow the proven `ContentIndex` precedent exactly: an `actor`
   over **system SQLite** (`import SQLite3`, no third-party dep), in `.applicationSupportDirectory`, schema
