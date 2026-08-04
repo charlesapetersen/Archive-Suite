@@ -2081,6 +2081,172 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
+        // --- Test 22 (W3.cap-r3-fu11): a CLEAR pressed while the end-of-session rotation review is
+        // regenerating. Same window as Test 21 — `applyRotationReviewAndFinalize` sets `isFinalizing` and
+        // then writes the changed segments from a DETACHED task, the one finish state with no sheet over the
+        // Live Capture panel — but the hazard is worse and it is data rather than money. The Captured pane's
+        // Clear button was `session.clear(); liveProc.clearSessionState()`, ungated: the first half Trashes
+        // the source photos the in-flight `writeSegmentFiles` is still reading, and the second empties
+        // `staged`/`retained` under the loop that is about to `staged.firstIndex` them — so the
+        // regeneration's `guard let idx` finds nothing, its partially-rewritten `_processed` files are
+        // orphaned, and the sources are in the Trash. Recoverable (Trash, per the Recovery Core Directive),
+        // which is why the item is LOW rather than MED.
+        //
+        // WHAT IS ASSERTED, stated at the strength the driver can actually reach. This inherits Test 21's
+        // ⚠️ exactly and it is not a footnote: `LiveCaptureProcessor` is `@MainActor`, so the `Task { … }` in
+        // `applyRotationReviewAndFinalize` cannot begin until the MainActor yields, which nothing between
+        // check 3 and check 4 does. So at check 4 the outer Task has not started and the inner
+        // `Task.detached` has not been CREATED, let alone run. This is a FLAG-STATE refusal — the Clear is
+        // issued in exactly the state the exposed window has, and is refused — NOT a demonstration of a
+        // Clear racing a running write. That weaker property is the one the fix turns on (the defect is the
+        // Clear landing at all, in a state from which a pending write will later read files it has Trashed),
+        // but the stronger one is not measured here and should not be read in. Making the overlap literal
+        // would need a gate inside `writeSegmentFiles`.
+        //
+        // WHY BOTH HALVES ARE IN ONE CHECK rather than two. The fix's real claim is ATOMICITY — the
+        // destructive half and the state half refuse together — and the failure the item is about is
+        // precisely a SPLIT: sources in the Trash while `staged` still lists the segments pointing at them.
+        // A check per half would pass on a mutant that gated only one, which is the outcome worse than
+        // either. Check 4 is therefore deliberately compound.
+        //
+        // NON-VACUITY: measured, and recorded in the checkpoint that made the measurements. ---
+        if isolatedBackup {
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let clOut = tmp.appendingPathComponent("fu11out", isDirectory: true)
+            let clStaging = tmp.appendingPathComponent("APStaging-fu11-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: clStaging, withIntermediateDirectories: true)
+            let clSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            clSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — no document reaches the LLM, so this runs for real, for $0, no network.
+                    taggingMode: .human, rotationMode: .off,
+                    // No merge: the regeneration has to SUCCEED here, so its per-page PDFs may stay exactly
+                    // where the first write put them (same reasoning as Test 21).
+                    mergeDocuments: false,
+                    outputDirectory: clOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: clStaging)
+            let clProc = clSession.liveProcessor
+            func clSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            // A real, decodable JPEG: the segment must reach the plain `.staged` label (a placeholder page
+            // would make it `.succeededPlaceholderImage`) and the regeneration must be able to rewrite it.
+            let clBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let clJPEG = clBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+
+            // 1. PREMISE. A two-page document stages cleanly, with its sources on disk and its output
+            //    written — both of the things a mid-window Clear would take away.
+            for seq in [1, 2] {
+                clSession.ingest(jpeg: clJPEG, groupId: "L1", seq: seq,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            clProc.segmentResolved(groupId: "L1")
+            let clStagedOK = await clSettle { clProc.statuses.first { $0.id == "L1" }?.phase == .staged }
+            let clSources = clSession.photos.filter { $0.groupId == "L1" }.map(\.url)
+            let clPDFsBefore = clProc.staged.first { $0.groupId == "L1" }?.pdfURLs ?? []
+            check("a two-page document stages cleanly, its sources on disk and its output written",
+                  clStagedOK && clSources.count == 2
+                      && clSources.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && !clPDFsBefore.isEmpty && clPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && clProc.isFinalized("L1") && clProc.failedGroupIds.isEmpty)
+
+            // 2. PREMISE. Its pages reach the rotation review, through the real Finish, with the operator's
+            //    own "Review rotation" preference restored around the one synchronous call that reads it.
+            let clPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+            clProc.finishSession()
+            if let clPriorReview {
+                UserDefaults.standard.set(clPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            check("a STAGED segment's pages enter the rotation review (fu11)",
+                  clProc.showRotationReview
+                      && clProc.rotationReviewPages.filter { $0.groupId == "L1" }.count == 2)
+
+            // 3. PREMISE, and what makes the rest non-vacuous: the operator straightens a page, and the
+            //    regeneration is PENDING and unpublished — `isFinalizing`, no sheet over the panel, the
+            //    scrim up. Asserted through `isFinishingScrimUp` (the property the view branches on) as well
+            //    as the raw triple, so this cannot keep passing while the view drifts.
+            for i in clProc.rotationReviewPages.indices
+            where clProc.rotationReviewPages[i].groupId == "L1" && clProc.rotationReviewPages[i].pageIndex == 0 {
+                clProc.rotationReviewPages[i].rotationDegrees = 90
+            }
+            clProc.applyRotationReviewAndFinalize()
+            check("the regeneration is pending and unpublished, with the panel frozen and nothing over it",
+                  clProc.isFinalizing && !clProc.showFinalizeSheet && !clProc.showRotationReview
+                      && clProc.isFinishingScrimUp)
+
+            // 4. THE FIX, both halves in one assertion because the fix's claim IS the pair (see the
+            //    ⚠️ above). Nothing is Trashed and nothing is torn down: the sources are still on disk AND
+            //    still in the Captured pane, and the staged record, its `finalizedGroups` entry, `retained`
+            //    and the output files the pending write is about to replace are all where the regeneration
+            //    will expect them.
+            clProc.clearSession()
+            check("a Clear mid-regeneration Trashes nothing and tears nothing down — both halves refuse",
+                  clSources.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && clSession.photos.filter { $0.groupId == "L1" }.count == 2
+                      && clProc.staged.contains { $0.groupId == "L1" }
+                      && clProc.isFinalized("L1")
+                      && clProc.retainedText(for: "L1") != nil
+                      && clPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 5. The refusal cost the finish nothing: the regeneration lands normally, the segment is still
+            //    filable and unfailed, the scrim is back down, and both sources are still in the backup
+            //    folder. This is where a Clear that got through is caught for the reason that matters — the
+            //    regeneration republishing over inputs that are gone.
+            let clRegen = await clSettle { !clProc.isFinalizing && clProc.showFinalizeSheet }
+            let clRecord = clProc.staged.first { $0.groupId == "L1" }
+            check("the regeneration lands intact and the segment is still filable (fu11)",
+                  clRegen && !clProc.isFinishingScrimUp && clProc.failedGroupIds.isEmpty
+                      && clRecord?.pagesComplete != false
+                      && clRecord?.pdfURLs.isEmpty == false
+                      && clRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && clSources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 6. …and the refusal is a WINDOW, not a ban: the same call, once the window has closed, does
+            //    its job in full — both panes empty and the sources really do go to the Trash.
+            //
+            //    SCOPE, stated as plainly as Test 21's check 8 had to be. `beginFinalize` has raised the
+            //    collection SHEET by the time this runs, so the state exercised is "finish sheet up, not
+            //    finalizing" — which is NOT a state the operator can press Clear in (the sheet is modal). So
+            //    this is primarily the guard's WIDTH measurement and only secondarily the not-a-ban claim;
+            //    checking the affordance as the operator meets it would have to dismiss the sheet first and
+            //    would lose the width measurement. One artifact of that trade, named rather than hidden: the
+            //    sheet is left up over a now-empty session, which is unreachable in production for the same
+            //    modality reason and is not asserted either way. Deliberately LAST, because it is
+            //    destructive.
+            clProc.clearSession()
+            check("after the window closes the same Clear empties both panes — a window, not a ban",
+                  clSession.photos.isEmpty && clProc.staged.isEmpty && clProc.statuses.isEmpty
+                      && !clProc.isFinalized("L1")
+                      && clSources.allSatisfy { !fm.fileExists(atPath: $0.path) })
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_RECOVERYTEST_OUT"]
