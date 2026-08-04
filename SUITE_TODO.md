@@ -850,6 +850,16 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `Test Files/Herrnstein` fallback exist, so section [3] needs no change. Don't "fix" that half. The owner has to
   run the script once interactively because section [2] `open`s the app (login-Keychain modal → see W21.seed).
   | files: ArchiveProcessor/scripts/test-smoke.sh | S | low | none
+- [ ] **W21.recovery-timeout — `test-recovery.sh`'s 60 s wait is running out of headroom [S · LOW · ops].**
+  Filed 2026-08-03 from `W3.cap-r3-fu2`. The script polls 60× 1 s for the driver's report and then declares a
+  timeout; the green suite now takes **~28 s** and has grown 89 → 113 → 127 → 133 checks in four sessions,
+  several of the newer sections holding a real 10 s settle. Nothing is wrong today, but the margin is halved
+  and the failure mode is bad: a spurious timeout looks exactly like a real hang, and either way it prints no
+  verdict at all (that ambiguity is exactly what left `fu2`'s M4 mutant undiagnosed). Fix is cheap — raise
+  the wait (180 s), or better, poll for process EXIT as well as the report file so a genuine crash/hang is
+  distinguished from "not finished yet" in the message. Same shape in the sibling drivers
+  (`test-manifest-persistence.sh`, `test-merge-safety.sh`, `test-batch-resume.sh`), so fix the pattern once
+  and apply it. | files: ArchiveProcessor/scripts/test-*.sh | S | low | none
 - [ ] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift` [S · LOW].**
   `TimeoutHandle(DispatchWorkItem { [weak self, weak conn] … })` at `CaptureServer.swift:151` captures a
   non-`Sendable` `DispatchWorkItem` in a `@Sendable` context; surfaces only on a full clean build. ⚠️ The file
@@ -1204,18 +1214,33 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > retained second copy of the key rather than syncing it, so there is one reader and nothing left to drift.
 > That also **unblocks `W17.stg1`**, which touches the same `RetainedSegment` (its `(blocked-on: W3.cap-r4)`
 > now resolves). `r3` — the page deleted mid-OCR whose paid call kept running — **shipped 2026-08-03
-> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed**, and the
-> first of its three residuals — **`-fu1`, the started-once guard that outlived its call — shipped
-> 2026-08-03 `1a84d1c`/`54981e0`** (entry in `SUITE_TODO_DONE.md`). This section is now done except the two
-> residuals below plus **`-fu4`**, which `-fu1`'s own adversarial pass found. All of them are in PRE-EXISTING
-> code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu2 [LOW · latent]** `LiveCaptureProcessor.swift:291` — `retryFailed` drops `pageTasks[k]`
-  without `.cancel()`: the exact mutant (M2) `cap-r3` was measured against, in production, 130 lines above
-  the fix. Currently unreachable by construction — a retryable group has already passed `finalizeSegment`'s
-  `:600` clear, and `.ocr`/`.tagging` map to `.processing`, for which `SegmentItem.actions(for:)` returns `[]`
-  — so no test can red it today and both adversarial passes rated it latent, not live. Worth closing for
-  symmetry (no entry dropped without cancelling first) so the next edit that makes retry reachable mid-flight
-  doesn't reopen a paid leak; say in the commit that it is a no-op today and why. | Capture | Tier-2
+> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed**, and two of
+> its three residuals with them — **`-fu1`, the started-once guard that outlived its call, shipped 2026-08-03
+> `1a84d1c`/`54981e0`**, and **`-fu2`, the retry that dropped a page's call without cancelling it, shipped
+> 2026-08-03 `3fdeb00`/`71cc4e6`** (both entries in `SUITE_TODO_DONE.md`). Between them the invariant is now
+> whole: **no `pageTasks` entry leaves the map with a RUNNING call behind it**, on every path that frees one
+> (`finalizeSegment`'s own clear drops without cancelling, correctly — it runs after every one of those pages
+> was awaited). Still open: **`-fu3`** and **`-fu4`**, both behaviour decisions rather than bug fixes, and
+> **`-fu5`**, which `-fu2`'s adversarial pass found — the unenforced `failedGroupIds ⊆ finalizedGroups`
+> invariant several of these latency arguments lean on. All in PRE-EXISTING code rather than in any of the
+> fixes.
+- [ ] **W3.cap-r3-fu5 [LOW · bookkeeping · contingent]** `LiveCaptureProcessor.finalize` /
+  `applyRotationReviewAndFinalize` — **nothing maintains `failedGroupIds ⊆ finalizedGroups`**, and several
+  latency arguments in this subsystem quietly depend on it (most recently `-fu2`'s: a failed group is
+  unreachable-with-a-live-task only because it keeps its late-page cover). `finalize` is not among the seven
+  writers of `failedGroupIds` — it removes a filed group from `finalizedGroups`, `statuses` and `retained`
+  and leaves the failed set alone — and a `.noOutput`/`.incompleteOutput` group IS in `staged` and `retained`
+  (both appended before the label branch), so it does enter the end-of-session rotation review, which
+  replaces the staged record wholesale without reconciling the failed set or the phase. So IF a regeneration
+  ever turns such a record filable (its original failure was transient — a write error, no free space —
+  rather than the missing staging dir, which fails regeneration the same way), the group is filed while still
+  counted failed: the operator gets a "Retry N failed" button with no matching row, and the group has lost
+  its late-page cover, so a phone dropped-ack re-upload can put a LIVE OCR task in front of the bulk retry.
+  **No deterministic trigger was demonstrated** — hence LOW and "contingent", not a reproduced bug — and
+  `-fu2`'s cancel already bounds the money half of the consequence. What wants deciding is whether `finalize`
+  should clear `failedGroupIds` for the groups it files (and the rotation review reconcile it), or whether
+  the invariant should simply be asserted somewhere it can be seen to hold. Found 2026-08-03 by `-fu2`'s
+  adversarial pass; pre-existing. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
   `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
   the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page

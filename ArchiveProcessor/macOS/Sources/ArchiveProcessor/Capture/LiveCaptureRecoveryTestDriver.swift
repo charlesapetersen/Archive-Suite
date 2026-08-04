@@ -43,7 +43,7 @@ import ArchiveCore
 ///  14. A retry (W3.cap-r3-fu2) cancels the calls it is about to make unreachable before it drops them —
 ///      exactly the group being retried, without touching another segment's in-flight call, and without
 ///      eating the fresh calls it buys to replace them. Latent in production (nothing offers a retry for a
-///      segment mid-OCR); the section pins that gate too.
+///      segment mid-OCR, and no such group is in `failedGroupIds`); the section pins both of those too.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1211,12 +1211,27 @@ enum LiveCaptureRecoveryTestDriver {
         //
         // HONEST SCOPE, because this is the one thing a reader could take the wrong way: the defect is LATENT,
         // and this section enters `retryFailed` through the API rather than through the UI **because the UI
-        // cannot reach it**. Every route into a retry runs past `finalizeSegment`'s own clear (`:630`) first —
+        // cannot reach it**. Every route into a retry runs past `finalizeSegment`'s own `pageTasks` clear first —
         // the bulk button passes `failedGroupIds`, which only `markFailed` writes, and `markFailed` runs after
         // that clear; the per-item menu offers `.retry` only for `.failed`/`.succeededNoText`/
-        // `.succeededPlaceholderImage`, never for a segment mid-OCR. Check 2 below PINS that gate, so the day
-        // an edit makes a retry reachable mid-flight this driver says so out loud. What the section proves is
-        // that the mechanism is right whenever it IS reached: cancel first, drop second, exactly this group. ---
+        // `.succeededPlaceholderImage`, never for a segment mid-OCR. Check 2 PINS BOTH legs of that gate — the
+        // per-item menu AND `failedGroupIds` — so the day an edit makes a retry reachable mid-flight this
+        // driver says so out loud. (The `failedGroupIds` leg is the fragile one: nothing enforces that a
+        // failed group stays in `finalizedGroups`, which is `W3.cap-r3-fu5`.) What the section proves is that
+        // the mechanism is right whenever it IS reached: cancel first, drop second, exactly this group.
+        //
+        // NON-VACUITY, measured (2026-08-03), four mutants of the loop:
+        //   M1 the pre-fix drop-without-cancel                   → 1 RED, the cancel check alone.
+        //   M2 a wholesale `for t in pageTasks.values { t.cancel() }` ahead of the same per-group drop
+        //                                                        → 1 RED, the scope check alone.
+        //   M3 the cancel moved BELOW the re-ingest              → 2 RED, the cancel + fresh-call checks.
+        //   M4 the cancel WITHOUT the `= nil`                    → the fresh-call check RED (the started-once
+        //      guard refuses the re-ingest, so nothing replaces the entry), and then the run emits NOTHING
+        //      further and the harness kills it at 60 s. Recorded as observed, ×3: by the clock the bounded
+        //      10 s settle below should have let the staging check report FAIL with ~20 s to spare (the green
+        //      suite finishes in ~28 s), so that state stops making progress for a reason this pass did not
+        //      diagnose. It is not a crash — the app is alive when the harness SIGTERMs it.
+        // Check 6 is a guard against over-reach, not a second catcher — see its own note. ---
         if isolatedBackup {
             // Same isolation as Tests 16/17, load-bearing for the same reason: `CaptureSession.init` adopts
             // the newest backup session that still holds unprocessed photos, so inherited photos would put
@@ -1290,14 +1305,22 @@ enum LiveCaptureRecoveryTestDriver {
                       && oldT1?.isCancelled == false && oldT2?.isCancelled == false
                       && u1.map { ruProc._recoveryTestHasPageTask(for: $0) } == true)
 
-            // 2. The reachability claim this item rests on, pinned rather than asserted in prose: a segment in
-            //    this state renders as `.processing`, and the shared per-item menu offers it NOTHING. If a
-            //    future edit offers a retry here, this check fails — and whoever sees it should re-read the
-            //    comment on `retryFailed`'s cancel loop, which is what keeps that edit safe.
+            // 2. The reachability claim this item rests on, pinned rather than asserted in prose. It has TWO
+            //    independent legs and both are checked here: a segment in this state renders as `.processing`,
+            //    for which the shared per-item menu offers NOTHING; and it is absent from `failedGroupIds`,
+            //    which is the entire input of the bulk "Retry N failed" button. If a future edit reaches this
+            //    loop through either one, the matching check fails — and whoever sees it should re-read the
+            //    comment on `retryFailed`'s cancel loop, which is what keeps that edit safe. Scope of the
+            //    second leg, since it asserts an absence: it pins that a group in THIS state is not in the
+            //    bulk retry's input. It cannot see the lifecycle path of `W3.cap-r3-fu5` — a group that fails,
+            //    is later filed by the rotation review, and stays in `failedGroupIds` after losing its
+            //    late-page cover — because nothing in this session ever fails.
             let midOCR = ruProc.statuses.first { $0.id == "U1" }
             check("no retry is offered for a segment mid-OCR — the reason the drop-without-cancel was latent",
                   midOCR?.phase == .ocr
                       && midOCR.map { SegmentItem.actions(for: SegmentItem.state(for: $0)).isEmpty } == true)
+            check("...and the bulk retry cannot reach it either: a mid-OCR group is in no failed set",
+                  !ruProc.failedGroupIds.contains("U1") && !ruProc.failedGroupIds.contains("U2"))
 
             // 3. THE FIX. The retry replaces every one of this group's entries, so the calls it drops can
             //    never be read again — they have to be cancelled on the way out.
@@ -1320,9 +1343,16 @@ enum LiveCaptureRecoveryTestDriver {
                       && newT1?.isCancelled == false && newT2?.isCancelled == false
                       && newT1 != oldT1 && newT2 != oldT2)
 
-            // 6. Measured on the OUTPUT rather than the mechanism: the re-finalize the retry triggers reads
-            //    the NEW calls, so the segment is staged with both pages of text. A cancel placed after the
-            //    re-ingest (the plausible wrong edit) would be cancelling the calls finalize is about to read.
+            // 6. The retry's own product, measured on the OUTPUT: the re-finalize it triggers reads the NEW
+            //    calls, so the segment stages with both pages of text — the mechanism must not cost the retry
+            //    the thing it exists to do. Stated honestly, this check is a guard against over-reach rather
+            //    than a second catcher of the fix: the $0 stub is cancellation-blind BY DESIGN (it has to park
+            //    on the gate for the checks above, and a cancelled stub still returns its text), so an
+            //    after-the-re-ingest cancel does not show up here — check 5 is what kills that one. The drop
+            //    is what this check is aimed at (cancel-without-`= nil` leaves the old entry in place, the
+            //    started-once guard refuses the re-ingest, and the group can never stage again) — but M4 is
+            //    also the mutant that stops the run before this line reports, so in practice check 5 catches
+            //    that one too. No measured mutant reddens this check alone.
             let restaged = await ruSettle { ruProc.staged.contains { $0.groupId == "U1" } }
             check("...and the retried segment stages with both pages of the OCR it just paid for",
                   restaged && textPages("U1") == 2)

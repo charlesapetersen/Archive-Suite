@@ -299,18 +299,29 @@ final class LiveCaptureProcessor: ObservableObject {
             //
             // It is a NO-OP as the code stands, and that is worth stating rather than implying a live bug was
             // fixed. No group that reaches here can still hold a running call: `finalizeSegment` awaits every
-            // page and clears these same entries (`:630`) BEFORE `markFailed` adds the group to
+            // page and clears these same entries (its `// free memory` loop, below) BEFORE `markFailed` adds it to
             // `failedGroupIds` — the bulk button's whole input — and the per-item menu offers a retry only for
             // `.failed`/`.succeededNoText`/`.succeededPlaceholderImage`, all of them past that same clear
             // (`.ocr`/`.tagging` render as `.processing`, whose `actions(for:)` is `[]`). A page arriving for
             // such a group afterwards cannot start one either: the group is still in `finalizedGroups`, so
-            // `photoIngested` takes the late-page branch. Nor is this the mid-finalize trade `photoRemoved`
-            // carves out for — a group suspended inside finalize is `.tagging`, so it is unreachable here too,
-            // and if it ever became reachable this line already lost that page (finalize reads the entry we
-            // just dropped as "OCR not started"), which the cancel makes visible rather than worse.
+            // `photoIngested` takes the late-page branch. That last leg rests on `failedGroupIds` never
+            // outliving `finalizedGroups`, which nothing enforces — see `W3.cap-r3-fu5`, filed by this fix's
+            // adversarial pass.
             //
-            // The symmetry is the point: no entry leaves `pageTasks` without its call being cancelled first,
-            // so the next edit that makes a retry reachable mid-flight cannot inherit a paid leak.
+            // ⚠️ If a future edit DOES make this reachable while a `finalizeSegment` is suspended on the group,
+            // the fix is to refuse the retry (`guard !finalizedGroups.contains(gid)`), NOT to copy
+            // `photoRemoved`'s mid-finalize carve-out. Two reasons. First, the cancel is genuinely worse than
+            // the drop for the ONE page finalize is parked on: finalize re-reads `pageTasks` per page, so
+            // dropping costs it only the pages it has not reached yet, but that page's Task was dereferenced
+            // before it suspended and cancelling destroys a call it already bought (the trade Test 17
+            // scenario 5 measures). Second, `finalizedGroups.remove(gid)` above plus the `segmentResolved`
+            // below would start a SECOND `finalizeSegment` for the group while the first is still suspended,
+            // and both would `staged.append` — a carve-out here would leave that untouched.
+            //
+            // The symmetry is the point: no entry leaves `pageTasks` with a RUNNING call behind it. (The
+            // `// free memory` loop drops without cancelling, and correctly so — it runs after finalize has
+            // awaited every one of those pages, so there is nothing left to cancel.) That way the next edit
+            // which makes a retry reachable mid-flight cannot inherit a paid leak.
             for p in group.photos {
                 let k = PageKey(p)
                 pageTasks[k]?.cancel()

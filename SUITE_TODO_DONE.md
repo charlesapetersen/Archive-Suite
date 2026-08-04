@@ -3280,6 +3280,56 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu2 [LOW · latent] — ✅ DONE 2026-08-03** (`3fdeb00` fix; `71cc4e6` test; this commit,
+  mutants + trackers). `retryFailed` dropped every page's `pageTasks` entry without cancelling it — the exact
+  mutant (M2) `cap-r3` was measured against, sitting in production 130 lines above that fix. **Shipped as the
+  no-op the item asked for, and the commit says so** rather than implying a live leak was closed. The
+  latency was re-derived here rather than taken on trust, and it holds on every route: `finalizeSegment`
+  awaits every page and clears these same entries (its `// free memory` loop) BEFORE `markFailed` inserts the
+  group into `failedGroupIds`, which is the bulk button's whole input; the only two writers of
+  `failedGroupIds` are `markFailed` and `retryFailed`'s own removal; the per-item menu offers a retry only for
+  `.failed`/`.succeededNoText`/`.succeededPlaceholderImage`, never for `.processing`, which is what
+  `.ocr`/`.tagging` render as; and a page arriving for such a group afterwards cannot start a call either,
+  because `finalize` drops only FILED groups out of `finalizedGroups`, so a failed group keeps its late-page
+  cover for the whole session. What the fix buys is the **invariant**, now whole across every path that frees
+  an entry: no `pageTasks` entry leaves the map without its call being cancelled first — so the next edit that
+  makes a retry reachable mid-flight cannot inherit the paid leak by construction. Stated with the qualifier
+  the adversarial pass insisted on: no entry leaves `pageTasks` with a **running** call behind it —
+  `finalizeSegment`'s own clear drops without cancelling and is right to, because it runs after every one of
+  those pages was awaited.
+  New driver **Test 18** (`test-recovery.sh` **127 → 133**) parks three pages on the $0 stub's gate — two of
+  the group to be retried, one of another group — and calls the REAL `retryFailed`; the gate is what stops
+  every check being vacuous (a finished Task cannot be shown to have been cancelled), and
+  `_recoveryTestOCRTasks` is the only vantage that tells a genuine `cancel()` from a silent drop. It enters
+  through the API and its header says so, because the UI cannot reach it — and check 2 **pins BOTH legs of
+  that gate**: the per-item menu (mapping the live mid-OCR status through the real
+  `SegmentItem.state(for:)`/`actions(for:)` and requiring it to be empty) and `failedGroupIds`, the bulk
+  button's whole input. The second leg was added by the adversarial pass, which pointed out that pinning only
+  the menu left the fragile half unpinned. **Four mutants measured:** M1 the pre-fix drop-without-cancel →
+  **1 red**, the fix's own check alone · M2 a wholesale `for t in pageTasks.values { t.cancel() }` ahead of
+  the same per-group drop → **1 red**, the scope check alone · M3 the cancel moved BELOW the re-ingest →
+  **2 red** · M4 the cancel without the `= nil` → the fresh-call check red and then **nothing further at
+  all**, the harness killing the run at 60 s. M4 is **recorded as observed (×3) and not explained**: by the
+  clock the bounded 10 s settle should have let the staging check report FAIL with ~20 s to spare (the green
+  suite takes ~28 s), so that state stops making progress for a reason this pass did not diagnose; it is not
+  a crash (the app is alive when SIGTERMed). **Honest limit, in the section header too:** the output check (6)
+  is a guard against over-reach, not a second catcher — the $0 stub is cancellation-blind by design, so an
+  after-the-re-ingest cancel shows up in check 5, and no measured mutant reddens check 6 alone.
+  **Tier-2: an independent adversarial pass** (separate context, told to refute) confirmed the unreachability
+  on every route it tried and found no path on which the shipped code behaves wrongly — but it corrected the
+  fix's own commentary twice, and both corrections shipped: (a) the claim that a cancel here would be no worse
+  than the drop even if it became reachable is **wrong for the one page finalize is parked on** — finalize
+  dereferenced that Task before suspending, so the drop costs it nothing and only the cancel destroys it
+  (exactly what Test 17 scenario 5 measures); the comment now says the right future fix is refusing the retry
+  while `finalizedGroups.contains(gid)`, not copying `photoRemoved`'s carve-out — which would also leave
+  `retryFailed`'s own `finalizedGroups.remove` + `segmentResolved` free to start a SECOND `finalizeSegment`
+  that double-appends to `staged`; and (b) the symmetry claim needed the "running" qualifier above. It also
+  filed the residual **`W3.cap-r3-fu5`** — the `failedGroupIds ⊆ finalizedGroups` invariant that this item's
+  own latency argument leans on is maintained by nothing.
+  `test-recovery.sh` ALL PASS 134 (×5 runs across the pass's changes); manifest-persistence 109,
+  multipage-reocr 29, merge-safety, segment-json and filerelay 10/10 all green; build clean, no new warnings.
+  No migration written because there is nothing to migrate. Leaves `-fu3`, `-fu4` and `-fu5` open.
+
 - [x] **W3.cap-r3-fu1 [MED] — ✅ DONE 2026-08-03** (`1a84d1c` fix; `54981e0` test; this commit, mutants +
   trackers). The filed premise held on all three paths. `photoIngested`'s W3.cap-r2 started-once guard read a
   SECOND record of its own — a `startedPages: Set<PageKey>` inserted beside the OCR Task — and that copy
