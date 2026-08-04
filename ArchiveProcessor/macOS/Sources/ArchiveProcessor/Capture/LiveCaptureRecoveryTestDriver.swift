@@ -897,7 +897,8 @@ enum LiveCaptureRecoveryTestDriver {
                 // The started-once guard (W3.cap-r2) has to be retired WITH the task: this page has no OCR
                 // any more, so if the phone re-sends it, it must be free to buy a new call. Leaving the guard
                 // armed over an absent task would file the page as "OCR not started" instead — silently
-                // text-less. This is also the behavioural read of `startedPages`, which is private.
+                // text-less. This is also the behavioural read of the started-once guard, which is private
+                // (`pageTasks`, since W3.cap-r3-fu1 retired the second copy that used to shadow it).
                 r3Send("R1", 1)
                 check("...so a later arrival of that same page is free to buy its own call",
                       photo("R1", 1) != nil && paidStarts() == 2)

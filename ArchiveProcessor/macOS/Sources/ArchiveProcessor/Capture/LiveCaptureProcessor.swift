@@ -115,8 +115,11 @@ final class LiveCaptureProcessor: ObservableObject {
         init(_ photo: CapturedPhoto) { groupId = photo.groupId; seq = photo.seq }
     }
 
+    /// Every page's OCR call, and — since W3.cap-r3-fu1 — the ONLY record of which pages have started one.
+    /// There used to be a second one (a `startedPages: Set<PageKey>` inserted beside the Task), and it went
+    /// stale the way a duplicated fact does: three paths freed the Task and left the key armed. See the guard
+    /// in `photoIngested` for what that cost and why presence-of-Task is the right question to ask.
     private var pageTasks: [PageKey: Task<OCRResult, Never>] = [:]
-    private var startedPages: Set<PageKey> = []
     private var finalizedGroups: Set<String> = []
     /// Bumped by `clearSessionState()`. A `finalizeSegment` that SUSPENDED at an `await` before the operator
     /// hit Clear captures this at its start and re-checks it after each await; if it changed, the session was
@@ -288,7 +291,7 @@ final class LiveCaptureProcessor: ObservableObject {
             failedGroupIds.remove(gid)
             staged.removeAll { $0.groupId == gid }
             retained[gid] = nil
-            for p in group.photos { let k = PageKey(p); startedPages.remove(k); pageTasks[k] = nil }
+            for p in group.photos { pageTasks[PageKey(p)] = nil }
             groupOCROverride[gid] = override    // nil clears any prior override
             setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
             setPhase(gid, .ocr)
@@ -328,8 +331,25 @@ final class LiveCaptureProcessor: ObservableObject {
     /// no tag card) also finalize right away.
     func photoIngested(_ photo: CapturedPhoto) {
         let key = PageKey(photo)
+        // W3.cap-r3-fu1 — the started-once guard asks `pageTasks`, not a second set of its own. It used to ask
+        // a `startedPages` set, and that set outlived the work it was guarding on three paths that free the
+        // Task without retiring the key: `finalizeSegment` clears `pageTasks` for the pages it staged,
+        // `finalize`'s straggler / partial branches leave keys armed for groups they just dropped out of
+        // `finalizedGroups`, and `photoRemoved`'s mid-finalize carve-out deliberately keeps the key. A page
+        // the phone re-sent after its group finalized therefore returned HERE, above the late-page branch
+        // below: it bought no call, raised no warning, and — once `finalize` had filed the group and dropped
+        // it from `finalizedGroups` — a later finalize read `pageTasks[key] == nil` as "OCR not started" and
+        // filed a silently text-less archival document.
+        //
+        // Presence-of-Task is the question the guard was always for, and it is strictly stronger than
+        // started-ness for the whole life of a page: a COMPLETED Task stays in the map until finalize clears
+        // it, so W3.cap-r2's dedup of a dropped-ack re-upload is unchanged, and the mid-finalize carve-out
+        // still de-duplicates a re-arrival rather than letting it overwrite the entry finalize is suspended
+        // on. That last part is exactly why retiring the key inside the carve-out would have been the WRONG
+        // fix — it would have let a re-arrival double-buy the page finalize was about to read. A page with no
+        // Task and no finalize behind it is a page whose OCR is genuinely gone, and it is free to buy one.
         guard session.processingMode == .live, let config,
-              !startedPages.contains(key) else { return }   // not live / dup / resume → silent
+              pageTasks[key] == nil else { return }   // not live / this page's call is already ours → silent
         if finalizedGroups.contains(photo.groupId) {
             // A page arrived for a document already finalized on the Mac — e.g. the operator kept shooting the
             // SAME document after it was force-completed at Finish, instead of starting a new segment. It can't
@@ -337,7 +357,6 @@ final class LiveCaptureProcessor: ObservableObject {
             session.statusMessage = "A late page arrived for an already-finished document — kept in the Backup Folder, not this collection. Tap Box or End segment to start a NEW segment."
             return
         }
-        startedPages.insert(key)
 
         // New capture arrived while a Finish is pending: treat it as another segment to include — the
         // pending finish KEEPS waiting and will complete once this segment is tagged + processed too (it's
@@ -419,18 +438,19 @@ final class LiveCaptureProcessor: ObservableObject {
     /// anything — and it cannot strand the entry either, because finalize's only other exits are the B8
     /// clear-generation guards and `clearSessionState` empties `pageTasks` wholesale.
     ///
-    /// `startedPages` is dropped alongside the task, exactly as `retryFailed` does when it re-runs a group:
-    /// this page's OCR is now GONE, so if the same `(groupId, seq)` ever arrives again it has to be allowed
-    /// to buy a call. Leaving W3.cap-r2's started-once guard armed for a page with no task would spend
-    /// nothing and instead file that page as "OCR not started" — a silently text-less archival document,
-    /// which is the worse of the two failures. The reclassify path can't reach that trade at all: both
-    /// callers skip `rg == groupId`, so the key retired here is never the key just ingested.
+    /// Dropping the entry retires the started-once guard with it (W3.cap-r3-fu1 made `pageTasks` the only
+    /// record of it): this page's OCR is now GONE, so if the same `(groupId, seq)` ever arrives again it has
+    /// to be allowed to buy a call. Leaving W3.cap-r2's guard armed over an absent task would spend nothing
+    /// and instead file that page as "OCR not started" — a silently text-less archival document, which is the
+    /// worse of the two failures. The reclassify path can't reach that trade at all: both callers skip
+    /// `rg == groupId`, so the key retired here is never the key just ingested. The mid-finalize carve-out
+    /// above keeps the entry, so it keeps the guard too — a re-arrival in that window is de-duplicated rather
+    /// than allowed to overwrite the Task finalize is suspended on.
     func photoRemoved(_ photo: CapturedPhoto) {
         guard session.processingMode == .live, !finalizedGroups.contains(photo.groupId) else { return }
         let key = PageKey(photo)
         pageTasks[key]?.cancel()
         pageTasks[key] = nil
-        startedPages.remove(key)
     }
 
     /// A document segment's Mac tag card was resolved (Save/Skip) → finalize it.
@@ -1223,7 +1243,12 @@ final class LiveCaptureProcessor: ObservableObject {
                 // Everything landed and nothing arrived behind it → staging holds nothing recoverable.
                 // Trash it and reset the session.
                 CaptureSession.trashOrRemove(stagingDir)
-                self.startedPages.removeAll()
+                // No started-once state to reset here since W3.cap-r3-fu1: `pageTasks` is that record, and
+                // the filed groups' entries were already freed by their own `finalizeSegment`. The set this
+                // line used to empty was emptied WHOLESALE, which also disarmed any page still mid-OCR in a
+                // group this batch never planned — so a re-upload of one could buy its call twice. Asking
+                // presence-of-Task keeps that page de-duplicated and still lets a genuinely task-less one
+                // (every page of a filed group) buy the call it needs.
                 self.rotationReviewPages.removeAll()
                 self.currentCollectionKey = "__unfiled__"
                 self.finalizeSummary = outcome.summary
@@ -1298,7 +1323,6 @@ final class LiveCaptureProcessor: ObservableObject {
         staged.removeAll()
         failedGroupIds.removeAll()
         finalizedGroups.removeAll()
-        startedPages.removeAll()
         retained.removeAll()
         groupCollectionKey.removeAll()
         groupOCROverride.removeAll()
