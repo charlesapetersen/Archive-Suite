@@ -112,6 +112,16 @@ bash "$ROOT/ops/autonomous/check-tracker-sync.sh" || true
 # See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
 
+# Context budget (2026-08-04) — the ONE thing nothing was watching. Owner: "token use is the real
+# bottleneck for development, not build speed." A fresh session's dominant fixed cost is the orientation
+# read (plan + tracker + app guide + resume prompt), and on 2026-08-04 AUTONOMOUS_PLAN.md had reached
+# 462 KB / ~117k tokens while its own compactor reported "no-op" every cycle for weeks. Nothing failed,
+# nothing warned — the docs just got bigger and every session silently paid. This step is free (pure
+# shell, zero tokens), which is the point: context is the expensive thing to spend and the cheap thing to
+# measure. It is a REAL step (not step_skippable): being over budget is a fact, never inconclusive.
+# When it REDs, fix the DOCUMENT, not the budget — per-file remedies are in context-budget.sh's header.
+step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
+
 echo
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"

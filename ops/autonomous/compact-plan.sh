@@ -91,6 +91,15 @@ if [ "$N" -le "$TRIGGER" ] && [ "$OVER_BYTES" = 0 ]; then
   echo "compact-plan: $N Session Log entries <= trigger $TRIGGER and ${REGB}B <= budget ${SL_MAX_BYTES}B — no-op"; exit 0
 fi
 
+# ⚠ ANTI-SILENT-FAILURE ALARM. If the region is over budget but we detected ~no entries, the entry-header
+# pattern no longer matches how sessions write this section — which is EXACTLY how this compactor no-op'd
+# for weeks before 2026-08-04. Say so loudly; a silent "nothing to cut" is what hid the last two bugs.
+if [ "$OVER_BYTES" = 1 ] && [ "$N" -lt 2 ]; then
+  echo "compact-plan: ⚠⚠ ALARM — Session Log is ${REGB}B (budget ${SL_MAX_BYTES}B) but only $N entries were DETECTED."
+  echo "compact-plan:    The entry-header rule no longer matches the authored format. FIX THE DETECTOR in this"
+  echo "compact-plan:    script — do NOT raise the budget. (health-gate's context-budget.sh will fail on the growth.)"
+fi
+
 # Effective keep: walk entries NEWEST-FIRST accumulating whole-entry bytes, and keep only those that fit the
 # byte budget (clamped to [1, KEEP]). So a single 37 KB entry cannot hold the whole section hostage.
 EKEEP="$KEEP"
@@ -195,6 +204,7 @@ echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N)
 # so a column-0 '## ' pasted mid-body (a quoted H2 / diff hunk, not blank-preceded) can NOT truncate the region
 # early. A blank-preceded '## ' inside a body (rare) could still end it → under-rotation, never data loss
 # (conservation guarantees every line lands in plan or archive). Same rule mirrored in the count and the split.
+(   # subshell: Pass 2's internal `exit`s must not skip Pass 3 (they silently did when Pass 3 landed)
 MH=$(grep -nE '^## Morning Review' "$PLAN" | head -1 | cut -d: -f1)
 [ -n "$MH" ] || { echo "compact-plan: no '## Morning Review' header — skip MR"; exit 0; }
 
@@ -221,6 +231,14 @@ MR_OVER=0
 [ "$MR_MAX_BYTES" -gt 0 ] && [ "$MREGB" -gt "$MR_MAX_BYTES" ] && MR_OVER=1
 if [ "$MN" -le "$MR_TRIGGER" ] && [ "$MR_OVER" = 0 ]; then
   echo "compact-plan: $MN Morning Review entries <= trigger $MR_TRIGGER and ${MREGB}B <= budget ${MR_MAX_BYTES}B — no-op"; exit 0
+fi
+
+# ⚠ ANTI-SILENT-FAILURE ALARM (same rationale as Pass 1 — Pass 2 had this exact failure: it wanted a bare
+# column-0 '**[' while the real section uses '### <date>' H3 headers and '- **[' bullets, so it saw MN=0
+# entries in an 81 KB section and reported a clean no-op).
+if [ "$MR_OVER" = 1 ] && [ "$MN" -lt 2 ]; then
+  echo "compact-plan: ⚠⚠ ALARM — Morning Review is ${MREGB}B (budget ${MR_MAX_BYTES}B) but only $MN entries were DETECTED."
+  echo "compact-plan:    The entry-header rule no longer matches the authored format. FIX THE DETECTOR in this script."
 fi
 
 # Effective keep from the byte budget, newest-first (this section is already prepend-ordered), clamped to
@@ -294,3 +312,93 @@ cp "$PLAN" "$PLAN.bak" || { rm -f "$MTMP" "$MDROP"; exit 1; }
 mv "$MTMP" "$PLAN"
 rm -f "$MDROP"
 echo "compact-plan: archived $MR_CUT Morning Review entries (newest $MR_EKEEP kept of $MN); plan $L_ORIG -> $L_KEPT lines; archive=$MR_ARCHIVE"
+) || echo "compact-plan: Pass 2 (Morning Review) exited nonzero — plan left untouched by Pass 2 (see message above)"
+
+# ===== Pass 3: WORK QUEUE done-item archival (2026-08-04) =====
+# WHY: the queue's job is the ORDER and the checkbox, and a `[x]` item contributes nothing to order — but
+# 218 checkbox lines (173 of them `[x]`, with fat DONE write-ups) were sitting inline, 91 KB / ~23k tokens
+# that every session read. The convention already says shipped work moves to `SUITE_TODO_DONE.md`; nothing
+# enforced it for the plan's mirror.
+#
+# THE SAFETY RULE, and it is not optional: `next-queue-item.sh` builds its tag->state map from PLAN +
+# SUITE_TODO + SUITE_TODO_DONE, and a tag it cannot find AT ALL reads as NOT done — which would block any
+# dependent forever. So an item is archived from here ONLY IF its tag is independently recorded `[x]` in
+# SUITE_TODO.md or SUITE_TODO_DONE.md. Resolvability is then preserved BY CONSTRUCTION, not by inspection.
+# (Verified when this landed: of the 28 `(blocked-on: …)` prerequisites referenced in the queue, ZERO were
+# among the 75 items whose done-state existed only in the plan — those 75 are a real tracker gap, and Pass 3
+# deliberately LEAVES them rather than stranding a future dependent.)
+#
+# Same contract as Passes 1-2: region-bounded, whole-span moves, validate-before-replace, .bak, archive-not-
+# delete, line conservation, idempotent.
+QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QUEUE_ARCHIVE.md}"
+WQ_MAX_BYTES="${WQ_MAX_BYTES:-120000}"   # WORK QUEUE region byte budget; 0 disables Pass 3
+
+(
+[ "$WQ_MAX_BYTES" -gt 0 ] || { echo "compact-plan: WQ pass disabled (WQ_MAX_BYTES=0)"; exit 0; }
+QH=$(grep -nE '^## WORK QUEUE' "$PLAN" | head -1 | cut -d: -f1)
+[ -n "$QH" ] || { echo "compact-plan: no '## WORK QUEUE' header — skip WQ"; exit 0; }
+TODOF="$REPO/SUITE_TODO.md"; DONEF="$REPO/SUITE_TODO_DONE.md"
+[ -f "$TODOF" ] || { echo "compact-plan: no SUITE_TODO.md — skip WQ (cannot prove done-state)"; exit 0; }
+[ -f "$DONEF" ] || DONEF=/dev/null
+
+QREGB=$(awk -v h="$QH" '
+  { if (NR==h) { inreg=1; prevblank=0; next }
+    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg) bytes += length($0)+1
+    prevblank = ($0 ~ /^[[:space:]]*$/) } END { print bytes+0 }' "$PLAN")
+[ "$QREGB" -gt "$WQ_MAX_BYTES" ] || { echo "compact-plan: WORK QUEUE ${QREGB}B <= budget ${WQ_MAX_BYTES}B — no-op"; exit 0; }
+
+# Tags recorded [x] in the trackers (the ONLY items Pass 3 may touch).
+SAFE=$(awk '
+  match($0, /^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*/) {
+    rest = substr($0, RLENGTH+1); sub(/^\*+[[:space:]]*/, "", rest)
+    if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) print substr(rest, 1, RLENGTH)
+  }' "$TODOF" "$DONEF" | sort -u)
+[ -n "$SAFE" ] || { echo "compact-plan: WQ no tracker-recorded done tags — no-op"; exit 0; }
+
+QTMP=$(mktemp) || exit 1; QDROP=$(mktemp) || { rm -f "$QTMP"; exit 1; }
+SAFEF=$(mktemp) || { rm -f "$QTMP" "$QDROP"; exit 1; }
+printf '%s\n' "$SAFE" > "$SAFEF"
+
+# Move the WHOLE span of each safe [x] item (its line + continuation lines) to the archive.
+awk -v h="$QH" -v drop="$QDROP" -v safef="$SAFEF" '
+  BEGIN { while ((getline t < safef) > 0) if (t != "") safe[t]=1 }
+  function is_cb(l) { return l ~ /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ }
+  {
+    if (NR == h) { inreg=1; prevblank=0; print; next }
+    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg) {
+      if (is_cb($0)) {
+        dropping = 0
+        if ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[[xX]\]/) {
+          rest = $0; sub(/^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*/, "", rest)
+          sub(/^\*+[[:space:]]*/, "", rest)
+          if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/) && (substr(rest,1,RLENGTH) in safe)) dropping = 1
+        }
+      } else if ($0 ~ /^[[:space:]]*$/ || /^## / || /^### / || /^> /) dropping = 0
+      if (dropping) { print >> drop; prevblank = ($0 ~ /^[[:space:]]*$/); next }
+    }
+    print
+    prevblank = ($0 ~ /^[[:space:]]*$/)
+  }
+' "$PLAN" > "$QTMP" || { rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+
+for a in '^## PRIME DIRECTIVES' '^## RESUME PROTOCOL' '^## WORK QUEUE' '^## Session Log' '^RUN STATUS:'; do
+  grep -qE "$a" "$QTMP" || { echo "compact-plan: WQ VALIDATION FAIL ($a missing) — abort, plan untouched"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+done
+QO=$(awk 'END{print NR}' "$PLAN"); QK=$(awk 'END{print NR}' "$QTMP"); QD=$(awk 'END{print NR}' "$QDROP")
+[ "$((QK + QD))" = "$QO" ] || { echo "compact-plan: WQ line conservation FAIL ($QK+$QD != $QO) — abort, plan untouched"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+[ "$QD" -gt 0 ] || { echo "compact-plan: WQ nothing archivable (all remaining [x] are recorded ONLY in the plan) — no-op"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 0; }
+# Every OPEN item must survive untouched — Pass 3 must never remove actionable work.
+OB=$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]' "$PLAN"); OA=$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]' "$QTMP")
+[ "$OB" = "$OA" ] || { echo "compact-plan: WQ open-item count changed ($OB -> $OA) — abort, plan untouched"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+
+cp "$PLAN" "$PLAN.bak" || { rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+{
+  echo ""
+  echo "<!-- $(date -u +%Y-%m-%dT%H:%MZ) archived completed WORK QUEUE items from AUTONOMOUS_PLAN.md (done-state recorded in SUITE_TODO/_DONE; ${QREGB}B region vs ${WQ_MAX_BYTES}B budget) -->"
+  cat "$QDROP"
+} >> "$QUEUE_ARCHIVE" || { echo "compact-plan: WQ archive write failed — abort, plan untouched"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
+mv "$QTMP" "$PLAN"; rm -f "$QDROP" "$SAFEF"
+echo "compact-plan: archived $QD WORK QUEUE line(s) of completed items; plan $QO -> $QK lines; archive=$QUEUE_ARCHIVE"
+) || echo "compact-plan: Pass 3 (WORK QUEUE) exited nonzero — plan left untouched by Pass 3 (see message above)"

@@ -600,11 +600,41 @@ per-session startup cost. `compact-plan.sh` runs **between cycles** (lock releas
 never race a session's append) and trims two growing sections back, archiving the overflow to recoverable
 files (the plan is gitignored, so `.bak` + the archives are the recovery points, not git):
 
-- **Pass 1 — `## Session Log`** (chronological, oldest-first): keep the last `KEEP=12` entries, archive older
-  ones to `AUTONOMOUS_SESSION_LOG_ARCHIVE.md` (trigger: >40 entries).
-- **Pass 2 — `## Morning Review`** (WS8, 2026-07-17; **newest-first** — each session prepends a `**[date]`
-  entry at the top): keep the newest `MR_KEEP=15` entries inline, archive the older tail to
-  `AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md` (trigger: >25 entries). Halved a real 3,136-line plan to 1,473.
+- **Pass 1 — `## Session Log`** (**newest-first** — sessions prepend): keep the newest `KEEP=6`, archive the
+  older tail to `AUTONOMOUS_SESSION_LOG_ARCHIVE.md` (trigger: >`TRIGGER=10` entries **or** region >`SL_MAX_BYTES=30000`).
+- **Pass 2 — `## Morning Review`** (WS8, 2026-07-17; **newest-first**): keep the newest `MR_KEEP=8` inline,
+  archive the older tail to `AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md` (trigger: >`MR_TRIGGER=12` **or**
+  >`MR_MAX_BYTES=30000`).
+- **Pass 3 — `## WORK QUEUE`** (2026-08-04): archive **completed `[x]`** items (the queue's job is the ORDER;
+  a done item adds nothing to it) to `AUTONOMOUS_WORK_QUEUE_ARCHIVE.md` once the region exceeds
+  `WQ_MAX_BYTES=120000`. ⚠️ **Only items whose tag is independently recorded `[x]` in `SUITE_TODO.md` or
+  `SUITE_TODO_DONE.md` are eligible** — `next-queue-item.sh` reads a *missing* tag as NOT done, so stripping a
+  plan-only `[x]` would block any future dependent forever. Resolvability is preserved **by construction**, and
+  Pass 3 deliberately leaves plan-only entries behind (those are a tracker gap to fix, not a compaction target).
+
+### 2026-08-04 — this compactor silently no-op'd for weeks. Read this before editing it.
+
+Owner: *"token use is the real bottleneck for development, not build speed."* The plan had reached **462 KB /
+~117k tokens** of per-session orientation cost while `compact-plan.sh` printed "no-op" every cycle. Four bugs:
+
+1. **Format drift disabled Pass 1.** Sessions write Session Log entries as bare date-led lines
+   (`2026-08-04 W3.cap-r3-fu9 \`sha\` — result`), not the `- ` bullets Pass 1 counted. 14 of 44 entries were
+   visible; the other 1,059 lines sat *before* the first `- ` as untouchable "preamble".
+2. **Pass 1 ran backwards.** The section is newest-first, but Pass 1 dropped "the FIRST `$CUT` (oldest)". The
+   header text said *"append"*, which is how the mismatch survived. Fixing (1) alone would have archived the
+   **32 newest** entries.
+3. **Pass 1 tore multi-line entries** — it moved only `/^- /` lines, orphaning continuations.
+4. **Pass 2 was broken the same way as (1)**: it wanted a bare column-0 `**[`, but the real section uses
+   `### <date>` H3 headers and `- **[…]` bullets → `MN=0` in an 81 KB section.
+
+**The lesson, encoded in the script:** a count-based trigger is a *proxy*; bytes are the cost. Both passes now
+also fire on a **byte budget**, and each prints a loud `⚠⚠ ALARM` when a region is over budget but ~no entries
+were detected — because a silent "nothing to cut" is precisely what hid all four bugs. **Never re-collapse an
+alarm into a quiet no-op**, and if you change an entry-header rule, re-check it against the *authored* format.
+
+**Enforcement lives outside this script too:** `context-budget.sh` (run by the health gate, free) fails the
+gate when any orientation document exceeds its budget — so if a detector ever breaks again, the resulting
+growth REDs the gate instead of quietly costing tokens. When it fails, **fix the document, not the budget.**
 
 Both passes are **safe by construction**: region-bounded (never touch DIRECTIVES / RESUME / WORK QUEUE / RUN
 STATUS), they build the result in a temp file and **validate every live anchor survives + the pre-region is
