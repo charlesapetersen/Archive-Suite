@@ -3280,6 +3280,70 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 
+- [x] **W3.cap-r3-fu10 [MED · reachability decision] — ✅ DONE 2026-08-04** (`0ee6179` code + Test 21 §3b +
+  four measured mutants; this commit, trackers). **The question: is the "Finishing — processing segments…"
+  throbber meant to BLOCK input, or only to explain the wait?** Its scrim was
+  `Color.black.opacity(0.2).ignoresSafeArea()` in an `.overlay` with no `.allowsHitTesting(false)`, and a
+  `Color` is hit-testable — so it blocked every click in the Live Capture panel as a SIDE EFFECT of being
+  drawn, with nothing saying whether that was meant. That ambiguity is what let `W3.cap-r3-fu7` reason from
+  this overlay in both directions and get it backwards once.
+  **DECIDED: frozen, not live** — which is also what the prior session recommended to the owner in Morning
+  Review, so this implements the recommendation rather than pre-empting a live choice. Three grounds: the
+  overlay stands in for the sheet that is not up yet and a sheet is modal, so freezing keeps the whole
+  `isFinalizing` window uniform instead of half-modal; every mutating affordance under it is a hazard in this
+  window (fu7's retry, fu11's Clear, fu3's remove-photo, and Finish which is already `.disabled`); and it is
+  not a lock-out, since the mode Picker is a sibling in `ContentView.mainContent`'s VStack, outside the frame
+  the overlay is sized to.
+  **Expressed in code, not only in prose.** `.frame(maxWidth:maxHeight:)` + `.contentShape(Rectangle())` make
+  the whole overlay one hit target — the `.frame` is load-bearing, because `Color` is the only greedy view in
+  that ZStack and `.contentShape` alone would shrink to the throbber card if someone removed it. The predicate
+  is extracted as `LiveCaptureProcessor.isFinishingScrimUp` (it had been restated in four places, one of them
+  a hand-copied driver assertion that could have kept passing while the view drifted), and the throbber now
+  carries `accessibilityIdentifier("live.finishing-throbber")` so `W21.vmgui-d` can wait on the window and
+  assert a button behind it is not `isHittable`.
+  **⚠️ The item's own suggested conclusion was too coarse and is NOT what shipped.** It said "blocking →
+  re-label fu7's gates belt-and-braces". They split three ways, and only one leg is spare: to the MOUSE the
+  retry buttons are covered twice; to the KEYBOARD and to VOICEOVER only `.disabled` covers them, because a
+  hit-test scrim is neither a focus ring nor an AX barrier; and on the deferred `modelChoiceTarget` Apply only
+  `retryFailed`'s guard covers them, because a presented sheet floats ABOVE the overlay. Recorded at the
+  overlay, at `retryFailed`, at the bulk button, at `SegmentItem.actions(for:finalizing:)` and in
+  `ArchiveProcessor/CLAUDE.md`.
+  **Knock-on severity calls, which is why this was MED despite changing no behaviour on its own.**
+  `W3.cap-r3-fu11` (ungated Clear) is **re-graded MED → LOW**: `clearSessionState()` has exactly one
+  production caller, that button, with no keyboard shortcut and no menu route, and it sits under the scrim —
+  so no mouse path survives. fu7's mutants **P6/P7 stay 0 RED and now provably so**: a click-driven XCUITest
+  cannot kill a `.disabled` on a control whose clicks the scrim already eats, so `W21.vmgui-d` must drive the
+  KEYBOARD for those — recorded in the driver so the lane writes the right test instead of reading a clicking
+  one's 0 RED as coverage.
+  **Test.** Driver Test 21 §3b measures the COVERAGE half — the scrim is up for exactly the exposed window,
+  and down when idle, under either sheet, and after the window closes. The two sheet states are reached by
+  ASSIGNMENT and restored on the same MainActor turn (deliberately not through the real `finalize(_:)`, which
+  moves files and would make a cosmetic mutant's kill depend on the harness's env for file safety); the check
+  asserts the restore. `test-recovery.sh` 156 → **157 checks ALL PASS**; build clean, no new warnings.
+  **4 mutants measured: S1 1 RED** (`!showFinalizeSheet` dropped), **S2 1 RED** (`!showRotationReview`
+  dropped — a SPECIFICATION kill; no path reaches that state today), **S3 1 RED** (property forced `false`),
+  **S4 2 RED** (forced `true` — predicted 1, measured 2, the second being the post-window sample). **S5/S6**
+  (`.contentShape` deleted; the overlay's `if` deleted) are **0 RED BY CONSTRUCTION** — hit-testing and
+  rendering are invisible to a headless driver, which is the point rather than a gap.
+  **ADVERSARIAL (independent pass, opus, read-only) — seven findings, all folded in before the code shipped.**
+  It confirmed the invalidation, sheet-float, escape-hatch, sole-caller and non-vacuity claims, and refuted or
+  narrowed six others: (1) "nothing under the scrim is worth reaching" was FALSE — `SegmentItem.actions`
+  deliberately KEEPS `.viewText`/`.revealFiles` while finalizing and driver check 7 asserts it, so freezing
+  takes two read-only affordances with it, now stated as accepted collateral; (2) the overlay sits over an
+  AppKit-backed `HSplitView`, the case where the SwiftUI hit-test story is least certain, so the DECISION
+  (normative) is now separated from what was OBSERVED (nothing), with the split divider named for the lane;
+  (3) "`.contentShape` survives removing the `Color`" was false — the `.frame` makes it true; (4)
+  "`finishSession` refuses to raise `showRotationReview` while finalizing" was false, that function has no
+  such guard, and the real argument (through `requestFinish` and `pendingFinish`) is now written out; (5) this
+  change's own 33-line insertion broke two line citations inside the very comment that warns a mis-cited line
+  caused a real analytical error — fixed, plus a third inherited from the tracker; (6) "Full Keyboard Access"
+  is the wrong name for the macOS 14+ setting ("Keyboard navigation", off by default) and the keyboard/AX legs
+  are reasoned not measured — both now labelled, since inferring reachability without observing it is the
+  exact error this item exists to correct; (7) the predicate excludes two of the view's FIVE sheets, so "no
+  sheet over the panel" was wrong as a rule statement. One residual filed: **`W3.cap-r3-fu10-fu1`** — the
+  window is modal to the pointer only; making it modal to focus + AX interacts with the VM lane's own test, so
+  it is `(blocked-on: W21.vmgui-d)`.
+
 - [x] **W3.cap-r3-fu7 [LOW · latent · race] — ✅ DONE 2026-08-04** (`765897b` fix + Test 21; `68160b0` five
   mutants; this commit, trackers + the adversarial pass). The item's own suggestion was the cheap one and it
   was right, but not sufficient on its own. `applyRotationReviewAndFinalize` sets `isFinalizing` and then

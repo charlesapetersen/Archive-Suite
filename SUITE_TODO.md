@@ -1249,28 +1249,20 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu10 [MED · reachability decision · blocks a severity claim]** `LiveCaptureView:47-59` —
-  **is the "Finishing — processing segments…" throbber meant to BLOCK input, or only to explain the wait?**
-  Its scrim is `Color.black.opacity(0.2).ignoresSafeArea()` inside an `.overlay` with **no**
-  `.allowsHitTesting(false)`, and a SwiftUI `Color` is hit-testable — so it very likely swallows every click in
-  the Live Capture panel for the whole regeneration window. This repo does both things deliberately elsewhere
-  (`OCRView.swift:652` passes clicks through with `.allowsHitTesting(false)`; `ManualSegmentTagView.swift:299`
-  absorbs them with an explicit `.contentShape` + `onTapGesture`), so the omission here reads as unexamined
-  rather than intended. **This decides the severity of three shipped things**, which is why it is MED despite
-  changing no behaviour on its own: (a) `W3.cap-r3-fu7`'s two view-layer edits are no-ops if the scrim already
-  blocks the buttons, and load-bearing if it does not; (b) so is the ungated Clear in `W3.cap-r3-fu11`; (c)
-  fu7's mutants P1/P2 measured a driver-only entry path if the UI never had one. Decide it explicitly and say
-  so at the overlay: **blocking** → add the `.contentShape`/comment that makes it deliberate and re-label fu7's
-  gates belt-and-braces; **not blocking** → add `.allowsHitTesting(false)` and fu7/fu11 become live fixes.
-  **ACTIONABLE NOW, and deliberately NOT `(blocked-on:)` anything** — read that way it would park a MED finding
-  behind an `[L]`. The decision plus the code that expresses it can be made from the code read above; what the
-  VM GUI lane adds is *observational confirmation* of the hit-test, which is a nicety here, not the gate (and
-  which the same session that does `W21.vmgui-d` can fold in later, along with fu7's 0-RED P6/P7 mutants).
-  A headless driver cannot see hit-testing at all, so do not wait for one. Found 2026-08-04 by
-  `W3.cap-r3-fu7`'s independent adversarial pass, which caught that fu7's filing (and its first-draft comments)
-  cited this very overlay as *evidence the panel was clickable* when it is the most likely reason it was not.
-  Pre-existing. | Capture/Views | Tier-2
-- [ ] **W3.cap-r3-fu11 [MED · data · same window as fu7]** `LiveCaptureView:363` — the **Clear button carries
+- [ ] **W3.cap-r3-fu10-fu1 [LOW · completeness] (blocked-on: W21.vmgui-d)** `LiveCaptureView` overlay — the
+  finishing window is now modal to the POINTER only. `W3.cap-r3-fu10` decided the panel should be frozen while
+  the regeneration runs and expressed that with `.frame`+`.contentShape`, but a hit-test scrim is neither a
+  focus ring nor an AX barrier: with macOS "Keyboard navigation" on (off by default) ⇥+Space still reaches a
+  control behind the overlay, and with no `.accessibilityAddTraits(.isModal)` a VoiceOver client can activate
+  what the pointer cannot. So the decision is expressed at partial strength, and every future affordance added
+  to this panel inherits the same silent hole. The one-liners that would close it (`.isModal` on the overlay,
+  or `.disabled(liveProc.isFinishingScrimUp)` on the panel content) would also make `W3.cap-r3-fu11` moot and
+  retire fu7's unkillable P6/P7 mutants — but `.isModal` can hide from XCUITest the very buttons
+  `W21.vmgui-d`'s own hit-test assertion needs to find, which is why this waits for the lane rather than
+  guessing. ⚠️ The `(blocked-on:)` is on THIS item only — `W3.cap-r3-fu11` is not gated by it. Filed
+  2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
+- [ ] **W3.cap-r3-fu11 [LOW · data · same window as fu7 — re-graded from MED by fu10]** `LiveCaptureView:396`
+  (was `:363` before fu10's insertion) — the **Clear button carries
   no `isFinalizing` gate**, and in the rotation-review regeneration window it is strictly more destructive than
   the retry `W3.cap-r3-fu7` just refused. `session.clear()` Trashes the received source photos while the
   detached `writeSegmentFiles` is reading them, and `liveProc.clearSessionState()` empties `staged`/`retained`
@@ -1283,9 +1275,19 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   remaining entrant to the `staged`-implies-`finalized` argument at
   `LiveCaptureProcessor.applyRotationReviewAndFinalize` (`retryFailed` and `finalize` both now refuse while
   `isFinalizing`) — so gating Clear would close that enumeration entirely. Gating a DELETE path is its own
-  decision and its own Tier-2 gate, which is why fu7 did not absorb it. **Its SEVERITY depends on
-  `W3.cap-r3-fu10` but its ACTIONABILITY does not** — gating Clear during `isFinalizing` is right either way,
-  exactly as fu7's guard is, so this carries no `(blocked-on:)` and must not be read as gated on fu10.
+  decision and its own Tier-2 gate, which is why fu7 did not absorb it.
+  ✅ **`W3.cap-r3-fu10` has now DISCHARGED the severity half** (shipped 2026-08-04 `0ee6179`): the window's
+  throbber scrim is meant to freeze the panel, and Clear sits under it — `clearSessionState()` has exactly
+  ONE production caller, that button, with no `.keyboardShortcut` and no menu command routing to it (checked:
+  the app's only commands are ⌘R "Start Processing", Files-tab-only, and ⌘⌥P provider-cycle). So **no mouse
+  path to this survives**, and it is **re-graded MED → LOW**. What survives is the keyboard/AX route a scrim
+  does not cover (`W3.cap-r3-fu10-fu1`), which needs a non-default macOS setting or VoiceOver. The fix is
+  unchanged and still worth doing — gating a delete path is right independent of how it is reached, and this
+  is the last entrant to the `staged`-implies-`finalized` enumeration at `applyRotationReviewAndFinalize` —
+  but it is no longer urgent, and anything that removes or narrows the scrim puts it straight back to MED.
+  ⚠️ Two caveats on the re-grade: fu10 settled the INTENT from a code read, not an observation (the overlay
+  sits over an AppKit-backed `HSplitView`, so `W21.vmgui-d` should confirm), and the keyboard leg is likewise
+  reasoned rather than measured. Actionability was never gated: no `(blocked-on:)`.
   Found 2026-08-04 by `W3.cap-r3-fu7`'s adversarial pass; pre-existing. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu9 [LOW · SUSPECTED · presentation]** `LiveCaptureView:81-117` — the Live Capture tab
   attaches `showRotationReview`, `modelChoiceTarget` and `textViewerTarget` as three separate `.sheet`
@@ -1302,8 +1304,10 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   modifiers at the SAME level; these are CHAINED, and current macOS SwiftUI may present them stacked quite
   happily, in which case this item closes as unreachable and fu7's scope note should be corrected to say so.
   A headless driver cannot see sheet presentation, so settling it needs the VM GUI lane (`W21.vmgui-d` gives
-  the Processor one) or a careful read of the modifier chain — the same lane `W3.cap-r3-fu10` waits on, so do
-  them together. **A second, independent leg the adversarial pass found:** a deferred Apply landing while
+  the Processor one) or a careful read of the modifier chain. (An earlier version said to pair this with
+  `W3.cap-r3-fu10`; fu10 shipped 2026-08-04 `0ee6179` off a code read and needed no lane, so this stands
+  alone. What fu10 DID leave for the lane is its own residual, `W3.cap-r3-fu10-fu1`, plus the hit-test
+  observation — those two and this one are the Processor lane's opening backlog.) **A second, independent leg the adversarial pass found:** a deferred Apply landing while
   `showRotationReview` is up calls `retryFailed`, which sets `retained[gid] = nil` — and
   `applyRotationReviewAndFinalize` then hits `guard var seg = retained[page.groupId]` and silently DROPS that
   group's rotation edits. So the sheet-state window loses operator work even where it costs no money, which is
