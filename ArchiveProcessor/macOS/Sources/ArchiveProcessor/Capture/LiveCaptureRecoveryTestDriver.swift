@@ -48,6 +48,11 @@ import ArchiveCore
 ///      `failedGroupIds ⊆ finalizedGroups` — the subset several of this subsystem's latency arguments lean
 ///      on — survives the one path that used to break it: a segment failed by a transient staging write
 ///      error, regenerated into a filable record by the end-of-session rotation review, and then filed.
+///  16. The end-of-session rotation review re-derives a regenerated segment's LABEL (W3.cap-r3-fu6), so the
+///      record and the row describing it cannot disagree in either direction: a segment that regenerates
+///      cleanly stops being counted failed (Test 19 — otherwise the sheet warns about a segment that is fine
+///      and the retry it invites re-buys the OCR), and one whose regeneration produces nothing stops wearing
+///      a success label over an empty record (Test 20 — otherwise finalize skips it silently).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1391,6 +1396,12 @@ enum LiveCaptureRecoveryTestDriver {
         // NON-VACUITY, measured (2026-08-03), four mutants of the two release helpers + the finalize call site:
         //   M1 the pre-fix `finalizedGroups.remove(gid)` back at the finalize call site
         //      → 2 RED, both here: the subset check and the button check. This is the shipped defect.
+        //      ⚠️ RE-MEASURED 2026-08-04, after `W3.cap-r3-fu6`: now **0 RED**. Not a regression in this
+        //      section — fu6 removed the reachability M1 needed. The regeneration re-derives the label, so
+        //      V1 leaves `failedGroupIds` at check 4 instead of at the finalize, and no other path can put a
+        //      filable record in the failed set (see the fu6 note at the `releaseFinalizedGroup` call site in
+        //      `finalize`). Read it as "the defect fu5 fixed can no longer be constructed", not as "fu5 was
+        //      unnecessary": it was real and shipped. The pairing's live coverage is now M2's 8 Test-17 REDs.
         //   M2 `releaseFinalizedGroup` clearing ONLY `failedGroupIds` (the finalized leg dropped)
         //      → 9 RED: the subset check here, plus 8 in Test 17, which needs that same removal for a filed
         //      group's re-uploaded page to buy its call. ⚠️ Read with the harness wait temporarily raised to
@@ -1512,18 +1523,33 @@ enum LiveCaptureRecoveryTestDriver {
                   fvRegen && fvRecord?.pagesComplete != false
                       && fvRecord?.pdfURLs.first.map { fm.fileExists(atPath: $0.path) } == true)
 
-            // 4. …and does NOT reconcile the label while doing it, which is what puts a filable group into
-            //    finalize still wearing the failed one. Pinned as the state the fix has to survive, NOT as
-            //    something this item fixes: the stale `.failed` on a regenerated record is its own defect —
-            //    it also makes the collection sheet warn "1 segment(s) failed to process and are NOT filed …
-            //    Retry them before finalizing" about a segment that is fine, and a retry there would delete
-            //    the freshly regenerated output and re-buy the OCR. Filed separately as `W3.cap-r3-fu6`. If
-            //    that lands, THIS check is the one that flips, and the section below still holds.
-            check("...while leaving it labelled failed — the state fu5 has to survive (see W3.cap-r3-fu6)",
-                  fvProc.failedGroupIds.contains("V1")
-                      && fvProc.statuses.first { $0.id == "V1" }?.phase == .failed)
+            // 4. THE FIX (W3.cap-r3-fu6) — and it RECONCILES the label while doing it. This check is the one
+            //    fu5 predicted would flip: it used to PIN the stale `.failed`, because fu5 needed a filable
+            //    group that was still counted failed and this was how that state arose. fu6 closed it at
+            //    source — `applyRotationReviewAndFinalize` now re-derives the label from the record it just
+            //    wrote (`labelStagedRecord`), so the "1 segment(s) failed to process and are NOT filed —
+            //    Retry them before finalizing" warning no longer names a segment that is fine, and the
+            //    operator can no longer be talked into a `retryFailed` that deletes the freshly regenerated
+            //    output and re-buys its OCR.
+            //    `.succeededPlaceholderImage`, not `.staged`, and that is not incidental: the synthetic bytes
+            //    are not a decodable image, so `generate` embeds the deliberate placeholder page (check 7
+            //    below turns on the same fact). Asserted as the SPECIFIC label the taxonomy owes this record
+            //    rather than "not failed", so a fix that reconciled the sets by blanket-clearing them would
+            //    still be caught — as would one that forgot the reason line, which is what the row shows.
+            //    The `== ["V2"]` equality is the over-reach half: V2 is genuinely failed and was NOT
+            //    regenerated, so a relabel that cleared the whole set would take the operator's one real
+            //    retry with it.
+            check("...and RECONCILES the label with it — a regenerated record is no longer counted failed",
+                  !fvProc.failedGroupIds.contains("V1")
+                      && fvProc.failedGroupIds == ["V2"]
+                      && fvProc.statuses.first { $0.id == "V1" }?.phase == .succeededPlaceholderImage
+                      && fvProc.statuses.first { $0.id == "V1" }?.failureKind == nil)
 
-            // 5. THE FIX. Finish files it, and a filed group leaves BOTH sets together.
+            // 5. THE FIX (fu5). Finish files it, and a filed group leaves BOTH sets together. Since fu6 the
+            //    group has ALREADY left the failed set at check 4, so what follows now confirms the pairing
+            //    holds rather than catching it failing — see the M1 re-measurement in the header. Kept
+            //    verbatim on purpose: it is still the only place in this driver that drives a real `finalize`
+            //    over a segment that reached it through the rotation review.
             fvProc.finalize([LiveCaptureProcessor.CollectionDraft(
                 id: fvRecord?.collectionKey ?? "__unfiled__", finalName: fvOut.lastPathComponent,
                 existingFolders: [], suggestedFolders: [], chosenExisting: fvOut,
@@ -1558,6 +1584,172 @@ enum LiveCaptureRecoveryTestDriver {
                   fvProc.failedGroupIds == ["V2"]
                       && !fvProc.statuses.contains { $0.id == "V1" }
                       && fvProc.statuses.contains { $0.id == "V2" && $0.phase == .failed })
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- Test 20 (W3.cap-r3-fu6): the BACKWARD direction — a SUCCESS label left over a record with
+        // nothing in it. Test 19 covers the forward half (a failed label surviving a good regeneration);
+        // this is the one that fails quietly instead of loudly. `applyRotationReviewAndFinalize` replaces the
+        // staged record wholesale, so a regeneration that produces NO output turns a `.staged` segment into
+        // an empty record still wearing "Staged" — and `executePlans` then skips it (`pagesComplete ==
+        // false`) with no failure surfaced anywhere. The operator finishes the session, sees no warning, and
+        // the document is simply not in the collection.
+        //
+        // HOW the write is made to fail, and why the shape is `mergeDocuments: true` rather than a
+        // read-only staging dir alone. Regeneration writes each page back to the SAME path
+        // (`<source-basename>.pdf` in the staging dir), so with per-page PDFs still sitting there a failed
+        // write could be masked by the previous run's file — `writeSegmentFiles` records a PDF it can prove
+        // is on disk, and the stale one is on disk. Merge removes that ambiguity for real instead of by
+        // deleting fixtures behind the code's back: the successful first write merges the per-page PDFs and
+        // deletes them, so the regeneration's target paths are genuinely absent. Check 2 asserts exactly
+        // that, because the whole section is vacuous without it.
+        //
+        // NON-VACUITY, measured (2026-08-04), on `labelStagedRecord` + the regeneration call site:
+        //   N1 the pre-fix regeneration — the `labelStagedRecord` call at the end of the `for outcome in
+        //      regenerated` loop deleted → 3 RED: Test 19's check 4 (the forward direction) plus checks 5
+        //      and 6 here (the backward one, and its operator-visible consequence). This is the shipped
+        //      defect, in both of its directions, and it is the only mutant either section needs to justify
+        //      itself.
+        //   N2 `labelStagedRecord` labelling from `RetainedSegment.texts` (`texts.contains { !$0.isEmpty }`)
+        //      instead of `pages[].result.text != nil` — the approximation the item warned against
+        //      → 0 RED. Recorded as an honest limit, not fixed: nothing here or in Test 19 stages a document
+        //      whose OCR returns an EMPTY STRING rather than nil, which is the only input that separates the
+        //      two, and manufacturing one needs an OCR stub per page rather than the single shared stub the
+        //      driver installs. The approximation is avoided in the code and argued in the comment; it is
+        //      not pinned by a test.
+        //   N3 the label re-derived from `self.retained[groupId]` instead of the `regenInputs` snapshot
+        //      → 0 RED, and expected to be: nothing on this path mutates `retained` while the detached write
+        //      runs, which is exactly why the code comment calls that a property of the surroundings rather
+        //      than of the line. Recorded so the next reader knows the snapshot is defensive, not covered.
+        // Checks 1–2 and 4 are premises, not catchers. ---
+        if isolatedBackup {
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let bwOut = tmp.appendingPathComponent("fu6out", isDirectory: true)
+            let bwStaging = tmp.appendingPathComponent("APStaging-fu6-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: bwStaging, withIntermediateDirectories: true)
+            let bwSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            bwSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` again — no document reaches the LLM, so this runs for real, for $0, no network.
+                    taggingMode: .human, rotationMode: .off,
+                    // Load-bearing, not incidental: see the merge note above.
+                    mergeDocuments: true,
+                    outputDirectory: bwOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: bwStaging)
+            let bwProc = bwSession.liveProcessor
+            func bwSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func bwChmod(_ mode: Int) {
+                try? fm.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: bwStaging.path)
+            }
+            // A REAL, decodable JPEG this time (Test 19 uses undecodable bytes on purpose). Two reasons: the
+            // segment must reach the plain `.staged` label the item names, which a placeholder page would
+            // pre-empt with `.succeededPlaceholderImage`; and the merge below only happens if both pages
+            // actually produce a PDF.
+            let bwBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let bwJPEG = bwBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+
+            // 1. PREMISE. A two-page document stages CLEANLY — the success label this section watches decay.
+            for seq in [1, 2] {
+                bwSession.ingest(jpeg: bwJPEG, groupId: "B1", seq: seq,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            bwProc.segmentResolved(groupId: "B1")
+            let bwStagedOK = await bwSettle { bwProc.statuses.first { $0.id == "B1" }?.phase == .staged }
+            let bwFirst = bwProc.staged.first { $0.groupId == "B1" }
+            check("a two-page document stages cleanly as ONE merged PDF, in no failed set",
+                  bwStagedOK && bwProc.failedGroupIds.isEmpty
+                      && bwFirst?.pagesComplete != false && bwFirst?.pdfURLs.count == 1
+                      && bwFirst?.pdfURLs.first.map { fm.fileExists(atPath: $0.path) } == true)
+
+            // 2. PREMISE, and the one that stops this section being vacuous: the merge deleted the per-page
+            //    PDFs, so the paths the regeneration will write to are ABSENT. Without this a failed write
+            //    would be masked by the previous run's file and check 4 would pass for no reason.
+            let bwSources = bwSession.photos.filter { $0.groupId == "B1" }.map(\.url)
+            let bwPerPage = bwSources.map {
+                bwStaging.appendingPathComponent($0.deletingPathExtension().lastPathComponent + ".pdf")
+            }
+            check("...and the merge left its per-page paths EMPTY, so the regeneration writes fresh",
+                  bwSources.count == 2 && bwPerPage.allSatisfy { !fm.fileExists(atPath: $0.path) })
+
+            // 3. PREMISE. The staged segment's pages reach the rotation review (as in Test 19, driven through
+            //    the real Finish, with the operator's own toggle restored around the one synchronous call).
+            bwChmod(0o555)   // from here the write cannot land — the transient failure this half needs
+            let bwPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+            bwProc.finishSession()
+            if let bwPriorReview {
+                UserDefaults.standard.set(bwPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            check("a STAGED segment's pages enter the end-of-session rotation review",
+                  bwProc.showRotationReview
+                      && bwProc.rotationReviewPages.filter { $0.groupId == "B1" }.count == 2)
+
+            // 4. PREMISE. The operator straightens a page; the regeneration runs and produces nothing.
+            for i in bwProc.rotationReviewPages.indices
+            where bwProc.rotationReviewPages[i].groupId == "B1" && bwProc.rotationReviewPages[i].pageIndex == 0 {
+                bwProc.rotationReviewPages[i].rotationDegrees = 90
+            }
+            bwProc.applyRotationReviewAndFinalize()
+            let bwRegen = await bwSettle { !bwProc.isFinalizing && bwProc.showFinalizeSheet }
+            bwChmod(0o755)   // restore before the finalize + the temp-dir cleanup at the end of the run
+            let bwRecord = bwProc.staged.first { $0.groupId == "B1" }
+            check("the regeneration produced NOTHING — the record that replaced it holds no PDF at all",
+                  bwRegen && bwRecord?.pdfURLs.isEmpty == true && bwRecord?.pagesComplete == false)
+
+            // 5. THE FIX. The label went down with the record. Before this, the segment kept "Staged" over an
+            //    empty record and the operator was told nothing at all; now it is `.failed` with a reason and
+            //    in the retry set, which is the only way the situation is recoverable — the sources are still
+            //    in the backup folder and a retry regenerates them. Asserted as an equality so a fix that
+            //    marked everything failed would not pass either.
+            check("...and the label went down with it: FAILED, with a reason, and offered for retry",
+                  bwProc.failedGroupIds == ["B1"]
+                      && bwProc.statuses.first { $0.id == "B1" }?.phase == .failed
+                      && bwProc.statuses.first { $0.id == "B1" }?.failureKind == .noOutput)
+
+            // 6. …and the outcome that was silent is now stated. `executePlans` declines to file the empty
+            //    record either way — that gate is unchanged and is not what this item touched — but the
+            //    segment now survives finalize with a row and a count against it, instead of vanishing from
+            //    the collection with the sheet reporting nothing wrong.
+            bwProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: bwRecord?.collectionKey ?? "__unfiled__", finalName: bwOut.lastPathComponent,
+                existingFolders: [], suggestedFolders: [], chosenExisting: bwOut,
+                segmentCount: 1, photoCount: 2)])
+            let bwFinalized = await bwSettle { !bwProc.isFinalizing && !bwProc.showFinalizeSheet }
+            check("finalize files nothing and SAYS so — the segment keeps its row, its count and its sources",
+                  bwFinalized
+                      && !((try? fm.contentsOfDirectory(at: bwOut, includingPropertiesForKeys: nil)) ?? [])
+                          .contains { $0.pathExtension == "pdf" }
+                      && bwProc.staged.contains { $0.groupId == "B1" }
+                      && bwProc.failedGroupIds == ["B1"]
+                      && bwProc.statuses.contains { $0.id == "B1" && $0.phase == .failed }
+                      && bwSources.allSatisfy { fm.fileExists(atPath: $0.path) })
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []

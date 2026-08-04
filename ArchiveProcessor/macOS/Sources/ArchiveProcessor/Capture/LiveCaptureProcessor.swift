@@ -1350,24 +1350,32 @@ final class LiveCaptureProcessor: ObservableObject {
             self.staged.removeAll { filedGroups.contains($0.groupId) }
             self.statuses.removeAll { filedGroups.contains($0.id) }
             // W3.cap-r3-fu5 — `releaseFinalizedGroup`, not a bare `finalizedGroups.remove`: a group that
-            // FILED must leave the failed set too, and it can be in it. A `.noOutput`/`.incompleteOutput`
-            // segment is still appended to `staged` and `retained` (both happen before the label branch), so
-            // it reaches the end-of-session rotation review — and a regeneration that succeeds where the
-            // first write failed replaces the staged record wholesale, making it filable without touching
-            // its label. The entry this used to leave behind outlived every row that explained it: the
+            // FILED must leave the failed set too. A `.noOutput`/`.incompleteOutput` segment is still
+            // appended to `staged` and `retained` (both happen before the label branch), so it reaches the
+            // end-of-session rotation review — and a regeneration that succeeded where the first write
+            // failed replaced the staged record wholesale, making the group filable while it was still
+            // counted failed. The entry this used to leave behind outlived every row that explained it: the
             // status row is dropped one line above, so the operator got a "Retry 1 failed" button with
             // nothing under it — and the collection sheet's "N segment(s) failed … NOT filed" warning —
-            // pointed at a document already in the collection.
+            // pointed at a document already in the collection. Pressing it usually cost nothing (the filed
+            // sources are retired below, `session.groups` is derived from `photos`, so the group is GONE and
+            // `retryFailed`'s `else { failedGroupIds.remove(gid) }` self-clears the phantom on first press);
+            // it cost MONEY in the placeholder case, where the withheld source keeps the group alive and the
+            // retry really does re-ingest and re-buy.
             //
-            // What pressing that button cost, corrected by the adversarial pass because the first version of
-            // this comment said "it re-buys the OCR" flatly and that is only the minority case. Usually it
-            // costs nothing: `clearFiled` below retires the filed sources, `session.groups` is derived from
-            // `photos`, so the group is GONE and `retryFailed`'s `else { failedGroupIds.remove(gid) }` guard
-            // self-clears the phantom on first press. The money case is the one where the filed record
-            // carries `placeholderSources` — the source is deliberately withheld, so the group survives and
-            // the retry really does re-ingest and re-buy. That is reachable in exactly this chain, because
-            // regeneration does not re-derive the label (`W3.cap-r3-fu6`), so a group can be in the failed
-            // set AND filed with a placeholder at the same time. Test 19 builds that shape.
+            // ⚠️ `W3.cap-r3-fu6` then closed the one chain that reached this. Regeneration now re-derives the
+            // label from the record it just wrote, so a group cannot be filable and failed at the same time,
+            // and no OTHER path inserts into `failedGroupIds` over a record `executePlans` will file:
+            // `markFailed` is the only writer that inserts, it only fires for `.noOutput` (no PDFs) or
+            // `.incompleteOutput` (`pagesComplete == false`), and `executePlans` skips both. So this pairing
+            // is now belt-and-braces at THIS call site rather than the fix for a live defect — kept because
+            // it is right on its own merits (a group whose every PDF reached its collection is not a failed
+            // one) and because the invariant it maintains, `failedGroupIds ⊆ finalizedGroups`, is load-bearing
+            // elsewhere: `retryFailed`'s cancel-loop latency argument rests on it. Do NOT read the two
+            // together as "fu5 was unnecessary" — the defect was real and shipped; fu6 removed its reachability
+            // afterwards. What that DOES mean is measured, not asserted: Test 19's mutant M1 (this line back
+            // to a bare `finalizedGroups.remove`) reads 0 RED as of fu6, where it read 2 RED before. The
+            // pairing's remaining coverage is Test 17 via `retryFailed` (fu5's M2, 9 RED).
             for gid in filedGroups { self.retained[gid] = nil; self.releaseFinalizedGroup(gid) }
             self.drafts.removeAll()
 
