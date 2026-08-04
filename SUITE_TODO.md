@@ -57,6 +57,16 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   core = replicants (shared `uuid` → memberships) vs near-duplicates (different `uuid` → date consolidation),
   and the link-conversion contract (nothing survives as `file://`/`zotero://`/`x-devonthink-item://`; only
   internet URLs stay `://`). See §9 open decisions + §8 owner prerequisites (a Reader root over Archival Photos).
+- `despotlight.md` — **QUEUED (Reader + Processor; Wave 26; mixed Tier-1/Tier-2)**: remove **all** reliance on
+  Spotlight (`NSMetadataQuery`/`kMDItem*`/`mdfind`) per the owner directive 2026-08-04 (*"Spotlight is
+  fundamentally unreliable on macOS"*), after a live incident where a dead Data-volume Spotlight index made the
+  Reader report *"No Read/Unread-tagged PDFs were found"* over 1,849 correctly-tagged files. Three stages:
+  (A) an owned read-only `CorpusWalker` in ArchiveCore becomes the Reader's Release discovery path — deleting
+  ~80 lines of `PendingWrite` Spotlight-lag masking and adding honest `.failed` vs `.emptyButReadable` states;
+  (B) `CorpusWatcher` (FSEvents — **verified** to report xattr-only tag writes) + a `LibraryIndex` SQLite warm
+  start following the `ContentIndex` precedent; (C) the Processor's home-wide tag vocabulary, the fixture
+  scripts' `mdimport`/`mdfind` polling, and the docs. Measured read-only on the real corpus: **123,028 files /
+  102,478 PDFs walked in 10.15 s single-threaded**, which is why this is safe. See **Wave 26** below.
 - `archive-notes/09-gap-closure.md` — **IN PROGRESS (Archive Notes post-ship reconciliation; W9; mixed Tier-1/Tier-2)**:
   closes the plan-vs-build + spec-vs-build deltas found after W0–W8 shipped (docs/tracker sync, wire built-but-dead
   features, re-arm safety-net lint/smoke tooling, secondary UI polish), then a **Phase-E verification review** that
@@ -114,6 +124,111 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   / `1.0`) while `retryOne` runs `detectRotation` with the run's real rotation mode, so an LLM rotation mode
   makes extra paid calls per file that the quoted figure does not include. Pass the run's values from
   `activeRunConfig` (now the retry sheets' seed anyway).
+
+## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
+
+**Owner directive, 2026-08-04:** *"Spotlight is fundamentally unreliable on macOS."* Remove **all** reliance
+on Spotlight (`NSMetadataQuery` / `kMDItem*` / `mdfind`) across the suite. **Read
+`execution-plans/despotlight.md` first** — it carries the full inventory, the measured evidence, the
+verified traps and the per-item test gates; these one-liners are not enough to work from.
+
+**The incident.** The owner pointed the Reader at `~/Desktop/Glazer Gemini 2.5 LLM` — 1,849 PDFs, **every
+one correctly tagged** — and got *"No Read/Unread-tagged PDFs were found in this folder."* The macOS
+Spotlight index for the whole Data volume was dead (`mdfind -onlyin` returned 0 for that folder, for
+`$HOME`, for `/Applications` **and** for the real corpus; four `mdbulkimport` helpers wedged 15 days at 0%
+CPU). Two failures: Spotlight went blind, and **the app blamed the files** —
+`NavigationWindowView.swift:174-176` asserts a fact about the corpus when the truth is "this app cannot
+see it." The Reader has **no Release filesystem fallback at all**; the one that exists
+(`ArchiveLibrary.loadFixtureSynchronously`, which already mirrors the production predicate) is `#if DEBUG`
+and "compiled out of Release entirely."
+
+**Why this is safe (measured 2026-08-04, read-only, real corpus):** a full recursive walk reading
+tags+label+type+mtime for **123,028 files / 102,478 PDFs / 535 dirs / depth 7** took **10.15 s
+single-threaded** (82 µs/file; ~0.4 s for 150k with a parallel `resourceValues` pass). `ArchiveLibrary`'s
+"no per-file disk I/O (the fast path at 150k)" justification for Spotlight **is already void** —
+`ContentIndexer.startIndexing` already opens and extracts text from *every PDF* in the corpus. Also
+settled: `~/Desktop/Google Drive/` is **not** Drive-synced (residual name; plain local disk, files fully
+materialised) so there is **no** placeholder/egress/sync hazard to defend against, and FSEvents **does**
+report xattr-only tag writes (`ItemXattrMod`), so live updates need no polling.
+
+⚠️ **Priority note for the owner:** inserted here *after* the Wave 23 drain (which your 2026-07-29 routing
+put first) and *ahead of* the older W16/W3.cap/W17–W22 backlog. `W26.walk1`+`W26.walk2` are the two items
+that stop the incident recurring — **say the word and they go to the top of the queue.**
+
+- [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
+  needs: none].** New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
+  `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
+  DEBUG fixture loader) + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable.
+  Shared by both apps. **Test:** scratch fixture with tagged/untagged/hidden/nested/package files and an
+  em-dash+NBSP filename → assert the exact expected set, **and** assert zero writes (pre/post xattr+mtime
+  snapshot of the whole fixture). Note there is currently **no test of Reader discovery whatsoever** — the
+  only `ArchiveLibrary` test file is `ArchiveLibraryOverrideTests.swift`, all 8 cases covering the
+  Spotlight-lag override; that gap is how a Release build with no fallback shipped.
+- [ ] **W26.walk2 — Reader discovery → `CorpusWalker`; delete the `PendingWrite` subsystem; honest
+  `DiscoveryStatus` [L · med · Tier-2 · needs: none] (blocked-on: W26.walk1).** Rip `NSMetadataQuery`,
+  both observers, both `searchScopes` branches (incl. the dead `NSMetadataQueryLocalComputerScope`
+  "future use" branch) and the `NSMetadataItem` plumbing out of `ArchiveLibrary.swift`. **Delete ~80 lines
+  of `PendingWrite` machinery** (`pending`, `settleTimer`, `overrideTTL`, `overrideDecision`,
+  `sameTags`/`sameLabel`, `armSettleTimer`) **and its 8-case test file** — it existed only to mask
+  Spotlight's tag-index lag; `TagWriter`'s verified `.after` is ground truth and now applies directly and
+  permanently. Promote the DEBUG fixture path into the real walker so `-ARUITestRootPath` selects a fixture
+  *root*, not a different discovery *mechanism*. Add `DiscoveryStatus` (`.walking(done:total:)` — real
+  progress Spotlight could never give — `.ok`, `.failed(reason:)`, `.emptyButReadable(scanned:)`), mirroring
+  `ContentIndexer.Failure`; **only `.emptyButReadable` may say "no tagged PDFs", and it must cite the count
+  scanned.** **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still list
+  every tagged file (**this test fails today** and is the regression guard for the whole wave), plus
+  `.failed` on an unreadable root and `.emptyButReadable` only on a genuinely untagged one.
+- [ ] **W26.fsev — `CorpusWatcher` (FSEvents) replaces `DidUpdate` [M · med · Tier-2 · needs: none]
+  (blocked-on: W26.walk2).** `kFSEventStreamCreateFlagFileEvents` on the security-scoped root, with
+  `start/stopAccessingSecurityScopedResource` balanced across the **stream's whole lifetime**. ⚠️ **Flags
+  are unioned across the coalescing window** — measured: a byte-free tag write also reported `ItemRenamed`,
+  which never happened. **Treat every event as "re-`stat` and re-read this path", never as "this happened."**
+  Handle `MustScanSubDirs` (re-walk subtree), `RootChanged` (re-resolve bookmark + re-walk),
+  `EventIdsWrapped`/`HistoryDone` (full re-walk), mount/unmount. Ignore atomic-write temp siblings
+  (measured: `a.txt.sb-858602c2-RXb79N`). Suppress the app's own `TagWriter` writes. **Test:** a
+  third-party `setResourceValue` (simulating Finder) is picked up with no Spotlight involved;
+  `MustScanSubDirs` triggers a subtree re-walk.
+- [ ] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2 ·
+  needs: none] (blocked-on: W26.walk2).** Follow the proven `ContentIndex` precedent exactly: an `actor`
+  over **system SQLite** (`import SQLite3`, no third-party dep), in `.applicationSupportDirectory`, schema
+  changes by **bumping the filename** (no migration — nothing to migrate). **Sibling store, not an
+  extension of `ContentIndex`** (discovery must work *before* content extraction, which is populated *from*
+  the library). Warm start renders persisted rows in ms, then revalidates in the background. Removals apply
+  **only after a walk completes successfully** — a cancelled walk must never read as "these files are gone"
+  (reuse `ContentIndexer`'s two-snapshot prune / `rootPrefix` eviction shape, `ContentIndexer.swift:361-420`).
+  ⚠️ **The trap that will get this wrong:** `URL.resourceValues` **caches on the backing `NSURL`** (measured
+  W23.m11-fu — a 100→250-byte rewrite read back unchanged on the same `URL` value), so a revalidation pass
+  that reuses `URL` values is **silently a no-op**. Use `stat(2)` via `withUnsafeFileSystemRepresentation`
+  for every freshness check. Also: store paths byte-exactly (em dash + NBSP filenames) — never round-trip
+  through NFC/NFD, or every launch re-indexes the corpus. **Test:** cold index → quit → warm start shows
+  rows before any walk finishes, **and** a file whose tags changed while the app was closed is corrected on
+  revalidation (this is the test that catches the caching trap).
+- [ ] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low ·
+  Tier-1 · needs: none] (blocked-on: W26.walk1).** Its `NSMetadataQueryUserHomeScope` +
+  `kMDItemUserTags LIKE "*"` harvests every tag in the **whole home folder** — a scope no per-root walk
+  reproduces. Replace with a monotonically-growing persisted vocabulary fed by: every root either app has
+  been pointed at, every tag the user types (`register(_:)` already does this), and every `TagWriter` write;
+  seeded by walking the **known archive roots**, never `$HOME`. **Accept and document the narrowing** —
+  tags on unrelated personal files stop appearing, which is an improvement for an archival tagging UI.
+  **Do not walk `$HOME` to emulate Spotlight** (slow, invasive, trips TCC across unrelated dirs).
+  **Test:** vocabulary survives relaunch, accumulates across roots, and no `$HOME` walk occurs.
+- [ ] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none]
+  (blocked-on: W26.walk2).** `ArchiveReader/scripts/make-gui-fixture.sh` (lines 16, 179, 186) and
+  `smoke-setup.sh` (lines 22, 26) force-index fixture copies then **poll `mdfind` until tags appear** — a
+  wait that becomes both unnecessary and impossible once discovery is ours, and a real source of
+  fixture-setup flake. **Test:** both scripts produce a usable fixture on a volume with indexing disabled.
+- [ ] **W26.docs — docs/SPEC stop claiming Spotlight [S · low · Tier-1 · needs: none] (blocked-on:
+  W26.walk2).** `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`) finds these
+  by tag fast"*) + its *Verified Facts* Spotlight line + Implementation Map; `ArchiveProcessor/CLAUDE.md`
+  (vocabulary narrowing); `SPEC/tag-format.md` (how tags are **read** — the tag vocabulary itself is
+  unchanged, so this is *not* a contract change); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
+- [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
+  (blocked-on: W26.fsev, W26.idx, W26.vocab).** Full-scale run against a **scratch copy** (never the real
+  corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline, memory ceiling, a
+  **no-write assertion across the whole tree**, and cancel-mid-walk leaves no partial removals. Confirm
+  `grep -rn "NSMetadataQuery\|kMDItem\|mdfind"` over `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and
+  `scripts/` returns **nothing but historical comments**. Then flip the wave and delete
+  `execution-plans/despotlight.md`.
 
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
 
