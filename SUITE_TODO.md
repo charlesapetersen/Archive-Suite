@@ -1262,8 +1262,11 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   fu7's mutants P1/P2 measured a driver-only entry path if the UI never had one. Decide it explicitly and say
   so at the overlay: **blocking** → add the `.contentShape`/comment that makes it deliberate and re-label fu7's
   gates belt-and-braces; **not blocking** → add `.allowsHitTesting(false)` and fu7/fu11 become live fixes.
-  ⚠️ Needs the VM GUI lane to settle by observation (`W21.vmgui-d` gives the Processor one) — a headless driver
-  cannot see hit-testing, and fu7's own P6/P7 mutants are 0 RED for exactly that reason. Found 2026-08-04 by
+  **ACTIONABLE NOW, and deliberately NOT `(blocked-on:)` anything** — read that way it would park a MED finding
+  behind an `[L]`. The decision plus the code that expresses it can be made from the code read above; what the
+  VM GUI lane adds is *observational confirmation* of the hit-test, which is a nicety here, not the gate (and
+  which the same session that does `W21.vmgui-d` can fold in later, along with fu7's 0-RED P6/P7 mutants).
+  A headless driver cannot see hit-testing at all, so do not wait for one. Found 2026-08-04 by
   `W3.cap-r3-fu7`'s independent adversarial pass, which caught that fu7's filing (and its first-draft comments)
   cited this very overlay as *evidence the panel was clickable* when it is the most likely reason it was not.
   Pre-existing. | Capture/Views | Tier-2
@@ -1280,7 +1283,9 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   remaining entrant to the `staged`-implies-`finalized` argument at
   `LiveCaptureProcessor.applyRotationReviewAndFinalize` (`retryFailed` and `finalize` both now refuse while
   `isFinalizing`) — so gating Clear would close that enumeration entirely. Gating a DELETE path is its own
-  decision and its own Tier-2 gate, which is why fu7 did not absorb it; severity depends on `W3.cap-r3-fu10`.
+  decision and its own Tier-2 gate, which is why fu7 did not absorb it. **Its SEVERITY depends on
+  `W3.cap-r3-fu10` but its ACTIONABILITY does not** — gating Clear during `isFinalizing` is right either way,
+  exactly as fu7's guard is, so this carries no `(blocked-on:)` and must not be read as gated on fu10.
   Found 2026-08-04 by `W3.cap-r3-fu7`'s adversarial pass; pre-existing. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu9 [LOW · SUSPECTED · presentation]** `LiveCaptureView:81-117` — the Live Capture tab
   attaches `showRotationReview`, `modelChoiceTarget` and `textViewerTarget` as three separate `.sheet`
