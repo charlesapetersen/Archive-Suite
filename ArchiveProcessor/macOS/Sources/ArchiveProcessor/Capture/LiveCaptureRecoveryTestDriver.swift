@@ -70,6 +70,17 @@ import ArchiveCore
 ///      a drained Finish is HELD while the sheet is open (through a full watchdog tick), the operator's
 ///      deferred Apply is still allowed, and closing the sheet resumes the finish with the review intact and
 ///      the retried segment's pages in it (Test 23).
+///  21. A pending Finish has an operator-visible ESCAPE that does not cost the session its source photos
+///      (W3.cap-r3-fu9-fu1): cancelling un-arms the wait and does nothing else — no OCR cancelled, no staged
+///      output dropped, no file touched — it is a cancel rather than a deferral, it is not a one-way door, and
+///      it works from a Captured pane that has been emptied out from under it (Test 24). (Index entry added by
+///      `W3.cap-r3-fu12`, which found Test 24 missing from this list.)
+///  22. An EMPTIED Captured pane still offers Finish and Clear while the session holds unfiled staged segments
+///      (W3.cap-r3-fu12) — the pane's control cluster was gated on `session.photos` while the unfiled work was
+///      not, so deleting the last received page stranded already-paid-for output behind an undiscoverable
+///      gesture. Both controls are driven from that state end to end (Finish → files on disk; Clear → abandons
+///      and leaves every processed file recoverable), the gate is measured in both directions, and an orphaned
+///      in-flight row is proved not to count as processing (Test 25).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -2852,6 +2863,245 @@ enum LiveCaptureRecoveryTestDriver {
 
             if let cfPriorReview {
                 UserDefaults.standard.set(cfPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- Test 25 (W3.cap-r3-fu12): what an EMPTIED Captured pane offers while the session still holds
+        // unfiled staged segments — and whether the two things it now offers actually WORK from there.
+        //
+        // THE ITEM WAS FILED AS A DECISION, NOT A BUG, so what this section is for needs saying first. The
+        // header's whole control cluster is gated on `!session.photos.isEmpty`, while the session's unfiled
+        // work is not: delete every received page with the per-thumbnail ✕ and the segments already OCR'd,
+        // tagged and written to `_processed/` are still there — with no Finish to file them and no Clear to
+        // abandon them. The pane said "Waiting for photos…". The decision taken was to offer the SAME two
+        // controls, gated on `LiveCaptureProcessor.hasUnfiledWork`; this section is what makes that decision
+        // falsifiable instead of a paragraph in a commit message.
+        //
+        // COVERAGE, stated before the checks for the same reason Test 24 had to. A headless driver calls model
+        // methods directly and cannot read a `View`, so it can never show that a BUTTON appeared. That is why
+        // the gate was put on the model rather than left inline in the header — the predicate the view draws on
+        // is itself measurable here (check 3), and its non-vacuity is measured in the other direction too
+        // (check 5: a fully successful finish must turn it OFF, or the cluster would linger over the green
+        // "Session complete" summary forever). What stays uncovered is exactly one leg: that the header reads
+        // it. See M1 — reverting the header arm leaves every check here green, the same view→model gap
+        // `W3.cap-r3-fu9` recorded as its M5 and fu9-fu1 as its M1/M6, and closing it needs the Processor VM
+        // GUI lane (`W21.vmgui-d`). `live.clear` / `live.finish` identifiers were added for that lane.
+        //
+        // WHAT IT DOES PROVE, and each is a property a plausible version of this decision gets wrong:
+        //   • the stranded state is real and the paid work survives reaching it (checks 1-2). Everything else
+        //     is worthless if the segment does not actually outlive the ✕.
+        //   • FINISH FILES FROM THERE (checks 4-5) — the substance of the decision. It is not enough that a
+        //     button appears: `requestFinish` runs `session.completeAllOpenDocGroups()` over a session with no
+        //     groups left, and had that returned false the finish would have died in its error branch and the
+        //     whole decision would have been unimplementable. Driven end to end, to files on disk.
+        //   • CLEAR ABANDONS FROM THERE WITHOUT DESTROYING THE OUTPUT (check 6) — the other half of the same
+        //     choice, and the reason it is safe to offer: `clearSessionState` is an in-memory reset, so the
+        //     `_processed` PDFs are still on disk afterwards. Note what Clear costs from THIS state compared
+        //     with the one Test 22 drives: `session.clear()` Trashes `photos`, which is empty here, so it
+        //     Trashes nothing at all.
+        //   • the new arm cannot draw a spinner that never stops (check 7) — the `processingCount` half of the
+        //     fix. `session.groups` is derived from `session.photos`, so an emptied pane orphans every
+        //     `.ocr`/`.tagging` row; unfiltered, "Processing…" would draw forever in exactly the state this
+        //     item makes visible.
+        //
+        // NON-VACUITY, measured (2026-08-04) — every mutant BUILT and RUN to a written report:
+        //   M1 the `else if liveProc.hasUnfiledWork` arm reverted to fu9-fu1's `else if liveProc.pendingFinish
+        //      { HStack(spacing: 8) { pendingFinishRow } }` — i.e. the shipped defect, exactly as it stood
+        //      -> 0 RED. RUN rather than predicted, because it is this item's own leg. Recorded as the priced
+        //      gap it is (`W21.vmgui-d`).
+        //   M2 `hasUnfiledWork` weakened to `!staged.isEmpty` (the reading the item's own title suggests)
+        //      -> 0 RED here, and that is the honest result: every state this section reaches has a staged
+        //      segment whenever it has a roster. The `statuses` spelling is defended by ARGUMENT, not by this
+        //      driver — it additionally covers a segment that failed to file and an orphaned in-flight row —
+        //      and check 7 is the closest this gets to it (a roster with nothing staged).
+        //   M3 `hasUnfiledWork` widened to `true` -> 1 RED, check 5. The gate that never turns off: the
+        //      cluster would draw over the finished-session summary with nothing left to finish.
+        //   M4 `processingCount`'s `session.groups` term deleted (the pre-fu12 spelling) -> 1 RED, check 7.
+        //      The forever-spinner leg, and also the one that would have put the count back out of step with
+        //      `proceedToFinishIfReady`.
+        //   M5 `finalize`'s `statuses.removeAll { filedGroups.contains($0.id) }` deleted -> 2 RED, checks 5
+        //      and 6. Not a mutant of this item's code, and run deliberately: it is what shows check 5 is
+        //      reading the roster the gate reads rather than passing on `staged` alone.
+        //
+        // COST (`W21.recovery-timeout`): no wall-clock waits — only settles, and one gate the section opens
+        // itself. Side effects outside its temp dir: three stub JPEGs to the Trash (the ✕ is
+        // `CaptureSession.removePhoto`, recoverable by design — driving the operator's real gesture is worth
+        // that). FILE SAFETY: every finalize destination is an explicit `chosenExisting` under `tmp`, so the
+        // move can never consult `currentOutputDirectory`, whose non-test fallback is the operator's real
+        // output folder. ---
+        if isolatedBackup {
+            // Prune the throwaway backup root FIRST, for the reason Test 24 records: `CaptureSession()` adopts
+            // orphaned photos out of the session folders earlier sections left behind, and check 1's
+            // single-page premise must be about THIS section's page.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let uwOut = tmp.appendingPathComponent("fu12out", isDirectory: true)
+            let uwFiled = tmp.appendingPathComponent("fu12filed", isDirectory: true)
+            let uwStaging = tmp.appendingPathComponent("APStaging-fu12-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: uwFiled, withIntermediateDirectories: true)
+            let uwGate = TestGate()
+            let uwSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            uwSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below runs
+                    // for real, for $0, with no network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: uwOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: uwStaging)
+            let uwProc = uwSession.liveProcessor
+            func uwSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            // A REAL, decodable JPEG: the checks below read the staged PDFs as artifacts that filed, and an
+            // undecodable page would route through the placeholder path (`W23.h5`) and withhold its source
+            // from retirement — a second story this section is not about.
+            let uwBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let uwJPEG = uwBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+            func uwSend(_ gid: String, _ seq: Int) {
+                uwSession.ingest(jpeg: uwJPEG, groupId: gid, seq: seq, type: .document,
+                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            func uwEmptyThePane() { for p in uwSession.photos { uwSession.removePhoto(p) } }
+            // The rotation review must be OFF so `finishSession` goes straight to `beginFinalize`: checks 4-5
+            // are about whether Finish FILES from the emptied pane, not about the review sheet (Test 24 covers
+            // the review path). Restored at the end, same handling as Tests 23 and 24.
+            let uwPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(false, forKey: DefaultsKeys.reviewRotation)
+
+            // 1. PREMISE. A one-page document goes all the way to STAGED — OCR through the stub, tag card
+            //    resolved, PDF written into the staging dir — and is not yet filed. This is the work the
+            //    emptied pane must not strand.
+            uwSend("U1", 1)
+            uwProc.segmentResolved(groupId: "U1")
+            let u1Staged = await uwSettle { uwProc.staged.contains { $0.groupId == "U1" } }
+            let u1PDFs = uwProc.staged.first { $0.groupId == "U1" }?.pdfURLs ?? []
+            check("a document is staged, written and unfiled — the work an emptied pane must not strand (fu12)",
+                  u1Staged && uwSession.photos.count == 1 && !u1PDFs.isEmpty
+                      && u1PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && uwProc.statuses.first { $0.id == "U1" }?.phase == .staged
+                      && !uwProc.pendingFinish && uwProc.failedGroupIds.isEmpty)
+
+            // 2. PREMISE — THE STRANDED STATE, reached by the operator's real gesture. The ✕ on the last page
+            //    empties both `photos` and the derived `groups`, and the staged segment does not care: its PDF
+            //    is still on disk and still unfiled. Every term after the first two is what makes this the
+            //    photoless-but-live state rather than a session that simply ended — and `!pendingFinish` is
+            //    what makes it a DIFFERENT state from the one fu9-fu1's second renderer already covered.
+            uwEmptyThePane()
+            check("emptying the pane with the ✕ strands a staged segment: no photos, no groups, work outstanding (fu12)",
+                  uwSession.photos.isEmpty && uwSession.groups.isEmpty
+                      && uwProc.staged.count == 1
+                      && u1PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && !uwProc.pendingFinish && !uwSession.phonePendingActive && !uwProc.isFinalizing)
+
+            // 3. THE GATE. `hasUnfiledWork` is the predicate the header's second arm draws on, and the two
+            //    terms after it are Finish's own `.disabled` inverted (`statuses.isEmpty || isFinalizing`) —
+            //    so this says the cluster's condition holds AND the button inside it would be pressable, which
+            //    is the whole model-side claim of the decision. Before this item both were true here and the
+            //    view asked `session.photos` anyway.
+            check("...and the gate the header now draws on is TRUE there, with Finish's own predicate open (fu12)",
+                  uwProc.hasUnfiledWork && !uwProc.statuses.isEmpty && !uwProc.isFinalizing)
+
+            // 4. THE DECISION, first half: Finish from the emptied pane REACHES collection naming. The term
+            //    worth reading is the premise, not the result — `requestFinish` starts with
+            //    `session.completeAllOpenDocGroups()` over a session with no groups at all. It returns true
+            //    vacuously (nothing newly completed, so no manifest write to fail), but had it returned false
+            //    the finish would have died in its "Could not save session completion" branch and this
+            //    decision could not have been implemented at all. Asserted rather than assumed.
+            uwProc.requestFinish()
+            let u1Draft = uwProc.drafts.first
+            check("Finish from an emptied pane reaches collection naming instead of dying in its error branch (fu12)",
+                  !uwProc.pendingFinish && uwProc.showFinalizeSheet
+                      && uwProc.drafts.count == 1 && u1Draft?.segmentCount == 1
+                      && !uwSession.statusMessage.contains("Could not save session completion"))
+
+            // 5. …and it FILES — to disk, and the gate turns off behind it. The destination is an explicit
+            //    `chosenExisting` under `tmp` (file safety: that is the one path `finalize` takes that never
+            //    consults `currentOutputDirectory`, whose non-test fallback is the operator's real output
+            //    folder). The last term is the gate's non-vacuity in the direction that matters: a fully
+            //    successful finish empties the roster, so the cluster does NOT linger over the green "Session
+            //    complete" summary offering to finish a session with nothing left in it.
+            uwProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: u1Draft?.id ?? "__unfiled__", finalName: uwFiled.lastPathComponent,
+                existingFolders: [], suggestedFolders: [], chosenExisting: uwFiled,
+                segmentCount: 1, photoCount: 1)])
+            let u1Filed = await uwSettle { !uwProc.isFinalizing && uwProc.staged.isEmpty }
+            let filedPDFs = ((try? fm.contentsOfDirectory(at: uwFiled, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension.lowercased() == "pdf" }
+            check("...and it files for real, after which the gate is OFF — nothing left to finish (fu12)",
+                  u1Filed && !filedPDFs.isEmpty && uwProc.statuses.isEmpty
+                      && uwProc.finalizeSummary != nil && !uwProc.hasUnfiledWork)
+
+            // 6. THE DECISION, second half: Clear abandons from the emptied pane, and the abandoned output is
+            //    still on disk afterwards — which is why it is safe to offer here. `clearSessionState` is a
+            //    pure in-memory reset (Recovery Core Directive), so the `_processed` PDFs survive in the
+            //    visible backup folder; what Clear drops is the app's memory of them. Note what it costs from
+            //    THIS state versus the Clear Test 22 drives: `session.clear()` Trashes `photos`, and `photos`
+            //    is empty, so it Trashes nothing whatsoever.
+            //
+            //    Finish reclaimed the spent staging dir along with the batch (`W3.cap-r6`), so put it back
+            //    before staging U2 — same handling as Test 17's re-finalize.
+            try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
+            uwSend("U2", 1)
+            uwProc.segmentResolved(groupId: "U2")
+            let u2Staged = await uwSettle { uwProc.staged.contains { $0.groupId == "U2" } }
+            let u2PDFs = uwProc.staged.first { $0.groupId == "U2" }?.pdfURLs ?? []
+            uwEmptyThePane()
+            let u2Stranded = u2Staged && uwSession.photos.isEmpty && uwProc.hasUnfiledWork
+                && !u2PDFs.isEmpty && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
+            uwProc.clearSession()
+            check("Clear abandons an emptied pane's unfiled work — and leaves every processed file on disk (fu12)",
+                  u2Stranded && uwProc.staged.isEmpty && uwProc.statuses.isEmpty
+                      && !uwProc.hasUnfiledWork && !uwProc.pendingFinish
+                      && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 7. THE `processingCount` HALF OF THE FIX: the new arm must not be able to draw a "Processing…"
+            //    spinner that can never stop. A page parked mid-OCR whose photo is then deleted leaves a
+            //    `.ocr` row behind (`photoRemoved` cancels the task and keeps the row), and `session.groups`
+            //    is derived from `session.photos` — so with the pane empty EVERY in-flight row is orphaned and
+            //    can never resolve. `proceedToFinishIfReady` has always excluded those from the hold; before
+            //    this item the property the UI shows did not, and it was survivable only because the cluster
+            //    was hidden in exactly this state. The last term is the roster staying non-empty: there is
+            //    still something here, so the operator still needs Clear to be offered — the fix narrows the
+            //    COUNT without narrowing the gate.
+            try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
+            LiveCaptureProcessor._recoveryTestOCRGate = { await uwGate.wait() }
+            uwSend("U3", 1)
+            let u3InOCR = await uwSettle { uwProc.statuses.contains { $0.id == "U3" && $0.phase == .ocr } }
+            uwEmptyThePane()
+            check("an orphaned in-flight row is not counted as processing — no spinner that can never stop (fu12)",
+                  u3InOCR && uwSession.groups.isEmpty
+                      && uwProc.statuses.contains { $0.id == "U3" && $0.phase == .ocr }
+                      && uwProc.processingCount == 0 && uwProc.hasUnfiledWork)
+
+            uwGate.open()
+            if let uwPriorReview {
+                UserDefaults.standard.set(uwPriorReview, forKey: DefaultsKeys.reviewRotation)
             } else {
                 UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
             }
