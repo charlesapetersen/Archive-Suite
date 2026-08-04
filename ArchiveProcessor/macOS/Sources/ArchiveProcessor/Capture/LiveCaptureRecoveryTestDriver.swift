@@ -44,6 +44,10 @@ import ArchiveCore
 ///      exactly the group being retried, without touching another segment's in-flight call, and without
 ///      eating the fresh calls it buys to replace them. Latent in production (nothing offers a retry for a
 ///      segment mid-OCR, and no such group is in `failedGroupIds`); the section pins both of those too.
+///  15. A group that FILES leaves the failed set with the finalized one (W3.cap-r3-fu5), so
+///      `failedGroupIds ⊆ finalizedGroups` — the subset several of this subsystem's latency arguments lean
+///      on — survives the one path that used to break it: a segment failed by a transient staging write
+///      error, regenerated into a filable record by the end-of-session rotation review, and then filed.
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -1216,9 +1220,10 @@ enum LiveCaptureRecoveryTestDriver {
         // that clear; the per-item menu offers `.retry` only for `.failed`/`.succeededNoText`/
         // `.succeededPlaceholderImage`, never for a segment mid-OCR. Check 2 PINS BOTH legs of that gate — the
         // per-item menu AND `failedGroupIds` — so the day an edit makes a retry reachable mid-flight this
-        // driver says so out loud. (The `failedGroupIds` leg is the fragile one: nothing enforces that a
-        // failed group stays in `finalizedGroups`, which is `W3.cap-r3-fu5`.) What the section proves is that
-        // the mechanism is right whenever it IS reached: cancel first, drop second, exactly this group.
+        // driver says so out loud. (The `failedGroupIds` leg used to be the fragile one — nothing kept a
+        // failed group inside `finalizedGroups`; `W3.cap-r3-fu5` made that structural and Test 19 drives it.)
+        // What the section proves is that the mechanism is right whenever it IS reached: cancel first, drop
+        // second, exactly this group.
         //
         // NON-VACUITY, measured (2026-08-03), four mutants of the loop:
         //   M1 the pre-fix drop-without-cancel                   → 1 RED, the cancel check alone.
@@ -1313,8 +1318,8 @@ enum LiveCaptureRecoveryTestDriver {
             //    comment on `retryFailed`'s cancel loop, which is what keeps that edit safe. Scope of the
             //    second leg, since it asserts an absence: it pins that a group in THIS state is not in the
             //    bulk retry's input. It cannot see the lifecycle path of `W3.cap-r3-fu5` — a group that fails,
-            //    is later filed by the rotation review, and stays in `failedGroupIds` after losing its
-            //    late-page cover — because nothing in this session ever fails.
+            //    is later filed by the rotation review, and used to stay in `failedGroupIds` after losing its
+            //    late-page cover — because nothing in this session ever fails. Test 19 drives that one.
             let midOCR = ruProc.statuses.first { $0.id == "U1" }
             check("no retry is offered for a segment mid-OCR — the reason the drop-without-cancel was latent",
                   midOCR?.phase == .ocr
@@ -1362,6 +1367,181 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
             LiveCaptureProcessor._recoveryTestOCRGate = nil
+        }
+
+        // --- Test 19 (W3.cap-r3-fu5): a group that FILES must leave the failed set.
+        // `failedGroupIds ⊆ finalizedGroups` is load-bearing and was unenforced. `markFailed` is the only
+        // writer that INSERTS, and it runs inside `finalizeSegment` after the group is already finalized, so
+        // the subset can only break on a REMOVAL — and of the three, `finalize` was the one that dropped the
+        // finalized entry alone, over exactly the groups it had just filed.
+        //
+        // Reaching it needs a group that is both FAILED and FILABLE, which sounds contradictory and is not:
+        // `finalizeSegment` appends to `staged` and `retained` BEFORE the label branch, so a `.noOutput`
+        // segment sits in both; `finishSession` enumerates `retained.values` unconditionally, so its pages
+        // enter the rotation review; and a regeneration there replaces the staged record WHOLESALE without
+        // touching the label. If the original failure was transient — a write error, no free space, rather
+        // than a missing source, which fails regeneration the same way — the record comes back filable while
+        // the group is still counted failed. This section builds that state for real, with a read-only
+        // staging dir as the transient error, and drives it through Finish → rotation review → finalize.
+        //
+        // What the leftover entry cost: `finalize` drops the status row one line above, so the operator got a
+        // "Retry 1 failed" button with no row under it, pointed at a document already in the collection — and
+        // `retryFailed` would have answered that button by buying its OCR a second time.
+        //
+        // NON-VACUITY, measured (2026-08-03), three mutants of `releaseFinalizedGroup` + its call site:
+        //   M1 the pre-fix `finalizedGroups.remove(gid)` back at the finalize call site
+        //      → 2 RED, both here: the subset check and the button check. This is the shipped defect.
+        //   M2 `releaseFinalizedGroup` clearing ONLY `failedGroupIds` (the finalized leg dropped)
+        //      → 9 RED: the subset check here, plus 8 in Test 17, which needs that same removal for a filed
+        //      group's re-uploaded page to buy its call. ⚠️ Read with the harness wait temporarily raised to
+        //      240 s — Test 17's stalled settles push the run past `test-recovery.sh`'s 60 s, and the report
+        //      is written only at the END, so under the script AS SHIPPED this mutant reads as a bare
+        //      timeout with no PASS/FAIL lines at all. (Corroborates `W21.recovery-timeout`.)
+        //   M3 `failedGroupIds.removeAll()` instead of removing this group
+        //      → 1 RED, the button check. It is caught only because the section files V1 while V2 is still
+        //      genuinely failed: an earlier draft with a single group let M3 through all 141 checks, and
+        //      Test 18's scope check does not cover this (it is about `pageTasks`, not the failed set).
+        // Checks 1–3 are premises, not catchers — they exist so a green result cannot come from the segments
+        // never failing, or from the regeneration never making V1 filable. ---
+        if isolatedBackup {
+            // Same isolation as Tests 16–18, and load-bearing for the same reason: `CaptureSession.init`
+            // adopts the newest backup session that still holds unprocessed photos, so inherited photos would
+            // put pages in this session it never ingested.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let fvOut = tmp.appendingPathComponent("fu5out", isDirectory: true)
+            let fvStaging = tmp.appendingPathComponent("APStaging-fu5-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: fvStaging, withIntermediateDirectories: true)
+            let fvSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            fvSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — a document only reaches the LLM in `.automatic`, so both finalizes below run
+                    // for real, for $0, with no network.
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: fvOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: fvStaging)
+            let fvProc = fvSession.liveProcessor
+            func fvSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func fvChmod(_ mode: Int) {
+                try? fm.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: fvStaging.path)
+            }
+
+            // 1. PREMISE. Fail the segment the way the item describes — a TRANSIENT write error, not a lost
+            //    source. `writeSegmentFiles` records only a PDF it can prove is on disk, so a staging dir it
+            //    cannot write into yields none at all → `.noOutput` → `markFailed`. The source photo lives in
+            //    the backup root and is untouched, which is exactly why step 3's regeneration can succeed
+            //    where this write did not. The subset is asserted HERE too: at the moment of failure the
+            //    group is in both sets, which is the state the rest of the section watches.
+            //    TWO groups fail, and only V1 is rotated below — so V2 is a segment that is STILL genuinely
+            //    failed and unfiled when the batch files V1. It is what makes the scoping load-bearing: a
+            //    `releaseFinalizedGroup` that cleared the failed set wholesale would take the operator's one
+            //    real retry with it, and nothing else in this driver would notice.
+            fvChmod(0o555)
+            for gid in ["V1", "V2"] {
+                fvSession.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: gid, seq: 1,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                fvProc.segmentResolved(groupId: gid)
+            }
+            let fvFailed = await fvSettle {
+                fvProc.failedGroupIds.contains("V1") && fvProc.failedGroupIds.contains("V2")
+            }
+            fvChmod(0o755)   // the error was transient; from here the dir is writable again
+            check("a transient staging write error fails both segments with NO output, inside both sets",
+                  fvFailed && fvProc.statuses.first { $0.id == "V1" }?.phase == .failed
+                      && fvProc.isFinalized("V1") && fvProc.isFinalized("V2")
+                      && fvProc.staged.first { $0.groupId == "V1" }?.pdfURLs.isEmpty == true
+                      && fvProc.staged.first { $0.groupId == "V2" }?.pdfURLs.isEmpty == true)
+
+            // 2. PREMISE. A failed segment's pages still reach the end-of-session rotation review, because
+            //    `finishSession` enumerates `retained.values` and nothing filters by label. Driven through the
+            //    real Finish rather than by poking `rotationReviewPages`: the "Review rotation" default is the
+            //    only input, and it is set and restored around the single SYNCHRONOUS call that reads it, so
+            //    this never leaves the operator's own toggle flipped.
+            let priorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+            fvProc.finishSession()
+            if let priorReview {
+                UserDefaults.standard.set(priorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            check("a FAILED segment's pages still enter the end-of-session rotation review",
+                  fvProc.showRotationReview
+                      && fvProc.rotationReviewPages.contains { $0.groupId == "V1" })
+
+            // 3. PREMISE. The operator corrects a rotation, so the review regenerates the segment — and this
+            //    time the write lands. The staged record is replaced wholesale, so a group that is still
+            //    counted failed is now one `executePlans` will file. Without this the finalize below would
+            //    file nothing and check 5 would pass for the wrong reason.
+            for i in fvProc.rotationReviewPages.indices where fvProc.rotationReviewPages[i].groupId == "V1" {
+                fvProc.rotationReviewPages[i].rotationDegrees = 90
+            }
+            fvProc.applyRotationReviewAndFinalize()
+            let fvRegen = await fvSettle {
+                !fvProc.isFinalizing && fvProc.staged.first { $0.groupId == "V1" }?.pdfURLs.isEmpty == false
+            }
+            let fvRecord = fvProc.staged.first { $0.groupId == "V1" }
+            check("the rotation review regenerates that record into a FILABLE one — a PDF proven on disk",
+                  fvRegen && fvRecord?.pagesComplete != false
+                      && fvRecord?.pdfURLs.first.map { fm.fileExists(atPath: $0.path) } == true)
+
+            // 4. …and does NOT reconcile the label while doing it, which is what puts a filable group into
+            //    finalize still wearing the failed one. Pinned as the state the fix has to survive, NOT as
+            //    something this item fixes: the stale `.failed` on a regenerated record is its own defect —
+            //    it also makes the collection sheet warn "1 segment(s) failed to process and are NOT filed …
+            //    Retry them before finalizing" about a segment that is fine, and a retry there would delete
+            //    the freshly regenerated output and re-buy the OCR. Filed separately as `W3.cap-r3-fu6`. If
+            //    that lands, THIS check is the one that flips, and the section below still holds.
+            check("...while leaving it labelled failed — the state fu5 has to survive (see W3.cap-r3-fu6)",
+                  fvProc.failedGroupIds.contains("V1")
+                      && fvProc.statuses.first { $0.id == "V1" }?.phase == .failed)
+
+            // 5. THE FIX. Finish files it, and a filed group leaves BOTH sets together.
+            fvProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: fvRecord?.collectionKey ?? "__unfiled__", finalName: fvOut.lastPathComponent,
+                existingFolders: [], suggestedFolders: [], chosenExisting: fvOut,
+                segmentCount: 1, photoCount: 1)])
+            let fvFiled = await fvSettle {
+                !fvProc.isFinalizing && !fvProc.staged.contains { $0.groupId == "V1" }
+            }
+            // Deliberately worded unlike Test 17's near-identical premise: the two shared a name while the
+            // mutants below were being read, and a FAIL line is all a reader gets.
+            check("the REGENERATED document really filed, so what follows is its post-filing state",
+                  fvFiled && ((try? fm.contentsOfDirectory(at: fvOut, includingPropertiesForKeys: nil)) ?? [])
+                      .contains { $0.pathExtension == "pdf" })
+            check("a FILED group leaves the failed set with the finalized one — the subset survives the file",
+                  !fvProc.failedGroupIds.contains("V1") && !fvProc.isFinalized("V1"))
+            // The operator-visible shape of the same thing, and the pairing that made it confusing rather
+            // than merely wrong: `failedGroupIds.count` IS the "Retry N failed" button, and the row that
+            // would have explained the count is dropped by the same finalize. Asserted as an EQUALITY
+            // against the one segment that genuinely failed, so it catches both directions — the filed
+            // group left in (the bug) and the unfiled one swept out with it (over-reach).
+            check("...so the button counts exactly the segment that is still failed, and it has a row",
+                  fvProc.failedGroupIds == ["V2"]
+                      && !fvProc.statuses.contains { $0.id == "V1" }
+                      && fvProc.statuses.contains { $0.id == "V2" && $0.phase == .failed })
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
