@@ -62,6 +62,14 @@ import ArchiveCore
 ///      `isFinishingScrimUp` and for no other state — down when idle, down under either sheet, and back down
 ///      the moment the regeneration lands (Test 21 §3b). Only the COVERAGE is measurable here; whether the
 ///      scrim then absorbs the click is a pixel question for the VM GUI lane.
+///  19. A CLEAR pressed in that same window (W3.cap-r3-fu11) refuses in BOTH halves at once — it neither
+///      Trashes the sources the pending write is still reading nor empties the state that write is about to
+///      publish into — and refuses only for the length of the window (Test 22).
+///  20. The finish flow never STARTS while one of the Processing list's per-item sheets is up
+///      (W3.cap-r3-fu9), so the rotation review is never raised as a second concurrent `.sheet` presentation:
+///      a drained Finish is HELD while the sheet is open (through a full watchdog tick), the operator's
+///      deferred Apply is still allowed, and closing the sheet resumes the finish with the review intact and
+///      the retried segment's pages in it (Test 23).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -2067,9 +2075,11 @@ enum LiveCaptureRecoveryTestDriver {
             //    button in (the sheet is modal). So this is primarily the guard's WIDTH measurement (mutant P5
             //    is 1 RED here), and only secondarily the not-a-ban claim; a check for the affordance as the
             //    operator meets it would have to dismiss the sheet first, and would then lose the width
-            //    measurement. ⚠️ It also COUPLES this section to `W3.cap-r3-fu9`: because it asserts the retry
-            //    SUCCEEDS under `showFinalizeSheet`, a future fu9 fix that refuses during the sheet states
-            //    turns this check RED and must rewrite it rather than read it as a regression.
+            //    measurement. ⚠️ It was also flagged as COUPLED to `W3.cap-r3-fu9`: because it asserts the
+            //    retry SUCCEEDS under `showFinalizeSheet`, a fu9 fix that refused during the sheet states
+            //    would have turned it RED. **fu9 shipped 2026-08-04 and did not** — it holds the FINISH while
+            //    a per-item sheet is up (Test 23) instead of refusing the retry, so this check stands
+            //    unchanged and the coupling is discharged rather than still pending.
             rfProc.retryFailed(groupIds: ["F1"])
             let rfReStaged = await rfSettle { rfProc.statuses.first { $0.id == "F1" }?.phase == .staged }
             check("after the window closes the retry works again — a window, not a ban",
@@ -2277,6 +2287,226 @@ enum LiveCaptureRecoveryTestDriver {
                       && !clProc.isFinalized("L1")
                       && clSources.allSatisfy { !fm.fileExists(atPath: $0.path) })
 
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- Test 23 (W3.cap-r3-fu9): the end-of-session rotation review raised while one of the Processing
+        // list's PER-ITEM sheets ("Retry with model" / "Rotate & re-run", "View text") is already on screen.
+        //
+        // THE WINDOW, and why it is reachable with no operator click. `finishSession` is the only writer of
+        // `showRotationReview`, and one of its two callers is `proceedToFinishIfReady` — driven by BACKGROUND
+        // events: a segment staging, a phone heartbeat, and a 5 s watchdog. So the operator presses Finish
+        // while the phone is still draining (the finish goes `pendingFinish`), opens a per-item sheet on a
+        // staged segment while they wait, and the drain completing then raises the review underneath their
+        // open sheet. No second click is needed anywhere. That is what this section drives, in that order.
+        //
+        // WHAT WAS **NOT** SETTLED, stated first because the fix is shaped around not needing it. Whether
+        // SwiftUI SUPPRESSES the second presentation, QUEUES it, or STACKS it is unobserved — a headless
+        // driver cannot see sheet presentation at all, and the Processor has no VM GUI lane yet
+        // (`W21.vmgui-d`). The item that filed this asked for the premise to be verified; it could not be,
+        // here, so it was made IRRELEVANT instead: each of the three answers is a different failure
+        // (a silently skipped review + a permanently dead Finish; a review describing pages of a segment
+        // being re-OCR'd, whose edits `applyRotationReviewAndFinalize` then drops on a nil `retained`; or a
+        // model sheet revealed again inside `isFinalizing`, where `W3.cap-r3-fu7`'s refusal is silent), and
+        // `proceedToFinishIfReady` refusing to start the finish while a per-item sheet is up makes the state
+        // none of them can be reached from. See `LiveCaptureProcessor.modelChoiceTarget`.
+        //
+        // WHAT THIS DRIVER CAN AND CANNOT PROVE. It proves the MODEL-layer rule and its non-vacuity: at
+        // check 3 every other term of `proceedToFinishIfReady`'s guard is independently asserted false, so
+        // only the sheet term can be doing the holding. It cannot prove the VIEW feeds that state — a
+        // SwiftUI binding is invisible from here. That leg is instead COMPILE-enforced: this item deleted
+        // `LiveCaptureView`'s two `@State` targets outright, so the view has no local copy left to drift
+        // back to and cannot compile while referring to one. That is stronger than the runtime check a
+        // driver could have made, and it is the reason no `perItemSheetUp`-vs-view mutant is listed below.
+        //
+        // NON-VACUITY, measured (2026-08-04). Every mutant was built and run to a written report (a 120 s
+        // wait, not `test-recovery.sh`'s 60 s — a stranded run that gets killed reads as 0 RED, which is the
+        // mistake `W3.cap-r3-fu11`'s pass made once). Baseline 0 RED; the counts are observed:
+        //   M1 the `!perItemSheetUp` term deleted from `proceedToFinishIfReady` (the shipped defect)
+        //      → 1 RED, check 3. The drained finish walks straight into the review with the model sheet
+        //      open. This is the mutant the section exists for. Checks 4–7 then still PASS, which is worth
+        //      recording rather than hiding: with the review raised early, the Apply's retry re-populates
+        //      `retained` before the review is applied, so the dropped-edits leg does not reproduce at the
+        //      driver's timing. Check 3 is therefore the load-bearing kill, and checks 6–7 assert the leg-2
+        //      PROPERTY rather than killing the leg-2 bug.
+        //   M2 the guard kept, but `perItemSheetDidChange`'s nudge deleted (only the 5 s watchdog re-arms it)
+        //      → 0 RED, and correctly so: check 5's settle outlives one watchdog period, so the watchdog
+        //      covers it. Recorded because it prices the nudge honestly — it is latency, not correctness. A
+        //      later edit may drop it without breaking this test; dropping the WATCHDOG would break it.
+        //   M3 the guard MOVED into `finishSession` instead (the plausible wrong placement)
+        //      → 3 RED, checks 3, 5 and 6. Predicted as 2 (checks 5 and 7) and recorded as measured. The
+        //      extra RED is the informative one and it lands EARLIER than predicted: `proceedToFinishIfReady`
+        //      clears `pendingFinish` on the line before the call, so a refusal one level in DISCARDS the
+        //      finish — and check 3 catches that immediately, because `pendingFinish` is already false while
+        //      the sheet is still up. Nothing then re-arms it, so the review never comes back (check 5) and
+        //      there is nothing to apply (check 6). Check 7 passes because `applyRotationReviewAndFinalize`
+        //      with no pages still reaches `beginFinalize`, which is exactly why check 7 alone would be a
+        //      weak assertion. This is the measurement behind the placement note in the guard's comment.
+        //   M4 the view-side analogue — the guard fed from a `@State` copy in `LiveCaptureView` instead of
+        //      from model state — is not buildable as a mutant here, by construction: the view has no
+        //      per-item `@State` left to feed it. Named rather than silently skipped.
+        //
+        // COST, since `W21.recovery-timeout` is about exactly this: check 3 deliberately waits 5.5 s so a
+        // watchdog tick (5 s period) lands INSIDE the negative window — the watchdog is the entrant that
+        // fires with no external event, so a guard that only covered the heartbeat path would pass a shorter
+        // wait. That is ~5.5 s added to a ~15 s ALL-PASS baseline against `test-recovery.sh`'s 60 s report
+        // wait. Budgeted, not accidental. ---
+        if isolatedBackup {
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let psOut = tmp.appendingPathComponent("fu9out", isDirectory: true)
+            let psStaging = tmp.appendingPathComponent("APStaging-fu9-\(String(UUID().uuidString.prefix(8)))",
+                                                      isDirectory: true)
+            try? fm.createDirectory(at: psStaging, withIntermediateDirectories: true)
+            let psSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            psSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    // `.human` — no document reaches the LLM, so this runs for real, for $0, no network.
+                    taggingMode: .human, rotationMode: .off,
+                    // No merge: the regeneration has to SUCCEED here (same reasoning as Tests 21/22).
+                    mergeDocuments: false,
+                    outputDirectory: psOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: psStaging)
+            let psProc = psSession.liveProcessor
+            func psSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func psPaidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            let psBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let psJPEG = psBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+
+            // The review preference must stay set across every await in this section — the review here is
+            // raised by a BACKGROUND event, not by a synchronous call the driver brackets (Tests 21/22 could
+            // restore it immediately because they call `finishSession()` themselves). Restored at the end.
+            let psPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+
+            // 1. PREMISE. A two-page document stages cleanly.
+            for seq in [1, 2] {
+                psSession.ingest(jpeg: psJPEG, groupId: "P1", seq: seq,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            psProc.segmentResolved(groupId: "P1")
+            let psStagedOK = await psSettle { psProc.statuses.first { $0.id == "P1" }?.phase == .staged }
+            let psPaidAfterStage = psPaidStarts()
+            check("a two-page document stages cleanly (fu9)",
+                  psStagedOK && psProc.isFinalized("P1") && psProc.failedGroupIds.isEmpty
+                      && psProc.staged.first { $0.groupId == "P1" }?.pdfURLs.isEmpty == false)
+
+            // 2. PREMISE. The finish goes through the REAL `requestFinish`, not `finishSession` directly
+            //    (Tests 21/22 could take that shortcut; this section cannot, because the whole point is the
+            //    background entrant). Both of `requestFinish`'s documented jobs are exercised: it
+            //    force-completes the still-open doc group — which surfaces that group's Mac tag card, a
+            //    thing the shortcut never showed — and it holds the finish while the phone says it still has
+            //    a page un-sent.
+            psSession.updatePhonePending(1)
+            psProc.requestFinish()
+            check("a Finish pressed while the phone is still draining goes pending, and surfaces the card",
+                  psProc.pendingFinish && !psProc.showRotationReview && !psProc.showFinalizeSheet
+                      && psSession.phonePendingActive && psSession.pendingTagGroup?.id == "P1")
+
+            // 3. THE FIX. The operator opens a per-item sheet while waiting, then resolves the card and the
+            //    phone drains — so `proceedToFinishIfReady` is entered by BOTH of its event-driven callers
+            //    (card resolution and `phoneStatusChanged`) and by the 5 s watchdog inside the wait below.
+            //    The finish is HELD, not advanced: no review, no collection sheet, no scrim.
+            //
+            //    NON-VACUITY IS THE POINT OF THE LAST FOUR TERMS. Every OTHER term of that guard is asserted
+            //    independently false here — card resolved, nothing still processing, phone drained — so the
+            //    hold is attributable to the sheet and to nothing else. Without them this check passes on a
+            //    finish that is stuck for an unrelated reason, which is exactly what the first run of this
+            //    section did: `requestFinish`'s force-completion had left the card outstanding, and the card
+            //    term of the same guard was doing all the work.
+            psProc.modelChoiceTarget = .init(groupId: "P1", includeRotation: true)
+            psSession.skipMacTags(groupId: "P1")
+            psSession.updatePhonePending(0)
+            var psRaisedWhileHeld = false
+            // WALL-CLOCK, not an iteration count: by this point in the run a dozen earlier `CaptureSession`s
+            // are still alive with their own 5 s heal ticks, so the MainActor is busy enough that 25 ms
+            // sleeps land ~160 ms apart — an iteration count that looked like 5.5 s measured 35 s and blew
+            // `test-recovery.sh`'s 60 s report wait outright. A deadline is also what actually makes the
+            // "one watchdog tick lands inside the window" claim true.
+            let psDeadline = Date().addingTimeInterval(5.5)   // > one 5 s watchdog period (see COST above)
+            while Date() < psDeadline {
+                if psProc.showRotationReview || psProc.showFinalizeSheet || psProc.isFinalizing {
+                    psRaisedWhileHeld = true
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            check("with a per-item sheet up, a drained Finish is HELD — the review is not raised over it",
+                  !psRaisedWhileHeld && psProc.pendingFinish && psProc.perItemSheetUp
+                      && !psProc.isFinishingScrimUp
+                      && psSession.pendingTagGroup == nil && !psSession.phonePendingActive
+                      && psProc.statuses.first { $0.id == "P1" }?.phase == .staged
+                      && psProc.processingCount == 0)
+
+            // 4. The hold is not a refusal — the operator's in-flight action still works. This is the
+            //    deferred Apply `W3.cap-r3-fu7` named: it buys the segment's OCR again (2 pages), which is
+            //    correct here because no finish is in flight. Then `onApply` clears the target, exactly as
+            //    the sheet does.
+            psProc.retryFailed(groupIds: ["P1"], override: LiveCaptureProcessor.OCROverride(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "", rotation: nil))
+            psProc.modelChoiceTarget = nil
+            let psReStaged = await psSettle { psProc.statuses.first { $0.id == "P1" }?.phase == .staged }
+            check("the deferred Apply is allowed while the finish waits, and re-stages the segment",
+                  psReStaged && psPaidStarts() == psPaidAfterStage + 2
+                      && psProc.retainedText(for: "P1") != nil)
+
+            // 5. …and the finish resumes BY ITSELF once the sheet is gone, with the review intact and its
+            //    pages taken from the RETRIED output. Nothing was skipped and nothing was lost, which is the
+            //    whole of what the item asked for.
+            let psReview = await psSettle { psProc.showRotationReview }
+            check("closing the sheet resumes the held finish, and the review arrives with the retried pages",
+                  psReview && !psProc.pendingFinish
+                      && psProc.rotationReviewPages.filter { $0.groupId == "P1" }.count == 2)
+
+            // 6. THE SECOND LEG the item filed — the operator's rotation edits are APPLIED, not silently
+            //    dropped. `applyRotationReviewAndFinalize` only reaches `isFinalizing` when a changed group
+            //    survived its `guard var seg = retained[page.groupId]`, so this observable is exactly the
+            //    difference between "the edits landed" and "they were discarded on a `retained` a retry had
+            //    emptied": a dropped edit leaves `changedGroups` empty and goes straight to `beginFinalize`.
+            for i in psProc.rotationReviewPages.indices
+            where psProc.rotationReviewPages[i].groupId == "P1" && psProc.rotationReviewPages[i].pageIndex == 0 {
+                psProc.rotationReviewPages[i].rotationDegrees = 90
+            }
+            psProc.applyRotationReviewAndFinalize()
+            check("the reviewed rotation is applied, not dropped on a retry-emptied `retained` (fu9)",
+                  psProc.isFinalizing && psProc.isFinishingScrimUp)
+
+            // 7. And the regeneration lands intact, so the held-then-resumed finish files like any other.
+            let psRegen = await psSettle { !psProc.isFinalizing && psProc.showFinalizeSheet }
+            let psRecord = psProc.staged.first { $0.groupId == "P1" }
+            check("the resumed finish regenerates intact and the segment is still filable (fu9)",
+                  psRegen && !psProc.isFinishingScrimUp && psProc.failedGroupIds.isEmpty
+                      && psRecord?.pagesComplete != false
+                      && psRecord?.pdfURLs.isEmpty == false
+                      && psRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true)
+
+            if let psPriorReview {
+                UserDefaults.standard.set(psPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
