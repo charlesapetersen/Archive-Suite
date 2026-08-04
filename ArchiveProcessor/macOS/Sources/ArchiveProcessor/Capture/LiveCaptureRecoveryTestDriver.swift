@@ -2551,6 +2551,210 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
+        // --- Test 24 (W3.cap-r3-fu9-fu1): CANCELLING a pending Finish — the escape that does not cost the
+        // session its source photos.
+        //
+        // WHAT WAS ACTUALLY BROKEN, since it is unusual: `cancelPendingFinish()` was correct code with no
+        // caller. Nothing in the shipped UI reached it, so while a Finish was pending — on a tag card, on
+        // in-flight OCR, on the phone's drain, or (since `W3.cap-r3-fu9`) on a per-item sheet — the operator's
+        // only exit was **Clear**, which Trashes every source photo of the session, and Clear is only rendered
+        // while `session.photos` is non-empty. Re-tapping Finish is not an exit (`requestFinish` re-arms). So
+        // the bug was a MISSING BUTTON, and the fix is one button plus a guard.
+        //
+        // WHICH IS EXACTLY WHY THE COVERAGE HAS TO BE STATED BEFORE THE CHECKS. A headless driver calls the
+        // model method directly, so on its own it re-proves what was already true and says nothing about the
+        // thing that was wrong. This section is therefore NOT the proof that the affordance exists; it is the
+        // proof that the affordance is SAFE TO OFFER — which was not previously established either, because
+        // nothing had ever exercised a cancel against live session state. See M1: deleting the button from
+        // `LiveCaptureView` leaves every check here green, the same UNCOVERED view→model leg `W3.cap-r3-fu9`
+        // recorded as its M5, and closing it needs the Processor VM GUI lane (`W21.vmgui-d`). The button
+        // carries `.accessibilityIdentifier("live.cancel-finish")` so that lane has something to press.
+        //
+        // WHAT IT DOES PROVE, and each one is a property a plausible implementation of "cancel" gets wrong:
+        //   • the wait is un-armed and the session is otherwise UNTOUCHED — photos still present, every source
+        //     file still on disk, the segment still mid-OCR, not one extra paid call (check 3). This is the
+        //     Clear contrast measured rather than asserted in prose: Test 22 drives the Clear that DOES Trash
+        //     the sources, so the two together say what the operator now gains.
+        //   • the cancel is a CANCEL, not a deferral: when the hold clears the finish does NOT quietly resume,
+        //     and the OCR that was in flight during the cancel still lands (check 5). A cancel that discarded
+        //     paid work in progress would be the money-path over-reach.
+        //   • it is not a one-way door — Finish works again afterwards (check 6). Cheap to check and the whole
+        //     value of the affordance: an escape that wedged the session would be worse than Clear.
+        //   • the `guard pendingFinish` is not decorative (check 4).
+        //
+        // NON-VACUITY, measured (2026-08-04). Baseline 178 checks, 0 RED, 0 Swift warnings:
+        //   M1 the `Button("Cancel finish")` deleted from `LiveCaptureView` — i.e. the shipped defect, exactly
+        //      as it stood before this item -> 0 RED. RUN, not predicted, because this is the item's own leg
+        //      and a comfortable prediction was not good enough: nothing here reads the view. Recorded as the
+        //      priced gap it is (`W21.vmgui-d`).
+        //   M2 `guard pendingFinish` deleted from `cancelPendingFinish()` -> 1 RED, check 4. The no-op leg:
+        //      without it a cancel with nothing armed overwrites the status line with a message about a finish
+        //      that was not happening.
+        //   M3 `pendingFinish = false` deleted, so cancelling only writes the status message -> 2 RED,
+        //      checks 3 and 5. The convincing-looking failure — the UI says "cancelled" and the finish then
+        //      raises the rotation review by itself the moment the gate opens.
+        //   M4 the cancel widened to also cancel the in-flight OCR (`for t in pageTasks.values { t.cancel() }`,
+        //      the "cancel means cancel everything" reading) -> 1 RED, check 5. The segment never stages and
+        //      the two paid calls are bought for nothing. This is the mutant that makes check 5's paid-call
+        //      term load-bearing rather than decorative.
+        //   M5 the cancel widened to `session.clear()` (conflating the two exits) is the OTHER over-reach and
+        //      would be caught by check 3's photo/source terms. NOT RUN: it Trashes the fixture photos to the
+        //      real Trash, and Test 22 already drives that Clear for its own purposes.
+        //
+        // COST (`W21.recovery-timeout`): ~0.5 s of negative window in check 5, no other wait — the section
+        // parks its OCR at a gate rather than racing it, so everything else is synchronous. ---
+        if isolatedBackup {
+            // Prune the throwaway backup root FIRST, exactly as Test 23 does and for a reason this section
+            // learned the hard way: `CaptureSession()` recovers orphaned photos out of the session folders
+            // left behind by earlier sections, so without this the "session" here starts holding Test 23's
+            // two pages as well as its own and check 3's photo count is 4. Every check that matters is about
+            // THIS section's two sources, so it starts from an empty root rather than reasoning about which
+            // four files it owns.
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            let cfOut = tmp.appendingPathComponent("fu9fu1out", isDirectory: true)
+            let cfStaging = tmp.appendingPathComponent("APStaging-fu9fu1-\(String(UUID().uuidString.prefix(8)))",
+                                                       isDirectory: true)
+            try? fm.createDirectory(at: cfStaging, withIntermediateDirectories: true)
+            let cfGate = TestGate()
+            let cfSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            LiveCaptureProcessor._recoveryTestOCRGate = { await cfGate.wait() }
+            cfSession._recoveryTestBeginLive(
+                config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                    outputDirectory: cfOut, contextCharCount: 0, sendPreviousImage: false,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                    textColumns: 1),
+                stagingDir: cfStaging)
+            let cfProc = cfSession.liveProcessor
+            func cfSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func cfPaidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
+            let cfBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let cfJPEG = cfBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+
+            // The review must be ON for check 6 to have an observable — `finishSession` with it off goes
+            // straight to `beginFinalize`, and "Finish works again" would then be a claim about the finalize
+            // sheet instead of the review. Restored at the end (same handling as Test 23).
+            let cfPriorReview = UserDefaults.standard.object(forKey: DefaultsKeys.reviewRotation)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+
+            // 1. PREMISE. A two-page document is parked MID-OCR at the gate, with both paid calls genuinely
+            //    in flight. This is the commonest real hold — the one the pending-finish message calls
+            //    "Finishing when processing completes (N left)" — and it is what gives checks 3 and 5 their
+            //    money terms: there is paid work outstanding at the moment the operator cancels.
+            for seq in [1, 2] {
+                cfSession.ingest(jpeg: cfJPEG, groupId: "C1", seq: seq,
+                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            cfProc.segmentResolved(groupId: "C1")
+            let cfInOCR = await cfSettle { cfProc.processingCount == 1 }
+            let cfPaidInFlight = cfPaidStarts()
+            check("a two-page document is held mid-OCR with its paid calls in flight (fu9-fu1)",
+                  cfInOCR && cfPaidInFlight == 2 && cfProc.staged.isEmpty && !cfProc.isFinalized("C1"))
+
+            // 2. PREMISE. Finish through the REAL `requestFinish`, then resolve the Mac tag card its
+            //    force-completion surfaces, so the hold is attributable to the in-flight processing and to
+            //    nothing else. Every other term of `proceedToFinishIfReady`'s guard is asserted false here for
+            //    the same reason Test 23's check 4 does it: without that, a later check can pass on a finish
+            //    that is stuck for an unrelated reason.
+            cfProc.requestFinish()
+            cfSession.skipMacTags(groupId: "C1")
+            check("a Finish pressed mid-OCR goes pending, held by the processing alone (fu9-fu1)",
+                  cfProc.pendingFinish && cfSession.pendingTagGroup == nil
+                      && !cfSession.phonePendingActive && !cfProc.perItemSheetUp
+                      && cfProc.processingCount == 1
+                      && !cfProc.showRotationReview && !cfProc.showFinalizeSheet && !cfProc.isFinalizing)
+
+            // 3. THE FIX. The operator leaves the wait — and the session is otherwise exactly as it was. The
+            //    source-file terms are the point of the whole item: this is the same operator intent that
+            //    previously had to be spelled **Clear**, which Trashes every one of these files (Test 22
+            //    drives that path). The paid-call term says the same thing about money: cancelling buys
+            //    nothing and refunds nothing, it just stops waiting.
+            let cfSourcesBefore = cfSession.photos.map(\.url)
+            cfProc.cancelPendingFinish()
+            let cfSourcesSurvive = cfSourcesBefore.count == 2
+                && cfSourcesBefore.allSatisfy { fm.fileExists(atPath: $0.path) }
+            check("the operator can leave a pending Finish, and it costs the session nothing (fu9-fu1)",
+                  !cfProc.pendingFinish && cfSession.photos.count == 2 && cfSourcesSurvive
+                      && cfProc.processingCount == 1 && cfPaidStarts() == cfPaidInFlight
+                      && cfProc.staged.isEmpty
+                      && !cfProc.showRotationReview && !cfProc.showFinalizeSheet && !cfProc.isFinalizing
+                      && cfSession.statusMessage.contains("Finish cancelled"))
+
+            // 4. The `guard pendingFinish` is real. A cancel with nothing armed must not narrate a finish that
+            //    was not happening over whatever the status line was actually saying — the view renders the
+            //    button on the same predicate, so this is the model half agreeing with it rather than trusting
+            //    it (`W3.cap-r3-fu11`'s shape).
+            cfSession.statusMessage = "fu9-fu1 sentinel"
+            cfProc.cancelPendingFinish()
+            check("cancelling with no finish armed is a true no-op (fu9-fu1)",
+                  !cfProc.pendingFinish && cfSession.statusMessage == "fu9-fu1 sentinel")
+
+            // 5. IT IS A CANCEL, NOT A DEFERRAL — and it threw nothing away. Opening the gate releases the
+            //    hold that the finish was waiting on, which is the exact event that would have advanced it:
+            //    `finalizeSegment`'s trailing `proceedToFinishIfReady`. It must find nothing armed. Meanwhile
+            //    the two calls that were in flight during the cancel still land — the segment stages, its text
+            //    is retained, its PDF exists — with no third call bought. A `cancel` that also cancelled
+            //    `pageTasks` (M4) fails here, and that is the money leg.
+            cfGate.open()
+            let cfStaged = await cfSettle { cfProc.statuses.first { $0.id == "C1" }?.phase == .staged }
+            var cfResumed = false
+            let cfDeadline = Date().addingTimeInterval(0.5)
+            while Date() < cfDeadline {
+                if cfProc.showRotationReview || cfProc.showFinalizeSheet || cfProc.isFinalizing
+                    || cfProc.pendingFinish {
+                    cfResumed = true
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            let cfRecord = cfProc.staged.first { $0.groupId == "C1" }
+            check("a cancelled finish does not resume, and the paid work in flight is not thrown away (fu9-fu1)",
+                  cfStaged && !cfResumed && cfPaidStarts() == cfPaidInFlight
+                      && cfProc.retainedText(for: "C1") != nil
+                      && cfRecord?.pdfURLs.isEmpty == false
+                      && cfRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && cfProc.failedGroupIds.isEmpty)
+
+            // 6. …and the escape is not a one-way door. Finish again, with nothing left holding it, and the
+            //    session finishes normally. An affordance that un-armed the wait but left the flow wedged
+            //    would be strictly worse than the Clear it replaces.
+            cfProc.requestFinish()
+            let cfReview = await cfSettle { cfProc.showRotationReview }
+            check("Finish still works after a cancel — the escape is not a one-way door (fu9-fu1)",
+                  cfReview && !cfProc.pendingFinish
+                      && cfProc.rotationReviewPages.filter { $0.groupId == "C1" }.count == 2)
+
+            cfProc.cancelRotationReview()
+            if let cfPriorReview {
+                UserDefaults.standard.set(cfPriorReview, forKey: DefaultsKeys.reviewRotation)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
+            }
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["LIVECAPTURE_RECOVERYTEST_OUT"]
