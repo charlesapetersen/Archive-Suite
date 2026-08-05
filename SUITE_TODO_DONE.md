@@ -3396,6 +3396,48 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W3.notes-passage-paste-at-caret — typing or pasting next to a provenance chip silently DROPPED the text and multiplied the block header — ✅ DONE 2026-08-05** (this commit).
+  **Root cause, measured.** `.noteBlockSource` / `.noteImageRelPath` describe ONE attachment character each —
+  identities, not styling. AppKit seeds `typingAttributes` from the character before the caret, or AT the caret
+  when there is none (offset 0), then `insertText` merges them into every inserted run lacking the key; it
+  strips `.attachment` and knows nothing about these two. So a caret adjacent to a chip stamped that chip's
+  `SourceAnchorBox` over everything inserted — and `MarkdownBridge.serialize`'s chip test asks only "does this
+  position carry `.noteBlockSource`?", never "is this THE attachment character?", so it minted one
+  `<!-- block: … -->` header per stamped character and swallowed each one's text.
+  **Measured:** pasting a 62-char passage at caret 0 → 62 headers, all bodies empty, **zero** `](assets/…)`
+  refs, the imported bytes on disk with nothing pointing at them (the mirror of the W14.3 bug `testG13`
+  guards). With no paste at all: typing one plain character at offset 0 before a chip emitted TWO headers and
+  DROPPED the character; before an inline image it duplicated the asset ref and dropped the character. Silent
+  data loss in ordinary editing. After: 2 headers, 1 asset ref, G13 41.7 s green, G4 17.6 s green, full lane
+  notes 15/15 + reader 16/16.
+  **Fixed in `EditorTextView.typingAttributes`'s setter** — the one point AppKit sets them — not in the
+  serializer and not as an offset-0 special case: this keeps the TEXT STORAGE correct (which
+  `NotePassageSource.blockRanges` depends on, since it enumerates `.noteBlockSource` RUNS to split the copy
+  path) and covers every insertion site plus plain typing at once. `.noteBlockKind` / `.noteInlineCode` are
+  deliberately not stripped — they legitimately continue while typing.
+  ⚠️ **How it stayed hidden:** `setEditorSelection` never cleared its input field, so `setEditorSelection(0,0)`
+  silently failed and left the previous whole-body selection in place — G13 had been exercising only
+  replace-whole-selection, never the ordinary caret paste, for its entire existence. Fixing the helper is what
+  exposed this. Residual, filed not fixed: `W3.notes-chip-header-needs-a-line-break`.
+  | ArchiveNotes/Editor | Tier-2
+
+- [x] **W21.vmgui-g13 — the seams that could not say why they did nothing — ✅ DONE 2026-08-05** (this commit).
+  Filed as a "reproducible" RED, regraded to a flake when it passed four runs in a row, and finally resolved as
+  a REAL bug once the lane it ran in was fixed (`W21.vmgui-g14-leak`) — the failure then moved to the
+  `.md`-reference assertion and reproduced on both attempts. Its two original failures came from the one gate
+  run whose notes lane was broken; the genuine defect it was pointing at is
+  `W3.notes-passage-paste-at-caret`, now fixed.
+  **What shipped here** is the diagnosability, and it is why the cause was findable at all: `handlePassagePaste`
+  and `copyPassageIfNote` each reported through a `Bool` their DEBUG seams threw away with `_ =`, so a declined
+  paste and a paste that imported nothing were the SAME observation, and the test asserted only that the
+  button was clickable. Both seams now return a diagnosis — the outcome, which of the guards declined, and
+  `imgs=`, the count of image bytes actually on the pasteboard, without which an `ok` outcome is a dead end
+  (`ExtractBuilder` `continue`s past a nil import and still returns non-empty markdown, so a paste that
+  imports ZERO files reports success). G13 also now asserts the paste RAN, and that the SOURCE note gained no
+  second asset — the check that separates "declined" from "imported into the wrong item" — placed BEFORE the
+  assertion that fails, because `continueAfterFailure = false` aborts on the first one. Same defect class as
+  `W16.bat7`: a caller reading a handler's silence as success. | ArchiveNotes/Editor + Tests | Tier-2
+
 - [x] **W21.vmgui-g14-leak — nothing ever guaranteed ONE window, so the Notes GUI lane was passing by luck — ✅ DONE 2026-08-04** (this commit).
   ⚠️ **Filed with the wrong mechanism and corrected here.** It was filed as "G14 leaks a window, cascading six
   false failures". The leak was a SYMPTOM. What was actually true: `ArchiveNotesApp` declares TWO

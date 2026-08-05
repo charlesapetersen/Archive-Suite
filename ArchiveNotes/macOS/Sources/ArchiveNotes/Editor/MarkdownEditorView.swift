@@ -29,8 +29,14 @@ final class EditorTestBox {
     /// and XCUITest cannot reliably make the styled TextKit-2 text view first responder — the same reason
     /// `setSelection` and `pasteImage` exist. These run the production `copy(_:)`/`paste(_:)` overrides'
     /// own handlers verbatim; only the keystroke is bypassed.
-    var copyPassage: (() -> Void)?
-    var pastePassage: (() -> Void)?
+    /// Returns a DIAGNOSIS, not Void — see `pastePassage` below and `uiTestCopyPassage` (W21.vmgui-g13).
+    var copyPassage: (() -> String)?
+    /// Returns a DIAGNOSIS, not Void (W21.vmgui-g13). `handlePassagePaste` has four silent-decline guards
+    /// and reports through a `Bool` that this seam used to throw away with `_ =`, so a UITest could only
+    /// ever assert that the BUTTON was clickable — a paste that declined and a paste that imported nothing
+    /// were the same observation. Same defect class as W16.bat7: a caller reading a handler's silence as
+    /// success. The string names the outcome plus the two pieces of state the decision turns on.
+    var pastePassage: (() -> String)?
     init() {}
 }
 #endif
@@ -131,10 +137,10 @@ struct MarkdownEditorView: NSViewRepresentable {
             _ = coordinator?.uiTestOpenFirstZotero()
         }
         testBox?.copyPassage = { [weak coordinator = context.coordinator] in
-            _ = coordinator?.uiTestCopyPassage()
+            coordinator?.uiTestCopyPassage() ?? "declined:noCoordinator"
         }
         testBox?.pastePassage = { [weak coordinator = context.coordinator] in
-            _ = coordinator?.uiTestPastePassage()
+            coordinator?.uiTestPastePassage() ?? "declined:noCoordinator"
         }
 #endif
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
@@ -542,21 +548,77 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// — the copy half of W14.3's live copy→paste. Read-only w.r.t. the store; it only writes the
         /// pasteboard. Returns whether a passage payload was written (false ⇒ the production path would
         /// have fallen through to the plain RTF copy, which is itself the finding).
-        @discardableResult
-        func uiTestCopyPassage() -> Bool {
-            return copyPassageIfNote()
+        /// Returns a DIAGNOSIS for the same reason `uiTestPastePassage` does (W21.vmgui-g13): this is the
+        /// OTHER half of the round-trip under test, and it was the remaining silent one. `copyPassageIfNote`
+        /// has five declines of its own and reported them through a `Bool` the seam discarded, so G13 could
+        /// only assert the copy BUTTON was clickable. That matters here specifically: a copy that succeeds
+        /// while embedding no image bytes is indistinguishable from a healthy copy, and it makes the paste
+        /// report `ok` while importing nothing. `imgs=` is the count actually written to the pasteboard.
+        func uiTestCopyPassage() -> String {
+            let wrote = copyPassageIfNote()
+            let imgs = PassagePasteboard.read()?.segments.reduce(0) { $0 + $1.assetPNGs.count } ?? -1
+            let segs = PassagePasteboard.read()?.segments.count ?? -1
+            let state = "segs=\(segs) imgs=\(imgs)"
+            if wrote { return "ok \(state)" }
+            if textView == nil { return "declined:noTextView \(state)" }
+            if currentIsRaw { return "declined:rawMode \(state)" }
+            guard let fmt = formattingContext else { return "declined:noFormattingContext \(state)" }
+            if fmt.currentItemKind != .note {
+                return "declined:itemKindNotNote(\(fmt.currentItemKind.map { "\($0)" } ?? "nil")) \(state)"
+            }
+            if fmt.currentItemID == nil { return "declined:noCurrentItemID \(state)" }
+            // Everything above held, so `passagePayload` returned nil — which it does only for an EMPTY
+            // selection (`passageBlocks(fromSelectionIn:)` filters `$0.length > 0`, then `guard
+            // !passages.isEmpty`). That points at the selection seam, not at the copy.
+            return "declined:emptySelection \(state)"
         }
 
         /// Run the REAL passage-paste handler (`paste(_:)`'s `passagePasteHandler`) — the paste half of
         /// W14.3, i.e. `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` importing the
         /// payload's image bytes into THIS extract's own `assets/`. Flushes the write-back (like
         /// `uiTestPasteImage`) so the `.md` is on disk when the test reads it, instead of waiting out the
-        /// autosave debounce. Returns whether a passage paste was handled.
-        @discardableResult
-        func uiTestPastePassage() -> Bool {
+        /// autosave debounce.
+        ///
+        /// Returns a DIAGNOSIS — the outcome, and when it declines, which of `handlePassagePaste`'s four
+        /// guards said no (W21.vmgui-g13). Deliberately NOT `@discardableResult`: the whole defect this
+        /// closes is a caller reading a handler's silence as success, and `@discardableResult` re-licenses
+        /// exactly that for the next caller.
+        ///
+        /// The production path runs FIRST and unmodified; the guards are only re-read afterwards, to name a
+        /// decline that already happened. They are pure reads of state that the declining path did not
+        /// mutate, so the re-read cannot disagree with the decision it is describing.
+        ///
+        /// `kind=` and `store=` are here because they are the two values the outcome actually turns on and
+        /// neither is observable from a UITest: `kind` is the guard
+        /// (`formattingContext?.currentItemKind == .extract`, set only by `NoteEditorPane`'s
+        /// `syncFormattingIdentity()` on `onAppear`/selection-change and never re-synced afterwards), and
+        /// `store` is the DESTINATION — `ItemAssetStore.addAsset` picks its directory from `itemID`, which
+        /// `refreshAssetStore(for:)` retargets per selection. A paste that reports `ok` with `store=` set to
+        /// the SOURCE note's id has imported the bytes into the wrong item's `assets/`, which is
+        /// indistinguishable at the filesystem from "no import happened" if you only look where you expected
+        /// the bytes to land.
+        func uiTestPastePassage() -> String {
             let handled = handlePassagePaste()
-            if handled { flushWriteBack() }
-            return handled
+            let kind = formattingContext?.currentItemKind.map { "\($0)" } ?? "nil"
+            let target = (assetStore as? ItemAssetStore)?.itemID
+            // `imgs=` is the observable that makes an `ok` outcome mean something. `ExtractBuilder`'s import
+            // loop iterates `passage.pendingAssets` and `continue`s past a nil import, so a payload carrying
+            // ZERO image bytes still yields non-empty markdown and `handlePassagePaste` still returns true —
+            // `ok` with `imgs=0` is "the paste ran and imported nothing", which is G13's exact symptom and was
+            // indistinguishable from a healthy paste without this count. `read()` is side-effect-free.
+            let imgs = PassagePasteboard.read()?.segments.reduce(0) { $0 + $1.assetPNGs.count } ?? -1
+            let state = "kind=\(kind) store=\(target?.uuidString.prefix(8) ?? "nil") imgs=\(imgs)"
+            if handled { flushWriteBack(); return "ok \(state)" }
+            if textView == nil { return "declined:noTextView \(state)" }
+            if currentIsRaw { return "declined:rawMode \(state)" }
+            if formattingContext?.currentItemKind != .extract { return "declined:itemKindNotExtract \(state)" }
+            if PassagePasteboard.read() == nil { return "declined:noPassagePayload \(state)" }
+            // The only exit left is `pastedExtractMarkdown` returning "". NOT "coerced away":
+            // `coercedToNotesOnly` maps blocks 1:1 (a non-note-passage block is REWRITTEN to `.freeform`,
+            // never dropped), so `serializedExtractBody`'s `guard !coerced.isEmpty` can only fire on a
+            // zero-segment payload — which `passagePayload` forbids — or a `BlockParser.serialize` that
+            // returned "". Naming coercion here would send the next reader to code that cannot be the cause.
+            return "declined:emptySerializedBody \(state)"
         }
 
         /// The attributed string a test commit inserts: raw mode → monospaced plain; styled → the same

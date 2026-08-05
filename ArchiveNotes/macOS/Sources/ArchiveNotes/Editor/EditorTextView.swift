@@ -47,6 +47,40 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// `.noteBlockSource` and `.noteImageRelPath` describe ONE attachment character each — they are
+    /// IDENTITIES, not styling, and must never continue as the operator types (`MarkdownBridge.swift`
+    /// applies each to exactly the 1-char attachment it belongs to; so does `tryPasteImage` below).
+    ///
+    /// AppKit seeds `typingAttributes` from the character BEFORE the caret — or, at location 0, from the
+    /// character AT 0 — and `insertText` then merges them into every inserted run that lacks the key. It
+    /// knows to strip `.attachment` and nothing about these two. So a caret adjacent to a block-header chip
+    /// (offset 0 of an extract whose body opens with one) stamped that chip's `SourceAnchorBox` onto every
+    /// typed or pasted character, and `MarkdownBridge.serialize`'s chip test — which asks only "does this
+    /// position carry `.noteBlockSource`?", never "is this THE attachment character?" — then minted one
+    /// `<!-- block: … -->` header per stamped character and SWALLOWED each one's text.
+    ///
+    /// Measured before this override (W3.notes-passage-paste-at-caret): pasting a 62-char passage at caret 0
+    /// produced 62 headers, all bodies empty, and **zero** `](assets/…)` references — the imported image
+    /// bytes were on disk with nothing in the `.md` pointing at them, the mirror of the W14.3 bug that
+    /// `testG13` exists to guard. With no paste at all, typing one plain character at offset 0 in front of a
+    /// chip emitted TWO headers and dropped the character; in front of an inline image it duplicated the
+    /// asset reference and dropped the character. Silent data loss in ordinary editing, not just under test.
+    ///
+    /// Fixed HERE, at the single point AppKit sets them, rather than in the serializer or as an offset-0
+    /// special case: this keeps the TEXT STORAGE itself correct, which `NotePassageSource.blockRanges`
+    /// depends on (it enumerates `.noteBlockSource` RUNS, so a leak would mis-split the copy path too), and
+    /// it covers every insertion site plus plain typing at once. `.noteBlockKind` and `.noteInlineCode` are
+    /// deliberately NOT stripped — those legitimately continue while typing.
+    override var typingAttributes: [NSAttributedString.Key: Any] {
+        get { super.typingAttributes }
+        set {
+            var clean = newValue
+            clean.removeValue(forKey: .noteBlockSource)
+            clean.removeValue(forKey: .noteImageRelPath)
+            super.typingAttributes = clean
+        }
+    }
+
     // MARK: - List keyboard behavior (Tab / Return / Backspace)
 
     override func insertTab(_ sender: Any?) {

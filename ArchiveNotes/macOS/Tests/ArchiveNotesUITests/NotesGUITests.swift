@@ -352,6 +352,12 @@ class NotesFixtureUITestCase: XCTestCase {
         _ = pollUntil(timeout: timeout) { app.activate(); return field.isHittable }
         guard field.isHittable else { return false }
         field.click()
+        // Select-all first: the field is per-pane @State that PERSISTS across calls, so typing without
+        // clearing APPENDS. G13 calls this twice ("0,100000" then "0,0"), and the second call produced a
+        // three-part string whose `parts.count == 2` parse failed, so `testBox.setSelection` was never
+        // invoked and the selection silently stayed put — nondeterministic, because what the append yields
+        // depends on where `click()` lands the caret. (W21.vmgui-g13)
+        field.typeKey("a", modifierFlags: .command)
         field.typeText("\(location),\(length)")
         // Clicking the button ends editing in the field (commits the binding via focus-loss) BEFORE the
         // button action reads `testSelectionInput`, so no explicit commit keystroke is needed.
@@ -437,6 +443,35 @@ class NotesFixtureUITestCase: XCTestCase {
             return seen.hasPrefix(expectedPrefix)
         }
         return seen
+    }
+
+    /// The passage paste's own verdict (`an.editor.test.pastePassageOutcome`, W21.vmgui-g13) — "ok …" or
+    /// "declined:<which guard> …", each carrying `kind=` and `store=`. `handlePassagePaste` reports through
+    /// a `Bool` no UITest could see, so a decline and a paste-that-imported-nothing used to be one
+    /// observation; this is the difference. Read as `.value` with `.label` as the fallback, the same way
+    /// `lastOpenedURL` does (W8-S8b probe fix).
+    func seamOutcome(_ identifier: String, timeout: TimeInterval = 8) -> String {
+        // Scoped like every other lookup (W21.vmgui-g14-leak) — this helper was in a stash during the
+        // scoping pass, so it is caught up here. Both windows carry the seam buttons.
+        let el = mainWindow.descendants(matching: .any)[identifier]
+        guard el.waitForExistence(timeout: timeout) else { return "<probe absent>" }
+        var seen = ""
+        // Value ONLY — never fall back to `.label`. The probe now rides on the seam BUTTON's a11y value
+        // (no extra element, no layout change), and a button's label is "pasteP"/"copyP": a fallback would
+        // return that and read as a diagnosis. Distinct markers for every non-answer, so "seam not wired",
+        // "never clicked" and "unreadable" can never alias onto one another.
+        _ = pollUntil(timeout: 5) {
+            seen = (el.value as? String) ?? ""
+            return !seen.isEmpty && seen != "-"
+        }
+        if seen.isEmpty { return "<probe value unreadable>" }
+        return seen == "-" ? "<probe never set>" : seen
+    }
+    func pastePassageOutcome(timeout: TimeInterval = 8) -> String {
+        seamOutcome("an.editor.test.pastePassage", timeout: timeout)
+    }
+    func copyPassageOutcome(timeout: TimeInterval = 8) -> String {
+        seamOutcome("an.editor.test.copyPassage", timeout: timeout)
     }
 
     /// Ensure the editor is in STYLED mode: block-chip seams (G6/G11) scan the text storage for
@@ -1114,6 +1149,15 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "the DEBUG selection seam must be drivable")
         XCTAssertTrue(clickStripButton("an.editor.test.copyPassage", timeout: 10),
                       "the copy-passage seam must be drivable (an.editor.test.copyPassage)")
+        // The COPY's own verdict, carrying the count of image bytes it actually put on the pasteboard
+        // (W21.vmgui-g13). A copy that succeeds with imgs=0 makes the paste report `ok` while importing
+        // nothing — the leading explanation for this test's RED, and previously unobservable.
+        let copyOutcome = copyPassageOutcome()
+        XCTAssertTrue(copyOutcome.hasPrefix("ok"),
+                      "the passage COPY must succeed, not decline — it reported: \(copyOutcome)")
+        XCTAssertFalse(copyOutcome.contains("imgs=0"),
+                       "the copy must embed the source note's image bytes in the payload, or the paste has "
+                       + "nothing to import — it reported: \(copyOutcome)")
 
         // --- 3. Paste it into the EXTRACT — `handlePassagePaste` declines unless an extract is loaded. ---
         setKind(to: "Both", in: app.windows["Archive Notes"])
@@ -1121,13 +1165,34 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("Moore says") },
                       "selecting the extract should load its body into the editor")
         ensureStyled()
-        _ = setEditorSelection(location: 0, length: 0)   // defined caret; the paste replaces the selection
+        // Not `_ =`: this silently failed for the whole life of the test (the field was never cleared, so the
+        // parse produced three parts and the seam was never called). W21.vmgui-g13.
+        XCTAssertTrue(setEditorSelection(location: 0, length: 0),
+                      "the selection seam must be drivable for the paste's caret")
         XCTAssertTrue(clickStripButton("an.editor.test.pastePassage", timeout: 10),
                       "the paste-passage seam must be drivable (an.editor.test.pastePassage)")
+        // The paste's OWN verdict (W21.vmgui-g13). Asserting the button was clickable proved nothing about
+        // whether the paste ran: `handlePassagePaste` declines at four guards and reported that only through
+        // a Bool the seam discarded. Every assertion below quotes this, so a failure names its own cause.
+        let outcome = pastePassageOutcome()
 
         // --- 4. The BYTES must be in the extract's own assets/, and the .md must reference them there. ---
+        XCTAssertTrue(outcome.hasPrefix("ok"),
+                      "the passage paste must RUN, not decline — it reported: \(outcome) "
+                      + "(the target extract is \(Self.idExtract.prefix(8)))")
+        // ⚠️ ORDER IS LOAD-BEARING. `continueAfterFailure = false`, so the FIRST failing assertion aborts
+        // the test — a discriminating check placed after the one that fails never runs. This one goes first
+        // for exactly that reason: it separates "the paste declined" from "the paste imported into the WRONG
+        // item". `ItemAssetStore.addAsset` picks its directory from `itemID`, which
+        // `NoteEditorPane.refreshAssetStore(for:)` retargets per selection, so a paste against a stale
+        // target writes a SECOND copy into the source note — on the filesystem indistinguishable from no
+        // import at all, unless you look where the bytes should NOT be. (W21.vmgui-g13)
+        XCTAssertEqual(Set(assetFiles(inItemDir: Self.idPlain)).subtracting(sourceAssetsBefore).count, 1,
+                       "the extract paste must not add an asset to the SOURCE note — it should hold exactly "
+                       + "the one image step 1 pasted. The paste reported: \(outcome)")
         XCTAssertTrue(pollUntil(timeout: 15) { newAsset(in: Self.idExtract, since: extractAssetsBefore) != nil },
-                      "the pasted passage's image bytes should be imported into the extract's own assets/")
+                      "the pasted passage's image bytes should be imported into the extract's own assets/ "
+                      + "— the paste reported: \(outcome)")
         guard let importedAsset = newAsset(in: Self.idExtract, since: extractAssetsBefore) else { return }
         XCTAssertEqual(assetBytes(Self.idExtract, importedAsset), sourceBytes,
                        "the imported file must be byte-identical to the source note's asset — a reference "

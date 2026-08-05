@@ -46,6 +46,11 @@ struct NoteEditorPane: View {
     /// The last external URL the app dispatched via `openExternalURL`, surfaced for the G6/G11 checks to
     /// read back (the reveal/zotero seams fire synchronously, so the button action re-reads the spy).
     @State private var testLastOpened = ""
+    /// Read-back of the last passage-paste outcome (W21.vmgui-g13) — the paste's own answer, which the
+    /// seam used to discard. "-" keeps the element present before the first paste.
+    @State private var testPasteOutcome = "-"
+    /// Same for the COPY half — it was the other silent seam (W21.vmgui-g13).
+    @State private var testCopyOutcome = "-"
 #endif
 
     var body: some View {
@@ -194,10 +199,20 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.test.zoteroOpen")
                     // W14.3's live copy→paste: ⌘C/⌘V go to the first responder, which XCUITest cannot
                     // reliably make the styled text view. These call the production handlers verbatim.
-                    Button("copyP") { testBox.copyPassage?() }
+                    Button("copyP") { testCopyOutcome = testBox.copyPassage?() ?? "declined:seamNil" }
                         .accessibilityIdentifier("an.editor.test.copyPassage")
-                    Button("pasteP") { testBox.pastePassage?() }
+                        .accessibilityValue(testCopyOutcome)
+                    // The paste's verdict rides on the BUTTON's own a11y value (W21.vmgui-g13) — no new
+                    // element, no new row, no height change. The first cut added a third row and grew the
+                    // strip 58 -> 84 pt; that run saw G14 take 1101 s (vs 29 s) and leave a second window
+                    // open, cascading `Multiple matching elements` into every editor-using test after it.
+                    // Whether the height did that was never established, and it does not need to be: the
+                    // diagnosis does not require a layout change, so it should not make one.
+                    // `declined:seamNil` (not "-") so "seam not wired" cannot alias onto the pre-click
+                    // sentinel — three distinct states used to read the same string.
+                    Button("pasteP") { testPasteOutcome = testBox.pastePassage?() ?? "declined:seamNil" }
                         .accessibilityIdentifier("an.editor.test.pastePassage")
+                        .accessibilityValue(testPasteOutcome)
                     // Read-back of the last external URL dispatched (G6/G11). A visible static text (not a
                     // 1×1 hidden element — the `an.status.indexReady` probe's queryability hazard) so
                     // XCUITest resolves it; "-" keeps the element present before the first dispatch.

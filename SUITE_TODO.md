@@ -1231,48 +1231,31 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner re-arms. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/arm.sh | S | low | none
-- [ ] **W21.vmgui-g13 — `testG13…` failed twice in ONE gate run and has not reproduced since; the lane it failed in was broken [S · LOW — REGRADED 2026-08-04, was M · MED "reproducible"].**
-  ⚠️ **REGRADE, read this first.** It has since PASSED every run that executed it — 32.018 s, 36.331 s, 39.333 s, 36.676 s — including three full green lanes. Both original failures came from the SAME gate run, whose notes lane is now known to have been running against a two-window state (`W21.vmgui-g14-leak`, closed) in which every unscoped query threw. The instrumentation below is still worth landing (the seams really do discard their own answers), but treat "reproducible failure" as REFUTED unless it recurs on a green lane.
-  Filed 2026-08-04 from the owner's health-gate run (`cfb09af`). Both attempts fail at
-  `NotesGUITests.swift:1050` — "the pasted passage's image bytes should be imported into the extract's own
-  assets/" — at 43.386 s and 43.583 s, i.e. the `pollUntil(timeout: 15)` fully expires. Not a race: the
-  `an.editor.test.pastePassage` click completes at t=27.05 s and teardown is at t=42.27 s, so the import
-  never happens at all.
-  ⚠️ **RULED OUT with evidence — do not re-derive:** (a) not a regression — `git diff 7d6bb40..HEAD --
-  ArchiveNotes/ packages/` is EMPTY, so code+test are byte-identical to `7d6bb40` (08-01), whose message
-  records "ArchiveNotesUITests 15/15 in the VM"; (b) not load — the 8 busy-loop shells ran Aug 2 09:22 → Aug 4
-  17:13, and both the passing (Aug 1) and failing (Aug 4 17:29) runs were unloaded; (c) not fixture staleness —
-  `make-notes-fixture.sh` does `rm -rf "$DST"`, the gate rebuilds every attempt, today's log says
-  "rebuilding … ready" with no WARN; (d) not container/scene persistence — `notes:prerun` wipes the container
-  per attempt; (e) not a missing `.noteImageRelPath` — `tryPasteImage` sets it inline (`EditorTextView.swift:259`)
-  and step 1's own source-note assertion passes.
-  **So it is ordering/lifetime-sensitive** — the only class consistent with identical code passing then failing.
-  Two candidates, both invisible by construction: (1) `handlePassagePaste` (`MarkdownEditorView.swift:449-451`)
-  declines at one of four guards, most likely `currentItemKind == .extract`, returning `false` in silence;
-  (2) the import runs against the wrong/dead store — `try? assetStore?.addAsset(…)` (`:456`) swallows a nil
-  store AND a throw, `Coordinator.assetStore` is `weak` (`:271`), its strong owner is `@State` in
-  `NoteEditorPane.swift:29`, and `updateNSView` rebinds only on a view update (`:189-191`), so a paste before
-  the rebind imports into the SOURCE note's `assets/` — exactly "no new asset in the extract".
-  **FIRST MOVE IS DIAGNOSABILITY, NOT A FIX.** Three layers discard the answer: the DEBUG seam throws away the
-  Bool (`_ = coordinator?.uiTestPastePassage()`, `:136-138`, though `:556` returns it), the `try?` swallows the
-  store error, and the test asserts only that the BUTTON was clickable (`:1046`). Surface the outcome as an
-  `an.status.*` probe (the `an.status.keyWindow` pattern from `7d6bb40`), assert it, and add "the SOURCE note
-  did NOT gain a second asset" — that one check separates (1) from (2) in a single run. Same defect class as
-  `W16.bat7`: a handler whose caller reads its silence as success. | ArchiveNotes/Editor + Tests | Tier-2
-- [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` now fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
-  Filed 2026-08-04 by the design pass on `W21.vmgui-g14-leak`. `NotesBrowserView.swift:70`
-  `.onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }` →
-  `NotesAppSettings.setWindowSize` writes the single shared `windowW`/`windowH` keys, and
-  `configureWindow` restores BOTH windows from those same keys. Before the one-window precondition landed this
-  write never happened, because the close button was occluded and the click never fired; now it does, once per
-  test. ⚠️ **This is the mechanism of `W21.vmgui-c`** — an undersized window put "Add folder" at x = −19 and the
-  raw toggle at x = 1033, four UITests failed as "not hittable", and they were misfiled as product bugs for two
-  days. Believed benign, and the reasoning is stated so it can be checked rather than trusted: both windows
-  restore from the SAME keys, so they should already be the same size and the write should be a no-op — and
-  three consecutive green lanes support that. But "probably a no-op" is the exact reasoning this lane has
-  punished repeatedly. Cheapest close-out: assert the two windows' frames match before the close, or skip the
-  size write when `Self.isUITestHarness`. If it ever bites, the fix is to DELETE the setUp close — window
-  scoping is the load-bearing fix and carries the lane without it. | ArchiveNotes/Views + Tests | Tier-2
+- [ ] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emits a block header with no preceding newline, so a pasted passage's provenance chip degrades to LITERAL TEXT on the next load [M · MED · data-shaped].**
+  Filed 2026-08-05, found while fixing `W3.notes-passage-paste-at-caret` and deliberately NOT fixed in the same
+  change. `MarkdownBridge.serialize` concatenates a body segment and the next header with no separator, so a
+  correct round-trip produces `…early egalitarian culture.<!-- block: note-passage` — the header starts
+  mid-line. `BlockParser.parse` only recognises a header at LINE START (`BlockParser.swift:56-58`), and
+  `BlockParser.serialize` guards exactly this case (`:90-101`); `MarkdownBridge.serialize` does not.
+  ⚠️ **This fires on the path that PASSES.** Round-tripped by hand: `BlockParser.parse` of a healthy pasted
+  extract yields `blocks=1` where it should be 2, and re-serializing gives a different string (the header's
+  field indentation is eaten). So the passage silently loses its provenance anchor on reload, and `testG13`
+  going green does NOT cover it — G13 asserts the `.md` the paste writes, never what a reload makes of it.
+  Fix is small (emit a newline before a header when the preceding character is not one, mirroring
+  `BlockParser.serialize`) but it is the shared write-back path for every note and extract, so it wants its own
+  Tier-2 plus a parse→serialize→parse idempotence test. **Add that test regardless** — the class is untested
+  today, which is why two defects in it have now been found by accident. | ArchiveNotes/Editor + Store | Tier-2
+- [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
+  Filed 2026-08-04. `NotesBrowserView.swift:70` `.onDisappear { … NotesAppSettings.setWindowSize(w.frame.size) }`
+  writes the single shared `windowW`/`windowH` keys, and `configureWindow` restores BOTH windows from them.
+  Before the one-window precondition landed this write never happened (the close button was occluded, so the
+  click never fired); now it happens once per test. ⚠️ **This is the mechanism of `W21.vmgui-c`**, where an
+  undersized window put controls off-screen, four UITests failed as "not hittable", and they were misfiled as
+  product bugs for two days. Believed benign — both windows restore from the SAME keys, so they should already
+  be the same size and the write a no-op — and five green lanes agree. But "probably a no-op" is the reasoning
+  this lane keeps punishing. Cheapest close-out: assert the two frames match before closing, or skip the size
+  write under `Self.isUITestHarness`. If it ever bites, DELETE the setUp close — window scoping is the
+  load-bearing fix and carries the lane alone. | ArchiveNotes/Views + Tests | Tier-2
 - [ ] **W21.vmgui-g5-flake — `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` is FLAKY in the VM [S · LOW].**
   Filed 2026-08-04. It failed attempt 1 at **46.250 s** and PASSED attempt 2 at **18.154 s** in the same gate
   run — a 2.5× spread, so something on that path has a long poll that occasionally loses. Not a regression
