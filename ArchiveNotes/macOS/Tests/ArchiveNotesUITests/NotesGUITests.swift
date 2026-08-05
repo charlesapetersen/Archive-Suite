@@ -64,11 +64,63 @@ class NotesFixtureUITestCase: XCTestCase {
         let window = app.windows["Archive Notes"]
         XCTAssertTrue(window.waitForExistence(timeout: 15), "Main window should appear")
 
+        // ONE WINDOW, GUARANTEED, before any test body runs (W21.vmgui-g14-leak).
+        //
+        // `ArchiveNotesApp` declares TWO `Window` scenes and its own comment calls them "both auto-opening
+        // windows" — there is no `.defaultLaunchBehavior(.suppressed)`. Both render `NotesBrowserView`, so
+        // both carry `an.status.indexReady` / `an.editor.text` / the toolbar ids, and almost every check in
+        // this suite queries UNSCOPED. Two windows therefore make those queries throw "Multiple matching
+        // elements", which surfaces as a failure in whatever ran next rather than as a window problem.
+        //
+        // Until now nothing guaranteed one window: `closeExtractsWindow` was called only at the END of the
+        // two tests that open it, so the suite depended on the app CONTAINER remembering "Extracts closed"
+        // from an earlier run. That is not a guarantee, it is a leftover — and it inverts on a FRESH
+        // container, which is exactly what `notes:prerun` creates. Proven in isolation on 2026-08-04: with
+        // the container wiped, `testG0` ALONE fails at line 133 with multiple matches, no other test in play.
+        // It also meant one leaked window (see G14 at 1101 s) poisoned every editor-using test after it.
+        //
+        // Closing it HERE fixes both: it is a precondition rather than a cleanup, so it holds no matter what
+        // the container remembers, and no matter which test leaked. `openExtractsWindow()` re-opens it via
+        // Window ▸ Extracts when G12/G14 need it, so nothing loses coverage.
+        //
+        // Written INLINE, on locals, rather than as a helper method: `setUpWithError` is nonisolated, so
+        // calling an instance method from it is `sending 'self' risks causing data races` — a hard error,
+        // where touching these `@MainActor` XCUITest members directly is only one of the 22 warnings already
+        // tracked as `W23.notes-uitest-warn`. Best-effort by design — no assertion. This runs before EVERY
+        // test, so asserting here would turn an unrelated window hiccup into a suite-wide failure; if the
+        // close does not take, the test that needs one window fails on its own terms with its own message.
+        // 8 s, not 1 s: the secondary scene comes up a BEAT AFTER the main one, so a 1 s sample returned
+        // false, skipped the close, and the window then opened anyway — G0 still failed on two matches.
+        // On a fresh container (the norm, since `notes:prerun` wipes it) this returns almost immediately
+        // because the window IS there; the full wait is only paid on an inherited container where it never
+        // opens, and correctness is worth those seconds.
+        let extractsWindow = app.windows["Extracts"]
+        if extractsWindow.waitForExistence(timeout: 8) {
+            // RAISE IT FIRST. Measured 2026-08-04: the close button exists but `isHittable == false`, because
+            // the secondary scene launches BEHIND the main window and an occluded element is not hittable —
+            // the same class as W21.vmgui-c's off-window controls, NOT a timing problem, which is why a
+            // longer wait changed nothing. Window ▸ Extracts brings it forward; that is the same menu path
+            // `openExtractsWindow()` already uses successfully in G12/G14.
+            let windowMenu = app.menuBars.menuBarItems["Window"]
+            if windowMenu.waitForExistence(timeout: 5) {
+                windowMenu.click()
+                let extractsItem = app.menuItems["Extracts"]
+                if extractsItem.waitForExistence(timeout: 3) { extractsItem.click() }
+            }
+            let closeButton = extractsWindow.buttons[XCUIIdentifierCloseWindow]
+            if closeButton.waitForExistence(timeout: 5), closeButton.isHittable { closeButton.click() }
+            _ = extractsWindow.waitForNonExistence(timeout: 8)
+        }
+
         // Readiness gate: the list populates from disk (NotesModel.buildIndexFromDisk enumerates
         // items/**/*.md — not Spotlight), so wait for a KNOWN seeded row to appear. This is the
         // reliable gate; the hidden `an.status.indexReady` probe (§3.4) is verified separately by
         // `waitForIndexReady` (its 1×1 clear-color queryability was flagged UNVERIFIED at W8-S7).
-        let seed = app.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
+        // Scoped to the main window like every other lookup — but through the LOCAL `window` above, not the
+        // `mainWindow` property: `setUpWithError` is nonisolated, so referencing an instance member here is
+        // `sending 'self' risks causing data races`. That is the same trap that killed the first version of
+        // this one-window work; the local costs nothing and sidesteps it entirely.
+        let seed = window.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
         XCTAssertTrue(seed.waitForExistence(timeout: 25), "a seeded note row should populate the list")
     }
 
@@ -76,6 +128,10 @@ class NotesFixtureUITestCase: XCTestCase {
         app?.terminate()
         app = nil
     }
+
+    // NOTE: the "one window before every test" precondition lives INLINE in `setUpWithError` above, not in a
+    // helper here — a nonisolated `setUp` cannot call an instance method without `sending 'self'`. The
+    // subclass keeps `closeExtractsWindow(_:)` for its own end-of-test tidy-up (W21.vmgui-g14-leak).
 
     // MARK: - Fixture lifecycle
     //
@@ -98,15 +154,34 @@ class NotesFixtureUITestCase: XCTestCase {
 
     /// The index-ready probe (§3.4), present only under the UITest harness. A UITest-gated `Text`
     /// (occluded behind the panes); its value/label carry the generation token once the build settles.
-    var indexReadyProbe: XCUIElement { app.descendants(matching: .any)["an.status.indexReady"] }
+    /// The scoping root for every element lookup in this suite (W21.vmgui-g14-leak).
+    ///
+    /// `ArchiveNotesApp` declares TWO auto-opening `Window` scenes and BOTH render `NotesBrowserView`, so
+    /// `an.status.indexReady` / `an.editor.text` / the toolbar ids exist TWICE whenever the Extracts window is
+    /// open. An `app.`-rooted query then throws "Multiple matching elements" — and lands that failure on
+    /// whatever test ran next, which is how six innocent tests were blamed on 2026-08-04.
+    ///
+    /// Scoping here is what makes the suite CORRECT rather than merely lucky: a window-scoped query resolves
+    /// to exactly one element or none, never two, so the result no longer depends on how many windows are
+    /// open. That is a property, not a cleanup — unlike closing the second window (setUp does that too, and
+    /// it helps, but it depends on z-order, menu readiness and hit-testing, all three of which have already
+    /// produced a false diagnosis in this lane). `Window` (not `WindowGroup`) means one window per title, so
+    /// the root itself cannot become ambiguous.
+    ///
+    /// ⚠️ Deliberately NOT applied to menus: `app.menuBars`, `app.menuItems`, `app.activate()` and
+    /// `app.typeKey` are OUTSIDE any window and must stay app-rooted, as must the window lookups themselves.
+    /// A blanket `app.` -> `mainWindow.` rewrite would break the suite.
+    var mainWindow: XCUIElement { app.windows["Archive Notes"] }
+
+    var indexReadyProbe: XCUIElement { mainWindow.descendants(matching: .any)["an.status.indexReady"] }
 
     /// The main editor NSTextView (id `an.editor.text`). Its `.value` is the current editor string —
     /// in styled mode block headers render as chips (no literal `<!-- block: -->`); in raw mode the
     /// literal Markdown source is shown.
-    var editor: XCUIElement { app.textViews["an.editor.text"] }
+    var editor: XCUIElement { mainWindow.textViews["an.editor.text"] }
 
     /// The raw/styled toggle (borderless Button, id `an.editor.rawToggle`).
-    var rawToggle: XCUIElement { app.descendants(matching: .any)["an.editor.rawToggle"] }
+    var rawToggle: XCUIElement { mainWindow.descendants(matching: .any)["an.editor.rawToggle"] }
 
     // MARK: - Readiness / polling helpers
 
@@ -141,7 +216,7 @@ class NotesFixtureUITestCase: XCTestCase {
     @discardableResult
     func selectItem(uuid: String, timeout: TimeInterval = 15) -> XCUIElement {
         app.activate()
-        let cell = app.descendants(matching: .any)["an.cell.title.\(uuid)"]
+        let cell = mainWindow.descendants(matching: .any)["an.cell.title.\(uuid)"]
         XCTAssertTrue(cell.waitForExistence(timeout: timeout), "Title cell for \(uuid) should exist")
         _ = pollUntil(timeout: timeout) { app.activate(); return cell.isHittable }
         if cell.isHittable {
@@ -266,7 +341,10 @@ class NotesFixtureUITestCase: XCTestCase {
     @discardableResult
     func setEditorSelection(location: Int, length: Int, timeout: TimeInterval = 10,
                             in scope: XCUIElement? = nil) -> Bool {
-        let root = scope ?? app!
+        // Default scope is the MAIN WINDOW, not the app (W21.vmgui-g14-leak): both windows carry this
+        // strip, so an app-rooted lookup throws once the Extracts window is open. Callers that mean the
+        // other window (G12/G14) already pass it explicitly.
+        let root = scope ?? mainWindow
         let field = root.descendants(matching: .any)["an.editor.test.selectionInput"]
         let button = root.descendants(matching: .any)["an.editor.test.select"]
         guard field.waitForExistence(timeout: timeout),
@@ -290,7 +368,7 @@ class NotesFixtureUITestCase: XCTestCase {
     /// finding to fix).
     @discardableResult
     func pasteImageViaSeam(timeout: TimeInterval = 10) -> Bool {
-        let button = app.descendants(matching: .any)["an.editor.test.pasteImage"]
+        let button = mainWindow.descendants(matching: .any)["an.editor.test.pasteImage"]
         guard button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
         guard button.isHittable else { return false }
@@ -305,7 +383,7 @@ class NotesFixtureUITestCase: XCTestCase {
     /// Returns false if the strip button isn't present/hittable (itself the finding to fix). Used by G10.
     @discardableResult
     func jumpFirstPassageViaSeam(timeout: TimeInterval = 10) -> Bool {
-        let button = app.descendants(matching: .any)["an.editor.test.jump"]
+        let button = mainWindow.descendants(matching: .any)["an.editor.test.jump"]
         guard button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
         guard button.isHittable else { return false }
@@ -337,7 +415,8 @@ class NotesFixtureUITestCase: XCTestCase {
     /// one window, which is required once a second window is open — see `setEditorSelection`.
     @discardableResult
     func clickStripButton(_ id: String, timeout: TimeInterval, in scope: XCUIElement? = nil) -> Bool {
-        let button = (scope ?? app!).descendants(matching: .any)[id]
+        // Same as `setEditorSelection`: default to the main window, explicit scope wins (W21.vmgui-g14-leak).
+        let button = (scope ?? mainWindow).descendants(matching: .any)[id]
         guard button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return button.isHittable }
         guard button.isHittable else { return false }
@@ -349,7 +428,7 @@ class NotesFixtureUITestCase: XCTestCase {
     /// the reveal/zotero seams populate from `WorkspaceOpenSpy`), polling until it starts with
     /// `expectedPrefix`. Returns the final observed value (empty/"-" if nothing dispatched). G6/G11.
     func lastOpenedURL(startingWith expectedPrefix: String, timeout: TimeInterval = 12) -> String {
-        let el = app.descendants(matching: .any)["an.editor.test.lastOpenedURL"]
+        let el = mainWindow.descendants(matching: .any)["an.editor.test.lastOpenedURL"]
         _ = el.waitForExistence(timeout: min(timeout, 8))
         var seen = ""
         _ = pollUntil(timeout: timeout) {
@@ -423,7 +502,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         // Fallback: drive the toolbar New menu explicitly if ⌘N didn't register.
         if !created {
-            let newMenu = app.descendants(matching: .any)["an.toolbar.new"]
+            let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
             if newMenu.waitForExistence(timeout: 5) {
                 newMenu.click()
                 let item = app.menuItems["New Note"]

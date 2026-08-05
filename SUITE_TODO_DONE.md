@@ -3396,6 +3396,31 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W21.vmgui-g14-leak — nothing ever guaranteed ONE window, so the Notes GUI lane was passing by luck — ✅ DONE 2026-08-04** (this commit).
+  ⚠️ **Filed with the wrong mechanism and corrected here.** It was filed as "G14 leaks a window, cascading six
+  false failures". The leak was a SYMPTOM. What was actually true: `ArchiveNotesApp` declares TWO
+  auto-opening `Window` scenes, BOTH render `NotesBrowserView`, so `an.status.indexReady` / `an.editor.text` /
+  the toolbar ids exist TWICE whenever the Extracts window is open — and almost every check queried UNSCOPED,
+  so those queries threw "Multiple matching elements" and blamed whatever test ran next.
+  `closeExtractsWindow` was called only at the END of G12/G14, never in setUp, so the suite depended on the app
+  CONTAINER remembering "Extracts closed" from an earlier run. A fresh container — which `notes:prerun`
+  creates — inverts that, and `notes:prerun`'s `rm -rf` was fire-and-forget, so a silently-failed wipe is what
+  had been keeping the suite green. **Measured, testG0 ALONE, container wiped:**
+  `windows=2 titles=["Archive Notes","Extracts"] indexReadyMatches=2`, and
+  `extracts: seen=true closeBtn=true hittable=false closed=false` — the close button EXISTS but is NOT
+  HITTABLE, because the second scene launches occluded BEHIND the main window. That is why two attempts at
+  raising the timeout changed nothing: occlusion, not timing.
+  **Fixed three ways, in order of how much weight each carries.** (1) LOAD-BEARING — a `mainWindow` scoping
+  root, with the shared helpers (`editor`, `indexReadyProbe`, `rawToggle`, `selectItem`, the seam clicks,
+  `lastOpenedURL`, `an.toolbar.new`) and the `scope ?? app!` defaults re-rooted to it. A window-scoped query
+  resolves to one element or none, never two, so correctness no longer depends on window COUNT and a future
+  leak cannot break a later test. Menus stay app-rooted (`app.menuBars`/`app.menuItems`/`activate`/`typeKey`)
+  — a blanket rewrite would break the suite. (2) HYGIENE — setUp closes the Extracts window, raising it via
+  Window ▸ Extracts first so the button is not occluded. (3) The prerun's wipe is CHECKED and warns, because
+  fresh-vs-inherited container are different tests. **Result: notes 15/15, reader 16/16, three consecutive
+  green lanes — and G14 went 1101.600 s → 37.1 s, so its 18-minute outlier was the two-window state too, not a
+  separate problem.** Residual risk filed as `W21.vmgui-winsize-writeback`. | ArchiveNotes/Tests + ops | Tier-2
+
 - [x] **W21.vmgui-flakereport — the flake guard retried, learned the answer, and then threw it away — ✅ DONE 2026-08-04** (this commit).
   `gui-vm-gate.sh`'s `show_failures()` looped BOTH attempts and `sort -u`'d them, printing the union directly
   beneath "RED — reproducible UITest failure in: <app>". The APP-level guard was always right (it clears an app

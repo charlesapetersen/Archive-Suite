@@ -1231,7 +1231,8 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner re-arms. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/arm.sh | S | low | none
-- [ ] **W21.vmgui-g13 — `testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract` fails REPRODUCIBLY in the VM, and the code it tests has not changed since it passed 15/15 [M · MED · the gate is RED on this].**
+- [ ] **W21.vmgui-g13 — `testG13…` failed twice in ONE gate run and has not reproduced since; the lane it failed in was broken [S · LOW — REGRADED 2026-08-04, was M · MED "reproducible"].**
+  ⚠️ **REGRADE, read this first.** It has since PASSED every run that executed it — 32.018 s, 36.331 s, 39.333 s, 36.676 s — including three full green lanes. Both original failures came from the SAME gate run, whose notes lane is now known to have been running against a two-window state (`W21.vmgui-g14-leak`, closed) in which every unscoped query threw. The instrumentation below is still worth landing (the seams really do discard their own answers), but treat "reproducible failure" as REFUTED unless it recurs on a green lane.
   Filed 2026-08-04 from the owner's health-gate run (`cfb09af`). Both attempts fail at
   `NotesGUITests.swift:1050` — "the pasted passage's image bytes should be imported into the extract's own
   assets/" — at 43.386 s and 43.583 s, i.e. the `pollUntil(timeout: 15)` fully expires. Not a race: the
@@ -1258,6 +1259,20 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `an.status.*` probe (the `an.status.keyWindow` pattern from `7d6bb40`), assert it, and add "the SOURCE note
   did NOT gain a second asset" — that one check separates (1) from (2) in a single run. Same defect class as
   `W16.bat7`: a handler whose caller reads its silence as success. | ArchiveNotes/Editor + Tests | Tier-2
+- [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` now fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
+  Filed 2026-08-04 by the design pass on `W21.vmgui-g14-leak`. `NotesBrowserView.swift:70`
+  `.onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }` →
+  `NotesAppSettings.setWindowSize` writes the single shared `windowW`/`windowH` keys, and
+  `configureWindow` restores BOTH windows from those same keys. Before the one-window precondition landed this
+  write never happened, because the close button was occluded and the click never fired; now it does, once per
+  test. ⚠️ **This is the mechanism of `W21.vmgui-c`** — an undersized window put "Add folder" at x = −19 and the
+  raw toggle at x = 1033, four UITests failed as "not hittable", and they were misfiled as product bugs for two
+  days. Believed benign, and the reasoning is stated so it can be checked rather than trusted: both windows
+  restore from the SAME keys, so they should already be the same size and the write should be a no-op — and
+  three consecutive green lanes support that. But "probably a no-op" is the exact reasoning this lane has
+  punished repeatedly. Cheapest close-out: assert the two windows' frames match before the close, or skip the
+  size write when `Self.isUITestHarness`. If it ever bites, the fix is to DELETE the setUp close — window
+  scoping is the load-bearing fix and carries the lane without it. | ArchiveNotes/Views + Tests | Tier-2
 - [ ] **W21.vmgui-g5-flake — `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` is FLAKY in the VM [S · LOW].**
   Filed 2026-08-04. It failed attempt 1 at **46.250 s** and PASSED attempt 2 at **18.154 s** in the same gate
   run — a 2.5× spread, so something on that path has a long poll that occasionally loses. Not a regression

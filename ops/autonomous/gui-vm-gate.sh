@@ -127,7 +127,22 @@ run_app_once() {   # $1 = app, $2 = attempt number
   tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
   fixture="$(archive_app_field "$app" fixture)"; mk="$(archive_app_field "$app" mkfixture)"
   prerun="$(archive_app_field "$app" prerun)"
-  [ -n "$prerun" ] && tart exec "$VM" bash -lc "$prerun" >>"$log" 2>&1
+  # CHECKED, not fire-and-forget (W21.vmgui-g14-leak). This used to be a bare
+  # `[ -n "$prerun" ] && tart exec …` whose exit status nothing read, and the command it runs is a container
+  # wipe — i.e. it decides whether the app starts from a FRESH container or an inherited one. Those are
+  # different tests: on a fresh container `ArchiveNotesApp`'s two auto-opening `Window` scenes both open,
+  # which is what the 2026-08-04 cascade turned out to be. A wipe that silently failed left "Extracts closed"
+  # remembered from an earlier run and the suite passed for the wrong reason. Never fatal — the run is still
+  # worth doing — but it must SAY so, because "which state did we start from" is now known to change the
+  # result. (The suite no longer depends on it: `closeExtractsWindowIfOpen()` in setUp makes one window a
+  # precondition either way. This warning exists so a silent change of premise can't happen again unseen.)
+  if [ -n "$prerun" ]; then
+    if tart exec "$VM" bash -lc "$prerun" >>"$log" 2>&1; then
+      echo "prerun[$app]: ok" >>"$log"
+    else
+      echo "WARN[$app]: prerun FAILED (exit $?) — the app may start from an INHERITED container, which is a different test than a fresh one. See $log." | tee -a "$log"
+    fi
+  fi
 
   # Fixtured UITests XCTSkip themselves when their scratch fixture is missing — which would let the
   # gate go GREEN on the few unfixtured tests and hide the real coverage. Build it if absent
