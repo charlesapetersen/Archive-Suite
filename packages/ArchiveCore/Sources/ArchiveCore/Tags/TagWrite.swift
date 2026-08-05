@@ -250,14 +250,21 @@ public enum CoordinatedTagWriter {
                 }
 
                 // §2/§3 fresh read inside coordination; a read FAILURE aborts (never treated as empty).
+                // Routed through `TagReading.read` — the ONLY primitive that can tell "no tags" apart
+                // from "couldn't read the tags". Reading `resourceValues` directly here is what made
+                // this comment a lie for as long as it has existed: the call does not throw for a file
+                // with unreadable extended attributes, so `rv.tagNames ?? []` handed the transform an
+                // empty `before` for a file carrying real tags, and line ~271 then wrote that delta —
+                // measured turning ["Unread","Subj","P9"] into ["Read"] (W26.deny). Do not inline this
+                // read again.
                 let before: [String]
                 let beforeLabel: Int?
-                do {
-                    let rv = try writeURL.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
-                    before = rv.tagNames ?? []
-                    beforeLabel = rv.labelNumber
-                } catch {
-                    throw TagWriteError.unreadable(error.localizedDescription)
+                switch TagReading.read(writeURL) {
+                case let .success(names, label):
+                    before = names
+                    beforeLabel = label
+                case let .failure(why):
+                    throw TagWriteError.unreadable(why)
                 }
 
                 guard let (intendedTags, intendedLabel) = transform(before, beforeLabel) else {
@@ -318,9 +325,16 @@ public enum CoordinatedTagWriter {
 
     // MARK: Helpers
 
+    /// The §8 post-write re-read. Also routed through `TagReading.read`: a re-read whose tags cannot be
+    /// read is not a verification, and coercing it to `[]` would let a write to an EMPTY tag array
+    /// "verify" against a file nobody can read. An unreadable re-read is a failed verification.
     private static func readPair(_ url: URL) throws -> ([String], Int?) {
-        let rv = try url.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
-        return (rv.tagNames ?? [], rv.labelNumber)
+        switch TagReading.read(url) {
+        case let .success(names, label):
+            return (names, label)
+        case let .failure(why):
+            throw TagWriteError.verificationFailed("post-write re-read failed: \(why)")
+        }
     }
 
     /// A small reference box so the synchronous coordination closure can hand results back out.

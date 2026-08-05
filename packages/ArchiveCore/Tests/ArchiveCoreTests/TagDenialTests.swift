@@ -149,6 +149,19 @@ final class TagDenialTests: XCTestCase {
         assertFailure(TagReading.read(fresh(path)), "corrupt tag attribute")
     }
 
+    /// An attribute holding a NON-empty array that macOS still reported as no tags is something we can
+    /// see but cannot interpret — "I don't know", not "there is nothing here". (This is also the shape
+    /// of a file that becomes readable between the `resourceValues` call and the probe.)
+    func testNonEmptyArrayMacOSDidNotReportAsTagsIsAFailure() throws {
+        let path = try makeFile("odd-array.pdf", tags: [])
+        let plist = try PropertyListSerialization.data(fromPropertyList: [1, 2, 3], format: .binary, options: 0)
+        let rc = plist.withUnsafeBytes { setxattr(path, finderTagsXattrName, $0.baseAddress, $0.count, 0, 0) }
+        XCTAssertEqual(rc, 0, "precondition: could not plant the attribute")
+        XCTAssertNil(try fresh(path).resourceValues(forKeys: [.tagNamesKey]).tagNames,
+                     "precondition: macOS reports nil tagNames for a non-string array")
+        assertFailure(TagReading.read(fresh(path)), "an attribute holding a non-tag array")
+    }
+
     /// A symlink resolves to its target's tags, so the denial probe must follow it too. With
     /// `XATTR_NOFOLLOW` this file's answer is ENOATTR — "confirmed no tags" — about a denied target.
     func testSymlinkToDeniedTargetIsAFailure() throws {
@@ -196,6 +209,98 @@ final class TagDenialTests: XCTestCase {
     /// Directories carry no tag attribute; a walker must not see every folder as unreadable.
     func testDirectoryIsConfirmedEmpty() throws {
         assertConfirmedEmpty(TagReading.read(fresh(tempDir.path)), "a plain directory")
+    }
+
+    // MARK: - CoordinatedTagWriter — the reproduction, inverted
+
+    /// The exact destruction, as a test: mode 0o200 read no-throw with `before == []`, the write
+    /// SUCCEEDED, and `["Unread","Subj","P9"]` became `["Read"]` on disk. It must now abort untouched.
+    private func assertWriteAbortsAndPreservesTags(_ path: String, _ what: String) {
+        let original = ["Unread", "Subj", "P9"]
+        var thrown: Error?
+        XCTAssertThrowsError(
+            try CoordinatedTagWriter.write(fresh(path)) { current, label in
+                // The Reader's real edit shape: swap Unread for Read. Against a `before` of [] this
+                // is what wrote ["Read"] over three tags.
+                (current.map { $0 == "Unread" ? "Read" : $0 }, label)
+            },
+            "\(what): the write must refuse when the current tags cannot be read"
+        ) { thrown = $0 }
+
+        guard case .unreadable = thrown as? TagWriteError else {
+            return XCTFail("\(what): expected TagWriteError.unreadable, got \(String(describing: thrown))")
+        }
+        // Restore access and confirm the tags are byte-identical — asserted straight from the
+        // filesystem, not through the code under test.
+        shell(["chmod", "-N", path])
+        try? chmod(path, 0o644)
+        XCTAssertEqual(tagsOnDisk(path), original, "\(what): tags must be untouched after the refusal")
+    }
+
+    func testWriteAbortsAndPreservesTagsWhenFileIsWriteOnly() throws {
+        let path = try makeFile("victim-0200.pdf", tags: ["Unread", "Subj", "P9"])
+        try chmod(path, 0o200)
+        assertWriteAbortsAndPreservesTags(path, "mode 0o200")
+    }
+
+    func testWriteAbortsAndPreservesTagsWhenACLDeniesReadExtAttr() throws {
+        let path = try makeFile("victim-acl.pdf", tags: ["Unread", "Subj", "P9"])
+        denyACL(path, "readextattr")
+        assertWriteAbortsAndPreservesTags(path, "ACL denying readextattr")
+    }
+
+    /// The 0o000 row: the write already failed here (-5000), so the tags survived by accident — but
+    /// the reported `before`/`inverse` was `[]`, so an UNDO of it would have been corrupt. Aborting
+    /// means there is no result to be wrong about.
+    func testWriteAbortsBeforeProducingACorruptInverse() throws {
+        let path = try makeFile("victim-0000.pdf", tags: ["Unread", "Subj", "P9"])
+        try chmod(path, 0o000)
+
+        var result: TagWriteResult?
+        XCTAssertThrowsError(
+            result = try CoordinatedTagWriter.write(fresh(path)) { current, label in
+                (current + ["Read"], label)
+            }
+        ) { error in
+            guard case .unreadable = error as? TagWriteError else {
+                return XCTFail("expected TagWriteError.unreadable, got \(error)")
+            }
+        }
+        XCTAssertNil(result, "no TagWriteResult — and so no `before: []` inverse to undo into")
+        try chmod(path, 0o644)
+        XCTAssertEqual(tagsOnDisk(path), ["Unread", "Subj", "P9"])
+    }
+
+    /// The transform must never even be consulted: it is what computes the destructive delta.
+    func testTransformIsNotCalledWhenTagsAreUnreadable() throws {
+        let path = try makeFile("victim-transform.pdf", tags: ["Unread", "Subj", "P9"])
+        try chmod(path, 0o200)
+        var transformCalls = 0
+        XCTAssertThrowsError(try CoordinatedTagWriter.write(fresh(path)) { current, label in
+            transformCalls += 1
+            return (current + ["Read"], label)
+        })
+        XCTAssertEqual(transformCalls, 0, "the transform saw a fabricated empty `before`")
+    }
+
+    /// A readable file must still be writable — this fix must not make the writer refuse ordinary work.
+    func testOrdinaryWriteStillSucceeds() throws {
+        let path = try makeFile("ordinary.pdf", tags: ["Unread", "Subj", "P9"])
+        let result = try CoordinatedTagWriter.write(fresh(path)) { current, label in
+            (current.map { $0 == "Unread" ? "Read" : $0 }, label)
+        }
+        XCTAssertTrue(multisetEqual(result.before, ["Unread", "Subj", "P9"]))
+        XCTAssertTrue(multisetEqual(tagsOnDisk(path), ["Read", "Subj", "P9"]))
+    }
+
+    /// And a file with genuinely no tags must still be taggable — the empty `before` that is REAL.
+    func testWriteToAConfirmedUntaggedFileStillSucceeds() throws {
+        let path = try makeFile("blank.pdf", tags: [])
+        let result = try CoordinatedTagWriter.write(fresh(path)) { current, label in
+            (current + ["Unread"], label)
+        }
+        XCTAssertEqual(result.before, [])
+        XCTAssertEqual(tagsOnDisk(path), ["Unread"])
     }
 
     // MARK: - The probe itself

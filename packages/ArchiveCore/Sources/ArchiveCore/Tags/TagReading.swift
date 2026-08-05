@@ -100,9 +100,16 @@ enum TagXattr {
             }
             let data = Data(buffer[0..<read])
             guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
-                  plist is [Any]
+                  let entries = plist as? [Any]
             else {
                 return .unreadable("tag attribute present (\(read) bytes) but is not a readable tag array")
+            }
+            // It must be an EMPTY array. A non-empty one that macOS nonetheless reported as no tags is
+            // an attribute we can see but cannot interpret — including the case where the file became
+            // readable between the resourceValues call above and this probe. Either way the honest
+            // answer is "I don't know", never "there is nothing here".
+            guard entries.isEmpty else {
+                return .unreadable("tag attribute holds \(entries.count) entr\(entries.count == 1 ? "y" : "ies") that macOS did not report as tags")
             }
             return .readableEmpty
         }
