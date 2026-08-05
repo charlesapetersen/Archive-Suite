@@ -17,6 +17,7 @@ final class DiscoveryHealthTests: XCTestCase {
 
     private func result(entries: Int = 0,
                         unreadable: Int = 0,
+                        unreadableReasons: [String] = [],
                         directoryErrors: Int = 0,
                         filesSeen: Int = 0,
                         vanished: Int = 0,
@@ -30,8 +31,11 @@ final class DiscoveryHealthTests: XCTestCase {
                         labelNumber: nil, contentModified: nil, contentTypeIdentifier: "com.adobe.pdf",
                         isDataless: false)
         }
+        let reasonFailures = unreadableReasons.enumerated().map {
+            CorpusReadFailure(url: URL(fileURLWithPath: "/tmp/reason-\($0.offset)"), reason: $0.element)
+        }
         return CorpusScanResult(entries: rows,
-                                unreadable: failures(unreadable, "unreadable"),
+                                unreadable: failures(unreadable, "unreadable") + reasonFailures,
                                 directoryErrors: failures(directoryErrors, "dir"),
                                 filesSeen: filesSeen, vanishedMidScan: vanished,
                                 rootUnreadable: rootUnreadable, cancelled: cancelled)
@@ -125,6 +129,36 @@ final class DiscoveryHealthTests: XCTestCase {
                        .partiallyUnreadable(files: 1, folders: 1))
     }
 
+    /// W26.notsup — ENOTSUP is deliberately still UNREADABLE, never "untagged", but it needs a
+    /// diagnosis a person can act on. A root may cross mounts, so keep every other failure count.
+    func testAnXattrLessVolumeGetsSpecificFinderTagGuidance() {
+        let enotsup = "tag attribute unreadable: extended attributes unsupported on this volume (ENOTSUP)"
+        let r = result(unreadable: 2, unreadableReasons: [enotsup, enotsup],
+                       directoryErrors: 3, filesSeen: 12)
+
+        let expected = DiscoveryFailure.finderTagsUnsupported(files: 2, otherFiles: 2, folders: 3)
+        XCTAssertEqual(DiscoveryHealth.failure(for: r, root: .heldStill), expected)
+        XCTAssertEqual(expected.message, "Finder tags unavailable for 2 files")
+        XCTAssertTrue(expected.detail.contains("do not support Finder tags"))
+        XCTAssertTrue(expected.detail.contains("will not list or edit them"))
+        XCTAssertTrue(expected.detail.contains("2 other files and 3 folders"),
+                      "the specific diagnosis must not hide simultaneous failures")
+        XCTAssertTrue(DiscoveryFailure.finderTagsUnsupported(files: 1, otherFiles: 0, folders: 0)
+            .detail.contains("whether this file carries Read or Unread"))
+        XCTAssertFalse(DiscoveryHealth.phase(after: r, root: .heldStill,
+                                             finishedAt: t0, lastSettled: nil).isSettled,
+                       "ENOTSUP remains unreadable and may never authorise absence")
+    }
+
+    func testENOTSUPTextInsideAnOrdinaryErrorIsNotAVolumeDiagnosis() {
+        let filenameShapedReason = "The file /tmp/report-(ENOTSUP)-draft.pdf could not be opened"
+        let r = result(unreadableReasons: [filenameShapedReason], filesSeen: 1)
+
+        XCTAssertEqual(DiscoveryHealth.failure(for: r, root: .heldStill),
+                       .partiallyUnreadable(files: 1, folders: 0),
+                       "only TagXattr's exact errno suffix proves Finder tags are unsupported")
+    }
+
     /// A degraded pass dates itself against the last good one, so the UI can say what it knew and
     /// when instead of an undated wrong claim.
     func testADegradedPassCarriesTheLastSettledTime() {
@@ -156,6 +190,8 @@ final class DiscoveryHealthTests: XCTestCase {
                                     .firstScan(done: 0, seen: 0),
                                     .revalidating(asOf: t0),
                                     .degraded(.rootUnreadable, asOf: t0),
+                                    .degraded(.finderTagsUnsupported(files: 4, otherFiles: 0, folders: 0),
+                                              asOf: nil),
                                     .degraded(.partiallyUnreadable(files: 1, folders: 0), asOf: nil)] {
             XCTAssertFalse(phase.isSettled, "\(phase) must not authorise deleting index rows")
         }
@@ -184,6 +220,7 @@ final class DiscoveryHealthTests: XCTestCase {
     /// empty string is the silent failure this type exists to end.
     func testEveryFailureSaysSomethingSpecific() {
         let all: [DiscoveryFailure] = [.rootUnreadable, .rootChangedMidScan, .incomplete,
+                                       .finderTagsUnsupported(files: 4, otherFiles: 0, folders: 0),
                                        .partiallyUnreadable(files: 1, folders: 0),
                                        .partiallyUnreadable(files: 0, folders: 1),
                                        .partiallyUnreadable(files: 2, folders: 3)]
@@ -226,6 +263,7 @@ final class LibraryEmptyStateTests: XCTestCase {
             .degraded(.rootUnreadable, asOf: nil),
             .degraded(.rootChangedMidScan, asOf: t0),
             .degraded(.incomplete, asOf: nil),
+            .degraded(.finderTagsUnsupported(files: 12, otherFiles: 0, folders: 0), asOf: t0),
             .degraded(.partiallyUnreadable(files: 1, folders: 0), asOf: t0),
             .settled(asOf: t0, scanned: 0),
         ]
@@ -240,6 +278,10 @@ final class LibraryEmptyStateTests: XCTestCase {
     /// itself, not describe the folder.
     func testTheIncidentShapeSaysWeCouldNotLook() {
         XCTAssertEqual(state(.degraded(.rootUnreadable, asOf: nil)), .couldNotLook(.rootUnreadable))
+        let unsupported = DiscoveryFailure.finderTagsUnsupported(files: 1_849,
+                                                                 otherFiles: 0, folders: 0)
+        XCTAssertEqual(state(.degraded(unsupported, asOf: nil)), .couldNotLook(unsupported),
+                       "an xattr-less volume explains why rows are absent; it never blames their tags")
         XCTAssertEqual(state(.degraded(.partiallyUnreadable(files: 3, folders: 1), asOf: t0)),
                        .couldNotLook(.partiallyUnreadable(files: 3, folders: 1)))
     }

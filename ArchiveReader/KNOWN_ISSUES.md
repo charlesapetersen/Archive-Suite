@@ -102,11 +102,13 @@ the latter, a write to an *empty* tag array would "verify" against a file nobody
 101,940 tagged · 51 empty-array residue · **0 denied** · 0 undecodable. Exposure was and is zero; this is a
 guard against modes and ACLs arriving from network copies, restores and archive extractions.
 
-**Known consequence, tracked as `W26.notsup`:** a volume with no xattr support (some SMB/NFS mounts — *not*
-FAT/exFAT, where macOS emulates them) returns `ENOTSUP`, so every file there now reads as unreadable and a
-Reader root pointed at one would list nothing. That is the honest answer, but "lists nothing" is the incident
-shape this wave exists to end, so it must not arrive silently. `W26.walk2` now gives it an honest
-`.degraded` surface; the still-open `W26.notsup` item must add specific ENOTSUP wording and coverage.
+**Known consequence, explained by `W26.notsup` (fixed 2026-08-05):** a volume with no xattr support (some
+SMB/NFS mounts — *not* FAT/exFAT, where macOS emulates them) returns `ENOTSUP`, so every file there still
+correctly reads as unreadable. Reader now surfaces *"Finder tags unavailable for N files"* and explains that
+it cannot list or edit those files because their volume cannot represent Read/Unread tags; it recommends an
+archive copy on a Finder-tag-capable volume such as APFS, followed by a rescan. Mixed-mount permission and
+folder failures keep their own counts. Classification keys on ArchiveCore's exact ENOTSUP suffix, not a broad
+substring that could be present in a filename. The safe read/write primitive is unchanged.
 
 **Tests:** `ArchiveCoreTests/TagDenialTests` (20, scratch temp files only), non-vacuity measured on six
 mutants — including reverting the coercion, which turns the write tests red by **succeeding**.

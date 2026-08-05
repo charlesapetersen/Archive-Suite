@@ -116,6 +116,30 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   corpus write, move, rename, delete, or content read was used. The walk1 enumerator allowance and obsolete
   fixture-comparison tests were retired in the production-swap checkpoint as required.
 
+- [x] **W26.notsup — a volume that does not support extended attributes reads as UNREADABLE, not untagged
+  [S · LOW · latent]. ✅ SHIPPED 2026-08-05** — this commit.
+  **The consequence, kept safe.** `TagXattr.inspect` still treats every errno except `ENOATTR` as unreadable,
+  including `ENOTSUP`; nothing special-cases an xattr-less volume back to "no tags." On some SMB/NFS mounts
+  that means every file is omitted and every tag write refuses, because Finder's Read/Unread tags cannot be
+  represented there. FAT/exFAT are not in this category on macOS, which emulates their xattrs. Exposure on the
+  owner's APFS corpus remains zero (0 non-ENOATTR results across 123,302 files, measured 2026-08-05).
+  **The missing explanation now exists.** `DiscoveryHealth` maps ArchiveCore's exact
+  `extended attributes unsupported on this volume (ENOTSUP)` suffix to a distinct
+  `DiscoveryFailure.finderTagsUnsupported`. The status line says *"Finder tags unavailable for N files"*;
+  its detail explains that Reader cannot tell whether those files carry Read/Unread, will not list or edit
+  them, and recommends using an archive copy on a Finder-tag-capable volume such as APFS before rescanning.
+  A root may cross mount boundaries, so the case also retains counts for other unreadable files and folders
+  rather than letting the specific diagnosis hide simultaneous failures.
+  **Adversarial correction before ship.** The first classifier used a broad `(ENOTSUP)` substring. An ordinary
+  localized error could contain a filename such as `report-(ENOTSUP)-draft.pdf` and be falsely diagnosed as a
+  volume capability. Classification now requires the exact ArchiveCore suffix; a negative regression test
+  pins that boundary.
+  **Verification.** Two new health-mapping tests plus the existing empty-state wiring: targeted 24/24 green;
+  complete Reader unit bundle 305/305 executed green with only the separately tracked
+  `DeepLinkTests.testRevealAndSelectNoRoot` environment case skipped (`W20.deeplink-isolation`). Reader
+  Release build green; write-surface lint clean and self-test 12/12. No ArchiveCore primitive or write path
+  changed, no real corpus was read or written, and no physical xattr-less volume was required.
+
 - [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
   ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
   **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as
@@ -155,8 +179,9 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   **The adversarial pass sent the fix back once:** `plist is [Any]` accepted a NON-empty array, so a tag array
   macOS declined to decode would still have been called "no tags" — the same coercion one layer in. It now
   requires the array to be empty, which also makes the read TOCTOU honest.
-  Residual filed: **`W26.notsup`** (an xattr-less volume now reads as unreadable, not untagged — deliberate,
-  but it needs somewhere to surface; folded into `W26.walk1`). See `ArchiveReader/KNOWN_ISSUES.md`.
+  Residual **`W26.notsup` shipped 2026-08-05**: an xattr-less volume remains unreadable rather than untagged,
+  and now gets specific Finder-tag capability guidance through `W26.walk2`'s health surface. See the completed
+  entry above and `ArchiveReader/KNOWN_ISSUES.md`.
 
 - [x] **W26.lint — extend the write-surface lint to cover ArchiveCore [S · low · Tier-1]. ✅ DONE 2026-08-05**
   — `1460125` (lint + self-test) → this commit (trackers + docs).

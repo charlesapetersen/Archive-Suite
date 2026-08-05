@@ -197,23 +197,12 @@ reports the *target's* tags through a symlink) and *"a returned size of 0"* (a r
 §7a.3. **(3)** The corpus census is refreshed: 123,302 regular files · 21,311 ENOATTR · 101,940 tagged · 51
 empty-array residue · **0 denied** · 0 undecodable.
 
-- [ ] **W26.notsup — a volume that does not support extended attributes now reads as UNREADABLE, not as
-  untagged [S · LOW · latent]** (blocked-on: W26.walk2). Filed 2026-08-05 by `W26.deny`'s adversarial pass;
-  a deliberate consequence of it, not a regression. `TagXattr.inspect` returns `.unreadable` for **any**
-  errno except `ENOATTR`, `ENOTSUP` included — per plan §7a.3, which names `ENOTSUP` explicitly. On a volume
-  with no xattr support (some SMB/NFS mounts; NOT FAT/exFAT, where macOS emulates them) every file would
-  therefore report as unreadable, so a Reader root pointed there would list **nothing** and every tag write
-  would refuse. That is the honest answer and the safe one — but "lists nothing" is exactly the incident
-  shape this wave exists to end, so it must not arrive silently. Exposure today is **zero**: the corpus is
-  APFS on the internal disk (0 non-ENOATTR errnos across 123,302 files, measured 2026-08-05).
-  ⚠️ **Dependency CORRECTED 2026-08-05 while shipping `W26.walk1`: this is `(blocked-on: W26.walk2)`, not
-  `walk1`.** It was filed saying "do it inside `W26.walk1`, whose `DiscoveryStatus`/`.degraded` work is where
-  this surfaces" — but `DiscoveryStatus` is `W26.walk2`'s deliverable, not walk1's. walk1 shipped the
-  *counters* (`CorpusScanResult.unreadable` + `isClean`), so an ENOTSUP volume is now correctly recorded as
-  unreadable; what still does not exist is anywhere in the UI for that to be SAID, which is exactly walk2.
-  Left against walk1 the resolver would have offered this next, with the same nowhere-to-surface problem the
-  original text warned about. Not worth its own primitive change: do NOT special-case `ENOTSUP` back to
-  "no tags".
+✅ **W26.notsup — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** An xattr-less
+SMB/NFS volume remains safely unreadable—never coerced to untagged—but Reader now says *"Finder tags
+unavailable for N files"* and explains that it cannot list or edit them, with APFS-copy + rescan guidance.
+Mixed-mount permission/file/folder counts remain visible. The mapper recognizes only ArchiveCore's exact
+ENOTSUP suffix; an ordinary error path containing `(ENOTSUP)` cannot be misdiagnosed as a volume capability.
+Exposure remains zero on the owner's APFS corpus.
 ✅ **W26.lint — SHIPPED 2026-08-05 (`1460125` → this commit); full entry in `SUITE_TODO_DONE.md`.** Two things
 later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write-surface.sh` now lints
 `packages/ArchiveCore/Sources/ArchiveCore` as well as the Reader app target, and allowances are

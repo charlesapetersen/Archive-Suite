@@ -16,6 +16,10 @@ enum DiscoveryFailure: Equatable, Sendable {
     case rootChangedMidScan
     /// The pass was cancelled (a root switch, app teardown) before reaching the end.
     case incomplete
+    /// One or more files live on a volume that cannot store Finder tags at all (`getxattr` returned
+    /// `ENOTSUP`). Keep the other failure counts too: a root may cross mount boundaries, and naming
+    /// the unsupported volume must not hide simultaneous permissions or directory failures.
+    case finderTagsUnsupported(files: Int, otherFiles: Int, folders: Int)
     /// The pass ran to the end but could not read everything it saw.
     case partiallyUnreadable(files: Int, folders: Int)
 
@@ -25,6 +29,8 @@ enum DiscoveryFailure: Equatable, Sendable {
         case .rootUnreadable:     return "Archive folder unreadable"
         case .rootChangedMidScan: return "Archive folder changed while scanning"
         case .incomplete:         return "Scan incomplete"
+        case let .finderTagsUnsupported(files, _, _):
+            return "Finder tags unavailable for \(files) file\(files == 1 ? "" : "s")"
         case let .partiallyUnreadable(files, folders):
             let parts = [files > 0 ? "\(files) file\(files == 1 ? "" : "s")" : nil,
                          folders > 0 ? "\(folders) folder\(folders == 1 ? "" : "s")" : nil]
@@ -45,6 +51,24 @@ enum DiscoveryFailure: Equatable, Sendable {
                  + "incomplete; rescan (⌘⌥R) once the folder is back."
         case .incomplete:
             return "The scan did not finish, so the list may be incomplete. Rescan with ⌘⌥R."
+        case let .finderTagsUnsupported(files, otherFiles, folders):
+            let volume = files == 1
+                ? "The volume holding this file does"
+                : "One or more volumes holding these files do"
+            let affected = files == 1 ? "this file carries" : "these \(files) files carry"
+            var detail = "\(volume) not support Finder tags, so Archive Reader cannot tell whether "
+                       + "\(affected) Read or Unread and will not list or edit them. Use a copy "
+                       + "of the archive on a volume with Finder-tag support, such as APFS, then rescan (⌘⌥R)."
+            if otherFiles > 0 || folders > 0 {
+                let other = [otherFiles > 0
+                                ? "\(otherFiles) other file\(otherFiles == 1 ? "" : "s")" : nil,
+                             folders > 0 ? "\(folders) folder\(folders == 1 ? "" : "s")" : nil]
+                    .compactMap { $0 }
+                    .joined(separator: " and ")
+                detail += " The scan also could not read \(other); the result may be incomplete for "
+                        + "more than one reason."
+            }
+            return detail
         case let .partiallyUnreadable(files, folders):
             let what = folders > 0
                 ? "Some items could not be read (\(files) file\(files == 1 ? "" : "s"), "
@@ -140,6 +164,12 @@ enum LibraryPhase: Equatable, Sendable {
 /// have to stand up. Every branch below is unit-tested in `DiscoveryHealthTests`.
 enum DiscoveryHealth {
 
+    /// Stable suffix emitted by ArchiveCore's `TagXattr.inspect` for `getxattr(...)=ENOTSUP`.
+    /// Do not infer this from generic localized errors: only that syscall result proves the volume
+    /// cannot represent Finder tags, rather than merely denying access to one file.
+    private static let finderTagsUnsupportedSuffix =
+        "extended attributes unsupported on this volume (ENOTSUP)"
+
     /// Map one pass onto a failure, or `nil` when it is authoritative.
     ///
     /// `isClean` is **consulted, not re-derived** — it is already the plan §5.13 tier-1 gate and lives
@@ -153,6 +183,14 @@ enum DiscoveryHealth {
         if result.cancelled { return .incomplete }
         if root == .changedMidScan { return .rootChangedMidScan }
         guard result.isClean else {
+            let unsupported = result.unreadable.reduce(into: 0) { count, failure in
+                if failure.reason.hasSuffix(finderTagsUnsupportedSuffix) { count += 1 }
+            }
+            if unsupported > 0 {
+                return .finderTagsUnsupported(files: unsupported,
+                                              otherFiles: result.unreadable.count - unsupported,
+                                              folders: result.directoryErrors.count)
+            }
             return .partiallyUnreadable(files: result.unreadable.count,
                                         folders: result.directoryErrors.count)
         }
