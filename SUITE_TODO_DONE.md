@@ -16,6 +16,50 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
+
+- [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
+  ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
+  **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as
+  empty)"* and then did `before = rv.tagNames ?? []` four lines under it. `resourceValues` **does not throw**
+  for a file whose extended attributes are unreadable while its directory is traversable — it returns
+  `tagNames == nil`, byte-for-byte its answer for an untagged file — so the `catch` never fired, `before`
+  became `[]` for a file carrying real tags, and `transform([], nil)` produced a delta that line ~271 wrote.
+  Reproduced independently here before fixing: `mode 0o200` and an ACL denying only `readextattr` both took
+  `["Unread","Subj","P9"]` → `["Read"]`, write **SUCCEEDED**; `mode 0o000` failed the write (−5000) but still
+  reported `before == []`, so its undo inverse was corrupt.
+  **The fix:** a new ArchiveCore primitive, `TagXattr.inspect`, resolves the ambiguity at the syscall layer —
+  `getxattr` on `com.apple.metadata:_kMDItemUserTags`, where **only `ENOATTR` confirms absence**. Both call
+  sites route through it: `TagReading.read` (only on the `tagNames == nil` branch, so a tagged file pays
+  nothing) and `CoordinatedTagWriter`, whose §2/§3 fresh read AND §8 post-write re-read now both refuse
+  rather than coerce. **Later items in this wave must CALL `TagXattr.inspect`, not re-derive it** (plan
+  §7a.3 makes this binding for `W26.walk1`'s pre-filter).
+  ⚠️ **Two of the plan's written prescriptions were measured WRONG while shipping this, and both would have
+  reintroduced the bug** (corrected in plan §4a.1 / §7a.3): (a) the probe must **FOLLOW symlinks** — NOT
+  `XATTR_NOFOLLOW`, which the plan specified — because `resourceValues` reports the *target's* tags through
+  a symlink, so a NOFOLLOW probe answers about the link and returns `ENOATTR` for a **denied target**;
+  (b) *"`ENOATTR` or a returned size of 0 is the only honest verified-no-tags"* is too strict — removing a
+  file's tags leaves a **42-byte empty-array plist**, and **51 of the owner's files** are in exactly that
+  state, so the strict rule would have reported all 51 as unreadable.
+  **Corpus census, read-only, 2026-08-05** (supersedes the 123,028 figure): **123,302** regular files in
+  30.8 s, 0 walk errors — 21,311 `ENOATTR` · 101,940 tagged · 51 empty-array residue · **0 denied** ·
+  0 undecodable · 0 non-array. So the fix changes the answer for **no file on disk today**; it guards
+  against modes and ACLs arriving from network copies, restores and archive extractions.
+  **Tests:** `ArchiveCoreTests/TagDenialTests` — 20 tests, throwaway temp files only. The four denial shapes,
+  a corrupt attribute, a non-tag array, a symlink to a denied target, the three write-abort cases (incl. "no
+  result, so no corrupt inverse" and "the transform is never even consulted"), and — the guards against
+  over-strictness — untagged, empty-array residue, traverse-only parent, a plain directory, an ordinary write,
+  a write to a confirmed-untagged file. Skipped as root, where every denial would pass vacuously.
+  **Six mutants measured**, each red exactly where it should be: M1 the original `?? []` → 9 red incl. the
+  write succeeding and destroying tags; M2 only the writer reverted → exactly the 4 write tests; M3
+  `XATTR_NOFOLLOW` → only the symlink test; M4 the plan's size-0 rule → the empty-array residue; M5 drop the
+  is-it-a-tag-array check → the corrupt attribute; M6 `ENOATTR` treated as unreadable → the honest cases.
+  **The adversarial pass sent the fix back once:** `plist is [Any]` accepted a NON-empty array, so a tag array
+  macOS declined to decode would still have been called "no tags" — the same coercion one layer in. It now
+  requires the array to be empty, which also makes the read TOCTOU honest.
+  Residual filed: **`W26.notsup`** (an xattr-less volume now reads as unreadable, not untagged — deliberate,
+  but it needs somewhere to surface; folded into `W26.walk1`). See `ArchiveReader/KNOWN_ISSUES.md`.
+
 ## Owner-reported bugs (2026-08-02)
 
 - [x] **W25.modelsync [MED · money] — changing the model in Settings did not change the Process Files cost

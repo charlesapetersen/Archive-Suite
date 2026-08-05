@@ -544,12 +544,34 @@ while the xattr is unreadable — and the wave's first item would then coerce a 
 exactly as before. **Use:**
 
 ```c
-getxattr(path, "com.apple.metadata:_kMDItemUserTags", nil, 0, 0, XATTR_NOFOLLOW)
+getxattr(path, "com.apple.metadata:_kMDItemUserTags", nil, 0, 0, 0)
 ```
 
-and return `.failure` when it returns `-1` with **any errno other than `ENOATTR` (93)**. `ENOATTR`, or a
-returned size of `0`, is the only honest "verified no tags". This is the same errno rule §7a.3 imposes on the
-optional size-0 pre-filter — one rule, applied in both places.
+and return `.failure` when it returns `-1` with **any errno other than `ENOATTR` (93)**. This is the same
+errno rule §7a.3 imposes on the optional size-0 pre-filter — one rule, applied in both places.
+
+🔴 **TWO CORRECTIONS, made while SHIPPING `W26.deny` (2026-08-05, `ad86cce`). Both were wrong above, both
+are load-bearing, and a later item that copies the original wording reintroduces the bug this wave exists
+to fix. The shipped `TagXattr.inspect` is the reference implementation — read it, not this section.**
+
+1. **The final argument is `0`, NOT `XATTR_NOFOLLOW`** (corrected in the snippet above). `resourceValues`
+   **follows** symlinks — measured: through a symlink to a tagged file it reports the *target's* tags. A
+   `XATTR_NOFOLLOW` probe therefore answers about the **link**, which carries no attribute of its own, and
+   returns `ENOATTR` — "confirmed no tags" — for a **denied target**. That is precisely the coercion §4a.1b
+   describes, displaced one indirection. Pinned by `TagDenialTests.testSymlinkToDeniedTargetIsAFailure`,
+   which is red under `XATTR_NOFOLLOW` and green under `0`.
+2. **"`ENOATTR`, or a returned size of `0`, is the only honest 'verified no tags'" was too strict and would
+   have mis-flagged real files.** Removing a file's tags leaves a **42-byte empty-array plist** behind, and
+   macOS reports `tagNames == nil` for it. A census of the owner's corpus (read-only, 2026-08-05, 123,302
+   regular files, 30.8 s, 0 walk errors) found **51 files in exactly that state** — the strict rule reports
+   every one of them as unreadable. The shipped rule: a *readable* attribute that decodes to an **empty
+   array** is a confirmed "no tags"; a non-empty array macOS did not report as tags, a non-array plist, or
+   undecodable bytes are all `.unreadable`.
+
+For completeness, that same census is the current exposure figure, and it supersedes the 123,028-file one
+quoted elsewhere in this plan: **21,311 ENOATTR · 101,940 tagged · 51 empty-array residue · 0 denied ·
+0 undecodable · 0 non-array.** Zero denied means `W26.deny` changed the answer for **no file on disk
+today** — it is a guard against modes and ACLs arriving from network copies, restores and extractions.
 
 ### 4a.1b 🔴 THE SAME COERCION IS IN THE AUDITED WRITE PATH — and it destroys tags
 
@@ -795,7 +817,7 @@ each leaving the app **working**.
 
 | Tag | Title | Effort | Risk | Tier | needs | blocked-on |
 |---|---|---|---|---|---|---|
-| `W26.deny` | 🔴 **Fix the read coercion in BOTH `TagReading.swift:34` and `TagWrite.swift:257`** | S | med | **2** | none | — |
+| `W26.deny` | ✅ **SHIPPED `ad86cce`** — read coercion fixed in BOTH `TagReading.swift` and `TagWrite.swift`; `TagXattr.inspect` is the primitive later items must reuse | S | med | **2** | none | — |
 | `W26.lint` | Extend `lint-write-surface.sh` to cover `packages/ArchiveCore` | S | low | 1 | none | — |
 | `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
 | `W26.walk2` | Reader discovery → `CorpusWalker`; delete `PendingWrite`; honest `DiscoveryStatus` | L | med | 2 | none | `W26.walk1` |
@@ -920,8 +942,11 @@ complete with `dirErrors == 0`. Promoting this verbatim would defeat `W26.deny` 
   clean ⇒ absence is not actionable, per §5.13 tier 1), and the row must be **kept** where one previously
   existed. Never `continue`.
 - **Fix (`W26.walk1`):** if a `getxattr` size-0 probe is used as a cheap pre-filter, **only `errno == ENOATTR`
-  (or a returned size of 0) may conclude "no tags."** `EACCES`, `EPERM`, `EIO`, `ENOTSUP` **must** fall
-  through to `TagReading.read`. Otherwise `W26.deny`'s bug is reintroduced *and persisted* into the index.
+  may conclude "no tags."** `EACCES`, `EPERM`, `EIO`, `ENOTSUP` **must** fall through to `TagReading.read`.
+  Otherwise `W26.deny`'s bug is reintroduced *and persisted* into the index. ⚠️ **Do not add "or a returned
+  size of 0" — and do not pass `XATTR_NOFOLLOW`.** Both were in the original wording here and both are wrong;
+  see the two corrections in §4a.1, measured while shipping `W26.deny`. Better: **call `TagXattr.inspect`,
+  which is shipped, tested against all seven denial shapes, and already applies exactly this rule.**
 
 ### 7a.4 The prune gate is wider than `.firstScan`
 

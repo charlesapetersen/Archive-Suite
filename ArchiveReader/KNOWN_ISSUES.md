@@ -2,11 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## 🔴 OPEN (W26.deny) — `TagWriter` can DESTROY tags on a file whose xattrs are unreadable-but-writable
+## ✅ FIXED (W26.deny) — `TagWriter` could DESTROY tags on a file whose xattrs are unreadable-but-writable
 
 **Found 2026-08-04** while auditing Spotlight removal; **independent of Spotlight** and of that wave.
-Tracked as `W26.deny` in `SUITE_TODO.md` (Tier-2, goes first). Affects `packages/ArchiveCore` — filed here
-because Reader tag safety is documented here.
+**Fixed 2026-08-05** — `2956f3c` (the read primitive) → `ad86cce` (the write path). Affects
+`packages/ArchiveCore` — filed here because Reader tag safety is documented here. The finding is kept below
+in full, followed by *what shipped*, because two of the prescriptions written into it were measured wrong.
 
 `TagWrite.swift:252-261` states *"§2/§3 fresh read inside coordination; a read FAILURE aborts (never treated
 as empty)"* and then does:
@@ -37,14 +38,49 @@ Violates the Core Directive (*"MUST NOT mangle, drop, or lose any tag unintentio
 `-rw-r--r--` — benign residue of removed tags, not denial.) So **latent, not an active fire** — but modes and
 ACLs arrive from network copies, restores and archive extractions, and the corpus is irreplaceable.
 
-**Fix:** correct both call sites — `TagReading.swift:34` and `TagWrite.swift:257` — by probing
-`access(R_OK)`/`getxattr` **only on the `tagNames == nil` branch** (parent/ACL denial already throws, so a
-blanket pre-check is wasted work at 150k), and route the writer's fresh read through the corrected primitive.
-
 ⚠️ **Testing gotcha that already caused one wrong conclusion here:** `URL.resourceValues` **caches on the
 backing `NSURL`**, so a probe that reuses a `URL` value returns a stale answer and the test passes while
 asserting nothing. Build a fresh `URL` per probe, or use `stat(2)`/`getxattr`. See *@Published willSet
 timing* below and the `url-resourcevalues-caches` note (W23.m11-fu) for the same class of trap.
+
+### What shipped (2026-08-05)
+
+**`TagXattr.inspect`** (`packages/ArchiveCore/.../Tags/TagReading.swift`) is the new shared primitive that
+answers *absent* / *readable-but-empty* / *unreadable* by asking the filesystem directly:
+`getxattr(path, "com.apple.metadata:_kMDItemUserTags", …)`, where **only `ENOATTR` (93) confirms absence** —
+`EACCES`, `EPERM`, `EIO`, `ENOTSUP`, `ENOENT` all mean *we could not look*. It runs **only on the
+`tagNames == nil` branch**, so a tagged file costs nothing extra. Both call sites route through it:
+`TagReading.read`, and `CoordinatedTagWriter`'s §2/§3 fresh read **and** its §8 post-write re-read (without
+the latter, a write to an *empty* tag array would "verify" against a file nobody can read).
+
+🔴 **Two prescriptions in the finding above are WRONG — do not follow them; they are corrected in
+`execution-plans/despotlight.md` §4a.1 and §7a.3:**
+
+1. **`access(R_OK)` is not a usable probe** (the finding's own later text says this; the "Fix" line said
+   `access(R_OK)`/`getxattr`). An ACE denying only `readextattr` leaves the file *data* readable, so
+   `access(R_OK)` returns 0 while the tags are unreadable.
+2. **The probe must FOLLOW symlinks — NOT `XATTR_NOFOLLOW`.** Measured: `resourceValues` reports the
+   **target's** tags through a symlink, so a `XATTR_NOFOLLOW` probe answers about the *link*, which has no
+   attribute of its own, and returns `ENOATTR` — "confirmed no tags" — for a **denied target**. The same
+   coercion, displaced one indirection.
+3. **"a returned size of 0" is not the only honest empty.** Removing a file's tags leaves a **42-byte
+   empty-array plist** behind, and macOS reports `tagNames == nil` for it. **51 of the owner's 123,302
+   files** are in that state; treating a nonzero size as unreadable would have mis-flagged every one. The
+   shipped rule: a readable attribute that decodes to an **empty array** is a confirmed "no tags"; a
+   non-empty array macOS did not report as tags, a non-array plist, or undecodable bytes are all unreadable.
+
+**Corpus census, read-only, 2026-08-05** — 123,302 regular files in 30.8 s, 0 walk errors: 21,311 `ENOATTR` ·
+101,940 tagged · 51 empty-array residue · **0 denied** · 0 undecodable. Exposure was and is zero; this is a
+guard against modes and ACLs arriving from network copies, restores and archive extractions.
+
+**Known consequence, tracked as `W26.notsup`:** a volume with no xattr support (some SMB/NFS mounts — *not*
+FAT/exFAT, where macOS emulates them) returns `ENOTSUP`, so every file there now reads as unreadable and a
+Reader root pointed at one would list nothing. That is the honest answer, but "lists nothing" is the incident
+shape this wave exists to end, so it must not arrive silently — folded into `W26.walk1`, where
+`DiscoveryStatus`/`.degraded` gives it somewhere to surface.
+
+**Tests:** `ArchiveCoreTests/TagDenialTests` (20, scratch temp files only), non-vacuity measured on six
+mutants — including reverting the coercion, which turns the write tests red by **succeeding**.
 
 ## ✅ FIXED (W23.l2) — a cancelled prune task could still defeat the two-emission absence gate
 

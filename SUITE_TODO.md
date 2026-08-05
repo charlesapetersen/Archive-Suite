@@ -188,27 +188,27 @@ per file (*has tags* / *verified none* / *could not read*), the `errorHandler:` 
 of everything skipped. **Every layer must be able to say "I don't know" separately from "there is nothing" —
 Spotlight could not, which is why the app lied.**
 
-- [ ] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2 ·
-  needs: none].** `TagWrite.swift:252-261` carries the comment *"a read FAILURE aborts (never treated as
-  empty)"* and then does `before = rv.tagNames ?? []` at `:257`. In the case above **the read does not
-  throw**, so the `catch` never fires, `before` becomes `[]` for a file with real tags, `transform([], nil)`
-  computes a delta against nothing, and `:271` writes it. **Reproduced twice on scratch files:** `mode 0o200`
-  (write-only, no read) → read no-throw, `before=[]`, write **SUCCEEDED**, disk went
-  `["Unread","Subj","P9"]` → `["Read"]` — **`Subj` and `P9` destroyed**; an **ACL denying `readextattr`** at
-  perms `0644` → identical destruction. With `mode 0o000` the write fails (-5000) so tags survive, **but the
-  recorded `before`/inverse is still `[]`, so UNDO is corrupt.** Direct violation of the Core Directive
-  (*"MUST NOT mangle, drop, or lose any tag unintentionally"*) and **independent of Spotlight** — a bug even
-  if this wave never happened. **Exposure on the real corpus today: ZERO, measured not assumed** — a read-only
-  scan of all 123,028 files found `owner lacks read bit: 0`, `getxattr EACCES: 0` (51 files match
-  nil-tags-with-xattr-present, but samples decode to a literal **empty array** at `-rw-r--r--` — benign
-  residue of removed tags). So it is **latent, not an active fire** — but modes and ACLs arrive from network
-  copies, restores and archive extractions, and the corpus is irreplaceable. **Fix BOTH call sites**
-  (`TagReading.swift:34` + `TagWrite.swift:257`), routing the writer's §2/§3 fresh read through the corrected
-  primitive so its comment becomes true. **Goes FIRST — every later item builds on this primitive.**
-  **Test:** the reproduction inverted — the write must ABORT with `TagWriteError.unreadable` and tags must be
-  byte-identical afterwards; plus the `0o000` variant asserting `before`/inverse is not `[]`; plus a
-  `TagReading` unit test covering all four denial shapes. Build every probe from a **fresh `URL`**. Also file
-  it in `ArchiveReader/KNOWN_ISSUES.md`.
+✅ **W26.deny — SHIPPED 2026-08-05 (`2956f3c` → `ad86cce`); full entry in `SUITE_TODO_DONE.md`.** Three things
+later items in this wave need from it. **(1)** `TagXattr.inspect` (ArchiveCore) is now the shared primitive
+for *"no tags"* vs *"couldn't read the tags"* — call it, don't re-derive it. **(2) Two of this plan's written
+prescriptions were measured WRONG while shipping it** — `XATTR_NOFOLLOW` (must FOLLOW: `resourceValues`
+reports the *target's* tags through a symlink) and *"a returned size of 0"* (a removed-tags file keeps a
+42-byte empty-array plist; 51 of the owner's files are in that state) — both now corrected in plan §4a.1 and
+§7a.3. **(3)** The corpus census is refreshed: 123,302 regular files · 21,311 ENOATTR · 101,940 tagged · 51
+empty-array residue · **0 denied** · 0 undecodable.
+
+- [ ] **W26.notsup — a volume that does not support extended attributes now reads as UNREADABLE, not as
+  untagged [S · LOW · latent]** (blocked-on: W26.walk1). Filed 2026-08-05 by `W26.deny`'s adversarial pass;
+  a deliberate consequence of it, not a regression. `TagXattr.inspect` returns `.unreadable` for **any**
+  errno except `ENOATTR`, `ENOTSUP` included — per plan §7a.3, which names `ENOTSUP` explicitly. On a volume
+  with no xattr support (some SMB/NFS mounts; NOT FAT/exFAT, where macOS emulates them) every file would
+  therefore report as unreadable, so a Reader root pointed there would list **nothing** and every tag write
+  would refuse. That is the honest answer and the safe one — but "lists nothing" is exactly the incident
+  shape this wave exists to end, so it must not arrive silently. Exposure today is **zero**: the corpus is
+  APFS on the internal disk (0 non-ENOATTR errnos across 123,302 files, measured 2026-08-05). **Do it inside
+  `W26.walk1`**, whose `DiscoveryStatus`/`.degraded` work is where "I could not read this whole volume"
+  becomes something the UI can say — a fix before then has nowhere to surface. Not worth its own primitive
+  change: do NOT special-case `ENOTSUP` back to "no tags".
 - [ ] **W26.lint — extend the write-surface lint to cover ArchiveCore [S · low · Tier-1 · needs: none].**
   `ArchiveReader/scripts/lint-write-surface.sh:10` hardcodes `SRC="macOS/Sources/ArchiveReader"`, so moving
   discovery into `packages/ArchiveCore` (which this plan does) moves it **out of the Core Directive's
