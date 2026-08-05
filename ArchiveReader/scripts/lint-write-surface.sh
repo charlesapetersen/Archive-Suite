@@ -38,10 +38,18 @@
 # copy elsewhere would not compile — but line numbers were rejected as the alternative (they churn
 # on every edit above the site, which is how an allowlist stops being read).
 #
-# NOT covered here, deliberately: a rule against the `errorHandler:`-less `FileManager.enumerator`
-# overload (plan §4a.2). It belongs to `W26.walk1`, which introduces the walker — and note the
-# measured trap in §7a.8: `enumerator(at:` matches ZERO occurrences in this repo because the call
-# is written across lines, so a rule keyed on that string would pass vacuously.
+# ── RULE 3: no `errorHandler:`-less FileManager.enumerator (W26.walk1, 2026-08-05) ────────────
+# That overload SILENTLY skips any directory it cannot descend into — no error, no count, and the
+# caller's scan still looks complete (plan §4a.2, confirmed by measurement: without the handler a
+# sealed directory was listed but never descended; with it, code 257 fired). It is one of the two
+# ways the de-Spotlight fix could have reproduced the incident it exists to end, so it is banned
+# in the linted trees rather than left to reviewer memory.
+#
+# ⚠️ The rule CANNOT be a grep. Measured while writing it: `enumerator(at:` matches ZERO
+# occurrences in this repo because every call is written across lines, so the obvious rule would
+# have passed vacuously — the worst kind of green (plan §7a.8). It therefore balances parentheses
+# with perl to isolate the whole call, across however many lines it spans, and asks whether THAT
+# text contains `errorHandler:`.
 set -uo pipefail
 
 # Repo root, so violation paths read the same way everywhere. `LINT_WRITE_SURFACE_ROOT` is a
@@ -71,6 +79,19 @@ ALLOW=(
   # PDFThumbnailer: its own disposable cache directory (write + LRU eviction). Outside the corpus.
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}try data.write(to: fileURL, options: .atomic)"
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}try? FileManager.default.removeItem(at: url)"
+
+  # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
+  # The Spotlight-era fixture loader. This is the exact call `W26.walk2` DELETES (the whole
+  # `#if DEBUG loadFixtureSynchronously` body is replaced by `CorpusWalker`), so it is allowed for
+  # the days it has left rather than patched. When walk2 removes it, the STALE-allowance guard
+  # above turns this entry into a hard failure — which is the point: the allowance cannot be
+  # forgotten, and nothing can quietly re-add a silent enumerator in its place.
+  "enumerator${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Search/ArchiveLibrary.swift${SEP}let enumerator = FileManager.default.enumerator("
+
+  # PDFThumbnailer walks its OWN disposable cache directory to rebuild the LRU index. An entry it
+  # cannot read costs an under-counted byte total in a cache that is rebuilt on demand — not a
+  # corpus file, and not an absence anything reports to the user.
+  "enumerator${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}guard let enumerator = fm.enumerator("
 )
 
 is_allowed() {   # <rule> <path> <trimmed line>
@@ -111,24 +132,45 @@ for a in ${ALLOW[@]+"${ALLOW[@]}"}; do
   fi
 done
 
-scan() {   # <rule> <message> <extended regex>
-  local rule="$1" message="$2" regex="$3"
+# Consumes `path:lineno:content` hits on stdin, drops the allowed ones, reports the rest. Runs in
+# the CURRENT shell (no pipeline subshell) so `fail=1` survives.
+scan_stream() {   # <rule> <message>
+  local rule="$1" message="$2"
   local hits="" line path rest content
   while IFS= read -r line; do
     [ -n "$line" ] || continue
-    path="${line%%:*}"          # grep -rn emits path:lineno:content
+    path="${line%%:*}"          # path:lineno:content, as grep -rn emits it
     rest="${line#*:}"
     content="${rest#*:}"
     content="${content#"${content%%[![:space:]]*}"}"   # ltrim (bash 3.2-safe)
     content="${content%"${content##*[![:space:]]}"}"   # rtrim
     is_allowed "$rule" "$path" "$content" || hits="${hits}${line}"$'\n'
-  done < <(grep -rnE "$regex" "${SRCS[@]}" --include='*.swift' 2>/dev/null || true)
+  done
 
   if [ -n "$hits" ]; then
     echo "✗ $message"
     printf '%s' "$hits"
     fail=1
   fi
+}
+
+scan() {   # <rule> <message> <extended regex>
+  scan_stream "$1" "$2" < <(grep -rnE "$3" "${SRCS[@]}" --include='*.swift' 2>/dev/null || true)
+}
+
+# Every `.enumerator(` call whose OWN argument list — balanced parens, however many lines it spans —
+# does not mention `errorHandler:`. Emits the line the call starts on, so an allowance pins that line
+# like every other rule here.
+enumerators_without_error_handler() {
+  find "${SRCS[@]}" -name '*.swift' -type f -print0 2>/dev/null \
+    | xargs -0 /usr/bin/perl -0777 -ne '
+        while (/\.enumerator\s*(\((?:[^()]++|(?1))*\))/gs) {
+          next if $1 =~ /errorHandler\s*:/;
+          my $lineno = 1 + (substr($_, 0, $-[0]) =~ tr/\n//);
+          my @lines = split /\n/, $_, -1;
+          print "$ARGV:$lineno:$lines[$lineno-1]\n";
+        }
+      '
 }
 
 # 1) tag-write APIs — only the audited choke-point, only the exact allowed lines.
@@ -140,6 +182,11 @@ scan tagwrite \
 scan destructive \
   "destructive / content-write API in the linted trees (or an allowed line that changed):" \
   '\.(removeItem|moveItem|trashItem|replaceItem|replaceItemAt|createFile)\(|FileHandle[^)]*forWriting|PDFDocument[^)]*\.write\(|\.write\(to:'
+
+# 3) FileManager.enumerator without an errorHandler: — a silent skip of what it cannot read.
+scan_stream enumerator \
+  "FileManager.enumerator without errorHandler: — it SILENTLY skips directories it cannot read:" \
+  < <(enumerators_without_error_handler)
 
 if [ "$fail" -eq 0 ]; then echo "✓ write-surface lint clean (${SRCS[*]})"; fi
 exit $fail

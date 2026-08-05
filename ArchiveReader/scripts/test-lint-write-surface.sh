@@ -9,6 +9,12 @@
 # Everything runs against a COPY of the two linted trees in a mktemp dir, via the lint's TEST-ONLY
 # `LINT_WRITE_SURFACE_ROOT` override. Nothing is ever planted in the real repo.
 #
+# The rule-3 cases (W26.walk1) exist for the same reason: `grep 'enumerator(at:'` matches ZERO
+# occurrences in this repo because the call is always written across lines, so the obvious spelling
+# of that rule would have passed vacuously. One case plants the violation MULTI-LINE, one plants it
+# on a single line, and one plants a handler-BEARING call that must still pass — a rule that just
+# banned `.enumerator(` would fail that third case.
+#
 # Usage: ArchiveReader/scripts/test-lint-write-surface.sh
 set -uo pipefail
 
@@ -123,6 +129,65 @@ fresh_tree
 /usr/bin/sed -i '' 's|try? FileManager\.default\.removeItem(at: url)|// removed for the test|' \
   "$SCRATCH/$CORE_SRC/Thumbnails/PDFThumbnailer.swift"
 expect 1 "an allowance whose line vanished FAILS as STALE" "STALE allowance"
+
+echo "── rule 3: a MULTI-LINE errorHandler-less enumerator (a grep would miss this) ──"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Corpus"
+cat > "$SCRATCH/$CORE_SRC/Corpus/PlantedSilentWalk.swift" <<'SWIFT'
+// The overload that silently skips any directory it cannot descend into — written the way Swift
+// style actually writes it, across lines, which is why `grep 'enumerator(at:'` finds NOTHING.
+import Foundation
+func plantedSilentWalk(_ root: URL) -> Int {
+    var n = 0
+    let en = FileManager.default.enumerator(
+        at: root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    )
+    while en?.nextObject() != nil { n += 1 }
+    return n
+}
+SWIFT
+expect 1 "a multi-line enumerator with no errorHandler FAILS" "Corpus/PlantedSilentWalk.swift"
+
+echo "── rule 3: the same call on ONE line is caught too ─────────────────────────"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Corpus"
+cat > "$SCRATCH/$CORE_SRC/Corpus/PlantedOneLine.swift" <<'SWIFT'
+import Foundation
+func plantedOneLine(_ root: URL) -> Bool {
+    return FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: []) != nil
+}
+SWIFT
+expect 1 "a single-line enumerator with no errorHandler FAILS" "Corpus/PlantedOneLine.swift"
+
+echo "── rule 3 bans the OVERLOAD, not the API: with a handler it must pass ──────"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Corpus"
+cat > "$SCRATCH/$CORE_SRC/Corpus/PlantedHonestWalk.swift" <<'SWIFT'
+import Foundation
+func plantedHonestWalk(_ root: URL) -> Int {
+    var n = 0
+    let en = FileManager.default.enumerator(
+        at: root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles],
+        errorHandler: { _, _ in true }
+    )
+    while en?.nextObject() != nil { n += 1 }
+    return n
+}
+SWIFT
+expect 0 "an enumerator WITH errorHandler passes (the rule is not a ban on walking)" "lint clean"
+
+echo "── rule 3: when W26.walk2 deletes the allowed call, the allowance goes STALE ─"
+fresh_tree
+# Simulates walk2 replacing `loadFixtureSynchronously` with CorpusWalker: the allowed call is gone,
+# so nothing violates rule 3 — but the allowance now guards nothing and must be reported, or a
+# future silent enumerator could slip in under it.
+/usr/bin/sed -i '' 's|let enumerator = FileManager\.default\.enumerator(|let enumerator = deleted_by_walk2(|' \
+  "$SCRATCH/$READER_SRC/Search/ArchiveLibrary.swift"
+expect 1 "removing the allowed enumerator call FAILS as STALE (walk2 must drop the allowance)" "STALE allowance"
 
 echo
 if [ "$failed" -eq 0 ]; then
