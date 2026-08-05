@@ -237,6 +237,19 @@ existed only because Spotlight contradicted a verified write.
 
 ### 4.1 `CorpusWalker` — new, `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`
 
+✅ **SHIPPED 2026-08-05 (`W26.walk1`: `b3efb16` → `025d126` → the trackers commit).** Two deliberate
+divergences from the sketch below, both forced by constraints this plan records elsewhere:
+
+- **Not a `TaskGroup`.** §4a.4/§7a.10 require the dataless I/O policy on *every* thread that touches a
+  corpus file, and it is thread-scoped while the cooperative pool reuses threads. The pass is therefore a
+  **synchronous single-threaded walk** — which §2 already measured at 10.15 s for 123k — with
+  `scanOnDedicatedThread`/`scanDetached` for off-main callers. Parallelising it later means giving each
+  worker the policy, not swapping in a `TaskGroup`.
+- **Emits `[CorpusEntry]`, not `[ArchiveFile]`.** `ArchiveFile` is the Reader's row model (it carries
+  `fileType`, a display string); ArchiveCore vends the raw material (`tagNames`, `labelNumber`,
+  `contentModified`, `contentTypeIdentifier`, `isDataless`) and `W26.walk2` builds the row. The shape is
+  otherwise 1:1 — `LibraryDiscoveryTests` pins that the rows built from it equal the shipped loader's.
+
 Read-only, deterministic discovery. Shared by both apps (the repo's DRY + shared-contract convention).
 
 - Input: a root `URL` (security-scoped), a predicate (default: has `Read` or `Unread`), a cancellation
@@ -666,6 +679,13 @@ Setting it inside a `Task.detached` body therefore both (a) fails to guarantee i
 on a dedicated `Thread`** that sets the policy first. This is a hard requirement on `W26.walk1`, not an
 optimisation.
 
+✅ **MET (`b3efb16`).** `CorpusWalker.scanOnDedicatedThread` is a real `Thread` (named
+`ArchiveCore.CorpusWalker`, asserted by a test) rather than `Task.detached`, and
+`withDatalessMaterializationDisabled` sets the policy on it and **restores the prior value** afterwards, so
+nothing leaks even if a caller runs `scan` on a thread it does not own. `scan` itself is synchronous, so an
+`await` mid-pass cannot silently break the coverage. Note the second reason for the dedicated thread, which
+this section does not give: a ~10 s blocking walk would starve the cooperative pool for its duration.
+
 This does not contradict §2 — the owner's corpus is genuinely local and needs no placeholder handling. It
 means the **walker is a general component** and a user can point a root anywhere, so it must fail fast and
 loudly rather than hang. (Open question for the owner: `IOPOL_SCOPE_PROCESS` would also stop
@@ -704,6 +724,11 @@ change. Flagged, not decided.)
    precisely how a Release build with no discovery fallback shipped. **The whole file is deleted and
    `W26.walk1` must land the replacement tests in the same work item** — the suite total drops by 8, so
    say it up front or a green run with fewer tests reads as a regression.
+   ✅ **HALF DONE (`W26.walk1`)**: `ArchiveReaderTests/LibraryDiscoveryTests.swift` is the first test ever to
+   construct `ArchiveLibrary` (Reader 276 → 279). It pins loader ≡ walker equivalence on a readable tree, and
+   their one required divergence on an unreadable file. **`ArchiveLibraryOverrideTests`' 8 cases remain
+   `W26.walk2`'s to delete** — and two of the three new cases go with them, since they compare against
+   `loadFixtureSynchronously` and the compiler retires them.
 6. ⚠️ **SYNC-VS-ASYNC IS THE FIRST DECISION, AND IT IS FORCED BY EXISTING TESTS.** Two test files already
    drive the DEBUG walker *as the production path* and assert **synchronously** that a freshly-tagged
    scratch PDF is in `model.library.files` immediately after `NavigationModel()` returns:
@@ -713,6 +738,11 @@ change. Flagged, not decided.)
    writing the walker: either keep a synchronous settle path for tests, or adopt Notes'
    `awaitSettled()` seam (`NotesModel.swift:286-300`) and convert both tests. Do not discover this at
    the build gate.
+   ✅ **DECIDED (`W26.walk1`, `b3efb16`): SYNCHRONOUS.** `CorpusWalker.scan` is a plain function, so both test
+   files keep working unchanged and no conversion is needed. Two independent reasons, not only the tests: the
+   thread-scoped dataless policy (§4a.4) is sound only if no `await` can move the pass to another thread, and
+   a caller who wants it off-main gets a dedicated `Thread` (`scanOnDedicatedThread`/`scanDetached`) rather
+   than a cooperative-pool task.
 7. **The Reader's write-surface lint bans ordinary file writes across the whole app target.**
    `ArchiveReader/scripts/lint-write-surface.sh:20-25` rejects `removeItem|moveItem|trashItem|replaceItem|
    createFile|FileHandle forWriting|PDFDocument.write|.write(to:)` anywhere under
@@ -941,15 +971,20 @@ A `.failure` from `TagReading.read` — the exact case `W26.deny` exists to make
 unreadable file leaves the library with **no error, no count, no signal**, and the scan still reports
 complete with `dirErrors == 0`. Promoting this verbatim would defeat `W26.deny` one item later.
 
-- **Fix (`W26.walk1`):** a `.failure` must be **counted and surfaced** (`tagFailures > 0` ⇒ the scan is not
-  clean ⇒ absence is not actionable, per §5.13 tier 1), and the row must be **kept** where one previously
-  existed. Never `continue`.
+- **Fix (`W26.walk1`):** ✅ **DONE** (`b3efb16`) — a `.failure` is **counted and surfaced** as
+  `CorpusScanResult.unreadable` (with its reason), and a non-empty `unreadable` makes `isClean` false ⇒
+  absence is not actionable, per §5.13 tier 1. **KEEPING an existing row is `W26.walk2`'s half**: the walker
+  has no rows, so it hands the caller every URL it could not read and walk2 must not drop those rows.
+  Never `continue`.
 - **Fix (`W26.walk1`):** if a `getxattr` size-0 probe is used as a cheap pre-filter, **only `errno == ENOATTR`
   may conclude "no tags."** `EACCES`, `EPERM`, `EIO`, `ENOTSUP` **must** fall through to `TagReading.read`.
   Otherwise `W26.deny`'s bug is reintroduced *and persisted* into the index. ⚠️ **Do not add "or a returned
   size of 0" — and do not pass `XATTR_NOFOLLOW`.** Both were in the original wording here and both are wrong;
   see the two corrections in §4a.1, measured while shipping `W26.deny`. Better: **call `TagXattr.inspect`,
-  which is shipped, tested against all seven denial shapes, and already applies exactly this rule.**
+  which is shipped, tested against all seven denial shapes, and already applies exactly this rule.** ✅ **RESOLVED BY NOT DOING IT** (`b3efb16`): `W26.walk1` uses **no
+  pre-filter at all** — every regular file goes through `TagReading.read`, whose `nil` branch already routes
+  through `TagXattr.inspect`. One fewer place for the rule to be re-derived wrongly, and an untagged file
+  still costs only the single immediate `getxattr` that branch makes.
 
 ### 7a.4 The prune gate is wider than `.firstScan`
 
@@ -1013,6 +1048,14 @@ read primitive.
   not a `grep` problem, since the call spans lines. Add it **with** the walker, keyed on the ban that matters
   (`.enumerator(` without `errorHandler:` in the same call), and give it a planted-violation test in
   `test-lint-write-surface.sh` like every other rule there.
+  ✅ **DONE** (`025d126`) — rule 3, balanced-paren via perl so it reads the whole call however many lines it
+  spans. Verified non-vacuous against the tree: exactly the two known multi-line sites, and `CorpusWalker`'s
+  handler-bearing call passes. Allowances: `ArchiveLibrary.swift:97` (the call `W26.walk2` deletes — the
+  STALE-allowance guard then FORCES the allowance out, and a self-test case simulates that deletion) and
+  `PDFThumbnailer.swift:158` (its own disposable cache; an unreadable entry there costs an under-counted byte
+  total in an index rebuilt on demand). Self-test 9 → 13 cases, including a handler-BEARING plant that must
+  **pass**, so the rule cannot decay into a ban on walking. Honest limit, in the script header: a
+  TRAILING-closure spelling of `errorHandler:` trips the rule — fail-safe, never a silent pass.
 - **Allowlist by `(file, exact pattern)`, not by file.** A file-level allowlist in ArchiveCore becomes a
   permanent unchecked hole in the package that now hosts the corpus walker. ✅ Done in `1460125`, with two
   additions its adversarial pass turned up — both were ways the *new* lint could still print "✓ clean" while
@@ -1053,6 +1096,13 @@ a strictly worse failure, and one that costs bandwidth and disk rather than just
 record per-entry datalessness (`getattrlistbulk` already returns the attribute) and persist it, so
 `ContentIndexer` can **skip** dataless files rather than materialise them. (`W26.walk1` + `W26.idx`.)
 
+✅ **`W26.walk1`'s half DONE** (`b3efb16`): the walk is single-threaded, so the one thread that touches corpus
+files sets the policy — `withDatalessMaterializationDisabled`, which also **restores** the prior value (and
+restores `IOPOL_DEFAULT` when the prior cannot be read, rather than skipping the *set* and silently dropping
+the protection). `CorpusEntry.isDataless` comes from `st_flags & SF_DATALESS` on the per-entry `stat`, not
+`getattrlistbulk`. **Still open for `W26.idx`:** persisting it, and making `ContentIndexer` skip on it — the
+expensive half, since `PDFDocument(url:)` is what downloads.
+
 ### 7a.11 `.settled` is reachable from a TRUNCATED walk — and `.settled` is what authorises pruning
 
 `completed` means only *"the enumerator ended"*. If the root goes away mid-walk — external drive ejected, a
@@ -1071,9 +1121,15 @@ Measured by the reviewer: with two directories renamed mid-enumeration, the `err
 yielded **403 of 1,203** paths that no longer existed. Persisting those rows would have `ContentIndexer` open
 them, get `nil` from `PDFDocument`, and record them as unreadable — a fabricated format-health problem.
 
-**Fix (`W26.walk1`):** a distinct `vanishedMidScan` counter. An `ENOENT` on the per-entry `stat`/tag read means
-the entry disappeared: **exclude it from `files`, never persist it, and do NOT count it as a `tagFailure`** (so
-it does not block pruning either). It is normal churn, not a denial.
+**Fix (`W26.walk1`):** ✅ **DONE** (`b3efb16`) — a distinct `vanishedMidScan` counter. An `ENOENT` on the
+per-entry `stat`/tag read means the entry disappeared: **excluded from `entries`, never persisted, and NOT
+counted as unreadable** (so it spoils neither `isClean` nor pruning). It is normal churn, not a denial.
+Tested deterministically: with `batchSize: 1` the `onBatch` callback deletes the rest of a 24-file fixture
+from inside the walk, and the pass must still be `isClean` with `entries + vanished == 24`.
+⚠️ **Known consequence, recorded:** a **dangling symlink** reports `.vanished` on every pass, not only the one
+it broke in (the probe follows symlinks, as `TagReading` does). Harmless — excluded from `entries`, as the
+Spotlight-era loader also excluded it, and it does not spoil cleanliness — but `vanishedMidScan` on such a
+tree is a floor, not a churn signal.
 
 ### 7a.13 Warm start must not claim currency from a scan that never finished
 

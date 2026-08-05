@@ -198,17 +198,22 @@ reports the *target's* tags through a symlink) and *"a returned size of 0"* (a r
 empty-array residue · **0 denied** · 0 undecodable.
 
 - [ ] **W26.notsup — a volume that does not support extended attributes now reads as UNREADABLE, not as
-  untagged [S · LOW · latent]** (blocked-on: W26.walk1). Filed 2026-08-05 by `W26.deny`'s adversarial pass;
+  untagged [S · LOW · latent]** (blocked-on: W26.walk2). Filed 2026-08-05 by `W26.deny`'s adversarial pass;
   a deliberate consequence of it, not a regression. `TagXattr.inspect` returns `.unreadable` for **any**
   errno except `ENOATTR`, `ENOTSUP` included — per plan §7a.3, which names `ENOTSUP` explicitly. On a volume
   with no xattr support (some SMB/NFS mounts; NOT FAT/exFAT, where macOS emulates them) every file would
   therefore report as unreadable, so a Reader root pointed there would list **nothing** and every tag write
   would refuse. That is the honest answer and the safe one — but "lists nothing" is exactly the incident
   shape this wave exists to end, so it must not arrive silently. Exposure today is **zero**: the corpus is
-  APFS on the internal disk (0 non-ENOATTR errnos across 123,302 files, measured 2026-08-05). **Do it inside
-  `W26.walk1`**, whose `DiscoveryStatus`/`.degraded` work is where "I could not read this whole volume"
-  becomes something the UI can say — a fix before then has nowhere to surface. Not worth its own primitive
-  change: do NOT special-case `ENOTSUP` back to "no tags".
+  APFS on the internal disk (0 non-ENOATTR errnos across 123,302 files, measured 2026-08-05).
+  ⚠️ **Dependency CORRECTED 2026-08-05 while shipping `W26.walk1`: this is `(blocked-on: W26.walk2)`, not
+  `walk1`.** It was filed saying "do it inside `W26.walk1`, whose `DiscoveryStatus`/`.degraded` work is where
+  this surfaces" — but `DiscoveryStatus` is `W26.walk2`'s deliverable, not walk1's. walk1 shipped the
+  *counters* (`CorpusScanResult.unreadable` + `isClean`), so an ENOTSUP volume is now correctly recorded as
+  unreadable; what still does not exist is anywhere in the UI for that to be SAID, which is exactly walk2.
+  Left against walk1 the resolver would have offered this next, with the same nowhere-to-surface problem the
+  original text warned about. Not worth its own primitive change: do NOT special-case `ENOTSUP` back to
+  "no tags".
 ✅ **W26.lint — SHIPPED 2026-08-05 (`1460125` → this commit); full entry in `SUITE_TODO_DONE.md`.** Two things
 later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write-surface.sh` now lints
 `packages/ArchiveCore/Sources/ArchiveCore` as well as the Reader app target, and allowances are
@@ -256,38 +261,33 @@ carry the old one; (4) the wave's **headline regression test passes vacuously** 
 `ARUITestRootPath` is absent. §7a also records one **rejected** review suggestion (`W26.retire`) — do **not**
 delete any W26 entry.
 
-- [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
-  needs: none] (blocked-on: W26.deny, W26.lint).** ⚠️ **`W26.lint` must land first**, or this item authors and
-  commits the entire new engine **outside** the Core Directive's automated enforcement. ✅ It has —
-  `1460125` — but **nothing invokes the lint for you** (`W26.lint-fu`), so **part of this item's gate is
-  running `./ArchiveReader/scripts/lint-write-surface.sh` before you commit the walker**; ArchiveCore is
-  linted now and the walker's whole point is being read-only, so a hit there is a design error, not a
-  formality. Also: if the walker needs an allowance, add it as a `(file, exact source line)` pair — the lint
-  refuses whole-file exemptions on purpose.
-  New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
-  `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
-  DEBUG fixture loader — **but NOT its error handling: `:102`'s `try?` and `:104`'s
-  `guard case .success … else { continue }` silently drop unreadable files; a `.failure` must be COUNTED and
-  SURFACED (`tagFailures > 0` ⇒ scan not clean ⇒ absence not actionable) and any existing row KEPT**)
-  + `TagReading.read` per file, bounded `TaskGroup`, batched emission, cancellable. If a `getxattr` size-0
-  pre-filter is used, **only `errno == ENOATTR` or a returned size of 0 may conclude "no tags"** — `EACCES`,
-  `EPERM`, `EIO`, `ENOTSUP` must fall through to `TagReading.read`, or `W26.deny`'s bug returns *and gets
-  persisted*.
-  Shared by both apps. **Test:** scratch fixture with tagged/untagged/hidden/nested/package files and an
-  em-dash+NBSP filename → assert the exact expected set, **and** assert zero writes (pre/post xattr+mtime
-  snapshot of the whole fixture). Note there is currently **no test of Reader discovery whatsoever** —
-  `grep 'ArchiveLibrary(' ArchiveReader/macOS/Tests` returns **zero hits**, and the only `ArchiveLibrary`
-  test file is `ArchiveLibraryOverrideTests.swift`, all 8 cases covering the Spotlight-lag override (deleted
-  by W26.walk2, so the suite total drops by 8 — say so, or a green run with fewer tests reads as a
-  regression). ⚠️ **DECIDE SYNC-VS-ASYNC BEFORE WRITING THE WALKER — existing tests force it:**
-  `DocumentPageLinkTests.swift:229-233`/`:239-240` and `RootMarkerStateTests.swift:143` already drive the
-  DEBUG walker *as the production path* and assert **synchronously** that a freshly-tagged scratch PDF is in
-  `model.library.files` immediately after `NavigationModel()` returns. **An async walker breaks both.**
-  Either keep a synchronous settle path or adopt Notes' `awaitSettled()` seam
-  (`ArchiveNotes/.../NotesModel.swift:286-300`) and convert them. **Copy the Notes shape generally** — it
-  already does walk → index → `awaitSettled` → `markIndexReady` → `adoptIndexFailure`, and
-  `ReaderLinkResolver.swift:235-266` is the already-reviewed off-actor enumerator pattern (private
-  `FileManager`, `nextObject()` not `for-in`).
+✅ **W26.walk1 — SHIPPED 2026-08-05 (`b3efb16` → `025d126` → this commit); full entry in
+`SUITE_TODO_DONE.md`.** Four things later items in this wave need from it.
+**(1) The engine is `CorpusWalker` (ArchiveCore `Corpus/CorpusWalker.swift`), and it is SYNCHRONOUS.**
+`scan(root:predicate:options:isCancelled:onBatch:) -> CorpusScanResult`, plus
+`scanOnDedicatedThread`/`scanDetached` for off-main callers. The sync-vs-async decision plan §5.6 said to
+make first is made: `DocumentPageLinkTests`/`RootMarkerStateTests` keep working unchanged, and the
+thread-scoped dataless I/O policy is only sound with no `await` in the pass. Off-main means a real `Thread`,
+never `Task.detached` — the cooperative pool reuses threads (policy leak) and a ~10 s blocking walk starves it.
+**(2) `CorpusScanResult` already models "I could not look."** `entries` · `unreadable` · `directoryErrors` ·
+`filesSeen` · `vanishedMidScan` · `rootUnreadable` · `cancelled`, and **`isClean`** — the single gate to
+consult before treating an absence as real (plan §5.13 tier 1). `W26.walk2`'s `DiscoveryStatus` should MAP
+this, not re-derive it. Plan §7a.3 (a `.failure` must be counted, never `continue`d), §4a.2 (the
+`errorHandler:` variant) and §7a.12 (`ENOENT` is churn, not a denial, and does not spoil cleanliness) are
+closed inside it.
+**(3) The write-surface lint now bans the `errorHandler:`-less `FileManager.enumerator` overload**
+(rule 3, multi-line aware — plan §7a.8, reassigned here by `W26.lint`), with an allowance pinned to
+`ArchiveLibrary.swift:97`. ⚠️ **`W26.walk2` MUST delete that allowance when it deletes the call** — the
+lint's STALE-allowance guard hard-fails otherwise, and there is a self-test case that simulates exactly
+that deletion. Run `./ArchiveReader/scripts/lint-write-surface.sh` before committing (nothing invokes it —
+`W26.lint-fu`).
+**(4) Reader discovery has tests for the first time ever** — `ArchiveReaderTests/LibraryDiscoveryTests.swift`
+(the `grep 'ArchiveLibrary('` → zero-hits gap is closed). Two of its three cases COMPARE the walker against
+the shipped DEBUG fixture loader, so they **stop compiling when `W26.walk2` deletes
+`loadFixtureSynchronously` — delete them then; that is intended.** ⚠️ They deliberately SET
+`-ARUITestRootPath` because the loader is the baseline being compared; `W26.walk2`'s headline regression test
+must do the OPPOSITE and assert the key is ABSENT (plan §7a.9). Do not copy their setup.
+
 - [ ] **W26.walk2 — Reader discovery → `CorpusWalker`; delete the `PendingWrite` subsystem; honest
   `DiscoveryStatus` [L · med · Tier-2 · needs: none] (blocked-on: W26.walk1).** Rip `NSMetadataQuery`,
   both observers, both `searchScopes` branches (incl. the dead `NSMetadataQueryLocalComputerScope`
@@ -306,7 +306,14 @@ delete any W26 entry.
   health is decided in one unit-testable place. **The empty-state copy needs a DENOMINATOR:** *"no
   Read/Unread-tagged PDFs"* may render **only** when the last scan's `outcome = complete` AND
   `dir_errors = 0` AND `files_seen > 0`, and must then say *"Scanned 1,849 files in this folder; none carry a
-  Read or Unread tag."* That one guard makes today's incident unrepresentable. Copy `ContentIndexer`'s
+  Read or Unread tag."* That one guard makes today's incident unrepresentable.
+  ➕ **Two obligations added by `W26.walk1` (2026-08-05), both of which hard-fail if skipped:** (a) delete
+  the write-surface lint's `enumerator` allowance for `ArchiveLibrary.swift:97` in the SAME commit that
+  deletes the call — the STALE-allowance guard fails the lint otherwise (and there is a self-test case for
+  precisely this); (b) delete the two `LibraryDiscoveryTests` cases that compare the walker against
+  `loadFixtureSynchronously` — they stop compiling when the loader goes, by design. Also: map
+  `CorpusScanResult` onto `DiscoveryStatus` rather than re-deriving cleanliness; `isClean` is already the
+  §5.13-tier-1 gate. Copy `ContentIndexer`'s
   generation-token discipline verbatim (`:176-179`) so a root switch mid-scan can't publish stale batches.
   ⚠️ **The absence rule INVERTS and is the likeliest way to lose index rows:** a deterministic walk has no
   transient drop (so `ContentIndexer.swift:280-284`'s justification evaporates) but gains a worse hazard — a
@@ -438,8 +445,12 @@ delete any W26 entry.
   codebase with the exact dependency the owner is removing. Rewrite it to a **walk-built stem index** (same
   `CorpusWalker`, second root) and add `(blocked-on: W26.walk1)` to it. **Unblocked — do this early; it is
   cheap and every day it is undone is a day the re-infection can land.** **Test:**
-  `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's historical notes, and
-  `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
+  `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's historical notes.
+  ⚠️ **The second half of that test is now STALE (2026-08-05):** it said `next-queue-item.sh` must report the
+  JPEGS item as `blocked:W26.walk1`, but `W26.walk1` has SHIPPED, so that edge resolves as `ok` the moment it
+  is added. That is fine — the edge existed to stop the item shipping before a walker existed, and one does
+  now — but do not chase the `blocked:` string. If the rewritten item needs the Reader-side second-root
+  plumbing rather than just the walker, point it at `W26.walk2` instead and say why.
 - [ ] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none]
   (blocked-on: W26.walk2).** `ArchiveReader/scripts/make-gui-fixture.sh` (lines 16, 179, 186) and
   `smoke-setup.sh` (lines 22, 26) force-index fixture copies then **poll `mdfind` until tags appear** — a
@@ -452,7 +463,10 @@ delete any W26 entry.
   unchanged, so this is *not* a contract change); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
   (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
-  corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline, memory ceiling, a
+  corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline — ⚠️ **`CorpusWalker` adds one
+  `stat(2)` per entry** (~15 µs, ≈+1.9 s at 123k) to get `S_ISREG` + `SF_DATALESS` + ENOENT-vs-denial from a
+  single call, so the baseline it must beat is ~12 s, not 10.15 s; confirm the real number rather than
+  assume it — memory ceiling, a
   **no-write assertion across the whole tree**, and cancel-mid-walk leaves no partial removals. Confirm
   `grep -rn "NSMetadataQuery\|kMDItem\|mdfind"` over `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and
   `scripts/` returns **nothing but historical comments**. Then flip the wave and delete

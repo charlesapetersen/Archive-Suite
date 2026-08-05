@@ -45,6 +45,11 @@
 # ways the de-Spotlight fix could have reproduced the incident it exists to end, so it is banned
 # in the linted trees rather than left to reviewer memory.
 #
+# Known shape it does NOT understand: a TRAILING-closure spelling — `.enumerator(at: …) { url, err
+# in … }` — puts the handler outside the parentheses, so the rule reports it. That direction is
+# fail-safe (a false alarm on honest code, never a silent pass), and the fix is to write the
+# `errorHandler:` label. Say so here rather than let someone rediscover it as a mystery failure.
+#
 # ⚠️ The rule CANNOT be a grep. Measured while writing it: `enumerator(at:` matches ZERO
 # occurrences in this repo because every call is written across lines, so the obvious rule would
 # have passed vacuously — the worst kind of green (plan §7a.8). It therefore balances parentheses

@@ -18,6 +18,56 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1].
+  ✅ SHIPPED 2026-08-05** — `b3efb16` (walker + 14 tests) → `025d126` (the enumerator lint rule) → this
+  commit (the Reader discovery tests + trackers).
+  **What shipped.** `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift` — read-only,
+  deterministic discovery whose result type is built around the distinction the whole incident turned on:
+  `entries` · `unreadable` · `directoryErrors` · `filesSeen` · `vanishedMidScan` · `rootUnreadable` ·
+  `cancelled`, plus **`isClean`** as the one gate before an absence may be treated as real. Tags come from
+  `TagReading.read`, so discovery and the write path agree by construction — including on "could not read".
+  **The four plan defects filed against this item, all closed:** §7a.3 (the promoted body's
+  `guard case .success … else { continue }` silently drops an unreadable file — now counted, with its
+  reason, and the pass is not clean); §4a.2 (the `errorHandler:`-less enumerator overload silently skips
+  directories it cannot descend — now recorded); §7a.12 (`ENOENT` is churn, gets its own counter, is
+  excluded from `entries` and must NOT count as a denial, or ordinary Finder activity permanently degrades
+  the library); §4a.4 + §7a.10 (cloud placeholders — the walk runs with
+  `IOPOL_MATERIALIZE_DATALESS_FILES_OFF` **thread-scoped and restored**, and every entry carries
+  `isDataless` so a later indexer can skip rather than download).
+  **Two decisions the plan said to make BEFORE writing it, made:** (a) **synchronous** (§5.6) —
+  `DocumentPageLinkTests`/`RootMarkerStateTests` assert discovery synchronously and keep working unchanged,
+  and the thread-scoped I/O policy is only sound without an `await`; off-main callers get
+  `scanOnDedicatedThread`/`scanDetached`, a real `Thread` rather than `Task.detached` (pool reuse leaks the
+  policy; a ~10 s blocking walk starves the pool). (b) **everything tagged is returned** (§5.17) —
+  user-excluded folders stay a post-discovery filter in `NavigationModel`, since excluded files are
+  deliberately visible in the UI but absent from the content index.
+  **No `getxattr` size-0 pre-filter.** The plan permitted one; declined, because only `ENOATTR` may ever
+  conclude "no tags" and re-deriving that outside `TagXattr.inspect` is how `W26.deny` comes back — persisted.
+  **Lint rule 3 (plan §7a.8, reassigned here by `W26.lint`):** no `FileManager.enumerator` without an
+  `errorHandler:`, in either linted tree. It **cannot be a grep** — `enumerator(at:` matches ZERO
+  occurrences in this repo because every call spans lines — so it balances parentheses with perl to isolate
+  the whole call. Verified non-vacuous: it reports exactly the two known multi-line sites and passes
+  `CorpusWalker`'s handler-bearing call. Allowances for `ArchiveLibrary.swift:97` (the call `W26.walk2`
+  deletes — the STALE guard then forces the allowance out) and `PDFThumbnailer.swift:158` (its own
+  disposable cache). Self-test 9 → 13 cases, including a handler-BEARING plant that must PASS, so the rule
+  cannot degrade into a ban on walking.
+  **Tests.** ArchiveCore 124 → 138: exact membership on a mixed fixture (tagged/untagged/other-tags-only/
+  hidden/nested/package-descendant + an em-dash & NBSP filename), a **byte-identity** check comparing mode,
+  size, `st_flags`, mtime, **ctime** and the raw tag xattr of every entry before and after two scans (ctime
+  is load-bearing: a tag write bumps ctime without touching mtime), denial/directory-denial/unreadable-root,
+  churn-is-not-denial, cancellation, batching, symlink-classified-by-target, and the I/O policy set inside
+  and restored after. Reader 276 → 279 via the first-ever `LibraryDiscoveryTests` — the walker matches the
+  shipped loader exactly on a readable tree, and diverges on exactly one thing: an unreadable file, which
+  the loader drops in silence while still reporting a settled library. 278/279 green (the known
+  `DeepLinkTests.testRevealAndSelectNoRoot` environment artifact). Notes + Processor test bundles rebuilt
+  (shared-ArchiveCore rule). `lint-write-surface.sh` + its self-test clean.
+  **Measured cost recorded rather than discovered:** one extra `stat(2)` per entry (~15 µs, ≈+1.9 s at
+  123k) buys `S_ISREG` + `SF_DATALESS` + ENOENT-vs-denial from one call and lets the walk skip
+  `resourceValues` entirely for directories — folded into `W26.verify`'s baseline.
+  **Filed while shipping:** nothing new; `W26.notsup`'s dependency was CORRECTED from `walk1` to `walk2`
+  (its `DiscoveryStatus`/`.degraded` surface is walk2's deliverable, so left as filed the resolver would
+  have offered it with nowhere to surface — the exact problem its own text warned about).
+
 - [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
   ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
   **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as

@@ -348,16 +348,16 @@ public enum CorpusWalker {
     /// a reused thread would silently change the behaviour of code that never asked for it.
     public static func withDatalessMaterializationDisabled<T>(_ body: () throws -> T) rethrows -> T {
         let prior = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
-        // A negative return means the policy could not be read; don't then guess what to restore.
-        let restorable = prior >= 0
-        if restorable {
-            _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD,
-                               IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
-        }
+        _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD,
+                           IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
         defer {
-            if restorable {
-                _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, prior)
-            }
+            // A negative `prior` means the policy could not be read (it does not fail in practice —
+            // measured 0 here). Restore the DEFAULT rather than skip the restore: leaving a thread
+            // pinned OFF would silently change unrelated work, and the default is `…_ON`-equivalent,
+            // so the worst case of guessing is that we hand back the behaviour every other caller
+            // already has. Skipping the SET instead would have quietly dropped the hang protection.
+            _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD,
+                               prior >= 0 ? prior : IOPOL_DEFAULT)
         }
         return try body()
     }
@@ -375,6 +375,11 @@ enum FileStat {
     /// Follows symlinks, exactly as `URL.resourceValues` and `TagReading.read` do: a symlink to a
     /// tagged PDF must be classified by its target, or the walk and the write path would disagree
     /// about the same entry (the symlink half of the `W26.deny` correction).
+    ///
+    /// Consequence worth knowing: a **dangling** symlink therefore reports `.vanished` on every pass,
+    /// not just the one it broke in. It is excluded from `entries` (as the Spotlight-era loader also
+    /// excluded it) and deliberately does not make the pass unclean, so a tree full of dead links
+    /// stays authoritative — but `vanishedMidScan` on such a tree is a floor, not a churn signal.
     static func capture(_ url: URL) -> FileStat {
         url.withUnsafeFileSystemRepresentation { rawPath -> FileStat in
             guard let rawPath else { return .failed("path has no filesystem representation") }

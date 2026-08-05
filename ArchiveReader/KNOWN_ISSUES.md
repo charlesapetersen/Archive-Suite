@@ -2,6 +2,28 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## 🟠 OPEN (`W26.walk2`) — Release discovery is Spotlight-only; the replacement engine now exists, UNWIRED
+
+**Found 2026-08-04.** The owner pointed the Reader at a folder of 1,849 correctly-tagged PDFs on a volume
+whose Spotlight index was dead, and the app said *"No Read/Unread-tagged PDFs were found in this folder."*
+Root cause: `ArchiveLibrary` discovers only through `NSMetadataQuery`, and the one filesystem walk that
+exists (`loadFixtureSynchronously`) is `#if DEBUG` — **compiled out of Release entirely**. There is no
+fallback to fail over to, and `NavigationWindowView.swift:174-176` states the empty result as a fact about
+the corpus rather than about what the app could see.
+
+**Half-fixed 2026-08-05 (`W26.walk1`: `b3efb16` → `025d126`).** `ArchiveCore.CorpusWalker` is the
+deterministic replacement — read-only, and its result distinguishes *has tags* / *verified none* /
+**could not read** (`unreadable`, `directoryErrors`, `isClean`), which no layer of the old stack could.
+`ArchiveReaderTests/LibraryDiscoveryTests` pins that it returns exactly what the shipped loader returns on a
+readable tree, and that it diverges on exactly one thing: an unreadable file, which the loader drops in
+silence while still reporting a settled library.
+
+**Still open — the Reader does not USE it yet** (`W26.walk2` in `SUITE_TODO.md`): the swap, the honest
+`DiscoveryStatus`, and an empty-state message that may only say "no tagged PDFs" when the scan was complete
+with zero errors *and* saw at least one file. Until then a dead Spotlight index still produces the incident.
+Workaround for the owner in the meantime: nothing app-side — `mdutil -E` on the affected volume and wait for
+a re-index.
+
 ## ✅ FIXED (W26.deny) — `TagWriter` could DESTROY tags on a file whose xattrs are unreadable-but-writable
 
 **Found 2026-08-04** while auditing Spotlight removal; **independent of Spotlight** and of that wave.
