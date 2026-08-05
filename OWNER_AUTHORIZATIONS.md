@@ -310,4 +310,40 @@ its own date. Verbatim as recorded when granted.)*
     `NotesModel` refactor is the right answer, the cost of getting it wrong is now low, and structural change
     in Notes is *actively cheap right now* (see the DEVONthink hold above). Still prefer the
     serialization/verification seam plus its test as the smaller first move.
+- **`W16.bat8` — AUTHORIZED (granted 2026-08-04, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
+  THE OWNER: (a) the smallest root cause.** `dismissPendingRun()` must clear the **in-memory** interrupted-run
+  manifest, not only the banner and the file. Today it clears the banner while the state the banner described
+  lives on, and everything downstream is that lie propagating: `startProcessing`'s recovery guard reads DISK so
+  it passes, the batch branch never assigns `activePendingRun`, and because `saveResultToPendingRun` routes to
+  the paid-batch journal only when `activePendingRun == nil`, every batch result lands in the pending-RUN
+  manifest while `batch.completedResults` stays empty — which is exactly what `resumeBatch` keys its
+  skip-what-is-done logic off, so a relaunch mid-batch re-downloads and re-materializes chunks already paid for
+  and already written. Filed 2026-08-03 from the W16.bat7 adversarial pass; **pre-existing**, covered by no
+  earlier grant. Note the trigger: the chain starts from a manifest **write failure**, not a Stop — `cancel()`
+  does clear `activePendingRun` — which is why this was graded MED rather than urgent, and why the owner
+  sequenced it after Wave 23.
+  - **Two alternatives were offered and NOT taken, and that is part of the grant.** (b) Make a live paid batch
+    win inside `saveResultToPendingRun` — **declined**, because it changes *which durable file a paid result
+    lands in*, the category every W16 money grant has been scoped item-by-item to control. (c) Additionally make
+    the routing predicate positive rather than a nil-check — **declined**, so **`activePendingRun == nil` stays
+    as the routing test**. Do not "improve" it while you are in there; if you come to believe the inferential
+    predicate must go, that is a new item and a new ask.
+  - ⛔ **SCRATCH COPIES ONLY — never a real journal.** Recorded honestly as belt-over-braces rather than
+    load-bearing: the owner asked at grant time whether constraints were needed at all, since he is not using
+    the app until the current work is done, and per `CLAUDE.md` §"There is no production material yet" the
+    Processor has produced no files, so there may be no real journal to protect *today*. Kept anyway for two
+    reasons — it costs nothing (`test-batch-resume.sh` already redirects the journal path, per the
+    `W16.bat2-fu2` discharge note above, so this only writes down what the harness does), and **a grant is a
+    permanent record while "I am not using the app now" expires.** Three entries in this file already carry
+    ⚠️ PREMISE VOID annotations from licences written against conditions that stopped holding; dropping a
+    constraint on a premise with a shelf life is the mirror image of that.
+  - ⛔ **Full Tier-2 per item, and RE-CONFIRM THE PREMISE FIRST — by symbol, not line.** The write-up is from
+    2026-08-03 and the tree has moved ~45 commits since, including `W16.bat7-fu`, which superseded the
+    transport-seam approach entirely (`materializePaidBatchChunk` no longer exists). If the defect has moved or
+    closed, **mark the item refuted with your evidence and move on — do not invent a fix for a bug that is not
+    there.** This constraint protects the *work*, not the app, and is unaffected by whether anyone is using it.
+  - ⛔ **One item per session.** Do not batch this with another money-path item and do not "while I'm here" an
+    adjacent one in the batch code.
+  - **Not data loss — money.** Results already written stay written; the cost is paying twice. Frame the fix
+    and its proof around re-spend, and do not over-correct into withholding or deleting anything.
 
