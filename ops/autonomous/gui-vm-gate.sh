@@ -202,12 +202,66 @@ for app in $APPS; do
   skipped="$skipped $app"
 done
 
-show_failures() {   # $1 = app — the failing test names from both attempts
+# Did this attempt actually execute tests? (A boot/build failure produces a log with no test cases, and
+# nothing can be concluded from comparing against it.)
+ran_tests()    { grep -q "^Test Case " "$(applog "$1" "$2")" 2>/dev/null; }
+# The failing test NAMES for one attempt, one per line, sorted — the unit the retry's answer is about.
+failed_tests() {   # $1 = app, $2 = attempt
+  [ -f "$(applog "$1" "$2")" ] || return 0
+  grep -E "^Test Case .* failed \(" "$(applog "$1" "$2")" \
+    | sed -E "s/^Test Case '-\[[^ ]+ ([^]]+)\]' failed.*/\1/" | sort -u
+}
+
+# The failing tests, PARTITIONED by what the retry actually proved about each one.
+#
+# ⚠️ This used to concatenate both attempts and `sort -u` them, and print the union directly beneath
+# "RED — reproducible UITest failure in: <app>". The app-level flake guard above is right — it only clears
+# an app when the whole retry is green — but at the TEST level the union throws the retry's answer away, so
+# a test that failed on attempt 1 and PASSED on attempt 2 was reported as evidence for a reproducible
+# failure, indistinguishable from one that failed twice. Found 2026-08-04 the expensive way: the notes lane
+# reported G13 *and* G5 as the reproducible failure, and the per-attempt logs showed G5 failing once at
+# 46.25 s and then PASSING on retry in 18.15 s. A reader (human or agent) who trusts the summary
+# investigates a bug that is not there — the mirror image of this file's own "a gate that says ✓ for work
+# it did not do is worse than no gate".
+#
+# The retry exists to answer exactly one question per test, so the report must state its answer. Evidence
+# for both attempts is still preserved in full (the per-attempt logs, referenced below) — this only stops
+# the SUMMARY from laundering a flake into a reproducible failure.
+show_failures() {   # $1 = app
   echo "  --- $1 ---"
+  local a1 a2 repro flaked
+  a1="$(failed_tests "$1" 1)"
+  if ran_tests "$1" 2; then
+    a2="$(failed_tests "$1" 2)"
+    repro="$(comm -12 <(printf '%s\n' "$a1" | grep -v '^$') <(printf '%s\n' "$a2" | grep -v '^$'))"
+    flaked="$(comm -23 <(printf '%s\n' "$a1" | grep -v '^$') <(printf '%s\n' "$a2" | grep -v '^$'))"
+    if [ -n "$repro" ]; then
+      echo "  REPRODUCIBLE (failed on BOTH attempts) — this is what the RED is about:"
+      printf '%s\n' "$repro" | sed 's/^/      /'
+    else
+      echo "  REPRODUCIBLE: none — no single test failed on both attempts."
+    fi
+    if [ -n "$flaked" ]; then
+      echo "  FLAKED (failed attempt 1, PASSED on retry) — NOT evidence of a regression; do not chase these:"
+      printf '%s\n' "$flaked" | sed 's/^/      /'
+    fi
+    # Attempt-2-only failures: a test that passed first and failed on the retry is also a flake, but the
+    # other way round, and it is worth naming rather than hiding — it means the suite is order/timing
+    # sensitive somewhere.
+    local newly; newly="$(comm -13 <(printf '%s\n' "$a1" | grep -v '^$') <(printf '%s\n' "$a2" | grep -v '^$'))"
+    [ -n "$newly" ] && { echo "  FLAKED THE OTHER WAY (passed attempt 1, failed on retry):";
+                         printf '%s\n' "$newly" | sed 's/^/      /'; }
+  else
+    echo "  (attempt 2 ran no tests — cannot separate flake from reproducible; showing attempt 1 only)"
+    printf '%s\n' "$a1" | grep -v '^$' | sed 's/^/      /'
+  fi
+  # The assertion messages, for whichever tests are above — the "why", kept unpartitioned on purpose.
+  echo "  --- assertion detail (both attempts) ---"
   for n in 1 2; do
     [ -f "$(applog "$1" "$n")" ] || continue
-    grep -E "Test Case .*failed|error:" "$(applog "$1" "$n")" | sed -E 's#/Volumes/My Shared Files/repo/##' | sort -u | head -12
+    grep -E "error:" "$(applog "$1" "$n")" | sed -E 's#/Volumes/My Shared Files/repo/##' | sort -u | head -12
   done
+  echo "  --- evidence: $(applog "$1" 1) · $(applog "$1" 2) ---"
 }
 
 echo "GUI-VM gate: passed[${green:- none} ] warned[${warned:- none} ] skipped[${skipped:- none} ] failed[${red:- none} ]"

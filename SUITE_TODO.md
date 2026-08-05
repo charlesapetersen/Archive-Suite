@@ -1231,6 +1231,40 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner re-arms. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/arm.sh | S | low | none
+- [ ] **W21.vmgui-g13 — `testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract` fails REPRODUCIBLY in the VM, and the code it tests has not changed since it passed 15/15 [M · MED · the gate is RED on this].**
+  Filed 2026-08-04 from the owner's health-gate run (`cfb09af`). Both attempts fail at
+  `NotesGUITests.swift:1050` — "the pasted passage's image bytes should be imported into the extract's own
+  assets/" — at 43.386 s and 43.583 s, i.e. the `pollUntil(timeout: 15)` fully expires. Not a race: the
+  `an.editor.test.pastePassage` click completes at t=27.05 s and teardown is at t=42.27 s, so the import
+  never happens at all.
+  ⚠️ **RULED OUT with evidence — do not re-derive:** (a) not a regression — `git diff 7d6bb40..HEAD --
+  ArchiveNotes/ packages/` is EMPTY, so code+test are byte-identical to `7d6bb40` (08-01), whose message
+  records "ArchiveNotesUITests 15/15 in the VM"; (b) not load — the 8 busy-loop shells ran Aug 2 09:22 → Aug 4
+  17:13, and both the passing (Aug 1) and failing (Aug 4 17:29) runs were unloaded; (c) not fixture staleness —
+  `make-notes-fixture.sh` does `rm -rf "$DST"`, the gate rebuilds every attempt, today's log says
+  "rebuilding … ready" with no WARN; (d) not container/scene persistence — `notes:prerun` wipes the container
+  per attempt; (e) not a missing `.noteImageRelPath` — `tryPasteImage` sets it inline (`EditorTextView.swift:259`)
+  and step 1's own source-note assertion passes.
+  **So it is ordering/lifetime-sensitive** — the only class consistent with identical code passing then failing.
+  Two candidates, both invisible by construction: (1) `handlePassagePaste` (`MarkdownEditorView.swift:449-451`)
+  declines at one of four guards, most likely `currentItemKind == .extract`, returning `false` in silence;
+  (2) the import runs against the wrong/dead store — `try? assetStore?.addAsset(…)` (`:456`) swallows a nil
+  store AND a throw, `Coordinator.assetStore` is `weak` (`:271`), its strong owner is `@State` in
+  `NoteEditorPane.swift:29`, and `updateNSView` rebinds only on a view update (`:189-191`), so a paste before
+  the rebind imports into the SOURCE note's `assets/` — exactly "no new asset in the extract".
+  **FIRST MOVE IS DIAGNOSABILITY, NOT A FIX.** Three layers discard the answer: the DEBUG seam throws away the
+  Bool (`_ = coordinator?.uiTestPastePassage()`, `:136-138`, though `:556` returns it), the `try?` swallows the
+  store error, and the test asserts only that the BUTTON was clickable (`:1046`). Surface the outcome as an
+  `an.status.*` probe (the `an.status.keyWindow` pattern from `7d6bb40`), assert it, and add "the SOURCE note
+  did NOT gain a second asset" — that one check separates (1) from (2) in a single run. Same defect class as
+  `W16.bat7`: a handler whose caller reads its silence as success. | ArchiveNotes/Editor + Tests | Tier-2
+- [ ] **W21.vmgui-g5-flake — `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` is FLAKY in the VM [S · LOW].**
+  Filed 2026-08-04. It failed attempt 1 at **46.250 s** and PASSED attempt 2 at **18.154 s** in the same gate
+  run — a 2.5× spread, so something on that path has a long poll that occasionally loses. Not a regression
+  (see `W21.vmgui-g13` (a) — same empty diff). ⚠️ It is NOT the cause of the gate RED; it was only reported as
+  one because `gui-vm-gate.sh` printed the union of both attempts' failures under "reproducible" (fixed
+  2026-08-04, see `SUITE_TODO_DONE.md` §W21.vmgui-flakereport). Worth finding the slow poll before it starts
+  failing twice. | ArchiveNotes/Tests | Tier-2
 - [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
   Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
   warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`

@@ -3396,6 +3396,24 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W21.vmgui-flakereport — the flake guard retried, learned the answer, and then threw it away — ✅ DONE 2026-08-04** (this commit).
+  `gui-vm-gate.sh`'s `show_failures()` looped BOTH attempts and `sort -u`'d them, printing the union directly
+  beneath "RED — reproducible UITest failure in: <app>". The APP-level guard was always right (it clears an app
+  only when the whole retry is green), but at the TEST level the union discarded the retry's answer, so a test
+  that failed once and PASSED on retry appeared as evidence for a reproducible failure, indistinguishable from
+  one that failed twice. Found the expensive way during the owner's 2026-08-04 gate run: the notes lane
+  reported `testG13…` **and** `testG5…` as the reproducible failure, and the per-attempt logs showed G5 failing
+  at 46.250 s and then **passing on retry at 18.154 s**. The summary sent a reader to investigate a bug that
+  was not there — the mirror image of this file's own rule that a gate saying ✓ for work it did not do is worse
+  than no gate. `show_failures()` now partitions: REPRODUCIBLE (failed both attempts — what the RED is about),
+  FLAKED (failed attempt 1, passed on retry — explicitly "do not chase these"), and FLAKED THE OTHER WAY
+  (passed first, failed on retry — named rather than hidden, since it means the suite is order/timing
+  sensitive). When attempt 2 ran no tests it says so and shows attempt 1 unpartitioned rather than inventing a
+  distinction. Evidence is still preserved in full — both per-attempt log paths are printed. Verified by
+  running the shipped functions against the two REAL attempt logs from the failing run: G13 → REPRODUCIBLE,
+  G5 → FLAKED. The two findings it disentangled are filed as `W21.vmgui-g13` and `W21.vmgui-g5-flake`.
+  | ops/autonomous | Tier-2
+
 - [x] **W3.cap-r3-fu12 [LOW · behaviour decision] — ✅ DONE 2026-08-04** (`5180d03` the decision + the gate;
   `5148086` Test 25; `ed8c429` round-1 mutants; `776fa73` the adversarial pass and the four fixes it forced;
   this commit, trackers). An emptied Captured pane hid **Finish** and **Clear** even while the session held
