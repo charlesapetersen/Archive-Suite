@@ -209,14 +209,29 @@ empty-array residue · **0 denied** · 0 undecodable.
   `W26.walk1`**, whose `DiscoveryStatus`/`.degraded` work is where "I could not read this whole volume"
   becomes something the UI can say — a fix before then has nowhere to surface. Not worth its own primitive
   change: do NOT special-case `ENOTSUP` back to "no tags".
-- [ ] **W26.lint — extend the write-surface lint to cover ArchiveCore [S · low · Tier-1 · needs: none].**
-  `ArchiveReader/scripts/lint-write-surface.sh:10` hardcodes `SRC="macOS/Sources/ArchiveReader"`, so moving
-  discovery into `packages/ArchiveCore` (which this plan does) moves it **out of the Core Directive's
-  automated enforcement** — and the same gap already exempts ArchiveCore's own `TagWrite.swift`, which is
-  exactly where `W26.deny`'s bug sat unlinted. Extend `SRC` to include
-  `packages/ArchiveCore/Sources/ArchiveCore`, keeping the tag-write allow-list pointed at the audited writer.
-  **Test:** the lint FAILS when a `setResourceValue` is planted in a new ArchiveCore file outside the writer,
-  and passes on a clean tree.
+✅ **W26.lint — SHIPPED 2026-08-05 (`1460125` → this commit); full entry in `SUITE_TODO_DONE.md`.** Two things
+later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write-surface.sh` now lints
+`packages/ArchiveCore/Sources/ArchiveCore` as well as the Reader app target, and allowances are
+**`(file, exact source line)` pairs — never whole files**, so a new ArchiveCore file that calls
+`setResourceValue`/`setxattr`/a `FileManager` mutator/`.write(to:)` fails the lint. **Run it before committing
+any ArchiveCore work** (`./ArchiveReader/scripts/lint-write-surface.sh`; self-test:
+`./ArchiveReader/scripts/test-lint-write-surface.sh`) — nothing invokes it for you, see `W26.lint-fu`.
+**(2)** It was not merely scoped too narrowly, it was passing **vacuously**: the Reader app target has **zero**
+tag-write hits of its own (its `TagWriter` is a delta adapter over `ArchiveCore.CoordinatedTagWriter`), so
+rule 1 had nothing left to catch. Verified by running the OLD script against planted ArchiveCore violations —
+exit 0, "✓ clean".
+
+- [ ] **W26.lint-fu — nothing actually RUNS the write-surface lint [S · low · Tier-2 · ops].** Filed 2026-08-05
+  while shipping `W26.lint`. The script's header claimed it was *"also invoked by the autonomous build"*;
+  measured false — there is no caller anywhere in `ops/`, `.claude/hooks/`, or any script, so the Core
+  Directive's automated half only runs when a human remembers it. (The header now says so honestly.) Wire
+  `./ArchiveReader/scripts/lint-write-surface.sh` into the daemon's health gate — and its self-test
+  `test-lint-write-surface.sh` alongside, since a lint that cannot fail is the failure mode `W26.lint` was
+  about. ⚠️ **Tier-2 per the autonomous-setup change discipline** (adversarial review + prove-the-mechanism
+  before install), and `arm.sh` installs from the PRIMARY checkout's working tree — a fix landed via
+  worktree+push is not live until the primary is fast-forwarded and the owner re-arms. Do NOT make the gate
+  fail on a pre-existing violation without checking a clean tree passes first: both scripts are green on
+  `1460125`.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -243,7 +258,12 @@ delete any W26 entry.
 
 - [ ] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1 ·
   needs: none] (blocked-on: W26.deny, W26.lint).** ⚠️ **`W26.lint` must land first**, or this item authors and
-  commits the entire new engine **outside** the Core Directive's automated enforcement.
+  commits the entire new engine **outside** the Core Directive's automated enforcement. ✅ It has —
+  `1460125` — but **nothing invokes the lint for you** (`W26.lint-fu`), so **part of this item's gate is
+  running `./ArchiveReader/scripts/lint-write-surface.sh` before you commit the walker**; ArchiveCore is
+  linted now and the walker's whole point is being read-only, so a hit there is a design error, not a
+  formality. Also: if the walker needs an allowance, add it as a `(file, exact source line)` pair — the lint
+  refuses whole-file exemptions on purpose.
   New read-only `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`:
   `FileManager.enumerator` (`[.skipsHiddenFiles, .skipsPackageDescendants]`, matching the already-working
   DEBUG fixture loader — **but NOT its error handling: `:102`'s `try?` and `:104`'s

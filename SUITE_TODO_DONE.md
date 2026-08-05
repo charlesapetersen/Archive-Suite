@@ -60,6 +60,41 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   Residual filed: **`W26.notsup`** (an xattr-less volume now reads as unreadable, not untagged — deliberate,
   but it needs somewhere to surface; folded into `W26.walk1`). See `ArchiveReader/KNOWN_ISSUES.md`.
 
+- [x] **W26.lint — extend the write-surface lint to cover ArchiveCore [S · low · Tier-1]. ✅ DONE 2026-08-05**
+  — `1460125` (lint + self-test) → this commit (trackers + docs).
+  **The gap as filed:** `lint-write-surface.sh:10` hardcoded `SRC="macOS/Sources/ArchiveReader"`, so moving
+  discovery into `packages/ArchiveCore` would have moved it out of the Core Directive's automated
+  enforcement — and the same gap already exempted ArchiveCore's own `TagWrite.swift`, where `W26.deny`'s bug
+  sat unlinted.
+  **It was worse than a gap: rule 1 was passing VACUOUSLY.** Measured while fixing it —
+  `grep -rnE 'setResourceValue|setResourceValues|setxattr'` over the Reader app target returns **zero** hits,
+  because `TagWriter` is now a delta adapter over `ArchiveCore.CoordinatedTagWriter`. The rule had nothing
+  left to catch, and its `grep -v '/TagWriter\.swift:'` exemption protected nothing.
+  **Proven against its own predecessor, not argued.** A scratch copy of both source trees with two plants in
+  ArchiveCore (`setResourceValue` in a new `Corpus/PlantedWalker.swift`; `removeItem` in
+  `Corpus/PlantedDelete.swift`) → the OLD script exits **0** `✓ write-surface lint clean`; the new one exits
+  **1** and names both files.
+  **What shipped:** both trees linted; the suite's entire permitted tag-write surface is now the three exact
+  lines in `ArchiveCore/Tags/TagWrite.swift`. Allowances are **`(file, exact source line)` pairs, never whole
+  files** (plan §7a.8 — a file-level exemption in the package about to host the corpus walker is a permanent
+  unchecked hole). Three audited rule-2 sites are allowed: `RootMarker`'s coordinated new-sidecar identity
+  write, `PDFThumbnailer`'s cache write + LRU eviction. The Reader's `TagWriter.swift` file-level exemption
+  is **gone** — a deliberate tightening, since the documented architecture is that no app calls
+  `setResourceValue` directly.
+  **The adversarial pass found the new version could still pass vacuously two ways**, so both now fail loudly:
+  a **renamed source root** (grep silently skips a missing path — stderr is suppressed so the report stays
+  readable — and the remaining tree passes) and a **stale allowance** whose line no longer exists (an
+  unreviewed pre-approved hole waiting to be re-filled).
+  **Test:** `ArchiveReader/scripts/test-lint-write-surface.sh` — 9 checks, all against a `mktemp` copy of the
+  two trees through a test-only root override, so nothing is ever planted in the real repo. Includes the
+  item's own gate (a planted tag write in a new ArchiveCore file), the same plant in the Reader target, a
+  fourth differently-spelled write **inside** `TagWrite.swift` itself (a file-level allowlist would miss it),
+  a repointed allowed line (`coordURL` → `fileURL`: same file, same API, different target ⇒ must fail), raw
+  `setxattr`, planted destructive APIs, and the two vacuous-pass guards.
+  **Also corrected:** the header claimed the lint is *"also invoked by the autonomous build"*. Nothing invokes
+  it — no caller in `ops/`, `.claude/hooks/`, or any script (measured 2026-08-05). It is honestly labelled a
+  manual gate, and wiring it in is filed as **`W26.lint-fu`**. Shell only, no Swift touched.
+
 ## Owner-reported bugs (2026-08-02)
 
 - [x] **W25.modelsync [MED · money] — changing the model in Settings did not change the Process Files cost

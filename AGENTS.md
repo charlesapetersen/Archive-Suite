@@ -128,6 +128,9 @@ Run the app's tests where present (Reader has an XCTest bundle + `scripts/lint-w
 Processor has `scripts/test-smoke.sh` / `test-tier2.sh`, plus `scripts/e2e-phone-mac.sh` — the full
 phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`Net/` changes). Tag‑write
 changes are Tier‑2 (adversarial review + tests on scratch copies).
+⚠️ **`ArchiveReader/scripts/lint-write-surface.sh` also covers `packages/ArchiveCore` now** (W26.lint), so run
+it for **any** ArchiveCore change, not just a Reader one — and you must run it *yourself*: nothing invokes it
+automatically, which is filed as `W26.lint-fu`.
 
 ### GUI verification — you can drive it yourself; don't punt it to the owner
 

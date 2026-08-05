@@ -818,7 +818,7 @@ each leaving the app **working**.
 | Tag | Title | Effort | Risk | Tier | needs | blocked-on |
 |---|---|---|---|---|---|---|
 | `W26.deny` | ✅ **SHIPPED `ad86cce`** — read coercion fixed in BOTH `TagReading.swift` and `TagWrite.swift`; `TagXattr.inspect` is the primitive later items must reuse | S | med | **2** | none | — |
-| `W26.lint` | Extend `lint-write-surface.sh` to cover `packages/ArchiveCore` | S | low | 1 | none | — |
+| `W26.lint` | ✅ **SHIPPED `1460125`** — both trees linted, `(file, exact line)` allowances, 9-check self-test; rule 1 had been passing VACUOUSLY. Nothing invokes it → `W26.lint-fu` | S | low | 1 | none | — |
 | `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
 | `W26.walk2` | Reader discovery → `CorpusWalker`; delete `PendingWrite`; honest `DiscoveryStatus` | L | med | 2 | none | `W26.walk1` |
 | `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
@@ -851,8 +851,11 @@ writer.
   must be byte-identical afterwards. Add the `0o000` variant asserting the recorded `before`/inverse is not
   `[]`. Plus a `TagReading` unit test for all four rows of §4a.1's table. ⚠️ Build every probe from a **fresh
   `URL`** (§4a.3) or the test will pass while asserting nothing.
-- `W26.lint` — `./ArchiveReader/scripts/lint-write-surface.sh` fails when a `setResourceValue` is planted in
-  a new ArchiveCore file outside the audited writer, and passes on a clean tree.
+- `W26.lint` — ✅ **MET (`1460125`).** `./ArchiveReader/scripts/lint-write-surface.sh` fails when a
+  `setResourceValue` is planted in a new ArchiveCore file outside the audited writer, and passes on a clean
+  tree — plus 8 more checks in `./ArchiveReader/scripts/test-lint-write-surface.sh`, all against a `mktemp`
+  copy of the two trees (nothing is planted in the real repo). The gate was also run against the **old**
+  script for contrast: it exits 0 on the same plants.
 - `W26.walk1` — scratch fixture with tagged/untagged/hidden/nested/package files + an em-dash+NBSP
   filename; assert the exact expected set. Assert the walker performs **zero** writes (pre/post xattr +
   mtime snapshot of the fixture).
@@ -990,12 +993,35 @@ read primitive.
 
 - **`W26.lint` must land BEFORE any ArchiveCore discovery code** — otherwise `W26.walk1` authors and commits
   the new engine entirely outside Core Directive enforcement. `W26.walk1` is therefore
-  `(blocked-on: W26.deny, W26.lint)`.
+  `(blocked-on: W26.deny, W26.lint)`. ✅ **SHIPPED `1460125`** — both trees are linted and the allowlist is
+  `(file, exact source line)` pairs as prescribed below. **But nothing invokes the lint** (measured: no caller
+  in `ops/`, `.claude/hooks/`, or any script — the script's own header claimed otherwise and was wrong), so
+  enforcement is only as real as the person running it. Filed as `W26.lint-fu`; until it lands, **running
+  `./ArchiveReader/scripts/lint-write-surface.sh` is part of `W26.walk1`'s gate**, and its self-test is
+  `./ArchiveReader/scripts/test-lint-write-surface.sh`.
+  One thing this correction under-stated: the tag-write rule was not merely *scoped* too narrowly, it was
+  **passing vacuously**. The Reader app target has **zero** `setResourceValue|setxattr` hits of its own, so
+  after the W0 refactor moved the write into `CoordinatedTagWriter` the rule had nothing left to catch. Ran
+  the old script against planted ArchiveCore violations to confirm: exit 0, "✓ write-surface lint clean".
 - **The lint's enumerator rule must be multi-line aware.** Verified: `grep -rn 'enumerator(at:'` matches
   **zero** occurrences in this repo (the call is written across lines) while `\.enumerator\(` matches 4. A rule
   keyed on `enumerator(at:` would pass vacuously — the worst kind of green.
+  ⚠️ **This rule is OWNED BY `W26.walk1`, not `W26.lint`** (decided while shipping the latter, 2026-08-05).
+  `W26.lint` deliberately did not add it: the only enumerator call sites today are the ones `W26.walk1`/`walk2`
+  replace or delete, so a rule written now would either fail on code that is about to go away or — worse, and
+  exactly per the warning above — be written to pass. Distinguishing the `errorHandler:`-less overload is also
+  not a `grep` problem, since the call spans lines. Add it **with** the walker, keyed on the ban that matters
+  (`.enumerator(` without `errorHandler:` in the same call), and give it a planted-violation test in
+  `test-lint-write-surface.sh` like every other rule there.
 - **Allowlist by `(file, exact pattern)`, not by file.** A file-level allowlist in ArchiveCore becomes a
-  permanent unchecked hole in the package that now hosts the corpus walker.
+  permanent unchecked hole in the package that now hosts the corpus walker. ✅ Done in `1460125`, with two
+  additions its adversarial pass turned up — both were ways the *new* lint could still print "✓ clean" while
+  checking less than it claimed: a **renamed source root** (`grep` just skips a missing path; stderr is
+  suppressed so the report stays readable, and the rest of the tree passes) and a **stale allowance** whose
+  line no longer exists, sitting there as a pre-approved hole for the next write to slip into. Both hard-fail
+  now. Honest limit, recorded: matching on line *content* means a byte-identical duplicate of an allowed line
+  in the same file would also be allowed — accepted because line numbers churn on every edit above the site,
+  and the allowed lines reference locals that exist only inside the writer's coordination block.
 - **`W26.walk2` must ship `rescan()` AND its user-visible trigger** (a "Rescan Archive Folder" command,
   ⌘⌥R — ⌘R is Mark Read). It deletes `DidUpdate`/`DidFinishGathering`, and `W26.fsev` is a later item, so
   without this the Reader has **no way to refresh at all** in between. The plan already names manual refresh

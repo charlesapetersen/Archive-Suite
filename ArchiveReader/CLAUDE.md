@@ -171,8 +171,16 @@ add {"1981"}`. All of the following hold for every delta.
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no
     `PDFDocument.write` path exists. The write-surface lint covers *all* write spellings
     (`setResourceValue(s)`, `setxattr`, `FileManager` mutators, `PDFDocument.write`). The lint is one
-    layer; the real guarantee is that only `TagWriter` imports tag-write APIs and *nothing* imports
-    move/rename/delete/content-write APIs.
+    layer; the real guarantee is that only the audited writer touches tag-write APIs and *nothing*
+    imports move/rename/delete/content-write APIs.
+    *Scope, corrected in W26.lint (2026-08-05):* the lint covers **both** `macOS/Sources/ArchiveReader`
+    **and** `packages/ArchiveCore/Sources/ArchiveCore`. It used to be Reader-only, which meant it did
+    not look at `ArchiveCore/Tags/TagWrite.swift` — the actual choke-point, and where W26.deny's
+    tag-destroying bug sat. Since Reader's `TagWriter` delegates, the app target has **zero** tag-write
+    hits of its own, so rule 1 was passing vacuously. The suite's entire permitted tag-write surface is
+    now three exact lines in `TagWrite.swift`; allowances are `(file, exact source line)` pairs, never
+    whole files. ⚠️ **Nothing runs the lint for you** (`W26.lint-fu`) — run it, and its self-test
+    `scripts/test-lint-write-surface.sh`, before committing Reader or ArchiveCore work.
 
 Risk tiering (mirrors Archive Processor): `TagWriter` and anything it touches is **Tier-2
 adversarial-review + property/integration tests on scratch copies** on every change. Never test tag
@@ -409,7 +417,10 @@ A change here is **Tier-2** and must build+test all three apps (Reader + Process
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
 `ArchiveReader/Tests/ArchiveReaderTests/` — 30 test files (266 tests). `scripts/lint-write-surface.sh`
-enforces the write surface. Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
+enforces the write surface across the Reader target **and** `packages/ArchiveCore` (W26.lint);
+`scripts/test-lint-write-surface.sh` is its 9-check self-test — it plants violations in a `mktemp` copy of
+both trees and asserts the lint fails, because a lint that cannot fail is exactly what this one was.
+Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 (Index health, W23.m9: `ContentIndexRecoveryTests` proves `open()` leaves no half-open handle;
 `ContentIndexerFailureTests` proves a dead index is *reported*, not answered as "no matches".)
 
@@ -471,8 +482,13 @@ Until step 2, treat the tag/PDF contract as the coupling; keep `Core/` UI-free a
 ## Never
 - Never write to the corpus during development/testing — copy files to the scratchpad first.
 - Never hand-edit `.pbxproj` (edit `project.yml` + regenerate).
-- Never add a tag-writing call outside `TagWriter`; never add a move/rename/delete/content-write
-  call anywhere (not even in `TagWriter`).
+- Never add a tag-writing call outside the audited choke-point — which since the W0 refactor is
+  `ArchiveCore.CoordinatedTagWriter`, *not* Reader's `TagWriter` (a delta adapter that no longer calls a
+  write API at all). The lint enforces exactly that: the permitted surface is three exact lines in
+  `ArchiveCore/Tags/TagWrite.swift`, so a tag write added anywhere else — **including elsewhere in
+  `TagWriter.swift`** — fails it.
+- Never add a move/rename/delete/content-write call anywhere (not even in the writer). The three
+  allowed exceptions in ArchiveCore are pinned line-by-line in the lint; adding a fourth is Tier-2.
 
 Milestones M0–M3 and the High-priority backlog all shipped; the keyboard map, options, edge-case
 rules, and decisions are folded into the §sections above. Further ideas live in `POTENTIAL_FEATURES.md`,
