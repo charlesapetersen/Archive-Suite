@@ -1,0 +1,435 @@
+import Foundation
+import UniformTypeIdentifiers
+
+/// One file the walk found and could fully read.
+///
+/// Deliberately NOT `ArchiveFile` (the Reader's row model): this is the shared, UI-free shape both apps
+/// build their own model from, so the walker can live in ArchiveCore without either app's display
+/// concerns leaking into it.
+public struct CorpusEntry: Sendable, Equatable {
+    public let url: URL
+    /// The raw tag names, exactly as `TagReading.read` returned them — never a parsed/normalised form,
+    /// because the parse belongs to the caller (`DocumentTags.parse`) and a lossy walker would make
+    /// discovery and writes disagree.
+    public let tagNames: [String]
+    public let labelNumber: Int?
+    /// **Content** modification date (`.contentModificationDateKey`). A Finder-tag write changes
+    /// `ctime`, not `mtime`, so this is the right key for a content-index freshness check and the
+    /// WRONG one for detecting a tag change (plan §5.12).
+    public let contentModified: Date?
+    public let contentTypeIdentifier: String?
+    /// True when the file is a cloud placeholder whose data is not on disk (`SF_DATALESS`). Reading
+    /// tags does not materialise it; opening it for text extraction WOULD (plan §7a.10), so this
+    /// travels with the entry to let a later indexer skip it rather than download the corpus.
+    public let isDataless: Bool
+
+    public init(url: URL, tagNames: [String], labelNumber: Int?, contentModified: Date?,
+                contentTypeIdentifier: String?, isDataless: Bool) {
+        self.url = url
+        self.tagNames = tagNames
+        self.labelNumber = labelNumber
+        self.contentModified = contentModified
+        self.contentTypeIdentifier = contentTypeIdentifier
+        self.isDataless = isDataless
+    }
+}
+
+/// Something the walk could not read, with the reason. Surfaced, never swallowed — see
+/// `CorpusScanResult.isClean`.
+public struct CorpusReadFailure: Sendable, Equatable {
+    public let url: URL
+    public let reason: String
+    public init(url: URL, reason: String) { self.url = url; self.reason = reason }
+}
+
+/// What one pass of the walk established — **including what it could not establish.**
+///
+/// The incident this whole subsystem exists to end (2026-08-04) was an app that said *"no tagged PDFs
+/// were found in this folder"* about 1,849 correctly-tagged files, because its discovery layer had no
+/// way to say *"I could not look."* So every count here that means "I don't know" is separate from the
+/// entries, and `isClean` is the single gate a caller must consult before treating an absence as real.
+public struct CorpusScanResult: Sendable {
+    /// Files that matched the predicate, in enumeration order.
+    public let entries: [CorpusEntry]
+
+    /// Files whose tags could not be read (`TagReading.read` → `.failure`). NEVER coerced to
+    /// "untagged": that coercion is the tag-destroying bug fixed in `W26.deny`. A caller that already
+    /// has a row for one of these URLs must KEEP it and mark it unverified (plan §7a.3).
+    public let unreadable: [CorpusReadFailure]
+
+    /// Directories the enumerator could not descend into (its `errorHandler:` fired). The overload
+    /// *without* that handler — the one the pre-W26 fixture loader used — skips these in silence,
+    /// which is the second way the fix could have reproduced the bug (plan §4a.2).
+    public let directoryErrors: [CorpusReadFailure]
+
+    /// Regular files encountered (matched or not, readable or not). Excludes directories, non-regular
+    /// entries, and entries that vanished before they could be classified.
+    public let filesSeen: Int
+
+    /// Entries that disappeared between being enumerated and being read (`ENOENT`). Normal churn, NOT
+    /// a denial: excluded from `entries`, and deliberately **not** counted as unreadable, so a rename
+    /// during the walk cannot make the pass look degraded (plan §7a.12).
+    public let vanishedMidScan: Int
+
+    /// The root could not be enumerated at all (`FileManager.enumerator` returned nil).
+    public let rootUnreadable: Bool
+
+    /// The caller's cancellation predicate returned true mid-pass.
+    public let cancelled: Bool
+
+    /// True only when the enumerator ran to its natural end.
+    public var completed: Bool { !rootUnreadable && !cancelled }
+
+    /// **The absence gate.** True only when the pass completed AND read everything it saw. Anything
+    /// else means an unseen file may be present-and-unreadable rather than gone, so absence is not
+    /// actionable: do not prune, do not report "nothing here" (plan §5.13 tier 1).
+    public var isClean: Bool { completed && directoryErrors.isEmpty && unreadable.isEmpty }
+}
+
+/// A batch of entries plus the running total, so a caller can populate a list progressively.
+public struct CorpusScanBatch: Sendable {
+    /// Entries discovered since the previous batch (never cumulative).
+    public let entries: [CorpusEntry]
+    /// Regular files seen so far across the whole pass.
+    public let filesSeen: Int
+}
+
+/// Read-only, deterministic corpus discovery — the replacement for Spotlight (`NSMetadataQuery`).
+///
+/// **It never writes, moves, renames or deletes.** Enumeration, `stat`, `resourceValues` and
+/// `getxattr` (inside `TagReading`) are the only filesystem calls it makes; the write-surface lint
+/// (`ArchiveReader/scripts/lint-write-surface.sh`) covers this package and is part of this item's gate.
+///
+/// Why a filesystem walk is affordable — measured read-only on the owner's real corpus, 2026-08-04:
+/// **123,028 files / 102,478 PDFs / depth 7 in 10.15 s single-threaded** (82 µs/file). The Spotlight
+/// path's justification ("no per-file disk I/O, the fast path at 150k") was already void, because
+/// `ContentIndexer` opens and extracts text from every PDF anyway.
+///
+/// Three design points a maintainer will otherwise re-litigate:
+///
+/// 1. **Synchronous by design.** `scan` is a plain function, not `async`. Two existing Reader test
+///    files (`DocumentPageLinkTests`, `RootMarkerStateTests`) assert synchronously that a
+///    freshly-tagged scratch PDF is discoverable the moment the model finishes initialising, and the
+///    thread-scoped dataless policy below is only sound if no `await` can move the work to another
+///    thread mid-pass. Off-main callers use `scanOnDedicatedThread`/`scanDetached`.
+/// 2. **Everything tagged is returned.** User-excluded folders are filtered *after* discovery by the
+///    Reader (`NavigationModel`), on purpose: excluded files are visible in the UI but absent from
+///    the content index. A walker that skipped them during enumeration would silently drop them from
+///    the UI while producing an identical index (plan §5.17).
+/// 3. **Tags come from `TagReading.read`,** the same primitive the write path reads through, so
+///    discovery and writes agree by construction — including on the "could not read" answer.
+public enum CorpusWalker {
+
+    // MARK: - Options
+
+    public struct Options: Sendable {
+        /// Matches the enumeration options of the pre-W26 fixture loader, so membership is unchanged.
+        public var enumerationOptions: FileManager.DirectoryEnumerationOptions
+        /// Entries per `onBatch` call. Batches only affect delivery, never the returned result.
+        public var batchSize: Int
+
+        public init(enumerationOptions: FileManager.DirectoryEnumerationOptions =
+                        [.skipsHiddenFiles, .skipsPackageDescendants],
+                    batchSize: Int = 500) {
+            self.enumerationOptions = enumerationOptions
+            self.batchSize = max(1, batchSize)
+        }
+    }
+
+    // MARK: - Predicates
+
+    /// The suite's master membership rule: a file belongs to the library iff it carries a `Read` or
+    /// `Unread` tag. Case-insensitive, matching the shipped Spotlight predicate and the fixture
+    /// loader it replaces — `NavigationUITests` pins this end to end.
+    public static let tracksReadState: @Sendable ([String]) -> Bool = { tagNames in
+        tagNames.contains {
+            $0.caseInsensitiveCompare(ReadState.read.rawValue) == .orderedSame ||
+            $0.caseInsensitiveCompare(ReadState.unread.rawValue) == .orderedSame
+        }
+    }
+
+    /// Everything with at least one tag — for a vocabulary harvest rather than a library.
+    public static let hasAnyTag: @Sendable ([String]) -> Bool = { !$0.isEmpty }
+
+    // MARK: - The walk
+
+    /// Walk `root` and return everything matching `predicate`, plus an honest account of what could
+    /// not be read.
+    ///
+    /// Runs entirely on the calling thread and suppresses on-demand materialisation of cloud
+    /// placeholders for the duration (see `withDatalessMaterializationDisabled`). `onBatch` is
+    /// therefore invoked on the calling thread, synchronously, before this returns.
+    ///
+    /// - Parameter isCancelled: polled once per entry; a `true` leaves `cancelled == true`, which
+    ///   makes the result not `isClean` — a cancelled pass can never authorise treating a file as gone.
+    public static func scan(root: URL,
+                            predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState,
+                            options: Options = Options(),
+                            isCancelled: @Sendable () -> Bool = { false },
+                            onBatch: (@Sendable (CorpusScanBatch) -> Void)? = nil) -> CorpusScanResult {
+        withDatalessMaterializationDisabled {
+            scanBody(root: root, predicate: predicate, options: options,
+                     isCancelled: isCancelled, onBatch: onBatch)
+        }
+    }
+
+    private static func scanBody(root: URL,
+                                 predicate: @escaping @Sendable ([String]) -> Bool,
+                                 options: Options,
+                                 isCancelled: @Sendable () -> Bool,
+                                 onBatch: (@Sendable (CorpusScanBatch) -> Void)?) -> CorpusScanResult {
+        var entries: [CorpusEntry] = []
+        var unreadable: [CorpusReadFailure] = []
+        var filesSeen = 0
+        var vanished = 0
+        var cancelled = false
+        var batch: [CorpusEntry] = []
+
+        // A private FileManager: the walk is driven off the main actor and must not share state with
+        // whatever else is using `FileManager.default` (the pattern already reviewed in
+        // ArchiveNotes' ReaderLinkResolver).
+        let fm = FileManager()
+
+        // `directoryErrors` is captured by the error handler, which FileManager may call from inside
+        // `nextObject()` — i.e. synchronously on this same thread, between our own statements. A class
+        // box keeps that legal without pretending the closure is concurrency-safe.
+        let errorSink = ErrorSink()
+
+        // `.contentTypeKey`/`.contentModificationDateKey` only: regular-file and dataless detection
+        // come from the single `stat` below, which is cheaper than a third resource-value key and is
+        // the only way to see `SF_DATALESS` at all.
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .contentTypeKey]
+
+        guard let enumerator = fm.enumerator(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: options.enumerationOptions,
+            // WITHOUT this handler the enumerator silently skips a directory it cannot descend into —
+            // no error, no count, and the scan still reports complete. That is the second way this fix
+            // could have reproduced the very bug it exists to fix (plan §4a.2). Returning `true`
+            // continues the walk; the recorded error is what makes the pass not `isClean`.
+            errorHandler: { url, error in
+                errorSink.record(url: url, reason: error.localizedDescription)
+                return true
+            }
+        ) else {
+            return CorpusScanResult(entries: [], unreadable: [], directoryErrors: [],
+                                    filesSeen: 0, vanishedMidScan: 0,
+                                    rootUnreadable: true, cancelled: false)
+        }
+
+        // `nextObject()` rather than `for … in`: NSEnumerator's Sequence conformance is unavailable
+        // from an async context, and this loop is meant to be callable from one.
+        while let entry = enumerator.nextObject() {
+            if isCancelled() { cancelled = true; break }
+            guard let url = entry as? URL else { continue }
+
+            switch FileStat.capture(url) {
+            case .vanished:
+                // Enumerated, then gone. Not a denial, not a tag failure, never persisted.
+                vanished += 1
+                continue
+            case let .failed(reason):
+                // We cannot even tell what this is. Honest answer: unknown, so the pass is not clean.
+                unreadable.append(CorpusReadFailure(url: url, reason: reason))
+                continue
+            case let .ok(isRegularFile, isDataless):
+                guard isRegularFile else { continue }   // directories, symlinks to dirs, devices…
+                filesSeen += 1
+
+                let values: URLResourceValues
+                do {
+                    values = try url.resourceValues(forKeys: Set(keys))
+                } catch {
+                    if FileStat.isMissing(url) { vanished += 1 } else {
+                        unreadable.append(CorpusReadFailure(url: url, reason: error.localizedDescription))
+                    }
+                    continue
+                }
+
+                switch TagReading.read(url) {
+                case let .failure(why):
+                    // The case `W26.deny` exists to make honest. The code being replaced wrote
+                    // `else { continue }` here, which lost the file with no error and no count.
+                    if FileStat.isMissing(url) { vanished += 1 } else {
+                        unreadable.append(CorpusReadFailure(url: url, reason: why))
+                    }
+                case let .success(tagNames, labelNumber):
+                    guard predicate(tagNames) else { continue }
+                    let e = CorpusEntry(url: url,
+                                        tagNames: tagNames,
+                                        labelNumber: labelNumber,
+                                        contentModified: values.contentModificationDate,
+                                        contentTypeIdentifier: values.contentType?.identifier,
+                                        isDataless: isDataless)
+                    entries.append(e)
+                    batch.append(e)
+                    if batch.count >= options.batchSize, let onBatch {
+                        onBatch(CorpusScanBatch(entries: batch, filesSeen: filesSeen))
+                        batch.removeAll(keepingCapacity: true)
+                    }
+                }
+            }
+        }
+
+        if !batch.isEmpty, let onBatch {
+            onBatch(CorpusScanBatch(entries: batch, filesSeen: filesSeen))
+        }
+
+        return CorpusScanResult(entries: entries,
+                                unreadable: unreadable,
+                                directoryErrors: errorSink.drain(),
+                                filesSeen: filesSeen,
+                                vanishedMidScan: vanished,
+                                rootUnreadable: false,
+                                cancelled: cancelled)
+    }
+
+    // MARK: - Off-main execution
+
+    /// Run `scan` on a **dedicated** `Thread` and hand the result to `completion` on that same thread.
+    ///
+    /// Not `Task.detached`, for two independent reasons: (a) the dataless I/O policy is per-thread and
+    /// Swift's cooperative pool reuses threads, so a policy set inside a task can outlive the work
+    /// that wanted it (plan §4a.4); (b) the pass is ~10 s of blocking I/O at corpus scale, which would
+    /// starve the cooperative pool for its duration.
+    @discardableResult
+    public static func scanOnDedicatedThread(root: URL,
+                                             predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState,
+                                             options: Options = Options(),
+                                             qualityOfService: QualityOfService = .utility,
+                                             isCancelled: @escaping @Sendable () -> Bool = { false },
+                                             onBatch: (@Sendable (CorpusScanBatch) -> Void)? = nil,
+                                             completion: @escaping @Sendable (CorpusScanResult) -> Void) -> Thread {
+        let thread = Thread {
+            completion(scan(root: root, predicate: predicate, options: options,
+                            isCancelled: isCancelled, onBatch: onBatch))
+        }
+        thread.name = "ArchiveCore.CorpusWalker"
+        thread.qualityOfService = qualityOfService
+        thread.start()
+        return thread
+    }
+
+    /// `async` façade over `scanOnDedicatedThread`. Honours task cancellation in addition to
+    /// `isCancelled`.
+    public static func scanDetached(root: URL,
+                                    predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState,
+                                    options: Options = Options(),
+                                    qualityOfService: QualityOfService = .utility,
+                                    onBatch: (@Sendable (CorpusScanBatch) -> Void)? = nil) async -> CorpusScanResult {
+        let cancellation = CancellationFlag()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                scanOnDedicatedThread(root: root, predicate: predicate, options: options,
+                                      qualityOfService: qualityOfService,
+                                      isCancelled: { cancellation.isSet },
+                                      onBatch: onBatch) { result in
+                    continuation.resume(returning: result)
+                }
+            }
+        } onCancel: {
+            cancellation.set()
+        }
+    }
+
+    // MARK: - Cloud placeholders
+
+    /// Run `body` with on-demand materialisation of dataless (cloud placeholder) files **disabled on
+    /// the current thread**, restoring the previous policy afterwards.
+    ///
+    /// Verified 2026-08-04 against a real `~/Library/CloudStorage/GoogleDrive-…` directory (Drive
+    /// installed, not signed in): without this, `getattrlistbulk` inside the enumerator **stalls and
+    /// then fails with `ETIMEDOUT` after 0.54 s per call**, and the no-`errorHandler` enumerator turns
+    /// that into a silent empty listing. With it, the stall becomes an immediate clean error the
+    /// `errorHandler:` above records.
+    ///
+    /// Save-and-restore matters: the policy is thread-scoped, and leaking "off" into unrelated work on
+    /// a reused thread would silently change the behaviour of code that never asked for it.
+    public static func withDatalessMaterializationDisabled<T>(_ body: () throws -> T) rethrows -> T {
+        let prior = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+        // A negative return means the policy could not be read; don't then guess what to restore.
+        let restorable = prior >= 0
+        if restorable {
+            _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD,
+                               IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+        }
+        defer {
+            if restorable {
+                _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, prior)
+            }
+        }
+        return try body()
+    }
+}
+
+// MARK: - stat, once, for three answers
+
+/// A single `stat(2)` answering "is this a regular file", "is it a cloud placeholder", and "did it just
+/// disappear" — the last of which is what keeps normal churn out of the denial counts.
+enum FileStat {
+    case ok(isRegularFile: Bool, isDataless: Bool)
+    case vanished
+    case failed(String)
+
+    /// Follows symlinks, exactly as `URL.resourceValues` and `TagReading.read` do: a symlink to a
+    /// tagged PDF must be classified by its target, or the walk and the write path would disagree
+    /// about the same entry (the symlink half of the `W26.deny` correction).
+    static func capture(_ url: URL) -> FileStat {
+        url.withUnsafeFileSystemRepresentation { rawPath -> FileStat in
+            guard let rawPath else { return .failed("path has no filesystem representation") }
+            var info = stat()
+            errno = 0
+            guard stat(rawPath, &info) == 0 else {
+                let code = errno
+                return code == ENOENT ? .vanished : .failed("stat failed: \(describe(code))")
+            }
+            return .ok(isRegularFile: (info.st_mode & S_IFMT) == S_IFREG,
+                       isDataless: (info.st_flags & UInt32(SF_DATALESS)) != 0)
+        }
+    }
+
+    /// Did this path disappear? Used to tell churn from denial when a *later* read fails.
+    static func isMissing(_ url: URL) -> Bool {
+        if case .vanished = capture(url) { return true }
+        return false
+    }
+
+    private static func describe(_ code: Int32) -> String {
+        switch code {
+        case EACCES:  return "permission denied (EACCES)"
+        case EPERM:   return "operation not permitted (EPERM)"
+        case ELOOP:   return "too many symbolic links (ELOOP)"
+        case EIO:     return "I/O error (EIO)"
+        case ETIMEDOUT: return "operation timed out (ETIMEDOUT) — a cloud/network volume?"
+        default:      return "errno \(code)"
+        }
+    }
+}
+
+// MARK: - Small boxes
+
+/// Collects the enumerator's directory errors. FileManager calls the handler synchronously on the
+/// walking thread, but the closure must be a `@Sendable`-safe reference type to satisfy Swift 6.
+private final class ErrorSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var failures: [CorpusReadFailure] = []
+
+    func record(url: URL, reason: String) {
+        lock.lock(); defer { lock.unlock() }
+        failures.append(CorpusReadFailure(url: url, reason: reason))
+    }
+
+    func drain() -> [CorpusReadFailure] {
+        lock.lock(); defer { lock.unlock() }
+        return failures
+    }
+}
+
+/// One-way cancellation bit shared between an `async` caller and the walking thread.
+private final class CancellationFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+    func set() { lock.lock(); defer { lock.unlock() }; flag = true }
+}
