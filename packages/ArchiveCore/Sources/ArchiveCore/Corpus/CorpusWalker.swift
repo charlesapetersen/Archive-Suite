@@ -84,6 +84,21 @@ public struct CorpusScanResult: Sendable {
     /// else means an unseen file may be present-and-unreadable rather than gone, so absence is not
     /// actionable: do not prune, do not report "nothing here" (plan §5.13 tier 1).
     public var isClean: Bool { completed && directoryErrors.isEmpty && unreadable.isEmpty }
+
+    /// Public so a *consumer's* health mapping can be tested without staging a filesystem that
+    /// reproduces every outcome (`W26.walk2`'s `DiscoveryHealth`). The walker is still the only thing
+    /// that produces one from a real tree.
+    public init(entries: [CorpusEntry], unreadable: [CorpusReadFailure],
+                directoryErrors: [CorpusReadFailure], filesSeen: Int, vanishedMidScan: Int,
+                rootUnreadable: Bool, cancelled: Bool) {
+        self.entries = entries
+        self.unreadable = unreadable
+        self.directoryErrors = directoryErrors
+        self.filesSeen = filesSeen
+        self.vanishedMidScan = vanishedMidScan
+        self.rootUnreadable = rootUnreadable
+        self.cancelled = cancelled
+    }
 }
 
 /// A batch of entries plus the running total, so a caller can populate a list progressively.
