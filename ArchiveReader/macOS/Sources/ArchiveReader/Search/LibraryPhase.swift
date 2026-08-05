@@ -56,6 +56,26 @@ enum DiscoveryFailure: Equatable, Sendable {
     }
 }
 
+/// Whether the root vouched for the pass that just walked it (plan §7a.11).
+///
+/// Three states, not two, and the third one is a bug I found reviewing my own first cut: a root that
+/// was **never readable** fails the before/after comparison exactly like one that was swapped
+/// mid-pass, so a two-state answer made an unreadable folder report *"Archive folder changed while
+/// scanning"* — a confident, specific, wrong diagnosis of the commonest case there is.
+enum RootStability: Equatable, Sendable {
+    /// The same readable root before and after the pass.
+    case heldStill
+    /// Identified at the start, but not the same root — or no longer readable — at the end.
+    case changedMidScan
+    /// Could not be identified even at the start: nothing here was ever readable.
+    case neverIdentified
+
+    static func between(_ before: CorpusRootFingerprint?, _ after: CorpusRootFingerprint?) -> RootStability {
+        guard before != nil else { return .neverIdentified }
+        return CorpusRootFingerprint.rootHeldStill(before: before, after: after) ? .heldStill : .changedMidScan
+    }
+}
+
 /// What the library currently knows, and how much of it is trustworthy.
 ///
 /// ⚠️ **This replaced `isGathering: Bool` outright rather than reinterpreting it.** The old flag drove
@@ -125,10 +145,13 @@ enum DiscoveryHealth {
     /// `isClean` is **consulted, not re-derived** — it is already the plan §5.13 tier-1 gate and lives
     /// with the walker that produces the counters. This function only adds the two things the walker
     /// cannot see: whether the caller cancelled it, and whether the root held still (§7a.11).
-    static func failure(for result: CorpusScanResult, rootHeldStill: Bool) -> DiscoveryFailure? {
-        if result.rootUnreadable { return .rootUnreadable }
+    static func failure(for result: CorpusScanResult, root: RootStability) -> DiscoveryFailure? {
+        // A root that could not be identified at all is unreadable, NOT "changed" — the walker's own
+        // `rootUnreadable` only fires when `FileManager` hands back no enumerator, which a sealed
+        // directory does not always do.
+        if result.rootUnreadable || root == .neverIdentified { return .rootUnreadable }
         if result.cancelled { return .incomplete }
-        if !rootHeldStill { return .rootChangedMidScan }
+        if root == .changedMidScan { return .rootChangedMidScan }
         guard result.isClean else {
             return .partiallyUnreadable(files: result.unreadable.count,
                                         folders: result.directoryErrors.count)
@@ -141,10 +164,10 @@ enum DiscoveryHealth {
     /// - Parameter lastSettled: when discovery last settled, for a `.degraded` result to date itself
     ///   against ("showing what we knew at 14:03" beats an undated wrong claim).
     static func phase(after result: CorpusScanResult,
-                      rootHeldStill: Bool,
+                      root: RootStability,
                       finishedAt: Date,
                       lastSettled: Date?) -> LibraryPhase {
-        if let f = failure(for: result, rootHeldStill: rootHeldStill) {
+        if let f = failure(for: result, root: root) {
             return .degraded(f, asOf: lastSettled)
         }
         return .settled(asOf: finishedAt, scanned: result.filesSeen)

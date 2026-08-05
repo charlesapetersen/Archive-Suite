@@ -163,7 +163,7 @@ final class ArchiveLibrary: ObservableObject {
         guard generation == currentScan else { return }   // superseded pass — publish nothing
         inFlight = nil
         files = merged(pass: pass, generation: generation)
-        let next = DiscoveryHealth.phase(after: pass.result, rootHeldStill: pass.rootHeldStill,
+        let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
         if case let .settled(asOf, _) = next { lastSettled = asOf }
         phase = next

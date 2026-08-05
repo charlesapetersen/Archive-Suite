@@ -5,7 +5,7 @@ import ArchiveCore
 struct DiscoveryPass: Sendable {
     let result: CorpusScanResult
     /// Did the root hold still from the pre-pass capture to the post-pass one (plan §7a.11)?
-    let rootHeldStill: Bool
+    let rootStability: RootStability
 }
 
 /// Runs a discovery pass — and brackets it with the root-identity capture that makes the pass's own
@@ -29,9 +29,7 @@ enum LibraryScan {
             let before = CorpusRootFingerprint.capture(root)
             let result = CorpusWalker.scan(root: root, isCancelled: isCancelled, onBatch: onBatch)
             let after = CorpusRootFingerprint.capture(root)
-            return DiscoveryPass(result: result,
-                                 rootHeldStill: CorpusRootFingerprint.rootHeldStill(before: before,
-                                                                                    after: after))
+            return DiscoveryPass(result: result, rootStability: .between(before, after))
         }
     }
 
