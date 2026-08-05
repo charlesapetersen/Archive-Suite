@@ -3396,6 +3396,66 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   also reverted the *uncommitted* test it was measuring, yielding two more bogus 0-REDs. Commit the test
   first, then revert per-file.) | Capture/Views | Tier-2
 
+- [x] **W3.cap-r3-fu12 [LOW · behaviour decision] — ✅ DONE 2026-08-04** (`5180d03` the decision + the gate;
+  `5148086` Test 25; `ed8c429` round-1 mutants; `776fa73` the adversarial pass and the four fixes it forced;
+  this commit, trackers). An emptied Captured pane hid **Finish** and **Clear** even while the session held
+  unfiled staged segments: the header cluster was gated on `!session.photos.isEmpty`, `liveProc.staged` is
+  independent of it, so deleting every received page with the per-thumbnail ✕ left segments already OCR'd,
+  tagged and written to `_processed/` with nothing to file them and nothing to abandon them. The pane just said
+  "Waiting for photos…"; recovery existed (shoot one more photo) but nothing said so.
+  **THE DECISION, since it was filed as one rather than as a bug: offer the SAME two controls.** Finish, because
+  the OCR behind those segments is already BOUGHT and filing them is the only way the operator sees it —
+  stranding paid work behind an undiscoverable gesture is the money-path harm. Clear, because abandoning is the
+  other half of the same choice and an operator who cannot abandon is stuck. Gated on a new model property
+  `hasUnfiledWork` (`!statuses.isEmpty || pendingFinish`) rather than a view predicate, for the reason
+  `isFinishingScrimUp` was named on the model: a headless driver can read a model property and cannot read a
+  `View`. `statuses` rather than `staged` is the WIDER spelling on purpose and it is measured (M2), covering a
+  segment that failed to file and an orphaned in-flight row as well. Both header arms compose the same extracted
+  `clearButton`/`liveFinishControls` — no tailored copy, because fu9-fu1's own comment warns that a copy-paste
+  is how one of two renderers drifts. It also un-stranded a case the item never named: a PARTLY-failed finish
+  left its failed groups behind the green "Session complete" summary with no way to re-Finish or discard them.
+  🔺 **THE ADVERSARIAL PASS FOUND THAT v1 SHIPPED A PRIMARY BUTTON THAT DID NOTHING** — the same class as
+  fu9-fu1's ("an affordance that hides in the state you need it") turned inside out: this one was *present* and
+  inert. `finishSession` guards `!staged.isEmpty` while `pendingFinish` is cleared one level above it, so with a
+  roster of nothing but an orphaned row (✕ the last page of a document still in OCR) a press armed the flag,
+  spawned a watchdog Task, lowered the flag and returned — no sheet, no status line, no state change, one
+  orphaned Task per press. Its sharpest point was that **Test 25's own check 7 CREATED that state and asserted
+  `hasUnfiledWork`**, i.e. blessed drawing the cluster there without ever pressing the button. Fixed with a
+  second, narrower property `canFinish` (`!staged.isEmpty || !session.groups.isEmpty`, the second disjunct
+  preserving the documented "Finish also recovers an un-ended segment" case) ADDED to the button's `.disabled`
+  rather than replacing its terms — money path, and a derived-equivalence argument is not worth one `||`.
+  Three more fixes from the same pass. **A false FILE-SAFETY claim:** the section said an explicit
+  `chosenExisting` means `finalize` "can never consult `currentOutputDirectory`" — it evaluates that
+  unconditionally one line after its guard, and check 4 reaches `beginFinalize`, which *enumerates* it on disk.
+  Nothing writes outside `tmp` (read-only enumeration, plus `test-recovery.sh` exports `LIVECAPTURE_TESTOUT`),
+  but the mechanism was mis-located, so the comment was telling the next author that `finalize` protects them;
+  it now names both real guards and carries a ⛔ on the "drive the real sheet's drafts" refactor that would file
+  into the operator's real output folder. **A wrong reachability bound:** "(0 left)" was claimed reachable for
+  ≤1.5 s via the per-item-sheet grace; it is the **5 s** watchdog tick, via the ordinary ✕ gesture, because
+  `removePhoto` neither clears the flag nor re-enters the gate — which is what turned "not worth a third message
+  branch" into worth one. **A performance regression:** `processingCount` rebuilt `session.groups` (a computed
+  property that builds a dictionary and sorts twice) once per status row, read from a SwiftUI body that
+  re-evaluates on every arriving photo; hoisted to one group-id Set. Plus `clearButton` got a `.help`, since it
+  was the only button in the cluster without one and sits beside "Cancel finish", which costs nothing.
+  Comment corrections: "can never resolve" softened (a re-paired phone re-uploads, so the group can return —
+  the predicate is live, the phrasing was not); M4 is **not** "the pre-fu12 spelling" (it now strips the finish
+  hold too, a combination that never shipped); check 3 admits it discriminates nothing about `hasUnfiledWork`,
+  its first term being implied by its second.
+  Driver **180 → 188 checks, ALL PASS, 0 FAIL, ~18 s** (`W21.recovery-timeout` headroom intact); six key-free
+  Capture/finalize drivers green alongside (manifest-persistence 109, merge-safety 15, segment-json 30,
+  multipage-reocr 29, filerelay 10/10, output-file-safety 18). Seven mutants BUILT and RUN against the final
+  baseline: **M1 0 / M2 2 / M3 2 / M4 2 / M5 2 / M6 0 / M7 1 RED**. Three predictions were wrong and are
+  recorded as measured rather than quietly fixed (M2 predicted 0, M3 predicted 1, M5's second RED is a
+  pre-existing check). M6 records that `hasUnfiledWork`'s `pendingFinish` disjunct is **unreachable dead code**,
+  kept only so this gate cannot delete fu9-fu1's escape — "belt-and-braces, unmeasured, argued" is its honest
+  status. M1's 0 RED is the same priced view→model gap fu9/fu9-fu1 recorded: nothing headless reads a `View`, so
+  `live.clear` / `live.finish` identifiers were added for `W21.vmgui-d` to press.
+  Two residuals filed rather than guessed at: **`W3.cap-r3-fu12-fu1`** (Clear here has no count and no
+  confirmation, and wipes `finalizeSummary` — the only record of what a partly-failed finish did not file) and
+  **`W3.cap-r3-fu12-fu2`** (with Review rotation ON, Finish from a ✕-emptied pane reviews pages whose sources
+  are in the Trash and discards every correction silently; pre-existing, promoted from two-step to one tap by
+  this arm). | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu9-fu1 [LOW · ops/UX] — ✅ DONE 2026-08-04** (`124652f` the button + the guard; `f311f75`
   Test 24 + round-1 mutants; `483dc8a` the adversarial pass and the fix it forced; this commit, trackers).
   `LiveCaptureProcessor.cancelPendingFinish()` was correct code with **no caller in the shipped UI** — its only
