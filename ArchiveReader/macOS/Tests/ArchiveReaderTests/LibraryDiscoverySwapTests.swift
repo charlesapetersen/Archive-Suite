@@ -148,6 +148,31 @@ final class LibraryDiscoverySwapTests: XCTestCase {
                        "§7a.4: a degraded pass must not authorise pruning content-index rows")
     }
 
+    /// A directory denial is more dangerous than a file denial: the enumerator never yields its
+    /// descendants, so there is no per-file failure URL from which to recover them. A degraded pass's
+    /// absences are non-authoritative as a set; every previously-visible unseen row must survive.
+    func testAnUnreadableDirectoryKeepsPreviouslyVisibleDescendantRows() async throws {
+        try XCTSkipIf(getuid() == 0, "a permission denial is meaningless when running as root")
+        let root = try makeRoot()
+        try makeFile("visible.pdf", tags: ["Read"], in: root)
+        let hidden = try makeFile("Sealed/hidden.pdf", tags: ["Unread", "Subject/Foo"], in: root)
+
+        let library = ArchiveLibrary()
+        library.start(scope: root)
+        try await waitForPass(library)
+        XCTAssertEqual(names(library), ["hidden.pdf", "visible.pdf"])
+
+        try FileManager.default.setAttributes([.posixPermissions: 0],
+                                              ofItemAtPath: hidden.deletingLastPathComponent().path)
+        library.rescan()
+        try await waitForPass(library)
+
+        XCTAssertEqual(names(library), ["hidden.pdf", "visible.pdf"],
+                       "a folder we could not enter is not evidence that its prior rows disappeared")
+        XCTAssertEqual(library.phase.failure, .partiallyUnreadable(files: 0, folders: 1))
+        XCTAssertFalse(library.phase.isSettled)
+    }
+
     // MARK: - 4. An unreadable ROOT is unreadable, not empty
 
     func testASealedRootIsDegradedRatherThanEmpty() async throws {

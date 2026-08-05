@@ -162,20 +162,25 @@ final class ArchiveLibrary: ObservableObject {
     private func finish(_ pass: DiscoveryPass, generation: UInt64) {
         guard generation == currentScan else { return }   // superseded pass — publish nothing
         inFlight = nil
-        files = merged(pass: pass, generation: generation)
         let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
+        files = merged(pass: pass, generation: generation,
+                       absenceIsAuthoritative: next.isSettled)
         if case let .settled(asOf, _) = next { lastSettled = asOf }
         phase = next
     }
 
     /// Build the row list from a completed pass. Two rules, and both are the point of this wave.
     ///
-    /// 1. **A file the pass could not READ keeps its existing row** (plan §7a.3 — `W26.walk1` made the
-    ///    walker report those files instead of silently dropping them; keeping the row is walk2's
-    ///    half). "I could not read it" must not render as "it is gone".
+    /// 1. **A pass whose absences are not authoritative keeps every unseen existing row** (plan
+    ///    §5.13 tier 1 / §7a.3). That includes a directly-unreadable file, every descendant of a
+    ///    directory the enumerator could not enter, and a clean-looking short walk whose root changed
+    ///    underneath it. "I could not reach it" must not render as "it is gone". A third-party tag
+    ///    removal may therefore remain visible until the next clean pass — the deliberately conservative
+    ///    answer when the same pass cannot prove absence.
     /// 2. **A verified write newer than this pass's start wins** (the §7a.2 ordering guard above).
-    private func merged(pass: DiscoveryPass, generation: UInt64) -> [ArchiveFile] {
+    private func merged(pass: DiscoveryPass, generation: UInt64,
+                        absenceIsAuthoritative: Bool) -> [ArchiveFile] {
         let result = pass.result
         var out: [ArchiveFile] = []
         out.reserveCapacity(result.entries.count)
@@ -192,10 +197,8 @@ final class ArchiveLibrary: ObservableObject {
             }
         }
 
-        if !result.unreadable.isEmpty {
-            let previous = Dictionary(files.map { ($0.url, $0) }, uniquingKeysWith: { first, _ in first })
-            for failure in result.unreadable where !placed.contains(failure.url) {
-                guard let row = previous[failure.url] else { continue }   // never seen → nothing to keep
+        if !absenceIsAuthoritative {
+            for row in files where !placed.contains(row.url) {
                 out.append(row)
             }
         }

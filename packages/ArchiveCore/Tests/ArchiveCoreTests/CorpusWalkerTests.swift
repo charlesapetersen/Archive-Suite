@@ -312,6 +312,25 @@ final class CorpusWalkerTests: XCTestCase {
         XCTAssertEqual(counts.value, [2, 2, 2, 1], "full batches, then a flush of the remainder")
     }
 
+    func testProgressBatchesAdvanceAcrossAnUntaggedTree() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for i in 0..<5 { try makeFile(String(format: "f%02d.pdf", i), in: root) }
+
+        let seen = UncheckedBox<[Int]>([])
+        let matches = UncheckedBox<[Int]>([])
+        let result = CorpusWalker.scan(root: root, options: .init(batchSize: 2), onBatch: { batch in
+            seen.value.append(batch.filesSeen)
+            matches.value.append(batch.entries.count)
+        })
+
+        XCTAssertEqual(result.filesSeen, 5)
+        XCTAssertTrue(result.entries.isEmpty, "the fixture is genuinely untagged")
+        XCTAssertEqual(seen.value, [2, 4, 5],
+                       "progress must be driven by files examined even when none match")
+        XCTAssertEqual(matches.value, [0, 0, 0], "empty progress batches invent no library rows")
+    }
+
     func testTheDatalessIOPolicyIsRestoredAfterAScan() throws {
         let root = tempDir.appendingPathComponent("root", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

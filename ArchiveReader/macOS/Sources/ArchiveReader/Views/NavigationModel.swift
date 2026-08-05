@@ -726,9 +726,12 @@ final class NavigationModel: ObservableObject {
             pendingRevealSettledMisses = 0
             return
         }
-        // A pass is still running — wait for the next emission.
-        if library.phase.isScanning { return }
-        // Settled but target not found — increment miss counter.
+        // Only an authoritative settled pass may count an absence. A revalidating pass is unfinished,
+        // and a degraded pass may have omitted the target merely because it could not reach it — counting
+        // either one as a miss would turn "I could not look" back into "the document is not here" after
+        // three retries, the same category error W26 removes from discovery.
+        guard library.phase.isSettled else { return }
+        // Settled but target not found — increment the confirmation counter.
         pendingRevealSettledMisses += 1
         if pendingRevealSettledMisses >= 3 {
             statusMessage = "Document not found in the current archive."

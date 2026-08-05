@@ -193,6 +193,8 @@ struct NavigationWindowView: View {
                     "No tagged documents", systemImage: "tray",
                     description: Text("Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
                                       + "none carry a Read or Unread tag."))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("ar.empty.nothingTagged")
             case .folderIsEmpty:
                 ContentUnavailableView("Nothing in this folder", systemImage: "tray",
                                        description: Text("The scan completed and found no files at all."))

@@ -2,7 +2,7 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## 🟠 OPEN (`W26.walk2`) — Release discovery is Spotlight-only; the replacement engine now exists, UNWIRED
+## ✅ FIXED (`W26.walk2`) — Release discovery was Spotlight-only and could blame an unreadable index on files
 
 **Found 2026-08-04.** The owner pointed the Reader at a folder of 1,849 correctly-tagged PDFs on a volume
 whose Spotlight index was dead, and the app said *"No Read/Unread-tagged PDFs were found in this folder."*
@@ -11,18 +11,25 @@ exists (`loadFixtureSynchronously`) is `#if DEBUG` — **compiled out of Release
 fallback to fail over to, and `NavigationWindowView.swift:174-176` states the empty result as a fact about
 the corpus rather than about what the app could see.
 
-**Half-fixed 2026-08-05 (`W26.walk1`: `b3efb16` → `025d126`).** `ArchiveCore.CorpusWalker` is the
+**Engine shipped 2026-08-05 (`W26.walk1`: `b3efb16` → `025d126`).** `ArchiveCore.CorpusWalker` is the
 deterministic replacement — read-only, and its result distinguishes *has tags* / *verified none* /
 **could not read** (`unreadable`, `directoryErrors`, `isClean`), which no layer of the old stack could.
 `ArchiveReaderTests/LibraryDiscoveryTests` pins that it returns exactly what the shipped loader returns on a
 readable tree, and that it diverges on exactly one thing: an unreadable file, which the loader drops in
 silence while still reporting a settled library.
 
-**Still open — the Reader does not USE it yet** (`W26.walk2` in `SUITE_TODO.md`): the swap, the honest
-`DiscoveryStatus`, and an empty-state message that may only say "no tagged PDFs" when the scan was complete
-with zero errors *and* saw at least one file. Until then a dead Spotlight index still produces the incident.
-Workaround for the owner in the meantime: nothing app-side — `mdutil -E` on the affected volume and wait for
-a re-index.
+**Fixed 2026-08-05 (`W26.walk2`: `f1c0d2f` → `b88d20a` → `6f5d6ad` → completion commit).** Release now uses
+that walker; all `NSMetadataQuery`/`NSMetadataItem` discovery and the Spotlight-lag `PendingWrite` subsystem
+are deleted. `LibraryPhase` is the single health gate: only a clean, root-stable `.settled` pass may treat an
+absence as real, prune content-index rows, or claim that no files carry Read/Unread tags. That last sentence
+must quote how many regular files were examined. A degraded pass keeps every unseen prior row, including
+descendants of a directory the enumerator could not enter, and cannot consume a deep link's not-found retry
+budget. File ▸ Rescan Archive Folder (⌘⌥R) supplies refresh until `W26.fsev` adds live FSEvents.
+
+**Non-vacuous GUI proof:** the Tart VM's fixture builder timed out with **0/11 files Spotlight-indexed**, yet
+Reader rendered all 11 tagged files and its existing 16 UI tests passed. A separate UI test over one genuinely
+untagged sandbox file verified the rendered denominator. The incident no longer has an app-side workaround
+because it no longer depends on Spotlight discovery.
 
 ## ✅ FIXED (W26.deny) — `TagWriter` could DESTROY tags on a file whose xattrs are unreadable-but-writable
 
@@ -98,8 +105,8 @@ guard against modes and ACLs arriving from network copies, restores and archive 
 **Known consequence, tracked as `W26.notsup`:** a volume with no xattr support (some SMB/NFS mounts — *not*
 FAT/exFAT, where macOS emulates them) returns `ENOTSUP`, so every file there now reads as unreadable and a
 Reader root pointed at one would list nothing. That is the honest answer, but "lists nothing" is the incident
-shape this wave exists to end, so it must not arrive silently — folded into `W26.walk1`, where
-`DiscoveryStatus`/`.degraded` gives it somewhere to surface.
+shape this wave exists to end, so it must not arrive silently. `W26.walk2` now gives it an honest
+`.degraded` surface; the still-open `W26.notsup` item must add specific ENOTSUP wording and coverage.
 
 **Tests:** `ArchiveCoreTests/TagDenialTests` (20, scratch temp files only), non-vacuity measured on six
 mutants — including reverting the coercion, which turns the write tests red by **succeeding**.
@@ -286,19 +293,14 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   `Equatable` reflect **displayed value**, not identity — identity belongs in `id`. Unit tests missed
   it; only the live GUI surfaced it (same lesson as the willSet gotcha above).
 
-## Spotlight tag-index lag clobber + the verified-write overlay (fixed 2026-07-05)
-- After a verified `TagWriter` write, Spotlight fires `NSMetadataQueryDidUpdate` but re-emits the
-  **stale** `kMDItemUserTags` until it re-indexes, so `ArchiveLibrary.reload()` overwrote the correct
-  row with the pre-write value (no guaranteed self-heal). Fix: `applyVerifiedWrites(_:)` records
-  `TagWriter`'s re-read `.after`/`.afterLabel` per URL and `reload()` **overlays** it until Spotlight
-  *value-converges* (case/order-insensitive multiset + normalized label) or a 600 s TTL leak-guard
-  (via a coalesced settle `Timer` for when Spotlight goes silent). It **never backslides** within the
-  TTL and is **display-only — no disk write, not even a disk read** (a read-only "disk oracle" variant
-  was considered and rejected as unneeded complexity + a scale hazard). The per-row decision is the
-  pure, unit-tested `overrideDecision`. Replaced the old `applyOptimisticReadState`/`setExactTags`
-  (which reconstructed tags from the model's own stale array); `mark`/`applyEdit`/`undo` now route
-  through one `applyVerifiedWrites` pass (batch O(N+M), one publish; undo displays the inverse-apply's
-  fresh `.after`, Safety §9).
+## Spotlight tag-index lag clobber (fixed 2026-07-05; obsolete subsystem removed by W26.walk2 2026-08-05)
+- The 2026-07-05 fix overlaid `TagWriter`'s verified `.after` value while Spotlight re-emitted stale tags.
+  It was necessary while `ArchiveLibrary` consumed `NSMetadataQuery`, but its 600-second TTL, convergence
+  comparisons, and settle timer had no role once filesystem discovery shipped. `W26.walk2` deleted that
+  `PendingWrite` subsystem and its 8-case test file. A smaller monotonic ordering guard now protects the
+  distinct race that remains: if a walk started before a verified write, its later emission cannot replace
+  the fresh `.after`/`.afterLabel`. All five write call sites still publish only the writer's verified re-read;
+  no optimistic reconstruction, disk write, or extra disk read was introduced.
 
 ## Interleaved merged PDFs: pages 3+ were unviewable AND unfindable (W23.m2 — fixed 2026-07-30)
 - Processor merges a multi-page document as `image1, text1, image2, text2, …` (`PDFGenerator.mergeDocumentPDFs`,

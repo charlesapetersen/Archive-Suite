@@ -849,8 +849,8 @@ each leaving the app **working**.
 |---|---|---|---|---|---|---|
 | `W26.deny` | ✅ **SHIPPED `ad86cce`** — read coercion fixed in BOTH `TagReading.swift` and `TagWrite.swift`; `TagXattr.inspect` is the primitive later items must reuse | S | med | **2** | none | — |
 | `W26.lint` | ✅ **SHIPPED `1460125`** — both trees linted, `(file, exact line)` allowances, 9-check self-test; rule 1 had been passing VACUOUSLY. Nothing invokes it → `W26.lint-fu` | S | low | 1 | none | — |
-| `W26.walk1` | `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
-| `W26.walk2` | Reader discovery → `CorpusWalker`; delete `PendingWrite`; honest `DiscoveryStatus` | L | med | 2 | none | `W26.walk1` |
+| `W26.walk1` | ✅ **SHIPPED `003ca59`** — `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
+| `W26.walk2` | ✅ **SHIPPED through `6f5d6ad` + completion commit** — Reader Release discovery uses `CorpusWalker`; `PendingWrite` deleted; honest `LibraryPhase`; hostile VM at 0/11 Spotlight-indexed green | L | med | 2 | none | `W26.walk1` |
 | `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
 | `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |

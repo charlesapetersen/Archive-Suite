@@ -288,77 +288,18 @@ the shipped DEBUG fixture loader, so they **stop compiling when `W26.walk2` dele
 `-ARUITestRootPath` because the loader is the baseline being compared; `W26.walk2`'s headline regression test
 must do the OPPOSITE and assert the key is ABSENT (plan §7a.9). Do not copy their setup.
 
-- [ ] **W26.walk2 — Reader discovery → `CorpusWalker`; delete the `PendingWrite` subsystem; honest
-  `DiscoveryStatus` [L · med · Tier-2 · needs: none] (blocked-on: W26.walk1).** Rip `NSMetadataQuery`,
-  both observers, both `searchScopes` branches (incl. the dead `NSMetadataQueryLocalComputerScope`
-  "future use" branch) and the `NSMetadataItem` plumbing out of `ArchiveLibrary.swift`. **Delete ~80 lines
-  of `PendingWrite` machinery** (`pending`, `settleTimer`, `overrideTTL`, `overrideDecision`,
-  `sameTags`/`sameLabel`, `armSettleTimer`) **and its 8-case test file** — it existed only to mask
-  Spotlight's tag-index lag; `TagWriter`'s verified `.after` is ground truth and now applies directly and
-  permanently. Promote the DEBUG fixture path into the real walker so `-ARUITestRootPath` selects a fixture
-  *root*, not a different discovery *mechanism*. Add `DiscoveryStatus` (`.walking(done:total:)` — real
-  progress Spotlight could never give — `.ok`, `.failed(reason:)`, `.emptyButReadable(scanned:)`), mirroring
-  `ContentIndexer.Failure`. ⚠️ **`isGathering: Bool` must be replaced outright, not reinterpreted** — today it
-  renders a full-screen spinner that **blanks the list** (`NavigationWindowView.swift:163-170`), so a warm
-  start would either blank real rows or lie that the view is settled. Use
-  `phase: LibraryPhase = .noRoot | .firstScan(done:seen:) | .revalidating(asOf:) | .settled(asOf:) | .degraded(Failure, asOf:)`
-  (full-screen spinner is correct **only** in `.firstScan`), with a pure `Outcome -> Failure?` mapping so
-  health is decided in one unit-testable place. **The empty-state copy needs a DENOMINATOR:** *"no
-  Read/Unread-tagged PDFs"* may render **only** when the last scan's `outcome = complete` AND
-  `dir_errors = 0` AND `files_seen > 0`, and must then say *"Scanned 1,849 files in this folder; none carry a
-  Read or Unread tag."* That one guard makes today's incident unrepresentable.
-  ➕ **Two obligations added by `W26.walk1` (2026-08-05), both of which hard-fail if skipped:** (a) delete
-  the write-surface lint's `enumerator` allowance for `ArchiveLibrary.swift:97` in the SAME commit that
-  deletes the call — the STALE-allowance guard fails the lint otherwise (and there is a self-test case for
-  precisely this); (b) delete the two `LibraryDiscoveryTests` cases that compare the walker against
-  `loadFixtureSynchronously` — they stop compiling when the loader goes, by design. Also: map
-  `CorpusScanResult` onto `DiscoveryStatus` rather than re-deriving cleanliness; `isClean` is already the
-  §5.13-tier-1 gate. Copy `ContentIndexer`'s
-  generation-token discipline verbatim (`:176-179`) so a root switch mid-scan can't publish stale batches.
-  ⚠️ **The absence rule INVERTS and is the likeliest way to lose index rows:** a deterministic walk has no
-  transient drop (so `ContentIndexer.swift:280-284`'s justification evaporates) but gains a worse hazard — a
-  scan ending early yields a legitimately-complete-looking short list. Three tiers: (1) `outcome != complete`
-  or `dir_errors > 0` → **absence is not actionable at all**, keep unseen rows as `verified = 0`;
-  (2) clean scan → absence is real; (3) keep a confirmation count across clean scans for the FSEvents
-  coalescing case. **Do not delete the gate and do not keep it as-is** — re-derive it from the `scan` table. ⚠️ **Three things that will bite:** (a) `applyVerifiedWrites` has **five callers** —
-  `NavigationModel.swift:839` (mark), `:862` (group edit), `:952` (inline edit), `:998` (corpus-wide rename),
-  `:1050` (undo) — rewrite all five to a direct row replacement from the verified `.after`/`.afterLabel`
-  they already pass in, reusing `rebuilt` (`:139-142`). (b) **`isGathering` is a correctness gate, not
-  cosmetic:** `pruneIfSettled` (`NavigationModel.swift:649-651`) gates **deletion of content-index rows** on
-  `isGathering == false`, so a walker that clears it during a partial pass would evict rows for files the
-  walk had not reached yet — it must go false **only after a complete pass**, and a cancelled/failed pass
-  must leave pruning blocked. Sharpened: `pruneIfSettled` computes `indexedUnderRoot.subtracting(currentPaths)`,
-  so with a **partial** `currentPaths` *everything not yet walked looks deleted* — batching for a responsive
-  UI is exactly what endangers it. Either prune only from a **complete** snapshot or gate pruning on a
-  walk-completion generation counter, and decide it here, before W26.idx builds on it. Also: **keep the
-  two-consecutive-absence prune gate** (`ContentIndexer.swift:283`) — its comment blames "Spotlight's
-  transient-drop window", but a walk/FSEvents source has its own transient-absence mode; it counts
-  **emissions, not time**, so **re-tune it rather than remove it**. And note **a Finder tag write changes
-  ctime, not mtime**: the walker must vend `.contentModificationDateKey` for the content-index skip (using
-  ctime would force a full re-extraction of the corpus on every tag edit) while detecting tag changes by
-  comparing the tag array itself. (c) a background walk publishing from a detached task **must keep the
-  `.receive(on:)` hop** at `NavigationModel.swift:110-117` or it re-opens the GUI-only *"showed 0 of N"* bug
-  that unit tests provably missed (`ArchiveReader/KNOWN_ISSUES.md:166-173`) — so this item needs a
-  functional/GUI gate, not just unit tests. Also un-fence the `UniformTypeIdentifiers` import
-  (`ArchiveLibrary.swift:4-6`) and gate the **Release** build. No entitlement or `project.yml` change is
-  needed anywhere. 🔴 **Two more, both verified:** (d) **changing the mtime SOURCE re-extracts the whole
-  corpus.** `ContentIndexer.swift:112` uses `f.contentModified?.timeIntervalSince1970 ?? 0` and `:114`
-  compares by **exact double inequality**; `contentModified` comes from Spotlight's
-  `NSMetadataItemFSContentChangeDateKey` today (`ArchiveLibrary.swift:196`) and from
-  `.contentModificationDateKey` after — differ by one bit and **every file re-extracts** (≈17 min of PDF text
-  extraction at the measured 9,706 µs/file × 102,478 PDFs). **Decide deliberately: accept the one-time
-  re-extraction (recommended — simple, self-healing, index is disposable) or compare with a tolerance (worse
-  — masks real changes). Say which in the commit** so the CPU burst is expected. Do **not** bump
-  `content-index-v2` → `v3` (same re-extraction *plus* a stranded DB the app cannot delete). (e) **excluded
-  folders must stay a POST-discovery filter** — `NavigationModel.swift:636-650` filters *after* discovery and
-  hands `pruneIfSettled` the filtered set against the whole `rootPrefix` ("*so excluded paths are eligible for
-  pruning*"), so excluded files are deliberately in `library.files` but not in the index. Skipping them during
-  the walk would silently drop them from the UI while producing an identical index outcome. **Return
-  everything tagged; let `NavigationModel` exclude.** **Test:** the incident, inverted — a fixture Spotlight has *never* indexed must still
-  list every tagged file (**this test fails today** and is the regression guard for the whole wave), plus
-  `.failed` on an unreadable root and `.emptyButReadable` only on a genuinely untagged one. Re-run (do not
-  assume) `DeepLinkTests.swift:118-123`, whose case depends on a root with **no** discoverable files, and
-  re-validate `FixtureUITestCase.swift:75-80` `waitForRows` timeouts across the 15 fixture UI tests.
+✅ **W26.walk2 — SHIPPED 2026-08-05 (`f1c0d2f` → `b88d20a` → `6f5d6ad` → this commit); full entry in
+`SUITE_TODO_DONE.md`.** Reader Release discovery now uses `ArchiveCore.CorpusWalker`; every
+`NSMetadataQuery`/`NSMetadataItem` path and the Spotlight-lag `PendingWrite` subsystem are gone.
+`LibraryPhase` is the single health/absence/pruning gate, incomplete passes keep every unseen prior row,
+and verified writes use a monotonic ordering guard instead of a timer. The incident's old claim is
+unrepresentable: only a settled scan may say no files carry Read/Unread, and it quotes the examined-file
+denominator. Manual File ▸ Rescan Archive Folder (⌘⌥R) covers the interval before `W26.fsev` ships.
+Adversarial completion added progress for wholly untagged trees, protected deep links from treating degraded
+passes as misses, and proved unreadable subtrees cannot erase prior rows. VM verification was deliberately
+hostile: Spotlight indexed **0/11** fixture files while Reader still rendered all 11; the full pre-existing
+16-test GUI suite and the new denominator check passed. The accepted one-time content-index re-extraction
+from switching mtime sources remains deliberate; the database version is unchanged.
 - [ ] **W26.fsev — `CorpusWatcher` (FSEvents) replaces `DidUpdate` [M · med · Tier-2 · needs: none]
   (blocked-on: W26.walk2).** `kFSEventStreamCreateFlagFileEvents` on the security-scoped root, with
   `start/stopAccessingSecurityScopedResource` balanced across the **stream's whole lifetime**. ⚠️ **Flags

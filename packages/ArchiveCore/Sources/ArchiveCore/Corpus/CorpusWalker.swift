@@ -140,7 +140,8 @@ public enum CorpusWalker {
     public struct Options: Sendable {
         /// Matches the enumeration options of the pre-W26 fixture loader, so membership is unchanged.
         public var enumerationOptions: FileManager.DirectoryEnumerationOptions
-        /// Entries per `onBatch` call. Batches only affect delivery, never the returned result.
+        /// Regular files examined per `onBatch` call. A batch may contain no matching entries: progress
+        /// must still advance across a large untagged tree. Batches only affect delivery, never the result.
         public var batchSize: Int
 
         public init(enumerationOptions: FileManager.DirectoryEnumerationOptions =
@@ -251,6 +252,15 @@ public enum CorpusWalker {
             case let .ok(isRegularFile, isDataless):
                 guard isRegularFile else { continue }   // directories, symlinks to dirs, devices…
                 filesSeen += 1
+                // Progress is about files EXAMINED, not matches found. The old match-sized batching
+                // left a 150k-file untagged tree at "0 scanned" until the pass ended — a real counter
+                // that never moved was scarcely better than Spotlight's indeterminate spinner.
+                defer {
+                    if filesSeen.isMultiple(of: options.batchSize), let onBatch {
+                        onBatch(CorpusScanBatch(entries: batch, filesSeen: filesSeen))
+                        batch.removeAll(keepingCapacity: true)
+                    }
+                }
 
                 let values: URLResourceValues
                 do {
@@ -279,15 +289,11 @@ public enum CorpusWalker {
                                         isDataless: isDataless)
                     entries.append(e)
                     batch.append(e)
-                    if batch.count >= options.batchSize, let onBatch {
-                        onBatch(CorpusScanBatch(entries: batch, filesSeen: filesSeen))
-                        batch.removeAll(keepingCapacity: true)
-                    }
                 }
             }
         }
 
-        if !batch.isEmpty, let onBatch {
+        if !filesSeen.isMultiple(of: options.batchSize), let onBatch {
             onBatch(CorpusScanBatch(entries: batch, filesSeen: filesSeen))
         }
 

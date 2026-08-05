@@ -122,4 +122,33 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertFalse(model.statusMessage.contains("different archive"),
                        "GUID matches — no mismatch warning")
     }
+
+    func testDegradedDiscoveryNeverCountsAsDocumentNotFound() throws {
+        try XCTSkipIf(getuid() == 0, "a permission denial is meaningless when running as root")
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DeepLinkTests-degraded-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let marker = RootMarker(guid: UUID(), name: "test", kind: .reader, createdAt: Date())
+        try JSONEncoder().encode(marker).write(to: dir.appendingPathComponent(RootMarker.filename))
+
+        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+            try? FileManager.default.removeItem(at: dir)
+            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
+        }
+
+        let model = NavigationModel()
+        XCTAssertTrue(model.library.phase.isSettled, "precondition: the initial fixture pass is clean")
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: dir.path)
+        model.rescan()
+        XCTAssertNotNil(model.library.phase.failure, "precondition: the rescan could not look")
+
+        model.revealAndSelect(rootGUID: marker.guid, relativePath: "missing.pdf", page: nil)
+        model.applyPendingRevealIfPossible()
+        model.applyPendingRevealIfPossible()
+
+        XCTAssertFalse(model.statusMessage.contains("Document not found"),
+                       "three degraded observations are still zero authoritative misses")
+    }
 }

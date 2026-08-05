@@ -68,6 +68,54 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   (its `DiscoveryStatus`/`.degraded` surface is walk2's deliverable, so left as filed the resolver would
   have offered it with nowhere to surface — the exact problem its own text warned about).
 
+- [x] **W26.walk2 — Reader discovery → `CorpusWalker`; delete the `PendingWrite` subsystem; honest
+  discovery health [L · med · Tier-2]. ✅ SHIPPED 2026-08-05** — `f1c0d2f` (root identity + health model) →
+  `b88d20a` (production swap) → `6f5d6ad` (incident regression suite) → this commit (adversarial findings,
+  cross-app/VM gate, trackers).
+  **The incident is closed.** Reader Release discovery now walks its selected root through
+  `ArchiveCore.CorpusWalker`; `NSMetadataQuery`, `NSMetadataItem`, both observers, both `searchScopes`
+  branches (including the dead whole-Mac branch), and the DEBUG-only alternate discovery mechanism are
+  gone. `-ARUITestRootPath` selects only a root now, so tests and production exercise the same engine.
+  The headline regression constructs `ArchiveLibrary` with that key explicitly absent and finds every tagged
+  file in a brand-new, never-indexed scratch tree. In the headless Tart VM, the hostile fixture reported
+  **0/11 files Spotlight-indexed after 60 seconds while Reader rendered all 11** — direct pixel evidence
+  that discovery no longer depends on the failed service that caused the 1,849-file incident.
+  **Honest state and absence.** `LibraryPhase` replaced `isGathering` with `.noRoot`,
+  `.firstScan(done:seen:)`, `.revalidating`, `.settled(asOf:scanned:)`, and `.degraded`; the pure
+  `DiscoveryHealth` mapping consults `CorpusScanResult.isClean` plus a pre/post
+  `CorpusRootFingerprint`. Only `.settled` makes absence actionable or permits content-index pruning.
+  Rows publish atomically at pass end; progress batches count regular files examined even when none match.
+  A degraded pass preserves **every** unseen prior row — including descendants of an unreadable directory,
+  for which no per-file failure URL can exist — and a degraded deep-link lookup never counts as a
+  document-not-found miss. The empty UI can claim *"none carry a Read or Unread tag"* only after a clean
+  scan that saw at least one file, and the rendered sentence quotes that denominator. Empty folder, no root,
+  first scan, revalidation, and failure each have distinct wording.
+  **The write race, without a Spotlight overlay.** The ~80-line `PendingWrite` TTL/convergence subsystem,
+  its timer and its 8-case test file were deleted. A monotonic sequence guard now stamps pass starts and
+  verified writes: the five existing write call sites directly replace rows from `TagWriter`'s fresh
+  `.after`/`.afterLabel`, and any older in-flight pass must retain that value. There is no TTL, timer, or tag
+  comparison. A verified write that removes Read/Unread membership removes its row immediately.
+  **Refresh and pruning.** File ▸ Rescan Archive Folder (⌘⌥R; ⌘R remains Mark Read) is the explicit refresh
+  path until `W26.fsev` ships. The two-consecutive-absence content-index gate remains, but its eligibility is
+  now strictly `phase.isSettled`; revalidating, degraded, cancelled, root-replaced, and partial snapshots
+  cannot prune. Excluded folders remain a post-discovery filter exactly as before.
+  **Deliberate mtime decision.** Discovery now vends `.contentModificationDateKey` instead of Spotlight's
+  `NSMetadataItemFSContentChangeDateKey`. Exact timestamps may differ, so the disposable content index will
+  re-extract the corpus once (the measured expectation is ~17 minutes). Accepted as simpler and self-healing;
+  no tolerance that might hide a real content edit, and no `content-index-v2` bump that would strand a DB.
+  **Adversarial completion.** Three findings were fixed before the checkbox moved: a degraded directory walk
+  could drop all previously visible descendants; degraded passes could consume a deep link's three-miss
+  give-up budget; and match-sized progress batches left a large wholly-untagged tree at zero until completion.
+  Each has a regression test. The empty-state accessibility element is also pinned by an off-screen UI test,
+  which creates and removes only its own sandbox scratch folder.
+  **Verification.** ArchiveCore: 146 XCTest + 105 Swift Testing tests green. Reader: 303/303 executed unit
+  tests green with the one known environment-dependent `DeepLinkTests.testRevealAndSelectNoRoot` case
+  skipped (`W20.deeplink-isolation`); Release build green; write-surface lint clean and self-test 12/12.
+  Processor Debug build and the complete Notes unit bundle are green (shared-ArchiveCore gate). Reader VM:
+  existing GUI suite 16/16 plus the new untagged-denominator test green; sighted capture inspected. No real
+  corpus write, move, rename, delete, or content read was used. The walk1 enumerator allowance and obsolete
+  fixture-comparison tests were retired in the production-swap checkpoint as required.
+
 - [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
   ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
   **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as
@@ -4343,4 +4391,3 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   confirmed that morning. The guard already makes that class of drift loud, which was the actual goal. The
   reasoning sits at the code site (`next-queue-item.sh` §2b) and in the plan's WORK QUEUE header, so a future
   attempt starts from it — deliberately NOT left as a lingering execution plan.
-
