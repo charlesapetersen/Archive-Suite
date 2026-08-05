@@ -278,9 +278,17 @@ final class ContentIndexer: ObservableObject {
     // MARK: - Pruning (gated cache eviction)
 
     /// Paths that were absent in the *previous* settled emission. A path is only eligible for
-    /// deletion after it has been confirmed absent across **two consecutive** post-gather snapshots
-    /// — this closes Spotlight's transient-drop window (a file can momentarily vanish from
-    /// `NSMetadataQueryDidUpdate` after a tag write and reappear on the next update).
+    /// deletion after it has been confirmed absent across **two consecutive** settled snapshots.
+    ///
+    /// ⚠️ **The reason changed with `W26.walk2`; the gate did not.** It was written to close
+    /// Spotlight's transient-drop window (a file could momentarily vanish from a `DidUpdate` after a
+    /// tag write and reappear on the next one). A deterministic walk has no such drop — but it has its
+    /// own transient-absence mode: a file being replaced by an atomic rewrite, or one whose tags could
+    /// not be read on that pass. The gate counts **emissions, not time**, so with one emission per
+    /// walk it now means "absent from two consecutive complete passes" — strictly stronger than what
+    /// it replaced. Re-tuned by re-reading, not removed (`W26.walk2`); deleting it was considered and
+    /// rejected, because index rows are the one thing here whose loss the user notices as
+    /// silently-missing search results.
     private var pendingPrune: Set<String>?
 
     /// The in-flight prune task. Serialized: a new call cancels any prior in-flight task so two
@@ -360,7 +368,7 @@ final class ContentIndexer: ObservableObject {
 
     /// Evict index rows for files no longer under `rootPrefix` — but ONLY when the snapshot is
     /// settled and confirmed across two emissions:
-    ///   Gate 1: `isGathering == false` (caller ensures) and `!currentPaths.isEmpty` (also enforced
+    ///   Gate 1: `library.phase.isSettled` (caller ensures) and `!currentPaths.isEmpty` (also enforced
     ///           inside `pruneDecision`, so an empty snapshot can never wipe the index)
     ///   Gate 2: a path must be absent in two consecutive calls (transient-drop guard)
     ///   Gate 3: only paths under `rootPrefix` (component-boundary) are candidates

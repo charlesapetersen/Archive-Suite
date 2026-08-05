@@ -154,27 +154,62 @@ struct NavigationWindowView: View {
         return menu
     }
 
-    /// Status overlay on the results area so the user always knows what's happening — most importantly
-    /// a spinner while Spotlight is finding/loading the tagged files for display.
+    /// Status overlay on the results area so the user always knows what's happening.
+    ///
+    /// ⚠️ **This is where the 2026-08-04 incident was actually rendered.** The old final branch read
+    /// *"No Read/Unread-tagged PDFs were found in this folder"* — a claim about the corpus — whenever
+    /// the list was empty and discovery was not gathering, which was also true when Spotlight had gone
+    /// blind over 1,849 tagged files. What the app may say is now decided by `LibraryEmptyState`
+    /// (pure, unit-tested): the "nothing is tagged" wording is reachable **only** from a pass that
+    /// completed, read everything it saw, held its root still, and counted at least one file — and it
+    /// must quote that count.
     @ViewBuilder private var tableOverlay: some View {
-        if model.rootStore.root == nil {
-            ContentUnavailableView("No archive folder chosen", systemImage: "folder.badge.questionmark",
-                                   description: Text("Choose a folder in the toolbar to browse its tagged PDFs."))
-        } else if model.library.isGathering {
+        // A first scan is the one phase where a list-blanking spinner is honest: there are no rows yet.
+        if model.library.phase.isFirstScan {
             VStack(spacing: 12) {
                 ProgressView().controlSize(.large)
                 Text("Finding tagged documents…").font(.headline).foregroundStyle(.secondary)
-                Text("in \(model.library.scopeDescription)").font(.callout).foregroundStyle(.tertiary)
+                Text(firstScanDetail).font(.callout).foregroundStyle(.tertiary)
             }
             .padding(28)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        } else if model.displayed.isEmpty && !model.library.files.isEmpty {
-            ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
-                                   description: Text("No files match the current filters or search. Use Clear to reset."))
-        } else if model.displayed.isEmpty {
-            ContentUnavailableView("No tagged documents", systemImage: "tray",
-                                   description: Text("No Read/Unread-tagged PDFs were found in this folder."))
+        } else {
+            switch LibraryEmptyState.forPhase(model.library.phase,
+                                              rowCount: model.library.files.count,
+                                              displayedCount: model.displayed.count) {
+            case .none:
+                EmptyView()
+            case .noRoot:
+                ContentUnavailableView("No archive folder chosen", systemImage: "folder.badge.questionmark",
+                                       description: Text("Choose a folder in the toolbar to browse its tagged PDFs."))
+            case .scanning:
+                ContentUnavailableView("Looking for tagged documents…", systemImage: "magnifyingglass",
+                                       description: Text("Scanning \(model.library.scopeDescription)."))
+            case let .couldNotLook(failure):
+                ContentUnavailableView(failure.message, systemImage: "exclamationmark.triangle.fill",
+                                       description: Text(failure.detail))
+            case let .nothingTagged(scanned):
+                ContentUnavailableView(
+                    "No tagged documents", systemImage: "tray",
+                    description: Text("Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
+                                      + "none carry a Read or Unread tag."))
+            case .folderIsEmpty:
+                ContentUnavailableView("Nothing in this folder", systemImage: "tray",
+                                       description: Text("The scan completed and found no files at all."))
+            case .filteredOut:
+                ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
+                                       description: Text("No files match the current filters or search. Use Clear to reset."))
+            }
         }
+    }
+
+    /// Live progress under the first-scan spinner — a real count, which the Spotlight path could never
+    /// give (it reported only "gathering" until it was done).
+    private var firstScanDetail: String {
+        guard case let .firstScan(done, seen) = model.library.phase, seen > 0 else {
+            return "in \(model.library.scopeDescription)"
+        }
+        return "\(done) tagged of \(seen) scanned in \(model.library.scopeDescription)"
     }
 
     /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
@@ -455,9 +490,19 @@ struct NavigationWindowView: View {
 
     private var statusBar: some View {
         HStack {
-            if model.library.isGathering { ProgressView().controlSize(.small); Text("Searching…") }
+            if model.library.phase.isScanning { ProgressView().controlSize(.small); Text("Scanning…") }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
                 .foregroundStyle(.secondary)
+            // Degraded discovery says so here rather than leaving a confident-looking count over a list
+            // that is missing whatever the pass could not read (the same treatment as a degraded
+            // content index below, W23.m9).
+            if let f = model.library.phase.failure {
+                Label(f.message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .lineLimit(1).truncationMode(.tail)
+                    .help(f.detail)
+                    .accessibilityIdentifier("ar.status.discoveryFailure")
+            }
             if let summary = model.activeFilterSummary {
                 Text("· \(summary)").foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                     .help("Active filter")

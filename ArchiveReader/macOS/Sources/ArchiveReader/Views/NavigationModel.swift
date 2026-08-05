@@ -150,7 +150,7 @@ final class NavigationModel: ObservableObject {
         notes.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
-        // Republish on library changes (isGathering / scope) so the results-area spinner is reactive.
+        // Republish on library changes (phase / scope) so the results-area spinner is reactive.
         library.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
@@ -644,9 +644,14 @@ final class NavigationModel: ObservableObject {
         restoreSelectionIfNeeded()                      // reading-session resume
         applyPendingRevealIfPossible()                  // deep-link reveal deferral
         // Prune stale index rows — separate from startIndexing (a destructive delete must never ride
-        // a harmless-on-empty indexing emission). Gated: settled (not gathering) + non-empty + root known.
+        // a harmless-on-empty indexing emission). Gated: settled + non-empty + root known.
         // Uses filesToIndex (excludes user-excluded folders) so excluded paths are eligible for pruning.
-        if !library.isGathering, !filesToIndex.isEmpty, let rootPath = rootStore.root?.path {
+        //
+        // `phase.isSettled` is strictly narrower than the `!isGathering` it replaced (plan §7a.4): a
+        // revalidating OR degraded pass now blocks pruning too, because both hand over a snapshot that
+        // omits files they merely failed to reach — and `pruneIfSettled` treats every omission as a
+        // deletion candidate.
+        if library.phase.isSettled, !filesToIndex.isEmpty, let rootPath = rootStore.root?.path {
             indexer.pruneIfSettled(currentPaths: Set(filesToIndex.map(\.url.path)), rootPrefix: rootPath)
         }
     }
@@ -721,8 +726,8 @@ final class NavigationModel: ObservableObject {
             pendingRevealSettledMisses = 0
             return
         }
-        // Still gathering — wait for next emission.
-        if library.isGathering { return }
+        // A pass is still running — wait for the next emission.
+        if library.phase.isScanning { return }
         // Settled but target not found — increment miss counter.
         pendingRevealSettledMisses += 1
         if pendingRevealSettledMisses >= 3 {
@@ -808,6 +813,23 @@ final class NavigationModel: ObservableObject {
                                  // ftsPaths with stale old-root paths after the new library loads.
             library.start(scope: url)
         }
+    }
+
+    /// Re-walk the granted archive folder (File ▸ Rescan Archive Folder, ⌘⌥R).
+    ///
+    /// Ships with the Spotlight removal rather than after it: deleting `NSMetadataQueryDidUpdate` took
+    /// away the app's only refresh mechanism, and the FSEvents watcher (`W26.fsev`) is the next item.
+    /// Until it lands, this is how an external change (the Processor writing a batch, a tag edited in
+    /// Finder) gets picked up. Read-only: a rescan walks, it never writes.
+    func rescan() {
+        guard rootStore.root != nil else {
+            statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"
+            announce(statusMessage)
+            return
+        }
+        library.rescan()
+        statusMessage = "Rescanning \(library.scopeDescription)…"
+        announce(statusMessage)
     }
 
     /// Immediately prune content-index rows under any excluded folder prefix.

@@ -86,13 +86,11 @@ ALLOW=(
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}try? FileManager.default.removeItem(at: url)"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
-  # The Spotlight-era fixture loader. This is the exact call `W26.walk2` DELETES (the whole
-  # `#if DEBUG loadFixtureSynchronously` body is replaced by `CorpusWalker`), so it is allowed for
-  # the days it has left rather than patched. When walk2 removes it, the STALE-allowance guard
-  # above turns this entry into a hard failure — which is the point: the allowance cannot be
-  # forgotten, and nothing can quietly re-add a silent enumerator in its place.
-  "enumerator${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Search/ArchiveLibrary.swift${SEP}let enumerator = FileManager.default.enumerator("
-
+  # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
+  # deleted the call (discovery is `ArchiveCore.CorpusWalker` now, which passes an `errorHandler:`),
+  # so the allowance went with it in the same commit — which is exactly what the STALE-allowance
+  # guard below exists to force. The Reader app target now has NO rule-3 allowance at all.
+  #
   # PDFThumbnailer walks its OWN disposable cache directory to rebuild the LRU index. An entry it
   # cannot read costs an under-counted byte total in a cache that is rebuilt on demand — not a
   # corpus file, and not an absence anything reports to the user.

@@ -1,214 +1,261 @@
 import Foundation
 import Combine
 import ArchiveCore
-#if DEBUG
-import UniformTypeIdentifiers   // fixture loader only (see loadFixtureSynchronously)
-#endif
 
-/// Discovers the tagged-PDF universe via Spotlight (`NSMetadataQuery`) and keeps it live-updated.
+/// Discovers the tagged-PDF universe by **walking the filesystem** (`ArchiveCore.CorpusWalker`).
 ///
-/// The master predicate is "has a Read or Unread tag" — the set of files Archive Reader cares about.
-/// Each result carries its tags/name/type/dates from the Spotlight index, so building the list needs
-/// no per-file disk I/O (the fast path at 150k). Tag facets here are for display/sort/filter only;
-/// the authoritative read for a write is done inside `TagWriter`.
+/// The master predicate is unchanged — a file belongs to the library iff it carries a `Read` or
+/// `Unread` tag (`CorpusWalker.tracksReadState`, shared so discovery and the write path cannot drift).
+/// Tag facets here are for display/sort/filter only; the authoritative read for a write is done inside
+/// `TagWriter`.
+///
+/// **Why this is not `NSMetadataQuery` any more (W26, owner directive 2026-08-04).** On 2026-08-04 the
+/// owner pointed the Reader at 1,849 correctly-tagged PDFs and was told *"No Read/Unread-tagged PDFs
+/// were found in this folder."* The Data volume's Spotlight index was dead — `mdfind` returned 0 for
+/// that folder, for `$HOME`, for `/Applications` and for the real corpus — and this class had **no
+/// Release filesystem fallback at all** (the working walk was `#if DEBUG`). Two failures: the index
+/// went blind, and the app then blamed the files. The old "no per-file disk I/O (the fast path at
+/// 150k)" justification was already void: `ContentIndexer` opens and extracts text from every PDF
+/// anyway, and a measured full walk of the real corpus (123,028 files) takes 10.15 s single-threaded.
+///
+/// So discovery is now deterministic, and — the part that actually fixes the incident — it can say
+/// **"I could not look"** separately from **"there is nothing here"**: see `phase` / `LibraryPhase`.
 @MainActor
 final class ArchiveLibrary: ObservableObject {
     @Published private(set) var files: [ArchiveFile] = []
-    @Published private(set) var isGathering = false
+    /// Replaced `isGathering: Bool` outright (plan §7a.4 / the walk2 item): one boolean could not both
+    /// drive a list-blanking spinner and gate destructive content-index pruning once discovery
+    /// revalidates behind rows that are already on screen.
+    @Published private(set) var phase: LibraryPhase = .noRoot
     @Published private(set) var scopeDescription = "No folder selected"
 
-    private let query = NSMetadataQuery()
+    /// The root being walked, so `rescan()` needs no argument.
+    private var root: URL?
 
-    /// Display-only overrides that pin the *verified* on-disk tags of a just-written file, so a laggy
-    /// Spotlight reload can't momentarily revert it. After a tag write, Spotlight fires `…DidUpdate`
-    /// (the xattr changed) but frequently re-emits the OLD `kMDItemUserTags` until it re-indexes —
-    /// which was clobbering the correct value with no guaranteed self-heal. An override renders
-    /// `TagWriter`'s verified `.after` for that URL until Spotlight *value-converges* to it (then we
-    /// trust Spotlight again) or a generous TTL leak-guard elapses (bounding how long a genuine
-    /// third-party edit could be masked). This NEVER touches disk — it is pure in-memory reconciliation
-    /// of Spotlight's tag-index lag: no write, and not even a read, so it cannot lose or mangle a tag.
-    struct PendingWrite: Sendable { let after: [String]; let afterLabel: Int?; let deadline: Date }
-    private var pending: [URL: PendingWrite] = [:]
-    /// One coalesced non-repeating timer: guarantees a reload eventually fires to expire an override
-    /// even if Spotlight goes completely silent. Nil (and none scheduled) whenever `pending` is empty.
-    private var settleTimer: Timer?
-    /// Leak-guard only, not the normal convergence path. Chosen well above observed Spotlight lag
-    /// (seconds) so it essentially only fires for a genuinely-stuck index or a real external edit —
-    /// where trusting Spotlight is then correct. Convergence normally drops the override far sooner.
-    private static let overrideTTL: TimeInterval = 600
+    /// When discovery last completed a clean pass on a root that held still. Dates `.revalidating`
+    /// and `.degraded`, so the UI can say what it knew and when instead of an undated wrong claim.
+    private var lastSettled: Date?
 
-    init() {
-        query.predicate = NSPredicate(format: "(kMDItemUserTags == %@) || (kMDItemUserTags == %@)",
-                                      ReadState.read.rawValue, ReadState.unread.rawValue)
-        query.valueListAttributes = [
-            NSMetadataItemPathKey, NSMetadataItemFSNameKey, NSMetadataItemContentTypeKey,
-            NSMetadataItemFSContentChangeDateKey, "kMDItemUserTags", "kMDItemFSLabel",
-        ]
-        let nc = NotificationCenter.default
-        nc.addObserver(forName: .NSMetadataQueryDidFinishGathering, object: query, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reload() }
+    // MARK: - The write-vs-walk ordering guard (replaced ~80 lines of TTL/convergence overlay)
+    //
+    // The deleted `PendingWrite` machinery (`pending`, `settleTimer`, `overrideTTL`,
+    // `overrideDecision`, `sameTags`/`sameLabel`, `armSettleTimer` — and its 8-case test file) existed
+    // for exactly one reason: Spotlight kept re-emitting a file's OLD `kMDItemUserTags` after a
+    // verified write, so a laggy reload clobbered the correct value. There is no index to lag now.
+    //
+    // But deleting it outright would have removed the only WRITE-VS-WALK ORDERING guard, and the
+    // plan's original justification ("a re-walk reads the same disk through the same primitive, so it
+    // converges") confused convergence with sequencing (plan §7a.2). The real hazard: the owner marks
+    // 2,000 rows Read; a rescan starts around write #300 and reads files #300–#2000 *while their
+    // writes are still pending*; its emission then lands after `applyVerifiedWrites` and publishes
+    // pre-write values over verified ones.
+    //
+    // The replacement is a sequence number, not a timer: one monotonic counter stamps both scan starts
+    // and verified writes, and a row whose write is NEWER than the pass's start keeps the verified
+    // value. No TTL, no timer, no value comparison — an ordering guarantee instead of a race that
+    // usually settles.
+    private struct VerifiedWrite { let after: [String]; let afterLabel: Int?; let seq: UInt64 }
+    private var verifiedWrites: [URL: VerifiedWrite] = [:]
+    private var clock: UInt64 = 0
+    /// Generation of the pass whose result may still be published. Bumped per pass, so a superseded
+    /// pass's late completion is dropped rather than publishing stale rows over a newer root's
+    /// (`ContentIndexer`'s generation-token discipline, same shape).
+    private var currentScan: UInt64 = 0
+    private var inFlight: ScanCancellation?
+
+#if DEBUG
+    /// Launch/defaults key that pins the app to a fixture root (XCUITest + unit tests).
+    private static let fixtureRootKey = "ARUITestRootPath"
+#endif
+
+    // MARK: - Starting and re-running discovery
+
+    /// Start (or restart) discovery within a scope. `nil` clears the library.
+    ///
+    /// Note what is gone with Spotlight: there is no whole-Mac scope any more. The old `nil`-scope
+    /// branch set `NSMetadataQueryLocalComputerScope` and was documented "future use" — dead code that
+    /// only a Spotlight index could have served, and walking the whole Mac is not something this app
+    /// should ever do.
+    func start(scope: URL?) {
+        inFlight?.cancel()
+        inFlight = nil
+        files = []
+        verifiedWrites.removeAll()      // no override may leak across roots
+        lastSettled = nil
+        root = scope
+        guard let scope else {
+            phase = .noRoot
+            scopeDescription = "No folder selected"
+            return
         }
-        nc.addObserver(forName: .NSMetadataQueryDidUpdate, object: query, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reload() }
-        }
+        scopeDescription = scope.lastPathComponent
+        phase = .firstScan(done: 0, seen: 0)
+        beginScan(root: scope)
     }
 
-    /// Start (or restart) discovery within a scope. `nil` scope searches the whole Mac (future use);
-    /// v1 passes the user-granted archive root.
-    func start(scope: URL?) {
-        query.stop()
+    /// Re-walk the current root, keeping the rows already on screen (File ▸ Rescan Archive Folder, ⌘⌥R).
+    ///
+    /// This ships **with** the swap, not after it: deleting `NSMetadataQueryDidUpdate` removed the
+    /// app's only refresh mechanism, and `CorpusWatcher` (FSEvents) is the next item — so without a
+    /// manual rescan the Reader would have no way at all to notice an external change.
+    func rescan() {
+        guard let root else { return }
+        inFlight?.cancel()
+        // `.firstScan` blanks the list, which is honest only when there is nothing to blank.
+        phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
+        beginScan(root: root)
+    }
+
+    private func beginScan(root: URL) {
+        clock += 1
+        let generation = clock
+        currentScan = generation
+        let token = ScanCancellation()
+        inFlight = token
+
 #if DEBUG
-        // XCUITest fixture path: when launched with `-ARUITestRootPath`, discover the fixture by
-        // enumerating it off disk instead of via Spotlight. NSMetadataQuery returns NOTHING for a
-        // temporary-exception path in a sandboxed process (the Route-B entitlement grants POSIX I/O,
-        // not Spotlight query visibility), so the live query below finds no rows under the fixture
-        // root. Deterministic, read-only, and compiled out of Release entirely.
-        if let scope, UserDefaults.standard.string(forKey: "ARUITestRootPath") != nil {
-            files = []
-            pending.removeAll(); settleTimer?.invalidate(); settleTimer = nil
-            isGathering = true
-            loadFixtureSynchronously(root: scope)
+        // A fixture root scans SYNCHRONOUSLY — same walker, same predicate, same failure accounting;
+        // only the delivery thread differs. That distinction is the whole point: pre-W26 this key
+        // selected a different discovery *mechanism* (the `#if DEBUG` fixture loader), which is how a
+        // Release build shipped with no filesystem discovery at all. Two shipped tests
+        // (`DocumentPageLinkTests`, `RootMarkerStateTests`) assert on `files` the moment
+        // `NavigationModel()` returns, and the XCUITest fixture lane's `waitForRows` timings were
+        // calibrated against a synchronous load.
+        if UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil {
+            finish(LibraryScan.pass(root: root, isCancelled: { token.isCancelled }),
+                   generation: generation)
             return
         }
 #endif
-        if let scope {
-            query.searchScopes = [scope]
-            scopeDescription = scope.lastPathComponent
-        } else {
-            query.searchScopes = [NSMetadataQueryLocalComputerScope]
-            scopeDescription = "This Mac"
-        }
-        files = []           // clear prior results so the "processing" spinner shows during (re)gather
-        pending.removeAll(); settleTimer?.invalidate(); settleTimer = nil   // no override may leak across roots
-        isGathering = true
-        query.start()
-    }
-
-#if DEBUG
-    /// Load the XCUITest fixture by enumerating `root` and reading Finder tags straight off disk,
-    /// mirroring the production predicate (a file appears iff it carries a Read or Unread tag). Used
-    /// only when the app is launched with `-ARUITestRootPath` (see `start(scope:)`), because a
-    /// sandboxed `NSMetadataQuery` returns no results for the temporary-exception fixture path. This
-    /// is a synchronous, read-only snapshot (the fixture is static during a test); no Spotlight, no
-    /// disk writes. Compiled out of Release.
-    private func loadFixtureSynchronously(root: URL) {
-        scopeDescription = root.lastPathComponent
-        let keys: [URLResourceKey] = [.contentTypeKey, .contentModificationDateKey, .isRegularFileKey]
-        let enumerator = FileManager.default.enumerator(
-            at: root, includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants])
-        var out: [ArchiveFile] = []
-        while let url = enumerator?.nextObject() as? URL {
-            let rv = try? url.resourceValues(forKeys: Set(keys))
-            guard rv?.isRegularFile == true else { continue }
-            guard case let .success(tagNames, labelNumber) = TagReading.read(url) else { continue }
-            let isTracked = tagNames.contains {
-                $0.caseInsensitiveCompare(ReadState.read.rawValue) == .orderedSame ||
-                $0.caseInsensitiveCompare(ReadState.unread.rawValue) == .orderedSame
+        // Progress only — NOT rows. See `finish`: rows are published once per pass, atomically.
+        let onBatch: @Sendable (CorpusScanBatch) -> Void = { batch in
+            let found = batch.entries.count
+            let seen = batch.filesSeen
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated { self?.reportProgress(generation: generation,
+                                                                found: found, seen: seen) }
             }
-            guard isTracked else { continue }
-            out.append(ArchiveFile(
-                url: url,
-                name: url.lastPathComponent,
-                fileType: Self.shortType(uti: rv?.contentType?.identifier, url: url),
-                tags: DocumentTags.parse(raw: tagNames, labelNumber: labelNumber),
-                contentModified: rv?.contentModificationDate))
         }
-        files = out
-        isGathering = false
+        LibraryScan.onDedicatedThread(root: root,
+                                     isCancelled: { token.isCancelled },
+                                     onBatch: onBatch) { [weak self] pass in
+            MainActor.assumeIsolated { self?.finish(pass, generation: generation) }
+        }
     }
-#endif
 
-    /// Reflect a batch of *verified* `TagWriter` results in the model immediately (so rows leave a
-    /// filtered view at once) and pin them against Spotlight's index lag until it catches up. Pass only
-    /// verified (non-throwing) results — a failed write must not move its row (Safety §11). The pinned
-    /// value is `TagWriter`'s re-read `.after`/`.afterLabel` (ground truth), never a reconstruction from
-    /// the model's own possibly-stale tags. Display-only: no disk write, no disk read.
+    /// Real progress — a count Spotlight could never give. Only meaningful during a first scan; a
+    /// revalidation deliberately leaves the on-screen rows and their counts alone.
+    private func reportProgress(generation: UInt64, found: Int, seen: Int) {
+        guard generation == currentScan, case let .firstScan(done, _) = phase else { return }
+        phase = .firstScan(done: done + found, seen: seen)
+    }
+
+    /// Publish a finished pass: rows first, then the verdict about how much of it to trust.
+    ///
+    /// **Rows are published once, atomically, at the end of the pass** — batches drive the progress
+    /// counter only. Two reasons, both load-bearing: (1) `pruneIfSettled` computes
+    /// `indexedUnderRoot.subtracting(currentPaths)`, so a PARTIAL row list makes everything not yet
+    /// walked look deleted (plan §7a.11's sharpening) — publishing progressively is exactly what would
+    /// endanger it; (2) `NavigationModel.libraryDidChange` rebuilds the folder tree, subject cache and
+    /// smart-folder counts per emission, so 200 partial emissions at corpus scale would be quadratic
+    /// work for a list the user cannot use yet anyway.
+    private func finish(_ pass: DiscoveryPass, generation: UInt64) {
+        guard generation == currentScan else { return }   // superseded pass — publish nothing
+        inFlight = nil
+        files = merged(pass: pass, generation: generation)
+        let next = DiscoveryHealth.phase(after: pass.result, rootHeldStill: pass.rootHeldStill,
+                                         finishedAt: Date(), lastSettled: lastSettled)
+        if case let .settled(asOf, _) = next { lastSettled = asOf }
+        phase = next
+    }
+
+    /// Build the row list from a completed pass. Two rules, and both are the point of this wave.
+    ///
+    /// 1. **A file the pass could not READ keeps its existing row** (plan §7a.3 — `W26.walk1` made the
+    ///    walker report those files instead of silently dropping them; keeping the row is walk2's
+    ///    half). "I could not read it" must not render as "it is gone".
+    /// 2. **A verified write newer than this pass's start wins** (the §7a.2 ordering guard above).
+    private func merged(pass: DiscoveryPass, generation: UInt64) -> [ArchiveFile] {
+        let result = pass.result
+        var out: [ArchiveFile] = []
+        out.reserveCapacity(result.entries.count)
+        var placed = Set<URL>()
+
+        for entry in result.entries {
+            placed.insert(entry.url)
+            if let write = verifiedWrites[entry.url], write.seq > generation {
+                // The walk read this file BEFORE the write landed; the write's verified re-read wins.
+                guard CorpusWalker.tracksReadState(write.after) else { continue }
+                out.append(Self.row(entry, tagNames: write.after, labelNumber: write.afterLabel))
+            } else {
+                out.append(Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber))
+            }
+        }
+
+        if !result.unreadable.isEmpty {
+            let previous = Dictionary(files.map { ($0.url, $0) }, uniquingKeysWith: { first, _ in first })
+            for failure in result.unreadable where !placed.contains(failure.url) {
+                guard let row = previous[failure.url] else { continue }   // never seen → nothing to keep
+                out.append(row)
+            }
+        }
+
+        // GC: an override this pass has now overtaken is finished. Anything newer than the pass stays,
+        // so a *second* stale pass cannot resurrect a pre-write value either.
+        verifiedWrites = verifiedWrites.filter { $0.value.seq > generation }
+        return out
+    }
+
+    // MARK: - Verified writes
+
+    /// Reflect a batch of *verified* `TagWriter` results in the model immediately, so rows leave a
+    /// filtered view at once, and stamp them so a walk that started earlier cannot undo them.
+    ///
+    /// Pass only verified (non-throwing) results — a failed write must not move its row (Safety §11).
+    /// The displayed value is `TagWriter`'s re-read `.after`/`.afterLabel` (ground truth), never a
+    /// reconstruction from the model's own possibly-stale tags. Display-only: no disk write, no read.
+    ///
+    /// All five call sites (`mark`, group edit, inline edit, corpus-wide rename, undo) already hand in
+    /// exactly that verified value, so this is now a **direct row replacement** rather than an overlay
+    /// consulted on every subsequent emission.
+    ///
+    /// One deliberate behaviour change: a write that leaves the file with **no** Read/Unread tag drops
+    /// the row from the library, because the membership predicate no longer holds. Spotlight used to do
+    /// this a beat later, on its next update; doing it here is the same end state, immediately, and
+    /// without a live query it is the only thing that would.
     func applyVerifiedWrites(_ results: [TagWriteResult]) {
         guard !results.isEmpty else { return }
-        let deadline = Date(timeIntervalSinceNow: Self.overrideTTL)
-        for r in results { pending[r.url] = PendingWrite(after: r.after, afterLabel: r.afterLabel, deadline: deadline) }
-        let byURL = pending                       // snapshot for one O(N) pass, one @Published emit
-        files = files.map { f in
-            guard let p = byURL[f.url] else { return f }
-            return Self.rebuilt(f, after: p.after, afterLabel: p.afterLabel)
+        var replacements: [URL: VerifiedWrite] = [:]
+        for r in results {
+            clock += 1
+            let write = VerifiedWrite(after: r.after, afterLabel: r.afterLabel, seq: clock)
+            verifiedWrites[r.url] = write
+            replacements[r.url] = write
         }
-        armSettleTimer()
+        files = files.compactMap { f in
+            guard let write = replacements[f.url] else { return f }
+            guard CorpusWalker.tracksReadState(write.after) else { return nil }
+            return Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel)
+        }
+    }
+
+    // MARK: - Row construction
+
+    private static func row(_ entry: CorpusEntry, tagNames: [String], labelNumber: Int?) -> ArchiveFile {
+        ArchiveFile(url: entry.url,
+                    name: entry.url.lastPathComponent,
+                    fileType: shortType(uti: entry.contentTypeIdentifier, url: entry.url),
+                    tags: DocumentTags.parse(raw: tagNames, labelNumber: labelNumber),
+                    // `.contentModificationDateKey`, deliberately: a Finder-tag write changes ctime,
+                    // not mtime, so this is the right key for the content-index freshness check and
+                    // the wrong one for detecting a tag change (plan §5.12).
+                    contentModified: entry.contentModified)
     }
 
     private static func rebuilt(_ f: ArchiveFile, after: [String], afterLabel: Int?) -> ArchiveFile {
         ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
-                    tags: DocumentTags.parse(raw: after, labelNumber: afterLabel), contentModified: f.contentModified)
-    }
-
-    /// Order-independent, case-insensitive tag-multiset equality — Spotlight and disk agree on tag case
-    /// in practice, but comparing case-insensitively guarantees an override converges (drops) rather
-    /// than being pinned until the TTL over a mere case/order difference. (macOS may reorder tags.)
-    private static func sameTags(_ a: [String], _ b: [String]) -> Bool {
-        a.map { $0.lowercased() }.sorted() == b.map { $0.lowercased() }.sorted()
-    }
-    private static func sameLabel(_ a: Int?, _ b: Int?) -> Bool { (a ?? 0) == (b ?? 0) }   // nil == 0 (no label)
-
-    /// Pure reconciliation for one Spotlight-reported row that has a pending override. Returns the
-    /// tags/label to DISPLAY and whether the override should be *kept* for the next reload:
-    /// - Spotlight has value-converged to our verified write  → drop, trust Spotlight (identical value).
-    /// - TTL leak-guard elapsed                                → drop, trust Spotlight (bounds masking).
-    /// - otherwise (Spotlight still stale / not yet converged) → keep showing the verified `.after`.
-    /// It only ever drops on convergence or expiry, so it can never *backslide* a correct row to a
-    /// stale value within the TTL. No I/O — pure, hence unit-testable without a live Spotlight query.
-    static func overrideDecision(spotlightTags: [String], spotlightLabel: Int?, pending p: PendingWrite,
-                                 now: Date) -> (tags: [String], label: Int?, keep: Bool) {
-        let converged = sameTags(spotlightTags, p.after) && sameLabel(spotlightLabel, p.afterLabel)
-        if converged || now >= p.deadline { return (spotlightTags, spotlightLabel, false) }
-        return (p.after, p.afterLabel, true)
-    }
-
-    /// (Re)arm a single non-repeating timer for the earliest pending deadline so an override still
-    /// expires if Spotlight never sends another update. Invalidated (and left nil) once `pending` drains.
-    /// Added in `.common` mode so it fires during table scrolling / splitter drags too.
-    private func armSettleTimer() {
-        settleTimer?.invalidate(); settleTimer = nil
-        guard let earliest = pending.values.map(\.deadline).min() else { return }
-        let t = Timer(timeInterval: max(1, earliest.timeIntervalSinceNow + 0.1), repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reload() }
-        }
-        RunLoop.main.add(t, forMode: .common)
-        settleTimer = t
-    }
-
-    private func reload() {
-        query.disableUpdates()
-        defer { query.enableUpdates() }
-
-        let hasPending = !pending.isEmpty       // steady state: this whole overlay path is skipped
-        var nextPending: [URL: PendingWrite] = [:]
-        let now = Date()
-        var out: [ArchiveFile] = []
-        out.reserveCapacity(query.resultCount)
-        for i in 0..<query.resultCount {
-            guard let item = query.result(at: i) as? NSMetadataItem,
-                  let path = item.value(forAttribute: NSMetadataItemPathKey) as? String else { continue }
-            let url = URL(fileURLWithPath: path)
-            let name = (item.value(forAttribute: NSMetadataItemFSNameKey) as? String) ?? url.lastPathComponent
-            var tagArray = (item.value(forAttribute: "kMDItemUserTags") as? [String]) ?? []
-            var label = item.value(forAttribute: "kMDItemFSLabel") as? Int
-            let uti = item.value(forAttribute: NSMetadataItemContentTypeKey) as? String
-            let modified = item.value(forAttribute: NSMetadataItemFSContentChangeDateKey) as? Date
-            // Overlay a just-written, verified value over Spotlight's laggy echo until it converges or
-            // the TTL fires. Only URLs still overriding are carried into `nextPending`, so converged /
-            // expired / vanished-from-results entries are all GC'd in this same pass (no leak).
-            if hasPending, let p = pending[url] {
-                let d = Self.overrideDecision(spotlightTags: tagArray, spotlightLabel: label, pending: p, now: now)
-                tagArray = d.tags; label = d.label
-                if d.keep { nextPending[url] = p }
-            }
-            out.append(ArchiveFile(
-                url: url, name: name, fileType: Self.shortType(uti: uti, url: url),
-                tags: DocumentTags.parse(raw: tagArray, labelNumber: label), contentModified: modified))
-        }
-        if hasPending { pending = nextPending; armSettleTimer() }
-        files = out
-        isGathering = false
+                    tags: DocumentTags.parse(raw: after, labelNumber: afterLabel),
+                    contentModified: f.contentModified)
     }
 
     private static func shortType(uti: String?, url: URL) -> String {
@@ -216,4 +263,12 @@ final class ArchiveLibrary: ObservableObject {
         let ext = url.pathExtension.uppercased()
         return ext.isEmpty ? "File" : ext
     }
+}
+
+/// One-way cancellation bit shared between the main actor and the walking thread.
+private final class ScanCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
 }

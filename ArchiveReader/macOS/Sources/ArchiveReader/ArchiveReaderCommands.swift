@@ -44,6 +44,11 @@ struct ArchiveReaderCommands: Commands {
             Button("Choose Archive Folder…") { nav?.chooseRoot() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(nav == nil)
+            // W26: with Spotlight's live `DidUpdate` gone and the FSEvents watcher still to come, this
+            // is the only way to pick up an external change. ⌘⌥R because ⌘R is Mark Read.
+            Button("Rescan Archive Folder") { nav?.rescan() }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+                .disabled(nav == nil)
             Button("Save Current Search…") { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
         }

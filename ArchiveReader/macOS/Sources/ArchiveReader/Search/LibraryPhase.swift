@@ -70,8 +70,10 @@ enum LibraryPhase: Equatable, Sendable {
     /// found so far, `seen` = regular files examined so far. No total: a filesystem walk cannot know
     /// one up front, and inventing one would be the same kind of lie this wave exists to remove.
     case firstScan(done: Int, seen: Int)
-    /// A later pass, running behind rows already on screen from the pass that settled at `asOf`.
-    case revalidating(asOf: Date)
+    /// A later pass, running behind rows already on screen. `asOf` is when discovery last settled —
+    /// `nil` when it never has (a rescan after a degraded first pass still has rows worth keeping on
+    /// screen, and claiming a settle time it never had would be its own small lie).
+    case revalidating(asOf: Date?)
     /// A pass completed, read everything it saw, and the root held still. `scanned` is how many
     /// regular files it examined — the **denominator** the empty state is required to quote.
     case settled(asOf: Date, scanned: Int)

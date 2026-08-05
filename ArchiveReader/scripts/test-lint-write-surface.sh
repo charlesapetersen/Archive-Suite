@@ -180,14 +180,13 @@ func plantedHonestWalk(_ root: URL) -> Int {
 SWIFT
 expect 0 "an enumerator WITH errorHandler passes (the rule is not a ban on walking)" "lint clean"
 
-echo "── rule 3: when W26.walk2 deletes the allowed call, the allowance goes STALE ─"
-fresh_tree
-# Simulates walk2 replacing `loadFixtureSynchronously` with CorpusWalker: the allowed call is gone,
-# so nothing violates rule 3 — but the allowance now guards nothing and must be reported, or a
-# future silent enumerator could slip in under it.
-/usr/bin/sed -i '' 's|let enumerator = FileManager\.default\.enumerator(|let enumerator = deleted_by_walk2(|' \
-  "$SCRATCH/$READER_SRC/Search/ArchiveLibrary.swift"
-expect 1 "removing the allowed enumerator call FAILS as STALE (walk2 must drop the allowance)" "STALE allowance"
+# RETIRED by `W26.walk2` (2026-08-05): this case simulated walk2 deleting the allowed
+# `ArchiveLibrary.swift` enumerator call, and asserted the allowance then went STALE. walk2 has
+# happened — the call and its allowance are both gone — so the sed matched nothing and the case
+# started asserting the opposite of its own name (lint clean, `expect 1` failing). It was never a
+# rule-3-specific behaviour: the STALE-allowance guard is generic and is still covered above, by the
+# PDFThumbnailer case. Deleted rather than re-pointed at another allowance, which would have been the
+# same test twice.
 
 echo
 if [ "$failed" -eq 0 ]; then
