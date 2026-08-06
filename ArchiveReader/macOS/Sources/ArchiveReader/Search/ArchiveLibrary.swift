@@ -53,6 +53,13 @@ final class ArchiveLibrary: ObservableObject {
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
 
+    /// `root` spelled the way the walker reports paths under it — the only spelling a *discovered*
+    /// path may be compared against. Derived from `root` here rather than read off `RootFolderStore`
+    /// on purpose: during a root switch this object is still finishing the previous root's pass, and
+    /// borrowing the store's current answer would judge one root's rows against another's.
+    /// (`W26.symroot-fu1`.)
+    private var rootDiscoveryPrefix: LibraryIndexPath?
+
     /// When discovery last completed a clean pass on a root that held still. Dates `.revalidating`
     /// and `.degraded`, so the UI can say what it knew and when instead of an undated wrong claim.
     private var lastSettled: Date?
@@ -217,6 +224,12 @@ final class ArchiveLibrary: ObservableObject {
             markerGUID.map { LibraryIndexRoot(path: LibraryIndexPath(url).value, markerGUID: $0) }
         }
         root = scope
+        rootDiscoveryPrefix = scope.map { url in
+            // Falls back to the caller's spelling rather than to nil for the same reason the primitive
+            // does not probe openability: `realpath` fails only when the path does not resolve at all,
+            // and a root that has momentarily gone away still needs a spelling to compare with.
+            LibraryIndexPath(CorpusWalker.discoveredPathPrefix(for: url) ?? LibraryIndexPath(url).value)
+        }
         guard let scope else {
             phase = .noRoot
             scopeDescription = "No folder selected"
@@ -353,8 +366,13 @@ final class ArchiveLibrary: ObservableObject {
     }
 
     private func publishWarmSnapshot(_ snapshot: LibraryIndexSnapshot) {
-        guard let root else { return }
-        let rootPath = LibraryIndexPath(root)
+        // Cache rows hold the paths the WALKER wrote, so containment is against the walker's spelling
+        // of the root and not the caller's. Against `LibraryIndexPath(root)` this filter emptied
+        // `warm` on every launch under any root whose spelling differs from its resolved one — the
+        // guard below still passed on a non-nil `asOf`, so a fully warm root showed zero files until
+        // the whole revalidation walk finished. (`W26.symroot-fu1`; `reverifyCacheRows` in
+        // `NavigationModel` is the same comparison on the write path and had to move with this one.)
+        guard root != nil, let rootPath = rootDiscoveryPrefix else { return }
         let warm = snapshot.entries.values
             .filter { LibraryIndexPath($0.path).isContained(in: rootPath) }
             .filter(\.tracked)

@@ -236,6 +236,114 @@ final class LibraryWarmStartTests: XCTestCase {
         XCTAssertEqual(model.statusMessage, "Marked 1; 1 could not update.")
     }
 
+    // MARK: A root whose spelling is not the walker's (W26.symroot-fu1)
+    //
+    // Both of these use a MID-PATH symlink, which `CorpusWalker.canonicalRoot` deliberately leaves
+    // alone (the root's final component is a real directory) — so the root URL keeps the caller's
+    // spelling while every path the walk reports comes back resolved. That is the divergence the two
+    // comparisons below got wrong, and it is not exotic: any `/var/folders` root is the same shape.
+
+    /// A warm root reached through a symlink must paint its cached rows.
+    ///
+    /// `publishWarmSnapshot` filtered cache rows for containment in `LibraryIndexPath(root)` — the
+    /// caller's spelling — while the rows hold the walker's. Under such a root `warm` came out empty
+    /// on **every** launch, and because `asOf` was non-nil the "truly cold root" guard still let the
+    /// publish through: a fully warm root showed zero files until the whole revalidation walk
+    /// finished, which is precisely the delay the cache exists to remove.
+    func testAWarmRootReachedThroughASymlinkPaintsItsCachedRows() async throws {
+        XCTAssertNil(UserDefaults.standard.string(forKey: "ARUITestRootPath"),
+                     "warm-start tests must exercise the production asynchronous path")
+        let scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let real = scratch.appendingPathComponent("real", isDirectory: true)
+        let corpus = real.appendingPathComponent("corpus", isDirectory: true)
+        try FileManager.default.createDirectory(at: corpus, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: scratch.appendingPathComponent("link", isDirectory: true), withDestinationURL: real)
+        let file = corpus.appendingPathComponent("report.pdf")
+        try Data("PDF fixture bytes".utf8).write(to: file)
+        try setTags(["Unread", "Subject/Linked"], on: file)
+
+        // The root as a caller would hold it: through the link. Nothing resolves this for us — the
+        // link is mid-path, so `canonicalRoot` returns it byte-unchanged, by design.
+        let linked = scratch.appendingPathComponent("link", isDirectory: true)
+            .appendingPathComponent("corpus", isDirectory: true)
+        XCTAssertNotEqual(linked.path, corpus.path, "precondition: the two spellings really differ")
+        let database = scratch.appendingPathComponent("library-index.sqlite3")
+        let marker = UUID()
+
+        let cold = ArchiveLibrary(libraryIndexURL: database,
+                                  watcherFactory: { _, _ in SilentWarmStartWatcher() })
+        cold.start(scope: linked, markerGUID: marker)
+        try await wait("the cold pass and its SQLite commit") { cold.phase.isSettled }
+        XCTAssertEqual(cold.files.count, 1, "the walk finds the file through the link")
+        XCTAssertEqual(cold.files.first?.url.path, file.path,
+                       "and reports it under the TARGET — the spelling the cache now holds")
+        cold.start(scope: nil)
+
+        let paused = PausedIndexedScan()
+        let warm = ArchiveLibrary(libraryIndexURL: database,
+                                  watcherFactory: { _, _ in SilentWarmStartWatcher() },
+                                  indexedScanStarter: { paused.request = $0 })
+        warm.start(scope: linked, markerGUID: marker)
+        try await wait("the cache to publish before revalidation") { paused.request != nil }
+
+        XCTAssertEqual(warm.files.count, 1,
+                       "the warm row is inside the granted root; only its spelling differed")
+        XCTAssertEqual(warm.files.first?.tags.raw, ["Unread", "Subject/Linked"])
+        XCTAssertTrue(try XCTUnwrap(warm.files.first).provenance.isCache)
+        guard case .revalidating = warm.phase else {
+            return XCTFail("warm rows must remain explicitly revalidating, got \(warm.phase)")
+        }
+        await cold.closeLibraryIndexForTesting()
+        await warm.closeLibraryIndexForTesting()
+    }
+
+    /// The write half, which the bullet above was MASKING: `reverifyCacheRows` rejected any row not
+    /// contained in `LibraryIndexPath(rootStore.root)`, so under such a root a bulk mark over
+    /// cache-provenance rows dropped every one of them. Nobody could see it while
+    /// `publishWarmSnapshot` was making sure no `.cache` row ever reached `files` — which is why the
+    /// two had to be fixed in the same change, and why this test asserts a real tag WRITE landed.
+    func testABulkMarkUnderASymlinkedRootDoesNotRejectEveryCachedRow() throws {
+        let scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let real = scratch.appendingPathComponent("real", isDirectory: true)
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: scratch.appendingPathComponent("link", isDirectory: true), withDestinationURL: real)
+        let linked = scratch.appendingPathComponent("link", isDirectory: true)
+
+        let file = real.appendingPathComponent("valid.pdf")
+        try Data("valid scratch PDF".utf8).write(to: file)
+        try setTags(["Unread", "Subject/Linked"], on: file)
+
+        UserDefaults.standard.set(linked.path, forKey: "ARUITestRootPath")
+        UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
+        defer {
+            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
+            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
+        }
+
+        let model = NavigationModel()
+        XCTAssertEqual(model.rootStore.root?.path, linked.path,
+                       "precondition: the store holds the LINK spelling, as a real pick would")
+        let diskRow = try XCTUnwrap(model.library.files.first { $0.url.path == file.path },
+                                    "the fixture walk must place the file under the target spelling")
+        model.library.replaceFilesForTesting([ArchiveFile(
+            url: diskRow.url, name: diskRow.name, fileType: diskRow.fileType, tags: diskRow.tags,
+            contentModified: diskRow.contentModified, provenance: .cache(asOf: Date())
+        )])
+        model.selection = [diskRow.url]
+        XCTAssertEqual(model.selectedFiles.count, 1, "precondition: the cached row is selected")
+
+        model.mark(.read)
+
+        XCTAssertEqual(Set(try tags(on: file)), Set(["Subject/Linked", "Read"]),
+                       "a cache row inside the granted root must be re-verified, not rejected")
+        XCTAssertEqual(model.statusMessage, "Marked 1 Read.",
+                       "and nothing was reported as un-updatable")
+    }
+
     func testColdIndexedFingerprintPhaseReportsProgressBeforeTagReads() throws {
         let scratch = try makeScratch()
         defer { try? FileManager.default.removeItem(at: scratch) }

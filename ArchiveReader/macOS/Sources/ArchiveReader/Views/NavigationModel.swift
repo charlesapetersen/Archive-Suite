@@ -882,8 +882,14 @@ final class NavigationModel: ObservableObject {
         var rejected = 0
         for file in files {
             guard file.provenance.isCache else { verified.append(file); continue }
-            guard let root = rootStore.root,
-                  LibraryIndexPath(file.url).isContained(in: LibraryIndexPath(root)) else {
+            // Against `LibraryIndexPath(root)` this rejected every cache row under any root whose
+            // spelling differs from the one the walker reports — a bulk tag write would have dropped
+            // all of them. It was MASKED until now: `publishWarmSnapshot` filtered on the same
+            // mistaken comparison, so no `.cache` row ever reached `files` to be rejected here. The
+            // two had to move together, and this is the half with a write behind it.
+            // (`W26.symroot-fu1`.)
+            guard let rootPath = rootStore.discoveredPathPrefix,
+                  LibraryIndexPath(file.url).isContained(in: LibraryIndexPath(rootPath)) else {
                 rejected += 1
                 continue
             }

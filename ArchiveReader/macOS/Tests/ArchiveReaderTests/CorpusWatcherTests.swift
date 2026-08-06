@@ -135,6 +135,50 @@ final class CorpusWatchRequestTests: XCTestCase {
             under: ExactFileURL.make("/", isDirectory: true)
         ), "a hidden first component stays outside the walk's universe, root or not")
     }
+
+    /// Events under a root whose spelling is not its resolved one must still be retained.
+    ///
+    /// FSEvents `realpath`s the watch root and delivers TARGET-spelled paths whichever spelling the
+    /// writer used, so testing them against the caller's spelling of the root dropped every event at
+    /// `reduce`'s containment guard: a watcher that reported `.started`, logged no failure, and
+    /// delivered no live update at all. `CorpusWatchEligibility` suppressed subtree rescans the same
+    /// way. A MID-PATH symlink on purpose — `canonicalRoot` leaves such a root byte-unchanged (its
+    /// final component is a real directory), so nothing upstream hides the divergence.
+    /// (`W26.symroot-fu1`.)
+    func testEventsUnderARootReachedThroughASymlinkAreRetained() throws {
+        let scratch = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("CorpusWatchSymroot-\(UUID().uuidString)", isDirectory: true)
+        let real = scratch.appendingPathComponent("real", isDirectory: true)
+        let watched = real.appendingPathComponent("corpus", isDirectory: true)
+        try FileManager.default.createDirectory(at: watched, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: scratch) }
+        try FileManager.default.createSymbolicLink(
+            at: scratch.appendingPathComponent("link", isDirectory: true), withDestinationURL: real)
+
+        let linkedRoot = scratch.appendingPathComponent("link", isDirectory: true)
+            .appendingPathComponent("corpus", isDirectory: true)
+        XCTAssertNotEqual(linkedRoot.path, watched.path,
+                          "precondition: the fixture's two spellings really differ")
+
+        // What FSEvents actually delivers: the resolved spelling.
+        let delivered = watched.appendingPathComponent("changed.pdf").path
+        let request = CorpusWatchRequest.reduce(root: linkedRoot, paths: [delivered],
+                                                flags: [flag(kFSEventStreamEventFlagItemXattrMod)])
+        XCTAssertEqual(request.paths, [delivered],
+                       "a tag write inside the granted root must not be discarded as foreign")
+
+        // The root's own event still reads as the root, so a MustScanSubDirs on it escalates properly
+        // rather than being filtered out or mistaken for a descendant subtree.
+        let rootEvent = CorpusWatchRequest.reduce(
+            root: linkedRoot, paths: [watched.path],
+            flags: [flag(kFSEventStreamEventFlagMustScanSubDirs)])
+        XCTAssertTrue(rootEvent.fullRescan)
+        XCTAssertTrue(rootEvent.subtrees.isEmpty)
+
+        XCTAssertTrue(CorpusWatchEligibility.includes(ExactFileURL.make(delivered),
+                                                      under: linkedRoot),
+                      "and the eligibility gate must agree, or subtree rescans stay suppressed")
+    }
 }
 
 @MainActor

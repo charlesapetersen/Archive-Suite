@@ -72,7 +72,7 @@ struct CorpusWatchRequest: Sendable, Equatable {
     /// work that may be skipped (`OwnEvent` and known atomic-write siblings); every retained path is
     /// subsequently re-statted and re-read.
     static func reduce(root: URL, paths: [String], flags: [FSEventStreamEventFlags]) -> CorpusWatchRequest {
-        let rootPath = canonicalRootPath(root.path)
+        let rootPath = watchedPathPrefix(root)
         var request = CorpusWatchRequest()
 
         for (path, eventFlags) in zip(paths, flags) {
@@ -165,6 +165,22 @@ struct CorpusWatchRequest: Sendable, Equatable {
 
     private static func canonicalRootPath(_ path: String) -> String {
         path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+    }
+
+    /// The prefix FSEvents delivers paths under for this root — the ONLY spelling event paths may be
+    /// tested against.
+    ///
+    /// Measured: FSEvents `realpath`s the watch root itself and reports target-spelled paths whichever
+    /// spelling the writer used. `canonicalRootPath` alone only trims a trailing slash, so under a
+    /// root whose spelling differs from its resolved one the containment guard in `reduce` dropped
+    /// **every** event — a watcher that looked perfectly healthy and delivered no live updates at all.
+    /// (`W26.symroot-fu1`.)
+    ///
+    /// Applied to the ROOT only, never to an event path: those arrive already resolved, and
+    /// `realpath`-ing each one would be a syscall per event that could only change a correct answer
+    /// into a wrong one for a path that has since been deleted.
+    static func watchedPathPrefix(_ root: URL) -> String {
+        canonicalRootPath(CorpusWalker.discoveredPathPrefix(for: root) ?? root.path)
     }
 
     private static func has(_ flags: FSEventStreamEventFlags,
@@ -464,8 +480,10 @@ enum CorpusWatchWork {
 /// live library disagree with the next launch scan.
 enum CorpusWatchEligibility {
     static func includes(_ url: URL, under root: URL) -> Bool {
-        let rootPath = root.path.hasSuffix("/") && root.path.count > 1
-            ? String(root.path.dropLast()) : root.path
+        // The same spelling `reduce` tests against, and for the same measured reason: `url` is an
+        // event path, already resolved. Comparing it to the caller's spelling of the root suppressed
+        // every subtree rescan under a symlinked or otherwise aliased root. (`W26.symroot-fu1`.)
+        let rootPath = CorpusWatchRequest.watchedPathPrefix(root)
         guard CorpusWatchRequest.contains(url.path, under: rootPath) else { return false }
         let pathBytes = Array(url.path.utf8)
         let rootBytes = Array(rootPath.utf8)
