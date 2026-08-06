@@ -54,7 +54,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   files was the run that would have written fixture subjects into the operator's real vocabulary. It now
   uses `KeychainHelper.isHeadlessTestMode`, the suite's existing enumeration of driver environments.
   **Tier-2 gate.** `ArchiveProcessor/scripts/test-tag-vocabulary.sh` + `scripts/tag-vocabulary-driver.swift`
-  — 49 assertions over the REAL `MacOSTagger` / `SystemTagsProvider` / `DefaultsKeys` / `KeychainHelper`,
+  — 51 assertions over the REAL `MacOSTagger` / `SystemTagsProvider` / `DefaultsKeys` / `KeychainHelper`,
   compiled standalone against the REAL ArchiveCore (the Processor has no XCTest bundle; this is the
   `test-drive-store.sh` pattern) and driven on scratch files across separate PROCESSES. Tag and label
   expectations are copied verbatim from `MacOSTaggerParityTests`, which predates the hook, so a perturbed
@@ -62,7 +62,12 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   verified on-disk result, facet-filtered; a **refused** write contributes nothing (the hook is after the
   `try`); relaunch is a real relaunch; a real harvest stamps the root and declines to re-walk; three
   forbidden roots each record nothing and start no walk; and the store resolves outside Application Support
-  under a driver environment, with a negative control proving it resolves inside for a normal run.
+  under a driver environment, with a negative control proving it resolves inside for a normal run. It also
+  proves **the harvest WROTE NOTHING** — every file's `(mtime, ctime, size, inode, label, tags)` is
+  identical afterwards, and no file appeared. That assertion was adopted from the killed checkpoint-2
+  session's uncommitted WIP (archived under `old/w26-vocab-prior-session-wip-20260806/`), which had thought
+  of it and this session had not; a mutant that rewrites one fixture file's tags mid-phase is caught by
+  **ctime and the tag list with mtime unchanged**, which is exactly the case a naive fingerprint misses.
   **Mutation-tested rather than assumed green** (the `W26.lint` lesson): five mutants, five killed — and one
   **survived the first attempt**, because the phase flushed the store itself right after `register`, so an
   assertion that a typed tag persists would have passed with `register`'s flush deleted. It now reads the

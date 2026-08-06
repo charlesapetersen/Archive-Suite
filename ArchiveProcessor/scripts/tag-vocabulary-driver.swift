@@ -194,6 +194,30 @@ private func persistedNames(_ url: URL?) -> Set<String> {
 private let vocabularyFile: URL? = ProcessInfo.processInfo.environment["ARCHIVEPROC_TAGVOCAB_FILE"]
     .flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
 
+/// Every regular file under `root`, with the stat fields a write would move plus its Finder tags.
+///
+/// Exists so "the harvest wrote nothing" can be a measurement rather than a claim about the code. `ctime`
+/// is in there deliberately: a Finder tag-only edit does not move `mtime`, so a fingerprint without it
+/// would call a tag rewrite unchanged — the same property `W26.idx` turns on. The harvest walks the
+/// operator's real archive root in production, so this is the file-safety assertion for the item.
+private func corpusFingerprint(_ root: URL) -> [String: String] {
+    var out: [String: String] = [:]
+    let fm = FileManager()
+    guard let e = fm.enumerator(at: root, includingPropertiesForKeys: nil,
+                                errorHandler: { _, _ in true }) else { return out }
+    while let any = e.nextObject() {
+        guard let url = any as? URL else { continue }
+        var st = stat()
+        guard lstat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { continue }
+        let values = try? url.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
+        let names = (values?.tagNames ?? []).sorted().joined(separator: "\u{1f}")
+        out[url.path] = "\(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)"
+            + "|\(st.st_ctimespec.tv_sec).\(st.st_ctimespec.tv_nsec)"
+            + "|\(st.st_size)|\(st.st_ino)|\(values?.labelNumber ?? 0)|\(names)"
+    }
+    return out
+}
+
 /// The relaunch claim, made by a process that did not do the writing, plus the real harvest.
 @MainActor
 private func phaseHarvest(scratch: URL, root: URL) {
@@ -218,12 +242,28 @@ private func phaseHarvest(scratch: URL, root: URL) {
             == root.standardizedFileURL.path,
           "\(String(describing: ProcessorTagVocabulary.currentArchiveRoot()?.path))")
 
+    // Snapshot the tree before the walk touches it. The harvest is READ-ONLY by construction, and this is
+    // where that stops being a construction argument.
+    let before = corpusFingerprint(root)
+    check("the fixture tree is non-empty, so the comparison below is not vacuous", before.count >= 2,
+          "\(before.count) files")
+
     SystemTagsProvider.shared.warmUp()
     let harvested = wait(upTo: 20) {
         vocabulary.knownRoots().first?.harvestedAt != nil
     }
     check("the harvest completed and stamped the root", harvested,
           "\(vocabulary.knownRoots())")
+
+    let after = corpusFingerprint(root)
+    check("the harvest WROTE NOTHING — mtime, ctime, size, inode, label and tags all unchanged",
+          after == before,
+          before.keys.sorted().compactMap { path in
+              before[path] == after[path] ? nil
+                : "\(path): \(before[path] ?? "-") -> \(after[path] ?? "(gone)")"
+          }.joined(separator: "; "))
+    check("…and the harvest created no files either", Set(after.keys) == Set(before.keys),
+          "\(Set(after.keys).symmetricDifference(before.keys).sorted())")
 
     let afterHarvest = Set(vocabulary.snapshot())
     check("the harvest learned subjects that only exist on disk",
