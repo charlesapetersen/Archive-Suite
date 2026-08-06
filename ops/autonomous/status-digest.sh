@@ -126,8 +126,33 @@ open_todo="$(num "$(grep -cE '^\s*[-*].*\[ \]' "$REPO/SUITE_TODO.md" 2>/dev/null
 done_todo="$(num "$(cat "$REPO/SUITE_TODO.md" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null | grep -cE '^\s*[-*].*\[[xX]\]')")"
 hold="$(num "$(awk '/^## HOLD QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]')")"
 
+# $STATE/last-gate only advances on a GREEN gate (the daemon writes HEAD there only on rc=0), so on its own
+# this block is STRUCTURALLY incapable of reporting a gate that has since gone RED. On 2026-08-06 it printed
+# "Build and tests passed, 30 changes ago" for a run that had PARKED on a RED gate 41 minutes earlier — read
+# as "healthy, just a bit stale" when the truth was "the last full check FAILED". last-gate.log always holds
+# the LAST gate run's verdict (the retry-once overwrites it) and that verdict NAMES the failing step, so read
+# it. ⚠️ It is written IN PLACE, so it lies WHILE a gate is executing — skip it then (memory
+# `health-gate-red-retry-once`).
+gate_red=""; gate_code=""
+if ! pgrep -f 'ops/autonomous/health-gate\.sh' >/dev/null 2>&1; then
+  gate_red="$(grep -m1 '^HEALTH GATE: RED' "$STATE/last-gate.log" 2>/dev/null \
+              | sed 's/^HEALTH GATE: RED[^A-Za-z0-9]*//' | tr -s ' ' | sed 's/^ *//; s/ *$//')"
+fi
+# Same doc-vs-code split the daemon's park note uses: context-budget/tracker-sync/coherence guard DOCUMENTS,
+# everything else builds or tests CODE. Split on spaces explicitly — do not trust the ambient IFS.
+if [ -n "$gate_red" ]; then
+  oldifs="$IFS"; IFS=' '
+  for s in $gate_red; do
+    case "$s" in context-budget|tracker-sync|coherence) : ;; *) gate_code="${gate_code:+$gate_code }$s" ;; esac
+  done
+  IFS="$oldifs"
+fi
 gate_last="$(cat "$STATE/last-gate" 2>/dev/null)"
-if [ -n "$gate_last" ] && g cat-file -e "${gate_last}^{commit}" 2>/dev/null; then
+if [ -n "$gate_code" ]; then
+  HEALTH="The last full check FAILED: $gate_code — the build or tests are broken"
+elif [ -n "$gate_red" ]; then
+  HEALTH="The last full check FAILED: $gate_red — the code built and passed; a document is over its size limit"
+elif [ -n "$gate_last" ] && g cat-file -e "${gate_last}^{commit}" 2>/dev/null; then
   gate_behind="$(num "$(g rev-list --count "$gate_last..HEAD")")"
   case "$gate_behind" in
     0) HEALTH="Build and tests passed, on the current code" ;;

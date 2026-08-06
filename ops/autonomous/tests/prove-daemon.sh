@@ -360,6 +360,36 @@ grep -q 'GATETOKEN9' "$CURLLOG" && ok "alerted the owner" || bad "no alert on re
 [ "$(grep -c 'launching fresh' "$L")" = 0 ] && ok "no session launched (gate gates the cycle)" || bad "launched a session despite red gate"
 rm -f "$STATE/alert.env"
 
+echo "[23c] WS7 — the park note NAMES the failing step, and never sells a DOCUMENT failure as a code regression"
+# 2026-08-06: the daemon parked with reader/notes/processor-build/coherence/tracker-sync/gui-vm ALL GREEN and
+# `context-budget` the ONLY failing step (one execution plan 110% over its size budget) — and told the owner it
+# was "a reproducible build/test regression" on "a broken tree". He went looking for a bug that did not exist.
+# The step name was on disk the whole time, in the gate's own "HEALTH GATE: RED —<steps>" line; the note just
+# never read it. The >=40 filler lines below are the crux: the gate prints that much AFTER its verdict, so the
+# note's embedded `tail -25` can NEVER contain the verdict — which is why parsing it explicitly is the fix.
+{ printf '#!/bin/sh\n'
+  printf 'echo "  \xe2\x9c\x97 context-budget (rc=1)"\n'
+  printf 'echo "HEALTH GATE: RED \xe2\x80\x94 context-budget"\n'
+  printf 'echo "--- failing output (tail) ---"\n'
+  printf 'i=0; while [ $i -lt 40 ]; do echo "filler line $i"; i=$((i+1)); done\n'
+  printf 'echo "\xe2\x9c\x97 context-budget: OVER budget: execution-plans/despotlight.md"\n'
+  printf 'exit 1\n'; } > "$T/gate-red-doc.sh"; chmod +x "$T/gate-red-doc.sh"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" run_daemon 0 8)
+grep -q 'PARKED (health gate RED (x2) — context-budget' "$L" && ok "park reason names the failing step" || bad "park reason is still anonymous"
+grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && ok "a document RED is not sold as a code regression" || bad "document park still implies a code regression"
+grep -q 'broken tree' "$L" && bad "still asserts a broken tree for a document-size failure" || ok "no broken-tree claim on a document RED"
+grep -q 'despotlight' "$L" && ok "names the over-budget document" || bad "did not name the offending file"
+grep -q 'context-budget.sh' "$L" && ok "points at that step's own remedy" || bad "no remedy pointer"
+# …and a REAL code regression must KEEP the original wording. The fix must not launder a broken build.
+{ printf '#!/bin/sh\necho "BUILD FAILED: boom in Reader"\n'
+  printf 'echo "HEALTH GATE: RED \xe2\x80\x94 reader"\nexit 1\n'; } > "$T/gate-red-code.sh"; chmod +x "$T/gate-red-code.sh"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" run_daemon 0 8)
+grep -q 'build/test regression' "$L" && ok "a real code RED still says regression" || bad "lost the code-regression wording on a real build failure"
+grep -q 'PARKED (health gate RED (x2) — reader' "$L" && ok "code RED names its step too" || bad "code RED is still anonymous"
+grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && bad "called a broken build a document problem" || ok "code RED not misfiled as a document problem"
+
 echo "[23b] WS7 — a FLAKY failure (red once, then green) must NOT park (F1 retry-once)"
 rm -f "$T/flaky.count"; echo "0:no" > "$CTRL"; write_plan; dfset 999999
 L=$(GATE_EVERY=1 GATE_CMD="$T/gate-flaky.sh" run_daemon 0 8)

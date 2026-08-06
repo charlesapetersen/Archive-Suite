@@ -16,6 +16,63 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Autonomous compactor + park diagnosis (from the 2026-08-06 health-gate RED)
+
+- [x] **The plan compactor had been ABORTING Pass 1 on every cycle for weeks, and three separate layers of
+  "nothing was watching" let it. ✅ FIXED 2026-08-06** — this commit. The daemon parked on `health gate RED
+  (x2)`; the park note said *"a reproducible build/test regression … a broken tree"*, but the tree was green
+  and the **only** failing step was `context-budget` (`execution-plans/despotlight.md` at 105,726 B against its
+  96,000 budget). The interesting defect was the one nobody was looking at:
+  - **The bug.** Every pass bounded its region with "the next **blank-preceded** `## ` header". The live plan's
+    `## Daemon Report` had **no** blank line before it (Session Log entries are blank-SEPARATED and
+    newest-PREPENDED, so the separator that ends up against the next header is exactly the one that goes
+    missing), so Pass 1's region ran to EOF, swept that whole section into the drop set, and hit the anchor
+    guard. The guard did its job — the plan was never corrupted — but the pass never ran either. Measured on
+    the live plan: the region read as **55,779 B / 26 entries** (the 26 = 11 real entries + 15 Daemon Report
+    `- **[` bullets, which match Pass 1's blank-agnostic `^- ` rule) instead of **39,057 B / 11**. Against
+    `SL_MAX_BYTES=30000` it should have been reclaiming ~11 KB *every cycle*; instead the plan reached
+    **174,152 B = 96%** of its own context budget. It was a deadlock: the pass had to run once to restore the
+    blank line that was stopping it from running.
+  - **Two sibling data-LOSS paths, found by adversarial review and now proven by tests.** With `## HOLD QUEUE`
+    not blank-preceded, **Pass 3 archived an owner-gated `[x]` HOLD QUEUE item out of the plan** (its safety
+    check counts only `[ ]`, so a `[x]` left silently). With a section following `## Daemon Report` without a
+    blank, **Pass 2 swept that entire section into the DR archive** (`E2E findings` is not in Pass 2's anchor
+    list). Both were latent only because of where those headers happen to sit today.
+  - **The fix.** A region now ends at the next real section header recognised **by name** (`SEC_HEADER_RE`)
+    *or* by the blank line — applied at all **nine** region-end sites. The blank rule is kept because it is
+    load-bearing (`prove-compact.sh` Case I: a `## ` pasted inside an entry body must not truncate a region),
+    and the name test cannot fire on body text: across **713 KB** of real archived entry bodies there is not
+    one column-0 `## ` line. An empty/unbound `sec` falls back to the blank rule rather than matching
+    everything. A section that is neither named nor blank-preceded degrades to exactly today's behaviour.
+  - **Why it stayed invisible, and what catches it now.** (1) `compact-plan.sh` always exited 0, so an abort
+    and a healthy no-op were indistinguishable — it now exits **1 only when a pass truly aborted**. (2) The
+    daemon's call site was `… || true`, which its own comment admitted *"swallows any error anyway"* — it now
+    logs a loud `⚠⚠ compact-plan ABORTED a pass` line (still never breaking the loop). (3) `prove-compact.sh`,
+    the mechanism proof for exactly this code, was **RED on main and wired into nothing** — three Case A
+    ordering assertions had been failing since `ce49ead` made Pass 1 newest-first without updating the fixture,
+    whose comment still claimed "oldest first … (matches real plan)". Fixture fixed, and it is a health-gate
+    step now (`compact-proof`). Harness: **49 → 72 assertions**, and the three new cases (J/K/L) each fail
+    against the pre-fix script.
+  - **Measured effect.** Session Log region 39,057 → **27,782 B**; plan 174,152 → **162,877 B** (−11,275,
+    verified on a copy: idempotent on a second run, every other section byte-identical, all five archived
+    entries recoverable). `despotlight.md` 105,726 → **85,685 B** (−20,041) by tombstoning seven sections whose
+    work has shipped, each tombstone keeping the facts other sections and live code still cite by number.
+    Together the orientation read drops **~31 KB/session (~8k tokens)** and — the real point — is **bounded
+    again**.
+  - **The park note no longer misdiagnoses.** It now parses the gate's own `HEALTH GATE: RED —<steps>` verdict
+    (the embedded `tail -25` *structurally* cannot contain it — the gate prints up to 40 more lines after it),
+    classifies document steps against code steps, and for a document failure says so plainly instead of
+    asserting a code regression. A real code RED keeps the original wording; a mixed RED is treated as code.
+    Step names now also ride in the park *reason*, which upgrades `daemon.log`, the ntfy title, the macOS
+    banner and `STATUS.md` for free. The split is IFS-independent: under an inherited `IFS=$'\n'` the loop saw
+    one word `" context-budget"` and would have misclassified every document failure as a code regression.
+  - ⚠️ **Not fixed here, deliberately** (each is a separate, smaller change): `health-gate.sh`'s
+    `--- failing output (tail) ---` is `tail -40` of the **shared** step accumulator, so it shows the last
+    step's output rather than the failing step's — it only looked right because `context-budget` runs last. And
+    nothing ever deletes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`, so the "Needs you" bullet stays after the
+    cause is fixed.
+
+
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
 - [x] **W26.oracle — the E2E test oracle reads Finder tags from the xattr, not `mdls` [S · low · Tier-1].

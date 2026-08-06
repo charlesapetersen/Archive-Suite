@@ -122,6 +122,19 @@ bash "$ROOT/ops/autonomous/check-tracker-sync.sh" || true
 # When it REDs, fix the DOCUMENT, not the budget — per-file remedies are in context-budget.sh's header.
 step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
 
+# compact-plan.sh is the ONLY thing keeping the plan's orientation cost bounded, so its correctness is a gate
+# concern, not a nicety. On 2026-08-06 it was found to have been ABORTING Pass 1 on EVERY cycle for weeks: the
+# live plan's '## Daemon Report' header had no blank line before it, so the Session Log region ran to EOF and
+# swept that section into the drop set; the anchor guard caught it, so the plan was never corrupted — and never
+# compacted either, drifting to 96% of its budget while ~11 KB/cycle went unreclaimed. Three things had to be
+# true for that to survive: the abort was swallowed by the daemon's `|| true`; nothing measured the REGION
+# sizes; and this harness — the mechanism proof for exactly that code — was itself RED on main and wired into
+# NOTHING (its only mention in the repo was one sentence in ops/autonomous/README.md). Three Case A ordering
+# assertions had been failing since ce49ead made Pass 1 newest-first without updating the fixture.
+# REAL step: sandbox fixtures via mktemp (never the live plan), no network, no GUI, ~2 s. If it REDs the
+# compactor is broken and the plan WILL drift back over budget — fix the compactor, don't skip this.
+step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
+
 echo
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"

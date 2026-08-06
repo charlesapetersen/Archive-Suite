@@ -477,8 +477,54 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   if [ "$GATE_RC" -eq 2 ]; then
     log "health gate timed out on retry — SKIPPING (inconclusive, not parking)."; return 0
   fi
-  park_run "health gate RED (x2)" \
-    "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row (a reproducible build/test regression the per-change reviews missed). The daemon stopped so it doesn't pile more commits on a broken tree. Fix it (run ./ops/autonomous/health-gate.sh to reproduce), then re-arm. Failing tail:
+  # WHICH step failed decides what the owner should go and DO — and the gate already says so, in a line this
+  # note never read. health-gate.sh publishes "HEALTH GATE: RED —<steps>" (its $fails list) and THEN prints up
+  # to 40 more lines of step output, so the `tail -25` below can never contain that verdict: it is structurally
+  # impossible for the tail alone to name the step.
+  # On 2026-08-06 that is exactly how a park whose ONLY failing step was `context-budget` — one execution plan
+  # 110% over its size budget, with reader/notes/processor-build/coherence/tracker-sync/gui-vm ALL GREEN —
+  # reached the owner as "a reproducible build/test regression" on "a broken tree", and cost him a hunt for a
+  # bug that did not exist. Name the step, and do not assert a cause the gate did not report.
+  local vline steps s has_code=0 doc_list="" diag over
+  vline="$(grep -m1 '^HEALTH GATE: RED' "$glog" 2>/dev/null)"
+  # Strip the "HEALTH GATE: RED" prefix plus any separator bytes (the em dash is multi-byte, so a byte-based
+  # cut could split it), collapse runs of spaces, and TRIM — `steps` is a clean "a b c" with no edge spaces.
+  steps="$(printf '%s' "$vline" | sed 's/^HEALTH GATE: RED[^A-Za-z0-9]*//' | tr -s ' ' | sed 's/^ *//; s/ *$//')"
+  # Split on spaces EXPLICITLY. Do not rely on the ambient IFS: this function can run under an inherited
+  # environment (launchd, a sourced profile) where IFS is not the default, and with IFS=$'\n' the loop below
+  # sees one word " context-budget" WITH its leading space, no `case` pattern matches, and every document
+  # failure silently misclassifies as a code regression — the exact bug this block exists to fix.
+  local IFS=' '
+  for s in $steps; do
+    # A DOCUMENT step failing means a file is oversized or the trackers disagree — the CODE is fine. Every
+    # other step in health-gate.sh builds or tests code. (coherence/tracker-sync are warn-only by construction
+    # so they cannot actually reach $fails; they are listed defensively, not because they can RED today.)
+    case "$s" in
+      context-budget|tracker-sync|coherence) doc_list="${doc_list:+$doc_list }$s" ;;
+      *)                                     has_code=1 ;;
+    esac
+  done
+  if [ "$has_code" = 1 ]; then
+    # Mixed RED counts as CODE (the conservative reading), but still say the doc step failed too.
+    diag="FAILED STEP(S): $steps — a reproducible build/test regression the per-change reviews missed. The daemon stopped so it doesn't pile more commits on a broken tree.${doc_list:+
+  Also failing (document-size / tracker, not code): $doc_list}"
+  elif [ -n "$doc_list" ]; then
+    over="$(grep -m1 'OVER budget:' "$glog" 2>/dev/null)"
+    diag="FAILED STEP(S): $doc_list — and NOTHING IS WRONG WITH THE CODE: every build and test suite in this gate PASSED. These steps guard DOCUMENT SIZE and tracker coherence, so this is a document edit, not a bug hunt.${over:+
+  $over}
+  Remedy: see the header of ops/autonomous/context-budget.sh — fix the DOCUMENT, not the budget. For an
+  execution plan that has SHIPPED, delete it (git keeps the history); for one still in flight, tombstone the
+  sections whose work has shipped. Raising a budget needs a reason recorded in the commit."
+  else
+    diag="the gate exited nonzero but printed no 'HEALTH GATE: RED' verdict line, so the failing step is UNKNOWN — read $glog in full before assuming a code regression."
+  fi
+  park_run "health gate RED (x2)${steps:+ — $steps}" \
+    "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row.
+$diag
+Reproduce: ./ops/autonomous/health-gate.sh   ·   full gate output: $glog
+Then re-arm: ./ops/autonomous/arm.sh
+Gate verdict + tail:
+${vline:-(no 'HEALTH GATE: RED' line in $glog)}
 $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -25)"
   return 9
 }
@@ -874,12 +920,22 @@ tick() {
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
   # Keep the durable plan small: archive old Session Log entries AND rotate the Daemon Report tail (WS8) so
   # the plan a fresh session reads doesn't inflate startup cost unbounded. Runs HERE — between cycles, lock
-  # released, NO session active — so it can never race a session's plan append. Both passes are self-gating
-  # (no-op under their triggers) and excluded from the work fingerprint (captured above), so a rotation is
-  # never counted as progress; failure never breaks the loop (each pass bails leaving the plan untouched; the
-  # `|| true` swallows any error anyway).
+  # released, NO session active — so it can never race a session's plan append. Every pass is self-gating
+  # (no-op under its triggers) and excluded from the work fingerprint (captured above), so a rotation is
+  # never counted as progress.
+  #
+  # ⚠ A FAILURE HERE STILL MUST NOT BREAK THE LOOP (each pass bails leaving the plan untouched) — but it must
+  # no longer be INVISIBLE, which is what `|| true` made it. 2026-08-06: compact-plan.sh had been aborting
+  # Pass 1 on EVERY cycle for weeks ("Daemon Report lost — abort"), and because that error was swallowed here
+  # and the script always exited 0, nothing anywhere noticed. The plan drifted to 96% of its context budget
+  # with ~11 KB/cycle going unreclaimed, and the run eventually PARKED on a context-budget gate — pointing at
+  # a different file. compact-plan.sh now exits nonzero ONLY when a pass truly aborted (a legitimate no-op is
+  # still 0), so this logs a loud, greppable line instead of discarding it. health-gate's `compact-proof` step
+  # is the standing mechanism proof; this line is the run-time symptom.
   if [ -x "$HOME/.local/bin/compact-plan.sh" ]; then
-    "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1 || true
+    if "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1; then :; else
+      log "⚠⚠ compact-plan ABORTED a pass (rc=$?) — the plan is NOT being kept within its context budget. Detail just above in this log; mechanism proof: ops/autonomous/tests/prove-compact.sh"
+    fi
   fi
   # WS5 — refresh the digest at the cycle tail, EXCEPT when the cycle parked (verdict 9): park_run already
   # wrote a PARKED digest (with the flag), and an unflagged tail write here would clobber it back to "running".

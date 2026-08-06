@@ -16,7 +16,10 @@
 # When one trips, the fix is almost never "raise the budget" — it is:
 #   * AUTONOMOUS_PLAN.md      -> let `compact-plan.sh` run (or find out why it no-op'd, again)
 #   * SUITE_TODO.md           -> move shipped entries to SUITE_TODO_DONE.md (the convention already says so)
-#   * execution-plans/*.md    -> the plan shipped; delete it (git keeps the history)
+#   * execution-plans/*.md    -> the plan shipped; delete it (git keeps the history). If the plan is still
+#                              IN FLIGHT, tombstone the sections whose work HAS shipped: replace each with a
+#                              few lines naming the commit and keeping only the facts other sections / live
+#                              code still cite by number (2026-08-06 did this to despotlight.md, -20 KB).
 #   * an app's CLAUDE.md      -> fold detail into the app's KNOWN_ISSUES / README, keep the map tight
 # Raise a budget only with a reason recorded in the commit.
 #

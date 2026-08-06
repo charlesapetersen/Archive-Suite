@@ -58,12 +58,44 @@ SL_MAX_BYTES="${SL_MAX_BYTES:-30000}"   # Session Log region byte budget (~7.5k 
 # arm.sh installs this script from the primary checkout, so a script/plan version skew is normal, and a
 # compactor that cannot find its own header aborts the pass (or, worse, would drop the region).
 DR_HEADER_RE='^## (Daemon Report|Morning Review)'
+# ===== 2026-08-06 — BUG 4: the plan's top-level SECTION VOCABULARY, used to bound every managed region =====
+# Every pass bounds its region with "the next '## ' after my header". That test used to be BLANK-PRECEDED
+# ALONE, which is wrong in both directions:
+#   * TOO NARROW (the live bug): '## Daemon Report' had no blank line before it, so Pass 1's Session Log region
+#     ran to EOF, swept the Daemon Report into the drop set, and aborted on the anchor guard EVERY cycle for
+#     weeks. Two sibling latent cases were reproduced on fixtures while fixing it: with '## HOLD QUEUE' not
+#     blank-preceded, Pass 3 archives OWNER-GATED HOLD QUEUE items out of the plan (its guard counts only
+#     '[ ]', so a '[x]' leaves silently); and with a section following '## Daemon Report' without a blank,
+#     Pass 2 sweeps that whole section into the DR archive (it is not in Pass 2's anchor list).
+#   * TOO WIDE is the hazard the blank rule was added for: a '## ' pasted INSIDE an entry body must not
+#     truncate a region (prove-compact.sh Case I, '## fake heading pasted in a body').
+# A real section header is now recognised by NAME as well as by the blank line — the plan is a
+# machine-managed file with a small, known set of top-level sections, so enumerating them is a contract, not
+# a guess. Measured: across 713 KB of real archived entry bodies there is not ONE column-0 '## ' line, so
+# the name test never fires on body text; and Case I's pasted heading matches no name, so it stays body.
+# DEGRADES SAFELY: a future section that is neither in this list nor blank-preceded behaves exactly as today
+# (region over-runs → the anchor guard aborts the pass, plan untouched) — and the EXIT-CODE CONTRACT below now
+# makes that abort LOUD instead of a log line nobody reads. Add new '## ' sections here when the plan grows one.
+# Passed to awk via -v, which is safe ONLY because this pattern contains no backslashes (BSD awk strips
+# backslashes from -v values — see the note in Pass 2's header).
+SEC_HEADER_RE='^## (PRIME DIRECTIVES|RESUME PROTOCOL|WORK QUEUE|HOLD QUEUE|E2E findings|Session Log|Daemon Report|Morning Review|GUI VERIFICATION|OWNER AUTHORIZATIONS)'
 DR_ARCHIVE="${AUTONOMOUS_DR_ARCHIVE:-${AUTONOMOUS_MR_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md}}"
 DR_KEEP="${DR_KEEP:-${MR_KEEP:-8}}"         # recent Daemon Report entries to retain inline
 DR_TRIGGER="${DR_TRIGGER:-${MR_TRIGGER:-12}}" # only rotate when the section exceeds this many entries (else no-op)
 DR_MAX_BYTES="${DR_MAX_BYTES:-${MR_MAX_BYTES:-30000}}"   # Daemon Report region byte budget (~7.5k tokens); 0 disables
 
 [ -f "$PLAN" ] || { echo "compact-plan: no plan at $PLAN — skip"; exit 0; }
+
+# ===== 2026-08-06 — EXIT-CODE CONTRACT, so an aborting pass can never again be invisible =====
+# A pass that ABORTS leaves the plan un-compacted for good; a pass that legitimately NO-OPs is healthy. Until
+# now both were plain stdout and this script always exited 0, so the daemon's `|| true` erased the difference:
+# "Daemon Report lost — abort" scrolled past in daemon.log every cycle for weeks, looking like routine output,
+# while the plan grew to 96% of its context budget. Each pass runs in a subshell that `exit 0`s for a
+# no-op/skip and `exit 1`s ONLY on an abort, so a nonzero subshell IS an abort — record it and report at the end.
+#   exit 0 = every pass compacted or legitimately no-op'd    ·    exit 1 = at least one pass ABORTED
+# The daemon logs a ⚠⚠ line on nonzero (it no longer swallows it), and health-gate's `compact-proof` step is
+# the standing mechanism proof. Callers that only want best-effort compaction may still ignore the code.
+ABORTED=""
 
 # ===== Pass 1: Session Log compaction (subshell so its internal `exit`s don't skip Pass 2) =====
 (
@@ -72,15 +104,30 @@ H=$(grep -nE '^## Session Log' "$PLAN" | head -1 | cut -d: -f1)
 
 TOTAL=$(awk 'END{print NR}' "$PLAN")
 
-# Count entries AND region bytes in one pass. Region = header .. first BLANK-PRECEDED '## ' after it (same
-# rule as Pass 2, so a column-0 '## ' pasted mid-body cannot truncate the region early). Entry header rule
-# per the note above: column-0 '- ' bullet OR date-led. Regexes are awk-PROGRAM literals, never via -v
-# (BSD awk strips backslashes from -v values).
+# Count entries AND region bytes in one pass. Region = header .. the next SECTION header after it. Entry
+# header rule per the note above: column-0 '- ' bullet OR date-led. Regexes are awk-PROGRAM literals, never
+# via -v (BSD awk strips backslashes from -v values).
+#
+# ===== 2026-08-06 — BUG 4 FIXED HERE: the region never closed, so Pass 1 aborted EVERY cycle =====
+# The rule used to be BLANK-PRECEDED '## ' alone. In the live plan '## Daemon Report' had NO blank line before
+# it (the Session Log's entries are blank-SEPARATED and newest-PREPENDED, so the separator after the OLDEST
+# entry — the one that sits against the next header — is exactly the one that goes missing). The region
+# therefore ran to EOF and swallowed the whole Daemon Report into the drop set; the anchor guard below caught
+# that and aborted, so the plan was never corrupted — and never compacted either. Measured on the live plan:
+# the region read as 55,779B/26 entries (the 26 = 11 real entries + 15 Daemon Report '- **[' bullets, which
+# match this pass's blank-agnostic '^- ' entry rule) instead of 39,057B/11. Against SL_MAX_BYTES=30000 Pass 1
+# should have been reclaiming ~11 KB every cycle; instead it printed "Daemon Report lost — abort" for weeks
+# while the plan grew to 96% of its context budget. The `|| true` at the daemon's call site swallowed it.
+# The fix keeps the blank-preceded rule (it is load-bearing — prove-compact.sh Case I proves a '## ' pasted
+# mid-body must NOT truncate the region) and ADDS the one header that legitimately bounds this region, blank
+# or not. A pasted heading cannot match '## Daemon Report'/'## Morning Review', so Case I is unaffected.
+# The general backstop for any FUTURE drift of this kind is `--audit` (below) + its health-gate step: it
+# reports the outcome (a pass that aborted) instead of requiring anyone to predict the mechanism.
 read -r N REGB <<EOF
-$(awk -v h="$H" '
+$(awk -v h="$H" -v sec="$SEC_HEADER_RE" '
   {
     if (NR == h) { inreg=1; prevblank=0; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
     if (inreg) { bytes += length($0) + 1
                  if (/^- / || /^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) c++ }
     prevblank = ($0 ~ /^[[:space:]]*$/)
@@ -108,10 +155,10 @@ fi
 # byte budget (clamped to [1, KEEP]). So a single 37 KB entry cannot hold the whole section hostage.
 EKEEP="$KEEP"
 if [ "$SL_MAX_BYTES" -gt 0 ]; then
-  EKEEP=$(awk -v h="$H" -v keep="$KEEP" -v budget="$SL_MAX_BYTES" '
+  EKEEP=$(awk -v h="$H" -v sec="$SEC_HEADER_RE" -v keep="$KEEP" -v budget="$SL_MAX_BYTES" '
     {
       if (NR == h) { inreg=1; prevblank=0; next }
-      if (inreg && /^## / && prevblank) inreg=0
+      if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0   # see BUG 4 above
       if (inreg) {
         if (/^- / || /^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) e++
         if (e > 0) sz[e] += length($0) + 1
@@ -136,10 +183,10 @@ DROP=$(mktemp) || { rm -f "$TMP"; exit 1; }
 # Split in ONE awk pass keyed on the entry ORDINAL, NEWEST-FIRST (this section is prepend-ordered): the
 # header + preamble + entries 1..EKEEP + everything OUTSIDE the region -> kept; entries EKEEP+1..end ->
 # archived. Whole entries travel together, so continuation lines can never be orphaned (bug 3).
-awk -v h="$H" -v keep="$EKEEP" -v drop="$DROP" '
+awk -v h="$H" -v sec="$SEC_HEADER_RE" -v keep="$EKEEP" -v drop="$DROP" '
   {
     if (NR == h) { inreg=1; prevblank=0; print; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0   # see BUG 4 above
     if (inreg && (/^- / || /^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) entry++
     if (inreg && entry > keep) print >> drop
     else print
@@ -178,7 +225,7 @@ cp "$PLAN" "$PLAN.bak" || { rm -f "$TMP" "$DROP"; exit 1; }
 mv "$TMP" "$PLAN"
 rm -f "$DROP"
 echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N); plan $L_ORIG -> $L_KEPT lines; archive=$ARCHIVE"
-) || echo "compact-plan: Pass 1 (Session Log) exited nonzero — plan left untouched by Pass 1 (see message above)"
+) || { echo "compact-plan: Pass 1 (Session Log) exited nonzero — plan left untouched by Pass 1 (see message above)"; ABORTED="$ABORTED pass1"; }
 
 # ===== Pass 2: Daemon Report rotation (WS8) =====
 # '## Daemon Report' is newest-first — each session PREPENDS an entry at the top — so keep the newest $DR_KEEP
@@ -214,19 +261,19 @@ MH=$(grep -nE "$DR_HEADER_RE" "$PLAN" | head -1 | cut -d: -f1)
 
 # count entries in the Daemon Report region (region = header .. first '## ' after it, else EOF). A header =
 # a column-0 '**[' line preceded by a blank line (see the structural rationale above).
-MN=$(awk -v h="$MH" '
+MN=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" '
   {
     if (NR == h) { inreg=1; prevblank=0; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
     if (inreg && (/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) c++
     prevblank = ($0 ~ /^[[:space:]]*$/)
   }
   END { print c+0 }' "$PLAN")
 # Region bytes, for the byte budget (same region rule as the count above).
-MREGB=$(awk -v h="$MH" '
+MREGB=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" '
   {
     if (NR == h) { inreg=1; prevblank=0; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
     if (inreg) bytes += length($0) + 1
     prevblank = ($0 ~ /^[[:space:]]*$/)
   }
@@ -249,10 +296,10 @@ fi
 # [1, DR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely.
 DR_EKEEP="$DR_KEEP"
 if [ "$DR_MAX_BYTES" -gt 0 ]; then
-  DR_EKEEP=$(awk -v h="$MH" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
+  DR_EKEEP=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
     {
       if (NR == h) { inreg=1; prevblank=0; next }
-      if (inreg && /^## / && prevblank) inreg=0
+      if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
       if (inreg) {
         if ((/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) e++
         if (e > 0) sz[e] += length($0) + 1
@@ -278,10 +325,10 @@ MDROP=$(mktemp) || { rm -f "$MTMP"; exit 1; }
 # (including any section AFTER Daemon Report) -> kept ($MTMP); entries DR_KEEP+1..end -> dropped ($MDROP).
 # Keyed on the running entry ordinal (same blank-preceded '**[' header rule as the count) — no line-range
 # arithmetic, no lost final line.
-awk -v h="$MH" -v keep="$DR_EKEEP" -v drop="$MDROP" '
+awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_EKEEP" -v drop="$MDROP" '
   {
     if (NR == h) { inreg=1; prevblank=0; print; next }   # the header itself is always kept
-    if (inreg && /^## / && prevblank) inreg=0             # first BLANK-PRECEDED "## " after the header ends it
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0             # region ends at the next real SECTION header (BUG 4)
     if (inreg && (/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) entry++          # crossing a real entry header advances the ordinal
     if (inreg && entry > keep) print >> drop              # entries DR_KEEP+1..end -> archived
     else print                                            # preamble, kept entries, all after-region lines
@@ -316,7 +363,7 @@ cp "$PLAN" "$PLAN.bak" || { rm -f "$MTMP" "$MDROP"; exit 1; }
 mv "$MTMP" "$PLAN"
 rm -f "$MDROP"
 echo "compact-plan: archived $DR_CUT Daemon Report entries (newest $DR_EKEEP kept of $MN); plan $L_ORIG -> $L_KEPT lines; archive=$DR_ARCHIVE"
-) || echo "compact-plan: Pass 2 (Daemon Report) exited nonzero — plan left untouched by Pass 2 (see message above)"
+) || { echo "compact-plan: Pass 2 (Daemon Report) exited nonzero — plan left untouched by Pass 2 (see message above)"; ABORTED="$ABORTED pass2"; }
 
 # ===== Pass 3: WORK QUEUE done-item archival (2026-08-04) =====
 # WHY: the queue's job is the ORDER and the checkbox, and a `[x]` item contributes nothing to order — but
@@ -345,9 +392,9 @@ TODOF="$REPO/SUITE_TODO.md"; DONEF="$REPO/SUITE_TODO_DONE.md"
 [ -f "$TODOF" ] || { echo "compact-plan: no SUITE_TODO.md — skip WQ (cannot prove done-state)"; exit 0; }
 [ -f "$DONEF" ] || DONEF=/dev/null
 
-QREGB=$(awk -v h="$QH" '
+QREGB=$(awk -v h="$QH" -v sec="$SEC_HEADER_RE" '
   { if (NR==h) { inreg=1; prevblank=0; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
     if (inreg) bytes += length($0)+1
     prevblank = ($0 ~ /^[[:space:]]*$/) } END { print bytes+0 }' "$PLAN")
 [ "$QREGB" -gt "$WQ_MAX_BYTES" ] || { echo "compact-plan: WORK QUEUE ${QREGB}B <= budget ${WQ_MAX_BYTES}B — no-op"; exit 0; }
@@ -365,12 +412,12 @@ SAFEF=$(mktemp) || { rm -f "$QTMP" "$QDROP"; exit 1; }
 printf '%s\n' "$SAFE" > "$SAFEF"
 
 # Move the WHOLE span of each safe [x] item (its line + continuation lines) to the archive.
-awk -v h="$QH" -v drop="$QDROP" -v safef="$SAFEF" '
+awk -v h="$QH" -v sec="$SEC_HEADER_RE" -v drop="$QDROP" -v safef="$SAFEF" '
   BEGIN { while ((getline t < safef) > 0) if (t != "") safe[t]=1 }
   function is_cb(l) { return l ~ /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ }
   {
     if (NR == h) { inreg=1; prevblank=0; print; next }
-    if (inreg && /^## / && prevblank) inreg=0
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
     if (inreg) {
       if (is_cb($0)) {
         dropping = 0
@@ -405,4 +452,13 @@ cp "$PLAN" "$PLAN.bak" || { rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
 } >> "$QUEUE_ARCHIVE" || { echo "compact-plan: WQ archive write failed — abort, plan untouched"; rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
 mv "$QTMP" "$PLAN"; rm -f "$QDROP" "$SAFEF"
 echo "compact-plan: archived $QD WORK QUEUE line(s) of completed items; plan $QO -> $QK lines; archive=$QUEUE_ARCHIVE"
-) || echo "compact-plan: Pass 3 (WORK QUEUE) exited nonzero — plan left untouched by Pass 3 (see message above)"
+) || { echo "compact-plan: Pass 3 (WORK QUEUE) exited nonzero — plan left untouched by Pass 3 (see message above)"; ABORTED="$ABORTED pass3"; }
+
+# ===== Final verdict (2026-08-06) — see the EXIT-CODE CONTRACT note above =====
+if [ -n "$ABORTED" ]; then
+  echo "compact-plan: ⚠⚠ ABORTED pass(es):$ABORTED — the plan was left UNTOUCHED by them, so its orientation"
+  echo "compact-plan:    cost is NOT being bounded and will keep growing until this is fixed. Reproduce with"
+  echo "compact-plan:    ops/autonomous/tests/prove-compact.sh (health-gate step 'compact-proof')."
+  exit 1
+fi
+exit 0

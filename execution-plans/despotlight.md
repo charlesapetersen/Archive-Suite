@@ -36,34 +36,13 @@ This plan removes the dependency, not just the misleading string.
 
 Audited 2026-08-04 across the whole worktree (all three apps + `packages/ArchiveCore` + tests + scripts).
 
-### Site 1 — `ArchiveReader/.../Search/ArchiveLibrary.swift` (219 lines) — **the critical one**
+### Site 1 — `ArchiveReader/.../Search/ArchiveLibrary.swift` — ✅ REMOVED by `W26.walk2` (`f1c0d2f` → `0ac71fd`)
 
-The **sole** discovery mechanism for the Reader. In a Release build there is **no filesystem fallback
-whatsoever**.
-
-| Line(s) | What Spotlight provides |
-|---|---|
-| 20 | `private let query = NSMetadataQuery()` |
-| 41-42 | predicate `(kMDItemUserTags == "Read") \|\| (kMDItemUserTags == "Unread")` |
-| 43-46 | `valueListAttributes`: path, FSName, contentType, FSContentChangeDate, `kMDItemUserTags`, `kMDItemFSLabel` |
-| 48-53 | `DidFinishGathering` / `DidUpdate` → `reload()` — the live-update mechanism |
-| 74-80 | `searchScopes = [user-picked root]`, else `NSMetadataQueryLocalComputerScope` |
-| 179-212 | `reload()` builds every `ArchiveFile` purely from `NSMetadataItem` attributes |
-
-- **Its stated justification (lines 11-12)** — *"building the list needs no per-file disk I/O (the fast
-  path at 150k)"* — **is already false in practice.** See §2.
-- **Lines 22-38 + 122-177 + 197-209: the `PendingWrite` override subsystem (~80 lines)** — `pending`
-  dict, `settleTimer`, `overrideTTL = 600`, `applyVerifiedWrites`, `overrideDecision`, `sameTags`,
-  `sameLabel`, `rebuilt`. It exists **solely to mask Spotlight's tag-index lag**: after a `TagWriter`
-  write, Spotlight fires `DidUpdate` but "frequently re-emits the OLD `kMDItemUserTags` until it
-  re-indexes — which was clobbering the correct value with no guaranteed self-heal." **All of this is
-  pure Spotlight tax and gets deleted.**
-- **Lines 60-73 + 87-119: `loadFixtureSynchronously`** — a *working* `FileManager` enumeration +
-  `TagReading.read` discovery path that already "mirror[s] the production predicate" — but it is
-  `#if DEBUG`, gated on the `-ARUITestRootPath` UITest flag, and "compiled out of Release entirely."
-  **The fix was already written, tested, and then excluded from the shipping build.** Its comment
-  (62-65) even documents the exact production failure mode as a test-only concern.
-
+Inventory removed 2026-08-06: every `NSMetadataQuery` / `NSMetadataItem` path and the Spotlight-lag
+`PendingWrite` subsystem this table catalogued is **gone**, so all of its line references pointed at code that
+no longer exists — actively misleading. The one durable finding is kept: **a working filesystem discovery path
+already existed and had been compiled out of Release**, which is how a Release build with no fallback shipped
+at all.
 ### Site 2 — `ArchiveProcessor/.../Tagging/SystemTagsProvider.swift` (97 lines)
 
 Tag-vocabulary autocomplete for manual tagging. `searchScopes = [NSMetadataQueryUserHomeScope]`,
@@ -138,22 +117,11 @@ is a pure code + doc change. One real build consequence: un-fencing the walker m
 `UniformTypeIdentifiers` import at `ArchiveLibrary.swift:4-6` must come out of `#if DEBUG`, and the
 **Release** build must be gated (not just Debug).
 
-### The better precedent: Archive Notes, end-to-end
+### The better precedent: Archive Notes, end-to-end — ✅ decision made; detail removed 2026-08-06
 
-`ContentIndex` is the right *storage* precedent, but **Archive Notes already implements this whole
-pattern** — a filesystem walk feeding a disposable FTS5 index, with a readiness flag, a settle await,
-health adoption, and tests around all of it. Copy the shape rather than invent it:
-
-- `ArchiveNotes/.../Core/NotesModel.swift:286-300` — `buildIndexFromDisk`: `allItemRefs` → `startIndexing`
-  → **`awaitSettled`** → `reloadItems` → **`markIndexReady`** → `adoptIndexFailure`.
-- `awaitSettled()` is the **test seam** that answers the sync/async question in §5.6.
-- `markIndexReady` is the `isGathering` analogue; `adoptIndexFailure` (`:311-321`) is the honest-degraded
-  precedent.
-- `ArchiveNotes/.../ReaderLinkResolver.swift:235-266` — the **already-reviewed** pattern for an off-actor
-  enumerator (private `FileManager` instance, `nextObject()` rather than `for-in`). Use it verbatim.
-
----
-
+Its only job was to force §5.6's synchronous-vs-async choice and supply a shape to copy. That choice was made
+**SYNCHRONOUS** in `W26.walk1` (`b3efb16`), and the shape shipped as `LibraryPhase` + `DiscoveryHealth` in
+`W26.walk2` (`0ac71fd`). Still standing: §9 forbids adopting the shared walker **into** Notes this wave.
 ## 2. Measured evidence — the numbers that make this safe
 
 All measured 2026-08-04 on this machine, **read-only**, with the exact Foundation APIs the replacement
@@ -248,70 +216,25 @@ existed only because Spotlight contradicted a verified write.
 
 ## 4. Architecture
 
-### 4.1 `CorpusWalker` — new, `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`
+### 4.1 `CorpusWalker` — ✅ SHIPPED 2026-08-05 (`W26.walk1` `b3efb16` → `025d126` → `003ca59`)
 
-✅ **SHIPPED 2026-08-05 (`W26.walk1`: `b3efb16` → `025d126` → the trackers commit).** Two deliberate
-divergences from the sketch below, both forced by constraints this plan records elsewhere:
+Sketch removed 2026-08-06. This is a correctness win as much as a size one: the shipped type deliberately
+diverged from the sketch, and leaving the old prescription in place invites exactly the failure §4a.1 warns
+about — a later item copies the plan's wording and reintroduces the thing that was fixed. **Two prescriptions
+in the deleted sketch are now FALSE; do not resurrect them:**
 
-- **Not a `TaskGroup`.** §4a.4/§7a.10 require the dataless I/O policy on *every* thread that touches a
-  corpus file, and it is thread-scoped while the cooperative pool reuses threads. The pass is therefore a
-  **synchronous single-threaded walk** — which §2 already measured at 10.15 s for 123k — with
-  `scanOnDedicatedThread`/`scanDetached` for off-main callers. Parallelising it later means giving each
-  worker the policy, not swapping in a `TaskGroup`.
-- **Emits `[CorpusEntry]`, not `[ArchiveFile]`.** `ArchiveFile` is the Reader's row model (it carries
-  `fileType`, a display string); ArchiveCore vends the raw material (`tagNames`, `labelNumber`,
-  `contentModified`, `contentTypeIdentifier`, `isDataless`) and `W26.walk2` builds the row. The shape is
-  otherwise 1:1 — `LibraryDiscoveryTests` pins that the rows built from it equal the shipped loader's.
+- the pass is **synchronous and single-threaded**, NOT "parallelised with a bounded `TaskGroup`" — the
+  thread-scoped dataless policy in §4a.4 / §7a.10 requires it;
+- it emits **`[CorpusEntry]`**, not `[ArchiveFile]`.
 
-Read-only, deterministic discovery. Shared by both apps (the repo's DRY + shared-contract convention).
+Authoritative: `packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift`.
+### 4.2 `ArchiveLibrary` — the swap — ✅ SHIPPED 2026-08-05 (`W26.walk2` `f1c0d2f` → `b88d20a` → `6f5d6ad` → `0ac71fd`)
 
-- Input: a root `URL` (security-scoped), a predicate (default: has `Read` or `Unread`), a cancellation
-  token, a progress callback.
-- Walk with `FileManager.enumerator(at:includingPropertiesForKeys:options:)`, options
-  `[.skipsHiddenFiles, .skipsPackageDescendants]` — matching the already-working DEBUG fixture loader
-  (lines 97-99), so behaviour is pre-validated.
-- Per file, read tags/label/type/mtime through **`TagReading.read`** (`ArchiveCore/Tags/TagReading.swift:29`)
-  — already the authoritative pre-write read, so discovery and writes agree by construction.
-- Emits `[ArchiveFile]` (unchanged shape) in batches so the UI can populate progressively.
-- **Never writes, never moves, never renames.** Enumeration + `resourceValues` only.
-- Parallelised with a bounded `TaskGroup` (width = `activeProcessorCount`, capped) over directory
-  chunks; ordering is imposed afterwards, not relied on from the enumerator.
-
-### 4.2 `ArchiveLibrary` — modify (the swap)
-
-- Delete: `query`, the predicate, `valueListAttributes`, both `NotificationCenter` observers, both
-  `searchScopes` branches, and the whole `reload()`-from-`NSMetadataItem` path.
-- Delete: **the entire `PendingWrite` override subsystem** — `PendingWrite`, `pending`, `settleTimer`,
-  `overrideTTL`, `armSettleTimer`, `overrideDecision`, `sameTags`, `sameLabel`, `applyVerifiedWrites`'s
-  pinning behaviour (the method stays, but now applies `TagWriter`'s verified `.after` **permanently and
-  directly**, because nothing will contradict it).
-- Promote `loadFixtureSynchronously` out of `#if DEBUG` into the real `CorpusWalker`-backed path; the
-  `-ARUITestRootPath` flag then selects a *fixture root*, not a *different discovery mechanism* —
-  removing the DEBUG/Release divergence that hid this bug.
-- `start(scope:)` runs the walk off the main actor, publishing batches; `isGathering` drives the
-  existing spinner, now with real progress (`n of m`), which Spotlight could never provide.
-
-⚠️ **`applyVerifiedWrites` has five callers that will not compile if its signature changes** —
-`NavigationModel.swift:839` (mark), `:862` (group edit), `:952` (inline edit — carries the *"one O(N+M)
-overlay pass (was per-file O(N×M))"* note), `:998` (corpus-wide rename), `:1050` (undo). Rewrite all five
-to a direct row replacement from the verified `.after`/`.afterLabel` they *already pass in*, reusing
-`rebuilt` (`:139-142`): same batch shape, one publish, no dict, no timer. Safety §11 still holds — only
-verified results move a row.
-
-⚠️ **`isGathering` and `scopeDescription` are correctness gates, not cosmetics.** Declared at
-`ArchiveLibrary.swift:17-18`, four consumers, two load-bearing: `pruneIfSettled`
-(`NavigationModel.swift:649-651`) gates **deletion of content-index rows** on `isGathering == false`, and
-the deep-link reveal give-up counter depends on it. **A walker that leaves `isGathering` false during a
-partial pass would let `pruneIfSettled` evict index rows for files the walk has not reached yet.**
-Redefine precisely: true while a pass is in flight, false **only after a pass completes**; a cancelled or
-failed pass must leave pruning blocked.
-
-⚠️ **Publisher ordering.** `NavigationModel.swift:110-117` uses a `willSet` publisher + a
-`MainActor.assumeIsolated` sink whose `.receive(on:)` hop fixes a **GUI-only** bug that unit tests
-provably missed (root cause at `ArchiveReader/KNOWN_ISSUES.md:166-173` — *"showed 0 of N"*). A background
-walk publishing batches from a detached task **must keep that hop** — hence `W26.walk2` needs a
-functional/GUI gate, not only unit tests.
-
+Deletion list removed 2026-08-06: every item on it is already gone from the code, so the list only described
+work that no longer exists (`git log -p -- execution-plans/despotlight.md` for the text). Kept because §5.11
+sharpens it and still binds: **§4.2's `isGathering` warning** — publishing batches progressively lets a partial
+result be mistaken for a complete one, so a list that is still filling must never present as settled (§4.3's
+honest states, and OPEN `W26.verify`'s GUI lane asserts exactly this).
 ### 4.3 Honest states — the actual UX fix
 
 `NavigationWindowView.swift` gains a state it never had: **"we could not read this folder"** as distinct
@@ -395,189 +318,36 @@ Also: **eight consumer sites** depend on `SystemTagsProvider`'s API surface, and
 persisted vocabulary, suggestions are available instantly on launch, so that state can likely be retired —
 check all eight consumers before removing it.
 
-### 4.5 `CorpusWatcher` — new (W26.fsev), FSEvents live updates — ✅ SHIPPED 2026-08-05
+### 4.5 `CorpusWatcher` — FSEvents live updates — ✅ SHIPPED 2026-08-05 (`W26.fsev` `7c016ce`, amended by `W26.fsev-fu1` `ab80c12` and `W26.fsev-fu2` `5394a97`)
 
-> ⚠️ **Amended 2026-08-06 by `W26.fsev-fu1`.** "It starts the stream before the launch walk" is still the
-> guarantee, but the *mechanism* changed, and the original one was a bug: `FSEventStreamCreate` `open(2)`s
-> the root, and doing that synchronously on the main thread meant an unopenable root (unanswered TCC prompt,
-> stalled network/cloud mount, disconnected volume) hung `NavigationModel.init()` and **the app never drew a
-> window**. The start now runs on a dedicated `Thread` and the **walk** waits behind it
-> (`ArchiveLibrary.passWaitingForWatcher`, gating `beginScan` and `drainWatchWork`) instead of the main
-> thread waiting on the open. A 2-second `watcherStartTimeout` bounds that wait: past it, discovery proceeds
-> without live events and the UI says *"Archive folder is not responding"*
-> (`DiscoveryFailure.liveUpdatesStalled`); a stream that returns late is still adopted and owes exactly one
-> catch-up pass. **Anything that reintroduces a synchronous `start()` on the main actor — including a lock
-> inside `CorpusWatcher`, which a stuck `start()` would hold against `stop()` — reintroduces the hang.**
->
-> ✅ **The walk's own deadline landed 2026-08-06 as `W26.fsev-fu2`.** `CorpusWalker`'s `opendir(3)` probe
-> blocks on the same root, so a pass that has examined **zero** files after `scanStallTimeout` (5 s) now
-> publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"*, the list's own half of what
-> `liveUpdatesStalled` says about the refresh channel. **Reported, not cancelled**: a blocked `opendir`
-> cannot be interrupted, so the walk keeps running and either its first examined file or its completion
-> withdraws the verdict, through the generation token that already existed. It is deliberately **not** routed
-> through `DiscoveryHealth` and grants no pruning and no authoritative absence — §7a.4's gate is unchanged,
-> because `.degraded` is not settled. This is also what makes §5.6's forced decision (a SYNCHRONOUS walker)
-> safe to keep: the blocking call is still blocking, but it can no longer silence the UI.
+Design detail removed 2026-08-06 (shipped — `CorpusWatcher.swift` is authoritative; full text in
+`git log -p -- execution-plans/despotlight.md`). Four sections still cite this one BY NUMBER, so the facts they
+depend on are kept verbatim rather than dropped:
 
-The shipped implementation is `ArchiveReader/.../Search/CorpusWatcher.swift` plus the bounded merge/scheduler
-in `ArchiveLibrary`. It starts the stream before the launch walk (so there is no scan→watch gap), reads every
-retained path through `ArchiveCore.CorpusWalker.inspect`, and preserves the launch walk's hidden/package
-exclusions. Exact paths are one stat/tag read; coalesced directories get subtree passes; recovery sentinels
-get one bounded root pass.
+- **FSEvents flags are UNIONED across the coalescing window** — so a flag set means "this path *may* have
+  changed", never "this specific thing happened". Always re-read; never trust the flags. (Cited by §5.4 and
+  §5.13.)
+- **A burst drops to a root-level re-scan** as the common case. (Cited by §7a.14, which still owns bounding it
+  — the FSEvents mainline re-walk is unthrottled.)
+- **`FSEventStreamFlushSync` replaces `mdfind` polling** in the fixture scripts — that is what makes OPEN
+  `W26.scripts` possible at all.
+- ⚠️ This section's original event-ID *"conservative high-water mark"* wording is **SUPERSEDED by §5.18**
+  (event IDs are **not** delivered in ascending order). Use §5.18, not the phrasing §5.18 quotes.
+- FSEvents vs kqueue vs `NSFilePresenter` was decided here — a later reviewer should **not** re-litigate it
+  (§Rejected).
+### 4.6 `LibraryIndex` — instant warm start — ✅ SHIPPED 2026-08-05 (`W26.idx` `84d18b0`)
 
-**Verified empirically 2026-08-04** (scratch dir, `kFSEventStreamCreateFlagFileEvents`): a pure Finder
-tag write — `setResourceValue(_:forKey:.tagNamesKey)`, changing **no file bytes** — *does* produce an
-event, flagged `ItemXattrMod | ItemInodeMetaMod | ItemModified`. A raw `setxattr` of a non-Finder xattr
-fires too. **So a watcher can see third-party tag edits; polling is not required.**
+Design detail removed 2026-08-06 (shipped — `ArchiveReader/.../Search/LibraryIndex.swift` and its real schema
+supersede the DDL sketch that was here; full text in `git log -p -- execution-plans/despotlight.md`). The facts
+that still BIND OPEN items are kept verbatim:
 
-**Critical gotcha, also measured:** FSEvents **unions flags across its coalescing window**. The
-byte-free tag write above *also* reported `ItemRenamed`, which never happened. Therefore:
-
-> Treat every event as **"this path may have changed — re-`stat` and re-read its tags"**, never as
-> "this specific thing happened." Flags may be used to *skip* work, never to *decide* semantics.
-
-- **Coalescing and drop-to-subtree are the COMMON path at this corpus's scale, not a rare edge.** Measured:
-  **12,060 xattr tag writes in 0.30 s produced only 1,088 delivered events in 37 batches.** A bulk
-  Read/Unread operation over a few thousand files *will* collapse into subtree re-walk requests, so the
-  re-walk path is mainline code that must be efficient — not an error handler. Apple states explicitly that
-  flags are **hints, not a replayable log**; observed one event coalescing a file's creation *and* its
-  subsequent tag write.
-- Recovery flags, all reducible to two primitives — *"re-read these paths"* and *"re-walk this subtree"*:
-  `MustScanSubDirs` (0x1) → re-walk that subtree; `UserDropped` (0x2) / `KernelDropped` (0x4) → **full
-  monitored-root pass** (the SDK permits sentinel path `/`, so stream-wide flags are reduced before path containment);
-  `RootChanged` → re-resolve the bookmark + re-walk; `EventIdsWrapped`/`HistoryDone` → full re-walk;
-  `Unmount`/`Mount` → stop/restart.
-- **Own-write detection has a proper API — use it instead of a side channel.**
-  `kFSEventStreamCreateFlagMarkSelf` tags the app's own writes with
-  `kFSEventStreamEventFlagOwnEvent` (0x80000); verified that a *different* process making the
-  byte-identical `setResourceValue` call is **not** so tagged. This is more reliable than `TagWriter`
-  publishing a URL list, and it distinguishes our write from Finder's even when the values match.
-- **`FSEventStreamSetDispatchQueue` is required — run-loop scheduling is deprecated as of macOS 13.**
-  Teardown order is mandated by the header: `Stop`, then **`Invalidate` while the stream is still
-  scheduled**, then `Release`. Getting this wrong is a crash, not a warning.
-- **No event-ID persistence in v1.** Launch starts the stream at `kFSEventStreamEventIdSinceNow` and then
-  performs a complete walk (that order, per the amendment above — the walk is what waits). Non-ascending IDs
-  and FullHistory values below the request make a naïve persisted high-water mark a silent-loss mechanism.
-  A SinceNow stream that starts *after* discovery — a recovery, or a start whose open outran its deadline —
-  is followed by one catch-up walk so the unwatched interval cannot disappear.
-  *(A captured `FSEventsGetCurrentEventId()` would remove the ordering constraint outright by making the
-  replay authoritative, which `W26.fsev-fu1` considered and did not take: it makes
-  `kFSEventStreamEventFlagHistoryDone` arrive for the first time, and that flag is currently reduced to a
-  full rescan — so it would trade a bounded wait for a whole-corpus re-walk on every launch plus a rewrite of
-  a 20-test reducer. Revisit only with a correctness argument.)*
-- **`FSEventStreamFlushSync` gives tests a deterministic synchronisation point** — which is precisely the
-  reason the fixture scripts currently poll `mdfind`, so it is what makes `W26.scripts` possible.
-- **`kqueue`/`DispatchSource.makeFileSystemObjectSource` is disqualified at this scale** (`EVFILT_VNODE`
-  needs one open file descriptor per watched file — 123k fds), and `NSFilePresenter` is disqualified on
-  semantics. FSEvents is the only viable choice; do not re-litigate it.
-- **Verify, don't assume, that the root has a working event channel.** A successful
-  `FSEventStreamStart` on the chosen path is the direct capability check; device-UUID probes only answer
-  whether *historical* events are available and legitimately return nil on read-only/firmlink arrangements.
-  Start failure surfaces *"Live archive updates unavailable"*. There is no periodic timer: activation retries
-  and, while still unavailable, re-walks once the last clean settle is over five minutes old; ⌘⌥R is immediate.
-- Sandbox: the stream is created on the **security-scoped root**, with
-  `start/stopAccessingSecurityScopedResource` balanced across the *stream's whole lifetime*, not per
-  read. Because exact/subtree work is asynchronous, each worker also owns a separate balanced operation scope
-  and cancellation token; stream teardown or root replacement cancels that work before its result can merge.
-  Directory symlinks are classified as non-regular and are never traversed, so a watched subtree cannot escape
-  the granted root. Entitlements already present (`app-sandbox`, `files.user-selected.read-only`,
-  app-scoped bookmarks) are sufficient — POSIX/FSEvents access to a user-granted root works even where
-  Spotlight query visibility does not (the very asymmetry documented at `ArchiveLibrary.swift:62-65`).
-- Atomic writes create temp siblings (measured: `a.txt.sb-858602c2-RXb79N`) — only the exact measured
-  `.sb-[8 hex]-[6 alnum]` suffix is ignored; an ordinary filename containing `.sb-` remains visible.
-- **Self-write suppression:** the stream uses `MarkSelf` and drops `OwnEvent`; there is no `TagWriter` URL
-  side channel. Recovery flags override OwnEvent because a unioned batch can also contain external work.
-
-### 4.6 `LibraryIndex` — new (W26.idx), instant warm start — ✅ SHIPPED 2026-08-05
-
-**Shipped implementation.** `Search/LibraryIndex.swift` is the separate system-SQLite actor at
-`library-index-v1.sqlite3`. It persists every readable regular file, raw tags, label, tracked/verified,
-dataless state and the fresh `(mtime, ctime, size, inode)` tuple under composite byte-exact
-`(root path, marker GUID, file path)` identity. Warm tracked rows publish with cache provenance, then
-`LibraryScan.revalidatedPass` fingerprints the root on a dedicated thread and reads tags only for
-new/changed/unverified paths. Scan provenance makes partial/canceled work non-authoritative; absence applies
-only on a clean pass. SQLite decode/encode/write work polls cancellation every 500 rows. Cache rows are
-freshly re-inspected before any mutation, corpus rename is conditional, dataless rows never reach PDF open,
-and the FSEvents path remains byte-exact through coalescing/containment/inspection. This is clean-slate v1:
-no migration, dual reader or legacy selection-state fallback.
-
-Follows the **existing, proven** `ContentIndex` precedent (`Search/ContentIndex.swift`): an `actor`
-wrapping **system SQLite** (`import SQLite3`, no third-party dependency), living under
-`.applicationSupportDirectory` (`ContentIndexer.swift:65`), with schema changes handled by **bumping the
-filename** (line 68) rather than writing a migration — exactly what the no-migration-burden directive
-licenses.
-
-**Sibling store, not an extension of `ContentIndex`.** Discovery must work *before* content extraction
-(`ContentIndex` is populated *from* the library), so folding discovery into it would invert the
-dependency and would put the 8-case content-index test suite in the blast radius of every discovery
-change. Keep them separate; both are disposable caches.
-
-```sql
--- Store the RAW tag array only. DocumentTags.parse(raw:labelNumber:) is the single parse authority
--- (ArchiveLibrary.swift:110-115, :205-207 both build ArchiveFile through it), so persisting derived
--- facets (read_state / priority / year) would fork that authority and let the DB disagree with the parser.
-CREATE TABLE entry (
-  path      TEXT NOT NULL,        -- byte-exact as the walk returned it; never NFC/NFD-normalised (§5.3)
-  root_id   INTEGER NOT NULL,
-  name      TEXT NOT NULL,
-  ext       TEXT NOT NULL DEFAULT '',
-  mtime     REAL NOT NULL,        -- content mtime: feeds ContentIndexer's extraction skip
-  ctime     REAL NOT NULL,        -- LOAD-BEARING: a tag write bumps ctime ONLY (§5.12)
-  size      INTEGER NOT NULL DEFAULT 0,
-  ino       INTEGER NOT NULL DEFAULT 0,
-  tags_raw  TEXT NOT NULL,        -- verbatim array, order preserved
-  label     INTEGER,
-  tracked   INTEGER NOT NULL,     -- 1 = carries Read/Unread
-  verified  INTEGER NOT NULL,     -- 0 = carried over from a scan that did not complete cleanly
-  is_dataless INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY(root_id, path)
-);
-CREATE INDEX entry_root ON entry(root_id, tracked);
-
--- Scan provenance. THIS is what makes honest status survive a relaunch: ContentIndexer's Failure is
--- @Published in memory only (ContentIndexer.swift:19-47) and is lost on quit, so a warm start currently
--- cannot tell "these 1,849 rows are correct" from "these are what a half-failed scan managed to see".
-CREATE TABLE scan (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  root_id    INTEGER NOT NULL,
-  started    REAL NOT NULL,
-  finished   REAL,                -- NULL = did not complete (crash / cancel / quit mid-scan)
-  dirs_seen  INTEGER NOT NULL DEFAULT 0,
-  files_seen INTEGER NOT NULL DEFAULT 0,
-  dir_errors INTEGER NOT NULL DEFAULT 0,   -- from the errorHandler (§4a.2) — gates the empty state
-  outcome    TEXT                          -- complete | partial | failed
-);
-```
-
-**Name it `library-index-v1.sqlite3`** and bump to `-v2` for any schema change. The filename-bump
-convention is not stylistic: **the write-surface lint bans file-delete APIs app-wide, so the app literally
-cannot remove a superseded DB** — bumping the name is the only available "migration". No versioned readers,
-no migration code (2026-08-01 no-migration directive).
-
-**Shipped: persist ALL regular files, not just tagged ones** (`tracked` distinguishes them). Measured cost on
-the real corpus was **60 MB and 1.3× the rows** — cheap, and it means an untagged file that *becomes* tagged
-is a changed-row read rather than absent from the cache universe.
-
-**No back-pressure machinery is needed.** Because the walk is ~10× cheaper than the tag read it feeds, two
-sequential phases are the simplest correct design (proven: two complete 123,028-entry fingerprint
-dictionaries built and diffed in one process): (A) walk on the policy-guarded dedicated `Thread` →
-`[Fingerprint]`; (B) one `SELECT path,mtime,ctime,size,ino FROM entry WHERE root_id=?` → diff map;
-(C) read tags only for the diff. **No `AsyncStream`, no bounded continuation, no semaphore.** Batch upserts
-at 500 rows purely to match `ContentIndex` — measured spread from 500→2000 is 15%, i.e. not a real lever.
-
-- **The filesystem and its xattrs remain the sole source of truth.** This DB is a disposable cache;
-  deleting it loses nothing (same guarantee `ContentIndex` already documents). It is stored **outside
-  the corpus**, in app support — never written into an archive folder.
-- **Warm start:** show persisted rows immediately, then revalidate in the background (`stat` each path,
-  re-read tags only where mtime/**ctime**/size/inode/dataless state moved, plus a full walk to catch
-  additions/removals). The user sees
-  rows in milliseconds with a subtle "revalidating…" affordance rather than a 10-second spinner.
-- **Removals** are applied only after the walk **completes successfully** — a cancelled or failed walk
-  must never be read as "these files are gone." (`ContentIndexer` already models this hazard with its
-  two-snapshot prune gates and `rootPrefix` eviction, `ContentIndexer.swift:361-420`; reuse that shape.)
-
----
-
+- **Rows are keyed on the BYTE-EXACT `(root path, marker GUID, file path)` — never NFC/NFD-normalised** (§5.3).
+  OPEN `W26.symroot`'s obvious fix (`resolvingSymlinksInPath()` before enumeration) breaks precisely this
+  contract, which is why that item has to settle the identity-vs-enumeration split before writing code.
+- Persisting every regular file measured **~60 MB / 1.3× rows**; OPEN `W26.verify` compares the SQLite file
+  size against that baseline (and peak RSS at 150k rows).
+- **Removals apply only after a cleanly COMPLETED walk** — a truncated or cancelled walk must never authorise
+  pruning (§7a.11, §7a.13); a cancelled warm revalidation must leave `asOf == nil` and prune nothing.
 ## 4a. 🔴 The two ways the FIX reproduces the BUG — read this first
 
 The incident was a **silent empty result** mistaken for a true negative. **Both halves of the replacement
@@ -941,42 +711,14 @@ writer.
 
 **Per-item test gates** (an item is not done without one that would *fail* if the work were wrong):
 
-- `W26.deny` — the reproduction from §4a.1b, as a test: a scratch file tagged `["Unread","Subj","P9"]` set to
-  `mode 0o200` (and a second with an ACL denying `readextattr`), then a `TagWriter` "mark Read". **Today it
-  destroys `Subj` and `P9`; after the fix the write must ABORT with `TagWriteError.unreadable`** and the tags
-  must be byte-identical afterwards. Add the `0o000` variant asserting the recorded `before`/inverse is not
-  `[]`. Plus a `TagReading` unit test for all four rows of §4a.1's table. ⚠️ Build every probe from a **fresh
-  `URL`** (§4a.3) or the test will pass while asserting nothing.
-- `W26.lint` — ✅ **MET (`1460125`).** `./ArchiveReader/scripts/lint-write-surface.sh` fails when a
-  `setResourceValue` is planted in a new ArchiveCore file outside the audited writer, and passes on a clean
-  tree — plus 8 more checks in `./ArchiveReader/scripts/test-lint-write-surface.sh`, all against a `mktemp`
-  copy of the two trees (nothing is planted in the real repo). The gate was also run against the **old**
-  script for contrast: it exits 0 on the same plants.
-- `W26.walk1` — scratch fixture with tagged/untagged/hidden/nested/package files + an em-dash+NBSP
-  filename; assert the exact expected set. Assert the walker performs **zero** writes (pre/post xattr +
-  mtime snapshot of the fixture).
-- `W26.walk2` — the incident reproduction, inverted: a fixture that Spotlight has *not* indexed
-  (`.metadata_never_index`, or simply never `mdimport`-ed) must still list every tagged file. This test
-  **fails today** and is the regression guard for the whole plan. Plus: `.failed` renders on an
-  unreadable root and `.emptyButReadable` only on a genuinely untagged one.
-- `W26.fsev` — write a tag with `TagWriter` on a fixture file, assert the row updates without any
-  Spotlight involvement; assert a *third-party* `setResourceValue` (simulating Finder) is picked up;
-  assert `MustScanSubDirs` triggers a subtree re-walk.
-- `W26.idx` — cold index, quit, warm start: assert rows appear before any walk completes, and that a
-  file whose tags changed **while the app was not running** is corrected on revalidation (this is the
-  test that catches the `resourceValues` caching trap, §5.1).
-- `W26.vocab` — vocabulary survives relaunch and accumulates across roots; no `$HOME` walk occurs.
-- `W26.oracle` — ✅ **DONE 2026-08-06.** The gate as written wanted "the Tier-2 assertion suite on a volume
-  with indexing disabled", which conflated two scripts (`tier2_assert.py` is the Tier-2 oracle;
-  `assert_mac.py` is the E2E one, and it is the `mdls` site) and would have needed a scratch DMG, a Gemini
-  key and a paid run. What shipped instead is cheaper and proves more:
-  `./ArchiveProcessor/scripts/test-finder-tags.sh` — no `mdutil`, no DMG, because a plain `mktemp`/`/tmp`
-  fixture is **already** un-indexed (that is the whole finding). It asserts the year-only-as-a-tag fixture
-  PASSES, that `mdls` cannot see that tag, that **stripping** the tag makes it FAIL (so the pass was caused
-  by the tag), and that an **unreadable** tag fails while saying the check went blind. 26 checks, 6/6 mutants
-  caught. `tier2_assert.py` was switched to the same shared reader under a byte-identical-output proof
-  against its own predecessor, since running it for real costs money and needs `pypdf`, which is not
-  installed here.
+- ✅ **The per-item test gates for the SHIPPED items** (`W26.deny`, `lint`, `walk1`, `walk2`, `notsup`, `fsev`,
+  `idx`, `vocab`, `oracle`) were all met, and are recorded per item — in more detail than here — in
+  `SUITE_TODO_DONE.md`; the tests themselves now exist in the repo. Bullets removed 2026-08-06 to bring this
+  plan back inside its context budget (`git log -p -- execution-plans/despotlight.md` for the text). Two of
+  them were also **wrong as written** and survived only as history: `W26.oracle`'s wanted a scratch DMG plus a
+  paid Gemini run (see `SUITE_TODO_DONE.md` for what actually replaced it), and `W26.deny`'s probe wording
+  (`XATTR_NOFOLLOW`, "a returned size of 0") is corrected in §4a.1. The gate bullets for the still-OPEN items
+  below are untouched.
 - `W26.reinfect` — `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's own
   historical notes, and `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
 - `W26.verify` — full-scale run against a **scratch copy** (never the real corpus), 100k+ files:

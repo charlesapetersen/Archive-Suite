@@ -102,6 +102,29 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
+## Autonomous diagnostics (from the 2026-08-06 health-gate RED)
+
+Filed 2026-08-06 while fixing the compactor abort + park misdiagnosis (full entry in `SUITE_TODO_DONE.md`).
+Both are honesty-of-reporting defects in the daemon's own diagnostics, deliberately left out of that change so
+it stayed one change.
+
+- [ ] **W27.gatetail — `health-gate.sh`'s "failing output (tail)" is the tail of the LAST step, not the FAILING
+  one [S · low · Tier-2 · ops].** `step()` appends every step's output to ONE shared `$LOG`, and the verdict
+  block prints `tail -40 "$LOG"` under the heading `--- failing output (tail) ---`. So the label is a lie
+  whenever the failing step is not the last one to run. It only looked correct on 2026-08-06 because
+  `context-budget` happens to be the final step; had `reader` failed, the park note would have quoted the
+  context-budget table as the reader's "failing output" — and the park note embeds this tail, so the mislabel
+  propagates to the owner. Fix: have `step()` keep each step's own output (e.g. `$LOG.<name>`) and quote the
+  failing one, or relabel honestly. ⚠️ Tier-2 per the autonomous-setup change discipline, and `arm.sh` installs
+  from the PRIMARY checkout, so it is not live until that is fast-forwarded and the owner re-arms.
+
+- [ ] **W27.parkstick — nothing ever deletes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`, so "Needs you" is
+  permanently sticky [S · low · ops].** `archive-suite-autonomous.sh` writes that file on park; a repo-wide
+  grep finds **one writer and no remover**. `status-digest.sh` shows a "It parked and left you a note … then
+  restart it" bullet whenever the file exists, so `arm.sh status` keeps asking for a decision long after the
+  cause is fixed and the daemon is healthy again. Fix: remove it when a run starts successfully (or when a gate
+  goes GREEN), so its presence means "there is an unhandled park" rather than "a park happened once".
+
 ## Owner-reported bugs (2026-08-02) — follow-ons
 
 - [ ] **W25.retry-backend — in gateway / Local Agent mode the retry sheets are decorative, and Live Capture's

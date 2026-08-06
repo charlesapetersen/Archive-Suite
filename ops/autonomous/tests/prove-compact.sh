@@ -38,8 +38,14 @@ make_plan(){
     echo "- [x] WS5 status digest"
     echo ""
     echo "## Session Log"
-    # chronological: oldest first, newest last (matches real plan). (`seq 1 0` emits "1 0" on BSD — guard it.)
-    [ "$nlog" -ge 1 ] && for i in $(seq 1 "$nlog"); do echo "- SLOG entry $i"; done
+    # newest-FIRST, exactly like the real plan (sessions PREPEND): entry $nlog = newest (top), entry 1 = oldest
+    # (bottom) — the same direction the Daemon Report fixture below already uses.
+    # ⚠ This emitted OLDEST-first until 2026-08-06. `ce49ead` made Pass 1 newest-first (its bug 2, "PASS 1 RAN
+    # BACKWARDS") without updating this fixture, so Case A's three ORDERING assertions went RED at that commit
+    # and STAYED red — unnoticed, because nothing in the repo ever ran this harness (its only reference was one
+    # sentence in ops/autonomous/README.md). It is a health-gate step now.
+    # (`seq 1 0` emits "1 0" on BSD — guard it.)
+    [ "$nlog" -ge 1 ] && for i in $(seq "$nlog" -1 1); do echo "- SLOG entry $i"; done
     echo ""
     echo "## Daemon Report"
     echo ""
@@ -202,6 +208,72 @@ chk "I mid-body '## ' did not truncate (kept 15)"  "[ \"\$(grep -c '^\\*\\*\\[20
 chk "I mid-body '## ' kept inline with its entry"  "grep -q '^## fake heading pasted' '$PLAN'"
 chk "I rotation happened (oldest entry archived)"  "grep -q 'MR entry 30 ' '$SANDBOX/mr-arch.md'"
 chk "I no conservation failure"                    "! grep -qi 'conservation FAIL' '$SANDBOX/out.txt'"
+
+# ===== BUG 4 (2026-08-06): a real section header must bound a region even with NO blank line before it =====
+# All three cases below FAIL against the pre-fix blank-preceded-only rule. Case J is the incident that parked
+# the daemon; K and L are the two sibling data-LOSS paths found while fixing it (J only under-compacts).
+noblank(){ perl -0pi -e "s/\n\n(## \Q$2\E)/\n\$1/" "$1"; }   # delete the blank line before header $2 in file $1
+isnoblank(){ awk -v hdr="$2" '$0 ~ ("^## " hdr){print (pb?"y":"n")} {pb=($0~/^[[:space:]]*$/)}' "$1" | grep -q '^n$'; }
+
+# ---------- Case J: Pass 1 — '## Daemon Report' with NO preceding blank line ----------
+# THE LIVE INCIDENT. Session Log entries are blank-SEPARATED and newest-PREPENDED, so the separator that ends up
+# against the NEXT header is exactly the one that goes missing. Old rule => the region ran to EOF, swept the whole
+# Daemon Report into the drop set, and aborted on the anchor guard EVERY cycle: plan never corrupted, never
+# compacted, 174,152 B = 96% of its context budget while Pass 1 should have been reclaiming ~11 KB a cycle.
+PLAN="$(make_plan 60 5)"
+noblank "$PLAN" "Daemon Report"
+chk "J precondition: DR header NOT blank-preceded"  "isnoblank '$PLAN' 'Daemon Report'"
+run "$PLAN"
+chk "J Pass 1 did NOT abort"                        "! grep -q 'Daemon Report lost' '$SANDBOX/out.txt'"
+chk "J slog compacted to KEEP=12"                   "[ \"\$(grep -c '^- SLOG entry ' '$PLAN')\" = 12 ]"
+chk "J kept the NEWEST slog entry (60)"             "grep -q '^- SLOG entry 60\$' '$PLAN'"
+chk "J archived the OLDEST slog entry (1)"          "grep -q '^- SLOG entry 1\$' '$SANDBOX/slog-arch.md'"
+chk "J Daemon Report header SURVIVED"               "grep -q '^## Daemon Report' '$PLAN'"
+chk "J DR entries survived inline"                  "grep -q 'MR entry 1 —' '$PLAN'"
+chk "J no DR content leaked into the slog archive"  "! grep -q 'MR entry' '$SANDBOX/slog-arch.md'"
+chk "J no conservation failure"                     "! grep -qi 'conservation FAIL' '$SANDBOX/out.txt'"
+
+# ---------- Case K: Pass 2 — a section AFTER Daemon Report with NO preceding blank line ----------
+# Case F proves the blank-preceded version survives. WITHOUT the blank, the old rule let Pass 2's region run to
+# EOF and sweep that entire section into the Daemon Report ARCHIVE — real data loss, and Pass 2's anchor list
+# (compact-plan.sh, the DR VALIDATION loop) does not include 'E2E findings', so nothing caught it. Masked in the
+# live plan only because Daemon Report happens to be its LAST section today.
+PLAN="$(make_plan 5 40 trailing)"
+noblank "$PLAN" "E2E findings"
+chk "K precondition: trailing header NOT blank-preceded" "isnoblank '$PLAN' 'E2E findings'"
+section "$PLAN" "E2E findings" > "$SANDBOX/preK-e2e.txt"
+run "$PLAN"
+chk "K DR still rotated to 15"                      "[ \"\$(grep -c '^\\*\\*\\[2026' '$PLAN')\" = 15 ]"
+chk "K trailing section header SURVIVED"            "grep -q '^## E2E findings' '$PLAN'"
+chk "K trailing section byte-identical"             "diff -q '$SANDBOX/preK-e2e.txt' <(section '$PLAN' 'E2E findings') >/dev/null"
+chk "K trailing section NOT swept into DR archive"  "! grep -q 'trailing section line' '$SANDBOX/mr-arch.md'"
+chk "K no conservation failure"                     "! grep -qi 'conservation FAIL' '$SANDBOX/out.txt'"
+
+# ---------- Case L: Pass 3 — '## HOLD QUEUE' with NO preceding blank line ----------
+# HOLD QUEUE is the OWNER-GATED list the daemon must never execute. With the old rule Pass 3's WORK QUEUE region
+# ran straight through it and archived its `[x]` lines out of the plan; Pass 3's own safety check counts only
+# `[ ]` open items, so a `[x]` hold item left silently. Needs a SUITE_TODO.md (Pass 3 refuses to archive an item
+# whose done-state it cannot independently prove) and a small WQ budget so the pass fires.
+qp="$SANDBOX/plan.md"; rm -f "$qp" "$qp.bak"
+{ printf '# P\n\nRUN STATUS: IN_PROGRESS\n\n## PRIME DIRECTIVES\n- x\n\n## RESUME PROTOCOL\n1. y\n\n## WORK QUEUE\n'
+  for i in $(seq 1 40); do printf -- '- [x] **WQ%d — shipped item %d.** %s\n' "$i" "$i" "$(head -c 200 /dev/zero | tr '\0' 'p')"; done
+  printf -- '- [ ] **WQOPEN — still open.**\n'
+  printf '## HOLD QUEUE\n- [x] **HOLD1 — owner-gated, ALREADY DONE.**\n- [ ] **HOLD2 — owner-gated, open.**\n\n## Session Log\n- SLOG entry 1\n\n## Daemon Report\n\n(preamble)\n'
+} > "$qp"
+printf '## Wave\n' > "$SANDBOX/SUITE_TODO.md"
+for i in $(seq 1 40); do printf -- '- [x] **WQ%d — shipped item %d.**\n' "$i" "$i" >> "$SANDBOX/SUITE_TODO.md"; done
+printf -- '- [x] **HOLD1 — owner-gated, ALREADY DONE.**\n' >> "$SANDBOX/SUITE_TODO.md"
+chk "L precondition: HOLD QUEUE NOT blank-preceded" "isnoblank '$qp' 'HOLD QUEUE'"
+AUTONOMOUS_PLAN="$qp" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch2.md" AUTONOMOUS_DR_ARCHIVE="$SANDBOX/mr-arch2.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$SANDBOX/wq-arch.md" WQ_MAX_BYTES=2000 \
+  bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/outL.txt" 2>&1
+chk "L Pass 3 ran (did not no-op)"                  "grep -qE 'archived .* WORK QUEUE|WQ ' '$SANDBOX/outL.txt'"
+chk "L HOLD QUEUE header SURVIVED"                  "grep -q '^## HOLD QUEUE' '$qp'"
+chk "L owner-gated DONE hold item still in plan"    "grep -q 'HOLD1 — owner-gated' '$qp'"
+chk "L owner-gated OPEN hold item still in plan"    "grep -q 'HOLD2 — owner-gated' '$qp'"
+chk "L no HOLD item leaked into the WQ archive"     "! grep -q 'owner-gated' '$SANDBOX/wq-arch.md'"
+chk "L the OPEN work item stayed inline"            "grep -q 'WQOPEN' '$qp'"
+chk "L no conservation failure"                     "! grep -qi 'conservation FAIL' '$SANDBOX/outL.txt'"
 
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="

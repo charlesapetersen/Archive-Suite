@@ -330,7 +330,7 @@ crash at a glance:
 | what you see | what it means |
 |---|---|
 | `reason: SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing` | An orderly system stop. **This is the normal case on a personal laptop** — closing the lid ends the login session and launchd TERMs the job. Not a defect. Just `./ops/autonomous/arm.sh` again. |
-| `reason: fell out of the main loop (rc 9 …)` | The daemon's own decision: `RUN STATUS: COMPLETE`, or it parked (idle past `IDLE_STOP`, attempt cap, disk guard, or a reproducible RED health gate). Check for `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`. |
+| `reason: fell out of the main loop (rc 9 …)` | The daemon's own decision: `RUN STATUS: COMPLETE`, or it parked (idle past `IDLE_STOP`, attempt cap, disk guard, or a reproducible RED health gate — which is **not necessarily a code regression**: the gate's `context-budget` step REDs when an orientation DOCUMENT is over its size budget while every build and suite is green, and the park note now names the failing step and says which kind it is). Check for `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`. |
 | `reason: SIGINT` / `SIGHUP` | Ctrl-C, or the controlling terminal/login session went away. |
 | a `daemon up` line with **no** matching `daemon down` | A **hard kill** — SIGKILL, OOM, or power loss. These cannot be trapped, so the *absence* of a line is itself the signature. On this laptop that is almost always the lid closing or the battery dying, not a bug. |
 
