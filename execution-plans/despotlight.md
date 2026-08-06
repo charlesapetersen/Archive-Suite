@@ -384,6 +384,19 @@ check all eight consumers before removing it.
 
 ### 4.5 `CorpusWatcher` — new (W26.fsev), FSEvents live updates — ✅ SHIPPED 2026-08-05
 
+> ⚠️ **Amended 2026-08-06 by `W26.fsev-fu1`.** "It starts the stream before the launch walk" is still the
+> guarantee, but the *mechanism* changed, and the original one was a bug: `FSEventStreamCreate` `open(2)`s
+> the root, and doing that synchronously on the main thread meant an unopenable root (unanswered TCC prompt,
+> stalled network/cloud mount, disconnected volume) hung `NavigationModel.init()` and **the app never drew a
+> window**. The start now runs on a dedicated `Thread` and the **walk** waits behind it
+> (`ArchiveLibrary.passWaitingForWatcher`, gating `beginScan` and `drainWatchWork`) instead of the main
+> thread waiting on the open. A 2-second `watcherStartTimeout` bounds that wait: past it, discovery proceeds
+> without live events and the UI says *"Archive folder is not responding"*
+> (`DiscoveryFailure.liveUpdatesStalled`); a stream that returns late is still adopted and owes exactly one
+> catch-up pass. **Anything that reintroduces a synchronous `start()` on the main actor — including a lock
+> inside `CorpusWatcher`, which a stuck `start()` would hold against `stop()` — reintroduces the hang.** The
+> *walk's own* `opendir` deadline is still missing: `W26.fsev-fu2`.
+
 The shipped implementation is `ArchiveReader/.../Search/CorpusWatcher.swift` plus the bounded merge/scheduler
 in `ArchiveLibrary`. It starts the stream before the launch walk (so there is no scan→watch gap), reads every
 retained path through `ArchiveCore.CorpusWalker.inspect`, and preserves the launch walk's hidden/package
@@ -420,10 +433,16 @@ byte-free tag write above *also* reported `ItemRenamed`, which never happened. T
 - **`FSEventStreamSetDispatchQueue` is required — run-loop scheduling is deprecated as of macOS 13.**
   Teardown order is mandated by the header: `Stop`, then **`Invalidate` while the stream is still
   scheduled**, then `Release`. Getting this wrong is a crash, not a warning.
-- **No event-ID persistence in v1.** Launch performs a complete walk, then the stream starts at
-  `kFSEventStreamEventIdSinceNow`. Non-ascending IDs and FullHistory values below the request make a naïve
-  persisted high-water mark a silent-loss mechanism. A recovered SinceNow stream is followed by one catch-up
-  walk so the outage interval cannot disappear.
+- **No event-ID persistence in v1.** Launch starts the stream at `kFSEventStreamEventIdSinceNow` and then
+  performs a complete walk (that order, per the amendment above — the walk is what waits). Non-ascending IDs
+  and FullHistory values below the request make a naïve persisted high-water mark a silent-loss mechanism.
+  A SinceNow stream that starts *after* discovery — a recovery, or a start whose open outran its deadline —
+  is followed by one catch-up walk so the unwatched interval cannot disappear.
+  *(A captured `FSEventsGetCurrentEventId()` would remove the ordering constraint outright by making the
+  replay authoritative, which `W26.fsev-fu1` considered and did not take: it makes
+  `kFSEventStreamEventFlagHistoryDone` arrive for the first time, and that flag is currently reduced to a
+  full rescan — so it would trade a bounded wait for a whole-corpus re-walk on every launch plus a rewrite of
+  a 20-test reducer. Revisit only with a correctness argument.)*
 - **`FSEventStreamFlushSync` gives tests a deterministic synchronisation point** — which is precisely the
   reason the fixture scripts currently poll `mdfind`, so it is what makes `W26.scripts` possible.
 - **`kqueue`/`DispatchSource.makeFileSystemObjectSource` is disqualified at this scale** (`EVFILT_VNODE`

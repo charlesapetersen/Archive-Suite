@@ -513,6 +513,11 @@ final class ArchiveLibrary: ObservableObject {
     /// no cancel — so its thread, and the security scope it took, leak for the life of the process.
     /// That is the price of the stall itself, not of this deferral.
     private func startWatcher(root: URL, holdingDiscovery: Bool) {
+        // One start at a time: a second `FSEventStreamCreate` on a root whose first one is stuck would
+        // block identically and leak a second thread. ⚠️ Returning here would ALSO drop
+        // `holdingDiscovery`, so a `holdingDiscovery: true` caller must never reach it — and cannot:
+        // `start(scope:)` calls `stopWatcher()` first, which clears `pendingWatcherStart`. Only
+        // `retryWatcherIfNeeded` can land here, and it passes `false`.
         guard pendingWatcherStart == nil else { return }
 #if DEBUG
         if isFixtureRoot {

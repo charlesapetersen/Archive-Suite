@@ -91,8 +91,8 @@ enum DiscoveryFailure: Equatable, Sendable {
             return "Archive Reader asked the system to watch the archive folder and has had no answer "
                  + "yet — usually an unanswered permission prompt, a stalled network or cloud volume, "
                  + "or a disconnected disk. The app stays usable while it waits, and it is listing "
-                 + "whatever it can read; live updates start as soon as the folder answers. Use ⌘⌥R "
-                 + "to try again."
+                 + "whatever it can read; live updates start on their own as soon as the folder "
+                 + "answers. ⌘⌥R re-scans now — it will not force the stalled request to return."
         case let .partiallyUnreadable(files, folders):
             let what = folders > 0
                 ? "Some items could not be read (\(files) file\(files == 1 ? "" : "s"), "

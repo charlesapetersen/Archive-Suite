@@ -2,7 +2,7 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## 🔴 OPEN (`W26.fsev-fu1`) — the app can hang at launch, with no window, while starting the FSEvents stream
+## ✅ FIXED (`W26.fsev-fu1`) — the app could hang at launch, with no window, starting the FSEvents stream
 
 **Found 2026-08-06** while shipping `W26.vocab-fu1`, from a stack sample rather than a reading. A Reader
 unit run sat for 9+ minutes at **0% CPU** in:
@@ -12,22 +12,32 @@ NavigationModel.init() → ArchiveLibrary.start(scope:) :186 → startWatcher :4
   → CorpusWatcher.start() :256 (FSEventStreamCreate) → open(2)   ← main thread
 ```
 
-`FSEventStreamCreate` opens the watched root, and it is called synchronously on the main thread during
+`FSEventStreamCreate` opens the watched root, and it was called synchronously on the main thread during
 `NavigationModel` construction. On local disk that is microseconds and invisible. Under an unanswerable TCC
 prompt, a stalled network/cloud mount, or a disconnected volume the `open` does not return and **the app
-never draws** — no window, no message, nothing to cancel. Everything else in this subsystem is already off
+never draws** — no window, no message, nothing to cancel. Everything else in this subsystem was already off
 the main thread (the launch walk has a dedicated `Thread`, the stream runs on its own queue); the stream's
-*creation* is the last synchronous step.
+*creation* was the last synchronous step.
 
-⚠️ Fixing it is a sequencing change, not a `DispatchQueue.async` around one line: `W26.fsev` deliberately
-starts the stream **before** the launch walk so no event between the two is lost. Tracked in `SUITE_TODO.md`
-§Wave 26.
+**Fixed 2026-08-06 (`a4aced6` → completion commit).** The start runs on a dedicated `Thread`, and
+`W26.fsev`'s ordering guarantee is preserved by inverting *who waits*: the launch **walk** is deferred behind
+the start instead of the main thread waiting on the open. A 2-second deadline bounds that deferral — an
+unopenable root now draws a window, lists whatever it can read, and says *"Archive folder is not
+responding"* (`DiscoveryFailure.liveUpdatesStalled`) instead of stalling silently. A stream that returns late
+is still adopted and pays for the interval it missed with exactly one catch-up pass. Full entry, including
+the three non-obvious decisions and the mutation results, in `SUITE_TODO_DONE.md` §Wave 26.
 
-**Practical consequence for testing right now:** this is how the long-known `DeepLinkTests` environment
-artifact (`testRevealAndSelectNoRoot` picks up the owner's real persisted `archiveRootBookmark`) now
-presents. It no longer merely *fails* — it **hangs the entire `ArchiveReaderTests` bundle**. Run the unit
-lane with `-skip-testing:ArchiveReaderTests/DeepLinkTests` rather than waiting it out. Proper isolation of
-the test itself is `W20.deeplink-isolation`.
+⚠️ **The walk's own `opendir` still has no deadline** — a root that will not open leaves the list in
+`.firstScan` indefinitely even though the status bar is now honest about it. That half is `W26.fsev-fu2`.
+
+**Practical consequence for testing — UNCHANGED, still skip it.** The long-known `DeepLinkTests` environment
+artifact (`testRevealAndSelectNoRoot` picks up the owner's real persisted `archiveRootBookmark`) presented as
+a **hang of the entire `ArchiveReaderTests` bundle** through this code path. The main-thread half of that is
+gone by construction, but whether the bundle still hangs is **not verified**: confirming it means provoking a
+TCC prompt on the owner's physical screen, which an unattended session may not do — and `CorpusWalker`'s
+`opendir` can block on the same root anyway (`W26.fsev-fu2`). Keep running the unit lane with
+`-skip-testing:ArchiveReaderTests/DeepLinkTests`. Proper isolation of the test itself is
+`W20.deeplink-isolation`.
 
 ## ✅ FIXED (`W26.walk2`) — Release discovery was Spotlight-only and could blame an unreadable index on files
 

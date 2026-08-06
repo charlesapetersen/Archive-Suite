@@ -820,6 +820,52 @@ final class CorpusWatcherLibraryTests: XCTestCase {
         XCTAssertNil(library.liveUpdateFailure,
                      "and the live root's healthy stream is not blamed for the abandoned one")
     }
+
+    /// What watcher IDENTITY buys over the root generation alone — and it takes this exact sequence to
+    /// see it, which is why the check is written on identity rather than on the generation.
+    ///
+    /// `receiveWatchRequest`'s RootChanged branch with **no resolver** installed — the documented
+    /// standalone/test-library fallback — stops the watcher and re-walks the SAME root, so
+    /// `rootGeneration` never moves. A ⌘⌥R then starts a *second* stream under that same generation.
+    /// When the first, abandoned start finally returns, a completion checking only the generation would
+    /// adopt it: a live stream on a root the app already decided it could not trust, and the pending
+    /// replacement discarded in its place.
+    func testAnAbandonedStartIsRefusedEvenThoughTheRootGenerationNeverMoved() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let watchers = BlockingWatcherLog()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0) { _, handler in
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            watchers.append(watcher)
+            return watcher
+        }
+        defer { watchers.releaseAll() }
+
+        library.start(scope: root)
+        let abandoned = try XCTUnwrap(watchers.all.first)
+        abandoned.waitUntilStarting()
+
+        library.receiveWatchRequestForTesting(CorpusWatchRequest(reResolveRoot: true))
+        // Dropping the held pass must not cost the walk: that branch requests its own urgent re-walk,
+        // and it is not held behind the abandoned start.
+        try await waitUntil { library.phase.isSettled }
+        XCTAssertEqual(library.files.map(\.url.lastPathComponent), ["a.pdf"])
+
+        library.rescan()                       // a second start, under the SAME root generation
+        try await waitUntil { watchers.all.count == 2 }
+        let replacement = watchers.all[1]
+        replacement.waitUntilStarting()
+
+        abandoned.release()
+        try await waitUntil { abandoned.stops == 1 }
+        XCTAssertFalse(library.flushWatcherForTesting(),
+                       "the abandoned stream must not quietly become the live one")
+        XCTAssertEqual(replacement.stops, 0, "nor may it displace the start that replaced it")
+
+        replacement.release()
+        try await waitUntil { library.flushWatcherForTesting() }
+        XCTAssertEqual(abandoned.stops, 1)
+    }
 }
 
 final class CorpusWatcherStreamTests: XCTestCase {
@@ -987,6 +1033,18 @@ private final class BlockingCorpusWatcher: CorpusWatching, @unchecked Sendable {
 }
 
 private final class BlockingWatcherCapture: @unchecked Sendable { var latest: BlockingCorpusWatcher? }
+
+/// Every watcher the factory made, in order, for the cases where *which* one got installed is the
+/// assertion. `releaseAll` in a `defer` keeps a blocked start from outliving its semaphore.
+private final class BlockingWatcherLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var watchers: [BlockingCorpusWatcher] = []
+    var all: [BlockingCorpusWatcher] { lock.lock(); defer { lock.unlock() }; return watchers }
+    func append(_ watcher: BlockingCorpusWatcher) {
+        lock.lock(); watchers.append(watcher); lock.unlock()
+    }
+    func releaseAll() { all.forEach { $0.release() } }
+}
 
 private final class CounterBox: @unchecked Sendable {
     private let lock = NSLock()

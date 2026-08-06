@@ -305,21 +305,20 @@ cache with no migration or legacy-state fallback, as directed. Fixture roots ans
 index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
 been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
 not run for this item and are carried into `W26.verify`.**
-- [ ] **W26.fsev-fu1 — `FSEventStreamCreate` blocks the MAIN THREAD at launch, unboundedly [S · med ·
-  Tier-2].** Filed 2026-08-06 by `W26.vocab-fu1`, from a stack sample rather than a reading:
-  `NavigationModel.init()` → `ArchiveLibrary.start(scope:)` (`:186`) → `startWatcher` (`:465`) →
-  `CorpusWatcher.start()` (`:256`, `FSEventStreamCreate`) → **`open(2)`, on the main thread**. Caught
-  because a Reader unit run hung there for 9+ minutes at 0% CPU against the owner's real corpus root —
-  under an unanswerable TCC prompt the `open` never returns and the app never draws. Local disk makes this
-  invisible (microseconds); a TCC prompt, a stalled network/cloud mount or a disconnected volume makes it
-  an app that hangs at launch with no window and no message. Everything else about this subsystem is
-  already off-thread — the launch walk is on a dedicated `Thread`, the stream runs on its own queue — so
-  the stream *creation* is the one synchronous step left. ⚠️ Moving it off the main thread must preserve
-  `W26.fsev`'s ordering guarantee that the stream starts BEFORE the launch walk, or events between the two
-  are lost; that ordering is the whole reason it is where it is, so this is a sequencing change, not a
-  `DispatchQueue.async` around one line. **Test:** a root whose `open` blocks (a `0o000` directory the
-  sandbox must prompt for, or a fake mount) leaves the main thread responsive and surfaces a timeout state
-  rather than a silent stall.
+- [ ] **W26.fsev-fu2 — a first scan against a root that will not open spins "Scanning…" forever; only the
+  *stream* half got a deadline [S · low · Tier-1 · needs: none].** Filed 2026-08-06 by `W26.fsev-fu1`,
+  which measured the remaining half of the same stall rather than inferring it. That item bounded the
+  FSEvents stream's `open(2)` with `watcherStartTimeout`, so an unopenable root now draws a window and says
+  *"Archive folder is not responding"*. But `CorpusWalker`'s own `opendir(3)` probe blocks on exactly the
+  same root, on its dedicated `Thread`, with **no deadline at all** — so `LibraryPhase` stays
+  `.firstScan(done: 0, seen: 0)` indefinitely and `phase.failure` never becomes `.rootUnreadable`. The
+  status bar is honest (the live-update channel says so) while the list's own state is not, which is the
+  exact split this wave exists to close. ⚠️ Cancelling a blocked `opendir` is not possible either, so the
+  fix is a *reported* deadline, not a cancellation: after N seconds with zero files seen, publish a
+  degraded phase that says the folder has not answered, and let a late-arriving pass supersede it (the
+  generation token already permits that). Do NOT make the timeout a reason to prune or to treat absence as
+  authoritative — `DiscoveryHealth` must still refuse that. **Test:** a first scan whose walk never returns
+  reaches a stated degraded phase, and a pass that finishes after the deadline still publishes its rows.
 - [ ] **W26.symroot — an archive root that is ITSELF a symlink cannot be discovered at all [S · low ·
   Tier-2 · needs: none].** Filed 2026-08-06 by `W26.vocab-fu1`, measured while writing its openability
   probe: `FileManager.enumerator(at:)` **refuses a root that is a symbolic link** — it reports the link to

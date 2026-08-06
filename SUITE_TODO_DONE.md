@@ -18,6 +18,73 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.fsev-fu1 — `FSEventStreamCreate` no longer opens the root on the MAIN THREAD at launch
+  [S · med · Tier-2]. ✅ SHIPPED 2026-08-06** — `a4aced6` (the sequencing + 5 tests) → this commit (the
+  identity case, the suite-wide lanes, the VM lane, trackers).
+
+  **The defect.** `NavigationModel.init()` → `ArchiveLibrary.start(scope:)` → `startWatcher` →
+  `CorpusWatcher.start()` → `FSEventStreamCreate` → **`open(2)`, on the main thread.** Found by
+  stack-sampling a Reader unit run that sat 9+ minutes at 0% CPU against the owner's real corpus root, not
+  by reading the code. On local disk the open is microseconds, which is how it survived a whole wave; under
+  an unanswerable TCC prompt, a stalled network/cloud mount or a disconnected volume it never returns and
+  **the app never draws a window** — no message, nothing to cancel.
+
+  **Why it was not a `DispatchQueue.async` around one line.** `W26.fsev` deliberately starts the stream
+  BEFORE the launch walk, because a change in the interval between them is lost for good
+  (`kFSEventStreamEventIdSinceNow` cannot replay it). The fix keeps that ordering and inverts *who waits*:
+  the **walk** is now deferred behind the start (`passWaitingForWatcher`, gating both `beginScan` and
+  `drainWatchWork`) instead of the **main thread** waiting on the open. Same guarantee, different victim.
+
+  **The deferral is bounded.** `watcherStartTimeout` (2 s) turns a silent stall into a drawn window: a root
+  that will not open degrades to "list what you can, no live updates" with a new
+  `DiscoveryFailure.liveUpdatesStalled` — *"Archive folder is not responding"*, distinct from
+  `liveUpdatesUnavailable`, which is a **finished** answer about a journal-less volume rather than "no
+  answer yet". The start is not abandoned: if it ever returns, the stream is adopted and pays for the
+  interval it missed with **exactly one** catch-up pass. `retryWatcherIfNeeded` therefore no longer reports
+  an outcome (it cannot), and `revalidateOnActivation` gets its catch-up from the start's own completion
+  instead of from a synchronous return value.
+
+  **Three decisions that are not obvious, each measured or reasoned rather than assumed.** (1) A dedicated
+  `Thread`, not a shared queue — a start stuck in `open` must not hold a pool slot that the NEXT root's
+  start would queue behind, which would make one bad volume cost every subsequent one its live updates.
+  (2) `CorpusWatching` gains `Sendable` but deliberately **no lock**: a lock held by a `start()` that never
+  returns would block `stop()` on the main thread and restore the original bug in a new place. Safety comes
+  from the call discipline instead (`stop()` only ever on an instance whose `start()` has returned), which
+  is now written down on the protocol. (3) `watcherDidStart` checks watcher **identity**, not just root
+  generation. Every abandonment path clears `pendingWatcherStart`, and the one sequence where the generation
+  cannot help — a RootChanged event with no resolver installed re-walks the *same* root, then ⌘⌥R starts a
+  second stream under that same generation — is now a test. Removing the identity clause was **verified** to
+  fail it; the first version of that test passed without the clause and was rewritten for that reason.
+
+  **DEBUG fixture roots keep the inline start, on purpose.** `beginScan`'s fixture branch is synchronous
+  because two shipped tests read `files` the moment `NavigationModel()` returns and the XCUITest lane's
+  `waitForRows` timings were calibrated against that; a fixture root is a scratch directory the test itself
+  just made on local disk, where the hazard cannot arise. One `isFixtureRoot` spelling now serves all three
+  behaviours that key off it, so they cannot drift.
+
+  **Tests: 6 new cases in `CorpusWatcherLibraryTests`** — the syscall runs off the main thread (the defect
+  itself, pinned at its narrowest); the walk waits for the stream while `start(scope:)` returns; a stalled
+  start still lists what is readable, says why, and later adopts the stream with one catch-up pass; a
+  stalled start that fails late reports the journal answer instead of the stall wording; a root switch
+  abandons a still-stuck start; and the identity case above. **Three mutations, all caught by name**:
+  dropping the identity check, making a late stream owe no catch-up pass, and removing the walk's hold each
+  failed a specific test. `testBurstQueuesAtMostOneMoreRootWalk` now asserts 0 passes mid-burst rather than
+  1 — the coalescing invariant it exists for is unchanged, the launch walk simply has not started yet.
+
+  **Lanes.** Reader Debug **349/349** executed unit tests (the known `DeepLinkTests` env artifact excluded)
+  with 0 source warnings; Reader Release clean; write-surface lint clean + self-test 14/14; **Reader
+  XCUITests 17/17 in the headless Tart VM** (the fixture was indexed 0/11 by Spotlight and the app still
+  listed everything — `W26.walk2`'s hostile proof, re-run against the new launch sequencing, which is the
+  one lane that could have caught a fixture-synchrony regression). No `ArchiveCore` change, so no cross-app
+  rebuild was owed; no host-screen automation and no real-corpus access.
+
+  **Filed:** `W26.fsev-fu2` — the *walk*'s own `opendir` has no deadline, so an unopenable root still spins
+  `.firstScan` forever even though the status bar is now honest about it.
+  **Not verified, deliberately:** whether this also stops the `DeepLinkTests` bundle **hang** described in
+  Reader `KNOWN_ISSUES.md`. Confirming it means provoking a TCC prompt on the owner's physical screen, which
+  an unattended session may not do. The main-thread half of that presentation is gone by construction; the
+  environment artifact itself remains `W20.deeplink-isolation`.
+
 - [x] **W26.vocab-fu1 — ArchiveCore: a missing or unopenable ROOT is now `rootUnreadable` [S · low ·
   Tier-1]. ✅ SHIPPED 2026-08-06** — `e050ebd` (the probe, the lint fix, ArchiveCore tests) → this commit
   (the app lanes + trackers).
