@@ -976,8 +976,9 @@ private struct SegmentTagCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text("Subjects").font(.callout).fontWeight(.medium)
-                // The Spotlight tag index is still gathering — tell the operator, so an empty suggestion
-                // list reads as "still loading" rather than "no matching tags." Clears when the query finishes.
+                // A cold first-run vocabulary harvest is still walking the archive root — tell the operator,
+                // so an empty suggestion list reads as "still loading" rather than "no matching tags."
+                // Since W26.vocab the vocabulary is PERSISTED, so this shows once, not on every launch.
                 if !tagsProvider.isReady {
                     ProgressView().controlSize(.small)
                     Text("building tag suggestions…").font(.caption2).foregroundStyle(.secondary)

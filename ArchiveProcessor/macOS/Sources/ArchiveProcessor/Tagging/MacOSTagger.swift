@@ -51,7 +51,7 @@ struct MacOSTagger {
         stampUnread isStamping: Bool
     ) throws -> TagWriteResult {
 
-        return try CoordinatedTagWriter.write(url) { current, label in
+        let result = try CoordinatedTagWriter.write(url) { current, label in
             // Copy-source mode (stampUnread == false): pass the source tag names through verbatim.
             // Do NOT reinterpret color words as Finder labels or touch the label number — the
             // standard color names round-trip as labels on their own, and manual mapping here would
@@ -101,6 +101,14 @@ struct MacOSTagger {
 
             return (allTagNames, targetLabel)
         }
+
+        // Feed the subject-autocomplete vocabulary from what VERIFIED on disk, not from what we intended
+        // (W26.vocab). One of three ingest paths that replaced the Spotlight query; `TagVocabulary` keeps
+        // only the subject facet, so the trailing "Unread" and the date/priority/colour tokens this write
+        // just stamped cannot become suggestions. Read-only with respect to the file — a suggestion list is
+        // never a write authority — and after the `try`, so a refused write contributes nothing.
+        ProcessorTagVocabulary.recordWrittenTags(result.after, labelNumber: result.afterLabel)
+        return result
     }
 
     @discardableResult
