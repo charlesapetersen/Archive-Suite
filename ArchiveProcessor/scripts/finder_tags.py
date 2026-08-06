@@ -130,7 +130,15 @@ def _self_test():
 
         untagged = mk('untagged.pdf')
         names, label, status = read_tags(untagged)
-        check((names, label, status) == ([], 0, ABSENT), f"untagged file -> {(names, label, status)!r}")
+        check((names, label, status) == ([], 0, ABSENT), f"no tag xattr at all -> {(names, label, status)!r}")
+
+        # An attribute that is PRESENT but zero-length: a readable "no tags", NOT a failure. Distinct
+        # from the case above (the attribute is in `xattr <file>`'s listing), and its own branch in
+        # read_tags — W26.deny measured that calling this an error mis-flagged 51 real corpus files.
+        # Without this fixture, mutating that branch to UNREADABLE survives the suite.
+        zerolen = mk('zero-length-attr.pdf', raw='')
+        names, label, status = read_tags(zerolen)
+        check((names, label, status) == ([], 0, ABSENT), f"zero-length tag xattr -> {(names, label, status)!r}")
 
         names, label, status = read_tags(os.path.join(d, 'vanished.pdf'))
         check(status == UNREADABLE, f"missing file -> status {status!r} (want {UNREADABLE!r})")

@@ -229,7 +229,11 @@ exit 0, "✓ clean".
   (shipped by `W26.vocab`) also has no caller — it is the Tier-2 gate on the tag-write vocabulary hook and
   the `$HOME`-walk prohibition, and it takes ~1 min, so wire it in with the other two. It needs no key, no
   network and no GUI, and it is self-contained (`mktemp -d`, `-outputDirectory` in the volatile argument
-  domain), so it is safe on the gate. Green on `a25ee02`.
+  domain), so it is safe on the gate. Green on `a25ee02`. ➕ **Third script, same gap, added 2026-08-06:**
+  `ArchiveProcessor/scripts/test-finder-tags.sh` (shipped by `W26.oracle`) — it is the differential proof that
+  the E2E oracle reads Finder tags from the xattr and not Spotlight, and it is the cheapest thing on this
+  list: **~2 s**, no key, no network, no GUI, no app build, `mktemp` only. Wire it in with the other three.
+  Green on this commit.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -331,13 +335,35 @@ have reset the phase to "Scanning…" while `drainWatchWork` refused to start an
   its target's tagged files; the discovered `URL`s still compare byte-equal to what the caller's root
   prefix would produce; `CorpusWalkerTests
   .testARootThatIsItselfASymlinkIsUnreadableBecauseTheEnumeratorRefusesIt` is rewritten, not deleted.
-- [ ] **W26.oracle — Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` [S · low · Tier-1 ·
-  needs: none].** `ArchiveProcessor/scripts/assert_mac.py:43` reads Finder tags via
-  `sh("mdls", "-name", "kMDItemUserTags", p)` (consumed `:44`, `:55`). **During the 2026-08-04 incident this
-  oracle would have reported empty tags and failed an otherwise-passing build** — the same failure mode as
-  the Reader, in the test lane. Swap in `tier2_assert.py`'s Spotlight-free `disk_tags()`. **Unblocked — can
-  go first.** **Test:** the Tier-2 assertion suite passes on a fixture whose volume has indexing disabled
-  (`mdutil -i off` on a scratch DMG, or simply never `mdimport`-ed) — today's oracle fails that.
+✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
+item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
+read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own
+output location (`/tmp/ap-e2e-$$/out`, `e2e-phone-mac.sh:34-35`), `mdls -name kMDItemUserTags` answers
+`(null)` — **exit 0** — for a file whose tags are provably on disk, because `/tmp` and `/var/folders` are
+never indexed. So the tag half of the E2E year check was not fragile, it was **dead in every run that has
+ever happened**; `year` has only ever been satisfiable from the output filename or the extracted text. The
+risk was never a false FAIL, it was silent loss of assertion coverage. New shared reader
+`ArchiveProcessor/scripts/finder_tags.py` (`read_tags` → `ok`/`absent`/`unreadable`, W26.deny's distinction
+in Python); `tier2_assert.py`'s `disk_tags` moved into it with **byte-identical** old-vs-new output proven on
+a synthetic run dir; new gate `./ArchiveProcessor/scripts/test-finder-tags.sh` (26 checks, 6/6 mutants
+caught). **Nothing under `ArchiveProcessor/scripts/` reads Spotlight any more** — `grep -rn
+"mdls\|mdfind\|mdimport\|kMDItem\|NSMetadataQuery"` over that tree returns only the two docstring lines that
+explain why not.
+
+- [ ] **W26.oracle-fu1 — `tier2_assert.py` reports a PASS for tags it could not read [S · low · Tier-2 ·
+  money-lane oracle].** Filed 2026-08-06 while shipping `W26.oracle`; **pre-existing**, and deliberately not
+  fixed there (one item per change — the swap was `assert_mac.py`'s). `tier2_assert.py` calls
+  `disk_tags(pdf_path)`, the compatibility shape that collapses *verified no tags* and *could not read the
+  tags* into the same `([], 0)`. Its `mode == 'none'` hard check is `check(tags == [], …)` — so a denied,
+  vanished or malformed tag xattr on a driver output **passes** the assertion that the pipeline wrote no
+  tags. That is the W26.deny defect (`2956f3c`) surviving in the Python oracle for the one lane that really
+  tags files. Fix: call `read_tags` and fail closed on `unreadable` in every mode, not just `none`.
+  ⚠️ **It needs neither a key nor the paid lane, contrary to how it looks:** `tier2_assert.py` is a pure
+  function of a run dir, so a `mktemp` dir holding a hand-written `manifest.tsv` plus tagged scratch files
+  drives every branch for free — that is exactly how `W26.oracle` proved its own change byte-identical. Do
+  not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
+  see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
+  message naming the unreadable read, in `none` and `automatic` alike.
 - [ ] **W26.reinfect — stop the approved JPEGS item from re-introducing `NSMetadataQuery` [S · low ·
   Tier-1 · needs: none].** `SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the
   JPEGS tree (**a second `NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of

@@ -18,6 +18,71 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.oracle — the E2E test oracle reads Finder tags from the xattr, not `mdls` [S · low · Tier-1].
+  ✅ SHIPPED 2026-08-06** — `50ea4a1` (the shared reader + the byte-identical predecessor proof) → this
+  commit (the swap, the gate, the trackers).
+
+  **The defect, and the correction to how the item described it.** `assert_mac.py:43` built its Finder-tag
+  blob with `sh("mdls", "-name", "kMDItemUserTags", p)`, consumed at `:44`/`:55` by the assertion *"every
+  expected year appears in an output filename OR a Finder tag."* The item said this *"would have"* reported
+  empty tags during the 2026-08-04 incident. **Measured on this machine, that is too kind.** The harness puts
+  TESTOUT at `/tmp/ap-e2e-$$/out` (`e2e-phone-mac.sh:34-35`), and neither `/tmp` nor `/var/folders` is
+  Spotlight-indexed — so on a file whose tags `xattr -px` returns in full, `mdls` answers
+  `kMDItemUserTags = (null)` and **exits 0**. The tag branch of that year check has therefore been **dead in
+  every E2E run there has ever been**; `year` could only ever be satisfied by the output filename or the
+  extracted text. The real cost was never a false FAIL — it was a silently missing assertion: a regression
+  that stopped writing the year into filenames but kept tagging it correctly would have been reported as
+  *"date extraction or tagging broke"*, and a regression that broke only tagging could not be caught at all.
+
+  **What shipped.** `ArchiveProcessor/scripts/finder_tags.py` is now the one Spotlight-free Finder-tag reader
+  for the Processor's oracles. `read_tags(path) -> (names, label, status)` reports **why** an empty answer is
+  empty — `absent` (verified) vs `unreadable` (denied, vanished, malformed, timed out) — which is W26.deny's
+  distinction (`2956f3c`, `ArchiveCore.TagXattr.inspect`) carried into the Python lane. Only the exact
+  `No such xattr` stderr signature confirms absence, so a future macOS wording change degrades to *"I could
+  not look"* and never to a false *"there is nothing here"*. A **zero-length** attribute is `absent`, not an
+  error, because W26.deny measured that calling size 0 a failure mis-flagged 51 real corpus files.
+  `assert_mac.py` now folds the xattr-read tag names into its blob, **prints the tags it read** (the E2E
+  report showed nothing about tags before), and when a year is missing while any tag read failed it says the
+  check *"may be a blind check rather than a real failure"* instead of blaming tagging.
+
+  **`tier2_assert.py` was touched, so the gate was equivalence, not a bare import.** It owns the assertions
+  for `test-tier2.sh` — the one driver that really tags files — so its local `disk_tags` was moved into the
+  shared module verbatim, and the **predecessor** (`git show HEAD:`) and the new version were run against the
+  same synthetic run dir in all three tagging modes from a foreign cwd: byte-identical stdout and exit codes,
+  including the tag-derived assertion text (`tags=['Red','Box','Unread']`, `labelNumber=6`), so the
+  comparison is not vacuous. That also proves the sibling import resolves as actually invoked — `python3
+  "$REPO/scripts/tier2_assert.py"` puts the scripts dir on `sys.path[0]`.
+
+  **The gate: `./ArchiveProcessor/scripts/test-finder-tags.sh`** (~2 s, no key, no network, no app build,
+  `mktemp` only). Lane 1 is `finder_tags.py --self-test`: every status branch against a real fixture —
+  tagged, no-xattr-at-all, zero-length xattr, vanished, `0o000`, non-plist value, bare colour name with no
+  `\nINDEX` suffix — plus a no-write assertion. Lane 2 builds the incident inside the test lane: a `/tmp`
+  fixture Spotlight has never indexed, whose expected year exists **only** as a Finder tag, with the ground
+  truth held **outside** TESTOUT (inside it, the oracle would find the year in its own ground-truth file and
+  the lane would pass without reading a tag). Four linked assertions: `mdls` finds no year there; the oracle
+  PASSES anyway; stripping the tag makes it FAIL (so the pass was *caused* by the tag); making the tag
+  unreadable makes it FAIL *while naming the blind read*. 26 checks green.
+
+  **Mutation-tested rather than assumed green, and it found a real hole.** Six mutants, and the first pass
+  killed only five: reverting to `mdls`, calling a denied read `absent`, dropping the blind-read diagnostic,
+  losing the bare-colour label index, and dropping tags from the year blob were all caught by a named check —
+  but **making a zero-length xattr `unreadable` SURVIVED**, because every "no tags" fixture had no attribute
+  at all and so never reached that branch. A present-but-empty attribute (`xattr -w … "" file`, which does
+  appear in the attribute listing) was added; that mutant is now caught by name. This is the branch W26.deny
+  measured against the real corpus, so it was the one that most needed a fixture.
+
+  **Filed:** `W26.oracle-fu1` — `tier2_assert.py` still calls the compatibility `disk_tags`, so an unreadable
+  tag xattr **passes** its `mode == 'none'` assertion that no tags were written; that is the W26.deny defect
+  surviving in the money lane's oracle, and it needs no key to fix or test. `W26.lint-fu` extended to wire
+  `test-finder-tags.sh` into the health gate — a test nothing runs is the `W26.lint` failure mode, and this
+  wave has now shipped three such scripts.
+
+  **Not done, deliberately:** `test-tier2.sh` was not run. It needs a Gemini key, costs money, and **cannot
+  pass on this machine at all** — `pypdf` is not installed, and `tier2_assert.py` makes that a hard failure
+  (`"pypdf not available — cannot verify PDF structure"`). Raised in the Daemon Report rather than fixed
+  inside this item. The equivalence proof above is what stands in for it, and it is stronger than a single
+  live run: it compares every assertion's text against the predecessor instead of just checking a verdict.
+
 - [x] **W26.fsev-fu2 — a first scan against a root that will not open no longer spins "Scanning…" for ever
   [S · low · Tier-1]. ✅ SHIPPED 2026-08-06** — `5b4a8c8` (the deadline) → this commit (5 tests, 4 mutants,
   the lanes, trackers).

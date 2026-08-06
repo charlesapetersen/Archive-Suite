@@ -99,6 +99,19 @@ reported empty tags and failed an otherwise-passing build** — the same failure
 test lane. Replace with `tier2_assert.py`'s `disk_tags()`. Independently shippable; was not in the
 original inventory.
 
+> ✅ **SHIPPED as `W26.oracle` (2026-08-06, `50ea4a1` → the completing commit) — and the "would have" above
+> is WRONG, measured.** The harness puts TESTOUT at `/tmp/ap-e2e-$$/out` (`e2e-phone-mac.sh:34-35`), and
+> neither `/tmp` nor `/var/folders` is Spotlight-indexed. On a file whose tags `xattr -px` returns in full,
+> `mdls -name kMDItemUserTags` answers `(null)` and **exits 0**. So this oracle was not *fragile during an
+> incident* — its tag branch was **dead in every E2E run that has ever happened**, and `year` has only ever
+> been satisfiable from the output filename or the extracted text. The failure mode is not a false FAIL but a
+> silently absent assertion. `disk_tags` moved into a new shared `ArchiveProcessor/scripts/finder_tags.py`
+> (whose `read_tags` also reports `absent` vs `unreadable` — §4a.1's distinction, in Python), and
+> `tier2_assert.py` was proven byte-identical against its own predecessor before being switched over. Gate:
+> `./ArchiveProcessor/scripts/test-finder-tags.sh`. **Generalise the lesson when reading the rest of this
+> plan: every `mdls`/`mdfind` site under a `mktemp`/`/tmp` path is presumed BLIND, not merely slow — check
+> whether the site's location is indexable before writing down what its failure mode was.**
+
 ### Site 7 — a **future re-infection** already approved in the backlog
 
 `SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the JPEGS tree (**a second
@@ -953,9 +966,17 @@ writer.
   file whose tags changed **while the app was not running** is corrected on revalidation (this is the
   test that catches the `resourceValues` caching trap, §5.1).
 - `W26.vocab` — vocabulary survives relaunch and accumulates across roots; no `$HOME` walk occurs.
-- `W26.oracle` — the Tier-2 assertion suite passes on a fixture whose volume has **indexing disabled**
-  (`mdutil -i off` on a scratch DMG, or simply never `mdimport`-ed). Today's `mdls` oracle fails that;
-  `disk_tags()` must not. This is the incident reproduced inside the *test lane*.
+- `W26.oracle` — ✅ **DONE 2026-08-06.** The gate as written wanted "the Tier-2 assertion suite on a volume
+  with indexing disabled", which conflated two scripts (`tier2_assert.py` is the Tier-2 oracle;
+  `assert_mac.py` is the E2E one, and it is the `mdls` site) and would have needed a scratch DMG, a Gemini
+  key and a paid run. What shipped instead is cheaper and proves more:
+  `./ArchiveProcessor/scripts/test-finder-tags.sh` — no `mdutil`, no DMG, because a plain `mktemp`/`/tmp`
+  fixture is **already** un-indexed (that is the whole finding). It asserts the year-only-as-a-tag fixture
+  PASSES, that `mdls` cannot see that tag, that **stripping** the tag makes it FAIL (so the pass was caused
+  by the tag), and that an **unreadable** tag fails while saying the check went blind. 26 checks, 6/6 mutants
+  caught. `tier2_assert.py` was switched to the same shared reader under a byte-identical-output proof
+  against its own predecessor, since running it for real costs money and needs `pypdf`, which is not
+  installed here.
 - `W26.reinfect` — `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's own
   historical notes, and `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
 - `W26.verify` — full-scale run against a **scratch copy** (never the real corpus), 100k+ files:

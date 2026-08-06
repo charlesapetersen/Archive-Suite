@@ -69,8 +69,18 @@ clicking**, via a headless hook built into the app (`Capture/ProcessFilesTestDri
   (accepting the LLM's segmentation/tagging proposals), so it runs fully unattended.
 - The app writes only a `TEST_DONE.txt` marker + a small `manifest.tsv` (per-file classification +
   status). **All PDF / Finder-tag / sidecar verification is done externally** by `scripts/tier2_assert.py`
-  reading the run dir *after* the app exits (reading tags in-process contends with Spotlight and wedges).
-  Needs `pypdf` (present) for PDF page/header checks.
+  reading the run dir *after* the app exits. Finder tags come from `scripts/finder_tags.py`, which reads the
+  `com.apple.metadata:_kMDItemUserTags` **xattr** directly — shared with `scripts/assert_mac.py` since
+  `W26.oracle`, and verified by `./scripts/test-finder-tags.sh` (~2 s, no key, no app build).
+  ⚠️ **The parenthetical that used to sit here — *"reading tags in-process contends with Spotlight and
+  wedges"* — is an UNVERIFIED rationale for this whole out-of-process architecture, and is flagged as
+  `execution-plans/despotlight.md` §"Site 8" rather than acted on.** No tag read on this path has ever gone
+  through Spotlight: `tier2_assert.py` has always used the xattr, and `TagReading.read` uses
+  `url.resourceValues`. The likelier cause is the main-actor context named two bullets up. Do not delete this
+  architecture on the strength of that, and do not restate the Spotlight claim as fact.
+  ⚠️ **`pypdf` is NOT installed on this machine** (measured 2026-08-06; this line used to say "present").
+  `tier2_assert.py` makes that a **hard failure** — *"pypdf not available — cannot verify PDF structure"* — so
+  `test-tier2.sh` cannot pass here at all until someone installs it.
 - Each case launches the app with env config, waits for the marker, kills the app, asserts, and cleans up
   the pipeline's `pending_run.json` resume-state so no stale "Resume Run" prompt is left behind.
 

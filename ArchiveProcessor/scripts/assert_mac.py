@@ -9,10 +9,16 @@ every injected document actually flowed through the REAL Mac pipeline:
 PDF text is extracted by the compiled `pdftext` helper (PDFKit). We also scan any
 *.json/*.txt manifest under TESTOUT so the check is robust to output layout.
 
+Finder tags are read from the tag **xattr** (`finder_tags.read_tags`), never via `mdls`/Spotlight —
+TESTOUT lives under `/tmp` (`e2e-phone-mac.sh:34-35`), which Spotlight does not index, so `mdls` used
+to answer `(null)` here for correctly tagged output and this half of the year check never fired at all.
+
 Usage: assert_mac.py <TESTOUT_DIR> <ground_truth.json> <pdftext_bin>
 Exit 0 = PASS, 1 = FAIL.
 """
 import json, os, subprocess, sys, glob
+
+from finder_tags import read_tags, UNREADABLE
 
 testout, gt_path, pdftext = sys.argv[1], sys.argv[2], sys.argv[3]
 gt = json.load(open(gt_path))
@@ -40,13 +46,24 @@ alltext = "\n".join(blob)
 
 # Filenames + Finder tags across everything under TESTOUT (years land in the name and/or as a Finder tag).
 names = "\n".join(os.path.relpath(p, testout) for p in glob.glob(os.path.join(testout, "**", "*"), recursive=True))
-tags = "\n".join(sh("mdls", "-name", "kMDItemUserTags", p) for p in pdfs)
-name_tag_blob = names + "\n" + tags
+# Tags from the xattr, not Spotlight — see the module docstring. `read_tags` also says whether an empty
+# answer is verified-empty or unreadable, so a blind read cannot be reported as a tagging failure.
+tag_names, unreadable = [], []
+for p in pdfs:
+    found, _label, status = read_tags(p)
+    tag_names.extend(found)
+    if status == UNREADABLE:
+        unreadable.append(os.path.relpath(p, testout))
+name_tag_blob = names + "\n" + "\n".join(tag_names)
 
 print(f"[assert] TESTOUT={testout}")
 print(f"[assert] {len(pdfs)} PDF(s), {len(manifests)} manifest/text file(s)")
 for p in pdfs:
     print(f"[assert]   pdf: {os.path.relpath(p, testout)}")
+print(f"[assert] Finder tags on output (xattr, no Spotlight): {sorted(set(tag_names)) or '(none)'}")
+if unreadable:
+    print(f"[assert] WARN: could not READ Finder tags on {len(unreadable)} file(s) — any tag-based check "
+          f"below is blind, not failing: {', '.join(unreadable[:5])}")
 
 fails = []
 for d in gt:
@@ -57,7 +74,11 @@ for d in gt:
     if not tok_ok:
         fails.append(f"{f}: OCR token '{tok}' not found in any output (OCR or plumbing broke)")
     if not yr_ok:
-        fails.append(f"{f}: year '{yr}' not in any filename/tag/text (date extraction or tagging broke)")
+        why = "date extraction or tagging broke"
+        if unreadable:
+            why += (f"; but the tag read FAILED on {len(unreadable)} file(s), so this may be a blind "
+                    f"check rather than a real failure — see the WARN above")
+        fails.append(f"{f}: year '{yr}' not in any filename/tag/text ({why})")
 
 if not pdfs:
     fails.append("no output PDFs under TESTOUT (finalize did not produce documents)")

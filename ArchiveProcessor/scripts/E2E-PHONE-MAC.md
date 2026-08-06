@@ -19,6 +19,13 @@ path to the Mac, is OCR'd by the real provider, tagged, rendered to a PDF, and f
 that each fixture's **unique OCR token** (e.g. `MEMO-ALPHA-4471`) and its **year** appear in the Mac's
 finalized output. Both sides are checked (Mac output + per-doc phone screencaps).
 
+The year may land in an output **filename** or a **Finder tag**, and `assert_mac.py` accepts either. ⚠️ Until
+`W26.oracle` (2026-08-06) the tag half never actually fired: it read tags via `mdls`, and TESTOUT lives under
+`/tmp` (below), which Spotlight does not index — so `mdls` returned `(null)` with exit 0 for correctly tagged
+output, in every run. Tags now come from the xattr via `scripts/finder_tags.py`; the oracle **prints the tags
+it read**, and if a year is missing while any tag read failed it says the check may be blind rather than
+blaming tagging. Guarded by `./scripts/test-finder-tags.sh`, which needs no emulator, key or network.
+
 ## Why emulator + inject (not a physical phone)
 A physical phone's camera is non-deterministic (framing/lighting/focus) and can't be driven unattended.
 The emulator runs the **identical** app build; a **debug-only** capture-inject seam (stripped from
