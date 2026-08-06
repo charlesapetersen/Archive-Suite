@@ -1381,8 +1381,11 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
-- [ ] **Reader/Notes: PDF + JPEG dual image reference** (owner, 2026-07-17; **design decided + premise corrected
-  by a full corpus audit 2026-07-29**). Let a Reader image entity — and thus the durable link surfaced in Notes —
+- [ ] **W24.jpeg1 — Reader/Notes: PDF + JPEG dual image reference** (blocked-on: W26.walk2, W26.verify)
+  (owner, 2026-07-17; **design decided + premise corrected by a full corpus audit 2026-07-29**; tagged
+  `W24.jpeg1` on 2026-08-06 by `W26.reinfect` — it had no tag, so `W26.reinfect` and the despotlight plan both
+  had to cite it by a line number that had already gone stale by 336 lines).
+  Let a Reader image entity — and thus the durable link surfaced in Notes —
   reference **both** an archival PDF and its JPEG partner (opens the PDF by default; user can switch to the
   higher-detail JPEG when the PDF lost resolution). Supports the DEVONthink import
   (`execution-plans/devonthink-import.md` §4a) but is a standalone Reader feature.
@@ -1408,10 +1411,38 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   **Decided design (owner, 2026-07-28/29):**
   1. **Root:** raise Reader's granted root to the common parent so both trees sit under one root GUID.
      *(Owner's choice; note it widens Reader's WRITE surface over sibling folders — keep tag writes scoped.)*
-  2. **Detection:** index the JPEGS tree (a second `NSMetadataQuery`). This is **REQUIRED, not an optimisation** —
-     80.1% of partners need relocation resolution no path rule can do. Resolve in this order: exact mirrored
-     subpath → indexed stem within collection context → **refuse and show no partner when ambiguous** (75 files);
-     never guess, since a wrong partner shows the historian a different archive's scan.
+  2. **Detection: a WALK-BUILT stem index over the JPEGS subtree. Not Spotlight.** *(Rewritten 2026-08-06 by
+     `W26.reinfect`. The original clause read "index the JPEGS tree (**a second `NSMetadataQuery`**)" and, being
+     open and owner-approved, was the one place in the backlog that could have re-introduced Spotlight into the
+     codebase Wave 26 exists to clear. **The requirement is unchanged; only the mechanism is.**)* An index is
+     still **REQUIRED, not an optimisation** — 80.1% of partners sit under a differently-named collection
+     folder, which no path rule can resolve. Resolve in this order: exact mirrored subpath → indexed stem within
+     collection context → **refuse and show no partner when ambiguous** (75 files); never guess, since a wrong
+     partner shows the historian a different archive's scan.
+     - **Mechanism:** `ArchiveCore.CorpusWalker` over the JPEGS subtree, building `stem → [path]` plus collection
+       context. A partner lookup needs no tags, so `scanFingerprints` (every readable regular file, one
+       following `stat(2)` each, **no per-file tag read**) is the cheaper entry point; use
+       `scan(predicate: { _ in true })` only if the partner index ever turns out to need tag data.
+     - **Measured 2026-08-06, read-only:** `Archival Photos JPEGS` holds **163,106 files** and enumerates in
+       **4.8 s** (`find -type f`, one run); the main tree is 123,302 files / ~10 s. The "Spotlight avoids per-file
+       I/O at this scale" argument is void here for exactly the reason it was void for Reader discovery.
+     - **It is a second SUBTREE, not a second root.** Design decision #1 raises the granted root to the common
+       parent `~/Desktop/Google Drive/`, and `Archival Photos JPEGS` is a **sibling of** `Archival Photos` under
+       it — so the JPEGS tree is already inside the one security scope, already inside what `CorpusWatcher`
+       watches, already inside what `LibraryIndex` keys on. Do **not** add a second granted root or bookmark.
+       ⚠️ It also means the raise roughly **doubles every cold walk** (123,302 + 163,106 ≈ 286k files) — which is
+       why this item is now `(blocked-on: W26.verify)` and not merely on a walker existing.
+     - **Absence must stay distinguishable from failure.** `CorpusScanResult` separates *verified none* from
+       *could not read* (`unreadable` / `directoryErrors` / `rootUnreadable` / `isClean`). "No partner" **hides
+       the switch** (see the tail of this item), so the switch may only be hidden on a **clean** pass; an
+       incomplete or denied JPEGS walk means *partner unknown* and must never render as "this PDF has no JPEG".
+       This is `W26.deny`'s distinction applied to a second consumer — the same class of bug, one subsystem over.
+     - **Storage is an open sub-decision — settle it before writing code.** Either a stem table inside the
+       existing `LibraryIndex` SQLite DB (which already carries untracked rows — `entry.tracked` +
+       `entry_root_tracked` — keyed by root marker GUID + byte-exact path, and already has the warm-start and
+       revalidation machinery this index would otherwise duplicate), or a separate disposable index. Reusing
+       `LibraryIndex` inherits its byte-exact path contract and therefore `W26.symroot`'s open question; a
+       separate index duplicates fingerprinting and revalidation.
   3. **Durable link:** encode the PDF path **and** the resolved JPEG path explicitly — the partner is not
      re-derivable, so a citation must pin what was actually cited. ⚠️ This changes `DurableLink`
      (`packages/ArchiveCore/Sources/ArchiveCore/Links/DurableLink.swift`) — a shared ArchiveCore type + cross-app
@@ -1422,6 +1453,21 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   Also handle: PDFs with no partner (9.3%) → hide the switch entirely; case-insensitive extension matching.
   **Verify:** headless render guards (`RenderProbe`/`DocumentRenderGuardTests`) that both the PDF page and the
   JPEG partner render non-blank; VM GUI lane (`W21.vmgui`) for the in-viewer switch.
+
+  **The blocking edge (added 2026-08-06 by `W26.reinfect`), and why it is not `W26.walk1`.** `W26.reinfect`
+  specified `(blocked-on: W26.walk1)` — "a walker must exist first". That is satisfied but too weak: this item
+  does not merely call the walker, it **raises Reader's granted root over a second 163k-file subtree**. So the
+  real prerequisites are **`W26.walk2`** (Reader discovery is filesystem-owned — raising the root while
+  discovery was Spotlight-only would have put ~286k files at the mercy of the same dead index that caused the
+  2026-08-04 incident) and **`W26.verify`** (the 100k+ scale lane has **never been run**; it is the measurement
+  that says whether doubling the walk is affordable, and it carries `W26.idx`'s unrun warm-start lanes too).
+  `walk1` and `walk2` have both shipped, so only `W26.verify` still gates this.
+  ⚠️ **This edge is documentation, and deliberately cannot be anything else.** `next-queue-item.sh` takes its
+  *candidates* from the plan's `## WORK QUEUE` region only (it reads `SUITE_TODO` just to resolve tag state),
+  and this item is **kept out of that region on purpose** — it is owner-gated (`DurableLink` is a cross-app
+  contract, §3). Mirroring the line into the plan to "make the edge live" would make the item **pickable by the
+  daemon**, which is the opposite of what is wanted. So the tag + edge exist to be read by a human and to give
+  the item a stable name; the thing actually keeping the daemon off it is its absence from the plan queue.
   | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | **owner** (DurableLink/SPEC change)
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
