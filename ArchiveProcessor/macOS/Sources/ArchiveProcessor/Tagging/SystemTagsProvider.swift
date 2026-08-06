@@ -209,32 +209,25 @@ final class SystemTagsProvider: ObservableObject {
             },
             completion: { result in
                 Task { @MainActor in
-                    if Self.mayStamp(result, root: root) { vocabulary.markHarvested(root) }
+                    // `completed` is the whole gate. It was NOT enough when this shipped: a root that
+                    // did not exist came back `completed == true`, so stamping recorded a vanished or
+                    // unmounted archive folder as harvested and the vocabulary then waited a day
+                    // before looking again. `W26.vocab-fu1` moved that distinction into the walker
+                    // (`CorpusWalker.rootIsOpenable`), where every caller gets it, and this item's
+                    // local `mayStamp` workaround was deleted rather than left as a second opinion.
+                    //
+                    // A denied *sub*directory is still stampable, deliberately: an unstamped root is
+                    // re-walked on the next `warmUp()` — i.e. on every tagging-UI appearance — so one
+                    // permanently-unreadable subfolder must not turn a 12 s corpus walk into a walk
+                    // per card. Nothing is ever pruned from the vocabulary, so the cost of missing a
+                    // few files is a few absent suggestions, not a wrong answer.
+                    if result.completed { vocabulary.markHarvested(root) }
                     vocabulary.flush()
                     SystemTagsProvider.shared.publishSnapshot()
                     SystemTagsProvider.shared.isReady = true
                     SystemTagsProvider.shared.harvest(roots, index: index + 1)
                 }
             })
-    }
-
-    /// May this pass claim the root is covered?
-    ///
-    /// `result.completed` alone is **not** enough, and the difference was measured rather than reasoned
-    /// about: for a root that does not exist (or cannot be opened) `FileManager.enumerator` still hands
-    /// back an enumerator, which reports the root to the error handler and then ends — so the pass comes
-    /// back `completed == true`, `rootUnreadable == false`, `filesSeen == 0`, with the root itself in
-    /// `directoryErrors`. Stamping that records a vanished or unmounted archive folder as harvested, and
-    /// the vocabulary then waits a day before looking again.
-    ///
-    /// A denied *sub*directory is deliberately still stampable. An unstamped root is re-walked on the
-    /// next `warmUp()` — i.e. on every tagging-UI appearance — so one permanently-unreadable subfolder
-    /// must not turn a 12 s corpus walk into a walk per card. Nothing is ever pruned from the vocabulary,
-    /// so the cost of missing a few files is a few absent suggestions, not a wrong answer.
-    private static func mayStamp(_ result: CorpusScanResult, root: URL) -> Bool {
-        guard result.completed, !result.rootUnreadable else { return false }
-        let rootPath = root.standardizedFileURL.path
-        return !result.directoryErrors.contains { $0.url.standardizedFileURL.path == rootPath }
     }
 
     // MARK: - Publishing

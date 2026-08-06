@@ -180,6 +180,39 @@ func plantedHonestWalk(_ root: URL) -> Int {
 SWIFT
 expect 0 "an enumerator WITH errorHandler passes (the rule is not a ban on walking)" "lint clean"
 
+echo "── rule 3 reads CODE, not prose: the same text in a doc comment must pass ──"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Corpus"
+cat > "$SCRATCH/$CORE_SRC/Corpus/PlantedProse.swift" <<'SWIFT'
+import Foundation
+
+/// Explains the rule, and must not trip it: `FileManager.enumerator(at:)` without an errorHandler
+/// silently skips what it cannot read. Measured — `FileManager.default.enumerator(at: root,
+/// includingPropertiesForKeys: nil, options: [])` still returns a live enumerator for a root it
+/// cannot open.
+//  FileManager.default.enumerator(at: someRoot, includingPropertiesForKeys: nil, options: [])
+/*
+ * FileManager.default.enumerator(at: someRoot, includingPropertiesForKeys: nil, options: [])
+ */
+func plantedProse() -> Int { 0 }
+SWIFT
+expect 0 "an errorHandler-less enumerator in a COMMENT passes (the rule is about calls)" "lint clean"
+
+echo "── …and the SAME text as real code still FAILS (the relaxation is not blanket) ──"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Corpus"
+cat > "$SCRATCH/$CORE_SRC/Corpus/PlantedProseAndCode.swift" <<'SWIFT'
+import Foundation
+
+/// `FileManager.enumerator(at:)` without an errorHandler silently skips what it cannot read.
+func plantedProseAndCode(_ root: URL) -> Bool {
+    let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: []) // documented above
+    return e != nil
+}
+SWIFT
+expect 1 "a real call is caught even when an identical line appears in a comment" \
+  "Corpus/PlantedProseAndCode.swift"
+
 # RETIRED by `W26.walk2` (2026-08-05): this case simulated walk2 deleting the allowed
 # `ArchiveLibrary.swift` enumerator call, and asserted the allowance then went STALE. walk2 has
 # happened — the call and its allowance are both gone — so the sed matched nothing and the case

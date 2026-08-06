@@ -186,9 +186,11 @@ enum DiscoveryHealth {
     /// with the walker that produces the counters. This function only adds the two things the walker
     /// cannot see: whether the caller cancelled it, and whether the root held still (§7a.11).
     static func failure(for result: CorpusScanResult, root: RootStability) -> DiscoveryFailure? {
-        // A root that could not be identified at all is unreadable, NOT "changed" — the walker's own
-        // `rootUnreadable` only fires when `FileManager` hands back no enumerator, which a sealed
-        // directory does not always do.
+        // A root that could not be identified at all is unreadable, NOT "changed". Since
+        // `W26.vocab-fu1` the walker's own `rootUnreadable` covers a missing, denied or
+        // not-a-directory root, so the two clauses now usually agree; `.neverIdentified` is kept
+        // because it is a different observation — `CorpusRootFingerprint.capture` failing — and it
+        // still fires alone when the root is opened successfully and then becomes unstattable.
         if result.rootUnreadable || root == .neverIdentified { return .rootUnreadable }
         if result.cancelled { return .incomplete }
         if root == .changedMidScan { return .rootChangedMidScan }

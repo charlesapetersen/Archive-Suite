@@ -81,6 +81,8 @@ public struct CorpusFingerprintScanResult: Sendable {
     public let directoryErrors: [CorpusReadFailure]
     public let filesSeen: Int
     public let vanishedMidScan: Int
+    /// The root itself could not be opened, so this pass examined nothing at all — see
+    /// `CorpusScanResult.rootUnreadable`, which this mirrors exactly.
     public let rootUnreadable: Bool
     public let cancelled: Bool
 
@@ -137,7 +139,13 @@ public struct CorpusScanResult: Sendable {
     /// during the walk cannot make the pass look degraded (plan §7a.12).
     public let vanishedMidScan: Int
 
-    /// The root could not be enumerated at all (`FileManager.enumerator` returned nil).
+    /// **The root itself could not be opened, so this pass examined nothing at all** — it is not a
+    /// statement about the tree's contents, and `completed` is false because of it.
+    ///
+    /// Covers a root that does not exist, one whose permissions deny us, one that is not a directory,
+    /// and an unmounted or disconnected volume. It is *not* set by a denial anywhere below the root:
+    /// that is `directoryErrors`, which costs the pass `isClean` but leaves what it did read
+    /// authoritative.
     public let rootUnreadable: Bool
 
     /// The caller's cancellation predicate returned true mid-pass.
@@ -260,6 +268,47 @@ public enum CorpusWalker {
 
     // MARK: - The walk
 
+    /// Can the walk actually open `root`? Measured, not assumed — and the answer is why every walk
+    /// below starts here rather than trusting the enumerator to refuse.
+    ///
+    /// `FileManager.enumerator(at:)` **returns a live enumerator for a root it cannot open.** Measured
+    /// 2026-08-06 across all three ways a root goes bad — a path that does not exist (`ENOENT`), a
+    /// `0o000` directory (`EACCES`), and a regular file passed as a root (`ENOTDIR`): in every case the
+    /// enumerator is non-nil, reports the root once to `errorHandler:`, and immediately ends. The pass
+    /// therefore came back `completed == true`, `rootUnreadable == false`, `filesSeen == 0`, making a
+    /// walk that read **nothing** indistinguishable from a walk that **found** nothing to any caller
+    /// gating on `completed` — the shape of the 2026-08-04 incident, one layer down. The
+    /// `guard let enumerator … else` branches below are kept as a defensive floor, but they are not the
+    /// branch that fires.
+    ///
+    /// `opendir(3)` is the discriminator, deliberately *not* "did the error handler report the root":
+    /// for the `0o000` case FileManager hands back `/private/var/…` while the caller passed `/var/…`,
+    /// so a path or byte comparison answers "that was not the root" for the very case this must catch
+    /// (the `/private` alias trap). `opendir` is also the exact operation enumeration needs and costs
+    /// one syscall per pass.
+    ///
+    /// The `lstat` in front of it is the one place this probe must **disagree** with how the rest of
+    /// the walk treats symlinks, and it too was measured: `FileManager.enumerator(at:)` will not
+    /// enumerate a root that is itself a symbolic link — it reports the link to `errorHandler:` and
+    /// yields nothing, even when the target is a perfectly readable directory. `opendir` follows the
+    /// link and would say "openable", leaving that root in exactly the completed-but-read-nothing state
+    /// this function exists to abolish. Only the FINAL component is checked, so an aliased *ancestor*
+    /// (`/var` → `/private/var`, which every temp fixture and much of the corpus path sits under) is
+    /// unaffected. Making a symlinked root actually work would mean resolving it before enumeration,
+    /// which would break the byte-exact path contract `LibraryIndex` keys on — tracked as `W26.symroot`
+    /// rather than smuggled in here.
+    private static func rootIsOpenable(_ root: URL) -> Bool {
+        root.withUnsafeFileSystemRepresentation { rawPath in
+            guard let rawPath else { return false }
+            var linkInfo = stat()
+            guard lstat(rawPath, &linkInfo) == 0,
+                  (linkInfo.st_mode & S_IFMT) != S_IFLNK else { return false }
+            guard let dir = opendir(rawPath) else { return false }
+            closedir(dir)
+            return true
+        }
+    }
+
     /// Re-stat and re-read one path through the same primitives as `scan`.
     ///
     /// The URL's resource-value cache is deliberately avoided by constructing a fresh filesystem URL
@@ -349,6 +398,15 @@ public enum CorpusWalker {
                                  isCancelled: @Sendable () -> Bool,
                                  onTagsRead: (@Sendable ([String], Int?) -> Void)?,
                                  onBatch: (@Sendable (CorpusScanBatch) -> Void)?) -> CorpusScanResult {
+        // Ask before walking: the enumerator will not tell us (see `rootIsOpenable`). Reported with
+        // empty failure lists, matching the nil-enumerator branch below, so a caller counting
+        // "folders I could not read" is not handed the root twice for one failure.
+        guard rootIsOpenable(root) else {
+            return CorpusScanResult(entries: [], unreadable: [], directoryErrors: [],
+                                    filesSeen: 0, vanishedMidScan: 0,
+                                    rootUnreadable: true, cancelled: false)
+        }
+
         var entries: [CorpusEntry] = []
         var unreadable: [CorpusReadFailure] = []
         var filesSeen = 0
@@ -476,6 +534,15 @@ public enum CorpusWalker {
         onProgress: (@Sendable (Int) -> Void)? = nil
     ) -> CorpusFingerprintScanResult {
         withDatalessMaterializationDisabled {
+            // Same root probe as `scanBody`, for the same measured reason: the warm-start revalidation
+            // walk must not report a vanished or unmounted root as "completed, zero files", because the
+            // caller then treats every cached row as gone.
+            guard rootIsOpenable(root) else {
+                return CorpusFingerprintScanResult(entries: [], unreadable: [], directoryErrors: [],
+                                                   filesSeen: 0, vanishedMidScan: 0,
+                                                   rootUnreadable: true, cancelled: false)
+            }
+
             var entries: [CorpusFingerprintEntry] = []
             var unreadable: [CorpusReadFailure] = []
             var filesSeen = 0

@@ -62,12 +62,12 @@ final class TagVocabularyHarvestTests: XCTestCase {
                           })
     }
 
-    /// `SystemTagsProvider.mayStamp`, mirrored so the tests exercise the same rule the app applies.
-    private func mayStamp(_ result: CorpusScanResult, root: URL) -> Bool {
-        guard result.completed, !result.rootUnreadable else { return false }
-        let rootPath = root.standardizedFileURL.path
-        return !result.directoryErrors.contains { $0.url.standardizedFileURL.path == rootPath }
-    }
+    /// `SystemTagsProvider`'s stamping rule, mirrored so the tests exercise what the app applies.
+    ///
+    /// It is now just `completed`: `W26.vocab-fu1` moved "the root could not be opened" into the walker
+    /// itself, so this app-local predicate no longer needs — and must not keep — its own opinion about
+    /// whether the root appears in `directoryErrors`.
+    private func mayStamp(_ result: CorpusScanResult) -> Bool { result.completed }
 
     // MARK: - The harvest itself
 
@@ -191,7 +191,7 @@ final class TagVocabularyHarvestTests: XCTestCase {
 
         XCTAssertTrue(result.cancelled, "the walk must actually have been cancelled")
         XCTAssertFalse(result.completed)
-        if mayStamp(result, root: root) { vocabulary.markHarvested(root) }
+        if mayStamp(result) { vocabulary.markHarvested(root) }
 
         XCTAssertGreaterThan(vocabulary.count, 0, "names absorbed before the cancel are kept")
         XCTAssertEqual(vocabulary.rootsNeedingHarvest(current: root).map { $0.path }, [root.path],
@@ -209,19 +209,20 @@ final class TagVocabularyHarvestTests: XCTestCase {
         XCTAssertEqual(vocabulary.rootsNeedingHarvest(current: root).count, 1, "due before")
 
         let result = harvest(root, into: vocabulary)
-        if mayStamp(result, root: root) { vocabulary.markHarvested(root) }
+        if mayStamp(result) { vocabulary.markHarvested(root) }
 
         XCTAssertTrue(vocabulary.rootsNeedingHarvest(current: root).isEmpty, "not due after")
     }
 
-    /// A root that vanished is not stamped — and `completed` alone would have stamped it.
+    /// A root that vanished is not stamped, and since `W26.vocab-fu1` the WALKER is what says so.
     ///
-    /// Measured, not assumed: `FileManager.enumerator(at:)` returns a live enumerator for a directory
-    /// that does not exist. It reports the root to the error handler and then ends, so the pass comes
-    /// back `completed == true`, `rootUnreadable == false`, `filesSeen == 0` — a walk that read nothing
-    /// looking exactly like a walk that found nothing. This test pins the distinction, and both
-    /// assertions below fail against the plain `result.completed` gate.
-    func testAVanishedRootIsNotStampedEvenThoughThePassSaysItCompleted() throws {
+    /// This is the behavioural record of that change. When `W26.vocab` shipped, `FileManager`'s live
+    /// enumerator for a directory that does not exist made this pass `completed == true` /
+    /// `rootUnreadable == false` / `filesSeen == 0` — a walk that read nothing looking exactly like a
+    /// walk that found nothing — and only a local predicate in the Processor kept the stamp off. The
+    /// assertions below are the same guarantee stated where every caller gets it, so the app-local
+    /// workaround could be deleted instead of left as a second opinion.
+    func testAVanishedRootIsUnreadableSoTheWalkerItselfRefusesTheStamp() throws {
         let root = try makeRoot("archive")
         let vocabulary = store()
         vocabulary.noteRoot(root)
@@ -229,12 +230,12 @@ final class TagVocabularyHarvestTests: XCTestCase {
 
         let result = harvest(root, into: vocabulary)
 
-        XCTAssertTrue(result.completed, "premise: the walker calls this pass complete")
-        XCTAssertFalse(result.rootUnreadable, "premise: and does NOT call the root unreadable")
+        XCTAssertTrue(result.rootUnreadable, "the root could not be opened, and the pass says so")
+        XCTAssertFalse(result.completed, "so it did not complete — this is not an empty archive")
         XCTAssertEqual(result.filesSeen, 0)
-        XCTAssertFalse(mayStamp(result, root: root), "…but the harvest must refuse to stamp it")
+        XCTAssertFalse(mayStamp(result), "and the harvest refuses to stamp it")
 
-        if mayStamp(result, root: root) { vocabulary.markHarvested(root) }
+        if mayStamp(result) { vocabulary.markHarvested(root) }
         XCTAssertEqual(vocabulary.rootsNeedingHarvest(current: root).count, 1,
                        "a root we never read stays due")
     }
@@ -258,7 +259,7 @@ final class TagVocabularyHarvestTests: XCTestCase {
 
         try XCTSkipUnless(!result.directoryErrors.isEmpty,
                           "this environment could descend the 0o000 directory; case N/A")
-        XCTAssertTrue(mayStamp(result, root: root),
+        XCTAssertTrue(mayStamp(result),
                       "a subdirectory error is not a reason to re-walk forever: \(result.directoryErrors)")
         XCTAssertTrue(vocabulary.snapshot().contains("Watergate"), "the readable half still landed")
     }
@@ -279,7 +280,7 @@ final class TagVocabularyHarvestTests: XCTestCase {
             for root in [rootA, rootB] {
                 vocabulary.noteRoot(root)
                 let result = harvest(root, into: vocabulary)
-                if mayStamp(result, root: root) { vocabulary.markHarvested(root) }
+                if mayStamp(result) { vocabulary.markHarvested(root) }
             }
             vocabulary.flush()
         }

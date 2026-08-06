@@ -317,8 +317,138 @@ final class CorpusWalkerTests: XCTestCase {
 
         XCTAssertTrue(result.entries.isEmpty)
         XCTAssertFalse(result.isClean, "a root we cannot enumerate must not report an actionable absence")
-        XCTAssertTrue(result.rootUnreadable || !result.directoryErrors.isEmpty,
-                      "either the enumerator refused outright or it reported the failure — not neither")
+        XCTAssertTrue(result.rootUnreadable, "the root could not be opened, so say THAT")
+    }
+
+    // MARK: - 3b. `rootUnreadable` means what its name says (W26.vocab-fu1)
+
+    /// The three ways a root goes bad, each pinned as `rootUnreadable` rather than as a completed pass
+    /// over an empty tree.
+    ///
+    /// This is a regression test against a real, measured trap, not a hypothetical: `FileManager
+    /// .enumerator(at:)` hands back a **live enumerator** for every one of these roots, reports the root
+    /// once to `errorHandler:` and then ends. Before `W26.vocab-fu1` all three therefore came back
+    /// `completed == true` / `rootUnreadable == false` / `filesSeen == 0`, so any caller gating on
+    /// `completed` — which is what "did the walk finish?" reads like — could not tell a walk that read
+    /// **nothing** from a walk that **found** nothing. That is the 2026-08-04 incident's shape one layer
+    /// below where it was fixed.
+    ///
+    /// `isClean` is asserted alongside because it is the absence gate the Reader uses, and it was
+    /// already false here (via `directoryErrors`) before this change. The point of the change is the
+    /// *diagnosis*, so it must be `completed`/`rootUnreadable` that carry it.
+    func testEveryUnopenableRootReportsRootUnreadableRatherThanACompletedEmptyPass() throws {
+        try XCTSkipIf(getuid() == 0, "root can open a 0o000 directory; the denial case is meaningless")
+
+        let missing = tempDir.appendingPathComponent("never-created", isDirectory: true)
+
+        let sealed = tempDir.appendingPathComponent("sealed", isDirectory: true)
+        try FileManager.default.createDirectory(at: sealed, withIntermediateDirectories: true)
+        try makeFile("sealed/inside.pdf", tags: ["Unread"], in: tempDir)
+        chmod(sealed, 0o000)
+
+        // Not a directory at all. A caller that hands us a file rather than a folder has not discovered
+        // an empty archive either.
+        let notADirectory = try makeFile("a-plain-file.pdf", tags: ["Unread"])
+
+        for (label, root) in [("missing", missing), ("0o000", sealed), ("regular file", notADirectory)] {
+            let result = CorpusWalker.scan(root: root)
+
+            XCTAssertTrue(result.rootUnreadable, "\(label): the root could not be opened")
+            XCTAssertFalse(result.completed, "\(label): a pass that opened nothing did not complete")
+            XCTAssertFalse(result.isClean, "\(label): and absence here is never actionable")
+            XCTAssertTrue(result.entries.isEmpty, "\(label)")
+            XCTAssertEqual(result.filesSeen, 0, "\(label)")
+
+            // The same answer from the cheap revalidation walk. `LibraryIndex` prunes cache rows off
+            // this result, so a vanished root leaking through as "completed, zero files" would delete a
+            // warm library rather than degrade it.
+            let fingerprints = CorpusWalker.scanFingerprints(root: root)
+            XCTAssertTrue(fingerprints.rootUnreadable, "\(label): fingerprint walk agrees")
+            XCTAssertFalse(fingerprints.completed, "\(label)")
+            XCTAssertTrue(fingerprints.entries.isEmpty, "\(label)")
+        }
+    }
+
+    /// The counter-case that stops the probe above from being a blunt "any error fails the root": a
+    /// denial **below** the root leaves the pass completed, because everything outside that subtree was
+    /// genuinely read. Only `isClean` falls — the distinction `directoryErrors` exists to carry.
+    ///
+    /// Without this, tightening `rootUnreadable` would silently re-file every sealed subfolder as an
+    /// unreadable archive, and the Processor's vocabulary harvest — which stamps on `completed` — would
+    /// re-walk a 100k-file corpus on every tagging-UI appearance for one permanently-locked folder.
+    func testADenialBELOWTheRootStillCompletesTheWalk() throws {
+        try XCTSkipIf(getuid() == 0, "a permission denial is meaningless when running as root")
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try makeFile("readable.pdf", tags: ["Read"], in: root)
+        try makeFile("Locked/hidden.pdf", tags: ["Unread"], in: root)
+        chmod(root.appendingPathComponent("Locked", isDirectory: true), 0o000)
+
+        let result = CorpusWalker.scan(root: root)
+
+        try XCTSkipUnless(!result.directoryErrors.isEmpty,
+                          "this environment could descend the 0o000 directory; case N/A")
+        XCTAssertFalse(result.rootUnreadable, "the ROOT opened fine — only a subtree did not")
+        XCTAssertTrue(result.completed, "so the pass completed, and the harvest may stamp it")
+        XCTAssertFalse(result.isClean, "…while absence stays non-actionable")
+        XCTAssertEqual(relativePaths(result, root: root), ["readable.pdf"])
+    }
+
+    /// A root that is ITSELF a symbolic link is unreadable — and this is the one assertion here whose
+    /// answer I got wrong before measuring it.
+    ///
+    /// `opendir(3)` follows the link, so the first version of the probe called such a root openable, and
+    /// this test failed asserting the walk would then find the target's files. It does not:
+    /// `FileManager.enumerator(at:)` **refuses a symlinked root**, reporting the link itself to
+    /// `errorHandler:` and yielding nothing, even though the target is a readable directory with files
+    /// in it (measured 2026-08-06). So a symlinked root was the last surviving instance of the exact
+    /// defect this item closes — a pass that read nothing and called itself complete — and the probe
+    /// now `lstat`s ahead of `opendir` specifically to catch it. Making such a root *work* is
+    /// `W26.symroot`, deliberately not folded in here.
+    func testARootThatIsItselfASymlinkIsUnreadableBecauseTheEnumeratorRefusesIt() throws {
+        let real = tempDir.appendingPathComponent("real", isDirectory: true)
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try makeFile("doc.pdf", tags: ["Read"], in: real)
+        let link = tempDir.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+
+        // The premise, pinned so a future Foundation that DOES follow a symlinked root fails here as
+        // itself rather than as a confusing `rootUnreadable` assertion.
+        let raw = FileManager().enumerator(at: link, includingPropertiesForKeys: nil,
+                                           options: [.skipsHiddenFiles, .skipsPackageDescendants],
+                                           errorHandler: { _, _ in true })
+        XCTAssertNil(raw?.nextObject(), "premise: the enumerator yields nothing for a symlinked root")
+
+        let result = CorpusWalker.scan(root: link)
+
+        XCTAssertTrue(result.rootUnreadable, "so the walk must say it could not look, not that it looked")
+        XCTAssertFalse(result.completed)
+        XCTAssertTrue(result.entries.isEmpty)
+
+        // The target itself is a perfectly good root — the link is the only thing that is not.
+        let direct = CorpusWalker.scan(root: real)
+        XCTAssertFalse(direct.rootUnreadable)
+        XCTAssertTrue(direct.isClean)
+        XCTAssertEqual(direct.entries.count, 1)
+    }
+
+    /// An aliased *ancestor* is not an aliased root. Every fixture in this file lives under
+    /// `/var/folders/…`, where `/var` is a symlink to `/private/var`, so an `lstat` applied to anything
+    /// but the final path component would have failed the whole suite — which is precisely how a
+    /// too-eager symlink rule would show up.
+    func testAnAliasedANCESTORDoesNotMakeARootUnreadable() throws {
+        let root = tempDir.appendingPathComponent("under-var", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try makeFile("doc.pdf", tags: ["Read"], in: root)
+
+        XCTAssertTrue(root.path.hasPrefix("/var/"),
+                      "premise: this fixture really is reached through the /var alias — \(root.path)")
+
+        let result = CorpusWalker.scan(root: root)
+
+        XCTAssertFalse(result.rootUnreadable)
+        XCTAssertTrue(result.isClean)
+        XCTAssertEqual(result.entries.count, 1)
     }
 
     // MARK: - 4. Churn is not denial

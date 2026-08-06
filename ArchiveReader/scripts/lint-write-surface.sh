@@ -173,6 +173,14 @@ scan() {   # <rule> <message> <extended regex>
 # Every `.enumerator(` call whose OWN argument list — balanced parens, however many lines it spans —
 # does not mention `errorHandler:`. Emits the line the call starts on, so an allowance pins that line
 # like every other rule here.
+#
+# A COMMENT is prose, not a call site (W26.vocab-fu1, 2026-08-06). Documenting *why* the banned
+# overload is banned means writing `FileManager.enumerator(at:)` in a doc comment, and the rule read
+# that as the violation it describes — so the honest way to explain the rule was to trip it. The
+# comment check is applied to the line the match STARTS on, which is exactly the line the rule
+# reports, and only to a line whose first non-space characters open a comment; a real call sharing a
+# line with a trailing comment is still caught. The only thing this can now miss is commented-out
+# code, which does not compile and cannot walk anything.
 enumerators_without_error_handler() {
   find "${SRCS[@]}" -name '*.swift' -type f -print0 2>/dev/null \
     | xargs -0 /usr/bin/perl -0777 -ne '
@@ -180,7 +188,9 @@ enumerators_without_error_handler() {
           next if $1 =~ /errorHandler\s*:/;
           my $lineno = 1 + (substr($_, 0, $-[0]) =~ tr/\n//);
           my @lines = split /\n/, $_, -1;
-          print "$ARGV:$lineno:$lines[$lineno-1]\n";
+          my $line = $lines[$lineno-1];
+          next if $line =~ m{^\s*(?://|\*)};
+          print "$ARGV:$lineno:$line\n";
         }
       '
 }

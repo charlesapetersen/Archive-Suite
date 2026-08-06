@@ -80,11 +80,14 @@ final class DiscoveryHealthTests: XCTestCase {
 
     /// A root that was never identifiable is UNREADABLE, not "changed while scanning". Found reviewing
     /// my own first cut, which had two root states and therefore gave a sealed folder — the commonest
-    /// case there is — a confident, specific, wrong diagnosis. The walker's own `rootUnreadable` does
-    /// not cover it: `FileManager` still hands back an enumerator for a sealed directory.
+    /// case there is — a confident, specific, wrong diagnosis.
+    ///
+    /// The clause earns its keep even though `W26.vocab-fu1` taught the walker to flag a sealed root
+    /// itself: this is the independent signal, a pass whose `rootUnreadable` is false and whose root
+    /// could not be fingerprinted, and the mapping must still land on `.rootUnreadable`.
     func testARootThatWasNeverIdentifiableIsUnreadableNotChanged() {
         let r = result(directoryErrors: 1)
-        XCTAssertFalse(r.rootUnreadable, "the premise: the walker got an enumerator and an error, not nil")
+        XCTAssertFalse(r.rootUnreadable, "the premise: the walker itself did not flag the root")
 
         XCTAssertEqual(DiscoveryHealth.failure(for: r, root: .neverIdentified), .rootUnreadable)
         XCTAssertEqual(DiscoveryHealth.failure(for: r, root: .changedMidScan), .rootChangedMidScan)
