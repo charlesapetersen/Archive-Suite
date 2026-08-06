@@ -2,6 +2,33 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## 🔴 OPEN (`W26.fsev-fu1`) — the app can hang at launch, with no window, while starting the FSEvents stream
+
+**Found 2026-08-06** while shipping `W26.vocab-fu1`, from a stack sample rather than a reading. A Reader
+unit run sat for 9+ minutes at **0% CPU** in:
+
+```
+NavigationModel.init() → ArchiveLibrary.start(scope:) :186 → startWatcher :465
+  → CorpusWatcher.start() :256 (FSEventStreamCreate) → open(2)   ← main thread
+```
+
+`FSEventStreamCreate` opens the watched root, and it is called synchronously on the main thread during
+`NavigationModel` construction. On local disk that is microseconds and invisible. Under an unanswerable TCC
+prompt, a stalled network/cloud mount, or a disconnected volume the `open` does not return and **the app
+never draws** — no window, no message, nothing to cancel. Everything else in this subsystem is already off
+the main thread (the launch walk has a dedicated `Thread`, the stream runs on its own queue); the stream's
+*creation* is the last synchronous step.
+
+⚠️ Fixing it is a sequencing change, not a `DispatchQueue.async` around one line: `W26.fsev` deliberately
+starts the stream **before** the launch walk so no event between the two is lost. Tracked in `SUITE_TODO.md`
+§Wave 26.
+
+**Practical consequence for testing right now:** this is how the long-known `DeepLinkTests` environment
+artifact (`testRevealAndSelectNoRoot` picks up the owner's real persisted `archiveRootBookmark`) now
+presents. It no longer merely *fails* — it **hangs the entire `ArchiveReaderTests` bundle**. Run the unit
+lane with `-skip-testing:ArchiveReaderTests/DeepLinkTests` rather than waiting it out. Proper isolation of
+the test itself is `W20.deeplink-isolation`.
+
 ## ✅ FIXED (`W26.walk2`) — Release discovery was Spotlight-only and could blame an unreadable index on files
 
 **Found 2026-08-04.** The owner pointed the Reader at a folder of 1,849 correctly-tagged PDFs on a volume

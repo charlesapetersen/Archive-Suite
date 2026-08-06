@@ -18,6 +18,66 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.vocab-fu1 — ArchiveCore: a missing or unopenable ROOT is now `rootUnreadable` [S · low ·
+  Tier-1]. ✅ SHIPPED 2026-08-06** — `e050ebd` (the probe, the lint fix, ArchiveCore tests) → this commit
+  (the app lanes + trackers).
+  **The premise, re-measured before fixing it (and it was worse than filed).**
+  `FileManager.enumerator(at:)` returns a **live enumerator for a root it cannot open** — confirmed across
+  all three ways a root goes bad, not just the filed one: a path that does not exist (`ENOENT`), a `0o000`
+  directory (`EACCES`), and a regular file handed in as a root (`ENOTDIR`). In every case the enumerator
+  is non-nil, reports the root once to `errorHandler:`, and ends. So `completed == true`,
+  `rootUnreadable == false`, `filesSeen == 0`, and a walk that read **nothing** was indistinguishable from
+  a walk that **found** nothing to any caller gating on `completed`. The `guard let enumerator … else`
+  branches in both walk functions were dead code. `rootUnreadable` now means what its name says, for
+  `scan` and `scanFingerprints` alike, via an `opendir(3)` probe ahead of enumeration.
+  **Two things the probe deliberately is NOT**, both measured rather than reasoned about:
+  1. **Not a comparison against the URL the error handler reported.** For the `0o000` root FileManager
+     hands back `/private/var/…` while the caller passed `/var/…` — so a path or byte comparison answers
+     "that was not the root" for the exact case it must catch. (The `/private` alias trap again.)
+  2. **Not `opendir` alone.** `opendir` FOLLOWS a symlink; `FileManager.enumerator` does not. Measured: a
+     root that is itself a symlink is refused outright — reported to `errorHandler:`, zero objects — even
+     when its target is a readable directory full of tagged files. My first cut called such a root
+     openable, and the test written to prove symlinks were fine is what failed. An `lstat` on the **final
+     component only** now precedes the `opendir`, so a symlinked root is the last instance of this defect
+     rather than a survivor of it; aliased *ancestors* (`/var` → `/private/var`, where every fixture in
+     the suite lives) are untouched, with a test that fails if they ever are not.
+  **A latent bug in the code this deleted.** `W26.vocab`'s local `mayStamp` compared
+  `directoryErrors` against the root by `standardizedFileURL.path` — which does not resolve the
+  `/private` alias, so for the `0o000` case it did **not** match and the harvest would have stamped a
+  wholly unreadable root as covered. The walker-level answer has no such hole. Per the item's own
+  instruction, `mayStamp` is deleted rather than left as a second opinion: `SystemTagsProvider` now stamps
+  on `result.completed`, and the ArchiveCore mirror of the rule was collapsed the same way.
+  **The counter-case is tested, because the tightening is dangerous without it.** A denial *below* the
+  root still completes the pass. Otherwise every sealed subfolder would re-file as an unreadable archive,
+  and the Processor's harvest — which stamps on `completed` — would re-walk a 100k-file corpus once per
+  tagging-UI appearance.
+  **Reader effect, as the item predicted:** a missing/denied/not-a-directory root now reports
+  "Archive folder unreadable" instead of the generic "1 folder could not be read". `DiscoveryHealth`'s
+  `.neverIdentified` clause is kept — it is an independent observation (`CorpusRootFingerprint.capture`
+  failing) — and both its comment and `LibraryPhase`'s, which asserted the walker could not see a sealed
+  root, are corrected.
+  **The write-surface lint went RED, on prose.** Rule 3 bans the `errorHandler:`-less overload, and
+  documenting *why* means writing `FileManager.enumerator(at:)` in a doc comment — which the balanced-paren
+  matcher read as the violation being described, so the honest way to explain the rule was to trip it.
+  Rule 3 now skips a match whose starting line opens a comment (`//` or `*` as the first non-space
+  characters, checked on the line the rule already reports); a real call sharing a line with a trailing
+  comment is still caught, and the only thing it can now miss is commented-out code. Guarded in **both**
+  directions by two new self-test cases — prose passes, the identical text as code still fails — because
+  an untested lint relaxation is exactly how rule 1 came to pass vacuously (`W26.lint`).
+  **Gate.** ArchiveCore 199 XCTest + 105 swift-testing; Reader **343 executed unit tests, TEST SUCCEEDED**,
+  Release build clean, zero source warnings; Processor Debug clean (its scheme has no test action — the
+  behaviour it lost lives in the ArchiveCore harvest mirror); Notes 189 + 738; write-surface lint clean on
+  both trees, self-test **12 → 14**. No VM lane: the only visible change is which sentence the empty state
+  shows, and `LibraryDiscoverySwapTests` already asserts that end to end through the real `ArchiveLibrary`
+  against a scratch tree (`LibraryEmptyState.forPhase(…) == .couldNotLook(.rootUnreadable)`), which is a
+  tighter assertion than a screenshot. Scratch/temp fixtures only; the real corpus was never touched.
+  **Filed while shipping:** `W26.symroot` (a symlinked archive root cannot be discovered at all —
+  pre-existing, and the obvious fix breaks `LibraryIndex`'s byte-exact path contract) and **`W26.fsev-fu1`
+  (`FSEventStreamCreate` blocks the MAIN THREAD at launch)** — the latter found by stack-sampling a Reader
+  unit run that hung 9+ minutes at 0% CPU, which is also a **material escalation of the known
+  `DeepLinkTests` environment artifact**: it no longer merely fails, it hangs the whole unit bundle, so a
+  session must exclude it up front rather than wait it out. See Daemon Report.
+
 - [x] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low].
   ✅ SHIPPED 2026-08-06** — `a90bbc8` (the store + 28 tests) → `2d7c7c2` (the provider rewrite; the last
   `NSMetadataQuery` in the Processor) → `eaa7987` (the harvest composition, and the two defects its first

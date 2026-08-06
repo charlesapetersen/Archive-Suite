@@ -305,20 +305,38 @@ cache with no migration or legacy-state fallback, as directed. Fixture roots ans
 index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
 been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
 not run for this item and are carried into `W26.verify`.**
-- [ ] **W26.vocab-fu1 — ArchiveCore: a missing or unopenable ROOT is not `rootUnreadable` [S · low ·
-  Tier-1].** Filed 2026-08-06 by `W26.vocab`, measured not inferred: for a root directory that does not
-  exist, `FileManager.enumerator(at:)` still returns a live enumerator, reports the root to the
-  `errorHandler`, and ends — so `CorpusWalker.scan` comes back `completed == true`,
-  `rootUnreadable == false`, `filesSeen == 0`, with the root itself in `directoryErrors`. A walk that read
-  **nothing** is therefore indistinguishable from a walk that **found** nothing to any caller gating on
-  `completed`. **The Reader is NOT affected** — it gates absence on `isClean`, which is false here — and
-  `W26.vocab` fixed its own harvest with a local `mayStamp` predicate, so nothing is broken today. The
-  question is whether `rootUnreadable` should mean what its name says, which is ArchiveCore's call, not a
-  Processor item's. ⚠️ If it changes, it changes a field Reader `DiscoveryHealth` branches on (a missing
-  root would start reporting "could not read the archive folder" instead of a generic degraded state —
-  more accurate, but a user-visible message change), and `W26.vocab`'s local `mayStamp` should then be
-  deleted rather than left as a second opinion. **Test:** a scan of a nonexistent and of a `0o000` root
-  each report `rootUnreadable`; the existing walk1/walk2 `isClean` assertions stay green.
+- [ ] **W26.fsev-fu1 — `FSEventStreamCreate` blocks the MAIN THREAD at launch, unboundedly [S · med ·
+  Tier-2].** Filed 2026-08-06 by `W26.vocab-fu1`, from a stack sample rather than a reading:
+  `NavigationModel.init()` → `ArchiveLibrary.start(scope:)` (`:186`) → `startWatcher` (`:465`) →
+  `CorpusWatcher.start()` (`:256`, `FSEventStreamCreate`) → **`open(2)`, on the main thread**. Caught
+  because a Reader unit run hung there for 9+ minutes at 0% CPU against the owner's real corpus root —
+  under an unanswerable TCC prompt the `open` never returns and the app never draws. Local disk makes this
+  invisible (microseconds); a TCC prompt, a stalled network/cloud mount or a disconnected volume makes it
+  an app that hangs at launch with no window and no message. Everything else about this subsystem is
+  already off-thread — the launch walk is on a dedicated `Thread`, the stream runs on its own queue — so
+  the stream *creation* is the one synchronous step left. ⚠️ Moving it off the main thread must preserve
+  `W26.fsev`'s ordering guarantee that the stream starts BEFORE the launch walk, or events between the two
+  are lost; that ordering is the whole reason it is where it is, so this is a sequencing change, not a
+  `DispatchQueue.async` around one line. **Test:** a root whose `open` blocks (a `0o000` directory the
+  sandbox must prompt for, or a fake mount) leaves the main thread responsive and surfaces a timeout state
+  rather than a silent stall.
+- [ ] **W26.symroot — an archive root that is ITSELF a symlink cannot be discovered at all [S · low ·
+  Tier-2 · needs: none].** Filed 2026-08-06 by `W26.vocab-fu1`, measured while writing its openability
+  probe: `FileManager.enumerator(at:)` **refuses a root that is a symbolic link** — it reports the link to
+  `errorHandler:` and yields zero objects, even when the target is a readable directory full of tagged
+  files. This is pre-existing and predates Wave 26; `W26.vocab-fu1` only changed how it *reads*, from a
+  completed-looking empty pass to an honest `rootUnreadable` ("Archive folder unreadable"). **Nothing is
+  known to be broken today** — no fixture, script or bookmark in this repo produces a symlinked root, and
+  one could never have worked, so there is no regression to chase; this is about a setup a user could
+  reasonably choose. ⚠️ **The obvious fix is the trap.** Resolving the root before enumeration
+  (`resolvingSymlinksInPath()`) would make every discovered path come back resolved, which breaks the
+  **byte-exact path contract `LibraryIndex` keys on** (W26.idx) — cache rows would stop matching live rows
+  wholesale, and `/var` → `/private/var` means that is not a corner case. So resolve for *enumeration*
+  while keeping the caller's spelling for *identity*, or decide the root is normalised once at selection
+  and everything downstream agrees. Decide that before writing code. **Test:** a symlinked root discovers
+  its target's tagged files; the discovered `URL`s still compare byte-equal to what the caller's root
+  prefix would produce; `CorpusWalkerTests
+  .testARootThatIsItselfASymlinkIsUnreadableBecauseTheEnumeratorRefusesIt` is rewritten, not deleted.
 - [ ] **W26.oracle — Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` [S · low · Tier-1 ·
   needs: none].** `ArchiveProcessor/scripts/assert_mac.py:43` reads Finder tags via
   `sh("mdls", "-name", "kMDItemUserTags", p)` (consumed `:44`, `:55`). **During the 2026-08-04 incident this
