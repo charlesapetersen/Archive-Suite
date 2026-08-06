@@ -181,7 +181,13 @@ enum CorpusWatcherStartResult: Equatable, Sendable {
     case journalUnavailable
 }
 
-protocol CorpusWatching: AnyObject {
+/// `Sendable` because `start()` is called off the main thread: `FSEventStreamCreate` `open(2)`s the
+/// watched root, and doing that on the main actor is how the app came to hang at launch with no window
+/// (`W26.fsev-fu1`). A conforming type must therefore tolerate `start()` on an arbitrary thread —
+/// `ArchiveLibrary` serialises the rest: `stop()` is only ever called on an instance whose `start()`
+/// has already returned, so no lock is needed. Deliberately no lock, in fact: one taken around a
+/// `start()` that never returns would block `stop()` on the main thread and restore the original bug.
+protocol CorpusWatching: AnyObject, Sendable {
     func start() -> CorpusWatcherStartResult
     func stop()
     @discardableResult func flushSync() -> Bool
@@ -221,6 +227,12 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
         callbackBox.owner = self
     }
 
+    /// ⚠️ **Called off the main thread on purpose** (`W26.fsev-fu1`). `FSEventStreamCreate` below
+    /// `open(2)`s `root`; under an unanswerable TCC prompt, a stalled network/cloud mount or a
+    /// disconnected volume that syscall never returns, and this used to run inside
+    /// `NavigationModel.init()`. See `ArchiveLibrary.startWatcher(root:holdingDiscovery:)` for the
+    /// sequencing that keeps the stream ahead of the launch walk without waiting for it on the main
+    /// thread. Never make this callable only from the main actor again.
     func start() -> CorpusWatcherStartResult {
         if stream != nil { return .started }
 

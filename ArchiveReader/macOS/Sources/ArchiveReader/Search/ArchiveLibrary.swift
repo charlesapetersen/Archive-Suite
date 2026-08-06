@@ -64,7 +64,25 @@ final class ArchiveLibrary: ObservableObject {
     private let indexedScanStarter: @MainActor (IndexedLibraryScanRequest) -> Void
     private let minimumRootRescanInterval: TimeInterval
     private let libraryIndex: LibraryIndex?
+    private let watcherStartTimeout: TimeInterval
     private var watcher: (any CorpusWatching)?
+
+    /// A stream start dispatched off the main thread that has not reported yet (`W26.fsev-fu1`).
+    private struct PendingWatcherStart {
+        let watcher: any CorpusWatching
+        let rootGeneration: UInt64
+        var deadline: DispatchWorkItem?
+        /// A stream that comes up *after* discovery has already started owes one catch-up pass:
+        /// `kFSEventStreamEventIdSinceNow` cannot replay an interval it was not watching.
+        var owesCatchUpPass: Bool
+    }
+    private var pendingWatcherStart: PendingWatcherStart?
+    /// True while the launch walk is waiting for that start. Gates `beginScan` and `drainWatchWork`,
+    /// which is what preserves `W26.fsev`'s stream-before-walk ordering now that the start is async.
+    private var watcherStartHoldsDiscovery = false
+    /// The one pass held by that flag. At most one, because every path that could start a second one
+    /// is gated on the same flag.
+    private var passWaitingForWatcher: (@MainActor () -> Void)?
     private var rootResolver: (@MainActor () -> ResolvedLibraryRoot?)?
     private var rootGeneration: UInt64 = 0
     private var watchWorkInFlight = false
@@ -82,8 +100,12 @@ final class ArchiveLibrary: ObservableObject {
     private(set) var rootScanStartsForTesting = 0
 #endif
 
+    /// `watcherStartTimeout` bounds how long the launch walk waits for the FSEvents stream to come up
+    /// before going ahead without it (`W26.fsev-fu1`). Two seconds is generous for the `open(2)` this
+    /// covers — microseconds on local disk, and the only cost of firing early is one catch-up pass.
     init(minimumRootRescanInterval: TimeInterval = 1.0,
          libraryIndexURL: URL? = ArchiveLibrary.defaultLibraryIndexURL,
+         watcherStartTimeout: TimeInterval = 2.0,
          watcherFactory: @escaping WatcherFactory = { root, handler in
              CorpusWatcher(root: root, handler: handler)
          },
@@ -96,6 +118,7 @@ final class ArchiveLibrary: ObservableObject {
          }) {
         self.minimumRootRescanInterval = max(0, minimumRootRescanInterval)
         self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
+        self.watcherStartTimeout = max(0, watcherStartTimeout)
         self.watcherFactory = watcherFactory
         self.indexedScanStarter = indexedScanStarter
     }
@@ -183,7 +206,10 @@ final class ArchiveLibrary: ObservableObject {
         }
         scopeDescription = scope.lastPathComponent
         phase = .firstScan(done: 0, seen: 0)
-        startWatcher(root: scope)
+        // Off the main thread, and the walk below waits behind it rather than the main thread waiting
+        // on its `open(2)` — see `startWatcher(root:holdingDiscovery:)`. The warm-start snapshot is
+        // deliberately NOT held: it comes from the cache database, not from the watched volume.
+        startWatcher(root: scope, holdingDiscovery: true)
         if usesPersistedIndex, let indexRoot, let libraryIndex {
             prepareInitialIndexedScan(root: scope, indexRoot: indexRoot, index: libraryIndex,
                                       rootGeneration: rootGeneration)
@@ -202,10 +228,18 @@ final class ArchiveLibrary: ObservableObject {
     /// broke that synchrony and let a unit test write the owner's live cache.
     private var usesPersistedIndex: Bool {
 #if DEBUG
-        if UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil { return false }
+        if isFixtureRoot { return false }
 #endif
         return indexRoot != nil && libraryIndex != nil
     }
+
+#if DEBUG
+    /// Whether this process is pinned to a fixture root. One spelling, so the several behaviours that
+    /// key off it (no persisted index, a synchronous walk, an inline watcher start) cannot drift apart.
+    private var isFixtureRoot: Bool {
+        UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil
+    }
+#endif
 
     /// RootChanged/Mount/Unmount must go back through the bookmark owner rather than assuming the old
     /// path still names the granted directory. `NavigationModel` installs this before starting a root.
@@ -219,7 +253,7 @@ final class ArchiveLibrary: ObservableObject {
     /// recovery control for a journal-less volume and the operator's way to demand a full proof now.
     func rescan() {
         guard let root else { return }
-        _ = retryWatcherIfNeeded(root: root)
+        retryWatcherIfNeeded(root: root)
         requestRootRescan(urgent: true)
     }
 
@@ -227,16 +261,13 @@ final class ArchiveLibrary: ObservableObject {
     /// content indexer: activation retries the stream, and re-walks only when the last clean settle is
     /// older than five minutes. Explicit ⌘⌥R remains available at any age.
     func revalidateOnActivation(now: Date = Date(), staleAfter: TimeInterval = 5 * 60) {
-        guard let root else { return }
-        if retryWatcherIfNeeded(root: root) {
-            // A replacement SinceNow stream cannot replay the interval while live updates were down.
-            // Start it first to close the new gap, then catch up once regardless of snapshot age.
-            requestRootRescan(urgent: true)
-            return
-        }
-        guard watcher == nil,
-              let lastSettled,
-              now.timeIntervalSince(lastSettled) >= staleAfter else { return }
+        guard let root, watcher == nil else { return }   // a live stream needs no polling at all
+        // The retry cannot report synchronously any more — its `FSEventStreamCreate` opens the root off
+        // the main thread (`W26.fsev-fu1`) — so the catch-up walk for a stream that DOES come back is
+        // requested by the start's own completion (`owesCatchUpPass`) rather than from here. What is
+        // left here is the volume that stays journal-less: re-walk only once the snapshot is stale.
+        retryWatcherIfNeeded(root: root)
+        guard let lastSettled, now.timeIntervalSince(lastSettled) >= staleAfter else { return }
         requestRootRescan(urgent: true)
     }
 
@@ -319,6 +350,16 @@ final class ArchiveLibrary: ObservableObject {
 
     private func beginScan(root: URL, cached: [LibraryIndexPath: LibraryIndexEntry] = [:],
                            indexScan: LibraryIndexScan? = nil) {
+        // `W26.fsev` requires the stream to be watching before the walk reads anything, or a change in
+        // between is lost for good. Since `W26.fsev-fu1` the stream comes up off the main thread, so
+        // the *walk* waits here — one deferred call — instead of the main thread waiting on `open(2)`.
+        // `drainWatchWork` is gated on the same flag, so at most this one pass can ever be waiting.
+        if watcherStartHoldsDiscovery {
+            passWaitingForWatcher = { [weak self] in
+                self?.beginScan(root: root, cached: cached, indexScan: indexScan)
+            }
+            return
+        }
 #if DEBUG
         rootScanStartsForTesting += 1
 #endif
@@ -453,19 +494,109 @@ final class ArchiveLibrary: ObservableObject {
 
     // MARK: - FSEvents delivery and bounded revalidation
 
-    private func startWatcher(root: URL) {
+    /// Bring up this root's FSEvents stream — **without opening the root on the main thread.**
+    ///
+    /// `FSEventStreamCreate` `open(2)`s every watched path. On local disk that is microseconds, which is
+    /// how it survived a whole wave sitting on the main actor inside `NavigationModel.init()`; under an
+    /// unanswerable TCC prompt, a stalled network/cloud mount or a disconnected volume the `open` never
+    /// returns and **the app never draws a window** (`W26.fsev-fu1`, from a stack sample of a 9-minute
+    /// 0%-CPU hang, not from a reading).
+    ///
+    /// `holdingDiscovery` is what keeps `W26.fsev`'s ordering guarantee — the stream must be watching
+    /// before the launch walk reads anything. The walk is *deferred* (`passWaitingForWatcher`) rather
+    /// than *waited on*, so the ordering survives while the main thread does not block.
+    /// `watcherStartTimeout` bounds that deferral: a root that will not open must degrade to "no live
+    /// updates, list what you can" rather than to "no window at all".
+    ///
+    /// A dedicated `Thread`, not a shared queue: a start stuck in `open(2)` must not occupy a pool slot
+    /// that the NEXT root's start would then queue behind. Such a start is unkillable — FSEvents offers
+    /// no cancel — so its thread, and the security scope it took, leak for the life of the process.
+    /// That is the price of the stall itself, not of this deferral.
+    private func startWatcher(root: URL, holdingDiscovery: Bool) {
+        guard pendingWatcherStart == nil else { return }
+#if DEBUG
+        if isFixtureRoot {
+            startWatcherInline(root: root)
+            return
+        }
+#endif
         let generation = rootGeneration
-        let made = watcherFactory(root) { [weak self] request in
+        let made = makeWatcher(root: root, generation: generation)
+        let deadline = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.watcherStartDidStall(generation: generation) }
+        }
+        pendingWatcherStart = PendingWatcherStart(watcher: made, rootGeneration: generation,
+                                                  deadline: deadline,
+                                                  owesCatchUpPass: !holdingDiscovery)
+        watcherStartHoldsDiscovery = holdingDiscovery
+        DispatchQueue.main.asyncAfter(deadline: .now() + watcherStartTimeout, execute: deadline)
+
+        let thread = Thread { [weak self] in
+            let result = made.start()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self else {
+                        made.stop()          // the library is gone; do not leave a stream running
+                        return
+                    }
+                    self.watcherDidStart(made, result: result)
+                }
+            }
+        }
+        thread.name = "ArchiveReader.CorpusWatcherStart"
+        thread.qualityOfService = .userInitiated
+        thread.start()
+    }
+
+#if DEBUG
+    /// The fixture lane keeps the pre-`W26.fsev-fu1` inline start, deliberately.
+    ///
+    /// `beginScan`'s fixture branch is synchronous because two shipped tests read `files` the moment
+    /// `NavigationModel()` returns and the XCUITest lane's `waitForRows` timings were calibrated against
+    /// that; deferring the walk behind an off-thread start would break both, and the catch-up pass a
+    /// late stream owes would perturb every fixture test that counts passes. The hazard cannot arise
+    /// here: a fixture root is a scratch directory the test itself just created on local disk, so its
+    /// `open(2)` cannot block on a permission prompt, a stalled mount or a missing volume.
+    private func startWatcherInline(root: URL) {
+        let made = makeWatcher(root: root, generation: rootGeneration)
+        install(made, result: made.start(), owesCatchUpPass: false)
+    }
+#endif
+
+    private func makeWatcher(root: URL, generation: UInt64) -> any CorpusWatching {
+        watcherFactory(root) { [weak self] request in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self?.receiveWatchRequest(request, rootGeneration: generation)
                 }
             }
         }
-        switch made.start() {
+    }
+
+    private func watcherDidStart(_ made: any CorpusWatching, result: CorpusWatcherStartResult) {
+        // Identity, not merely generation: every abandonment path clears `pendingWatcherStart`, so a
+        // stream nobody is waiting for any more gets stopped instead of installed — including one whose
+        // `open` finally returned long after its root was replaced.
+        guard let pending = pendingWatcherStart, pending.watcher === made,
+              pending.rootGeneration == rootGeneration, root != nil else {
+            made.stop()
+            return
+        }
+        pending.deadline?.cancel()
+        pendingWatcherStart = nil
+        install(made, result: result, owesCatchUpPass: pending.owesCatchUpPass)
+        releaseDiscoveryHold()
+    }
+
+    private func install(_ made: any CorpusWatching, result: CorpusWatcherStartResult,
+                         owesCatchUpPass: Bool) {
+        switch result {
         case .started:
             watcher = made
             liveUpdateFailure = nil
+            // A SinceNow stream cannot replay what it was not watching, so a stream that arrived after
+            // discovery had already begun pays for the gap with exactly one catch-up pass.
+            if owesCatchUpPass { requestRootRescan(urgent: true) }
         case .journalUnavailable:
             made.stop()
             watcher = nil
@@ -473,15 +604,47 @@ final class ArchiveLibrary: ObservableObject {
         }
     }
 
-    /// Returns true only when this call replaced a missing stream with a running SinceNow stream.
-    @discardableResult
-    private func retryWatcherIfNeeded(root: URL) -> Bool {
-        guard watcher == nil else { return false }
-        startWatcher(root: root)
-        return watcher != nil
+    /// The stream's `open(2)` outran its deadline. Say so and stop holding the app hostage to it: a
+    /// list of what can be read, plus an honest "not responding", beats a window that never appears.
+    ///
+    /// The start is **not** abandoned — if it ever returns, `install` still adopts the stream and pays
+    /// for the interval it missed. That is why `owesCatchUpPass` is set here rather than at the start.
+    private func watcherStartDidStall(generation: UInt64) {
+        guard var pending = pendingWatcherStart, pending.rootGeneration == generation,
+              generation == rootGeneration else { return }
+        pending.deadline = nil
+        pending.owesCatchUpPass = true
+        pendingWatcherStart = pending
+        liveUpdateFailure = .liveUpdatesStalled
+        releaseDiscoveryHold()
+    }
+
+    /// Let the pass that was waiting for the stream run. Idempotent.
+    private func releaseDiscoveryHold() {
+        watcherStartHoldsDiscovery = false
+        let held = passWaitingForWatcher
+        passWaitingForWatcher = nil
+        held?()
+        drainWatchWork()
+    }
+
+    /// Bring the stream back after a journal failure or a stalled start (⌘⌥R, window activation).
+    ///
+    /// Asynchronous since `W26.fsev-fu1`, so it reports no outcome and the caller must not condition
+    /// anything on one: a start that succeeds requests its own catch-up pass. It also never holds
+    /// discovery — the operator asked for a walk *now*, and a stalled stream must not delay it.
+    private func retryWatcherIfNeeded(root: URL) {
+        guard watcher == nil, pendingWatcherStart == nil else { return }
+        startWatcher(root: root, holdingDiscovery: false)
     }
 
     private func stopWatcher() {
+        pendingWatcherStart?.deadline?.cancel()
+        // Dropping the reference is what abandons an in-flight start: `watcherDidStart` checks identity,
+        // so one still stuck in `open(2)` stops itself if it ever returns.
+        pendingWatcherStart = nil
+        watcherStartHoldsDiscovery = false
+        passWaitingForWatcher = nil
         watcher?.stop()
         watcher = nil
     }
@@ -522,7 +685,8 @@ final class ArchiveLibrary: ObservableObject {
     }
 
     private func drainWatchWork() {
-        guard inFlight == nil, !watchWorkInFlight, indexPreparation == nil, let root else { return }
+        guard inFlight == nil, !watchWorkInFlight, indexPreparation == nil,
+              !watcherStartHoldsDiscovery, let root else { return }
 
         if queuedRootRescan {
             let urgent = queuedRootRescanIsUrgent

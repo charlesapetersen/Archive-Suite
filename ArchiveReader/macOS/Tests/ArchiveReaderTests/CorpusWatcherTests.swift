@@ -571,11 +571,15 @@ final class CorpusWatcherLibraryTests: XCTestCase {
 
         library.start(scope: root)
         // The completion cannot reach this MainActor until the first await, so all three requests are
-        // guaranteed to arrive while the launch walk is in flight.
+        // guaranteed to arrive before the launch walk has started — since `W26.fsev-fu1` that walk is
+        // waiting for the stream's off-thread `open(2)`, which is why this count is 0 rather than 1.
+        // The invariant under test is unchanged: three requests still collapse into ONE queued bit, so
+        // the totals below are the launch walk plus exactly one more, never four.
         library.receiveWatchRequestForTesting(CorpusWatchRequest(fullRescan: true))
         library.receiveWatchRequestForTesting(CorpusWatchRequest(fullRescan: true))
         library.receiveWatchRequestForTesting(CorpusWatchRequest(fullRescan: true))
-        XCTAssertEqual(library.rootScanStartsForTesting, 1)
+        XCTAssertEqual(library.rootScanStartsForTesting, 0,
+                       "the launch walk waits for the stream, so the burst coalesces before it starts")
 
         try await waitUntil { library.phase.isSettled && library.rootScanStartsForTesting == 2 }
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -643,6 +647,178 @@ final class CorpusWatcherLibraryTests: XCTestCase {
 
         XCTAssertNil(library.liveUpdateFailure)
         XCTAssertEqual(attempts.value, 2)
+    }
+
+    // MARK: - W26.fsev-fu1 — the stream's `open(2)` is not allowed to hold the main thread
+
+    /// The bug itself, pinned at its narrowest: `FSEventStreamCreate` opens the watched root, and until
+    /// `W26.fsev-fu1` it did so on the main thread inside `NavigationModel.init()`. A stack sample of a
+    /// 9-minute 0%-CPU hang is what found it. Nothing about a *result* is asserted here — only where the
+    /// syscall runs, because that is the whole defect.
+    func testTheStreamsOpenIsNotPerformedOnTheMainThread() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0) { _, handler in
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        library.start(scope: root)
+        try XCTUnwrap(capture.latest).waitUntilStarting()
+
+        XCTAssertEqual(try XCTUnwrap(capture.latest).startedOnMainThread, false,
+                       "FSEventStreamCreate open(2)s the root; on the main thread that is the hang")
+    }
+
+    /// The ordering guarantee `W26.fsev` exists for, kept while the main thread stays free.
+    ///
+    /// Both halves matter and they pull against each other: the walk must not read anything before the
+    /// stream is watching (or a change in between is lost for good), yet the main thread must not wait
+    /// for the stream's `open`. So the walk is *deferred*, not *waited on* — and because the ordering
+    /// held, no catch-up pass is owed.
+    func testTheLaunchWalkWaitsForTheStreamWhileTheMainThreadDoesNot() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0) { _, handler in
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        let before = Date()
+        library.start(scope: root)
+        let returned = Date().timeIntervalSince(before)
+        let watcher = try XCTUnwrap(capture.latest)
+        watcher.waitUntilStarting()
+
+        XCTAssertLessThan(returned, 1.0, "start(scope:) returned without waiting on the stream's open")
+        XCTAssertEqual(library.rootScanStartsForTesting, 0,
+                       "the walk has NOT started: the stream is not watching yet (W26.fsev ordering)")
+        XCTAssertTrue(library.phase.isFirstScan, "and the app already has a phase to draw")
+        XCTAssertNil(library.liveUpdateFailure, "nothing has failed yet — the open is merely in progress")
+
+        watcher.release()
+        try await waitUntil { library.phase.isSettled }
+
+        XCTAssertEqual(library.files.map(\.url.lastPathComponent), ["a.pdf"])
+        XCTAssertNil(library.liveUpdateFailure)
+        XCTAssertEqual(library.rootScanStartsForTesting, 1,
+                       "the ordering held, so no catch-up pass is owed")
+        XCTAssertTrue(library.flushWatcherForTesting(), "and the stream really was installed")
+    }
+
+    /// A root whose `open` does not come back — an unanswered permission prompt, a stalled network or
+    /// cloud mount, a disconnected volume. The deadline is what turns the old silent stall into a drawn
+    /// window: discovery goes ahead without live events, and the reason is stated.
+    func testAStalledStreamStartStopsHoldingDiscoveryAndSaysWhy() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0, watcherStartTimeout: 0.2) { _, handler in
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        library.start(scope: root)
+        let watcher = try XCTUnwrap(capture.latest)
+        watcher.waitUntilStarting()
+        try await waitUntil { library.liveUpdateFailure == .liveUpdatesStalled }
+        try await waitUntil { library.phase.isSettled }
+
+        XCTAssertEqual(library.files.map(\.url.lastPathComponent), ["a.pdf"],
+                       "an unanswerable open must not cost the user the list of what IS readable")
+        XCTAssertEqual(library.discoveryFailure?.message, "Archive folder is not responding")
+        XCTAssertTrue(library.discoveryFailure?.detail.contains("no answer") == true)
+        XCTAssertFalse(library.flushWatcherForTesting(), "no stream is installed while it is stalled")
+        XCTAssertEqual(library.rootScanStartsForTesting, 1)
+
+        // The start is not abandoned. When it finally returns, the stream is adopted — and because
+        // discovery ran without it, `kFSEventStreamEventIdSinceNow` owes exactly one catch-up pass.
+        watcher.release()
+        try await waitUntil { library.liveUpdateFailure == nil && library.phase.isSettled }
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertTrue(library.flushWatcherForTesting())
+        XCTAssertEqual(library.rootScanStartsForTesting, 2,
+                       "one catch-up pass for the interval nothing was watching — and only one")
+    }
+
+    /// The late answer may be a *failure*, and then the stall wording must give way to the finished one:
+    /// "not responding" describes not knowing, `liveUpdatesUnavailable` describes knowing. No catch-up
+    /// pass is owed either, because there is no stream to have missed anything.
+    func testAStalledStartThatEventuallyFailsReportsTheJournalAnswerInstead() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0, watcherStartTimeout: 0.2) { _, handler in
+            let watcher = BlockingCorpusWatcher(result: .journalUnavailable, handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        library.start(scope: root)
+        let watcher = try XCTUnwrap(capture.latest)
+        watcher.waitUntilStarting()
+        try await waitUntil { library.liveUpdateFailure == .liveUpdatesStalled }
+        try await waitUntil { library.phase.isSettled }
+        watcher.release()
+
+        try await waitUntil { library.liveUpdateFailure == .liveUpdatesUnavailable }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(library.rootScanStartsForTesting, 1,
+                       "no stream came up, so nothing owes a catch-up walk")
+        XCTAssertTrue(library.discoveryFailure?.detail.contains("five minutes") == true,
+                      "and the stale-activation fallback is the one being advertised")
+    }
+
+    /// The adversarial case for making the start async: the owner switches root while the first root's
+    /// `open` is still stuck. When it finally returns it must be STOPPED, not installed — otherwise the
+    /// Reader ends up with a live stream on a directory nobody is looking at, feeding events into the
+    /// new root's library. The new root must also not be held behind the stuck start.
+    func testARootSwitchAbandonsAStreamWhoseOpenIsStillStuck() async throws {
+        let stuckRoot = try makeRoot()
+        try makeFile("stuck.pdf", tags: ["Unread"], root: stuckRoot)
+        let nextRoot = try makeRoot()
+        try makeFile("next.pdf", tags: ["Read"], root: nextRoot)
+
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0) { root, handler in
+            guard root == stuckRoot else { return MockCorpusWatcher(handler: handler) }
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        library.start(scope: stuckRoot)
+        let stuck = try XCTUnwrap(capture.latest)
+        stuck.waitUntilStarting()
+        XCTAssertEqual(library.rootScanStartsForTesting, 0)
+
+        library.start(scope: nextRoot)
+        try await waitUntil { library.phase.isSettled }
+        XCTAssertEqual(library.files.map(\.url.lastPathComponent), ["next.pdf"],
+                       "the new root is not held behind the abandoned root's open")
+        let passesBefore = library.rootScanStartsForTesting
+
+        stuck.release()
+        try await waitUntil { stuck.stops == 1 }
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(library.files.map(\.url.lastPathComponent), ["next.pdf"])
+        XCTAssertEqual(library.scopeDescription, nextRoot.lastPathComponent)
+        XCTAssertEqual(library.rootScanStartsForTesting, passesBefore,
+                       "an abandoned stream owes nothing: no catch-up pass for a root nobody watches")
+        XCTAssertNil(library.liveUpdateFailure,
+                     "and the live root's healthy stream is not blamed for the abandoned one")
     }
 }
 
@@ -767,6 +943,50 @@ private final class MockCorpusWatcher: CorpusWatching, @unchecked Sendable {
 }
 
 private final class MockWatcherCapture: @unchecked Sendable { var latest: MockCorpusWatcher? }
+
+/// A stream whose `start()` blocks exactly where `FSEventStreamCreate`'s `open(2)` blocks on a root
+/// behind an unanswered permission prompt, a stalled mount or a disconnected volume (`W26.fsev-fu1`).
+/// It also records the thread it was called on, which is the property the fix is *about*.
+///
+/// Always `release()` it before the test ends — a `DispatchSemaphore` deallocated while a thread waits
+/// on it traps inside libdispatch.
+private final class BlockingCorpusWatcher: CorpusWatching, @unchecked Sendable {
+    private let result: CorpusWatcherStartResult
+    private let handler: CorpusWatcher.Handler
+    private let entered = DispatchSemaphore(value: 0)
+    private let gate = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var mainThread: Bool?
+    private var stopCount = 0
+
+    init(result: CorpusWatcherStartResult = .started, handler: @escaping CorpusWatcher.Handler) {
+        self.result = result
+        self.handler = handler
+    }
+
+    func start() -> CorpusWatcherStartResult {
+        lock.lock(); mainThread = Thread.isMainThread; lock.unlock()
+        entered.signal()
+        gate.wait()
+        return result
+    }
+    func stop() { lock.lock(); stopCount += 1; lock.unlock() }
+    func flushSync() -> Bool { result == .started }
+    func emit(_ request: CorpusWatchRequest) { handler(request) }
+
+    var startedOnMainThread: Bool? { lock.lock(); defer { lock.unlock() }; return mainThread }
+    var stops: Int { lock.lock(); defer { lock.unlock() }; return stopCount }
+
+    /// Block until `start()` has actually been entered, so a test's "the walk has not begun" assertion
+    /// cannot pass merely because the start had not been dispatched yet.
+    func waitUntilStarting(timeout: TimeInterval = 5) {
+        XCTAssertEqual(entered.wait(timeout: .now() + timeout), .success,
+                       "the stream start was never dispatched")
+    }
+    func release() { gate.signal() }
+}
+
+private final class BlockingWatcherCapture: @unchecked Sendable { var latest: BlockingCorpusWatcher? }
 
 private final class CounterBox: @unchecked Sendable {
     private let lock = NSLock()

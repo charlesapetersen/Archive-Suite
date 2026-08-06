@@ -24,6 +24,12 @@ enum DiscoveryFailure: Equatable, Sendable {
     /// Kept out of `LibraryPhase.degraded`: the snapshot is authoritative at its settle time, while
     /// this warning describes how it will be refreshed (activation after five minutes or ⌘⌥R).
     case liveUpdatesUnavailable
+    /// The FSEvents stream's `open(2)` of the root has not come back yet, so live updates are not up
+    /// and the reason is not yet known: an unanswered permission prompt, a stalled network/cloud
+    /// mount, or a disconnected volume. Distinct from `liveUpdatesUnavailable`, which is a *finished*
+    /// answer about a volume with no usable journal — this one means "still no answer", and the walk
+    /// went ahead without live events rather than let the app hang with no window (`W26.fsev-fu1`).
+    case liveUpdatesStalled
     /// The pass ran to the end but could not read everything it saw.
     case partiallyUnreadable(files: Int, folders: Int)
 
@@ -37,6 +43,8 @@ enum DiscoveryFailure: Equatable, Sendable {
             return "Finder tags unavailable for \(files) file\(files == 1 ? "" : "s")"
         case .liveUpdatesUnavailable:
             return "Live archive updates unavailable"
+        case .liveUpdatesStalled:
+            return "Archive folder is not responding"
         case let .partiallyUnreadable(files, folders):
             let parts = [files > 0 ? "\(files) file\(files == 1 ? "" : "s")" : nil,
                          folders > 0 ? "\(folders) folder\(folders == 1 ? "" : "s")" : nil]
@@ -79,6 +87,12 @@ enum DiscoveryFailure: Equatable, Sendable {
             return "This volume did not provide a working FSEvents journal, so Archive Reader cannot "
                  + "follow Finder or Processor changes continuously. It will re-scan when the app becomes "
                  + "active and its last clean scan is more than five minutes old; use ⌘⌥R to refresh now."
+        case .liveUpdatesStalled:
+            return "Archive Reader asked the system to watch the archive folder and has had no answer "
+                 + "yet — usually an unanswered permission prompt, a stalled network or cloud volume, "
+                 + "or a disconnected disk. The app stays usable while it waits, and it is listing "
+                 + "whatever it can read; live updates start as soon as the folder answers. Use ⌘⌥R "
+                 + "to try again."
         case let .partiallyUnreadable(files, folders):
             let what = folders > 0
                 ? "Some items could not be read (\(files) file\(files == 1 ? "" : "s"), "
