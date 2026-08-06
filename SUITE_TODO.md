@@ -115,13 +115,13 @@ it stayed one change.
   `context-budget` happens to be the final step; had `reader` failed, the park note would have quoted the
   context-budget table as the reader's "failing output" — and the park note embeds this tail, so the mislabel
   propagates to the owner. Fix: have `step()` keep each step's own output (e.g. `$LOG.<name>`) and quote the
-  failing one, or relabel honestly. ⚠️ Tier-2 per the autonomous-setup change discipline, and `arm.sh` installs
-  from the PRIMARY checkout, so it is not live until that is fast-forwarded and the owner re-arms.
+  failing one, or relabel honestly. ⚠️ Tier-2 per the autonomous-setup change discipline, and `daemon.sh` installs
+  from the PRIMARY checkout, so it is not live until that is fast-forwarded and the owner restarts it.
 
 - [ ] **W27.parkstick — nothing ever deletes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`, so "Needs you" is
   permanently sticky [S · low · ops].** `archive-suite-autonomous.sh` writes that file on park; a repo-wide
   grep finds **one writer and no remover**. `status-digest.sh` shows a "It parked and left you a note … then
-  restart it" bullet whenever the file exists, so `arm.sh status` keeps asking for a decision long after the
+  restart it" bullet whenever the file exists, so `daemon.sh status` keeps asking for a decision long after the
   cause is fixed and the daemon is healthy again. Fix: remove it when a run starts successfully (or when a gate
   goes GREEN), so its presence means "there is an unhandled park" rather than "a park happened once".
 
@@ -245,8 +245,8 @@ exit 0, "✓ clean".
   `./ArchiveReader/scripts/lint-write-surface.sh` into the daemon's health gate — and its self-test
   `test-lint-write-surface.sh` alongside, since a lint that cannot fail is the failure mode `W26.lint` was
   about. ⚠️ **Tier-2 per the autonomous-setup change discipline** (adversarial review + prove-the-mechanism
-  before install), and `arm.sh` installs from the PRIMARY checkout's working tree — a fix landed via
-  worktree+push is not live until the primary is fast-forwarded and the owner re-arms. Do NOT make the gate
+  before install), and `daemon.sh` installs from the PRIMARY checkout's working tree — a fix landed via
+  worktree+push is not live until the primary is fast-forwarded and the owner restarts it. Do NOT make the gate
   fail on a pre-existing violation without checking a clean tree passes first: both scripts are green on
   `1460125`. ➕ **Same gap, same fix, added 2026-08-06:** `ArchiveProcessor/scripts/test-tag-vocabulary.sh`
   (shipped by `W26.vocab`) also has no caller — it is the Tier-2 gate on the tag-write vocabulary hook and
@@ -1216,7 +1216,7 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
   clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
   change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
-- [ ] **W21.status-idle — `arm.sh status` reports "nothing it can do" while a session is actively mid-item,
+- [ ] **W21.status-idle — `daemon.sh status` reports "nothing it can do" while a session is actively mid-item,
   and blames the HOLD QUEUE for it [S · LOW · ops].** Filed 2026-08-02 from the daemon-report walkthrough,
   where the headline read *"◐ Running, but not finding anything it can do (2 hours)"* and *"Needs you: 2
   task(s) are held back for you to decide"* — while a session launched at 08:18 had already committed
@@ -1235,10 +1235,10 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   from `daemon.log`. ⚠️ This is **the mirror image of the known "status says *productive* while every session
   exits rc=1" bug** — same root shape (the headline summarizes state it does not measure), so fix both
   directions or the next one lands as a new surprise. **Tier-2 per the autonomous-setup change discipline**
-  (adversarial review + prove-the-mechanism before install), and remember `arm.sh` installs from the PRIMARY
+  (adversarial review + prove-the-mechanism before install), and remember `daemon.sh` installs from the PRIMARY
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
-  and the owner re-arms. Read-only reporting change; no daemon behaviour change.
-  | files: ops/autonomous/arm.sh | S | low | none
+  and the owner restarts it. Read-only reporting change; no daemon behaviour change.
+  | files: ops/autonomous/daemon.sh | S | low | none
 - [ ] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emits a block header with no preceding newline, so a pasted passage's provenance chip degrades to LITERAL TEXT on the next load [M · MED · data-shaped].**
   Filed 2026-08-05, found while fixing `W3.notes-passage-paste-at-caret` and deliberately NOT fixed in the same
   change. `MarkdownBridge.serialize` concatenates a body segment and the next header with no separator, so a

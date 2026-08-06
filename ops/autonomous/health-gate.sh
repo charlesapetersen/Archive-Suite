@@ -135,6 +135,19 @@ step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
 # compactor is broken and the plan WILL drift back over budget — fix the compactor, don't skip this.
 step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 
+# Same argument, for the two OTHER hermetic ops harnesses. Both are seconds long, sandbox-only (mktemp fixtures
+# + an isolated $HOME) and deterministic, so there is no reason to leave them unwatched:
+#   * prove-status.sh — the ONE status renderer the owner reads. It sat silently at 34/2 until 2026-08-06, and
+#     the cause was the harness itself reading the owner's REAL ~/Desktop park note: 34/2 with that file
+#     present, 36/0 without. Its verdict depended on state outside its own sandbox. Now isolated.
+#   * prove-daemon-dispatch.sh — daemon.sh's command dispatch, driven through `--dry-run` so it never installs
+#     or launches anything. Guards the 2026-08-06 rename (arm.sh -> daemon.sh, verb `arm` -> `start`),
+#     including that the retired `arm` verb is REJECTED rather than quietly still working as an alias.
+# prove-daemon.sh is deliberately NOT here: ~10 min of real daemon loops does not belong in a gate that already
+# runs ~22 min against GATE_MAXRUN=50min. Run that one by hand for daemon-behaviour changes.
+step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
+step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
+
 echo
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"

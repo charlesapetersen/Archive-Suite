@@ -98,7 +98,7 @@ GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts 
 
 # STATUS — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a few seconds of
 # reading: is it running, what has it done, how much is left, is the code healthy, does it need the owner.
-# ONE renderer (ops/autonomous/status-digest.sh), shared with `arm.sh status`; it suppresses colour when
+# ONE renderer (ops/autonomous/status-digest.sh), shared with `daemon.sh status`; it suppresses colour when
 # stdout is not a terminal, so the file written here stays clean text. Overridable (harness stub).
 STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
 
@@ -278,7 +278,7 @@ IDLE_SINCE="$STATE/idle.since"
 NOCOMPLETE="$STATE/nocomplete.count"   # WS4: consecutive committed-but-completed-nothing sessions
 # Clear BOTH counters at every daemon startup so on-disk state shares the daemon's lifetime (BACKOFF is
 # in-memory and resets on start; these must too). Otherwise a stale stamp/count from a PRIOR run makes the
-# first cycle PARK immediately — turning the owner's re-arm (an explicit "try again" signal) into a single
+# first cycle PARK immediately — turning the owner's restart (an explicit "try again" signal) into a single
 # retry. Arming a run always buys a full window. (idle.since was a confirmed-HIGH review finding, 2026-07-16;
 # nocomplete.count gets the same treatment for the same reason — see README "Idle backoff"/"Attempt cap".)
 rm -f "$IDLE_SINCE" "$NOCOMPLETE" 2>/dev/null || true
@@ -328,9 +328,9 @@ note_committed() {
   n=$(( n + 1 )); echo "$n" > "$NOCOMPLETE" 2>/dev/null || true
   if [ "$MAX_NOCOMPLETE" -gt 0 ] && [ "$n" -ge "$MAX_NOCOMPLETE" ]; then
     local recent; recent="$(git -C "$REPO" log -5 --format='  %h %s' 2>/dev/null)"
-    rm -f "$NOCOMPLETE" 2>/dev/null || true   # don't re-park instantly on a bare re-arm without a fresh streak
+    rm -f "$NOCOMPLETE" 2>/dev/null || true   # don't re-park instantly on a bare restart without a fresh streak
     park_run "no item completed in $n sessions" \
-      "Archive Suite autonomous run PARKED: $n sessions committed work but completed NO item (no checkbox flipped in the plan WORK QUEUE or SUITE_TODO.md) — the current item is likely mis-sized or stuck (checkpoints keep landing, but its box never flips to [x]). Split/re-scope it, or raise AUTONOMOUS_MAX_NOCOMPLETE, then re-arm. Recent commits:
+      "Archive Suite autonomous run PARKED: $n sessions committed work but completed NO item (no checkbox flipped in the plan WORK QUEUE or SUITE_TODO.md) — the current item is likely mis-sized or stuck (checkpoints keep landing, but its box never flips to [x]). Split/re-scope it, or raise AUTONOMOUS_MAX_NOCOMPLETE, then restart it. Recent commits:
 $recent"
     return 9
   fi
@@ -359,16 +359,16 @@ backoff_sleep() {
 # Park the run: stop cleanly and say so LOUDLY (log + Desktop file + local notification + REMOTE alert)
 # rather than idle forever holding a caffeinate assertion. Callers: the idle path (no progress for
 # $IDLE_STOP) and the disk guard (WS2) — hence the reason/message parameters rather than a hardcoded idle
-# message. Deliberately does NOT rewrite RUN STATUS: the plan stays IN_PROGRESS so a plain re-arm resumes
+# message. Deliberately does NOT rewrite RUN STATUS: the plan stays IN_PROGRESS so a plain restart resumes
 # with no edit, and the EXIT trap still fires the taskport security reminder.
 #   $1 = short reason (log + notification title)   $2 = the owner-facing message
 park_run() {
   local reason="$1" m="$2"
-  rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a re-arm could trip over
+  rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a restart could trip over
   # Release the engine lock HERE, not in the caller's post-verdict cleanup: under `keepalive` (WS1) the
   # `launchctl bootout` below SIGTERMs THIS process the instant it's called (verified), so everything textually
   # after it — including tick()'s `rm -f "$LOCK"` — never runs. Without this, an idle/attempt-cap park (both
-  # hold the lock) would leave a fresh lock, and a re-arm within $STALE (25 min) would no-op "engine busy".
+  # hold the lock) would leave a fresh lock, and a restart within $STALE (25 min) would no-op "engine busy".
   rm -f "$LOCK" 2>/dev/null || true
   log "!!!!!!!!!!!! PARKED ($reason) — stopping. $m"
   { echo "[$(date '+%F %T')] $m"; } > "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
@@ -398,7 +398,7 @@ note_no_progress() {
   if [ "$IDLE_STOP" -gt 0 ] && [ "$idle" -ge "$IDLE_STOP" ]; then
     local hrs=$(( IDLE_STOP / 3600 ))
     park_run "no progress for ${hrs}h" \
-      "Archive Suite autonomous run PARKED: ${hrs}h with no progress — every remaining queue item looks blocked on you (owner/GUI-gated). Nothing was lost; the plan is intact. Check:  ./ops/autonomous/arm.sh status   then re-arm with:  ./ops/autonomous/arm.sh"
+      "Archive Suite autonomous run PARKED: ${hrs}h with no progress — every remaining queue item looks blocked on you (owner/GUI-gated). Nothing was lost; the plan is intact. Check:  ./ops/autonomous/daemon.sh status   then restart it with:  ./ops/autonomous/daemon.sh start"
     return 9
   fi
   log "no progress (idle ${idle}s) — next attempt in ${BACKOFF}s."
@@ -522,7 +522,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
     "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row.
 $diag
 Reproduce: ./ops/autonomous/health-gate.sh   ·   full gate output: $glog
-Then re-arm: ./ops/autonomous/arm.sh
+Then restart it: ./ops/autonomous/daemon.sh start
 Gate verdict + tail:
 ${vline:-(no 'HEALTH GATE: RED' line in $glog)}
 $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -25)"
@@ -782,7 +782,7 @@ tick() {
   #     lock/launch, so we never start a session we already know cannot build.
   if ! disk_ok; then
     park_run "low disk (${LAST_FREE_MB}MB free)" \
-      "Archive Suite autonomous run PARKED — LOW DISK: only ${LAST_FREE_MB}MB free on the repo volume (need ${MINFREE_MB}MB). Every build would fail, so the run stopped instead of burning sessions. Free some space (per-worktree build/DD is usually the culprit), then re-arm:  ./ops/autonomous/arm.sh"
+      "Archive Suite autonomous run PARKED — LOW DISK: only ${LAST_FREE_MB}MB free on the repo volume (need ${MINFREE_MB}MB). Every build would fail, so the run stopped instead of burning sessions. Free some space (per-worktree build/DD is usually the culprit), then restart it:  ./ops/autonomous/daemon.sh start"
     return 9
   fi
 
@@ -791,7 +791,7 @@ tick() {
   #      be the sole active engine. RED -> park (return 9). GREEN -> it WAS this cycle's work: mark progress
   #      (so the idle backoff doesn't count the gate cycle as idle) and end the cycle. Not due -> fall through.
   #      NOTE: unlike the instantaneous disk guard, the gate holds NO lock for up to GATE_MAXRUN and builds in
-  #      the primary checkout. That's safe because only ONE daemon runs (launchd single-instance + arm.sh's
+  #      the primary checkout. That's safe because only ONE daemon runs (launchd single-instance + daemon.sh's
   #      double-launch guard) and interactive sessions don't consult engine.lock; a concurrent second daemon
   #      is the only overlap risk, which those guards already preclude.
   health_gate; local hg=$?
@@ -905,7 +905,7 @@ tick() {
     # Name the cause. A usage-limit fast-fail is NOT an empty queue: the CLI exits nonzero in ~2-3s when the
     # window is exhausted (see the Watchdog note above) and cannot move the fingerprint, so it lands here
     # looking identical to "there was nothing to do". Reading that as an idle queue is the same misreport
-    # W23.status1 fixed one layer up in `arm.sh status`; this is the log line it left behind.
+    # W23.status1 fixed one layer up in `daemon.sh status`; this is the log line it left behind.
     local _elapsed=$(( SECONDS - _t0 ))
     if [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
       log "session (rc=$rc) exited after ${_elapsed}s — likely USAGE-LIMIT fast-fail, not an empty queue; backing off."

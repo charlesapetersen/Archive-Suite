@@ -37,7 +37,7 @@ REVIEW_EVERY="${AUTONOMOUS_REVIEW_EVERY:-20}"      # global cooldown: ≥ this m
 # and `--status` still reports honestly (it prints a DISABLED banner but the real table underneath).
 #
 # TO RE-ENABLE: set REVIEW_ENABLED_DEFAULT=1 below (or export AUTONOMOUS_REVIEW_ENABLED=1 for a one-off run),
-# then re-install + re-arm from the PRIMARY checkout (`arm.sh` installs from $REPO's working tree, not
+# then re-install + restart from the PRIMARY checkout (`daemon.sh` installs from $REPO's working tree, not
 # origin/main — so `git merge --ff-only origin/main` there FIRST or you'll re-install the old copy).
 #
 # HOW IT DISABLES: the script reports `none due …` and exits 3 — the *existing*, already-handled path in the

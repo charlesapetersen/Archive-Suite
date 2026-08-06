@@ -14,6 +14,13 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; DIGEST="$HERE/../status-digest.sh"
 [ -f "$DIGEST" ] || { echo "no digest at $DIGEST"; exit 2; }
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+# ⚠ ISOLATE $HOME. status-digest.sh reads "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" to decide whether to
+# print a "it parked and left you a note" ask, so without this the OWNER'S REAL DESKTOP leaks into the
+# assertions. Measured 2026-08-06: with a real park note present this harness reported 34 passed / 2 FAILED
+# ("invented an ask" and "scan ran past a '## ' heading"), and 36/0 with no note — i.e. the two failures were
+# an environment leak, not a defect, and the harness's verdict depended on a file outside the sandbox.
+# prove-daemon.sh already did this (its header promises to "never touch the owner's Desktop"); this did not.
+export HOME="$T/home"; mkdir -p "$HOME/Desktop"
 R="$T/repo with space"; mkdir -p "$R"        # space: mirrors the real repo path
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
@@ -54,7 +61,7 @@ printf '%s' "$OUT" | grep -qE '2 tasks to do · 1 finished' \
 
 echo "[1] not running -> says so, and says how to start it"
 OUT="$(RUNNING=0 SUPERVISED=0 run)"
-printf '%s' "$OUT" | grep -q 'Not running' && printf '%s' "$OUT" | grep -q 'arm.sh' \
+printf '%s' "$OUT" | grep -q 'Not running' && printf '%s' "$OUT" | grep -q 'daemon.sh' \
   && ok "stopped state names the fix" || bad "stopped state wrong" "$OUT"
 
 echo "[2] running with no idle marker -> Working now"

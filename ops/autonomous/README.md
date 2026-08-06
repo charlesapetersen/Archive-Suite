@@ -42,13 +42,17 @@ read that section.
 
 ## Install / run
 
-**One command (preferred): `./ops/autonomous/arm.sh`** — checks every prerequisite (claude CLI outside
+> **Renamed 2026-08-06 (owner):** this script was `arm.sh` and its verb was `arm`; it is now
+> **`daemon.sh`** with **`start`**. A bare `./ops/autonomous/daemon.sh` still means `start`, but the old
+> `arm` verb is rejected rather than silently aliased — two spellings for one command is how docs drift.
+
+**One command (preferred): `./ops/autonomous/daemon.sh start`** — checks every prerequisite (claude CLI outside
 `~/Desktop`, daemon + resume prompt present, an L0 plan whose `RUN STATUS` is `IN_PROGRESS` with unchecked
 `[ ]` items), installs the latest committed copies to the runtime location, refuses to double-launch, warns
 with the exact fix if the plan is stale-`COMPLETE`, launches, and confirms the first cycle started. By
 **default (2026-07-17)** it launches under **launchd KeepAlive** (crash-restart — see below), the right
-posture for a long unattended run. `arm.sh nohup` is the opt-in detached mode; `arm.sh status` (read-only)
-and `arm.sh stop` round it out. `./ops/autonomous/arm.sh --dry-run [nohup]` previews the resolved launch
+posture for a long unattended run. `daemon.sh nohup` is the opt-in detached mode; `daemon.sh status` (read-only)
+and `daemon.sh stop` round it out. `./ops/autonomous/daemon.sh --dry-run [nohup]` previews the resolved launch
 mode without touching anything. The manual steps below are what it automates.
 
 The committed copies here are the source of truth; install to the runtime location:
@@ -58,37 +62,37 @@ cp ops/autonomous/archive-suite-autonomous.sh ~/.local/bin/ && chmod +x ~/.local
 cp ops/autonomous/resume-prompt.txt ~/.local/state/archive-autonomous/
 ```
 
-**Default — crash-restart under launchd (`./ops/autonomous/arm.sh`; WS1, default since 2026-07-17).** The
+**Default — crash-restart under launchd (`./ops/autonomous/daemon.sh start`; WS1, default since 2026-07-17).** The
 daemon runs under a launchd LaunchAgent with **`KeepAlive=true`**, so a **crash / OOM / stray kill
 auto-restarts** it — motivated by a real 2026-07-17 death where the daemon was TERMed mid-session and nothing
 brought it back. The model is simple: **the only thing that stops it is a `launchctl bootout`**, which every
-intentional stop performs (`arm.sh stop`, park, plan-COMPLETE); any other death leaves the job registered, so
+intentional stop performs (`daemon.sh stop`, park, plan-COMPLETE); any other death leaves the job registered, so
 launchd relaunches (throttled to 60s). Proven on-machine by `tests/prove-keepalive.sh`; the dispatch (that
-bare `arm` selects this) by `tests/prove-arm-dispatch.sh`.
+bare `arm` selects this) by `tests/prove-daemon-dispatch.sh`.
 - **Survives a daemon crash, NOT a logout/reboot** — a LaunchAgent only loads at GUI login (reboot-survival is
   deliberately out of scope; it'd need auto-login, defeated by FileVault anyway — see "don't reboot" below).
 - May log `Operation not permitted` until `/bin/bash` has **Full Disk Access** (System Settings → Privacy).
 
-**Opt-in — detached nohup (`./ops/autonomous/arm.sh nohup`).** macOS has **no `setsid`**, so a subshell +
+**Opt-in — detached nohup (`./ops/autonomous/daemon.sh nohup`).** macOS has **no `setsid`**, so a subshell +
 `nohup` detaches the loop so it survives the launching command returning (equivalent to
 `( nohup ~/.local/bin/archive-suite-autonomous.sh >…/nohup.out 2>&1 & )`). It runs while this login session is
 alive and inherits its `~/Desktop`/screen (TCC) grant. (That host-screen grant used to matter for GUI-verify;
 it no longer does — GUI runs off-screen in the Tart VM regardless of supervisor, `ops/gui/README.md` §3.)
 Downside: **no crash-restart** (a crash just stops it). If the launching terminal
 closes, the daemon stops — fine by design: all state is durable in the plan + `git`, so a stop loses nothing
-and the next `arm.sh` continues the queue. **We deliberately do NOT chase reboot/close durability.**
+and the next `daemon.sh start` continues the queue. **We deliberately do NOT chase reboot/close durability.**
 
 ## Stop / status
 
 ```bash
 tail -f ~/.local/state/archive-autonomous/daemon.log            # cadence + rc of each resume
 tail -f ~/.local/state/archive-autonomous/last-session.log      # the most recent resume's transcript
-./ops/autonomous/arm.sh stop                                    # STOP either mode (boots out the launchd job, THEN kills)
+./ops/autonomous/daemon.sh stop                                    # STOP either mode (boots out the launchd job, THEN kills)
 ```
-`arm.sh stop` is the right stopper in both modes: under `keepalive` a bare `pkill` would just be relaunched by
-launchd, so `stop` boots out the job first. (`arm.sh status --details` shows which mode is in force, under
+`daemon.sh stop` is the right stopper in both modes: under `keepalive` a bare `pkill` would just be relaunched by
+launchd, so `stop` boots out the job first. (`daemon.sh status --details` shows which mode is in force, under
 *restart on crash*.)
-`./arm.sh status` opens with a plain-language **state line** — *Working now* / *Paused — it hit the usage cap*
+`./daemon.sh status` opens with a plain-language **state line** — *Working now* / *Paused — it hit the usage cap*
 / *Running, but not finding anything it can do* / *Stopped itself* / *Set to run, but not running right now* /
 *Not running* — so a parked run is never mistaken for a crash, and a throttled one is never mistaken for an
 empty queue. The daemon self-terminates when the plan's `RUN STATUS:` line
@@ -107,7 +111,7 @@ had no terminal state and spun forever. Two real waste modes, both observed 2026
 **The mechanism.** Any cycle that **advances nothing** doubles the gap (`INTERVAL` → `MAXBACKOFF`, default
 30 min); any progress resets it to `INTERVAL`; `IDLE_STOP` (default **72 h**) of *unbroken* no-progress **parks**
 the run — a clean stop with a loud, owner-visible signal (`daemon.log` + `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`
-+ a notification). Park deliberately leaves `RUN STATUS: IN_PROGRESS`, so a plain re-arm resumes with no edit.
++ a notification). Park deliberately leaves `RUN STATUS: IN_PROGRESS`, so a plain restart resumes with no edit.
 `IDLE_STOP` is **72 h** (not 6 h) so a long usage-cap outage doesn't self-park a healthy multi-day run: a
 consecutive run of usage fast-fails all count as unbroken no-progress, and a *weekly* cap can exceed the
 ~5 h rolling window, so a 6 h idle clock would park a run that is merely *waiting for the window to reopen*.
@@ -127,7 +131,7 @@ the fingerprint and resets the backoff; a usage fast-fail can't move it and fall
   only *accelerates* retries (an unchanged one → keep backing off; a changed one → retry now, via an
   interruptible `backoff_sleep` that wakes early the instant the owner arms an item).
 - **Idle clock shares the daemon's lifetime.** `idle.since` is cleared at every startup (and on park), so a
-  stale stamp from a prior run can't make a fresh daemon park on cycle 1 — an owner re-arm always buys a full
+  stale stamp from a prior run can't make a fresh daemon park on cycle 1 — an owner restart always buys a full
   `IDLE_STOP` window. *(Confirmed-HIGH finding from the change's own adversarial review.)*
 
 Knobs (env-overridable): `AUTONOMOUS_MAXBACKOFF`, `AUTONOMOUS_IDLE_STOP` (0 disables the auto-park). Built
@@ -140,7 +144,7 @@ work but completed no queue item**, and parks + alerts at `AUTONOMOUS_MAX_NOCOMP
 "An item completed" = the count of **top-level `[x]` checkbox items** in the plan's `## WORK QUEUE` went up
 (prose mentions of `[x]` are excluded so a session can't fake a completion by writing about one); completing
 any item resets the streak. The counter (`$STATE/nocomplete.count`) is cleared at startup alongside
-`idle.since`, for the same reason (a re-arm must never park on cycle 1 off a stale count). The park message
+`idle.since`, for the same reason (a restart must never park on cycle 1 off a stale count). The park message
 lists the recent commits so you can see which item is stuck.
 
 **Periodic health gate (WS7, 2026-07-17).** Per-change review catches per-change bugs; a *compounding*
@@ -227,7 +231,7 @@ paid Processor OCR smoke.
   confirm it's green + prompt-free before arming a long run.
 
 **STATUS — the check-in surface (rewritten 2026-07-31 for readability).** `status-digest.sh` is **the one
-status renderer**; `arm.sh status` is a thin forwarder that adds no formatting of its own. The default view is
+status renderer**; `daemon.sh status` is a thin forwarder that adds no formatting of its own. The default view is
 written for the owner at a glance, not for an engineer reading logs, and answers only five questions:
 
 > **is it running? · what has it done? · how much is left? · is the code healthy? · does it need me?**
@@ -236,7 +240,7 @@ written for the owner at a glance, not for an engineer reading logs, and answers
 Archive Suite — overnight worker   Fri 31 Jul, 09:03
 
   ○  Not running
-     Nothing is working on the project right now. Start it: ./ops/autonomous/arm.sh
+     Nothing is working on the project right now. Start it: ./ops/autonomous/daemon.sh start
 
   Done       69 changes in the last 24 hours · latest 15 minutes ago
              "feat(ops): daemon runs at effort=xhigh, and each session now…"
@@ -252,12 +256,12 @@ two of them were historically reported as each other:
 it can do* (unblock it) · *Stopped itself* = parked (decide something) · *Set to run, but not running right
 now* (crash-looping) · *Not running*.
 
-`arm.sh status --details` adds the diagnostics that used to clutter the default view — current commit, plan
+`daemon.sh status --details` adds the diagnostics that used to clutter the default view — current commit, plan
 line, restart-on-crash mode, disk, spare worktrees, keychain state, GUI lane, whether paced reviews are on,
 and the last log lines. Nothing was deleted, only demoted; anything genuinely *wrong* still surfaces under
 **Needs you** with no flag.
 
-Before this rewrite, `arm.sh status` printed six sections of its own and *then* pasted the digest underneath,
+Before this rewrite, `daemon.sh status` printed six sections of its own and *then* pasted the digest underneath,
 so the run state and plan line each appeared twice in two different wordings — and the `GUI` and `keychain`
 sections were fixed text that had stopped telling anyone anything. One renderer, one wording.
 
@@ -266,7 +270,7 @@ a terminal, so the file stays clean text). Read-only, non-fatal, degrades gracef
 prints a report with no repo, plan or state at all, because it is what you run when something is already
 broken. Covered by `ops/autonomous/tests/prove-status.sh` (34 checks: every state, the jargon budget, and the
 no-ANSI-in-a-file rule). Check in with:
-`cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/arm.sh status`).
+`cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/daemon.sh status`).
 
 ## Remote alerting + disk guard (added 2026-07-16 — WS6/WS2 of the 2-week hardening)
 
@@ -314,7 +318,7 @@ productive session and wakes you.
 ```
 Then launch the app once (`./launch.sh processor`) and click **Always Allow** if *it* prompts, to confirm the
 app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
-re-created item gets a fresh, empty partition list). `arm.sh status --details` shows whether the fix is
+re-created item gets a fresh, empty partition list). `daemon.sh status --details` shows whether the fix is
 applied, and if it is *not*, the default view says so under **Needs you** without the flag.
 (Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
 
@@ -329,7 +333,7 @@ crash at a glance:
 
 | what you see | what it means |
 |---|---|
-| `reason: SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing` | An orderly system stop. **This is the normal case on a personal laptop** — closing the lid ends the login session and launchd TERMs the job. Not a defect. Just `./ops/autonomous/arm.sh` again. |
+| `reason: SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing` | An orderly system stop. **This is the normal case on a personal laptop** — closing the lid ends the login session and launchd TERMs the job. Not a defect. Just `./ops/autonomous/daemon.sh` again. |
 | `reason: fell out of the main loop (rc 9 …)` | The daemon's own decision: `RUN STATUS: COMPLETE`, or it parked (idle past `IDLE_STOP`, attempt cap, disk guard, or a reproducible RED health gate — which is **not necessarily a code regression**: the gate's `context-budget` step REDs when an orientation DOCUMENT is over its size budget while every build and suite is green, and the park note now names the failing step and says which kind it is). Check for `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`. |
 | `reason: SIGINT` / `SIGHUP` | Ctrl-C, or the controlling terminal/login session went away. |
 | a `daemon up` line with **no** matching `daemon down` | A **hard kill** — SIGKILL, OOM, or power loss. These cannot be trapped, so the *absence* of a line is itself the signature. On this laptop that is almost always the lid closing or the battery dying, not a bug. |
@@ -444,8 +448,8 @@ ranking, cooldown, fail-open stale-sha handling, `--status` and `--record` are a
 dedicated case [10] for the switch itself). **Why:** the owner-commissioned Codex full-suite review of
 2026-07-29 filed 24 confirmed findings as `SUITE_TODO.md` **Wave 23** (5 HIGH / 15 MED / 4 LOW) — the
 bottleneck is fixing those, not finding more. **To re-enable:** flip `REVIEW_ENABLED_DEFAULT=1`, then
-re-install from the **primary checkout** (`git merge --ff-only origin/main` there first — `arm.sh` installs
-from `$REPO`'s working tree, not `origin/main`) and re-arm.
+re-install from the **primary checkout** (`git merge --ff-only origin/main` there first — `daemon.sh` installs
+from `$REPO`'s working tree, not `origin/main`) and restart it.
 
 **Needs-owner HOLD QUEUE (WS10, 2026-07-17).** The daemon **never auto-executes** irreversible / highest-
 blast-radius work: **Tier-3 releases** (DMG / `gh release` / version tags), **SPEC / `tag-format` changes**
@@ -545,7 +549,7 @@ autonomous run for a different repo:
 
 ## Changing this setup — review discipline (added 2026-07-11)
 
-The daemon (`archive-suite-autonomous.sh`), `arm.sh`, the resume prompt, and this setup are
+The daemon (`archive-suite-autonomous.sh`), `daemon.sh`, the resume prompt, and this setup are
 **Tier-2-equivalent infrastructure**: they drive autonomous, self-pushing work next to the file-safety
 blast radius. Treat every change to them like a Tier-2 code change:
 
@@ -607,7 +611,7 @@ shared `origin/main` ref) so it can't hang the loop; never touches the primary c
   session could orphan a runaway build child. The health-watchdog change routes every kill through
   `_terminate_tree`, which TERM+KILLs claude's whole descendant tree (snapshotted up-front, with a detached
   KILL backstop). (The parent's `trap 'exit 0' TERM INT` still doesn't reap the backgrounded child on a TERM to
-  the daemon itself — minor, and `arm.sh stop` covers it by pkill-matching the subshells.)
+  the daemon itself — minor, and `daemon.sh stop` covers it by pkill-matching the subshells.)
 
 ## Plan compaction — keep the durable plan small (`compact-plan.sh`)
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # status-digest.sh — "what is the overnight worker doing?", answered in about ten seconds of reading.
 #
-# THE ONE STATUS RENDERER. `arm.sh status` calls this and adds nothing of its own; the daemon writes its
+# THE ONE STATUS RENDERER. `daemon.sh status` calls this and adds nothing of its own; the daemon writes its
 # output to $STATE/STATUS.md every cycle and on park. There is deliberately no second copy of this
-# formatting anywhere — arm.sh used to print its own six sections and THEN paste this digest underneath,
+# formatting anywhere — daemon.sh used to print its own six sections and THEN paste this digest underneath,
 # so the run state and the plan line appeared twice, in two different wordings, and a fix to one never
 # reached the other. (Same failure as ops/gui/tart-lib.sh: two copies of one fact is how they drift.)
 #
@@ -23,7 +23,7 @@ STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 JOB="com.archivesuite.autonomous"; GUI_DOMAIN="gui/$(id -u)"
 LOG="$STATE/daemon.log"
-ARM="./ops/autonomous/arm.sh"
+DAEMON_CMD="./ops/autonomous/daemon.sh"
 
 DETAILS=0
 case "${1:-}" in -d|--details|--detail|-v|--verbose|full) DETAILS=1 ;; esac
@@ -54,7 +54,7 @@ clip() {
   s="${s:0:$n}"; s="${s% *}"; printf '%s…' "$s"
 }
 
-# Why the daemon is idle is decided in run-state-lib.sh, shared with arm.sh. Guarded because arm.sh may run
+# Why the daemon is idle is decided in run-state-lib.sh, shared with daemon.sh. Guarded because daemon.sh may run
 # from a checkout that predates the lib (memory `arm-installs-from-primary-checkout`).
 if [ -r "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh" ]; then
   . "$(cd "$(dirname "$0")" && pwd)/run-state-lib.sh"
@@ -104,14 +104,14 @@ elif [ "$supervised" = 1 ]; then
   # Job loaded but no process: either between restarts, or crash-looping. Never let those read alike.
   lec="$(launchctl print "$GUI_DOMAIN/$JOB" 2>/dev/null | awk -F'= ' '/last exit code/{gsub(/[^0-9-]/,"",$2); print $2; exit}')"
   STATE_ICON="${RED}✕${OFF}"; STATE_LINE="Set to run, but not running right now"
-  STATE_HINT="Restarting, or failing to start (last exit ${lec:-?}). If this persists: $ARM stop, then $ARM"
+  STATE_HINT="Restarting, or failing to start (last exit ${lec:-?}). If this persists: $DAEMON_CMD stop, then $DAEMON_CMD start"
 elif tail -n 8 "$LOG" 2>/dev/null | grep -q 'PARKED'; then
   STATE_ICON="${AMB}◆${OFF}"; STATE_LINE="Stopped itself — everything left needs a decision from you"
-  STATE_HINT="Nothing is lost. Clear what it is waiting on, then restart: $ARM"
+  STATE_HINT="Nothing is lost. Clear what it is waiting on, then restart it: $DAEMON_CMD start"
   [ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && STATE_HINT="$STATE_HINT  (see ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt)"
 else
   STATE_ICON="${DIM}○${OFF}"; STATE_LINE="Not running"
-  STATE_HINT="Nothing is working on the project right now. Start it: $ARM"
+  STATE_HINT="Nothing is working on the project right now. Start it: $DAEMON_CMD start"
 fi
 
 # ---------------------------------------------------------------------------------------------------
@@ -229,5 +229,5 @@ if [ "$DETAILS" = 1 ]; then
   printf '\n  %s\n' "${B}Last few log lines${OFF}"
   tail -n 6 "$LOG" 2>/dev/null | sed 's/^/    /' || printf '    (no log yet)\n'
 else
-  printf '\n  %smore: %s status --details%s\n' "$DIM" "$ARM" "$OFF"
+  printf '\n  %smore: %s status --details%s\n' "$DIM" "$DAEMON_CMD" "$OFF"
 fi

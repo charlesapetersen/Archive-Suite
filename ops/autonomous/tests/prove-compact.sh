@@ -127,7 +127,7 @@ chk "D slog still compacted without MR header"  "[ \"\$(grep -c '^- SLOG entry '
 chk "D MR skip logged"                          "grep -q 'no .## Daemon Report. header' '$SANDBOX/out.txt'"
 
 # ---------- Case D2: the LEGACY '## Morning Review' header still rotates (renamed 2026-08-05) ----------
-# arm.sh installs the compactor from the primary checkout while the plan lives on disk, so a new script
+# daemon.sh installs the compactor from the primary checkout while the plan lives on disk, so a new script
 # meeting an old plan is an ordinary skew — and a compactor that cannot find its own section silently
 # stops bounding the file. The header match is an alternation; this proves it stays one.
 PLAN="$(make_plan 5 40)"

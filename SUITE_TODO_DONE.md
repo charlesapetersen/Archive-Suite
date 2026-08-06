@@ -18,6 +18,41 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Autonomous compactor + park diagnosis (from the 2026-08-06 health-gate RED)
 
+- [x] **`arm.sh` → `daemon.sh`, and the verb `arm` → `start` (owner, 2026-08-06). ✅ DONE** — this commit.
+  "Arm"/"re-arm" was jargon that had to be explained every time it surfaced in a park note or a status hint.
+  The owner chose the conventional shape, so it is now `daemon.sh start | stop | status | nohup` (`keepalive`
+  stays an explicit alias for `start`). A **bare `./ops/autonomous/daemon.sh` still means `start`**, so every
+  "Start it: …" hint and the owner's habit keep working; the retired `arm` verb is **rejected**, not silently
+  aliased — `daemon.sh arm` exits nonzero with `unknown command 'arm'. Use: start | stop | status | nohup |
+  keepalive`. Two spellings for one command is how docs drift, so there is deliberately no back-compat alias
+  (and nothing to migrate — nothing installs or invokes `arm.sh`; `~/.local/bin` holds only the daemon and the
+  compactor, and the launchd plist's `ProgramArguments` points at `archive-suite-autonomous.sh`, never at this
+  script, so the rename cannot break a loaded job).
+  - **Scope:** 76 path references across 15 files, plus `tests/prove-arm-dispatch.sh` →
+    `tests/prove-daemon-dispatch.sh` and the `ARM=` variables (`status-digest.sh` → `DAEMON_CMD`, the harness →
+    `DAEMON`). Daemon-sense "re-arm" became "restart" in 18 places across the daemon, README, `AGENTS.md` and
+    `SUITE_TODO.md`. **Two `re-arm`s were deliberately LEFT** because they are a different sense entirely —
+    `SUITE_TODO.md` "re-arm safety-net lint/smoke tooling" and "re-arming a started-once guard" — and app-code
+    `arm`/`armed` (Capture timers in the Processor, iOS and Android companions) was never in scope.
+  - **Proof:** `prove-daemon-dispatch.sh` 10/10, with two NEW assertions pinning the rename (`start` resolves to
+    keepalive; the retired `arm` verb exits nonzero and is named as unknown). `prove-status` 36/0,
+    `prove-compact` 72/0, `prove-daemon` unchanged. All dispatch checks run through `--dry-run`, so the proof
+    never installs or launches anything.
+
+- [x] **`prove-status.sh` was reading the owner's REAL `~/Desktop` — its verdict depended on state outside the
+  sandbox. ✅ FIXED 2026-08-06** — this commit. `status-digest.sh` checks
+  `$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt` to decide whether to print a "it parked and left you a note"
+  ask, and this harness never isolated `$HOME` (unlike `prove-daemon.sh`, whose header promises to "never touch
+  the owner's Desktop"). Measured, and reproduced deterministically by creating and removing that one file:
+  **34 passed / 2 FAILED with a real park note present, 36 / 0 without.** So the two failures reported earlier
+  in this session as "pre-existing on main" were an **environment leak, not a defect** — the earlier reading
+  that they were latent `status-digest.sh` bugs was wrong. Now `export HOME="$T/home"` in the sandbox, and the
+  count is identical either way.
+  - Both this harness and `prove-daemon-dispatch.sh` are now **health-gate steps** (`status-proof`,
+    `dispatch-proof`), for the same reason `compact-proof` was added: each is seconds long, hermetic and
+    deterministic, and an unwatched proof decays into decoration. `prove-daemon.sh` is deliberately excluded —
+    ~10 min of real daemon loops does not belong in a gate already running ~22 min against `GATE_MAXRUN=50min`.
+
 - [x] **The plan compactor had been ABORTING Pass 1 on every cycle for weeks, and three separate layers of
   "nothing was watching" let it. ✅ FIXED 2026-08-06** — this commit. The daemon parked on `health gate RED
   (x2)`; the park note said *"a reproducible build/test regression … a broken tree"*, but the tree was green
@@ -852,8 +887,8 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
     not *idle*, and doesn't auto-park a healthy multi-day run. NOT addressed (owner, deferred 2026-07-20):
     reboot/auto-login survival.
   **Owner actions to start a long run (standing, not blocking):** run `./ops/autonomous/fix-keychain-access.sh`
-  once (DONE 2026-07-17: Gemini/Anthropic/Mistral partition-listed), then `./ops/autonomous/arm.sh` (the run is
-  currently DOWN; `arm.sh` now defaults to launchd KeepAlive / crash-restart — use `arm.sh nohup` only if you
+  once (DONE 2026-07-17: Gemini/Anthropic/Mistral partition-listed), then `./ops/autonomous/daemon.sh` (the run is
+  currently DOWN; `daemon.sh` now defaults to launchd KeepAlive / crash-restart — use `daemon.sh nohup` only if you
   want GUI-verify).
 
 
@@ -3407,7 +3442,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   A misleading message here is expensive in a specific way: a session that believes it defers a GUI check to
   the owner that it could have run itself. Same treatment for any sibling `tart` call in `ops/gui/tart-lib.sh`.
   | files: ops/gui/vm-gui-runner.sh, ops/gui/tart-lib.sh | XS | low | none
-- [x] **W23.status1 — `arm.sh status` blamed an empty queue for what was a usage cap [XS · misreport].**
+- [x] **W23.status1 — `daemon.sh status` blamed an empty queue for what was a usage cap [XS · misreport].**
   ✅ **DONE 2026-07-31** (this commit, owner's Morning Review walkthrough). For an hour that morning both
   status renderers said *"running, BACKING OFF (idle 3375s — sessions finding no actionable work)"* while
   every session since 06:35 had been **refused with a 429** (five-hour cap, reset 07:30) and died in ~5
@@ -3416,7 +3451,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   actions** — "the queue is drained, add work or stop the daemon" vs "it is throttled and resumes by itself"
   — so this is a misreport, not a wording nit; it is the same family as the `last-gate.log` trap in memory
   `health-gate-red-retry-once`. **Fix:** new `ops/autonomous/run-state-lib.sh` owns the question, sourced by
-  BOTH `arm.sh` and `status-digest.sh` (writing the check twice is how the tart-PATH trap survived three
+  BOTH `daemon.sh` and `status-digest.sh` (writing the check twice is how the tart-PATH trap survived three
   sessions — see W21.vmgui-path, fixed the same day). Keyed on the **terminal** `"api_error_status":429`, not
   on a `rate_limit_event`, so a session that was warned, recovered and did work is not slandered as
   throttled; `resetsAt` distinguishes *"resets 09:21"* from *"already reset 07:30 — next attempt should get
@@ -3427,7 +3462,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   synthetic future reset renders "resets HH:MM", a warned-but-successful session and a missing file both
   return not-throttled; then end-to-end through the real `status-digest.sh` with a stubbed `pgrep`, printing
   THROTTLED and BACKING OFF from the two real logs respectively.
-  | files: ops/autonomous/run-state-lib.sh (new), arm.sh, status-digest.sh | Tier-2 | XS
+  | files: ops/autonomous/run-state-lib.sh (new), daemon.sh, status-digest.sh | Tier-2 | XS
 
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
@@ -3955,7 +3990,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Flagged — need the owner present / GUI / a scratch-corpus write
 
-- [x] **Headless GUI-test lane for the daemon — Tart macOS VM (BUILT 2026-07-28).** macOS has no `Xvfb`, so host GUI tests hijack the one console `WindowServer` (the screen); a **Tart** `macos-tahoe-xcode:26.3` VM (macOS 26 + Xcode 26.3, matches host) gives its own virtual display so XCUITest **and** a sighted pixel loop run entirely off the physical monitor. Shipped `ops/gui/vm-gui-runner.sh` + `ops/gui/README.md` §3: **resumable** image pull (skopeo → local `crane` registry → `tart clone`; a network drop costs ≤512 MB vs the non-resumable `tart pull`), VM `archive-gui-runner`, an **XCUITest lane** (Reader UITests build + run + drive the app in-VM — proven, 10/15 pass), and a **VNC sighted lane** (`--vnc-experimental` virtual display; `vncdotool` grabs the framebuffer + injects input from the host — off-screen, and bypasses guest TCC). Also fixed `make-gui-fixture.sh` (was broken since the `c07c98c` corpus slim removed the consecutive `00002–00010` it required → now takes the first 10 real PDFs + honors `AR_FIXTURE_SRC`). **Follow-ups — both DONE 2026-07-28:** (1) ✅ window-scoped the 5 toolbar UITests via a `toolbarButton(_:)` helper in `FixtureUITestCase` (scope to the "Archive Reader" window + prefer the hittable match) → **full Reader UITest suite is 15/15 green in the VM** (was 10/15). (2) ✅ wired into the periodic health gate as a **fail-open** step — `ops/autonomous/gui-vm-gate.sh` + a hook in `health-gate.sh`, **ON by default (owner enabled 2026-07-28; `AUTONOMOUS_GUI_VM=0` disables)**: missing-VM/boot/timeout → skip (never parks; inert where no VM), REDs only on a reproducible `** TEST FAILED **` (retry-once). On-by-default also raised `GATE_MAXRUN`→50 min (absorbs the ~15–20 min VM step; else a slow cold run could false-park), added a fixture-absent WARN, and updated session guidance (CLAUDE.md loop step 2 + resume-prompt STEP 3.5) so sessions verify view/interaction changes in the VM **screen-free, regardless of gui-mode**. **Item-picking gate RELAXED / `gui-mode` RETIRED (2026-07-28, owner-directed):** GUI items now run + verify OFF-screen in the VM by default (no gate); Live-Capture E2E runs on the Android **emulator** (unattended — the harness is "emulator only, never a physical phone"), so the daemon needs **no capability flags at all**. `gui-mode` + its `arm.sh gui`/taskport/UI-automation machinery is DELETED from `arm.sh`, the resume-prompt (STEP 1/2/3.5), the daemon work-fingerprint, `prove-daemon.sh`, and `next-queue-item.sh`; owner-interaction/hardware work is simply not daemon work (→ Morning Review / hold-queue). Model: unattended-by-definition, so flags key off machine capability (there are none left needed), never owner presence. prove-daemon 72/72; taskport confirmed already-secure (nothing stranded). | files: FixtureUITestCase/NavigationUITests/ViewerUITests, ops/autonomous/{gui-vm-gate,health-gate,archive-suite-autonomous,resume-prompt,arm.sh,next-queue-item,tests/prove-daemon}, ops/gui/{vm-gui-runner,README}, CLAUDE.md, ArchiveReader/scripts/make-gui-fixture.sh | done
+- [x] **Headless GUI-test lane for the daemon — Tart macOS VM (BUILT 2026-07-28).** macOS has no `Xvfb`, so host GUI tests hijack the one console `WindowServer` (the screen); a **Tart** `macos-tahoe-xcode:26.3` VM (macOS 26 + Xcode 26.3, matches host) gives its own virtual display so XCUITest **and** a sighted pixel loop run entirely off the physical monitor. Shipped `ops/gui/vm-gui-runner.sh` + `ops/gui/README.md` §3: **resumable** image pull (skopeo → local `crane` registry → `tart clone`; a network drop costs ≤512 MB vs the non-resumable `tart pull`), VM `archive-gui-runner`, an **XCUITest lane** (Reader UITests build + run + drive the app in-VM — proven, 10/15 pass), and a **VNC sighted lane** (`--vnc-experimental` virtual display; `vncdotool` grabs the framebuffer + injects input from the host — off-screen, and bypasses guest TCC). Also fixed `make-gui-fixture.sh` (was broken since the `c07c98c` corpus slim removed the consecutive `00002–00010` it required → now takes the first 10 real PDFs + honors `AR_FIXTURE_SRC`). **Follow-ups — both DONE 2026-07-28:** (1) ✅ window-scoped the 5 toolbar UITests via a `toolbarButton(_:)` helper in `FixtureUITestCase` (scope to the "Archive Reader" window + prefer the hittable match) → **full Reader UITest suite is 15/15 green in the VM** (was 10/15). (2) ✅ wired into the periodic health gate as a **fail-open** step — `ops/autonomous/gui-vm-gate.sh` + a hook in `health-gate.sh`, **ON by default (owner enabled 2026-07-28; `AUTONOMOUS_GUI_VM=0` disables)**: missing-VM/boot/timeout → skip (never parks; inert where no VM), REDs only on a reproducible `** TEST FAILED **` (retry-once). On-by-default also raised `GATE_MAXRUN`→50 min (absorbs the ~15–20 min VM step; else a slow cold run could false-park), added a fixture-absent WARN, and updated session guidance (CLAUDE.md loop step 2 + resume-prompt STEP 3.5) so sessions verify view/interaction changes in the VM **screen-free, regardless of gui-mode**. **Item-picking gate RELAXED / `gui-mode` RETIRED (2026-07-28, owner-directed):** GUI items now run + verify OFF-screen in the VM by default (no gate); Live-Capture E2E runs on the Android **emulator** (unattended — the harness is "emulator only, never a physical phone"), so the daemon needs **no capability flags at all**. `gui-mode` + its `daemon.sh gui`/taskport/UI-automation machinery is DELETED from `daemon.sh`, the resume-prompt (STEP 1/2/3.5), the daemon work-fingerprint, `prove-daemon.sh`, and `next-queue-item.sh`; owner-interaction/hardware work is simply not daemon work (→ Morning Review / hold-queue). Model: unattended-by-definition, so flags key off machine capability (there are none left needed), never owner presence. prove-daemon 72/72; taskport confirmed already-secure (nothing stranded). | files: FixtureUITestCase/NavigationUITests/ViewerUITests, ops/autonomous/{gui-vm-gate,health-gate,archive-suite-autonomous,resume-prompt,daemon.sh,next-queue-item,tests/prove-daemon}, ops/gui/{vm-gui-runner,README}, CLAUDE.md, ArchiveReader/scripts/make-gui-fixture.sh | done
 - [x] **GUI-verified 2026-07-08 (owner-driven, on the AR-Smoke scratch corpus, checked at the on-disk xattr level):** Reader inline tag-editor commit — Return-commit ✓, blur-commit of a completed token ✓. Found the half-typed-fragment case *dropped* the word (the documented no-lost-tag safety) yet left a misleading phantom chip; owner chose **WYSIWYG** instead, so `SubjectTokenField` now commits the field's tokens on blur (typed text sticks). Adds route through `TagWriter` (no tag loss); Tier-2 APPROVE. | files: Views/SubjectTokenField.swift | done
 - [x] **Perf-checked the nav Table 2026-07-08 (owner-driven GUI, 40k synthetic scratch corpus): the SwiftUI `Table` JANKS at scale.** Scroll stutters; filter-box *keystrokes* lag + can beachball (per keystroke it re-filters 40k AND re-diffs the whole Table on the main thread); sort is slow. Discovery/load of 40k was fine — it's the Table view layer. At the ~150k production target this would be worse. → spawned the follow-up below.
 - [x] **Reader: swap the nav SwiftUI `Table` → AppKit `NSTableView`** — `AppKitTableView.swift` (`NSViewRepresentable` wrapping `NSScrollView`+`NSTableView` with `NSTableViewDiffableDataSource`): virtualized rows + cell reuse (fixes scroll); incremental snapshot apply (fixes sort); debounced `filterSearchText` (150 ms, fixes the typing beachball). `ContextMenuTableView` subclass for right-click menu; `ContextMenuActions` trampoline bridges NSMenu items to `NavigationModel`. Model + `TagWriter` untouched (no data-safety surface). Build clean, 161 tests green. **Full GUI re-verify deferred → Morning Review (owner-gated).** ✅

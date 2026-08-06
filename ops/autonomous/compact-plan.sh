@@ -55,7 +55,7 @@ SL_MAX_BYTES="${SL_MAX_BYTES:-30000}"   # Session Log region byte budget (~7.5k 
 # per session; it grows unbounded (~1.8k lines observed) and every session reads it. Keep the newest
 # $DR_KEEP entries inline, archive the older tail (recoverable — never deleted).
 # The section was called "Morning Review" until 2026-08-05. Every match below accepts BOTH spellings:
-# arm.sh installs this script from the primary checkout, so a script/plan version skew is normal, and a
+# daemon.sh installs this script from the primary checkout, so a script/plan version skew is normal, and a
 # compactor that cannot find its own header aborts the pass (or, worse, would drop the region).
 DR_HEADER_RE='^## (Daemon Report|Morning Review)'
 # ===== 2026-08-06 — BUG 4: the plan's top-level SECTION VOCABULARY, used to bound every managed region =====

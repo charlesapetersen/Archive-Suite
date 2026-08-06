@@ -1,7 +1,7 @@
 # run-state-lib.sh — the one place that decides WHY the daemon is idle.
 # SOURCE this (`. "$(dirname "$0")/run-state-lib.sh"`), never execute it.
 #
-# WHY THIS FILE EXISTS. On 2026-07-31 `arm.sh status` said "running, BACKING OFF (idle 3375s — sessions
+# WHY THIS FILE EXISTS. On 2026-07-31 `daemon.sh status` said "running, BACKING OFF (idle 3375s — sessions
 # finding no actionable work)" for an hour while the truth was a 429: every session since 06:35 had been
 # refused by the five-hour usage cap and died in ~5 seconds, and `next-queue-item.sh` was offering ~20
 # actionable items the whole time. The two states call for OPPOSITE responses from the owner — "the queue
@@ -10,7 +10,7 @@
 # either way (waiting longer is exactly what a cap wants); only the explanation was wrong, so this file
 # changes reporting only and touches no control flow.
 #
-# Both `arm.sh` and `status-digest.sh` render this state, so the detector lives here rather than being
+# Both `daemon.sh` and `status-digest.sh` render this state, so the detector lives here rather than being
 # written twice — the same lesson as ops/gui/tart-lib.sh, where a fix landing in one of two copies is how
 # the tart-PATH trap survived three sessions.
 #

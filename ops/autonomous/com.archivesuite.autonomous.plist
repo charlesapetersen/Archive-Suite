@@ -16,7 +16,7 @@
   <true/>
 
   <!-- KeepAlive=true: the ONLY thing that stops the daemon is a `launchctl bootout` — which every INTENTIONAL
-       stop performs (park_run, plan COMPLETE, and `arm.sh stop`). Any OTHER death (crash, OOM, a stray
+       stop performs (park_run, plan COMPLETE, and `daemon.sh stop`). Any OTHER death (crash, OOM, a stray
        SIGTERM/SIGKILL) leaves the job registered, so launchd relaunches it. Deliberately NOT
        {SuccessfulExit:false}: the daemon traps SIGTERM/INT and exits 0, so a stray TERM would look
        "successful" and NOT restart — exactly the death observed 2026-07-17 (daemon TERMed mid-session,

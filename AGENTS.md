@@ -52,8 +52,8 @@ leaves `origin/main` ahead of it. So after your final push:
 cd "/Users/<user>/Claude/Archive Suite" && git merge --ff-only origin/main
 ```
 *(2026-07-29: `origin/main` was at `62a10d1` while the primary checkout still sat at `cb948c6`. Also note
-`ops/autonomous/arm.sh` installs the daemon scripts from **that working tree**, not from `origin/main` — so a
-lagging primary checkout silently re-installs stale daemon scripts when the owner re-arms.)*
+`ops/autonomous/daemon.sh` installs the daemon scripts from **that working tree**, not from `origin/main` — so a
+lagging primary checkout silently re-installs stale daemon scripts when the owner restarts it.)*
 
 **2. Tick the daemon's plan, not just `SUITE_TODO.md`.**
 `.maintenance/` is **gitignored**, so it is invisible to a normal diff and easy to miss — but

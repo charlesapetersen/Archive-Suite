@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
-# ops/autonomous/arm.sh — ONE-COMMAND prep + launch + verify for the autonomous run.
+# ops/autonomous/daemon.sh — ONE-COMMAND prep + launch + verify for the autonomous run.
 #
-# Collapses the whole "arm the daemon" dance (install runtime copies, check every
+# Renamed from `arm.sh` on 2026-08-06 (owner), and the verb "arm" is retired with it: the command is now
+# `start`. `arm`/`re-arm` was jargon that had to be explained every time it appeared in a park note.
+#
+# Collapses the whole "start the daemon" dance (install runtime copies, check every
 # prerequisite, guard the stale-COMPLETE + double-launch footguns, launch detached,
 # verify the first cycle started) into a single command so it never has to be
 # re-derived from README.md again.
 #
 # Run from the PRIMARY checkout:
-#   ./ops/autonomous/arm.sh            # DEFAULT: install + verify prereqs + launch under launchd KeepAlive, so
-#                                      #   a CRASH/OOM/kill auto-restarts (WS1) — best for a long unattended run.
+#   ./ops/autonomous/daemon.sh start   # install + verify prereqs + launch under launchd KeepAlive, so a
+#                                      #   CRASH/OOM/kill auto-restarts (WS1) — best for a long unattended run.
 #                                      #   Survives a daemon crash, NOT a logout/reboot (reboot out of scope).
-#   ./ops/autonomous/arm.sh nohup      # opt-in: detached nohup, NO crash-restart. (GUI now runs off-screen in
+#   ./ops/autonomous/daemon.sh         # same thing — a bare invocation still means `start`.
+#   ./ops/autonomous/daemon.sh stop    # stop it (boots out the launchd job first, then kills the process)
+#   ./ops/autonomous/daemon.sh status  # daemon state + supervisor + RUN STATUS + recent log (read-only)
+#   ./ops/autonomous/daemon.sh nohup   # opt-in: detached nohup, NO crash-restart. (GUI now runs off-screen in
 #                                      #   the Tart VM — ops/gui/README §3 — so nohup no longer buys GUI-verify.)
-#                                      #   `keepalive` is an explicit alias for the default.
-#   ./ops/autonomous/arm.sh status     # show daemon state + supervisor + RUN STATUS + recent log (read-only)
-#   ./ops/autonomous/arm.sh stop       # stop it (boots out the launchd job first, then kills the process)
+#                                      #   `keepalive` is an explicit alias for the default `start` mode.
 #
 # Prereqs it enforces (and explains if missing): claude CLI outside ~/Desktop (launchd/TCC),
 # the daemon script + resume prompt present, an L0 plan whose RUN STATUS is IN_PROGRESS with
@@ -39,8 +43,8 @@ GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd dom
 
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
 # Why the daemon is idle is decided in ONE place, shared with status-digest.sh — see run-state-lib.sh.
-# Guarded: arm.sh runs from the PRIMARY checkout, which may not have merged this file yet (memory
-# `arm-installs-from-primary-checkout`). A missing lib must degrade to the old wording, not to a blank line.
+# Guarded: daemon.sh runs from the PRIMARY checkout, which may not have merged this file yet (memory
+# `daemon-start-installs-from-primary-checkout`). A missing lib must degrade to the old wording, not a blank line.
 if [ -r "$REPO/ops/autonomous/run-state-lib.sh" ]; then
   . "$REPO/ops/autonomous/run-state-lib.sh"
 else
@@ -74,11 +78,11 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 
 # Optional `--dry-run` as the FIRST arg: preview the resolved launch mode + exit BEFORE any install/launch.
 # An EXPLICIT flag (NOT an ambient env var) on purpose — an env var could be exported once while iterating and
-# then silently turn a real `arm.sh` into a success-reporting no-op; a flag you have to type can't be inherited.
+# then silently turn a real `daemon.sh` into a success-reporting no-op; a flag you have to type can't be inherited.
 DRYRUN=""
 if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
 
-case "${1:-arm}" in
+case "${1:-start}" in
   status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest
   stop)
     # bootout FIRST — under `keepalive` (launchd KeepAlive=true) a plain pkill would just be relaunched, so we
@@ -86,7 +90,7 @@ case "${1:-arm}" in
     # (no such job). THEN pkill the loop + any resume session it spawned: a bare `claude -p` child is NOT
     # matched by the script-name pgrep (its cmdline is the prompt text), so killing only the loop orphans it
     # (reparented to init, running off stale state — the repeated-orphan bug); match sessions by the resume
-    # prompt's distinctive phrase. Neither pattern matches arm.sh itself or an interactive Claude session.
+    # prompt's distinctive phrase. Neither pattern matches daemon.sh itself or an interactive Claude session.
     booted=0; launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null && { booted=1; echo "launchd job booted out."; }
     k=0
     pkill -f 'archive-suite-autonomous\.sh' && k=1
@@ -98,22 +102,24 @@ case "${1:-arm}" in
     elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
     else echo "daemon was not running."; fi
     exit 0 ;;
-  arm|keepalive) MODE='keepalive' ;;   # DEFAULT (2026-07-17): launchd KeepAlive so a crash/kill auto-restarts (WS1)
+  start|keepalive) MODE='keepalive' ;; # DEFAULT (2026-07-17): launchd KeepAlive so a crash/kill auto-restarts (WS1).
+                                       # A BARE `./daemon.sh` still means `start` (renamed from `arm` 2026-08-06):
+                                       # every doc and status hint says "start it: ./ops/autonomous/daemon.sh".
   nohup)         MODE='nohup' ;;       # opt-in: detached nohup (no crash-restart). (GUI now runs off-screen in
                                        # the Tart VM — ops/gui/README §3 — so nohup no longer buys GUI-verify.)
-  *) fail "unknown command '${1}'. Use: arm | nohup | keepalive | status | stop" ;;
+  *) fail "unknown command '${1}'. Use: start | stop | status | nohup | keepalive" ;;
 esac
 
 # --dry-run: report the resolved launch mode and exit BEFORE any install/launch — a loud, unmistakable line so
-# a preview is never mistaken for a real arm. (tests/prove-arm-dispatch.sh asserts the dispatch through this.)
-[ -n "$DRYRUN" ] && { echo "arm.sh --dry-run: would launch in mode '$MODE' — NOTHING installed or launched."; exit 0; }
+# a preview is never mistaken for a real start. (tests/prove-daemon-dispatch.sh asserts the dispatch through this.)
+[ -n "$DRYRUN" ] && { echo "daemon.sh --dry-run: would launch in mode '$MODE' — NOTHING installed or launched."; exit 0; }
 
-# ---- arm ----
+# ---- start ----
 # 1. prerequisites (each with a fix hint)
 [ -x "$CLAUDE" ] || fail "claude CLI not executable at $CLAUDE — it MUST live outside ~/Desktop for launchd/TCC. Install/symlink it there."
 [ -f "$DAEMON_SRC" ] || fail "daemon script missing: $DAEMON_SRC"
 [ -f "$PROMPT_SRC" ] || fail "L2 resume prompt missing: $PROMPT_SRC"
-[ -f "$PLAN" ]       || fail "L0 plan missing: $PLAN — write it (queue + directives) before arming."
+[ -f "$PLAN" ]       || fail "L0 plan missing: $PLAN — write it (queue + directives) before starting."
 mkdir -p "$BIN" "$STATE"
 
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
@@ -125,11 +131,11 @@ echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prom
 # 2b. ensure a stable local code-signing identity exists so Debug builds re-sign stably and the macOS
 #     Keychain stops re-prompting for the API key every rebuild (see ArchiveProcessor/launch.sh).
 #     Idempotent + non-fatal — a missing cert just means builds fall back to ad-hoc (the old behavior).
-bash "$REPO/ops/autonomous/ensure-signing.sh" || echo "arm: ensure-signing failed (non-fatal; ad-hoc fallback)"
+bash "$REPO/ops/autonomous/ensure-signing.sh" || echo "daemon.sh: ensure-signing failed (non-fatal; ad-hoc fallback)"
 
 # 3. don't double-launch. Check the process AND the launchd job UNCONDITIONALLY (not only in keepalive mode):
-#    a keepalive job can be registered but momentarily process-down (crash/throttle window), and arming plain
-#    `arm.sh` then would miss it via pgrep and start a SECOND nohup sibling that park's self-bootout can't
+#    a keepalive job can be registered but momentarily process-down (crash/throttle window), and starting plain
+#    `daemon.sh` then would miss it via pgrep and start a SECOND nohup sibling that park's self-bootout can't
 #    stop. Checking the job regardless catches that cross-mode collision.
 if pgrep -f archive-suite-autonomous.sh >/dev/null \
    || launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
@@ -158,7 +164,7 @@ echo "plan status OK: $st"
 # 5. launch — launchd KeepAlive (DEFAULT, crash-restart; WS1) or opt-in detached nohup
 if [ "$MODE" = keepalive ]; then
   # Install the LaunchAgent + (re)bootstrap it. RunAtLoad launches the daemon; KeepAlive=true relaunches it
-  # on any bootout-less death (crash/OOM/stray signal). `arm.sh stop`, park, and plan-COMPLETE all bootout,
+  # on any bootout-less death (crash/OOM/stray signal). `daemon.sh stop`, park, and plan-COMPLETE all bootout,
   # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
   # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). (GUI verification now
   # runs off-screen in the Tart VM regardless of supervisor — ops/gui/README §3 — so no host TCC grant matters.)

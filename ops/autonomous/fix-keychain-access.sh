@@ -68,8 +68,8 @@ for a in "${present[@]}"; do
 done
 PW=""   # drop it from this shell's memory promptly
 
-# Durable marker so `arm.sh status` can stop nagging (reading the partition list itself would need auth).
-# Records WHICH accounts were fixed, so arm.sh can warn if a NEW key (e.g. an OpenAI key added later) is
+# Durable marker so `daemon.sh status` can stop nagging (reading the partition list itself would need auth).
+# Records WHICH accounts were fixed, so daemon.sh can warn if a NEW key (e.g. an OpenAI key added later) is
 # present but not yet covered — the exact "added a provider after running this" gap.
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"
 if [ "$rc" -eq 0 ]; then
