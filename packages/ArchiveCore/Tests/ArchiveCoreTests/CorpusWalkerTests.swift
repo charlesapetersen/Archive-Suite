@@ -541,6 +541,118 @@ final class CorpusWalkerTests: XCTestCase {
                       "…while the enumerator resolves it in the ENTRIES regardless — \(entry.url.path)")
     }
 
+    // MARK: - 3d. The spelling discovered paths come back with (W26.symroot-fu1)
+
+    /// The whole contract of `discoveredPathPrefix`, asserted against the walker's own output rather
+    /// than against a second copy of the rule: **every** path a pass reports is that prefix plus `/`.
+    ///
+    /// A caller (the Reader's folder tree, its exclusions, its warm-start containment, its relative-path
+    /// link writing) has to be able to strip the root off a discovered path. Until `W26.symroot-fu1` they
+    /// all used the caller's own spelling of the root, which the table in `discoveredPathPrefix` shows is
+    /// not the spelling the walk emits — for three of the four roots below.
+    func testEveryPathTheWalkReportsStartsWithTheDiscoveredPathPrefix() throws {
+        let real = tempDir.appendingPathComponent("real", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: real.appendingPathComponent("sub", isDirectory: true), withIntermediateDirectories: true)
+        _ = try makeFile("doc.pdf", tags: ["Read"], in: real)
+        _ = try makeFile("sub/deep.pdf", tags: ["Unread"], in: real)
+        let link = tempDir.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+
+        let roots: [(String, URL)] = [
+            ("plain directory", real),
+            ("through a symlinked root", link),
+            ("through a MID-PATH symlink", link.appendingPathComponent("sub", isDirectory: true)),
+            ("with a trailing slash", URL(fileURLWithPath: link.path + "/", isDirectory: true)),
+        ]
+        for (label, root) in roots {
+            let prefix = try XCTUnwrap(CorpusWalker.discoveredPathPrefix(for: root), label)
+            XCTAssertFalse(prefix.hasSuffix("/"),
+                           "\(label): a prefix ending in / breaks every component-boundary test")
+
+            let result = CorpusWalker.scan(root: root)
+            XCTAssertFalse(result.entries.isEmpty, "\(label): premise — this root has tagged files")
+            for entry in result.entries {
+                XCTAssertTrue(entry.url.path.hasPrefix(prefix + "/"),
+                              "\(label): \(entry.url.path) is not under \(prefix)")
+            }
+            // The cheap revalidation walk emits the same spelling, or a warm root would revalidate to
+            // zero rows against the very paths the full walk had just written.
+            for entry in CorpusWalker.scanFingerprints(root: root).entries {
+                XCTAssertTrue(entry.url.path.hasPrefix(prefix + "/"),
+                              "\(label): fingerprint pass — \(entry.url.path) is not under \(prefix)")
+            }
+        }
+    }
+
+    /// Why this is a SECOND function and not a use of `canonicalRoot`.
+    ///
+    /// A mid-path symlink is the case that separates them: the final component is an ordinary directory,
+    /// so `canonicalRoot` returns the root byte-unchanged — correctly, that is its documented job — while
+    /// the enumerator still reports every entry under the resolved target. Anyone who "simplifies" the
+    /// comparison sites back onto `canonicalRoot` fails here, and nowhere else in this file.
+    func testAMidPathSymlinkIsWhyThisIsNotCanonicalRoot() throws {
+        let real = tempDir.appendingPathComponent("real", isDirectory: true)
+        let sub = real.appendingPathComponent("sub", isDirectory: true)
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        _ = try makeFile("sub/deep.pdf", tags: ["Read"], in: real)
+        let link = tempDir.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        let viaLink = link.appendingPathComponent("sub", isDirectory: true)
+
+        let canonical = try XCTUnwrap(CorpusWalker.canonicalRoot(viaLink))
+        XCTAssertEqual(fileSystemBytes(canonical), fileSystemBytes(viaLink),
+                       "premise: the final component is a real directory, so canonicalRoot leaves it alone")
+
+        let prefix = try XCTUnwrap(CorpusWalker.discoveredPathPrefix(for: viaLink))
+        XCTAssertNotEqual(prefix, viaLink.path,
+                          "…while the spelling the walk emits resolves the link in the MIDDLE")
+        let entry = try XCTUnwrap(CorpusWalker.scan(root: viaLink).entries.first)
+        XCTAssertTrue(entry.url.path.hasPrefix(prefix + "/"), entry.url.path)
+        XCTAssertFalse(entry.url.path.hasPrefix(canonical.path + "/"),
+                       "the canonicalRoot spelling rejects the walker's own entry — \(entry.url.path)")
+    }
+
+    /// `nil` means *this path does not resolve*, and nothing else. In particular a `0o000` directory has
+    /// a perfectly good spelling: a caller that has temporarily lost access to its granted root must keep
+    /// comparing paths the same way, not have every containment check start answering "not mine".
+    func testTheDiscoveredPathPrefixIsNilOnlyWhenTheRootDoesNotResolve() throws {
+        let missing = tempDir.appendingPathComponent("never-created", isDirectory: true)
+        let dangling = tempDir.appendingPathComponent("dangling", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: missing)
+        let cycleA = tempDir.appendingPathComponent("cycle-a", isDirectory: true)
+        let cycleB = tempDir.appendingPathComponent("cycle-b", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: cycleA, withDestinationURL: cycleB)
+        try FileManager.default.createSymbolicLink(at: cycleB, withDestinationURL: cycleA)
+
+        for (label, root) in [("missing", missing), ("dangling link", dangling), ("cycle", cycleA)] {
+            XCTAssertNil(CorpusWalker.discoveredPathPrefix(for: root), label)
+        }
+
+        let sealed = tempDir.appendingPathComponent("sealed", isDirectory: true)
+        try FileManager.default.createDirectory(at: sealed, withIntermediateDirectories: true)
+        chmod(sealed, 0o000)
+        defer { chmod(sealed, 0o755) }
+        if getuid() != 0 {   // root can open a 0o000 directory, so only then is this the denied case
+            XCTAssertNil(CorpusWalker.canonicalRoot(sealed),
+                         "premise: there is nothing to ENUMERATE here…")
+        }
+        // Cross-checked against the same function applied to its readable PARENT rather than against
+        // `resolvingSymlinksInPath()`, which resolves in the wrong direction here: it *strips*
+        // `/private`, so it would answer `/var/folders/…` where the enumerator says `/private/var/…`.
+        let parentPrefix = try XCTUnwrap(CorpusWalker.discoveredPathPrefix(for: tempDir))
+        XCTAssertEqual(CorpusWalker.discoveredPathPrefix(for: sealed), parentPrefix + "/sealed",
+                       "…yet it still has a spelling; openability is canonicalRoot's question, not this one")
+
+        // A link to a regular file resolves, so it has a spelling too. The walk refuses it (see
+        // `testASymlinkedRootWhoseTargetIsUnusableIsStillRootUnreadable`) and that refusal is the layer
+        // which must reject it; this function deliberately does not.
+        let toFile = tempDir.appendingPathComponent("to-file", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: toFile,
+                                                   withDestinationURL: try makeFile("target.pdf"))
+        XCTAssertNotNil(CorpusWalker.discoveredPathPrefix(for: toFile))
+    }
+
     /// An aliased *ancestor* is not an aliased root. Every fixture in this file lives under
     /// `/var/folders/…`, where `/var` is a symlink to `/private/var`, so an `lstat` applied to anything
     /// but the final path component would have failed the whole suite — which is precisely how a

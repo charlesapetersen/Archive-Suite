@@ -338,6 +338,50 @@ public enum CorpusWalker {
         }
     }
 
+    /// The prefix every path this walker reports under `root` is spelled with — or `nil` when the root
+    /// cannot be resolved at all.
+    ///
+    /// This is what a caller needs in order to ask *"is this discovered path inside my granted root?"*,
+    /// or to turn a discovered path back into a root-relative one. `canonicalRoot` is **not** that
+    /// value, and the difference is measured rather than stylistic:
+    ///
+    /// | root as the caller spells it | what the enumerator reports |
+    /// | --- | --- |
+    /// | `/tmp/x/real` (aliased ancestor: `/tmp` → `/private/tmp`) | `/private/tmp/x/real/…` |
+    /// | `/tmp/x/link/sub` (`link` → `real`, a MID-PATH symlink) | `/private/tmp/x/real/sub/…` |
+    ///
+    /// `canonicalRoot` resolves only a symlinked FINAL component, because that is the one thing the
+    /// enumerator cannot do for itself, and deliberately leaves every other root byte-identical so no
+    /// existing `LibraryIndex` row can shift (see its own notes). The enumerator resolves all the rest
+    /// itself — measured 2026-08-06: entries come back spelled at the root's full `realpath(3)`. Row 2
+    /// is why this has to be a second function: `canonicalRoot` returns that root *unchanged* (its final
+    /// component `sub` is not a link), so a caller comparing against it would reject every path the walk
+    /// had just handed it. Row 1 is not exotic either — every `/var/folders` fixture root is one, which
+    /// is why the Reader's folder tree has never placed a file under a fixture root.
+    ///
+    /// **For COMPARISON and relative-path arithmetic only.** A `String` and not a `URL` on purpose: this
+    /// spelling carries no sandbox security scope (a URL rebuilt from it is a different instance from
+    /// the one the bookmark granted), so it must never be opened, and it must never be persisted —
+    /// `W26.symroot-fu1`, and the 2026-07-11 incident for the persistence half.
+    ///
+    /// Openability is deliberately NOT probed here — that question is `canonicalRoot`'s, and a caller
+    /// that holds a root it cannot currently reach still needs a spelling to compare with rather than a
+    /// sudden `nil`. `realpath` fails only when the path does not resolve at all (`ENOENT`, a dangling
+    /// link, `ELOOP`); a `0o000` directory resolves fine.
+    public static func discoveredPathPrefix(for root: URL) -> String? {
+        root.withUnsafeFileSystemRepresentation { rawPath -> String? in
+            guard let rawPath else { return nil }
+            var resolved = [CChar](repeating: 0, count: Int(PATH_MAX))
+            guard realpath(rawPath, &resolved) != nil else { return nil }
+            // `realpath` never returns a trailing slash except for `/` itself, which every containment
+            // check in the suite already special-cases; pass it through as-is rather than inventing a
+            // spelling. Built through the filesystem representation so a decomposed on-disk name stays
+            // byte-exact — `String(cString:)` would too, but this says so.
+            return String(decoding: resolved.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) },
+                          as: UTF8.self)
+        }
+    }
+
     /// Re-stat and re-read one path through the same primitives as `scan`.
     ///
     /// The URL's resource-value cache is deliberately avoided by constructing a fresh filesystem URL
