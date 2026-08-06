@@ -65,7 +65,16 @@ final class ArchiveLibrary: ObservableObject {
     private let minimumRootRescanInterval: TimeInterval
     private let libraryIndex: LibraryIndex?
     private let watcherStartTimeout: TimeInterval
+    private let scanStallTimeout: TimeInterval
     private var watcher: (any CorpusWatching)?
+
+    /// The walk's own stall reporting (`W26.fsev-fu2`). `filesSeenInCurrentPass` is the discriminator:
+    /// a walk that has examined even one file is demonstrably past the root probe, whatever else is
+    /// slow about it. `stalledScan` names the pass a deadline has already spoken about, so the verdict
+    /// is withdrawn exactly once and cannot be re-applied to its successor.
+    private var scanStallDeadline: DispatchWorkItem?
+    private var stalledScan: UInt64?
+    private var filesSeenInCurrentPass = 0
 
     /// A stream start dispatched off the main thread that has not reported yet (`W26.fsev-fu1`).
     private struct PendingWatcherStart {
@@ -103,9 +112,16 @@ final class ArchiveLibrary: ObservableObject {
     /// `watcherStartTimeout` bounds how long the launch walk waits for the FSEvents stream to come up
     /// before going ahead without it (`W26.fsev-fu1`). Two seconds is generous for the `open(2)` this
     /// covers — microseconds on local disk, and the only cost of firing early is one catch-up pass.
+    ///
+    /// `scanStallTimeout` bounds how long a pass may examine **zero** files before the app says so
+    /// (`W26.fsev-fu2`). Five seconds rather than the stream's two, because this one covers real work:
+    /// a healthy walk emits its first 500-file batch in ~40 ms (measured 123,028 files in 10.15 s), so
+    /// five seconds with nothing seen means the root probe itself has not returned. Firing early costs
+    /// only a sentence that the next progress callback — or the finished pass — withdraws.
     init(minimumRootRescanInterval: TimeInterval = 1.0,
          libraryIndexURL: URL? = ArchiveLibrary.defaultLibraryIndexURL,
          watcherStartTimeout: TimeInterval = 2.0,
+         scanStallTimeout: TimeInterval = 5.0,
          watcherFactory: @escaping WatcherFactory = { root, handler in
              CorpusWatcher(root: root, handler: handler)
          },
@@ -119,6 +135,7 @@ final class ArchiveLibrary: ObservableObject {
         self.minimumRootRescanInterval = max(0, minimumRootRescanInterval)
         self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
         self.watcherStartTimeout = max(0, watcherStartTimeout)
+        self.scanStallTimeout = max(0, scanStallTimeout)
         self.watcherFactory = watcherFactory
         self.indexedScanStarter = indexedScanStarter
     }
@@ -177,6 +194,7 @@ final class ArchiveLibrary: ObservableObject {
         stopWatcher()
         inFlight?.cancel()
         inFlight = nil
+        cancelScanStallDeadline()
         scheduledRootRescan?.cancel()
         scheduledRootRescan = nil
         pendingWatchRequest = CorpusWatchRequest()
@@ -385,6 +403,11 @@ final class ArchiveLibrary: ObservableObject {
             return
         }
 #endif
+        // Everything below here hands the walk to another thread and cannot be waited on. Arm the
+        // stall deadline first, and only here: the fixture branch above has already finished, and the
+        // `watcherStartHoldsDiscovery` branch at the top of this function has not started anything
+        // yet (the stream's own deadline covers that interval).
+        armScanStallDeadline(generation: generation)
         // Progress only — NOT rows. See `finish`: rows are published once per pass, atomically.
         let onBatch: @Sendable (CorpusScanBatch) -> Void = { batch in
             let found = batch.entries.filter { CorpusWalker.tracksReadState($0.tagNames) }.count
@@ -415,8 +438,64 @@ final class ArchiveLibrary: ObservableObject {
     /// Real progress — a count Spotlight could never give. Only meaningful during a first scan; a
     /// revalidation deliberately leaves the on-screen rows and their counts alone.
     private func reportProgress(generation: UInt64, found: Int, seen: Int) {
-        guard generation == currentScan, case let .firstScan(done, _) = phase else { return }
+        guard generation == currentScan else { return }
+        // Tracked for EVERY pass, not just a first scan, because this is what `scanDidStall` reads:
+        // a revalidation records no visible progress, but it is just as capable of hanging on the
+        // root probe, and "still scanning" is just as false about it.
+        filesSeenInCurrentPass = max(filesSeenInCurrentPass, seen)
+        if stalledScan == generation, seen > 0 {
+            // It answered after all. Withdraw the stall BEFORE adding to the counts: a walk that is
+            // producing files must not keep a phase `LibraryEmptyState` reads as "could not look".
+            stalledScan = nil
+            phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
+        }
+        guard case let .firstScan(done, _) = phase else { return }
         phase = .firstScan(done: done + found, seen: seen)
+    }
+
+    /// Report — never cancel — a walk that has not answered (`W26.fsev-fu2`).
+    ///
+    /// `W26.fsev-fu1` bounded the FSEvents stream's `open(2)`, so an unopenable root draws a window
+    /// and the status bar says live updates are not responding. `CorpusWalker`'s own `opendir(3)`
+    /// probe blocks on the *same* root with no bound at all, so the list's state stayed
+    /// `.firstScan(done: 0, seen: 0)` — an honest status bar above a spinner that lies for ever.
+    ///
+    /// This is a *reported* deadline, not a cancellation, and the distinction is forced rather than
+    /// chosen: a thread blocked in `opendir`/`readdir` cannot be interrupted, and `ScanCancellation`
+    /// is only consulted between directory entries, which a stalled probe never reaches. The pass
+    /// keeps running and supersedes this verdict if it ever comes back — through the same generation
+    /// token every other late completion already goes through.
+    private func armScanStallDeadline(generation: UInt64) {
+        cancelScanStallDeadline()
+        guard scanStallTimeout > 0 else { return }
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.scanDidStall(generation: generation) }
+        }
+        scanStallDeadline = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + scanStallTimeout, execute: work)
+    }
+
+    private func cancelScanStallDeadline() {
+        scanStallDeadline?.cancel()
+        scanStallDeadline = nil
+        stalledScan = nil
+        filesSeenInCurrentPass = 0
+    }
+
+    /// The pass has run for `scanStallTimeout` without examining a single file, so it never got past
+    /// the root. Say so as a **degraded** phase: `.firstScan` blanks the list behind a spinner and
+    /// `LibraryEmptyState` reads it as `.scanning`, which is the shape of claim this wave exists to
+    /// stop the app from making about a folder it has not read.
+    ///
+    /// ⚠️ Deliberately NOT routed through `DiscoveryHealth`. That type judges a *finished* pass, and
+    /// callers of `isSettled` — content-index pruning above all — are entitled to assume a phase it
+    /// produced describes one. `.degraded` is not settled, so this grants no pruning and makes no
+    /// absence authoritative; it only replaces one sentence with a truer one.
+    private func scanDidStall(generation: UInt64) {
+        scanStallDeadline = nil
+        guard generation == currentScan, inFlight != nil, filesSeenInCurrentPass == 0 else { return }
+        stalledScan = generation
+        phase = .degraded(.scanStalled, asOf: lastSettled)
     }
 
     /// Publish a finished pass: rows first, then the verdict about how much of it to trust.
@@ -431,6 +510,9 @@ final class ArchiveLibrary: ObservableObject {
     private func finish(_ pass: DiscoveryPass, generation: UInt64, rootGeneration: UInt64,
                         indexScan: LibraryIndexScan?) {
         guard rootGeneration == self.rootGeneration, generation == currentScan else { return }
+        // The walk is over, whatever it found — including a pass already reported stalled, which is
+        // exactly the "let a late-arriving pass supersede it" half of the item.
+        cancelScanStallDeadline()
         let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
 
@@ -683,7 +765,11 @@ final class ArchiveLibrary: ObservableObject {
         queuedRootRescan = true
         queuedRootRescanIsUrgent = queuedRootRescanIsUrgent || urgent
         pendingWatchRequest = CorpusWatchRequest()
-        if !phase.isScanning {
+        // A pass reported stalled keeps its degraded phase (`W26.fsev-fu2`). `drainWatchWork` cannot
+        // start the queued rescan while that walk is still in flight, so an optimistic "Scanning…"
+        // here would put back the very spinner the deadline exists to remove — and ⌘⌥R, the control
+        // whose tooltip says it will NOT force a stalled read to return, is the likeliest caller.
+        if !phase.isScanning, stalledScan == nil {
             phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
         }
         drainWatchWork()

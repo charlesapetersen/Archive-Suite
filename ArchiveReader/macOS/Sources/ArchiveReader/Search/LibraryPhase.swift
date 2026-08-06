@@ -11,6 +11,15 @@ import ArchiveCore
 enum DiscoveryFailure: Equatable, Sendable {
     /// The root itself could not be enumerated at all.
     case rootUnreadable
+    /// The walk asked to open the root and has not been answered yet, so it has read nothing — and
+    /// unlike `rootUnreadable` it does not yet know *why*, or even that the answer will be "no"
+    /// (`W26.fsev-fu2`). `CorpusWalker`'s `opendir(3)` probe blocks indefinitely on an unanswered
+    /// permission prompt, a stalled network/cloud mount or a disconnected volume; without this the
+    /// phase stayed `.firstScan(done: 0, seen: 0)` and the app showed a spinner for ever.
+    ///
+    /// This is the *walk*'s half of the stall. `liveUpdatesStalled` is the *stream*'s half: there,
+    /// the list is real and only its refresh channel is missing; here, there is no list at all.
+    case scanStalled
     /// The root was replaced, ejected or became unreadable *during* the pass, so a short list is not
     /// evidence of absence even though the enumerator ended normally (plan §7a.11).
     case rootChangedMidScan
@@ -37,6 +46,7 @@ enum DiscoveryFailure: Equatable, Sendable {
     var message: String {
         switch self {
         case .rootUnreadable:     return "Archive folder unreadable"
+        case .scanStalled:        return "Archive folder has not answered"
         case .rootChangedMidScan: return "Archive folder changed while scanning"
         case .incomplete:         return "Scan incomplete"
         case let .finderTagsUnsupported(files, _, _):
@@ -59,6 +69,12 @@ enum DiscoveryFailure: Equatable, Sendable {
         case .rootUnreadable:
             return "This app could not read the archive folder at all, so the list below is empty "
                  + "because nothing could be looked at — not because the folder has no tagged files."
+        case .scanStalled:
+            return "Archive Reader asked to read the archive folder and has had no answer yet — "
+                 + "usually an unanswered permission prompt, a stalled network or cloud volume, or a "
+                 + "disconnected disk. Nothing here says anything about what the folder contains: the "
+                 + "app has not managed to look at it yet. The list fills in on its own if the read "
+                 + "comes back. ⌘⌥R will not force the stalled read to return."
         case .rootChangedMidScan:
             return "The archive folder was replaced, ejected or became unreadable while it was being "
                  + "scanned, so the scan stopped early without reporting an error. The list may be "
