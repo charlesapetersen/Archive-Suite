@@ -85,6 +85,15 @@ ALLOW=(
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}try data.write(to: fileURL, options: .atomic)"
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}try? FileManager.default.removeItem(at: url)"
 
+  # TagVocabulary: its own JSON cache of subject tag NAMES, at a URL the owning app injects (each app
+  # keeps its own — the Reader is sandboxed, the Processor is not) and which is redirected to a scratch
+  # directory under any self-test driver. The path is never a corpus path: nothing derives it from a
+  # scanned file, the store holds strings rather than URLs, and it is never consulted by a write path.
+  # Same shape of allowance as PDFThumbnailer above — a disposable, app-owned cache, rebuilt by walking
+  # again. Introduced by `W26.vocab` (`a90bbc8`), which did not run this lint; the allowance is being
+  # added in the same item's completing commit rather than left for someone to discover.
+  "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagVocabulary.swift${SEP}try? data.write(to: fileURL, options: .atomic)"
+
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
   # deleted the call (discovery is `ArchiveCore.CorpusWalker` now, which passes an `errorHandler:`),

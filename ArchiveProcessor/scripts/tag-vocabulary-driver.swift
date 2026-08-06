@@ -275,6 +275,29 @@ private func phaseForbiddenRoot(expectedNames: Int) {
           SystemTagsProvider.shared.isReady)
 }
 
+/// Where the store resolves to, asserted **without constructing it**. A self-test driver's fixture
+/// subjects must never reach the operator's real suggestion list, and the only safe way to check that
+/// is to look at the resolved path: writing a tag and then looking for it in Application Support would
+/// cause the pollution whenever the guard is broken.
+///
+/// `expectScratch` is 1 when the process was launched with a driver environment set.
+private func phaseStorePath(expectScratch: Bool) {
+    print("── phase: store-path (a self-test driver never writes the operator's vocabulary)")
+    let path = ProcessorTagVocabulary.storeURL.path
+    let inAppSupport = path.contains("/Application Support/")
+    print("     resolved: \(path)")
+    if expectScratch {
+        check("a driver run resolves the store OUTSIDE Application Support", !inAppSupport, path)
+        check("…and inside the temporary directory",
+              path.hasPrefix(NSTemporaryDirectory()) || path.hasPrefix("/var/folders/")
+                || path.hasPrefix("/private/var/folders/"), path)
+    } else {
+        // The negative control: without a driver environment the redirection must NOT happen, or the
+        // assertion above would pass for the wrong reason (e.g. a store that is always in /tmp).
+        check("a NORMAL run resolves the store inside Application Support", inAppSupport, path)
+    }
+}
+
 // MARK: - Entry point
 
 @main
@@ -292,18 +315,22 @@ struct TagVocabularyDriver {
         switch phase {
         case "write":
             phaseWrite(scratch: scratch)
+            // The write-hook ingests use the debounced save; land them before the process ends.
+            ProcessorTagVocabulary.shared.flush()
         case "harvest":
             phaseHarvest(scratch: scratch, root: URL(fileURLWithPath: args[3], isDirectory: true))
+            ProcessorTagVocabulary.shared.flush()
         case "forbidden":
             phaseForbiddenRoot(expectedNames: Int(args[3]) ?? -1)
+        case "store-path":
+            // Deliberately touches NOTHING else — in the negative-control run the store resolves to the
+            // operator's real file, so this phase must never construct, read or flush it.
+            phaseStorePath(expectScratch: args[3] == "scratch")
         default:
             FileHandle.standardError.write(Data("unknown phase \(phase)\n".utf8))
             exit(2)
         }
 
-        // Give the debounced save a chance to land before the process ends; `flush()` is the
-        // guarantee, this only keeps a stray pending write from looking like a leak in the log.
-        ProcessorTagVocabulary.shared.flush()
         exit(results.failures == 0 ? 0 : 1)
     }
 }

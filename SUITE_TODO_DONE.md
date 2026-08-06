@@ -18,6 +18,66 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low].
+  ✅ SHIPPED 2026-08-06** — `a90bbc8` (the store + 28 tests) → `2d7c7c2` (the provider rewrite; the last
+  `NSMetadataQuery` in the Processor) → `eaa7987` (the harvest composition, and the two defects its first
+  filesystem test found) → `a25ee02` (the write-path Tier-2 proof) → this commit (trackers).
+  **What shipped.** `ArchiveCore.TagVocabulary` — a persisted, monotonically-growing set of **subject** tag
+  names, replacing an `NSMetadataQuery` scoped to `NSMetadataQueryUserHomeScope` with
+  `kMDItemUserTags LIKE "*"`. No per-root walk reproduces a home-wide scope, so the plan's §4.4 answer is
+  to change SHAPE rather than mechanism: stop re-deriving the vocabulary on demand and accumulate it, from
+  three non-Spotlight sources — a one-per-root `CorpusWalker` harvest of the persisted output directory,
+  every tag the operator types (`register`, now flushed synchronously so it survives a relaunch), and every
+  Finder-tag write the app performs, taken from `TagWriteResult.after`/`.afterLabel` — the tags that
+  VERIFIED on disk, not the ones intended.
+  **The `$HOME` prohibition is a function, not a comment.** `isHarvestableRoot` refuses `$HOME`, the nine
+  personal-data folders directly inside it, and the whole-filesystem roots, case-insensitively (the boot
+  volume is, so `/users/me/desktop` would otherwise bypass a guard that only knew the canonical spelling).
+  A *specific* folder inside Desktop — the real corpus is one — stays harvestable.
+  **Two defects found by the FIRST filesystem test of the harvest, neither reachable from the unit tests**
+  (which hand `add` literal arrays and never walk anything): (1) the harvest ingested through the walker's
+  `([String]) -> Bool` predicate, which carries no Finder label, so the marker colour was never dropped —
+  and since this app stamps Red or Purple on every real-tagging output, "Red" and "Purple" were on course
+  to become permanent entries in a field labelled *Subjects*, while the write path (which has
+  `afterLabel`) already avoided exactly that. Fixed with an additive
+  `onTagsRead: (@Sendable ([String], Int?) -> Void)?` on `CorpusWalker.scan`/`scanOnDedicatedThread` —
+  every successful read, matching or not, before the predicate, never consulted for the result, default
+  `nil` so no existing caller changes. It also retires the smell it replaces: the predicate is no longer a
+  sink defended by "do not fix this to return true". (2) A **vanished archive root was stamped as
+  harvested**, because `FileManager.enumerator(at:)` returns a live enumerator for a missing directory and
+  the pass comes back `completed == true` / `rootUnreadable == false` / `filesSeen == 0`. New
+  `mayStamp` also requires the root to be absent from `directoryErrors`; a denied *sub*directory
+  deliberately still stamps, because an unstamped root is re-walked on every tagging-UI appearance.
+  **A third defect, from the adversarial pass:** the store's test-mode redirection checked only
+  `ARCHIVEPROC_HEADLESS`, but `scripts/test-tier2.sh` — the one driver that runs the REAL tagging pipeline
+  over the Ground Truth fixtures — sets `PROCESSFILES_TESTMODE` instead, so the run that tags the most
+  files was the run that would have written fixture subjects into the operator's real vocabulary. It now
+  uses `KeychainHelper.isHeadlessTestMode`, the suite's existing enumeration of driver environments.
+  **Tier-2 gate.** `ArchiveProcessor/scripts/test-tag-vocabulary.sh` + `scripts/tag-vocabulary-driver.swift`
+  — 49 assertions over the REAL `MacOSTagger` / `SystemTagsProvider` / `DefaultsKeys` / `KeychainHelper`,
+  compiled standalone against the REAL ArchiveCore (the Processor has no XCTest bundle; this is the
+  `test-drive-store.sh` pattern) and driven on scratch files across separate PROCESSES. Tag and label
+  expectations are copied verbatim from `MacOSTaggerParityTests`, which predates the hook, so a perturbed
+  write shows up as a diff against the old behaviour. It pins: the write is unchanged; the ingest is the
+  verified on-disk result, facet-filtered; a **refused** write contributes nothing (the hook is after the
+  `try`); relaunch is a real relaunch; a real harvest stamps the root and declines to re-walk; three
+  forbidden roots each record nothing and start no walk; and the store resolves outside Application Support
+  under a driver environment, with a negative control proving it resolves inside for a normal run.
+  **Mutation-tested rather than assumed green** (the `W26.lint` lesson): five mutants, five killed — and one
+  **survived the first attempt**, because the phase flushed the store itself right after `register`, so an
+  assertion that a typed tag persists would have passed with `register`'s flush deleted. It now reads the
+  JSON back before any flush of ours. An assertion downstream of the thing it tests is not an assertion.
+  **The narrowing is accepted and documented, as the item required:** suggestions are now scoped to the
+  archive rather than to every tagged file in the home folder, and are subjects only. Both are improvements
+  for this UI; a tag existing only on an unrelated personal file outside every archive root will no longer
+  be suggested. Widening the harvest to `~/Desktop` would recover most of that but needs a new user-visible
+  authorisation prompt (`NSDesktopFolderUsageDescription`) — an owner decision, raised in the Daemon Report.
+  **Verification.** ArchiveCore 195 XCTest + 105 Swift Testing; Reader unit bundle green; Notes bundle
+  green; Processor Debug BUILD SUCCEEDED with no source warnings; write-surface lint + self-test 12/12.
+  No real corpus read or written, no persisted default touched, no host-screen automation.
+  **Filed:** `W26.vocab-fu1` (whether `rootUnreadable` should cover a missing root — ArchiveCore's call);
+  `W26.lint-fu` extended to wire this script into the health gate, which nothing currently runs.
+
 - [x] **W26.walk1 — `CorpusWalker` in ArchiveCore + the first-ever Reader discovery test [M · low · Tier-1].
   ✅ SHIPPED 2026-08-05** — `b3efb16` (walker + 14 tests) → `025d126` (the enumerator lint rule) → this
   commit (the Reader discovery tests + trackers).

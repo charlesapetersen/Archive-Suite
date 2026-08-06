@@ -60,15 +60,17 @@ if ! xcrun swiftc -swift-version 6 \
       "$SRC/Tagging/MacOSTagger.swift" \
       "$SRC/Tagging/SystemTagsProvider.swift" \
       "$SRC/Models/DefaultsKeys.swift" \
+      "$SRC/Models/KeychainHelper.swift" \
       "$REPO/scripts/tag-vocabulary-driver.swift" \
       -o "$WORK/driver" 2>"$WORK/driver.err"; then
   echo "  [FAIL] driver build:"; head -40 "$WORK/driver.err"; exit 1
 fi
 
 # --- 3. A scratch archive root with tags only the HARVEST can find ------------------------------
-# Written with `xattr`-free Finder APIs via a throwaway swift snippet would need another compile, so
-# use the driver-independent `tag` route: plain `xattr` is not it either. `osascript` is banned
-# unattended. Simplest correct answer: a tiny swiftc one-liner reusing the already-built module.
+# Seeded by a separate throwaway binary rather than by the driver, so the harvest phase learns these
+# subjects from the FILESYSTEM and could not have learned them from its own earlier writes. Tags are
+# written through `.tagNamesKey`/`.labelNumberKey` — the same resource-value API the Finder uses —
+# because the point is a real Finder tag, which `xattr(1)` would only approximate.
 cat >"$WORK/seed.swift" <<'SWIFT'
 import Foundation
 let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
@@ -106,6 +108,16 @@ for forbidden in "$HOME" "$HOME/Documents" "/"; do
   ARCHIVEPROC_TAGVOCAB_FILE="$WORK/forbidden.json" "$WORK/driver" forbidden "$SCRATCH" 0 \
     -outputDirectory "$forbidden" || fail=1
 done
+
+echo ""
+# The store's own location, asserted without constructing the store. `PROCESSFILES_TESTMODE` rather
+# than `ARCHIVEPROC_HEADLESS` on purpose: `test-tier2.sh` is the driver that runs the REAL tagging
+# pipeline over the Ground Truth fixtures, and that is the variable it sets.
+PROCESSFILES_TESTMODE=1 "$WORK/driver" store-path "$SCRATCH" scratch || fail=1
+echo ""
+# The negative control — no driver environment, so the redirection must NOT happen. Read-only: this
+# phase resolves a path and prints it, and never opens, reads or writes the file it names.
+"$WORK/driver" store-path "$SCRATCH" normal || fail=1
 
 # --- 5. The vocabulary never learned anything about a real corpus -------------------------------
 echo ""

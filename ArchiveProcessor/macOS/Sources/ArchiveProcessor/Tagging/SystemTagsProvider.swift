@@ -17,7 +17,13 @@ enum ProcessorTagVocabulary {
 
     /// One store per process. `TagVocabulary` is internally locked, so this is safe to hit from the
     /// walker's dedicated thread and the main actor at the same time.
-    static let shared: TagVocabulary = TagVocabulary(fileURL: fileURL())
+    static let shared: TagVocabulary = TagVocabulary(fileURL: storeURL)
+
+    /// The resolved store location. Separate from `shared` so a self-test can assert the test-mode
+    /// redirection **without** constructing the store — checking it by writing a tag and looking for it
+    /// in Application Support would mean causing the exact pollution the redirection prevents whenever
+    /// the redirection is broken.
+    static let storeURL: URL = resolveStoreURL()
 
     /// Feed the vocabulary from a completed Finder-tag write.
     ///
@@ -31,18 +37,25 @@ enum ProcessorTagVocabulary {
 
     /// `<Application Support>/ArchiveProcessor/tag-vocabulary.json` in normal use.
     ///
-    /// Under `ARCHIVEPROC_HEADLESS` (which every `scripts/test-*.sh` self-test driver sets) it moves to a
-    /// scratch directory instead, so a driver's synthetic tags — "Red Scare", fixture subjects — can never
-    /// land in the operator's real suggestion list. Same reasoning as `ProcessingHistoryTestDriver`'s
-    /// throwaway `UserDefaults` suite. `ARCHIVEPROC_TAGVOCAB_FILE` overrides both.
-    private static func fileURL() -> URL {
+    /// Under **any** self-test driver it moves to a scratch directory instead, so a driver's synthetic
+    /// tags — fixture subjects like "Dean" or "War Department" — can never land in the operator's real
+    /// suggestion list. Same reasoning as `ProcessingHistoryTestDriver`'s throwaway `UserDefaults` suite.
+    /// `ARCHIVEPROC_TAGVOCAB_FILE` overrides both.
+    ///
+    /// The test is `KeychainHelper.isHeadlessTestMode`, the suite's existing enumeration of driver
+    /// environments, rather than a private `ARCHIVEPROC_HEADLESS` check. That distinction is not
+    /// theoretical: `scripts/test-tier2.sh` is the one driver that runs the REAL tagging pipeline over the
+    /// Ground Truth fixtures, and it sets `PROCESSFILES_TESTMODE`, **not** `ARCHIVEPROC_HEADLESS` — so the
+    /// narrower check let exactly the run that tags the most files write fixture subjects into the real
+    /// vocabulary. One list, maintained in one place, or the next driver added misses it the same way.
+    private static func resolveStoreURL() -> URL {
         let env = ProcessInfo.processInfo.environment
         if let override = env["ARCHIVEPROC_TAGVOCAB_FILE"], !override.isEmpty {
             return URL(fileURLWithPath: override)
         }
         let fm = FileManager.default
         let base: URL
-        if env["ARCHIVEPROC_HEADLESS"] != nil {
+        if KeychainHelper.isHeadlessTestMode {
             base = fm.temporaryDirectory.appendingPathComponent("ArchiveProcessor-TagVocabTest",
                                                                 isDirectory: true)
         } else {

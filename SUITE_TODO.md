@@ -225,7 +225,11 @@ exit 0, "✓ clean".
   before install), and `arm.sh` installs from the PRIMARY checkout's working tree — a fix landed via
   worktree+push is not live until the primary is fast-forwarded and the owner re-arms. Do NOT make the gate
   fail on a pre-existing violation without checking a clean tree passes first: both scripts are green on
-  `1460125`.
+  `1460125`. ➕ **Same gap, same fix, added 2026-08-06:** `ArchiveProcessor/scripts/test-tag-vocabulary.sh`
+  (shipped by `W26.vocab`) also has no caller — it is the Tier-2 gate on the tag-write vocabulary hook and
+  the `$HOME`-walk prohibition, and it takes ~1 min, so wire it in with the other two. It needs no key, no
+  network and no GUI, and it is self-contained (`mktemp -d`, `-outputDirectory` in the volatile argument
+  domain), so it is safe on the gate. Green on `a25ee02`.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -301,15 +305,20 @@ cache with no migration or legacy-state fallback, as directed. Fixture roots ans
 index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
 been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
 not run for this item and are carried into `W26.verify`.**
-- [ ] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low ·
-  Tier-1 · needs: none] (blocked-on: W26.walk1).** Its `NSMetadataQueryUserHomeScope` +
-  `kMDItemUserTags LIKE "*"` harvests every tag in the **whole home folder** — a scope no per-root walk
-  reproduces. Replace with a monotonically-growing persisted vocabulary fed by: every root either app has
-  been pointed at, every tag the user types (`register(_:)` already does this), and every `TagWriter` write;
-  seeded by walking the **known archive roots**, never `$HOME`. **Accept and document the narrowing** —
-  tags on unrelated personal files stop appearing, which is an improvement for an archival tagging UI.
-  **Do not walk `$HOME` to emulate Spotlight** (slow, invasive, trips TCC across unrelated dirs).
-  **Test:** vocabulary survives relaunch, accumulates across roots, and no `$HOME` walk occurs.
+- [ ] **W26.vocab-fu1 — ArchiveCore: a missing or unopenable ROOT is not `rootUnreadable` [S · low ·
+  Tier-1].** Filed 2026-08-06 by `W26.vocab`, measured not inferred: for a root directory that does not
+  exist, `FileManager.enumerator(at:)` still returns a live enumerator, reports the root to the
+  `errorHandler`, and ends — so `CorpusWalker.scan` comes back `completed == true`,
+  `rootUnreadable == false`, `filesSeen == 0`, with the root itself in `directoryErrors`. A walk that read
+  **nothing** is therefore indistinguishable from a walk that **found** nothing to any caller gating on
+  `completed`. **The Reader is NOT affected** — it gates absence on `isClean`, which is false here — and
+  `W26.vocab` fixed its own harvest with a local `mayStamp` predicate, so nothing is broken today. The
+  question is whether `rootUnreadable` should mean what its name says, which is ArchiveCore's call, not a
+  Processor item's. ⚠️ If it changes, it changes a field Reader `DiscoveryHealth` branches on (a missing
+  root would start reporting "could not read the archive folder" instead of a generic degraded state —
+  more accurate, but a user-visible message change), and `W26.vocab`'s local `mayStamp` should then be
+  deleted rather than left as a second opinion. **Test:** a scan of a nonexistent and of a `0o000` root
+  each report `rootUnreadable`; the existing walk1/walk2 `isClean` assertions stay green.
 - [ ] **W26.oracle — Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` [S · low · Tier-1 ·
   needs: none].** `ArchiveProcessor/scripts/assert_mac.py:43` reads Finder tags via
   `sh("mdls", "-name", "kMDItemUserTags", p)` (consumed `:44`, `:55`). **During the 2026-08-04 incident this
@@ -847,6 +856,16 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   the never-mutate-live-root hazard; inject a throwaway defaults instead. **Tier-2** (touches the security-scoped
   bookmark store) — adversarial review; daemon-buildable (build + Reader unit tests, scratch-only). Restores
   coverage + removes the skip. | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/RootFolderStore.swift, Tests/ArchiveReaderTests/DeepLinkTests.swift, ops/autonomous/health-gate.sh | S–M | low | none
+  🔺 **ESCALATED 2026-08-06 — it no longer fails, it HANGS, and it reads the real corpus while it does.**
+  Observed while running the Reader lane for `W26.vocab`: the case sat for **6+ minutes with no progress**
+  and had to be killed. The mechanism is the same defaults leak, but Wave 26 changed what happens next —
+  discovery used to hand the picked-up real root to Spotlight (an instant empty answer on a dead index,
+  which is the whole incident) and now hands it to `CorpusWalker`, which dutifully walks ~123k real files
+  from inside a unit test. So the artifact went from "one red assertion" to "a multi-minute unit run that
+  touches `~/Desktop/Google Drive/Archival Photos`". Read-only, and nothing writes — but a test bundle has
+  no business reading the corpus at all, and any future lane that runs the suite WITHOUT the
+  `-skip-testing` line now stalls rather than reporting a failure. This makes the item's priority
+  higher than "restore coverage": it is now also a real-corpus-contact and a wall-clock problem.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
