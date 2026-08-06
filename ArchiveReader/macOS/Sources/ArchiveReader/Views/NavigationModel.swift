@@ -814,7 +814,18 @@ final class NavigationModel: ObservableObject {
         panel.prompt = "Choose Archive Root"
         panel.message = "Choose the folder that contains your tagged archive PDFs."
         if panel.runModal() == .OK, let url = panel.url {
-            rootStore.setRoot(url)
+            // A refused pick used to be an `NSLog` and nothing else — no root, no scan, and a window
+            // that looked exactly as it had before the panel opened. Say why, and leave the previous
+            // root's view state alone rather than tearing it down for a root we did not get.
+            // (`W26.symroot-fu1`.)
+            if let refusal = rootStore.setRoot(url) {
+                statusMessage = refusal.message
+                announce(statusMessage)
+                return
+            }
+            // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
+            // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
+            guard let adopted = rootStore.root else { return }
             // A scope from the old root can't apply to a new one.
             scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil
             indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
@@ -833,7 +844,7 @@ final class NavigationModel: ObservableObject {
             ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
                                  // (which passes the `generation == ftsGeneration` guard) can't repopulate
                                  // ftsPaths with stale old-root paths after the new library loads.
-            library.start(scope: url, markerGUID: rootStore.rootMarker?.guid)
+            library.start(scope: adopted, markerGUID: rootStore.rootMarker?.guid)
         }
     }
 
