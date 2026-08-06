@@ -2,6 +2,26 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever
+
+**Found 2026-08-06** by `W26.fsev-fu1`, which bounded the *stream*'s `open(2)` and measured that the *walk*'s
+own probe had no bound at all. `CorpusWalker.rootIsOpenable` calls `opendir(3)` on the same root, on its
+dedicated `Thread`; under an unanswered TCC prompt, a stalled network/cloud mount or a disconnected volume it
+does not return, the pass never reaches `finish`, and `LibraryPhase` stays `.firstScan(done: 0, seen: 0)` —
+which `LibraryEmptyState` reads as `.scanning`. So the status bar was honest about live updates while the
+list beneath it blanked behind a spinner that would never stop.
+
+**Fixed 2026-08-06 (`5b4a8c8` → completion commit).** A pass that has examined **zero** files after
+`scanStallTimeout` (5 s) publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"*. It is a
+**reported** deadline, not a cancellation, because a thread blocked in `opendir` cannot be interrupted: the
+walk keeps running and supersedes the verdict if it returns, and so does the first file it sees. The verdict
+grants nothing — `.degraded` is not settled, so no content-index pruning and no authoritative absence.
+
+⚠️ **The thread is still stuck.** Nothing here makes an unopenable root openable, or reclaims the thread and
+security scope that a stalled walk holds for the life of the process. What changed is that the app says so
+and stays usable. If you are diagnosing a Reader that reports this, the problem is the volume or the
+permission prompt, not the app.
+
 ## ✅ FIXED (`W26.fsev-fu1`) — the app could hang at launch, with no window, starting the FSEvents stream
 
 **Found 2026-08-06** while shipping `W26.vocab-fu1`, from a stack sample rather than a reading. A Reader
@@ -27,15 +47,16 @@ responding"* (`DiscoveryFailure.liveUpdatesStalled`) instead of stalling silentl
 is still adopted and pays for the interval it missed with exactly one catch-up pass. Full entry, including
 the three non-obvious decisions and the mutation results, in `SUITE_TODO_DONE.md` §Wave 26.
 
-⚠️ **The walk's own `opendir` still has no deadline** — a root that will not open leaves the list in
-`.firstScan` indefinitely even though the status bar is now honest about it. That half is `W26.fsev-fu2`.
+✅ **The walk's own `opendir` now has a deadline too** — see the `W26.fsev-fu2` entry above. Its probe still
+blocks; the difference is that the list stops claiming to be scanning and says the folder has not answered.
 
 **Practical consequence for testing — UNCHANGED, still skip it.** The long-known `DeepLinkTests` environment
 artifact (`testRevealAndSelectNoRoot` picks up the owner's real persisted `archiveRootBookmark`) presented as
 a **hang of the entire `ArchiveReaderTests` bundle** through this code path. The main-thread half of that is
 gone by construction, but whether the bundle still hangs is **not verified**: confirming it means provoking a
 TCC prompt on the owner's physical screen, which an unattended session may not do — and `CorpusWalker`'s
-`opendir` can block on the same root anyway (`W26.fsev-fu2`). Keep running the unit lane with
+`opendir` can still block on the same root (`W26.fsev-fu2` bounded the *report*, not the syscall), which
+leaves a test that waits on the library waiting. Keep running the unit lane with
 `-skip-testing:ArchiveReaderTests/DeepLinkTests`. Proper isolation of the test itself is
 `W20.deeplink-isolation`.
 

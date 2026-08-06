@@ -394,8 +394,17 @@ check all eight consumers before removing it.
 > without live events and the UI says *"Archive folder is not responding"*
 > (`DiscoveryFailure.liveUpdatesStalled`); a stream that returns late is still adopted and owes exactly one
 > catch-up pass. **Anything that reintroduces a synchronous `start()` on the main actor — including a lock
-> inside `CorpusWatcher`, which a stuck `start()` would hold against `stop()` — reintroduces the hang.** The
-> *walk's own* `opendir` deadline is still missing: `W26.fsev-fu2`.
+> inside `CorpusWatcher`, which a stuck `start()` would hold against `stop()` — reintroduces the hang.**
+>
+> ✅ **The walk's own deadline landed 2026-08-06 as `W26.fsev-fu2`.** `CorpusWalker`'s `opendir(3)` probe
+> blocks on the same root, so a pass that has examined **zero** files after `scanStallTimeout` (5 s) now
+> publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"*, the list's own half of what
+> `liveUpdatesStalled` says about the refresh channel. **Reported, not cancelled**: a blocked `opendir`
+> cannot be interrupted, so the walk keeps running and either its first examined file or its completion
+> withdraws the verdict, through the generation token that already existed. It is deliberately **not** routed
+> through `DiscoveryHealth` and grants no pruning and no authoritative absence — §7a.4's gate is unchanged,
+> because `.degraded` is not settled. This is also what makes §5.6's forced decision (a SYNCHRONOUS walker)
+> safe to keep: the blocking call is still blocking, but it can no longer silence the UI.
 
 The shipped implementation is `ArchiveReader/.../Search/CorpusWatcher.swift` plus the bounded merge/scheduler
 in `ArchiveLibrary`. It starts the stream before the launch walk (so there is no scan→watch gap), reads every

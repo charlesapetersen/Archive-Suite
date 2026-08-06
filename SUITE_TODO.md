@@ -305,20 +305,15 @@ cache with no migration or legacy-state fallback, as directed. Fixture roots ans
 index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
 been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
 not run for this item and are carried into `W26.verify`.**
-- [ ] **W26.fsev-fu2 — a first scan against a root that will not open spins "Scanning…" forever; only the
-  *stream* half got a deadline [S · low · Tier-1 · needs: none].** Filed 2026-08-06 by `W26.fsev-fu1`,
-  which measured the remaining half of the same stall rather than inferring it. That item bounded the
-  FSEvents stream's `open(2)` with `watcherStartTimeout`, so an unopenable root now draws a window and says
-  *"Archive folder is not responding"*. But `CorpusWalker`'s own `opendir(3)` probe blocks on exactly the
-  same root, on its dedicated `Thread`, with **no deadline at all** — so `LibraryPhase` stays
-  `.firstScan(done: 0, seen: 0)` indefinitely and `phase.failure` never becomes `.rootUnreadable`. The
-  status bar is honest (the live-update channel says so) while the list's own state is not, which is the
-  exact split this wave exists to close. ⚠️ Cancelling a blocked `opendir` is not possible either, so the
-  fix is a *reported* deadline, not a cancellation: after N seconds with zero files seen, publish a
-  degraded phase that says the folder has not answered, and let a late-arriving pass supersede it (the
-  generation token already permits that). Do NOT make the timeout a reason to prune or to treat absence as
-  authoritative — `DiscoveryHealth` must still refuse that. **Test:** a first scan whose walk never returns
-  reaches a stated degraded phase, and a pass that finishes after the deadline still publishes its rows.
+✅ **W26.fsev-fu2 — SHIPPED 2026-08-06 (this commit); full entry in `SUITE_TODO_DONE.md`.** The walk now has
+the deadline the stream got in `W26.fsev-fu1`. A pass that has examined **zero** files after
+`scanStallTimeout` (5 s) publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"* — instead
+of leaving the list in `.firstScan(done: 0, seen: 0)` behind a spinner for ever. Reported, never cancelled: a
+thread blocked in `opendir` cannot be interrupted. It grants nothing (`.degraded` is not settled, so no
+pruning and no authoritative absence, and it is set directly rather than through `DiscoveryHealth`, whose
+contract is about FINISHED passes); a late pass supersedes it through the existing generation token, and so
+does the first file seen. `requestRootRescan` had to learn about it too — ⌘⌥R while stalled would otherwise
+have reset the phase to "Scanning…" while `drainWatchWork` refused to start anything.
 - [ ] **W26.symroot — an archive root that is ITSELF a symlink cannot be discovered at all [S · low ·
   Tier-2 · needs: none].** Filed 2026-08-06 by `W26.vocab-fu1`, measured while writing its openability
   probe: `FileManager.enumerator(at:)` **refuses a root that is a symbolic link** — it reports the link to

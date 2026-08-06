@@ -18,6 +18,61 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.fsev-fu2 — a first scan against a root that will not open no longer spins "Scanning…" for ever
+  [S · low · Tier-1]. ✅ SHIPPED 2026-08-06** — `5b4a8c8` (the deadline) → this commit (5 tests, 4 mutants,
+  the lanes, trackers).
+
+  **The defect.** `W26.fsev-fu1` bounded the FSEvents stream's `open(2)`, so an unopenable root drew a window
+  and the status bar said *"Archive folder is not responding"*. `CorpusWalker`'s own `opendir(3)` probe
+  blocks on the **same** root, on its dedicated `Thread`, with no bound at all — the pass never reaches
+  `finish`, `LibraryPhase` stays `.firstScan(done: 0, seen: 0)`, and `LibraryEmptyState` reads that as
+  `.scanning`. An honest status bar above a list-blanking spinner that lies for ever, which is precisely the
+  "I could not look" / "there is nothing here" split this wave exists to close.
+
+  **Reported, not cancelled — forced, not chosen.** A thread blocked in `opendir`/`readdir` cannot be
+  interrupted, and `ScanCancellation` is only consulted between directory entries, which a stalled probe
+  never reaches. So `scanStallTimeout` (5 s) changes what the app *says*, not what it is doing: a pass that
+  has examined **zero** files by then publishes `.degraded(.scanStalled)` — a new `DiscoveryFailure` case,
+  *"Archive folder has not answered"*, distinct from `liveUpdatesStalled` (which is about the refresh
+  channel, with a real list underneath) and from `rootUnreadable` (which is a finished answer).
+
+  **Five seconds, not the stream's two, and keyed on files rather than time alone.** A healthy walk emits its
+  first 500-file batch in ~40 ms (measured: 123,028 files in 10.15 s), so five seconds with nothing seen
+  means the root probe itself has not returned. One examined file proves the pass is past that probe, so
+  `filesSeenInCurrentPass` — tracked for revalidations too, which record no visible progress but hang just as
+  readily — is the discriminator. ⚠️ Known and accepted: a root of **fewer than 500 files** emits no progress
+  until the walk ends, so a genuinely slow small folder can draw the sentence for the second or two before
+  its pass lands. Self-correcting, and never authoritative.
+
+  **It grants nothing.** `.degraded` is not settled, so no content-index pruning and no authoritative
+  absence — and the phase is set **directly** rather than through `DiscoveryHealth`, deliberately: that type
+  judges a *finished* pass, and every caller of `isSettled` is entitled to assume a phase it produced
+  describes one. The empty state says `couldNotLook`, never `.nothingTagged` / `.folderIsEmpty`.
+
+  **Two supersedings, not one.** A late pass withdraws the verdict through the generation token that already
+  existed — and so does the first progress callback, because a walk that is producing rows must not keep a
+  phase the empty state reads as "could not look". Without that, the wrong sentence would stand for the whole
+  remaining duration of a walk that had merely been slow to start.
+
+  **The non-obvious edit.** `requestRootRescan` optimistically resets the phase to a scanning one whenever it
+  is asked for a re-walk. ⌘⌥R is the likeliest thing an owner staring at "has not answered" will press — and
+  the failure's own tooltip says it will not force the stalled read to return — while `drainWatchWork`
+  refuses to start anything with the stalled walk still in flight. Unguarded, the press would have put back
+  the exact silent spinner this item removes.
+
+  **Mutation-tested, four mutants, each caught by a named test:** removing the report entirely (the pre-fix
+  behaviour — kills 4 of the 5 tests, the survivor being the one that asserts a stall must *not* happen);
+  dropping the zero-files discriminator; dropping the `requestRootRescan` guard; dropping the
+  progress-withdrawal. Honest limit: `finish`'s `cancelScanStallDeadline()` is defence-in-depth whose only
+  real window — a deadline firing during a slow SQLite commit after an empty-folder pass — I could not make
+  deterministic; the `inFlight != nil` guard is what closes the general case.
+
+  **Verification.** Reader Debug **354/354** executed unit tests (349 before; known `DeepLinkTests` env
+  artifact excluded), 0 source warnings; Reader Release clean; write-surface lint clean + self-test 14/14;
+  **Reader XCUITests 17/17 in the headless Tart VM** (its fixture again indexed 0/11 by Spotlight while the
+  app listed everything). No ArchiveCore change, so no cross-app rebuild was owed. No host-screen automation,
+  no real-corpus access; scratch corpora and scratch SQLite files only.
+
 - [x] **W26.fsev-fu1 — `FSEventStreamCreate` no longer opens the root on the MAIN THREAD at launch
   [S · med · Tier-2]. ✅ SHIPPED 2026-08-06** — `a4aced6` (the sequencing + 5 tests) → this commit (the
   identity case, the suite-wide lanes, the VM lane, trackers).
