@@ -110,6 +110,69 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.reinfect — the approved JPEGS-index item can no longer re-introduce `NSMetadataQuery`
+  [S · low · Tier-1]. ✅ SHIPPED 2026-08-06** — `39d1567` (the rewrite + the tag + the edge) → this commit
+  (the tracker move + the plan's Site 7).
+
+  **What it was.** `SUITE_TODO.md` §"PDF + JPEG dual image reference" §2 read *"Detection: index the JPEGS
+  tree (**a second `NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of partners need
+  relocation resolution no path rule can do."* Open, owner-approved, and therefore the one place in the
+  backlog that could have put Spotlight back into the codebase Wave 26 exists to clear. `despotlight.md`
+  §"Site 7" called it the highest-value find in the doc lane, and it was right to.
+
+  **What shipped.** The requirement is untouched — the relocation problem is real and no path rule solves
+  it. Only the mechanism changed: `ArchiveCore.CorpusWalker` over the JPEGS subtree, `scanFingerprints`
+  (one following `stat(2)` per file, **no** per-file tag read, since a partner lookup needs no tags),
+  building `stem → [path]` plus collection context. The resolution order (exact mirrored subpath → indexed
+  stem in collection context → refuse when ambiguous) is unchanged.
+
+  **Three things the rewrite could say that the original could not**, each from measuring rather than
+  reading:
+  - **It is a second SUBTREE, not a second root** — and this is what changed the blocking edge. `Archival
+    Photos JPEGS` is a **sibling of** `Archival Photos` under `~/Desktop/Google Drive/` (measured
+    read-only today), so design decision #1's root raise *already contains it*: no second bookmark, and it
+    is already inside what `CorpusWatcher` watches and `LibraryIndex` keys on. The same measurement says
+    the JPEGS tree is **163,106 files** (4.8 s to enumerate) against the main tree's 123,302 — so the root
+    raise roughly **doubles every cold walk** (~286k files). The item therefore got
+    `(blocked-on: W26.walk2, W26.verify)`, **not** the `(blocked-on: W26.walk1)` `W26.reinfect` specified:
+    `walk2` because raising the root while discovery was still Spotlight-only would have put 286k files at
+    the mercy of the index that failed on 2026-08-04, and `verify` because its 100k+ scale lane — never yet
+    run — is the measurement that says whether doubling the walk is affordable at all.
+  - **Absence must stay distinguishable from failure.** "No partner" **hides the switch**, so it may only
+    be concluded from a clean pass; an incomplete or denied JPEGS walk means *partner unknown*.
+    `CorpusScanResult` already separates the two. This is `W26.deny`'s defect written down for a second
+    consumer **before that consumer exists**, which is the only cheap moment to do it.
+  - **Storage is an open sub-decision**, now named instead of left implicit: a stem table inside the
+    existing `LibraryIndex` SQLite DB (which already carries untracked rows — `entry.tracked` +
+    `entry_root_tracked` — and the warm-start/revalidation machinery a separate index would duplicate)
+    inherits its byte-exact path contract and therefore `W26.symroot`'s open question.
+
+  **The item had no tag, and that was the actual reason it kept going stale.** Both `W26.reinfect` and
+  `despotlight.md` §Site 7 cite it as `SUITE_TODO.md:1048`; it was at line 1384 by the time this ran — 336
+  lines out. It is now **`W24.jpeg1`** (the `W24.*` namespace already holds owner-decided items that are
+  not for the daemon queue, e.g. `W24.cal1`).
+
+  **The `(blocked-on:)` clause is documentation and deliberately cannot be more than that.**
+  `next-queue-item.sh` draws its *candidates* from the plan's `## WORK QUEUE` region only — it reads
+  `SUITE_TODO` just to resolve tag state — and `W24.jpeg1` is kept out of that region on purpose, because
+  §3 changes `DurableLink`, a cross-app contract, making it owner-gated. Mirroring the line into the plan
+  to "make the edge live" would make the item **daemon-pickable**, i.e. the exact opposite of the intent.
+  What keeps the daemon off it is its absence from the plan queue; the tag and edge are for the human who
+  eventually picks it up.
+
+  **Gate, and the one honest deviation from it.** The item's test was *"`grep -n "NSMetadataQuery"
+  SUITE_TODO.md` returns nothing outside Wave 26's historical notes"*. It now returns **one** hit outside
+  §Wave 26: the superseded clause, quoted inside the annotation that replaces it. That is deliberate —
+  deleting it would erase the record that the mechanism was *changed by decision* rather than lost in an
+  edit, and it is the same "passage explicitly annotated as history" carve-out `despotlight.md` §7a.7
+  already had to add to `W26.verify`'s own grep for the same reason. `W26.verify`'s grep is unaffected
+  either way: it covers `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and `scripts/`, not root
+  markdown. The second half of the test (*"`next-queue-item.sh` reports the JPEGS item as
+  `blocked:W26.walk1`"*) was already flagged stale on 2026-08-05; it is worse than stale — the script never
+  prints that item at all, for the structural reason above.
+
+  **Nothing filed.** No code was touched; this is a Tier-1 tracker change.
+
 - [x] **W26.oracle — the E2E test oracle reads Finder tags from the xattr, not `mdls` [S · low · Tier-1].
   ✅ SHIPPED 2026-08-06** — `50ea4a1` (the shared reader + the byte-identical predecessor proof) → this
   commit (the swap, the gate, the trackers).

@@ -387,19 +387,6 @@ explain why not.
   not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
   see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
   message naming the unreadable read, in `none` and `automatic` alike.
-- [ ] **W26.reinfect — stop the approved JPEGS item from re-introducing `NSMetadataQuery` [S · low ·
-  Tier-1 · needs: none].** `SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the
-  JPEGS tree (**a second `NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of
-  partners need relocation resolution no path rule can do."* If it ships during this wave it re-infects the
-  codebase with the exact dependency the owner is removing. Rewrite it to a **walk-built stem index** (same
-  `CorpusWalker`, second root) and add `(blocked-on: W26.walk1)` to it. **Unblocked — do this early; it is
-  cheap and every day it is undone is a day the re-infection can land.** **Test:**
-  `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's historical notes.
-  ⚠️ **The second half of that test is now STALE (2026-08-05):** it said `next-queue-item.sh` must report the
-  JPEGS item as `blocked:W26.walk1`, but `W26.walk1` has SHIPPED, so that edge resolves as `ok` the moment it
-  is added. That is fine — the edge existed to stop the item shipping before a walker existed, and one does
-  now — but do not chase the `blocked:` string. If the rewritten item needs the Reader-side second-root
-  plumbing rather than just the walker, point it at `W26.walk2` instead and say why.
 - [ ] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none]
   (blocked-on: W26.walk2).** `ArchiveReader/scripts/make-gui-fixture.sh` (lines 16, 179, 186) and
   `smoke-setup.sh` (lines 22, 26) force-index fixture copies then **poll `mdfind` until tags appear** — a

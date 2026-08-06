@@ -91,13 +91,25 @@ original inventory.
 > plan: every `mdls`/`mdfind` site under a `mktemp`/`/tmp` path is presumed BLIND, not merely slow — check
 > whether the site's location is indexable before writing down what its failure mode was.**
 
-### Site 7 — a **future re-infection** already approved in the backlog
+### Site 7 — a **future re-infection** already approved in the backlog — ✅ CLOSED 2026-08-06
 
-`SUITE_TODO.md:1048` (open, owner-decided) specifies *"Detection: index the JPEGS tree (**a second
-`NSMetadataQuery`**). This is **REQUIRED, not an optimisation** — 80.1% of partners need relocation
-resolution no path rule can do."* If that ships before or during this wave it **re-introduces the exact
-dependency the owner is removing.** Rewrite it to a walk-built stem index (same walker, second root) and
-add a `(blocked-on: W26.walk1)` edge so it cannot start first. Highest-value find in the doc lane.
+The item (open, owner-decided) specified *"Detection: index the JPEGS tree (**a second `NSMetadataQuery`**).
+This is **REQUIRED, not an optimisation** — 80.1% of partners need relocation resolution no path rule can
+do."* Shipping it before or during this wave would have **re-introduced the exact dependency the owner is
+removing.** Highest-value find in the doc lane, and it is now shut: §2 is a walk-built stem index over the
+JPEGS subtree (`CorpusWalker.scanFingerprints`), with the requirement itself untouched.
+
+Two corrections this plan owes the reader, both from measuring rather than reading (full record in
+`SUITE_TODO_DONE.md` → `W26.reinfect`):
+- **"same walker, second root" was wrong** — `Archival Photos JPEGS` is a *sibling* of `Archival Photos`
+  under `~/Desktop/Google Drive/`, so design decision #1's root raise already contains it. It is a second
+  **subtree** of one root, needing no second bookmark.
+- **`(blocked-on: W26.walk1)` was too weak.** The JPEGS tree is **163,106 files** against the main tree's
+  123,302, so the root raise roughly **doubles every cold walk** (~286k). The edge shipped as
+  `(blocked-on: W26.walk2, W26.verify)`.
+
+The item also had **no tag** — which is why this section and `W26.reinfect` both cited it as
+`SUITE_TODO.md:1048`, a line number 336 lines stale by the time the work ran. It is now **`W24.jpeg1`**.
 
 ### Site 8 — a load-bearing claim that may itself rest on a Spotlight myth
 
@@ -691,14 +703,14 @@ each leaving the app **working**.
 | `W26.idx` | ✅ **SHIPPED in completion commit** — SQLite warm start; byte-exact root/path identity; stat/ctime revalidation; honest provenance; cache-write and dataless guards | L | med | 2 | none | `W26.walk2` |
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |
 | `W26.oracle` | Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` | S | low | 1 | none | — |
-| `W26.reinfect` | Rewrite the open JPEGS-index item off `NSMetadataQuery` + add its blocking edge | S | low | 1 | none | — |
+| `W26.reinfect` | ✅ **SHIPPED in completion commit** — JPEGS §2 is a walk-built stem index; item tagged `W24.jpeg1`; edge `(blocked-on: W26.walk2, W26.verify)`, not `walk1` (§Site 7) | S | low | 1 | none | — |
 | `W26.scripts` | Fixture scripts drop `mdimport`/`mdfind` polling | S | low | 1 | none | `W26.walk2` |
 | `W26.docs` | Docs/SPEC stop claiming Spotlight (incl. `ArchiveReader/CLAUDE.md:106`) | S | low | 1 | none | `W26.walk2` |
 | `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab`, `W26.oracle`, `W26.reinfect`, `W26.deny`, `W26.lint` |
 
-`W26.oracle` and `W26.reinfect` are **unblocked and can go first** — neither depends on the walker.
-`W26.reinfect` is deliberately early: it is cheap, and every day it is undone is a day the JPEGS item
-could ship a second `NSMetadataQuery` into the codebase this wave exists to clear.
+`W26.oracle` and `W26.reinfect` were **unblocked and went first** — neither depends on the walker.
+`W26.reinfect` was deliberately early: it is cheap, and every day it stayed undone was a day the JPEGS item
+could ship a second `NSMetadataQuery` into the codebase this wave exists to clear. Both are now shipped.
 
 **`W26.deny` goes first and is not optional.** It is a live Core Directive violation (§4a.1b), it is
 independent of Spotlight, and every later item builds on the corrected primitive. **`W26.lint` closes a
@@ -719,8 +731,11 @@ writer.
   paid Gemini run (see `SUITE_TODO_DONE.md` for what actually replaced it), and `W26.deny`'s probe wording
   (`XATTR_NOFOLLOW`, "a returned size of 0") is corrected in §4a.1. The gate bullets for the still-OPEN items
   below are untouched.
-- `W26.reinfect` — `grep -n "NSMetadataQuery" SUITE_TODO.md` returns nothing outside Wave 26's own
-  historical notes, and `next-queue-item.sh` reports the JPEGS item as `blocked:W26.walk1`.
+- ✅ `W26.reinfect` — met, with one deliberate deviation recorded in `SUITE_TODO_DONE.md`: the grep returns
+  **one** hit outside §Wave 26, the superseded clause quoted inside the annotation that replaces it, which
+  is §7a.7's "explicitly annotated as history" carve-out. The gate's second half was unsatisfiable, not
+  merely stale: `next-queue-item.sh` can never report the JPEGS item as `blocked:` anything, because it
+  draws candidates from the plan's `## WORK QUEUE` only and that item is owner-gated, so it is kept out.
 - `W26.verify` — full-scale run against a **scratch copy** (never the real corpus), 100k+ files:
   timings, memory ceiling, no-write assertion across the whole tree, and cancel-mid-walk leaves no
   partial removals.
